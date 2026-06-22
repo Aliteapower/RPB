@@ -1,0 +1,20 @@
+spring:
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+security:
+  jwt:
+    secret: test-only-not-used
+
+rpb:
+  local-auth:
+    enabled: false
