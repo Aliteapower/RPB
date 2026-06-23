@@ -36,6 +36,7 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/queue-tickets").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/queue-tickets/*/call").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/queue-tickets/*/skip").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/queue-tickets/*/rejoin").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/queue-tickets/*/seating/direct").permitAll()
                 .anyRequest().denyAll()
             )

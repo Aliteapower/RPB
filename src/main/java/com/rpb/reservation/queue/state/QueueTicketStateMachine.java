@@ -19,7 +19,7 @@ public final class QueueTicketStateMachine implements StateMachine<QueueTicketSt
     static {
         ALLOWED.put(QueueTicketStatus.WAITING, EnumSet.of(QueueTicketStatus.CALLED, QueueTicketStatus.CANCELLED, QueueTicketStatus.EXPIRED));
         ALLOWED.put(QueueTicketStatus.CALLED, EnumSet.of(QueueTicketStatus.SEATED, QueueTicketStatus.SKIPPED, QueueTicketStatus.CANCELLED, QueueTicketStatus.EXPIRED));
-        ALLOWED.put(QueueTicketStatus.SKIPPED, EnumSet.of(QueueTicketStatus.REJOINED, QueueTicketStatus.CANCELLED, QueueTicketStatus.EXPIRED));
+        ALLOWED.put(QueueTicketStatus.SKIPPED, EnumSet.of(QueueTicketStatus.WAITING, QueueTicketStatus.REJOINED, QueueTicketStatus.CANCELLED, QueueTicketStatus.EXPIRED));
         ALLOWED.put(QueueTicketStatus.REJOINED, EnumSet.of(QueueTicketStatus.WAITING, QueueTicketStatus.CALLED, QueueTicketStatus.CANCELLED, QueueTicketStatus.EXPIRED));
     }
 

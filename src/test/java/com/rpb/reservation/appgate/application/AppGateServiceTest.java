@@ -237,6 +237,23 @@ class AppGateServiceTest {
     }
 
     @Test
+    void visibleAppsRecognizesQueueRejoinAsReservationQueuePermission() {
+        when(entitlements.findAllByTenantId(TENANT_ID)).thenReturn(List.of(entitlement("enabled", null)));
+        when(storeSettings.findAllByTenantIdAndStoreId(TENANT_ID, STORE_ID)).thenReturn(List.of(storeSetting(true, true)));
+        when(platformApps.findAllByStatusOrderBySortOrderAscAppKeyAsc("active"))
+            .thenReturn(List.of(platformApp("active")));
+
+        List<AppGateAppEntry> apps = service.visibleApps(
+            actor(Set.of(STORE_ID), Set.of("queue.rejoin")),
+            STORE_ID
+        );
+
+        assertThat(apps).hasSize(1);
+        assertThat(apps.get(0).appKey()).isEqualTo(APP_KEY);
+        assertThat(apps.get(0).permissions()).containsExactly("queue.rejoin");
+    }
+
+    @Test
     void visibleAppsRecognizesQueueViewAsReservationQueuePermission() {
         when(entitlements.findAllByTenantId(TENANT_ID)).thenReturn(List.of(entitlement("enabled", null)));
         when(storeSettings.findAllByTenantIdAndStoreId(TENANT_ID, STORE_ID)).thenReturn(List.of(storeSetting(true, true)));

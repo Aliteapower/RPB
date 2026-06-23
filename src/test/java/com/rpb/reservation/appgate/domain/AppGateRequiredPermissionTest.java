@@ -41,6 +41,11 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void queueRejoinPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.QUEUE_REJOIN).isEqualTo("queue.rejoin");
+    }
+
+    @Test
     void queueViewPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.QUEUE_VIEW).isEqualTo("queue.view");
     }
@@ -60,6 +65,7 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.QUEUE_CALL,
                 AppGateRequiredPermission.QUEUE_SEAT,
                 AppGateRequiredPermission.QUEUE_SKIP,
+                AppGateRequiredPermission.QUEUE_REJOIN,
                 AppGateRequiredPermission.QUEUE_VIEW
             );
     }

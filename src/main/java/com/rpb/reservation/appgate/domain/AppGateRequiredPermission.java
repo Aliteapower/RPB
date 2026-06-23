@@ -12,6 +12,7 @@ public final class AppGateRequiredPermission {
     public static final String QUEUE_CALL = "queue.call";
     public static final String QUEUE_SEAT = "queue.seat";
     public static final String QUEUE_SKIP = "queue.skip";
+    public static final String QUEUE_REJOIN = "queue.rejoin";
     public static final String WALKIN_DIRECT_SEATING_CREATE = "walkin.direct_seating.create";
     public static final String CLEANING_START = "cleaning.start";
     public static final String CLEANING_COMPLETE = "cleaning.complete";
@@ -26,6 +27,7 @@ public final class AppGateRequiredPermission {
         QUEUE_CALL,
         QUEUE_SEAT,
         QUEUE_SKIP,
+        QUEUE_REJOIN,
         WALKIN_DIRECT_SEATING_CREATE,
         CLEANING_START,
         CLEANING_COMPLETE

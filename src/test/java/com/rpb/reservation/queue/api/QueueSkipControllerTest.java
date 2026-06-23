@@ -55,6 +55,11 @@ class QueueSkipControllerTest {
         "src/main/java/com/rpb/reservation/queue/api/QueueSkipApiErrorResponse.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueSkipApiMapper.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueRejoinApiErrorCode.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueRejoinApiErrorMapper.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueRejoinApiErrorResponse.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueRejoinApiMapper.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -68,6 +73,8 @@ class QueueSkipControllerTest {
         "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueApiErrorResponse.java",
         "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueApiMapper.java",
         "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueController.java",
+        "src/main/java/com/rpb/reservation/queue/api/RejoinQueueTicketRequest.java",
+        "src/main/java/com/rpb/reservation/queue/api/RejoinQueueTicketResponse.java",
         "src/main/java/com/rpb/reservation/queue/api/SkipQueueTicketRequest.java",
         "src/main/java/com/rpb/reservation/queue/api/SkipQueueTicketResponse.java"
     );

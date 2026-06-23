@@ -30,6 +30,7 @@ public record QueueTicket(
     Instant calledAt,
     Instant expiresAt,
     Instant skippedAt,
+    Instant rejoinedAt,
     String note
 ) {
 
@@ -80,6 +81,7 @@ public record QueueTicket(
             calledAt,
             expiresAt,
             null,
+            null,
             note
         );
     }
@@ -113,6 +115,7 @@ public record QueueTicket(
             null,
             null,
             null,
+            null,
             note
         );
     }
@@ -139,7 +142,45 @@ public record QueueTicket(
             null,
             null,
             null,
+            null,
             null
+        );
+    }
+
+    public QueueTicket(
+        QueueTicketId id,
+        StoreScope scope,
+        UUID queueGroupId,
+        CustomerId customerId,
+        UUID reservationId,
+        UUID walkInId,
+        QueueTicketNumber ticketNumber,
+        PartySize partySize,
+        BusinessDate businessDate,
+        QueueTicketStatus status,
+        Integer queuePosition,
+        Instant calledAt,
+        Instant expiresAt,
+        Instant skippedAt,
+        String note
+    ) {
+        this(
+            id,
+            scope,
+            queueGroupId,
+            customerId,
+            reservationId,
+            walkInId,
+            ticketNumber,
+            partySize,
+            businessDate,
+            status,
+            queuePosition,
+            calledAt,
+            expiresAt,
+            skippedAt,
+            null,
+            note
         );
     }
 
@@ -161,6 +202,7 @@ public record QueueTicket(
             calledAt,
             expiresAt,
             skippedAt,
+            rejoinedAt,
             note
         );
     }
@@ -181,6 +223,7 @@ public record QueueTicket(
             calledAt,
             expiresAt,
             skippedAt,
+            rejoinedAt,
             note
         );
     }
@@ -202,6 +245,29 @@ public record QueueTicket(
             calledAt,
             expiresAt,
             skippedAt,
+            rejoinedAt,
+            note
+        );
+    }
+
+    public QueueTicket rejoin(Instant rejoinedAt, int queuePosition) {
+        Objects.requireNonNull(rejoinedAt, "queue_ticket_rejoined_at_required");
+        return new QueueTicket(
+            id,
+            scope,
+            queueGroupId,
+            customerId,
+            reservationId,
+            walkInId,
+            ticketNumber,
+            partySize,
+            businessDate,
+            QueueTicketStatus.WAITING,
+            queuePosition,
+            null,
+            null,
+            skippedAt,
+            rejoinedAt,
             note
         );
     }

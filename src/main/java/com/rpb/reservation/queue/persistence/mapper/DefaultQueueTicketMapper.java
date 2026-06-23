@@ -36,6 +36,7 @@ public class DefaultQueueTicketMapper implements QueueTicketMapper {
             toInstant(entity.getCalledAt()),
             toInstant(entity.getExpiresAt()),
             toInstant(entity.getSkippedAt()),
+            toInstant(entity.getRejoinedAt()),
             entity.getNote()
         );
     }
@@ -58,7 +59,7 @@ public class DefaultQueueTicketMapper implements QueueTicketMapper {
             domain.queuePosition(),
             toOffsetDateTime(domain.calledAt()),
             toOffsetDateTime(domain.skippedAt()),
-            null,
+            toOffsetDateTime(domain.rejoinedAt()),
             toOffsetDateTime(domain.expiresAt()),
             null,
             domain.note(),
