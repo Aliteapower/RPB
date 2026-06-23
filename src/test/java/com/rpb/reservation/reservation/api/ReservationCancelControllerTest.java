@@ -11,9 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
-import com.rpb.reservation.reservation.application.ReservationCheckInError;
-import com.rpb.reservation.reservation.application.ReservationCheckInResult;
-import com.rpb.reservation.reservation.application.command.CheckInReservationCommand;
+import com.rpb.reservation.reservation.application.ReservationCancelError;
+import com.rpb.reservation.reservation.application.ReservationCancelResult;
+import com.rpb.reservation.reservation.application.command.CancelReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
@@ -34,14 +34,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class ReservationCheckInControllerTest {
-    private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/check-in";
-    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000701");
-    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000701");
-    private static final UUID OTHER_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000799");
-    private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000701");
-    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000701");
-    private static final Instant ARRIVED_AT = Instant.parse("2030-06-20T03:10:00Z");
+class ReservationCancelControllerTest {
+    private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/cancel";
+    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000981");
+    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000981");
+    private static final UUID OTHER_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000989");
+    private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000981");
+    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000981");
+    private static final Instant CANCELLED_AT = Instant.parse("2030-06-20T03:20:00Z");
 
     private ReservationCreateApplicationService createApplicationService;
     private ReservationCheckInApplicationService checkInApplicationService;
@@ -58,7 +58,7 @@ class ReservationCheckInControllerTest {
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
         cancelApplicationService = mock(ReservationCancelApplicationService.class);
-        actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.check_in"), Set.of(STORE_ID)));
+        actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.cancel"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders
             .standaloneSetup(new ReservationController(
                 createApplicationService,
@@ -82,62 +82,64 @@ class ReservationCheckInControllerTest {
     }
 
     @Test
-    void checksInConfirmedReservationAndMapsRequestToCommand() throws Exception {
-        when(checkInApplicationService.checkInReservation(any())).thenReturn(success(false));
+    void cancelsReservationAndMapsRequestToCommand() throws Exception {
+        when(cancelApplicationService.cancelReservation(any())).thenReturn(success(false));
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
-                .header("Idempotency-Key", " idem-check-in ")
+                .header("Idempotency-Key", " idem-cancel ")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "arrivedAt": "2030-06-20T03:10:00Z",
-                      "reasonCode": " customer_arrived ",
-                      "note": " Guest is waiting at host stand "
+                      "cancelledAt": "2030-06-20T03:20:00Z",
+                      "reasonCode": " guest_requested ",
+                      "note": " Customer called to cancel "
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.reservationId").value(RESERVATION_ID.toString()))
-            .andExpect(jsonPath("$.reservationCode").value("R-20300620-0701"))
-            .andExpect(jsonPath("$.status").value("arrived"))
-            .andExpect(jsonPath("$.arrivedAt").value("2030-06-20T03:10:00Z"))
-            .andExpect(jsonPath("$.alreadyArrived").value(false))
-            .andExpect(jsonPath("$.events[0]").value("reservation.arrived"))
+            .andExpect(jsonPath("$.reservationCode").value("R-CANCEL-0981"))
+            .andExpect(jsonPath("$.status").value("cancelled"))
+            .andExpect(jsonPath("$.cancelledAt").value("2030-06-20T03:20:00Z"))
+            .andExpect(jsonPath("$.cancellationReasonCode").value("guest_requested"))
+            .andExpect(jsonPath("$.alreadyCancelled").value(false))
+            .andExpect(jsonPath("$.events[0]").value("reservation.cancelled"))
             .andExpect(jsonPath("$.idempotency.status").value("completed"))
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
 
-        ArgumentCaptor<CheckInReservationCommand> commandCaptor = ArgumentCaptor.forClass(CheckInReservationCommand.class);
-        verify(checkInApplicationService).checkInReservation(commandCaptor.capture());
-        CheckInReservationCommand command = commandCaptor.getValue();
+        ArgumentCaptor<CancelReservationCommand> commandCaptor = ArgumentCaptor.forClass(CancelReservationCommand.class);
+        verify(cancelApplicationService).cancelReservation(commandCaptor.capture());
+        CancelReservationCommand command = commandCaptor.getValue();
         assertThat(command.tenantId()).isEqualTo(TENANT_ID);
         assertThat(command.storeId()).isEqualTo(STORE_ID);
         assertThat(command.reservationId()).isEqualTo(RESERVATION_ID);
-        assertThat(command.idempotencyKey()).isEqualTo("idem-check-in");
+        assertThat(command.idempotencyKey()).isEqualTo("idem-cancel");
         assertThat(command.actorId()).isEqualTo(ACTOR_ID);
         assertThat(command.actorType()).isEqualTo("staff");
-        assertThat(command.arrivedAt()).isEqualTo(ARRIVED_AT);
-        assertThat(command.reasonCode()).isEqualTo("customer_arrived");
-        assertThat(command.note()).isEqualTo("Guest is waiting at host stand");
-        verifyNoInteractions(createApplicationService);
+        assertThat(command.cancelledAt()).isEqualTo(CANCELLED_AT);
+        assertThat(command.reasonCode()).isEqualTo("guest_requested");
+        assertThat(command.note()).isEqualTo("Customer called to cancel");
+        verifyNoInteractions(createApplicationService, checkInApplicationService, seatingApplicationService, queueApplicationService);
     }
 
     @Test
-    void alreadyArrivedWithNewKeyReturnsSuccessLikeResponseWithoutEvents() throws Exception {
-        when(checkInApplicationService.checkInReservation(any())).thenReturn(ReservationCheckInResult.alreadyArrived(
+    void alreadyCancelledWithNewKeyReturnsSuccessLikeResponseWithoutEvents() throws Exception {
+        when(cancelApplicationService.cancelReservation(any())).thenReturn(ReservationCancelResult.alreadyCancelled(
             RESERVATION_ID,
-            "R-20300620-0701",
-            ARRIVED_AT,
+            "R-CANCEL-0981",
+            CANCELLED_AT,
+            "guest_requested",
             "completed"
         ));
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
-                .header("Idempotency-Key", "idem-already-arrived")
+                .header("Idempotency-Key", "idem-already-cancelled")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("arrived"))
-            .andExpect(jsonPath("$.alreadyArrived").value(true))
-            .andExpect(jsonPath("$.arrivedAt").value("2030-06-20T03:10:00Z"))
+            .andExpect(jsonPath("$.status").value("cancelled"))
+            .andExpect(jsonPath("$.alreadyCancelled").value(true))
+            .andExpect(jsonPath("$.cancelledAt").value("2030-06-20T03:20:00Z"))
             .andExpect(jsonPath("$.events").isEmpty())
             .andExpect(jsonPath("$.idempotency.status").value("completed"))
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
@@ -145,11 +147,12 @@ class ReservationCheckInControllerTest {
 
     @Test
     void completedIdempotencyReplayReturnsOkAndReplayedTrue() throws Exception {
-        when(checkInApplicationService.checkInReservation(any())).thenReturn(ReservationCheckInResult.replay(
+        when(cancelApplicationService.cancelReservation(any())).thenReturn(ReservationCancelResult.replay(
             RESERVATION_ID,
-            "R-20300620-0701",
-            "arrived",
-            ARRIVED_AT,
+            "R-CANCEL-0981",
+            "cancelled",
+            CANCELLED_AT,
+            "guest_requested",
             false
         ));
 
@@ -160,7 +163,7 @@ class ReservationCheckInControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.idempotency.status").value("completed"))
             .andExpect(jsonPath("$.idempotency.replayed").value(true))
-            .andExpect(jsonPath("$.alreadyArrived").value(false))
+            .andExpect(jsonPath("$.alreadyCancelled").value(false))
             .andExpect(jsonPath("$.events").isEmpty());
     }
 
@@ -174,58 +177,56 @@ class ReservationCheckInControllerTest {
             .andExpect(jsonPath("$.error.code").value("MISSING_IDEMPOTENCY_KEY"))
             .andExpect(jsonPath("$.error.messageKey").value("reservation.missing_idempotency_key"));
 
-        verifyNoInteractions(checkInApplicationService);
-        verifyNoInteractions(createApplicationService);
+        verifyNoInteractions(cancelApplicationService);
     }
 
     @Test
-    void requestDtoOnlyExposesArrivedAtReasonCodeAndNote() {
-        assertThat(CheckInReservationRequest.class.getRecordComponents())
+    void requestDtoOnlyExposesCancelledAtReasonCodeAndNote() {
+        assertThat(CancelReservationRequest.class.getRecordComponents())
             .extracting(component -> component.getName())
-            .containsExactly("arrivedAt", "reasonCode", "note");
+            .containsExactly("cancelledAt", "reasonCode", "note");
     }
 
     @Test
-    void checkInEndpointDeclaresAppGateReservationQueuePermission() throws Exception {
+    void cancelEndpointDeclaresAppGateReservationQueueCancelPermission() throws Exception {
         Method method = ReservationController.class.getMethod(
-            "checkInReservation",
+            "cancelReservation",
             UUID.class,
             UUID.class,
             String.class,
-            CheckInReservationRequest.class
+            CancelReservationRequest.class
         );
 
         RequireAppGate annotation = method.getAnnotation(RequireAppGate.class);
         assertThat(annotation).isNotNull();
         assertThat(annotation.appKey()).isEqualTo("reservation_queue");
-        assertThat(annotation.permission()).isEqualTo("reservation.check_in");
+        assertThat(annotation.permission()).isEqualTo("reservation.cancel");
     }
 
     @Test
     void mapsApplicationErrorsToApiErrors() throws Exception {
-        assertApplicationError(ReservationCheckInError.INVALID_COMMAND, 400, "INVALID_COMMAND", "failed");
-        assertApplicationError(ReservationCheckInError.STORE_NOT_FOUND, 404, "STORE_NOT_FOUND", "failed");
-        assertApplicationError(ReservationCheckInError.STORE_SCOPE_MISMATCH, 403, "STORE_SCOPE_MISMATCH", "failed");
-        assertApplicationError(ReservationCheckInError.STORE_ACCESS_DENIED, 403, "FORBIDDEN", "failed");
-        assertApplicationError(ReservationCheckInError.RESERVATION_NOT_FOUND, 404, "RESERVATION_NOT_FOUND", "failed");
-        assertApplicationError(ReservationCheckInError.RESERVATION_STATUS_NOT_CONFIRMED, 409, "RESERVATION_STATUS_NOT_CONFIRMED", "failed");
-        assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_CANCELLED, 409, "RESERVATION_CANNOT_CHECK_IN_CANCELLED", "failed");
-        assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_NO_SHOW, 409, "RESERVATION_CANNOT_CHECK_IN_NO_SHOW", "failed");
-        assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_COMPLETED, 409, "RESERVATION_CANNOT_CHECK_IN_COMPLETED", "failed");
-        assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_SEATED, 409, "RESERVATION_CANNOT_CHECK_IN_SEATED", "failed");
-        assertApplicationError(ReservationCheckInError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS", "started");
-        assertApplicationError(ReservationCheckInError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY", "failed");
-        assertApplicationError(ReservationCheckInError.IDEMPOTENCY_CONFLICT, 409, "IDEMPOTENCY_CONFLICT", "conflict");
-        assertApplicationError(ReservationCheckInError.AUDIT_WRITE_FAILED, 500, "AUDIT_WRITE_FAILED", "failed");
-        assertApplicationError(ReservationCheckInError.BUSINESS_EVENT_WRITE_FAILED, 500, "EVENT_WRITE_FAILED", "failed");
-        assertApplicationError(ReservationCheckInError.STATE_TRANSITION_WRITE_FAILED, 500, "STATE_TRANSITION_WRITE_FAILED", "failed");
-        assertApplicationError(ReservationCheckInError.REPOSITORY_SAVE_FAILED, 500, "PERSISTENCE_ERROR", "failed");
-        assertApplicationError(ReservationCheckInError.PERSISTENCE_ERROR, 500, "PERSISTENCE_ERROR", "failed");
+        assertApplicationError(ReservationCancelError.INVALID_COMMAND, 400, "INVALID_COMMAND", "failed");
+        assertApplicationError(ReservationCancelError.STORE_NOT_FOUND, 404, "STORE_NOT_FOUND", "failed");
+        assertApplicationError(ReservationCancelError.STORE_SCOPE_MISMATCH, 403, "STORE_SCOPE_MISMATCH", "failed");
+        assertApplicationError(ReservationCancelError.STORE_ACCESS_DENIED, 403, "FORBIDDEN", "failed");
+        assertApplicationError(ReservationCancelError.RESERVATION_NOT_FOUND, 404, "RESERVATION_NOT_FOUND", "failed");
+        assertApplicationError(ReservationCancelError.RESERVATION_CANNOT_CANCEL_ARRIVED, 409, "RESERVATION_CANNOT_CANCEL_ARRIVED", "failed");
+        assertApplicationError(ReservationCancelError.RESERVATION_CANNOT_CANCEL_SEATED, 409, "RESERVATION_CANNOT_CANCEL_SEATED", "failed");
+        assertApplicationError(ReservationCancelError.RESERVATION_CANNOT_CANCEL_NO_SHOW, 409, "RESERVATION_CANNOT_CANCEL_NO_SHOW", "failed");
+        assertApplicationError(ReservationCancelError.RESERVATION_CANNOT_CANCEL_COMPLETED, 409, "RESERVATION_CANNOT_CANCEL_COMPLETED", "failed");
+        assertApplicationError(ReservationCancelError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS", "started");
+        assertApplicationError(ReservationCancelError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY", "failed");
+        assertApplicationError(ReservationCancelError.IDEMPOTENCY_CONFLICT, 409, "IDEMPOTENCY_CONFLICT", "conflict");
+        assertApplicationError(ReservationCancelError.AUDIT_WRITE_FAILED, 500, "AUDIT_WRITE_FAILED", "failed");
+        assertApplicationError(ReservationCancelError.BUSINESS_EVENT_WRITE_FAILED, 500, "EVENT_WRITE_FAILED", "failed");
+        assertApplicationError(ReservationCancelError.STATE_TRANSITION_WRITE_FAILED, 500, "STATE_TRANSITION_WRITE_FAILED", "failed");
+        assertApplicationError(ReservationCancelError.REPOSITORY_SAVE_FAILED, 500, "PERSISTENCE_ERROR", "failed");
+        assertApplicationError(ReservationCancelError.PERSISTENCE_ERROR, 500, "PERSISTENCE_ERROR", "failed");
     }
 
     @Test
     void forbiddenRoleReturnsForbiddenWithoutCallingService() throws Exception {
-        actorProvider.actor = actor(Set.of("customer"), Set.of("reservation.check_in"), Set.of(STORE_ID));
+        actorProvider.actor = actor(Set.of("customer"), Set.of("reservation.cancel"), Set.of(STORE_ID));
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
                 .header("Idempotency-Key", "idem-forbidden-role")
@@ -234,11 +235,11 @@ class ReservationCheckInControllerTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
 
-        verifyNoInteractions(checkInApplicationService);
+        verifyNoInteractions(cancelApplicationService);
     }
 
     @Test
-    void missingCheckInPermissionReturnsForbiddenWithoutCallingService() throws Exception {
+    void missingCancelPermissionReturnsForbiddenWithoutCallingService() throws Exception {
         actorProvider.actor = actor(Set.of("store_staff"), Set.of(), Set.of(STORE_ID));
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
@@ -248,7 +249,7 @@ class ReservationCheckInControllerTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
 
-        verifyNoInteractions(checkInApplicationService);
+        verifyNoInteractions(cancelApplicationService);
     }
 
     @Test
@@ -260,19 +261,19 @@ class ReservationCheckInControllerTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("STORE_SCOPE_MISMATCH"));
 
-        verifyNoInteractions(checkInApplicationService);
+        verifyNoInteractions(cancelApplicationService);
     }
 
     private void assertApplicationError(
-        ReservationCheckInError applicationError,
+        ReservationCancelError applicationError,
         int expectedStatus,
         String expectedApiCode,
         String expectedIdempotencyStatus
     ) throws Exception {
-        ReservationCheckInResult result = applicationError == ReservationCheckInError.COMMAND_IN_PROGRESS
-            ? ReservationCheckInResult.retryLater(applicationError)
-            : ReservationCheckInResult.failure(applicationError);
-        when(checkInApplicationService.checkInReservation(any())).thenReturn(result);
+        ReservationCancelResult result = applicationError == ReservationCancelError.COMMAND_IN_PROGRESS
+            ? ReservationCancelResult.retryLater(applicationError)
+            : ReservationCancelResult.failure(applicationError);
+        when(cancelApplicationService.cancelReservation(any())).thenReturn(result);
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
                 .header("Idempotency-Key", "idem-" + applicationError.name())
@@ -286,17 +287,25 @@ class ReservationCheckInControllerTest {
             .andExpect(jsonPath("$.idempotency.status").value(expectedIdempotencyStatus));
     }
 
-    private static ReservationCheckInResult success(boolean replayed) {
+    private static ReservationCancelResult success(boolean replayed) {
         if (replayed) {
-            return ReservationCheckInResult.replay(RESERVATION_ID, "R-20300620-0701", "arrived", ARRIVED_AT, false);
+            return ReservationCancelResult.replay(
+                RESERVATION_ID,
+                "R-CANCEL-0981",
+                "cancelled",
+                CANCELLED_AT,
+                "guest_requested",
+                false
+            );
         }
-        return ReservationCheckInResult.success(
+        return ReservationCancelResult.success(
             RESERVATION_ID,
-            "R-20300620-0701",
-            "arrived",
-            ARRIVED_AT,
+            "R-CANCEL-0981",
+            "cancelled",
+            CANCELLED_AT,
+            "guest_requested",
             "completed",
-            List.of("reservation.arrived"),
+            List.of("reservation.cancelled"),
             List.of(UUID.randomUUID()),
             List.of(UUID.randomUUID()),
             UUID.randomUUID()
@@ -306,9 +315,9 @@ class ReservationCheckInControllerTest {
     private static String validRequestJson() {
         return """
             {
-              "arrivedAt": "2030-06-20T03:10:00Z",
-              "reasonCode": "customer_arrived",
-              "note": "Guest is waiting at host stand"
+              "cancelledAt": "2030-06-20T03:20:00Z",
+              "reasonCode": "guest_requested",
+              "note": "Customer called to cancel"
             }
             """;
     }
@@ -317,11 +326,10 @@ class ReservationCheckInControllerTest {
         return switch (apiCode) {
             case "EVENT_WRITE_FAILED" -> "reservation.event_write_failed";
             case "RESERVATION_NOT_FOUND" -> "reservation.not_found";
-            case "RESERVATION_STATUS_NOT_CONFIRMED" -> "reservation.status_not_confirmed";
-            case "RESERVATION_CANNOT_CHECK_IN_CANCELLED" -> "reservation.cannot_check_in_cancelled";
-            case "RESERVATION_CANNOT_CHECK_IN_NO_SHOW" -> "reservation.cannot_check_in_no_show";
-            case "RESERVATION_CANNOT_CHECK_IN_COMPLETED" -> "reservation.cannot_check_in_completed";
-            case "RESERVATION_CANNOT_CHECK_IN_SEATED" -> "reservation.cannot_check_in_seated";
+            case "RESERVATION_CANNOT_CANCEL_ARRIVED" -> "reservation.cannot_cancel_arrived";
+            case "RESERVATION_CANNOT_CANCEL_SEATED" -> "reservation.cannot_cancel_seated";
+            case "RESERVATION_CANNOT_CANCEL_NO_SHOW" -> "reservation.cannot_cancel_no_show";
+            case "RESERVATION_CANNOT_CANCEL_COMPLETED" -> "reservation.cannot_cancel_completed";
             default -> "reservation." + apiCode.toLowerCase();
         };
     }

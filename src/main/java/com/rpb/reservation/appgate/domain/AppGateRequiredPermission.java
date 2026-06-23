@@ -8,6 +8,7 @@ public final class AppGateRequiredPermission {
     public static final String RESERVATION_SEAT = "reservation.seat";
     public static final String RESERVATION_TODAY_VIEW = "reservation.today_view";
     public static final String RESERVATION_QUEUE = "reservation.queue";
+    public static final String RESERVATION_CANCEL = "reservation.cancel";
     public static final String QUEUE_VIEW = "queue.view";
     public static final String QUEUE_CALL = "queue.call";
     public static final String QUEUE_SEAT = "queue.seat";
@@ -24,6 +25,7 @@ public final class AppGateRequiredPermission {
         RESERVATION_SEAT,
         RESERVATION_TODAY_VIEW,
         RESERVATION_QUEUE,
+        RESERVATION_CANCEL,
         QUEUE_VIEW,
         QUEUE_CALL,
         QUEUE_SEAT,

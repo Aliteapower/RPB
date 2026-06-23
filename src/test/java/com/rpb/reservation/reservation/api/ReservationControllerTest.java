@@ -15,6 +15,7 @@ import com.rpb.reservation.reservation.application.ReservationCreateResult;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -50,6 +51,7 @@ class ReservationControllerTest {
     private ReservationCheckInApplicationService checkInApplicationService;
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
+    private ReservationCancelApplicationService cancelApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -59,6 +61,7 @@ class ReservationControllerTest {
         checkInApplicationService = mock(ReservationCheckInApplicationService.class);
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
+        cancelApplicationService = mock(ReservationCancelApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(CurrentActor.storeStaff(
             TENANT_ID,
             ACTOR_ID,
@@ -75,6 +78,7 @@ class ReservationControllerTest {
                 checkInApplicationService,
                 seatingApplicationService,
                 queueApplicationService,
+                cancelApplicationService,
                 actorProvider,
                 apiMapper,
                 errorMapper,
@@ -83,7 +87,9 @@ class ReservationControllerTest {
                 new ReservationArrivedDirectSeatingApiMapper(),
                 new ReservationArrivedDirectSeatingApiErrorMapper(),
                 new ReservationArrivedToQueueApiMapper(),
-                new ReservationArrivedToQueueApiErrorMapper()
+                new ReservationArrivedToQueueApiErrorMapper(),
+                new ReservationCancelApiMapper(),
+                new ReservationCancelApiErrorMapper()
             ))
             .build();
     }

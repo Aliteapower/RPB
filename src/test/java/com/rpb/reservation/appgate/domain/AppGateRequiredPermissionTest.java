@@ -26,6 +26,11 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void reservationCancelPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.RESERVATION_CANCEL).isEqualTo("reservation.cancel");
+    }
+
+    @Test
     void queueCallPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.QUEUE_CALL).isEqualTo("queue.call");
     }
@@ -67,6 +72,7 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.RESERVATION_SEAT,
                 AppGateRequiredPermission.RESERVATION_TODAY_VIEW,
                 AppGateRequiredPermission.RESERVATION_QUEUE,
+                AppGateRequiredPermission.RESERVATION_CANCEL,
                 AppGateRequiredPermission.QUEUE_CALL,
                 AppGateRequiredPermission.QUEUE_SEAT,
                 AppGateRequiredPermission.QUEUE_SKIP,

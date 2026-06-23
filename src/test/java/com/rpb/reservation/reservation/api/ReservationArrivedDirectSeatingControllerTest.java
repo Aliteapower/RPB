@@ -16,6 +16,7 @@ import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeati
 import com.rpb.reservation.reservation.application.command.SeatArrivedReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -47,6 +48,7 @@ class ReservationArrivedDirectSeatingControllerTest {
     private ReservationCheckInApplicationService checkInApplicationService;
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
+    private ReservationCancelApplicationService cancelApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -56,6 +58,7 @@ class ReservationArrivedDirectSeatingControllerTest {
         checkInApplicationService = mock(ReservationCheckInApplicationService.class);
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
+        cancelApplicationService = mock(ReservationCancelApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.seat"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders
             .standaloneSetup(new ReservationController(
@@ -63,6 +66,7 @@ class ReservationArrivedDirectSeatingControllerTest {
                 checkInApplicationService,
                 seatingApplicationService,
                 queueApplicationService,
+                cancelApplicationService,
                 actorProvider,
                 new ReservationApiMapper(),
                 new ReservationApiErrorMapper(),
@@ -71,7 +75,9 @@ class ReservationArrivedDirectSeatingControllerTest {
                 new ReservationArrivedDirectSeatingApiMapper(),
                 new ReservationArrivedDirectSeatingApiErrorMapper(),
                 new ReservationArrivedToQueueApiMapper(),
-                new ReservationArrivedToQueueApiErrorMapper()
+                new ReservationArrivedToQueueApiErrorMapper(),
+                new ReservationCancelApiMapper(),
+                new ReservationCancelApiErrorMapper()
             ))
             .build();
     }

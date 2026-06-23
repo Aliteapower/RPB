@@ -23,12 +23,13 @@ import com.rpb.reservation.reservation.api.ReservationCancelApiMapper;
 import com.rpb.reservation.reservation.api.ReservationCheckInApiErrorMapper;
 import com.rpb.reservation.reservation.api.ReservationCheckInApiMapper;
 import com.rpb.reservation.reservation.api.ReservationController;
-import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeatingResult;
+import com.rpb.reservation.reservation.application.ReservationCancelResult;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -62,20 +63,19 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("local")
 @TestPropertySource(properties = {
     "rpb.local-auth.enabled=true",
-    "rpb.local-auth.tenant-id=10000000-0000-0000-0000-000000000901",
-    "rpb.local-auth.actor-id=30000000-0000-0000-0000-000000000901",
+    "rpb.local-auth.tenant-id=10000000-0000-0000-0000-000000000987",
+    "rpb.local-auth.actor-id=30000000-0000-0000-0000-000000000987",
     "rpb.local-auth.actor-type=staff",
     "rpb.local-auth.roles[0]=store_staff",
-    "rpb.local-auth.permissions[0]=reservation.seat",
-    "rpb.local-auth.store-ids[0]=20000000-0000-0000-0000-000000000901"
+    "rpb.local-auth.permissions[0]=reservation.cancel",
+    "rpb.local-auth.store-ids[0]=20000000-0000-0000-0000-000000000987"
 })
-class LocalRuntimeReservationArrivedDirectSeatingSecurityTest {
-    private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/direct";
-    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000901");
-    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000901");
-    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000901");
-    private static final UUID TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000901");
-    private static final UUID SEATING_ID = UUID.fromString("80000000-0000-0000-0000-000000000901");
+class LocalRuntimeReservationCancelSecurityTest {
+    private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/cancel";
+    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000987");
+    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000987");
+    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000987");
+    private static final Instant CANCELLED_AT = Instant.parse("2030-06-20T03:20:00Z");
 
     @Autowired
     private MockMvc mockMvc;
@@ -102,46 +102,45 @@ class LocalRuntimeReservationArrivedDirectSeatingSecurityTest {
     private AppGateDenialAuditService appGateDenialAuditService;
 
     @Test
-    void acceptsLocalProfileSeatRequestWithoutJwtLoginWhenConfiguredActorHasPermission() throws Exception {
+    void acceptsLocalProfileCancelRequestWithoutJwtLoginWhenConfiguredActorHasPermission() throws Exception {
         when(appGateService.evaluate(any())).thenReturn(AppGateDecision.allow(
             "reservation_queue",
             TENANT_ID,
             STORE_ID,
-            "reservation.seat"
+            "reservation.cancel"
         ));
-        when(seatingApplicationService.seatArrivedReservation(any())).thenReturn(ReservationArrivedDirectSeatingResult.success(
+        when(cancelApplicationService.cancelReservation(any())).thenReturn(ReservationCancelResult.success(
             RESERVATION_ID,
-            "R-SEAT-0901",
-            SEATING_ID,
-            "dining_table",
-            TABLE_ID,
-            4,
-            "occupied",
-            List.of(),
-            List.of(TABLE_ID),
+            "R-CANCEL-0987",
+            "cancelled",
+            CANCELLED_AT,
+            "guest_requested",
             "completed",
-            List.of("reservation.seated", "seating.created", "table.occupied"),
-            List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
-            List.of(UUID.randomUUID(), UUID.randomUUID()),
+            List.of("reservation.cancelled"),
+            List.of(UUID.randomUUID()),
+            List.of(UUID.randomUUID()),
             UUID.randomUUID()
         ));
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
-                .header("Idempotency-Key", "local-runtime-reservation-seat")
+                .header("Idempotency-Key", "local-runtime-reservation-cancel")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "tableId": "60000000-0000-0000-0000-000000000901",
-                      "note": "Window table"
+                      "cancelledAt": "2030-06-20T03:20:00Z",
+                      "reasonCode": "guest_requested",
+                      "note": "Guest requested cancellation"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.resourceType").value("table"))
+            .andExpect(jsonPath("$.status").value("cancelled"))
             .andExpect(jsonPath("$.idempotency.status").value("completed"));
 
-        verify(seatingApplicationService).seatArrivedReservation(any());
+        verify(cancelApplicationService).cancelReservation(any());
         verifyNoInteractions(createApplicationService);
         verifyNoInteractions(checkInApplicationService);
+        verifyNoInteractions(seatingApplicationService);
+        verifyNoInteractions(queueApplicationService);
     }
 }
