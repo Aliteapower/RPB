@@ -129,12 +129,19 @@ class QueueCallUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/queueCallApi.ts")
             .doesNotContain(
-                "src/api/queueSkipApi.ts",
                 "src/api/queueRejoinApi.ts",
                 "src/api/queueDisplayApi.ts",
+                "src/api/queueWorkbenchApi.ts",
+                "src/api/queueCallFromListApi.ts",
+                "src/api/queueSeatFromListApi.ts",
+                "src/api/seatingApi.ts",
                 "src/api/seatingFromQueueApi.ts",
+                "src/api/tableMapApi.ts",
+                "src/api/noShowApi.ts",
                 "src/api/reservationNoShowApi.ts",
-                "src/api/reservationCancellationApi.ts"
+                "src/api/cancellationApi.ts",
+                "src/api/reservationCancellationApi.ts",
+                "src/api/turnoverApi.ts"
             );
     }
 
