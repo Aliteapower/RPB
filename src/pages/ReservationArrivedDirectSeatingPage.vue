@@ -6,6 +6,7 @@ import {
   ReservationArrivedDirectSeatingApiError,
   seatArrivedReservation
 } from '../api/reservationArrivedDirectSeatingApi'
+import TableResourcePicker from '../components/staff-table/TableResourcePicker.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   ReservationArrivedDirectSeatingApiErrorResponse,
@@ -128,6 +129,16 @@ function validateForm(): ReservationArrivedDirectSeatingApiErrorResponse | null 
   return null
 }
 
+function selectTable(tableId: string): void {
+  form.tableId = tableId
+  form.tableGroupId = ''
+}
+
+function selectTableGroup(tableGroupId: string): void {
+  form.tableGroupId = tableGroupId
+  form.tableId = ''
+}
+
 function toRequest(): SeatArrivedReservationRequest {
   return {
     tableId: optionalValue(form.tableId),
@@ -201,14 +212,24 @@ function queryValue(value: unknown): string {
 
       <section class="resource-panel" aria-label="桌台选择">
         <p class="resource-rule">桌台 ID 和桌组 ID 必须二选一</p>
-        <label>
-          <span>桌台 ID</span>
-          <input v-model="form.tableId" autocomplete="off" name="tableId" type="text" />
-        </label>
-        <label>
-          <span>桌组 ID</span>
-          <input v-model="form.tableGroupId" autocomplete="off" name="tableGroupId" type="text" />
-        </label>
+        <TableResourcePicker
+          :store-id="storeId"
+          :selected-table-id="form.tableId"
+          :selected-table-group-id="form.tableGroupId"
+          @select-table="selectTable"
+          @select-table-group="selectTableGroup"
+        />
+        <details class="field-group">
+          <summary>手动填写资源 ID</summary>
+          <label>
+            <span>桌台 ID</span>
+            <input v-model="form.tableId" autocomplete="off" name="tableId" type="text" />
+          </label>
+          <label>
+            <span>桌组 ID</span>
+            <input v-model="form.tableGroupId" autocomplete="off" name="tableGroupId" type="text" />
+          </label>
+        </details>
       </section>
 
       <details class="field-group">

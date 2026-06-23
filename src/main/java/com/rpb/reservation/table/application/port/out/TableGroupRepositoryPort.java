@@ -20,6 +20,10 @@ public interface TableGroupRepositoryPort {
 
     List<TableGroup> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate);
 
+    default List<TableGroup> findVisibleGroups(StoreScope scope, String status, PartySize partySize) {
+        throw new UnsupportedOperationException("find_visible_table_groups_not_implemented");
+    }
+
     TableGroup save(StoreScope scope, TableGroup tableGroup);
 
     TableGroupMember saveMember(StoreScope scope, TableGroupMember member);

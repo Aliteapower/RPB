@@ -56,6 +56,11 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void tableViewPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.TABLE_VIEW).isEqualTo("table.view");
+    }
+
+    @Test
     void customerLookupPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.CUSTOMER_LOOKUP).isEqualTo("customer.lookup");
     }
@@ -78,6 +83,7 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.QUEUE_SKIP,
                 AppGateRequiredPermission.QUEUE_REJOIN,
                 AppGateRequiredPermission.QUEUE_VIEW,
+                AppGateRequiredPermission.TABLE_VIEW,
                 AppGateRequiredPermission.CUSTOMER_LOOKUP
             );
     }

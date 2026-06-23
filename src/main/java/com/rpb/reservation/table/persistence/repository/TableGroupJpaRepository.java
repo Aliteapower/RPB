@@ -27,4 +27,23 @@ public interface TableGroupJpaRepository extends JpaRepository<TableGroupEntity,
         @Param("storeId") UUID storeId,
         @Param("partySize") int partySize
     );
+
+    @Query("""
+        select tableGroup from TableGroupEntity tableGroup
+        where tableGroup.tenantId = :tenantId
+          and tableGroup.storeId = :storeId
+          and tableGroup.deletedAt is null
+          and (:status is null or tableGroup.status = :status)
+          and (:partySize is null or (
+            tableGroup.capacityMin <= :partySize
+            and tableGroup.capacityMax >= :partySize
+          ))
+        order by tableGroup.groupCode asc
+        """)
+    List<TableGroupEntity> findVisibleGroups(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("status") String status,
+        @Param("partySize") Integer partySize
+    );
 }

@@ -53,6 +53,16 @@ public class DiningTablePersistenceAdapter implements DiningTableRepositoryPort 
     }
 
     @Override
+    public List<DiningTable> findVisibleResources(StoreScope scope, String status, PartySize partySize) {
+        return repository.findVisibleResources(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            status,
+            partySize == null ? null : partySize.value()
+        ).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public DiningTable save(StoreScope scope, DiningTable table) {
         DiningTableEntity mapped = mapper.toEntity(table);
         DiningTableEntity entity = repository.findByIdAndTenantIdAndStoreIdAndDeletedAtIsNull(

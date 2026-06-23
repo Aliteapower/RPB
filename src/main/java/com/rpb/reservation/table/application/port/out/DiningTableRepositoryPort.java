@@ -17,5 +17,9 @@ public interface DiningTableRepositoryPort {
 
     List<DiningTable> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate);
 
+    default List<DiningTable> findVisibleResources(StoreScope scope, String status, PartySize partySize) {
+        throw new UnsupportedOperationException("find_visible_dining_table_resources_not_implemented");
+    }
+
     DiningTable save(StoreScope scope, DiningTable table);
 }

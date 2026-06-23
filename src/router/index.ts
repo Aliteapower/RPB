@@ -10,6 +10,7 @@ import ReservationCreatePage from '../pages/ReservationCreatePage.vue'
 import ReservationTodayViewPage from '../pages/ReservationTodayViewPage.vue'
 import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
 import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
+import TableResourceListPage from '../pages/TableResourceListPage.vue'
 import WalkInDirectSeatingPage from '../pages/WalkInDirectSeatingPage.vue'
 
 const localValidationStoreId = '20000000-0000-0000-0000-000000000983'
@@ -71,6 +72,11 @@ export const router = createRouter({
       path: '/stores/:storeId/queue-tickets/seating/direct',
       name: 'seating-from-called-queue',
       component: SeatingFromCalledQueuePage
+    },
+    {
+      path: '/stores/:storeId/tables',
+      name: 'table-resource-list',
+      component: TableResourceListPage
     },
     {
       path: '/stores/:storeId/reservations/seating/direct',

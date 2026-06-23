@@ -377,6 +377,7 @@ class ReservationControllerTest {
                 "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
+                "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
                 "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
             );
         assertThat(sourceFiles)
@@ -406,6 +407,7 @@ class ReservationControllerTest {
                 "src/components/staff/StaffGuestNameField.vue",
                 "src/components/staff/StaffSingaporePhoneField.vue",
                 "src/components/staff/StaffTimeWheelPicker.vue",
+                "src/components/staff-table/TableResourcePicker.vue",
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/QueueCallPage.vue",
                 "src/pages/QueueTicketListPage.vue",
@@ -416,6 +418,7 @@ class ReservationControllerTest {
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
+                "src/pages/TableResourceListPage.vue",
                 "src/pages/WalkInDirectSeatingPage.vue"
             );
         assertThat(vueFiles)

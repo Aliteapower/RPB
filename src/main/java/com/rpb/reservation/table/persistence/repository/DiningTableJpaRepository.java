@@ -29,4 +29,23 @@ public interface DiningTableJpaRepository extends JpaRepository<DiningTableEntit
         @Param("storeId") UUID storeId,
         @Param("partySize") int partySize
     );
+
+    @Query("""
+        select diningTable from DiningTableEntity diningTable
+        where diningTable.tenantId = :tenantId
+          and diningTable.storeId = :storeId
+          and diningTable.deletedAt is null
+          and (:status is null or diningTable.status = :status)
+          and (:partySize is null or (
+            diningTable.capacityMin <= :partySize
+            and diningTable.capacityMax >= :partySize
+          ))
+        order by diningTable.tableCode asc
+        """)
+    List<DiningTableEntity> findVisibleResources(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("status") String status,
+        @Param("partySize") Integer partySize
+    );
 }

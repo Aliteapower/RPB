@@ -77,6 +77,16 @@ public class TableGroupPersistenceAdapter implements TableGroupRepositoryPort {
     }
 
     @Override
+    public List<TableGroup> findVisibleGroups(StoreScope scope, String status, PartySize partySize) {
+        return groupRepository.findVisibleGroups(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            status,
+            partySize == null ? null : partySize.value()
+        ).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public TableGroup save(StoreScope scope, TableGroup tableGroup) {
         return mapper.toDomain(groupRepository.save(mapper.toEntity(tableGroup)));
     }

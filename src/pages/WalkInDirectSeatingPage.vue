@@ -8,13 +8,13 @@ import {
 } from '../api/walkInDirectSeatingApi'
 import StaffGuestContactLookup from '../components/staff/StaffGuestContactLookup.vue'
 import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../components/staff/staffGuestContact'
+import TableResourcePicker from '../components/staff-table/TableResourcePicker.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   ApiErrorResponse,
   SeatWalkInDirectlyRequest,
   SeatWalkInDirectlyResponse
 } from '../types/walkInDirectSeating'
-
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -97,6 +97,16 @@ function validateForm(): ApiErrorResponse | null {
   return null
 }
 
+function selectTable(tableId: string): void {
+  form.tableId = tableId
+  form.tableGroupId = ''
+}
+
+function selectTableGroup(tableGroupId: string): void {
+  form.tableGroupId = tableGroupId
+  form.tableId = ''
+}
+
 function toRequest(): SeatWalkInDirectlyRequest {
   return {
     partySize: form.partySize,
@@ -173,8 +183,17 @@ function createLocalError(code: string, messageKey: string): ApiErrorResponse {
         />
       </details>
 
+      <TableResourcePicker
+        :store-id="storeId"
+        :party-size="form.partySize"
+        :selected-table-id="form.tableId"
+        :selected-table-group-id="form.tableGroupId"
+        @select-table="selectTable"
+        @select-table-group="selectTableGroup"
+      />
+
       <details class="field-group">
-        <summary>桌台选择</summary>
+        <summary>手动填写资源 ID</summary>
         <label>
           <span>桌台 ID</span>
           <input v-model="form.tableId" name="tableId" type="text" />
