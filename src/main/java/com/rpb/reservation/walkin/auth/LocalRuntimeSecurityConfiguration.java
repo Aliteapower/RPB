@@ -33,6 +33,7 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/check-in").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/seating/direct").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/queue").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/customers/phone-lookup").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/queue-tickets").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/queue-tickets/*/call").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/queue-tickets/*/skip").permitAll()

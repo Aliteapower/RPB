@@ -582,7 +582,8 @@ class ReservationCreateApiIntegrationTest {
                     && !path.endsWith("src/pages/ReservationCheckInPage.vue")
                     && !path.endsWith("src/pages/ReservationArrivedDirectSeatingPage.vue")
                     && !path.endsWith("src/pages/ReservationArrivedToQueuePage.vue")
-                    && !path.endsWith("src/pages/ReservationTodayViewPage.vue"))
+                    && !path.endsWith("src/pages/ReservationTodayViewPage.vue")
+                    && !path.endsWith("src/components/reservation-workbench/CreateReservationDialog.vue"))
                 .noneMatch(path -> path.toLowerCase().contains("openapi") && (
                     path.endsWith(".yml") || path.endsWith(".yaml") || path.endsWith(".json")
                 ));

@@ -51,6 +51,11 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void customerLookupPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.CUSTOMER_LOOKUP).isEqualTo("customer.lookup");
+    }
+
+    @Test
     void reservationQueueEntryPermissionsContainConfirmedRuntimeCapabilities() {
         assertThat(AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS)
             .containsExactlyInAnyOrder(
@@ -66,7 +71,8 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.QUEUE_SEAT,
                 AppGateRequiredPermission.QUEUE_SKIP,
                 AppGateRequiredPermission.QUEUE_REJOIN,
-                AppGateRequiredPermission.QUEUE_VIEW
+                AppGateRequiredPermission.QUEUE_VIEW,
+                AppGateRequiredPermission.CUSTOMER_LOOKUP
             );
     }
 }

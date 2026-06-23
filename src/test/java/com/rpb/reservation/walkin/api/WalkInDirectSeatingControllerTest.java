@@ -269,6 +269,7 @@ class WalkInDirectSeatingControllerTest {
             .containsExactlyInAnyOrder(
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInDirectSeatingController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
+                "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
@@ -294,6 +295,11 @@ class WalkInDirectSeatingControllerTest {
             .containsExactlyInAnyOrder(
                 "src/App.vue",
                 "src/components/DateTimeWheelPicker.vue",
+                "src/components/reservation-workbench/CreateReservationDialog.vue",
+                "src/components/staff/StaffGuestContactLookup.vue",
+                "src/components/staff/StaffGuestNameField.vue",
+                "src/components/staff/StaffSingaporePhoneField.vue",
+                "src/components/staff/StaffTimeWheelPicker.vue",
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/QueueCallPage.vue",
                 "src/pages/QueueTicketListPage.vue",
@@ -316,6 +322,7 @@ class WalkInDirectSeatingControllerTest {
                 "src/pages/ReservationCheckInPage.vue",
                 "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
+                "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue"
             ).contains(path))
             .noneMatch(WalkInDirectSeatingControllerTest::isForbiddenUiFile);

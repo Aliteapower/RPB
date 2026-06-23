@@ -20,7 +20,9 @@ public class DefaultCustomerMapper implements CustomerMapper {
             entity.getCustomerCode(),
             entity.getCustomerType(),
             new E164Phone(entity.getPhoneE164()),
-            entity.getStatus()
+            entity.getStatus(),
+            entity.getDisplayName(),
+            entity.getNickname()
         );
     }
 
@@ -32,8 +34,8 @@ public class DefaultCustomerMapper implements CustomerMapper {
             domain.scope().tenantId().value(),
             domain.customerCode(),
             domain.customerType(),
-            domain.customerCode(),
-            null,
+            displayName(domain),
+            domain.nickname(),
             domain.phone().value(),
             null,
             null,
@@ -44,5 +46,9 @@ public class DefaultCustomerMapper implements CustomerMapper {
             null,
             0
         );
+    }
+
+    private static String displayName(Customer domain) {
+        return domain.displayName() == null ? domain.customerCode() : domain.displayName();
     }
 }

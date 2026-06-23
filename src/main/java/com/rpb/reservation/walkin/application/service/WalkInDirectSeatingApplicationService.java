@@ -314,13 +314,14 @@ public class WalkInDirectSeatingApplicationService {
         E164Phone phone = parsePhone(command.phoneE164());
         require(customerIdentityRule.evaluate(command.customerId(), command.customerName(), command.customerNickname(), phone), WalkInDirectSeatingError.INVALID_CUSTOMER_IDENTITY);
         if (command.customerId() != null) {
-            return customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
+            Customer customer = customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
                 .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.INVALID_CUSTOMER_IDENTITY));
+            return refreshCustomerProfile(tenantScope, customer, command, phone);
         }
         if (phone.isPresent()) {
             Optional<Customer> existing = customerRepository.findByPhone(tenantScope, phone);
             if (existing.isPresent()) {
-                return existing.get();
+                return refreshCustomerProfile(tenantScope, existing.get(), command, phone);
             }
         }
         return customerRepository.save(
@@ -331,9 +332,28 @@ public class WalkInDirectSeatingApplicationService {
                 "C-" + UUID.randomUUID().toString().substring(0, 8),
                 "walk_in_guest",
                 phone,
-                "active"
+                "active",
+                blankToNull(command.customerName()),
+                blankToNull(command.customerNickname())
             )
         );
+    }
+
+    private Customer refreshCustomerProfile(
+        TenantScope tenantScope,
+        Customer customer,
+        SeatWalkInDirectlyCommand command,
+        E164Phone phone
+    ) {
+        Customer refreshed = customer.refreshProfile(
+            phone,
+            blankToNull(command.customerName()),
+            blankToNull(command.customerNickname())
+        );
+        if (refreshed.equals(customer)) {
+            return customer;
+        }
+        return customerRepository.save(tenantScope, refreshed);
     }
 
     private ResourceSelection resolveResource(SeatWalkInDirectlyCommand command, StoreScope scope, PartySize partySize, BusinessDate businessDate) {

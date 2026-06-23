@@ -309,13 +309,14 @@ public class ReservationCreateApplicationService {
     private Customer resolveCustomer(CreateReservationCommand command, TenantScope tenantScope) {
         E164Phone phone = parsePhone(command.phoneE164());
         if (command.customerId() != null) {
-            return customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
+            Customer customer = customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
                 .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.CUSTOMER_NOT_FOUND));
+            return refreshCustomerProfile(tenantScope, customer, command, phone);
         }
         if (phone.isPresent()) {
             Optional<Customer> existing = customerRepository.findByPhone(tenantScope, phone);
             if (existing.isPresent()) {
-                return existing.get();
+                return refreshCustomerProfile(tenantScope, existing.get(), command, phone);
             }
         }
         return customerRepository.save(
@@ -326,9 +327,28 @@ public class ReservationCreateApplicationService {
                 "C-" + UUID.randomUUID().toString().substring(0, 8),
                 "temporary",
                 phone,
-                "active"
+                "active",
+                blankToNull(command.customerName()),
+                blankToNull(command.customerNickname())
             )
         );
+    }
+
+    private Customer refreshCustomerProfile(
+        TenantScope tenantScope,
+        Customer customer,
+        CreateReservationCommand command,
+        E164Phone phone
+    ) {
+        Customer refreshed = customer.refreshProfile(
+            phone,
+            blankToNull(command.customerName()),
+            blankToNull(command.customerNickname())
+        );
+        if (refreshed.equals(customer)) {
+            return customer;
+        }
+        return customerRepository.save(tenantScope, refreshed);
     }
 
     private ReservationCode resolveReservationCode(CreateReservationCommand command, BusinessDate businessDate, StoreScope scope) {

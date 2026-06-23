@@ -4,14 +4,15 @@ import { useRoute } from 'vue-router'
 
 import { createReservation, ReservationCreateApiError } from '../api/reservationCreateApi'
 import DateTimeWheelPicker from '../components/DateTimeWheelPicker.vue'
+import StaffGuestContactLookup from '../components/staff/StaffGuestContactLookup.vue'
+import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../components/staff/staffGuestContact'
 import { useStoreContextStore } from '../stores/storeContext'
+import { formatReservationCreateErrorMessage } from '../utils/reservationCreateMessages'
 import type {
   CreateReservationRequest,
   CreateReservationResponse,
   ReservationApiErrorResponse
 } from '../types/reservation'
-
-const E164_PATTERN = /^[+][1-9][0-9]{1,14}$/
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -22,8 +23,8 @@ const form = reactive({
   reservedEndAt: '',
   customerId: '',
   customerName: '',
-  customerNickname: '',
-  phoneE164: '',
+  customerSalutation: '',
+  phoneLocal: '',
   note: ''
 })
 
@@ -93,8 +94,8 @@ function validateForm(): ReservationApiErrorResponse | null {
     }
   }
 
-  const phoneE164 = form.phoneE164.trim()
-  if (phoneE164 && !E164_PATTERN.test(phoneE164)) {
+  const phoneLocal = form.phoneLocal.trim()
+  if (phoneLocal && !isValidSingaporeLocalPhone(phoneLocal)) {
     return createLocalError('INVALID_PHONE_E164', 'reservation.invalid_phone_e164')
   }
 
@@ -108,8 +109,8 @@ function toRequest(): CreateReservationRequest {
     reservedEndAt: optionalIsoInstant(form.reservedEndAt),
     customerId: optionalValue(form.customerId),
     customerName: optionalValue(form.customerName),
-    customerNickname: optionalValue(form.customerNickname),
-    phoneE164: optionalValue(form.phoneE164),
+    customerNickname: optionalValue(form.customerSalutation),
+    phoneE164: toSingaporePhoneE164(form.phoneLocal),
     note: optionalValue(form.note)
   }
 }
@@ -267,28 +268,14 @@ function pad2(value: number): string {
 
       <details class="field-group">
         <summary>客户信息</summary>
-        <label>
-          <span>客户 ID（可选）</span>
-          <input v-model="form.customerId" autocomplete="off" name="customerId" type="text" />
-        </label>
-        <label>
-          <span>客户姓名（可选）</span>
-          <input v-model="form.customerName" autocomplete="name" name="customerName" type="text" />
-        </label>
-        <label>
-          <span>客户昵称（可选）</span>
-          <input v-model="form.customerNickname" name="customerNickname" type="text" />
-        </label>
-        <label>
-          <span>手机号（可选）</span>
-          <input
-            v-model="form.phoneE164"
-            autocomplete="tel"
-            name="phoneE164"
-            placeholder="+6591234567"
-            type="tel"
-          />
-        </label>
+        <StaffGuestContactLookup
+          :store-id="storeId"
+          v-model:customer-id="form.customerId"
+          v-model:customer-name="form.customerName"
+          v-model:salutation="form.customerSalutation"
+          v-model:phone-local="form.phoneLocal"
+          :disabled="isSubmitting"
+        />
       </details>
 
       <details class="field-group">
@@ -364,7 +351,7 @@ function pad2(value: number): string {
     <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
       <h2>创建失败</h2>
       <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+      <p class="message-key">原因：{{ formatReservationCreateErrorMessage(apiError.error.messageKey) }}</p>
     </section>
 
     <p v-if="lastIdempotencyKey" class="idempotency-key">

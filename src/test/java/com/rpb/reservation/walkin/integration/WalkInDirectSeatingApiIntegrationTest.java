@@ -45,6 +45,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 class WalkInDirectSeatingApiIntegrationTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/walk-ins/direct-seating";
+    private static final UUID LOOKUP_CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000009101");
     private static final LocalPostgresTestDatabase DATABASE = LocalPostgresTestDatabase.start();
 
     @Autowired
@@ -104,6 +105,36 @@ class WalkInDirectSeatingApiIntegrationTest {
         assertSuccessfulTableSeating("idem-no-phone", SMALL_TABLE_ID);
         assertThat(fixture.scalarInteger("select count(*) from customers where tenant_id = ? and phone_e164 is null", TENANT_ID))
             .isEqualTo(1);
+    }
+
+    @Test
+    void seatsWalkInAndRefreshesRecognizedCustomerProfile() throws Exception {
+        insertRecognizedCustomer();
+        SeatWalkInDirectlyRequest request = new SeatWalkInDirectlyRequest(
+            2,
+            LOOKUP_CUSTOMER_ID,
+            "陈女士",
+            "女士",
+            "+6598765430",
+            SMALL_TABLE_ID,
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-refresh-walkin-customer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(request)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(fixture.scalarString("select display_name from customers where id = ?", LOOKUP_CUSTOMER_ID))
+            .isEqualTo("陈女士");
+        assertThat(fixture.scalarString("select nickname from customers where id = ?", LOOKUP_CUSTOMER_ID))
+            .isEqualTo("女士");
+        assertThat(fixture.scalarString("select phone_e164 from customers where id = ?", LOOKUP_CUSTOMER_ID))
+            .isEqualTo("+6598765430");
     }
 
     @Test
@@ -438,6 +469,20 @@ class WalkInDirectSeatingApiIntegrationTest {
 
     private SeatWalkInDirectlyRequest request(int partySize, UUID tableId, UUID tableGroupId) {
         return new SeatWalkInDirectlyRequest(partySize, null, "Guest", null, null, tableId, tableGroupId, null, null);
+    }
+
+    private void insertRecognizedCustomer() {
+        jdbc.update(
+            """
+            insert into customers (
+                id, tenant_id, customer_code, customer_type, display_name,
+                nickname, phone_e164, status
+            )
+            values (?, ?, 'C-WALKIN-LOOKUP', 'regular', '陈先生', '先生', '+6598765430', 'active')
+            """,
+            LOOKUP_CUSTOMER_ID,
+            TENANT_ID
+        );
     }
 
     private String requestHash(SeatWalkInDirectlyRequest request) {

@@ -6,6 +6,8 @@ import {
   seatWalkInDirectly,
   WalkInDirectSeatingApiError
 } from '../api/walkInDirectSeatingApi'
+import StaffGuestContactLookup from '../components/staff/StaffGuestContactLookup.vue'
+import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../components/staff/staffGuestContact'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   ApiErrorResponse,
@@ -13,16 +15,16 @@ import type {
   SeatWalkInDirectlyResponse
 } from '../types/walkInDirectSeating'
 
-const E164_PATTERN = /^[+][1-9][0-9]{1,14}$/
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
 
 const form = reactive({
   partySize: 2,
+  customerId: '',
   customerName: '',
-  customerNickname: '',
-  phoneE164: '',
+  customerSalutation: '',
+  phoneLocal: '',
   tableId: '',
   tableGroupId: '',
   overrideReasonCode: '',
@@ -83,8 +85,8 @@ function validateForm(): ApiErrorResponse | null {
     return createLocalError('INVALID_PARTY_SIZE', 'walkin.direct_seating.invalid_party_size')
   }
 
-  const phoneE164 = form.phoneE164.trim()
-  if (phoneE164 && !E164_PATTERN.test(phoneE164)) {
+  const phoneLocal = form.phoneLocal.trim()
+  if (phoneLocal && !isValidSingaporeLocalPhone(phoneLocal)) {
     return createLocalError('INVALID_PHONE_E164', 'walkin.direct_seating.invalid_phone_e164')
   }
 
@@ -98,10 +100,10 @@ function validateForm(): ApiErrorResponse | null {
 function toRequest(): SeatWalkInDirectlyRequest {
   return {
     partySize: form.partySize,
-    customerId: null,
+    customerId: optionalValue(form.customerId),
     customerName: optionalValue(form.customerName),
-    customerNickname: optionalValue(form.customerNickname),
-    phoneE164: optionalValue(form.phoneE164),
+    customerNickname: optionalValue(form.customerSalutation),
+    phoneE164: toSingaporePhoneE164(form.phoneLocal),
     tableId: optionalValue(form.tableId),
     tableGroupId: optionalValue(form.tableGroupId),
     overrideReasonCode: optionalValue(form.overrideReasonCode),
@@ -161,24 +163,14 @@ function createLocalError(code: string, messageKey: string): ApiErrorResponse {
 
       <details class="field-group">
         <summary>客户信息</summary>
-        <label>
-          <span>客户姓名（可选）</span>
-          <input v-model="form.customerName" autocomplete="name" name="customerName" type="text" />
-        </label>
-        <label>
-          <span>客户昵称（可选）</span>
-          <input v-model="form.customerNickname" name="customerNickname" type="text" />
-        </label>
-        <label>
-          <span>手机号（可选）</span>
-          <input
-            v-model="form.phoneE164"
-            autocomplete="tel"
-            name="phoneE164"
-            placeholder="+6591234567"
-            type="tel"
-          />
-        </label>
+        <StaffGuestContactLookup
+          :store-id="storeId"
+          v-model:customer-id="form.customerId"
+          v-model:customer-name="form.customerName"
+          v-model:salutation="form.customerSalutation"
+          v-model:phone-local="form.phoneLocal"
+          :disabled="isSubmitting"
+        />
       </details>
 
       <details class="field-group">
