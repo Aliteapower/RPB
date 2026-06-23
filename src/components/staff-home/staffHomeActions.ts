@@ -10,6 +10,7 @@ export type StaffHomeActionTone =
 export type StaffHomeActionItem = {
   id: string
   label: string
+  description?: string
   symbol: string
   to: RouteLocationRaw
   tone: StaffHomeActionTone

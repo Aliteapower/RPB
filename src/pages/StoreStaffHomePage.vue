@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import StaffHomeActionGroup from '../components/staff-home/StaffHomeActionGroup.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import StaffHomeWorkflowStrip from '../components/staff-home/StaffHomeWorkflowStrip.vue'
@@ -54,6 +55,9 @@ const canSeatWalkInDirectly = computed(() =>
 const canHandleCleaning = computed(() =>
   hasPermission('cleaning.start') && hasPermission('cleaning.complete')
 )
+const canViewTables = computed(() =>
+  hasPermission('table.view')
+)
 const hasReceptionOperations = computed(
   () => canSeatWalkInDirectly.value || canCheckInReservation.value
 )
@@ -70,7 +74,7 @@ const hasQueueOperations = computed(
     canCallQueueTicket.value ||
     canSeatCalledQueueTicket.value
 )
-const hasTableTurnoverOperations = computed(() => canHandleCleaning.value)
+const hasTableTurnoverOperations = computed(() => canHandleCleaning.value || canViewTables.value)
 const hasVisibleOperation = computed(
   () =>
     hasReceptionOperations.value ||
@@ -166,6 +170,12 @@ const cleaningRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
+const tableResourceListRoute = computed(() => ({
+  name: 'table-resource-list',
+  params: {
+    storeId: storeId.value
+  }
+}))
 const reservationRoute = computed(() => ({
   name: 'reservation-create',
   params: {
@@ -219,6 +229,7 @@ const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'walkin-direct-seating',
         label: '散客直接入座',
+        description: '现场客人不排队直接安排桌台',
         symbol: '入',
         to: walkInRoute.value,
         tone: 'primary',
@@ -229,6 +240,7 @@ const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'reservation-check-in',
         label: '预约到店',
+        description: '确认预约客人已到店',
         symbol: '到',
         to: reservationCheckInRoute.value,
         tone: 'primary',
@@ -241,6 +253,7 @@ const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions(
     ? {
         id: 'reservation-create',
         label: '创建预约',
+        description: '登记新的门店预约',
         symbol: '约',
         to: reservationRoute.value,
         tone: 'reservation'
@@ -250,6 +263,7 @@ const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions(
     ? {
         id: 'reservation-today-view',
         label: '今日预约',
+        description: '查看当前营业日预约',
         symbol: '今',
         to: reservationTodayViewRoute.value,
         tone: 'reservation'
@@ -259,6 +273,7 @@ const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions(
     ? {
         id: 'reservation-arrived-to-queue',
         label: '预约排队',
+        description: '将到店预约加入排队',
         symbol: '排',
         to: reservationArrivedToQueueRoute.value,
         tone: 'reservation'
@@ -268,6 +283,7 @@ const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions(
     ? {
         id: 'reservation-arrived-direct-seating',
         label: '预约入座',
+        description: '给到店预约安排桌台',
         symbol: '座',
         to: reservationArrivedDirectSeatingRoute.value,
         tone: 'success'
@@ -279,6 +295,7 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'queue-ticket-list',
         label: '排队列表',
+        description: '查看当前排队票状态',
         symbol: '列',
         to: queueTicketListRoute.value,
         tone: 'queue',
@@ -289,6 +306,7 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'queue-call',
         label: '排队叫号',
+        description: '输入排队记录 ID 并执行叫号',
         symbol: '叫',
         to: queueCallRoute.value,
         tone: 'queue',
@@ -299,6 +317,7 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'seating-from-called-queue',
         label: '排队入座',
+        description: '输入已叫号排队票 ID 并安排桌台入座',
         symbol: '座',
         to: seatingFromCalledQueueRoute.value,
         tone: 'success'
@@ -306,10 +325,21 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
     : null
 ]))
 const tableTurnoverActions = computed<StaffHomeActionItem[]>(() => compactActions([
+  canViewTables.value
+    ? {
+        id: 'table-resource-list',
+        label: '桌台列表',
+        description: '查看后台配置的桌号及分组',
+        symbol: '桌',
+        to: tableResourceListRoute.value,
+        tone: 'support'
+      }
+    : null,
   canHandleCleaning.value
     ? {
         id: 'cleaning-complete',
         label: '清台处理',
+        description: '处理已离店桌台清洁',
         symbol: '清',
         to: cleaningRoute.value,
         tone: 'support'
@@ -368,7 +398,7 @@ function hasPermission(permission: string): boolean {
 </script>
 
 <template>
-  <main class="staff-shell">
+  <main class="staff-workbench-shell staff-shell">
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :current-time-text="currentTimeText"
@@ -421,23 +451,16 @@ function hasPermission(permission: string): boolean {
         <strong>入口会按 App Gate 权限自动显示。</strong>
       </section>
     </div>
+
+    <StaffBottomNav :store-id="storeId" active-tab="home" />
   </main>
 </template>
 
 <style scoped>
-.staff-shell {
-  background:
-    linear-gradient(180deg, #f8fafc 0%, #eef4f8 46%, #e8eef4 100%);
-  color: #0f172a;
-  margin: 0 auto;
-  max-width: 520px;
-  min-height: 100dvh;
-}
-
 .workbench-body {
   display: grid;
   gap: 16px;
-  padding: 12px 14px max(30px, env(safe-area-inset-bottom));
+  padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
 }
 
 .app-state {
@@ -502,11 +525,6 @@ function hasPermission(permission: string): boolean {
 }
 
 @media (min-width: 720px) {
-  .staff-shell {
-    border-left: 1px solid #dbe3ee;
-    border-right: 1px solid #dbe3ee;
-  }
-
   .workbench-body {
     padding-top: 16px;
   }

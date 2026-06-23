@@ -576,18 +576,33 @@ class ReservationCreateApiIntegrationTest {
         }
         try (Stream<Path> paths = Files.walk(Path.of("."))) {
             assertThat(paths.filter(Files::isRegularFile).map(path -> path.toString().replace('\\', '/')).toList())
-                .noneMatch(path -> path.endsWith(".vue")
-                    && path.toLowerCase().contains("reservation")
-                    && !path.endsWith("src/pages/ReservationCreatePage.vue")
-                    && !path.endsWith("src/pages/ReservationCheckInPage.vue")
-                    && !path.endsWith("src/pages/ReservationArrivedDirectSeatingPage.vue")
-                    && !path.endsWith("src/pages/ReservationArrivedToQueuePage.vue")
-                    && !path.endsWith("src/pages/ReservationTodayViewPage.vue")
-                    && !path.endsWith("src/components/reservation-workbench/CreateReservationDialog.vue"))
+                .noneMatch(ReservationCreateApiIntegrationTest::isForbiddenReservationUiFile)
                 .noneMatch(path -> path.toLowerCase().contains("openapi") && (
                     path.endsWith(".yml") || path.endsWith(".yaml") || path.endsWith(".json")
                 ));
         }
+    }
+
+    private static boolean isForbiddenReservationUiFile(String path) {
+        String normalized = path.replace('\\', '/');
+        if (normalized.startsWith("./")) {
+            normalized = normalized.substring(2);
+        }
+        if (!normalized.endsWith(".vue") || !normalized.toLowerCase().contains("reservation")) {
+            return false;
+        }
+        return !Set.of(
+            "src/pages/ReservationCreatePage.vue",
+            "src/pages/ReservationCheckInPage.vue",
+            "src/pages/ReservationArrivedDirectSeatingPage.vue",
+            "src/pages/ReservationArrivedToQueuePage.vue",
+            "src/pages/ReservationTodayViewPage.vue",
+            "src/components/reservation-workbench/CreateReservationDialog.vue",
+            "src/components/reservation-workbench/ReservationMonthCalendar.vue",
+            "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+            "src/components/reservation-workbench/ReservationTodayListItem.vue",
+            "src/components/reservation-workbench/ReservationTodayListPanel.vue"
+        ).contains(normalized);
     }
 
     private static boolean isForbiddenQueueApiFile(String path) {

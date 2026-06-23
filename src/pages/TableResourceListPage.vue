@@ -6,6 +6,7 @@ import {
   fetchTableResources,
   TableResourceApiError
 } from '../api/tableResourceApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   TableResourceApiErrorResponse,
@@ -260,6 +261,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       </div>
     </section>
 
+    <StaffBottomNav :store-id="storeId" active-tab="table" />
   </main>
 </template>
 

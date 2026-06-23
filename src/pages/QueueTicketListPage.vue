@@ -6,6 +6,7 @@ import { fetchMeApps } from '../api/meAppsApi'
 import { listQueueTickets, QueueTicketListApiError } from '../api/queueTicketListApi'
 import { QueueRejoinApiError, rejoinQueueTicket } from '../api/queueRejoinApi'
 import { QueueSkipApiError, skipQueueTicket } from '../api/queueSkipApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { MeAppEntry } from '../types/meApps'
 import type {
@@ -518,7 +519,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 </script>
 
 <template>
-  <main class="page-shell">
+  <main class="staff-workbench-shell staff-workbench-shell--padded page-shell">
     <section class="page-header">
       <p class="eyebrow">门店员工</p>
       <h1>排队列表</h1>
@@ -690,19 +691,12 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
       <button type="button" :disabled="isLoading" @click="refresh">刷新</button>
       <button type="button" :disabled="!canGoNext" @click="goNext">下一页</button>
     </nav>
+
+    <StaffBottomNav :store-id="storeId" active-tab="queue" />
   </main>
 </template>
 
 <style scoped>
-.page-shell {
-  display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 680px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
-}
-
 .page-header,
 .filter-panel,
 .state-panel,
@@ -998,10 +992,6 @@ a:focus-visible {
 }
 
 @media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
-  }
-
   h1 {
     font-size: 2rem;
   }

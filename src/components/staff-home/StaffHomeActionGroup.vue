@@ -25,6 +25,7 @@ defineProps<{
       >
         <span class="action-symbol" aria-hidden="true">{{ action.symbol }}</span>
         <span class="action-label">{{ action.label }}</span>
+        <span v-if="action.description" class="action-description">{{ action.description }}</span>
       </RouterLink>
     </div>
   </section>
@@ -99,6 +100,13 @@ defineProps<{
   font-size: 0.88rem;
   font-weight: 900;
   line-height: 1.2;
+}
+
+.action-description {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .high-frequency-action {

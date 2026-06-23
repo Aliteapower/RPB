@@ -68,6 +68,13 @@ class ReservationCheckInUiImplementationValidationTest {
             .contains("idempotency");
 
         assertThat(page)
+            .contains("StaffBottomNav")
+            .contains("staff-workbench-shell")
+            .contains("reservation-check-in-workbench")
+            .contains("reservation-check-in-card")
+            .contains("check-in-result-card")
+            .contains("确认预约客人已到店")
+            .contains("active-tab=\"reservation\"")
             .contains("reservationId")
             .contains("arrivedAt")
             .contains("reasonCode")

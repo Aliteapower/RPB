@@ -16,10 +16,14 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path staffHomePath = Path.of("src", "pages", "StoreStaffHomePage.vue");
         Path todayViewPath = Path.of("src", "pages", "ReservationTodayViewPage.vue");
+        Path todayQuickActionsPath = Path.of("src", "components", "reservation-workbench", "ReservationQuickActionPanel.vue");
+        Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
+        assertThat(todayQuickActionsPath).exists();
+        assertThat(todayListItemPath).exists();
 
         String page = Files.readString(pagePath);
         String apiClient = Files.readString(apiPath);
@@ -27,6 +31,9 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
         String router = Files.readString(routerPath);
         String staffHome = Files.readString(staffHomePath);
         String todayView = Files.readString(todayViewPath);
+        String todayWorkbenchSource = todayView
+            + Files.readString(todayQuickActionsPath)
+            + Files.readString(todayListItemPath);
 
         assertThat(router)
             .contains("ReservationArrivedToQueuePage")
@@ -45,12 +52,12 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
             .contains("hasVisibleOperation");
         assertForbiddenQueueOperationsAbsent(staffHome);
 
-        assertThat(todayView)
-            .contains("queueReservationRoute")
-            .contains("name: 'reservation-arrived-to-queue'")
-            .contains("进入排队")
-            .contains("item.status === 'arrived'")
-            .contains("reservationId: item.reservationId")
+        assertThat(todayWorkbenchSource)
+            .contains("ReservationQuickActionPanel")
+            .contains("routeName: 'reservation-arrived-to-queue'")
+            .contains("label: '预约排队'")
+            .contains("已到店预约进入排队")
+            .doesNotContain("取消预约需后端契约")
             .doesNotContain("queueArrivedReservation")
             .doesNotContain("reservationArrivedToQueueApi");
 
