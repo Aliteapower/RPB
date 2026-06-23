@@ -3,13 +3,20 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
+import StaffHomeActionGroup from '../components/staff-home/StaffHomeActionGroup.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import StaffHomeWorkflowStrip from '../components/staff-home/StaffHomeWorkflowStrip.vue'
+import type { StaffHomeActionItem } from '../components/staff-home/staffHomeActions'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { MeAppEntry } from '../types/meApps'
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
+const { currentTimeText } = useCurrentClock()
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
 const apps = ref<MeAppEntry[]>([])
 const appsLoading = ref(false)
 const appsLoadFailed = ref(false)
@@ -47,19 +54,106 @@ const canSeatWalkInDirectly = computed(() =>
 const canHandleCleaning = computed(() =>
   hasPermission('cleaning.start') && hasPermission('cleaning.complete')
 )
-const hasVisibleOperation = computed(
+const hasReceptionOperations = computed(
+  () => canSeatWalkInDirectly.value || canCheckInReservation.value
+)
+const hasReservationOperations = computed(
   () =>
-    canSeatWalkInDirectly.value ||
-    canHandleCleaning.value ||
     canCreateReservation.value ||
     canViewTodayReservations.value ||
-    canCheckInReservation.value ||
     canQueueArrivedReservation.value ||
-    canViewQueueTickets.value ||
-    canCallQueueTicket.value ||
-    canSeatCalledQueueTicket.value ||
     canSeatArrivedReservation.value
 )
+const hasQueueOperations = computed(
+  () =>
+    canViewQueueTickets.value ||
+    canCallQueueTicket.value ||
+    canSeatCalledQueueTicket.value
+)
+const hasTableTurnoverOperations = computed(() => canHandleCleaning.value)
+const hasVisibleOperation = computed(
+  () =>
+    hasReceptionOperations.value ||
+    hasReservationOperations.value ||
+    hasQueueOperations.value ||
+    hasTableTurnoverOperations.value
+)
+const appStatusTone = computed(() => {
+  if (appsLoading.value) {
+    return 'loading'
+  }
+
+  if (appsLoadFailed.value) {
+    return 'error'
+  }
+
+  if (!hasReservationQueue.value) {
+    return 'empty'
+  }
+
+  if (!hasVisibleOperation.value) {
+    return 'limited'
+  }
+
+  return 'ready'
+})
+const appStatusLabel = computed(() => {
+  if (appsLoading.value) {
+    return '检查中'
+  }
+
+  if (appsLoadFailed.value) {
+    return '暂不可用'
+  }
+
+  if (!hasReservationQueue.value) {
+    return '暂无应用'
+  }
+
+  if (!hasVisibleOperation.value) {
+    return '无入口'
+  }
+
+  return '应用可用'
+})
+const appStatusTitle = computed(() => {
+  if (appsLoading.value) {
+    return '应用检查中'
+  }
+
+  if (appsLoadFailed.value) {
+    return '应用暂不可用'
+  }
+
+  if (!hasReservationQueue.value) {
+    return '暂无可见应用'
+  }
+
+  if (!hasVisibleOperation.value) {
+    return '当前权限无可用入口'
+  }
+
+  return '可用入口已按权限展示'
+})
+const appStatusDetail = computed(() => {
+  if (appsLoading.value) {
+    return '正在读取当前门店 App Gate。'
+  }
+
+  if (appsLoadFailed.value) {
+    return '请稍后重试或联系管理员检查应用权限。'
+  }
+
+  if (!hasReservationQueue.value) {
+    return '当前门店没有可见的 reservation_queue 应用入口。'
+  }
+
+  if (!hasVisibleOperation.value) {
+    return '应用可见，但当前账号没有已开放的操作权限。'
+  }
+
+  return '入口不会展示未授权业务操作。'
+})
 const walkInRoute = computed(() => ({
   name: 'walk-in-direct-seating',
   params: {
@@ -120,6 +214,108 @@ const reservationArrivedDirectSeatingRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
+const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
+  canSeatWalkInDirectly.value
+    ? {
+        id: 'walkin-direct-seating',
+        label: '散客直接入座',
+        symbol: '入',
+        to: walkInRoute.value,
+        tone: 'primary',
+        emphasis: true
+      }
+    : null,
+  canCheckInReservation.value
+    ? {
+        id: 'reservation-check-in',
+        label: '预约到店',
+        symbol: '到',
+        to: reservationCheckInRoute.value,
+        tone: 'primary',
+        emphasis: true
+      }
+    : null
+]))
+const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions([
+  canCreateReservation.value
+    ? {
+        id: 'reservation-create',
+        label: '创建预约',
+        symbol: '约',
+        to: reservationRoute.value,
+        tone: 'reservation'
+      }
+    : null,
+  canViewTodayReservations.value
+    ? {
+        id: 'reservation-today-view',
+        label: '今日预约',
+        symbol: '今',
+        to: reservationTodayViewRoute.value,
+        tone: 'reservation'
+      }
+    : null,
+  canQueueArrivedReservation.value
+    ? {
+        id: 'reservation-arrived-to-queue',
+        label: '预约排队',
+        symbol: '排',
+        to: reservationArrivedToQueueRoute.value,
+        tone: 'reservation'
+      }
+    : null,
+  canSeatArrivedReservation.value
+    ? {
+        id: 'reservation-arrived-direct-seating',
+        label: '预约入座',
+        symbol: '座',
+        to: reservationArrivedDirectSeatingRoute.value,
+        tone: 'success'
+      }
+    : null
+]))
+const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
+  canViewQueueTickets.value
+    ? {
+        id: 'queue-ticket-list',
+        label: '排队列表',
+        symbol: '列',
+        to: queueTicketListRoute.value,
+        tone: 'queue',
+        emphasis: true
+      }
+    : null,
+  canCallQueueTicket.value
+    ? {
+        id: 'queue-call',
+        label: '排队叫号',
+        symbol: '叫',
+        to: queueCallRoute.value,
+        tone: 'queue',
+        emphasis: true
+      }
+    : null,
+  canSeatCalledQueueTicket.value
+    ? {
+        id: 'seating-from-called-queue',
+        label: '排队入座',
+        symbol: '座',
+        to: seatingFromCalledQueueRoute.value,
+        tone: 'success'
+      }
+    : null
+]))
+const tableTurnoverActions = computed<StaffHomeActionItem[]>(() => compactActions([
+  canHandleCleaning.value
+    ? {
+        id: 'cleaning-complete',
+        label: '清台处理',
+        symbol: '清',
+        to: cleaningRoute.value,
+        tone: 'support'
+      }
+    : null
+]))
 
 watch(
   storeId,
@@ -154,6 +350,18 @@ watch(
   { immediate: true }
 )
 
+function compactActions(actions: Array<StaffHomeActionItem | null>): StaffHomeActionItem[] {
+  return actions.filter((action): action is StaffHomeActionItem => action !== null)
+}
+
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return '默认门店'
+  }
+
+  return `门店 ${value.slice(0, 8)}`
+}
+
 function hasPermission(permission: string): boolean {
   return reservationQueueEntry.value?.permissions.includes(permission) ?? false
 }
@@ -161,323 +369,146 @@ function hasPermission(permission: string): boolean {
 
 <template>
   <main class="staff-shell">
-    <section class="staff-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>员工工作台</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-    </section>
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    />
 
-    <section v-if="appsLoading" class="status-panel" aria-label="应用加载状态">
-      <p class="status-label">可用应用</p>
-      <p class="status-flow">加载中...</p>
-      <p class="status-note">正在检查当前门店权限。</p>
-    </section>
+    <div class="workbench-body">
+      <StaffHomeWorkflowStrip />
 
-    <section v-else-if="!hasReservationQueue" class="status-panel" aria-label="应用可用状态">
-      <p class="status-label">可用应用</p>
-      <p class="status-flow">{{ appsLoadFailed ? '暂不可用' : '暂无' }}</p>
-      <p class="status-note">当前门店没有可见应用入口。</p>
-    </section>
-
-    <section v-else class="status-panel" aria-label="闭环状态">
-      <p class="status-label">预约与入座</p>
-      <p class="status-label">当前闭环</p>
-      <p class="status-flow">散客入座 → 占用 → 清台 → 可用</p>
-      <p class="status-note">创建预约只锁定时段容量，不会直接安排入座。</p>
-    </section>
-
-    <nav v-if="hasVisibleOperation" class="operation-list" aria-label="门店员工操作">
-      <RouterLink v-if="canSeatWalkInDirectly" class="operation-link primary-action" :to="walkInRoute">
-        <span>散客直接入座</span>
-        <strong>无预约客户有空桌时直接安排入座</strong>
-      </RouterLink>
-
-      <RouterLink v-if="canHandleCleaning" class="operation-link" :to="cleaningRoute">
-        <span>清台处理</span>
-        <strong>开始或完成清台，释放桌台</strong>
-      </RouterLink>
-
-      <RouterLink v-if="canCreateReservation" class="operation-link reservation-action" :to="reservationRoute">
-        <span>创建预约</span>
-        <strong>为客户创建新的预约记录</strong>
-      </RouterLink>
-
-      <RouterLink
-        v-if="canViewTodayReservations"
-        class="operation-link today-view-action"
-        :to="reservationTodayViewRoute"
+      <section
+        class="app-state"
+        :class="`tone-${appStatusTone}`"
+        aria-label="应用可用状态"
       >
-        <span>今日预约</span>
-        <strong>查看当天预约并进入到店或入座操作</strong>
-      </RouterLink>
+        <div>
+          <p>{{ appStatusTitle }}</p>
+          <strong>{{ appStatusDetail }}</strong>
+        </div>
+      </section>
 
-      <RouterLink
-        v-if="canCheckInReservation"
-        class="operation-link check-in-action"
-        :to="reservationCheckInRoute"
+      <nav v-if="hasVisibleOperation" class="operation-groups" aria-label="门店员工操作">
+        <StaffHomeActionGroup
+          group-id="staff-section-reception"
+          heading="接待"
+          :actions="receptionActions"
+        />
+        <StaffHomeActionGroup
+          group-id="staff-section-reservation"
+          heading="预约管理"
+          :actions="reservationActions"
+        />
+        <StaffHomeActionGroup
+          group-id="staff-section-queue"
+          heading="排队管理"
+          :actions="queueActions"
+        />
+        <StaffHomeActionGroup
+          group-id="staff-section-table-turnover"
+          heading="桌台流转"
+          :actions="tableTurnoverActions"
+        />
+      </nav>
+
+      <section
+        v-else-if="hasReservationQueue && !appsLoading"
+        class="empty-state"
+        aria-label="当前权限无可用入口"
       >
-        <span>预约到店</span>
-        <strong>客户到店后，将预约状态标记为已到店</strong>
-      </RouterLink>
-
-      <RouterLink
-        v-if="canQueueArrivedReservation"
-        class="operation-link queue-action"
-        :to="reservationArrivedToQueueRoute"
-      >
-        <span>预约排队</span>
-        <strong>为已到店且暂无空桌的预约创建排队号</strong>
-      </RouterLink>
-
-      <RouterLink
-        v-if="canViewQueueTickets"
-        class="operation-link queue-list-action"
-        :to="queueTicketListRoute"
-      >
-        <span>排队列表</span>
-        <strong>查看等待、已叫号和已入座的排队票</strong>
-      </RouterLink>
-
-      <RouterLink
-        v-if="canCallQueueTicket"
-        class="operation-link queue-call-action"
-        :to="queueCallRoute"
-      >
-        <span>排队叫号</span>
-        <strong>输入排队记录 ID 并执行叫号</strong>
-      </RouterLink>
-
-      <RouterLink
-        v-if="canSeatCalledQueueTicket"
-        class="operation-link queue-seat-action"
-        :to="seatingFromCalledQueueRoute"
-      >
-        <span>排队入座</span>
-        <strong>输入已叫号排队票 ID 并安排桌台入座</strong>
-      </RouterLink>
-
-      <RouterLink
-        v-if="canSeatArrivedReservation"
-        class="operation-link seat-reservation-action"
-        :to="reservationArrivedDirectSeatingRoute"
-      >
-        <span>预约入座</span>
-        <strong>为已到店预约安排桌台并完成入座</strong>
-      </RouterLink>
-    </nav>
-
-    <section v-if="hasVisibleOperation" class="handoff-notes" aria-label="操作说明">
-      <h2>操作路径</h2>
-      <ol>
-        <li>散客有空桌时，可直接入座。</li>
-        <li>客人离席后进入清台处理。</li>
-        <li>完成清台后确认桌台状态为 available。</li>
-        <li>创建预约只创建预约记录，不自动执行到店或入座。</li>
-        <li v-if="canViewTodayReservations">今日预约用于查看和复制预约 ID，不直接改变预约状态。</li>
-        <li v-if="canQueueArrivedReservation">预约排队只处理已到店且需要等待的预约。</li>
-        <li v-if="canViewQueueTickets">排队列表只读展示排队票，不执行叫号或入座。</li>
-        <li v-if="canCallQueueTicket">排队叫号只处理等待中的排队记录，不执行入座。</li>
-        <li v-if="canSeatCalledQueueTicket">排队入座只处理已叫号的排队记录。</li>
-        <li>预约入座只处理已到店的预约。</li>
-      </ol>
-    </section>
+        <p>当前权限无可用入口</p>
+        <strong>入口会按 App Gate 权限自动显示。</strong>
+      </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
 .staff-shell {
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #eef4f8 46%, #e8eef4 100%);
+  color: #0f172a;
+  margin: 0 auto;
+  max-width: 520px;
+  min-height: 100dvh;
+}
+
+.workbench-body {
   display: grid;
   gap: 16px;
-  margin: 0 auto;
-  max-width: 560px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
+  padding: 12px 14px max(30px, env(safe-area-inset-bottom));
 }
 
-.staff-header {
-  display: grid;
-  gap: 4px;
-}
-
-.eyebrow,
-.store-context,
-.status-label {
-  color: #667085;
-  font-size: 0.82rem;
-  margin: 0;
-}
-
-h1,
-h2,
-.status-flow {
-  color: #14213d;
-  letter-spacing: 0;
-  margin: 0;
-}
-
-h1 {
-  font-size: 1.7rem;
-  line-height: 1.15;
-}
-
-h2 {
-  font-size: 1rem;
-}
-
-.status-panel,
-.operation-link,
-.handoff-notes {
+.app-state {
+  align-items: center;
   background: #ffffff;
-  border: 1px solid #d8e0eb;
-  border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
+  border: 1px solid #dbe3ee;
+  border-left: 4px solid #94a3b8;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+  display: flex;
+  min-height: 64px;
+  padding: 12px 14px;
 }
 
-.status-panel {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-}
-
-.status-flow,
-.status-note {
-  font-size: 1rem;
-  font-weight: 800;
-}
-
-.status-note {
-  color: #41516a;
-  font-size: 0.9rem;
-  line-height: 1.35;
-}
-
-.operation-list {
-  display: grid;
-  gap: 12px;
-}
-
-.operation-link {
-  color: #182536;
-  display: grid;
-  gap: 5px;
-  min-height: 78px;
-  padding: 14px;
-  text-decoration: none;
-}
-
-.operation-link span {
-  color: #315f91;
-  font-size: 0.86rem;
-  font-weight: 800;
-}
-
-.operation-link strong {
-  font-size: 1rem;
-  line-height: 1.35;
-}
-
-.primary-action {
-  border-color: #a7d7be;
-}
-
-.primary-action span {
-  color: #176b4d;
-}
-
-.reservation-action {
-  border-color: #b8cdf6;
-}
-
-.reservation-action span {
-  color: #315f91;
-}
-
-.check-in-action {
-  border-color: #a7d7be;
-}
-
-.check-in-action span {
-  color: #176b4d;
-}
-
-.today-view-action {
-  border-color: #c7d2fe;
-}
-
-.today-view-action span {
-  color: #4f46e5;
-}
-
-.queue-action {
-  border-color: #a7d7be;
-}
-
-.queue-action span {
-  color: #176b4d;
-}
-
-.queue-list-action {
-  border-color: #b8cdf6;
-}
-
-.queue-list-action span {
-  color: #315f91;
-}
-
-.queue-call-action {
-  border-color: #fed7aa;
-}
-
-.queue-call-action span {
-  color: #c2410c;
-}
-
-.queue-seat-action {
-  border-color: #c7d2fe;
-}
-
-.queue-seat-action span {
-  color: #4f46e5;
-}
-
-.seat-reservation-action {
-  border-color: #fed7aa;
-}
-
-.seat-reservation-action span {
-  color: #c2410c;
-}
-
-.operation-link:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.28);
-  outline-offset: 2px;
-}
-
-.handoff-notes {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-}
-
-ol {
-  color: #41516a;
-  display: grid;
-  gap: 8px;
+.app-state p,
+.empty-state p {
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.25;
   margin: 0;
-  padding-left: 20px;
 }
 
-li {
-  line-height: 1.45;
+.app-state strong,
+.empty-state strong {
+  color: #64748b;
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+.tone-ready {
+  border-left-color: #22c55e;
+}
+
+.tone-loading,
+.tone-limited {
+  border-left-color: #f97316;
+}
+
+.tone-empty {
+  border-left-color: #64748b;
+}
+
+.tone-error {
+  border-left-color: #ef4444;
+}
+
+.operation-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.empty-state {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 18px 14px;
 }
 
 @media (min-width: 720px) {
   .staff-shell {
-    padding-top: 36px;
+    border-left: 1px solid #dbe3ee;
+    border-right: 1px solid #dbe3ee;
   }
 
-  h1 {
-    font-size: 2rem;
+  .workbench-body {
+    padding-top: 16px;
   }
 }
 </style>
