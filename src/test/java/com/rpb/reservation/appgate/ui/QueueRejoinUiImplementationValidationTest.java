@@ -7,12 +7,12 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class QueueSkipUiImplementationValidationTest {
+class QueueRejoinUiImplementationValidationTest {
     @Test
-    void queueSkipUiImplementsListPageContract() throws Exception {
+    void queueRejoinUiImplementsListPageContract() throws Exception {
         Path pagePath = Path.of("src", "pages", "QueueTicketListPage.vue");
-        Path apiPath = Path.of("src", "api", "queueSkipApi.ts");
-        Path typesPath = Path.of("src", "types", "queueSkip.ts");
+        Path apiPath = Path.of("src", "api", "queueRejoinApi.ts");
+        Path typesPath = Path.of("src", "types", "queueRejoin.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
@@ -23,55 +23,56 @@ class QueueSkipUiImplementationValidationTest {
         String types = Files.readString(typesPath);
 
         assertThat(apiClient)
-            .contains("skipQueueTicket")
-            .contains("/api/v1/stores/${encodeURIComponent(storeId)}/queue-tickets/${encodeURIComponent(queueTicketId)}/skip")
+            .contains("rejoinQueueTicket")
+            .contains("/api/v1/stores/${encodeURIComponent(storeId)}/queue-tickets/${encodeURIComponent(queueTicketId)}/rejoin")
             .contains("'Idempotency-Key': idempotencyKey")
             .contains("body: JSON.stringify({})")
             .contains("UNKNOWN_ERROR")
-            .contains("queue.skip.unknown_error");
-        assertForbiddenSkipRequestFieldsAbsent(apiClient);
+            .contains("queue.rejoin.unknown_error");
+        assertForbiddenRejoinRequestFieldsAbsent(apiClient);
 
         assertThat(types)
-            .contains("interface SkipQueueTicketResponse")
-            .contains("interface QueueSkipApiErrorResponse")
-            .contains("interface QueueSkipIdempotency")
+            .contains("interface RejoinQueueTicketResponse")
+            .contains("interface QueueRejoinApiErrorResponse")
+            .contains("interface QueueRejoinIdempotency")
             .contains("queueTicketId")
             .contains("queueTicketNumber")
             .contains("queueTicketStatus")
+            .contains("queuePosition")
             .contains("reservationId")
             .contains("reservationCode")
             .contains("reservationStatus")
-            .contains("skippedAt")
-            .contains("alreadySkipped")
+            .contains("rejoinedAt")
+            .contains("alreadyRejoined")
             .contains("events")
             .contains("idempotency");
 
         assertThat(page)
             .contains("fetchMeApps")
             .contains("reservation_queue")
-            .contains("queue.skip")
-            .contains("canSkipQueueTicket")
-            .contains("canShowSkipAction")
-            .contains("item.queueTicketStatus === 'called'")
-            .contains("skipQueueTicket")
-            .contains("createIdempotencyKey")
-            .contains("queue:skip")
-            .contains("confirmSkipTicket")
-            .contains("executeConfirmedSkip")
-            .contains("skipInFlightTicketId")
-            .contains("refreshAfterSkipSuccess")
-            .contains("shouldRefreshAfterSkipError")
-            .contains("QUEUE_TICKET_STATUS_NOT_CALLED")
+            .contains("queue.rejoin")
+            .contains("canRejoinQueueTicket")
+            .contains("canShowRejoinAction")
+            .contains("item.queueTicketStatus === 'skipped'")
+            .contains("rejoinQueueTicket")
+            .contains("createRejoinIdempotencyKey")
+            .contains("queue:rejoin")
+            .contains("confirmRejoinTicket")
+            .contains("executeConfirmedRejoin")
+            .contains("rejoinInFlightTicketId")
+            .contains("refreshAfterRejoinSuccess")
+            .contains("shouldRefreshAfterRejoinError")
+            .contains("QUEUE_TICKET_STATUS_NOT_SKIPPED")
             .contains("PERMISSION_DENIED")
             .contains("error.code")
             .contains("error.messageKey")
-            .contains("过号")
-            .contains("确认过号");
-        assertForbiddenSkipPageFieldsAbsent(page);
+            .contains("重新入队")
+            .contains("确认重新入队");
+        assertForbiddenRejoinPageFieldsAbsent(page);
     }
 
     @Test
-    void queueSkipUiStaysInsideApprovedBoundary() throws Exception {
+    void queueRejoinUiStaysInsideApprovedBoundary() throws Exception {
         List<String> vueFiles = Files.walk(Path.of("src", "pages"))
             .filter(Files::isRegularFile)
             .map(path -> path.toString().replace('\\', '/'))
@@ -81,11 +82,11 @@ class QueueSkipUiImplementationValidationTest {
         assertThat(vueFiles)
             .contains("src/pages/QueueTicketListPage.vue")
             .doesNotContain(
-                "src/pages/QueueSkipPage.vue",
                 "src/pages/QueueRejoinPage.vue",
                 "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueWorkbenchPage.vue",
                 "src/pages/TableMapPage.vue",
+                "src/pages/ReservationCalendarPage.vue",
                 "src/pages/ReservationNoShowPage.vue",
                 "src/pages/ReservationCancellationPage.vue"
             );
@@ -97,57 +98,67 @@ class QueueSkipUiImplementationValidationTest {
             .toList();
 
         assertThat(apiFiles)
-            .contains("src/api/queueSkipApi.ts")
+            .contains("src/api/queueRejoinApi.ts")
             .doesNotContain(
                 "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
+                "src/api/queueCallFromListApi.ts",
+                "src/api/queueSeatFromListApi.ts",
                 "src/api/tableMapApi.ts",
-                "src/api/autoAssignmentApi.ts",
+                "src/api/reservationCalendarApi.ts",
+                "src/api/noShowApi.ts",
                 "src/api/reservationNoShowApi.ts",
-                "src/api/reservationCancellationApi.ts"
+                "src/api/cancellationApi.ts",
+                "src/api/reservationCancellationApi.ts",
+                "src/api/turnoverApi.ts"
             );
     }
 
-    private static void assertForbiddenSkipRequestFieldsAbsent(String source) {
+    private static void assertForbiddenRejoinRequestFieldsAbsent(String source) {
         assertThat(source)
-            .doesNotContain("skippedAt: request.skippedAt")
-            .doesNotContain("reasonCode: request.reasonCode")
-            .doesNotContain("note: request.note")
+            .doesNotContain("note:")
+            .doesNotContain("skippedAt:")
+            .doesNotContain("rejoinedAt: request.rejoinedAt")
+            .doesNotContain("reasonCode")
+            .doesNotContain("targetStatus")
+            .doesNotContain("queuePosition: request.queuePosition")
+            .doesNotContain("ticketNumber")
             .doesNotContain("tenantId")
             .doesNotContain("storeId: request.storeId")
             .doesNotContain("actorId")
             .doesNotContain("actorType")
             .doesNotContain("queueTicketId: request.queueTicketId")
             .doesNotContain("reservationId: request.reservationId")
-            .doesNotContain("tableId: request.tableId")
-            .doesNotContain("tableGroupId: request.tableGroupId")
-            .doesNotContain("seatingId: request.seatingId")
-            .doesNotContain("cleaningId: request.cleaningId")
-            .doesNotContain("turnoverId: request.turnoverId")
-            .doesNotContain("rejoin")
+            .doesNotContain("tableId")
+            .doesNotContain("seatingId")
+            .doesNotContain("status: request.status")
+            .doesNotContain("skip:")
             .doesNotContain("noShow")
             .doesNotContain("cancel")
-            .doesNotContain("status: request.status");
+            .doesNotContain("cleaning")
+            .doesNotContain("turnover");
     }
 
-    private static void assertForbiddenSkipPageFieldsAbsent(String source) {
+    private static void assertForbiddenRejoinPageFieldsAbsent(String source) {
         assertThat(source)
             .doesNotContain("name=\"tenantId\"")
             .doesNotContain("name=\"storeId\"")
             .doesNotContain("name=\"actorId\"")
             .doesNotContain("name=\"actorType\"")
+            .doesNotContain("name=\"note\"")
             .doesNotContain("name=\"skippedAt\"")
+            .doesNotContain("name=\"rejoinedAt\"")
             .doesNotContain("name=\"reasonCode\"")
+            .doesNotContain("name=\"targetStatus\"")
+            .doesNotContain("name=\"queuePosition\"")
+            .doesNotContain("name=\"ticketNumber\"")
             .doesNotContain("name=\"reservationId\"")
             .doesNotContain("name=\"tableId\"")
-            .doesNotContain("name=\"tableGroupId\"")
             .doesNotContain("name=\"seatingId\"")
-            .doesNotContain("name=\"cleaningId\"")
-            .doesNotContain("name=\"turnoverId\"")
             .doesNotContain("name=\"status\"")
             .doesNotContain("叫号屏")
             .doesNotContain("桌位图")
-            .doesNotContain("自动分桌")
+            .doesNotContain("预约日历")
             .doesNotContain("爽约处理")
             .doesNotContain("取消预约");
     }

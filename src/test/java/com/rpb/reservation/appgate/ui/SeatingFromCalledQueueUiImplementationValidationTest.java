@@ -142,7 +142,6 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/seatingFromCalledQueueApi.ts")
             .doesNotContain(
-                "src/api/queueRejoinApi.ts",
                 "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
                 "src/api/queueCallFromListApi.ts",

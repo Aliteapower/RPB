@@ -129,7 +129,6 @@ class QueueCallUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/queueCallApi.ts")
             .doesNotContain(
-                "src/api/queueRejoinApi.ts",
                 "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
                 "src/api/queueCallFromListApi.ts",
