@@ -1,17 +1,15 @@
 package com.rpb.reservation.reservation.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewItem;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
+import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.application.service.ReservationTodayViewApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -25,7 +23,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -35,13 +32,13 @@ class ReservationTodayViewControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000009701");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000009701");
 
-    private ReservationTodayViewApplicationService applicationService;
+    private CapturingReservationTodayViewService applicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        applicationService = mock(ReservationTodayViewApplicationService.class);
+        applicationService = new CapturingReservationTodayViewService();
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.today_view"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders
             .standaloneSetup(new ReservationTodayViewController(
@@ -70,8 +67,23 @@ class ReservationTodayViewControllerTest {
     }
 
     @Test
+    void calendarSummaryEndpointRequiresReservationTodayViewAppGatePermission() throws Exception {
+        Method method = ReservationTodayViewController.class.getMethod(
+            "calendarSummary",
+            UUID.class,
+            String.class
+        );
+
+        RequireAppGate annotation = method.getAnnotation(RequireAppGate.class);
+
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.appKey()).isEqualTo("reservation_queue");
+        assertThat(annotation.permission()).isEqualTo("reservation.today_view");
+    }
+
+    @Test
     void mapsOptionalQueryParamsToReadOnlyApplicationQueryAndResponse() throws Exception {
-        when(applicationService.getToday(any())).thenReturn(ReservationTodayViewResult.success(
+        applicationService.todayResult = ReservationTodayViewResult.success(
             STORE_ID,
             LocalDate.parse("2030-06-20"),
             "Asia/Singapore",
@@ -90,7 +102,7 @@ class ReservationTodayViewControllerTest {
                 "****4567",
                 "Window seat"
             ))
-        ));
+        );
 
         mockMvc.perform(get("/api/v1/stores/{storeId}/reservations/today", STORE_ID)
                 .param("businessDate", "2030-06-20")
@@ -108,9 +120,7 @@ class ReservationTodayViewControllerTest {
             .andExpect(jsonPath("$.items[0].phoneE164").doesNotExist())
             .andExpect(jsonPath("$.idempotency").doesNotExist());
 
-        ArgumentCaptor<ReservationTodayViewQuery> captor = ArgumentCaptor.forClass(ReservationTodayViewQuery.class);
-        verify(applicationService).getToday(captor.capture());
-        ReservationTodayViewQuery query = captor.getValue();
+        ReservationTodayViewQuery query = applicationService.todayQuery;
         assertThat(query.tenantId()).isEqualTo(TENANT_ID);
         assertThat(query.storeId()).isEqualTo(STORE_ID);
         assertThat(query.actorId()).isEqualTo(ACTOR_ID);
@@ -128,6 +138,8 @@ class ReservationTodayViewControllerTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
             .andExpect(jsonPath("$.error.messageKey").value("reservation.forbidden"));
+
+        assertThat(applicationService.todayQuery).isNull();
     }
 
     private static CurrentActor actor(Set<String> roles, Set<String> permissions, Set<UUID> storeIds) {
@@ -151,6 +163,28 @@ class ReservationTodayViewControllerTest {
         @Override
         public Optional<CurrentActor> currentActor() {
             return Optional.ofNullable(actor);
+        }
+    }
+
+    private static final class CapturingReservationTodayViewService extends ReservationTodayViewApplicationService {
+        private ReservationTodayViewQuery todayQuery;
+        private ReservationCalendarSummaryQuery calendarSummaryQuery;
+        private ReservationTodayViewResult todayResult;
+
+        private CapturingReservationTodayViewService() {
+            super(null, null);
+        }
+
+        @Override
+        public ReservationTodayViewResult getToday(ReservationTodayViewQuery query) {
+            this.todayQuery = query;
+            return todayResult;
+        }
+
+        @Override
+        public ReservationCalendarSummaryResult getCalendarSummary(ReservationCalendarSummaryQuery query) {
+            this.calendarSummaryQuery = query;
+            throw new AssertionError("Calendar summary should not be invoked by this controller test");
         }
     }
 }

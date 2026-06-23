@@ -4,11 +4,13 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.customer.value.CustomerId;
+import com.rpb.reservation.reservation.application.port.out.ReservationCalendarSummaryRow;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationTodayViewRow;
 import com.rpb.reservation.reservation.domain.Reservation;
 import com.rpb.reservation.reservation.persistence.entity.ReservationEntity;
 import com.rpb.reservation.reservation.persistence.mapper.ReservationMapper;
+import com.rpb.reservation.reservation.persistence.repository.ReservationCalendarSummaryProjection;
 import com.rpb.reservation.reservation.persistence.repository.ReservationJpaRepository;
 import com.rpb.reservation.reservation.persistence.repository.ReservationTodayViewProjection;
 import com.rpb.reservation.reservation.value.ReservationCode;
@@ -16,6 +18,7 @@ import com.rpb.reservation.reservation.value.ReservationId;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -134,6 +137,22 @@ public class ReservationPersistenceAdapter implements ReservationRepositoryPort 
     }
 
     @Override
+    public List<ReservationCalendarSummaryRow> findCalendarSummary(
+        StoreScope scope,
+        LocalDate startInclusive,
+        LocalDate endExclusive,
+        Set<String> statuses
+    ) {
+        return repository.findCalendarSummary(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            startInclusive,
+            endExclusive,
+            statuses
+        ).stream().map(ReservationPersistenceAdapter::toCalendarSummaryRow).toList();
+    }
+
+    @Override
     public Reservation save(StoreScope scope, Reservation reservation) {
         try {
             ReservationEntity entity = mapper.toEntity(reservation);
@@ -220,6 +239,15 @@ public class ReservationPersistenceAdapter implements ReservationRepositoryPort 
             projection.getCustomerNickname(),
             projection.getPhoneE164(),
             projection.getNote()
+        );
+    }
+
+    private static ReservationCalendarSummaryRow toCalendarSummaryRow(
+        ReservationCalendarSummaryProjection projection
+    ) {
+        return new ReservationCalendarSummaryRow(
+            projection.getBusinessDate(),
+            projection.getReservationCount() == null ? 0L : projection.getReservationCount()
         );
     }
 

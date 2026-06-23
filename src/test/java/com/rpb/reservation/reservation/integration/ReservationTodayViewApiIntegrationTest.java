@@ -34,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 class ReservationTodayViewApiIntegrationTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/today";
+    private static final String CALENDAR_SUMMARY_ENDPOINT = "/api/v1/stores/{storeId}/reservations/calendar-summary";
     private static final LocalPostgresTestDatabase DATABASE = LocalPostgresTestDatabase.start();
 
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000991");
@@ -48,6 +49,8 @@ class ReservationTodayViewApiIntegrationTest {
     private static final UUID NO_SHOW_ID = UUID.fromString("50000000-0000-0000-0000-000000000995");
     private static final UUID COMPLETED_ID = UUID.fromString("50000000-0000-0000-0000-000000000996");
     private static final UUID DRAFT_ID = UUID.fromString("50000000-0000-0000-0000-000000000997");
+    private static final UUID NEXT_DAY_CONFIRMED_ID = UUID.fromString("50000000-0000-0000-0000-000000000998");
+    private static final UUID DRAFT_ONLY_DAY_ID = UUID.fromString("50000000-0000-0000-0000-000000000999");
     private static final LocalDate BUSINESS_DATE = LocalDate.parse("2030-06-20");
 
     @Autowired
@@ -156,6 +159,46 @@ class ReservationTodayViewApiIntegrationTest {
     }
 
     @Test
+    void calendarSummaryReturnsReservationCountsForEachReservedDateInMonthWithoutDrafts() throws Exception {
+        fixture.allStatusReservations(BUSINESS_DATE);
+        fixture.reservation(
+            NEXT_DAY_CONFIRMED_ID,
+            CUSTOMER_PHONE_ID,
+            "R-TV-NEXT-DAY",
+            "confirmed",
+            BUSINESS_DATE.plusDays(1),
+            0,
+            0,
+            "Next day"
+        );
+        fixture.reservation(
+            DRAFT_ONLY_DAY_ID,
+            CUSTOMER_PHONE_ID,
+            "R-TV-DRAFT-ONLY-DAY",
+            "draft",
+            BUSINESS_DATE.plusDays(2),
+            0,
+            0,
+            "Draft only day"
+        );
+
+        mockMvc.perform(get(CALENDAR_SUMMARY_ENDPOINT, STORE_ID).param("month", "2030-06"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.storeId").value(STORE_ID.toString()))
+            .andExpect(jsonPath("$.month").value("2030-06"))
+            .andExpect(jsonPath("$.storeTimezone").value("Asia/Singapore"))
+            .andExpect(jsonPath("$.days.length()").value(2))
+            .andExpect(jsonPath("$.days[0].businessDate").value("2030-06-20"))
+            .andExpect(jsonPath("$.days[0].reservationCount").value(6))
+            .andExpect(jsonPath("$.days[1].businessDate").value("2030-06-21"))
+            .andExpect(jsonPath("$.days[1].reservationCount").value(1))
+            .andExpect(jsonPath("$.idempotency").doesNotExist());
+
+        assertReadOnlyBoundary();
+    }
+
+    @Test
     void missingBusinessDateDefaultsToCurrentDateInStoreTimezone() throws Exception {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Singapore"));
         fixture.reservation(CONFIRMED_ID, CUSTOMER_PHONE_ID, "R-TV-TODAY", "confirmed", today, 0, 0, "Today note");
@@ -175,6 +218,12 @@ class ReservationTodayViewApiIntegrationTest {
         fixture.allStatusReservations(BUSINESS_DATE);
 
         mockMvc.perform(get(ENDPOINT, STORE_ID).param("businessDate", "2030/06/20"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("INVALID_BUSINESS_DATE"))
+            .andExpect(jsonPath("$.error.messageKey").value("reservation.today_view.invalid_business_date"));
+
+        mockMvc.perform(get(CALENDAR_SUMMARY_ENDPOINT, STORE_ID).param("month", "2030/06"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("INVALID_BUSINESS_DATE"))

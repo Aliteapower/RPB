@@ -1,7 +1,9 @@
 package com.rpb.reservation.reservation.api;
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
+import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.application.service.ReservationTodayViewApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -65,6 +67,37 @@ public class ReservationTodayViewController {
             actor.actorType(),
             businessDate,
             status
+        ));
+        if (!result.success()) {
+            return errorMapper.toResponse(result);
+        }
+        return ResponseEntity.ok(apiMapper.toResponse(result));
+    }
+
+    @GetMapping("/calendar-summary")
+    @RequireAppGate(appKey = "reservation_queue", permission = REQUIRED_PERMISSION)
+    public ResponseEntity<?> calendarSummary(
+        @PathVariable UUID storeId,
+        @RequestParam(value = "month", required = false) String month
+    ) {
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return errorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(REQUIRED_PERMISSION)) {
+            return errorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return errorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        ReservationCalendarSummaryResult result = applicationService.getCalendarSummary(new ReservationCalendarSummaryQuery(
+            actor.tenantId(),
+            storeId,
+            actor.actorId(),
+            actor.actorType(),
+            month
         ));
         if (!result.success()) {
             return errorMapper.toResponse(result);

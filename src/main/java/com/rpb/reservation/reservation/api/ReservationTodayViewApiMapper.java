@@ -1,5 +1,7 @@
 package com.rpb.reservation.reservation.api;
 
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryDay;
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewItem;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
 import java.util.List;
@@ -16,6 +18,16 @@ public class ReservationTodayViewApiMapper {
             result.storeTimezone(),
             result.statusFilter(),
             items(result.items())
+        );
+    }
+
+    public ReservationCalendarSummaryResponse toResponse(ReservationCalendarSummaryResult result) {
+        return new ReservationCalendarSummaryResponse(
+            true,
+            result.storeId(),
+            result.month().toString(),
+            result.storeTimezone(),
+            summaryDays(result.days())
         );
     }
 
@@ -37,6 +49,21 @@ public class ReservationTodayViewApiMapper {
             item.customerNickname(),
             item.phoneMasked(),
             item.note()
+        );
+    }
+
+    private static List<ReservationCalendarSummaryResponse.DayResponse> summaryDays(
+        List<ReservationCalendarSummaryDay> days
+    ) {
+        return days.stream().map(ReservationTodayViewApiMapper::summaryDay).toList();
+    }
+
+    private static ReservationCalendarSummaryResponse.DayResponse summaryDay(
+        ReservationCalendarSummaryDay day
+    ) {
+        return new ReservationCalendarSummaryResponse.DayResponse(
+            day.businessDate(),
+            day.reservationCount()
         );
     }
 }

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
+import { getReservationCalendarSummary } from '../api/reservationCalendarSummaryApi'
 import {
   getReservationTodayView,
   ReservationTodayViewApiError
@@ -42,8 +43,11 @@ const response = ref<ReservationTodayViewResponse | null>(null)
 const apiError = ref<ReservationTodayViewApiErrorResponse | null>(null)
 const apps = ref<MeAppEntry[]>([])
 const showCreateReservationDialog = ref(false)
+const visibleMonthKey = ref(monthKeyFromDate(businessDate.value))
+const reservationCounts = ref<Record<string, number>>({})
 let loadSequence = 0
 let appsLoadSequence = 0
+let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const items = computed(() => response.value?.items ?? [])
@@ -51,9 +55,6 @@ const displayedBusinessDate = computed(() => response.value?.businessDate || bus
 const storeTimezone = computed(() => response.value?.storeTimezone || 'Asia/Singapore')
 const showEmptyState = computed(
   () => !isLoading.value && !apiError.value && !!response.value && items.value.length === 0
-)
-const markedReservationDates = computed(() =>
-  response.value?.businessDate && items.value.length > 0 ? [response.value.businessDate] : []
 )
 const reservationQueueEntry = computed(() =>
   apps.value.find(app => app.appKey === 'reservation_queue' && app.entryVisible)
@@ -66,6 +67,21 @@ watch(
   [storeId, businessDate, selectedStatus],
   () => {
     void loadTodayView()
+  },
+  { immediate: true }
+)
+
+watch(
+  businessDate,
+  nextBusinessDate => {
+    visibleMonthKey.value = monthKeyFromDate(nextBusinessDate)
+  }
+)
+
+watch(
+  [storeId, visibleMonthKey],
+  () => {
+    void loadCalendarSummary()
   },
   { immediate: true }
 )
@@ -131,6 +147,36 @@ async function loadTodayView(): Promise<void> {
   }
 }
 
+async function loadCalendarSummary(): Promise<void> {
+  const currentStoreId = storeId.value
+  const currentMonth = visibleMonthKey.value
+  const sequence = ++calendarSummaryLoadSequence
+
+  if (!currentStoreId || !currentMonth) {
+    reservationCounts.value = {}
+    return
+  }
+
+  try {
+    const result = await getReservationCalendarSummary(currentStoreId, currentMonth)
+
+    if (sequence === calendarSummaryLoadSequence) {
+      reservationCounts.value = Object.fromEntries(
+        result.days.map(day => [day.businessDate, day.reservationCount])
+      )
+    }
+  } catch {
+    if (sequence === calendarSummaryLoadSequence) {
+      reservationCounts.value = {}
+    }
+  }
+}
+
+function refreshReservationWorkbench(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
 function openCreateReservationDialog(): void {
   showCreateReservationDialog.value = true
 }
@@ -140,15 +186,22 @@ function handleReservationCreated(result: CreateReservationResponse): void {
     businessDate.value === result.businessDate && selectedStatus.value === 'operational'
 
   businessDate.value = result.businessDate
+  visibleMonthKey.value = monthKeyFromDate(result.businessDate)
   selectedStatus.value = 'operational'
 
   if (shouldReload) {
     void loadTodayView()
   }
+  void loadCalendarSummary()
 }
 
 function handleReservationCancelled(): void {
   void loadTodayView()
+  void loadCalendarSummary()
+}
+
+function handleVisibleMonthChanged(month: string): void {
+  visibleMonthKey.value = month
 }
 
 function createLocalError(code: string, messageKey: string): ReservationTodayViewApiErrorResponse {
@@ -169,6 +222,14 @@ function todayDateInput(): string {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+function monthKeyFromDate(value: string): string {
+  const [year, month] = value.split('-')
+  if (!year || !month) {
+    return ''
+  }
+  return `${year}-${month}`
+}
 </script>
 
 <template>
@@ -179,7 +240,7 @@ function todayDateInput(): string {
         <h1>今日预约</h1>
         <span>门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }} · {{ displayedBusinessDate }}</span>
       </div>
-      <button type="button" :disabled="isLoading" @click="loadTodayView">刷新</button>
+      <button type="button" :disabled="isLoading" @click="refreshReservationWorkbench">刷新</button>
     </section>
 
     <ReservationQuickActionPanel
@@ -190,7 +251,8 @@ function todayDateInput(): string {
 
     <ReservationMonthCalendar
       v-model:selected-date="businessDate"
-      :marked-dates="markedReservationDates"
+      :reservation-counts="reservationCounts"
+      @visible-month-changed="handleVisibleMonthChanged"
     />
 
     <ReservationTodayListPanel

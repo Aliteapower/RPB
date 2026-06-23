@@ -145,6 +145,8 @@ class StaffUiV12TableSelectionValidationTest {
         Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
         Path timePickerPath = Path.of("src", "components", "staff", "StaffTimeWheelPicker.vue");
         Path cancelApiPath = Path.of("src", "api", "reservationCancelApi.ts");
+        Path calendarSummaryApiPath = Path.of("src", "api", "reservationCalendarSummaryApi.ts");
+        Path calendarSummaryTypePath = Path.of("src", "types", "reservationCalendarSummary.ts");
 
         assertThat(Files.exists(actionsPath)).isTrue();
         assertThat(Files.exists(calendarPath)).isTrue();
@@ -153,6 +155,8 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(todayListItemPath)).isTrue();
         assertThat(Files.exists(timePickerPath)).isTrue();
         assertThat(Files.exists(cancelApiPath)).isTrue();
+        assertThat(Files.exists(calendarSummaryApiPath)).isTrue();
+        assertThat(Files.exists(calendarSummaryTypePath)).isTrue();
 
         String source = Files.readString(pagePath)
             + Files.readString(actionsPath)
@@ -161,7 +165,9 @@ class StaffUiV12TableSelectionValidationTest {
             + Files.readString(todayListPath)
             + Files.readString(todayListItemPath)
             + Files.readString(timePickerPath)
-            + Files.readString(cancelApiPath);
+            + Files.readString(cancelApiPath)
+            + Files.readString(calendarSummaryApiPath)
+            + Files.readString(calendarSummaryTypePath);
 
         assertThat(source)
             .contains("ReservationQuickActionPanel")
@@ -208,6 +214,15 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("cancel-requested")
             .contains("selectedDate")
             .contains("monthDays")
+            .contains("getReservationCalendarSummary")
+            .contains("/api/v1/stores/${storeId}/reservations/calendar-summary")
+            .contains("ReservationCalendarSummaryResponse")
+            .contains("reservationCounts")
+            .contains(":reservation-counts=\"reservationCounts\"")
+            .contains("visibleMonthKey")
+            .contains("loadCalendarSummary")
+            .contains("reservation-calendar__reservation-count")
+            .contains("aria-label")
             .doesNotContain("name=\"reservationTime\" type=\"time\"")
             .doesNotContain("复制 ID")
             .doesNotContain("navigator.clipboard")

@@ -142,4 +142,26 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
         @Param("businessDate") LocalDate businessDate,
         @Param("statuses") Collection<String> statuses
     );
+
+    @Query("""
+        select
+          r.businessDate as businessDate,
+          count(r.id) as reservationCount
+        from ReservationEntity r
+        where r.tenantId = :tenantId
+          and r.storeId = :storeId
+          and r.businessDate >= :startInclusive
+          and r.businessDate < :endExclusive
+          and r.status in :statuses
+          and r.deletedAt is null
+        group by r.businessDate
+        order by r.businessDate asc
+        """)
+    List<ReservationCalendarSummaryProjection> findCalendarSummary(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("startInclusive") LocalDate startInclusive,
+        @Param("endExclusive") LocalDate endExclusive,
+        @Param("statuses") Collection<String> statuses
+    );
 }

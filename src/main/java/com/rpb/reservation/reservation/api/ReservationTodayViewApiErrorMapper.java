@@ -1,5 +1,6 @@
 package com.rpb.reservation.reservation.api;
 
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewError;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,10 @@ import org.springframework.stereotype.Component;
 public class ReservationTodayViewApiErrorMapper {
 
     public ResponseEntity<ReservationTodayViewApiErrorResponse> toResponse(ReservationTodayViewResult result) {
+        return toResponse(toApiErrorCode(result.error()));
+    }
+
+    public ResponseEntity<ReservationTodayViewApiErrorResponse> toResponse(ReservationCalendarSummaryResult result) {
         return toResponse(toApiErrorCode(result.error()));
     }
 

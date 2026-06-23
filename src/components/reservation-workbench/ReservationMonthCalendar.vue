@@ -9,24 +9,29 @@ interface CalendarDay {
   selected: boolean
   today: boolean
   marked: boolean
+  reservationCount: number
 }
 
 const props = withDefaults(
   defineProps<{
     selectedDate: string
     markedDates?: string[]
+    reservationCounts?: Record<string, number>
   }>(),
   {
-    markedDates: () => []
+    markedDates: () => [],
+    reservationCounts: () => ({})
   }
 )
 
 const emit = defineEmits<{
   'update:selectedDate': [value: string]
+  'visible-month-changed': [value: string]
 }>()
 
 const visibleMonth = ref(toMonthDate(props.selectedDate))
 const markedDateSet = computed(() => new Set(props.markedDates))
+const visibleMonthKey = computed(() => monthKey(visibleMonth.value))
 
 const monthTitle = computed(() => {
   const year = visibleMonth.value.getFullYear()
@@ -44,6 +49,7 @@ const monthDays = computed<CalendarDay[]>(() => {
   for (let index = 0; index < 42; index += 1) {
     const date = new Date(year, month, 1 - firstDay.getDay() + index)
     const isoDate = formatDate(date)
+    const reservationCount = props.reservationCounts[isoDate] ?? 0
 
     days.push({
       date,
@@ -52,7 +58,8 @@ const monthDays = computed<CalendarDay[]>(() => {
       currentMonth: date.getMonth() === month,
       selected: props.selectedDate === isoDate,
       today: today === isoDate,
-      marked: markedDateSet.value.has(isoDate)
+      marked: markedDateSet.value.has(isoDate) || reservationCount > 0,
+      reservationCount
     })
   }
 
@@ -65,6 +72,7 @@ watch(
     const selectedMonth = toMonthDate(value)
     if (!sameMonth(selectedMonth, visibleMonth.value)) {
       visibleMonth.value = selectedMonth
+      emitVisibleMonth()
     }
   }
 )
@@ -79,6 +87,7 @@ function previousMonth(): void {
     visibleMonth.value.getMonth() - 1,
     1
   )
+  emitVisibleMonth()
 }
 
 function nextMonth(): void {
@@ -87,6 +96,11 @@ function nextMonth(): void {
     visibleMonth.value.getMonth() + 1,
     1
   )
+  emitVisibleMonth()
+}
+
+function emitVisibleMonth(): void {
+  emit('visible-month-changed', visibleMonthKey.value)
 }
 
 function toMonthDate(value: string): Date {
@@ -111,11 +125,28 @@ function sameMonth(left: Date, right: Date): boolean {
   return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth()
 }
 
+function monthKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
 function formatDate(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function reservationCountLabel(count: number): string {
+  return count > 99 ? '99+' : String(count)
+}
+
+function dayAriaLabel(day: CalendarDay): string {
+  const prefix = day.selected ? '已选择' : '选择'
+  const reservationText =
+    day.reservationCount > 0 ? `，${day.reservationCount} 个预订` : '，暂无预订'
+  return `${prefix} ${day.isoDate}${reservationText}`
 }
 </script>
 
@@ -148,10 +179,18 @@ function formatDate(date: Date): string {
           'is-today': day.today,
           'has-reservation': day.marked
         }"
+        :aria-label="dayAriaLabel(day)"
         type="button"
         @click="selectDate(day)"
       >
         <span>{{ day.dayNumber }}</span>
+        <span
+          v-if="day.reservationCount > 0"
+          class="reservation-calendar__reservation-count"
+          aria-hidden="true"
+        >
+          {{ reservationCountLabel(day.reservationCount) }}
+        </span>
       </button>
     </div>
   </section>
@@ -218,6 +257,7 @@ function formatDate(date: Date): string {
   border-radius: 999px;
   color: #0f172a;
   display: inline-flex;
+  flex-direction: column;
   font-size: 0.88rem;
   font-weight: 850;
   height: 42px;
@@ -225,6 +265,10 @@ function formatDate(date: Date): string {
   justify-self: center;
   position: relative;
   width: 42px;
+}
+
+.reservation-calendar__day > span:first-child {
+  line-height: 1;
 }
 
 .reservation-calendar__day.is-muted {
@@ -241,20 +285,29 @@ function formatDate(date: Date): string {
   color: #ffffff;
 }
 
-.reservation-calendar__day.has-reservation::after {
-  background: #f97316;
+.reservation-calendar__reservation-count {
+  align-items: center;
+  background: #ef4444;
   border-radius: 999px;
-  bottom: 5px;
-  content: '';
-  height: 4px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.55rem;
+  font-weight: 950;
+  height: 13px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 13px;
+  padding: 0 3px;
   left: 50%;
+  letter-spacing: 0;
   position: absolute;
+  top: 25px;
   transform: translateX(-50%);
-  width: 4px;
 }
 
-.reservation-calendar__day.is-selected.has-reservation::after {
+.reservation-calendar__day.is-selected .reservation-calendar__reservation-count {
   background: #ffffff;
+  color: #ef4444;
 }
 
 .reservation-calendar__day:focus-visible {
