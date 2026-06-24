@@ -7,31 +7,36 @@ interface ReservationQuickAction {
   subtitle: string
   symbol: string
   tone: string
+  disabled?: boolean
   routeName?: string
-  action?: 'create-reservation'
+  action?: 'create-reservation' | 'show-confirmed-reservations' | 'show-arrived-reservations'
 }
 
 const props = defineProps<{
+  canCreateReservationForSelectedDate: boolean
   storeId: string
   selectedDate: string
 }>()
 
 const emit = defineEmits<{
   'open-create-reservation': []
+  'show-confirmed-reservations': []
+  'show-arrived-reservations': []
 }>()
 
 const entries = computed<ReservationQuickAction[]>(() => [
   {
     label: '预约到店',
     subtitle: '确认预约客人已到店',
-    routeName: 'reservation-check-in',
+    action: 'show-confirmed-reservations',
     symbol: '到',
     tone: 'primary'
   },
   {
     label: '创建预约',
-    subtitle: '登记新的门店预约',
+    subtitle: props.canCreateReservationForSelectedDate ? '登记新的门店预约' : '过去日期不可创建预约',
     action: 'create-reservation',
+    disabled: !props.canCreateReservationForSelectedDate,
     symbol: '约',
     tone: 'plain'
   },
@@ -45,7 +50,7 @@ const entries = computed<ReservationQuickAction[]>(() => [
   {
     label: '预约入座',
     subtitle: '为已到店预约安排桌台',
-    routeName: 'reservation-arrived-direct-seating',
+    action: 'show-arrived-reservations',
     symbol: '入',
     tone: 'plain'
   }
@@ -70,8 +75,20 @@ function routeFor(routeName: string) {
 }
 
 function triggerAction(entry: ReservationQuickAction): void {
+  if (entry.disabled) {
+    return
+  }
+
   if (entry.action === 'create-reservation') {
     emit('open-create-reservation')
+  }
+
+  if (entry.action === 'show-confirmed-reservations') {
+    emit('show-confirmed-reservations')
+  }
+
+  if (entry.action === 'show-arrived-reservations') {
+    emit('show-arrived-reservations')
   }
 }
 </script>
@@ -100,6 +117,9 @@ function triggerAction(entry: ReservationQuickAction): void {
           v-else
           class="reservation-actions__entry"
           :class="`reservation-actions__entry--${entry.tone}`"
+          :aria-disabled="entry.disabled ? 'true' : 'false'"
+          :disabled="entry.disabled"
+          :title="entry.disabled ? entry.subtitle : undefined"
           type="button"
           @click="triggerAction(entry)"
         >
@@ -198,5 +218,17 @@ function triggerAction(entry: ReservationQuickAction): void {
 .reservation-actions__entry:focus-visible {
   outline: 3px solid rgba(249, 115, 22, 0.28);
   outline-offset: 2px;
+}
+
+.reservation-actions__entry:disabled {
+  background: #f8fafc;
+  border-color: #dbe3ee;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.reservation-actions__entry:disabled .reservation-actions__symbol {
+  background: #e2e8f0;
+  color: #94a3b8;
 }
 </style>

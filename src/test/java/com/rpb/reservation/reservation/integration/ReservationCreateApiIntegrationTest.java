@@ -600,6 +600,8 @@ class ReservationCreateApiIntegrationTest {
             "src/components/reservation-workbench/CreateReservationDialog.vue",
             "src/components/reservation-workbench/ReservationMonthCalendar.vue",
             "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+            "src/components/reservation-workbench/ReservationSeatDialog.vue",
+            "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
             "src/components/reservation-workbench/ReservationTodayListItem.vue",
             "src/components/reservation-workbench/ReservationTodayListPanel.vue"
         ).contains(normalized);

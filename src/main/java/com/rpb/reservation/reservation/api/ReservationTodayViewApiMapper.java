@@ -48,7 +48,11 @@ public class ReservationTodayViewApiMapper {
             item.customerName(),
             item.customerNickname(),
             item.phoneMasked(),
-            item.note()
+            item.note(),
+            item.seatingId(),
+            item.currentResourceType(),
+            item.currentResourceId(),
+            item.currentResourceCode()
         );
     }
 

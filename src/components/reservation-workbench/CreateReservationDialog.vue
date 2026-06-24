@@ -16,11 +16,17 @@ import type {
   ReservationApiErrorResponse
 } from '../../types/reservation'
 
-const props = defineProps<{
-  open: boolean
-  storeId: string
-  selectedDate: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    storeId: string
+    selectedDate: string
+    minDate?: string
+  }>(),
+  {
+    minDate: ''
+  }
+)
 
 const emit = defineEmits<{
   'update:open': [open: boolean]
@@ -48,6 +54,7 @@ const canSubmit = computed(
     !isSubmitting.value &&
     !!form.businessDate &&
     !!form.time &&
+    !isBeforeMinDate(form.businessDate) &&
     Number.isInteger(form.partySize) &&
     form.partySize > 0
 )
@@ -67,6 +74,15 @@ watch(
   selectedDate => {
     if (props.open) {
       applyDefaultFutureDateTime(selectedDate)
+    }
+  }
+)
+
+watch(
+  () => props.minDate,
+  () => {
+    if (props.open) {
+      applyDefaultFutureDateTime(props.selectedDate)
     }
   }
 )
@@ -107,6 +123,10 @@ function validateForm(): ReservationApiErrorResponse | null {
 
   if (!toIsoInstant()) {
     return createLocalError('INVALID_TIME_RANGE', 'reservation.invalid_time_range')
+  }
+
+  if (isBeforeMinDate(form.businessDate)) {
+    return createLocalError('RESERVATION_START_IN_PAST', 'reservation.start_in_past')
   }
 
   if (isReservationStartInPast(form.businessDate, form.time)) {
@@ -180,9 +200,15 @@ function resetAfterSuccess(): void {
 }
 
 function applyDefaultFutureDateTime(selectedDate: string): void {
-  const next = defaultFutureReservationDateTime(selectedDate)
+  const nextSelectedDate =
+    props.minDate && selectedDate < props.minDate ? props.minDate : selectedDate
+  const next = defaultFutureReservationDateTime(nextSelectedDate)
   form.businessDate = next.businessDate
   form.time = next.time
+}
+
+function isBeforeMinDate(value: string): boolean {
+  return !!props.minDate && !!value && value < props.minDate
 }
 </script>
 
@@ -216,7 +242,7 @@ function applyDefaultFutureDateTime(selectedDate: string): void {
 
         <label>
           <span>日期</span>
-          <input v-model="form.businessDate" name="businessDate" type="date" />
+          <input v-model="form.businessDate" :min="minDate" name="businessDate" type="date" />
         </label>
 
         <StaffTimeWheelPicker v-model="form.time" label="时间" name="reservationTime" />

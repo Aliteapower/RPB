@@ -279,6 +279,7 @@ class ReservationArrivedDirectSeatingControllerTest {
         assertApplicationError(ReservationArrivedDirectSeatingError.STORE_ACCESS_DENIED, 403, "FORBIDDEN", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_NOT_FOUND, 404, "RESERVATION_NOT_FOUND", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_STATUS_NOT_ARRIVED, 409, "RESERVATION_STATUS_NOT_ARRIVED", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_NOT_TODAY, 409, "RESERVATION_NOT_TODAY", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING, 409, "RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_CANCELLED, 409, "RESERVATION_CANNOT_SEAT_CANCELLED", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_NO_SHOW, 409, "RESERVATION_CANNOT_SEAT_NO_SHOW", "failed");
@@ -430,6 +431,7 @@ class ReservationArrivedDirectSeatingControllerTest {
         return switch (apiCode) {
             case "RESERVATION_NOT_FOUND" -> "reservation.not_found";
             case "RESERVATION_STATUS_NOT_ARRIVED" -> "reservation.status_not_arrived";
+            case "RESERVATION_NOT_TODAY" -> "reservation.not_today";
             case "RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING" -> "reservation.seated_without_active_seating";
             case "RESERVATION_CANNOT_SEAT_CANCELLED" -> "reservation.cannot_seat_cancelled";
             case "RESERVATION_CANNOT_SEAT_NO_SHOW" -> "reservation.cannot_seat_no_show";

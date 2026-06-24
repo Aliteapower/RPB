@@ -3,21 +3,10 @@ import { computed } from 'vue'
 
 import type { ReservationTodayViewItem } from '../../types/reservationTodayView'
 
-const actionRoutes = {
-  checkIn: {
-    label: '到店',
-    routeName: 'reservation-check-in'
-  },
-  directSeating: {
-    label: '入桌',
-    routeName: 'reservation-arrived-direct-seating'
-  }
-} as const
-
 const cancellableStatuses = new Set(['draft', 'confirmed'])
 
 const statusLabels: Record<string, string> = {
-  confirmed: '待确认',
+  confirmed: '已预约',
   arrived: '已到店',
   seated: '已入桌',
   cancelled: '已取消',
@@ -28,14 +17,21 @@ const statusLabels: Record<string, string> = {
 
 const props = defineProps<{
   canCancelReservation: boolean
+  canRunCurrentDayActions: boolean
+  canSwitchTable: boolean
   item: ReservationTodayViewItem
   isCancelling?: boolean
-  storeId: string
+  isCheckingIn?: boolean
+  isSeating?: boolean
+  isSwitching?: boolean
   storeTimezone: string
 }>()
 
 const emit = defineEmits<{
   'cancel-requested': [item: ReservationTodayViewItem]
+  'check-in-requested': [item: ReservationTodayViewItem]
+  'seat-requested': [item: ReservationTodayViewItem]
+  'switch-table-requested': [item: ReservationTodayViewItem]
 }>()
 
 const customerName = computed(() => {
@@ -45,45 +41,63 @@ const customerName = computed(() => {
 
 const phoneDisplay = computed(() => optionalDisplay(props.item.phoneMasked))
 const timeRange = computed(
-  () => `${formatStoreDateTime(props.item.reservedStartAt)} - ${formatStoreDateTime(props.item.reservedEndAt)}`
+  () => `${formatStoreTime(props.item.reservedStartAt)} - ${formatStoreTime(props.item.reservedEndAt)}`
 )
 const statusText = computed(() => statusLabels[props.item.status] ?? props.item.status)
 const statusClass = computed(() => `status-${props.item.status.replace(/_/g, '-')}`)
-const canCheckIn = computed(() => props.item.status === 'confirmed')
-const canSeat = computed(() => props.item.status === 'arrived')
+const showCheckIn = computed(() => props.item.status === 'confirmed')
+const showSeat = computed(() => props.item.status === 'arrived')
+const showSwitchTable = computed(() => props.item.status === 'seated' && !!props.item.seatingId)
+const canCheckIn = computed(() => showCheckIn.value && props.canRunCurrentDayActions)
+const canSeat = computed(() => showSeat.value && props.canRunCurrentDayActions)
+const canSwitchTableAction = computed(
+  () => showSwitchTable.value && props.canSwitchTable && props.canRunCurrentDayActions
+)
 const canCancel = computed(
   () => props.canCancelReservation && cancellableStatuses.has(props.item.status)
 )
+const currentDayActionTitle = computed(() =>
+  props.canRunCurrentDayActions ? undefined : '仅当日预约可以操作'
+)
+const tableAssignmentText = computed(() => {
+  const code = props.item.currentResourceCode?.trim()
 
-function checkInRoute() {
-  return {
-    name: actionRoutes.checkIn.routeName,
-    params: {
-      storeId: props.storeId
-    },
-    query: {
-      reservationId: props.item.reservationId
-    }
+  if (code) {
+    return `桌号：${code}`
   }
-}
 
-function directSeatingRoute() {
-  return {
-    name: actionRoutes.directSeating.routeName,
-    params: {
-      storeId: props.storeId
-    },
-    query: {
-      reservationId: props.item.reservationId
-    }
-  }
-}
+  return props.item.status === 'seated' ? '桌号：已入桌' : '桌号：未分配'
+})
 
 function requestCancel(): void {
   emit('cancel-requested', props.item)
 }
 
-function formatStoreDateTime(value: string): string {
+function requestCheckIn(): void {
+  if (!canCheckIn.value) {
+    return
+  }
+
+  emit('check-in-requested', props.item)
+}
+
+function requestSeat(): void {
+  if (!canSeat.value) {
+    return
+  }
+
+  emit('seat-requested', props.item)
+}
+
+function requestSwitchTable(): void {
+  if (!canSwitchTableAction.value) {
+    return
+  }
+
+  emit('switch-table-requested', props.item)
+}
+
+function formatStoreTime(value: string): string {
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
@@ -92,15 +106,13 @@ function formatStoreDateTime(value: string): string {
 
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: props.storeTimezone,
-    month: '2-digit',
-    day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   }).formatToParts(date)
 
   const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
-  return `${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`
+  return `${part('hour')}:${part('minute')}`
 }
 
 function optionalDisplay(value: string | null | undefined): string {
@@ -116,7 +128,7 @@ function optionalDisplay(value: string | null | undefined): string {
         <span>{{ phoneDisplay }}</span>
       </div>
       <p>{{ timeRange }}</p>
-      <p>{{ item.partySize }}人 · 桌号：未分配</p>
+      <p>{{ item.partySize }}人 · {{ tableAssignmentText }}</p>
     </div>
 
     <div class="reservation-today-list-item__actions" aria-label="预约操作">
@@ -124,21 +136,38 @@ function optionalDisplay(value: string | null | undefined): string {
         {{ statusText }}
       </span>
 
-      <RouterLink
-        v-if="canCheckIn"
+      <button
+        v-if="showCheckIn"
         class="reservation-today-list-item__action reservation-today-list-item__action--primary"
-        :to="checkInRoute()"
+        :disabled="!canCheckIn || isCheckingIn"
+        :title="currentDayActionTitle"
+        type="button"
+        @click="requestCheckIn"
       >
-        {{ actionRoutes.checkIn.label }}
-      </RouterLink>
+        {{ isCheckingIn ? '到店中' : '到店' }}
+      </button>
 
-      <RouterLink
-        v-if="canSeat"
+      <button
+        v-if="showSeat"
         class="reservation-today-list-item__action reservation-today-list-item__action--primary"
-        :to="directSeatingRoute()"
+        :disabled="!canSeat || isSeating"
+        :title="currentDayActionTitle"
+        type="button"
+        @click="requestSeat"
       >
-        {{ actionRoutes.directSeating.label }}
-      </RouterLink>
+        {{ isSeating ? '入桌中' : '入桌' }}
+      </button>
+
+      <button
+        v-if="showSwitchTable && canSwitchTable"
+        class="reservation-today-list-item__action reservation-today-list-item__action--secondary"
+        :disabled="!canSwitchTableAction || isSwitching"
+        :title="currentDayActionTitle"
+        type="button"
+        @click="requestSwitchTable"
+      >
+        {{ isSwitching ? '换桌中' : '换桌' }}
+      </button>
 
       <button
         v-if="canCancel"
@@ -256,8 +285,15 @@ function optionalDisplay(value: string | null | undefined): string {
 }
 
 .reservation-today-list-item__action--primary {
+  border: 1px solid #f97316;
   background: #f97316;
   color: #ffffff;
+}
+
+.reservation-today-list-item__action--secondary {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
 .reservation-today-list-item__action--danger {
@@ -266,9 +302,12 @@ function optionalDisplay(value: string | null | undefined): string {
   color: #ffffff;
 }
 
+.reservation-today-list-item__action:disabled,
 .reservation-today-list-item__action--danger:disabled {
-  background: #fca5a5;
-  cursor: progress;
+  background: #e2e8f0;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 a:focus-visible,

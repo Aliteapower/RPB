@@ -56,7 +56,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -107,33 +109,6 @@ public class ReservationArrivedDirectSeatingApplicationService {
     private final ReservationArrivedSeatingRule reservationArrivedSeatingRule = new ReservationArrivedSeatingRule();
 
     @Autowired
-    public ReservationArrivedDirectSeatingApplicationService(
-        StoreRepositoryPort storeRepository,
-        ReservationRepositoryPort reservationRepository,
-        DiningTableRepositoryPort diningTableRepository,
-        TableGroupRepositoryPort tableGroupRepository,
-        TableLockRepositoryPort tableLockRepository,
-        SeatingRepositoryPort seatingRepository,
-        BusinessEventRepositoryPort businessEventRepository,
-        StateTransitionLogRepositoryPort stateTransitionLogRepository,
-        AuditLogRepositoryPort auditLogRepository,
-        IdempotencyRepositoryPort idempotencyRepository
-    ) {
-        this(
-            storeRepository,
-            reservationRepository,
-            diningTableRepository,
-            tableGroupRepository,
-            tableLockRepository,
-            seatingRepository,
-            businessEventRepository,
-            stateTransitionLogRepository,
-            auditLogRepository,
-            idempotencyRepository,
-            Clock.systemUTC()
-        );
-    }
-
     public ReservationArrivedDirectSeatingApplicationService(
         StoreRepositoryPort storeRepository,
         ReservationRepositoryPort reservationRepository,
@@ -229,6 +204,7 @@ public class ReservationArrivedDirectSeatingApplicationService {
         if (!scope.equals(reservation.scope())) {
             throw new ApplicationFailure(ReservationArrivedDirectSeatingError.STORE_SCOPE_MISMATCH);
         }
+        requireReservationForStoreToday(store, reservation);
 
         if (reservation.status() == ReservationStatus.SEATED) {
             return alreadySeated(scope, command, started, reservation);
@@ -285,6 +261,13 @@ public class ReservationArrivedDirectSeatingApplicationService {
             transitionIds,
             auditLog.id()
         );
+    }
+
+    private void requireReservationForStoreToday(Store store, Reservation reservation) {
+        LocalDate storeToday = LocalDate.now(clock.withZone(ZoneId.of(store.timezone())));
+        if (!reservation.businessDate().value().equals(storeToday)) {
+            throw new ApplicationFailure(ReservationArrivedDirectSeatingError.RESERVATION_NOT_TODAY);
+        }
     }
 
     private ReservationArrivedDirectSeatingResult alreadySeated(

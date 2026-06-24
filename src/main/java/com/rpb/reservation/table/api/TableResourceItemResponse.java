@@ -14,7 +14,9 @@ public record TableResourceItemResponse(
     String status,
     boolean selectable,
     String selectionDisabledReason,
-    List<String> memberTableCodes
+    List<String> memberTableCodes,
+    UUID currentSeatingId,
+    UUID currentCleaningId
 ) {
 
     public TableResourceItemResponse {

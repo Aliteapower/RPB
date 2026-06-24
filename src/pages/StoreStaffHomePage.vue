@@ -188,10 +188,13 @@ const reservationTodayViewRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
-const reservationCheckInRoute = computed(() => ({
-  name: 'reservation-check-in',
+const reservationConfirmedTodayRoute = computed(() => ({
+  name: 'reservation-today-view',
   params: {
     storeId: storeId.value
+  },
+  query: {
+    status: 'confirmed'
   }
 }))
 const reservationArrivedToQueueRoute = computed(() => ({
@@ -218,10 +221,13 @@ const seatingFromCalledQueueRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
-const reservationArrivedDirectSeatingRoute = computed(() => ({
-  name: 'reservation-arrived-direct-seating',
+const reservationArrivedTodayRoute = computed(() => ({
+  name: 'reservation-today-view',
   params: {
     storeId: storeId.value
+  },
+  query: {
+    status: 'arrived'
   }
 }))
 const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
@@ -238,11 +244,11 @@ const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
     : null,
   canCheckInReservation.value
     ? {
-        id: 'reservation-check-in',
+        id: 'reservation-confirmed-today',
         label: '预约到店',
-        description: '确认预约客人已到店',
+        description: '从今日预约确认客人到店',
         symbol: '到',
-        to: reservationCheckInRoute.value,
+        to: reservationConfirmedTodayRoute.value,
         tone: 'primary',
         emphasis: true
       }
@@ -281,11 +287,11 @@ const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions(
     : null,
   canSeatArrivedReservation.value
     ? {
-        id: 'reservation-arrived-direct-seating',
+        id: 'reservation-arrived-today-seating',
         label: '预约入座',
-        description: '给到店预约安排桌台',
+        description: '从已到店预约选择桌台',
         symbol: '座',
-        to: reservationArrivedDirectSeatingRoute.value,
+        to: reservationArrivedTodayRoute.value,
         tone: 'success'
       }
     : null

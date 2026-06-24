@@ -66,12 +66,14 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
             .contains("cleaningRoute")
             .contains("reservationRoute")
             .contains("reservationTodayViewRoute")
-            .contains("reservationCheckInRoute")
+            .contains("reservationConfirmedTodayRoute")
             .contains("reservationArrivedToQueueRoute")
             .contains("queueTicketListRoute")
             .contains("queueCallRoute")
             .contains("seatingFromCalledQueueRoute")
-            .contains("reservationArrivedDirectSeatingRoute")
+            .contains("reservationArrivedTodayRoute")
+            .contains("status: 'confirmed'")
+            .contains("status: 'arrived'")
             .contains("group-id=\"staff-section-reception\"")
             .contains("heading=\"接待\"")
             .contains(":actions=\"receptionActions\"")
@@ -83,7 +85,9 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
             .contains(":actions=\"queueActions\"")
             .contains("group-id=\"staff-section-table-turnover\"")
             .contains("heading=\"桌台流转\"")
-            .contains(":actions=\"tableTurnoverActions\"");
+            .contains(":actions=\"tableTurnoverActions\"")
+            .doesNotContain("reservation-check-in")
+            .doesNotContain("reservation-arrived-direct-seating");
     }
 
     @Test

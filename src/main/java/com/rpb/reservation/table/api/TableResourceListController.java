@@ -120,7 +120,9 @@ public class TableResourceListController {
             item.status(),
             item.selectable(),
             item.selectionDisabledReason(),
-            item.memberTableCodes()
+            item.memberTableCodes(),
+            item.currentSeatingId(),
+            item.currentCleaningId()
         );
     }
 

@@ -3,6 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
+import {
+  checkInReservation,
+  ReservationCheckInApiError
+} from '../api/reservationCheckInApi'
 import { getReservationCalendarSummary } from '../api/reservationCalendarSummaryApi'
 import {
   getReservationTodayView,
@@ -11,11 +15,15 @@ import {
 import CreateReservationDialog from '../components/reservation-workbench/CreateReservationDialog.vue'
 import ReservationMonthCalendar from '../components/reservation-workbench/ReservationMonthCalendar.vue'
 import ReservationQuickActionPanel from '../components/reservation-workbench/ReservationQuickActionPanel.vue'
+import ReservationSeatDialog from '../components/reservation-workbench/ReservationSeatDialog.vue'
+import ReservationTableSwitchDialog from '../components/reservation-workbench/ReservationTableSwitchDialog.vue'
 import ReservationTodayListPanel from '../components/reservation-workbench/ReservationTodayListPanel.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
+import type { ReservationCheckInApiErrorResponse } from '../types/reservationCheckIn'
 import type {
   ReservationTodayViewApiErrorResponse,
+  ReservationTodayViewItem,
   ReservationTodayViewResponse,
   ReservationTodayViewStatusFilter
 } from '../types/reservationTodayView'
@@ -28,7 +36,7 @@ const storeContext = useStoreContextStore()
 const statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: string }> = [
   { value: 'operational', label: '进行中' },
   { value: 'all', label: '全部' },
-  { value: 'confirmed', label: '已确认' },
+  { value: 'confirmed', label: '已预约' },
   { value: 'arrived', label: '已到店' },
   { value: 'seated', label: '已入座' },
   { value: 'cancelled', label: '已取消' },
@@ -37,12 +45,20 @@ const statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: str
 ]
 
 const businessDate = ref(todayDateInput())
-const selectedStatus = ref<ReservationTodayViewStatusFilter>('operational')
+const selectedStatus = ref<ReservationTodayViewStatusFilter>(
+  statusFilterFromQuery(route.query.status) ?? 'operational'
+)
 const isLoading = ref(false)
 const response = ref<ReservationTodayViewResponse | null>(null)
 const apiError = ref<ReservationTodayViewApiErrorResponse | null>(null)
+const checkInApiError = ref<ReservationCheckInApiErrorResponse | null>(null)
 const apps = ref<MeAppEntry[]>([])
 const showCreateReservationDialog = ref(false)
+const showSeatDialog = ref(false)
+const showTableSwitchDialog = ref(false)
+const selectedSeatReservation = ref<ReservationTodayViewItem | null>(null)
+const selectedSwitchTableReservation = ref<ReservationTodayViewItem | null>(null)
+const checkingInReservationId = ref<string | null>(null)
 const visibleMonthKey = ref(monthKeyFromDate(businessDate.value))
 const reservationCounts = ref<Record<string, number>>({})
 let loadSequence = 0
@@ -53,6 +69,9 @@ const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId)
 const items = computed(() => response.value?.items ?? [])
 const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || '后端默认')
 const storeTimezone = computed(() => response.value?.storeTimezone || 'Asia/Singapore')
+const storeTodayDate = computed(() => todayDateInput(storeTimezone.value))
+const canCreateReservationForSelectedDate = computed(() => businessDate.value >= storeTodayDate.value)
+const canRunCurrentDayActions = computed(() => businessDate.value === storeTodayDate.value)
 const showEmptyState = computed(
   () => !isLoading.value && !apiError.value && !!response.value && items.value.length === 0
 )
@@ -61,6 +80,9 @@ const reservationQueueEntry = computed(() =>
 )
 const canCancelReservation = computed(
   () => reservationQueueEntry.value?.permissions.includes('reservation.cancel') ?? false
+)
+const canSwitchTable = computed(
+  () => reservationQueueEntry.value?.permissions.includes('table.switch') ?? false
 )
 
 watch(
@@ -75,6 +97,35 @@ watch(
   businessDate,
   nextBusinessDate => {
     visibleMonthKey.value = monthKeyFromDate(nextBusinessDate)
+  }
+)
+
+watch(
+  () => route.query.status,
+  status => {
+    const nextStatus = statusFilterFromQuery(status)
+
+    if (nextStatus && nextStatus !== selectedStatus.value) {
+      selectedStatus.value = nextStatus
+    }
+  }
+)
+
+watch(
+  showSeatDialog,
+  open => {
+    if (!open) {
+      selectedSeatReservation.value = null
+    }
+  }
+)
+
+watch(
+  showTableSwitchDialog,
+  open => {
+    if (!open) {
+      selectedSwitchTableReservation.value = null
+    }
   }
 )
 
@@ -173,12 +224,25 @@ async function loadCalendarSummary(): Promise<void> {
 }
 
 function refreshReservationWorkbench(): void {
+  checkInApiError.value = null
   void loadTodayView()
   void loadCalendarSummary()
 }
 
 function openCreateReservationDialog(): void {
+  if (!canCreateReservationForSelectedDate.value) {
+    return
+  }
+
   showCreateReservationDialog.value = true
+}
+
+function showConfirmedReservations(): void {
+  selectedStatus.value = 'confirmed'
+}
+
+function showArrivedReservations(): void {
+  selectedStatus.value = 'arrived'
 }
 
 function handleReservationCreated(result: CreateReservationResponse): void {
@@ -200,6 +264,88 @@ function handleReservationCancelled(): void {
   void loadCalendarSummary()
 }
 
+async function handleReservationCheckIn(item: ReservationTodayViewItem): Promise<void> {
+  const currentStoreId = storeId.value
+
+  if (!currentStoreId || checkingInReservationId.value) {
+    return
+  }
+
+  if (!canRunCurrentDayActions.value) {
+    checkInApiError.value = createLocalCheckInError('RESERVATION_NOT_TODAY', 'reservation.not_today')
+    return
+  }
+
+  checkInApiError.value = null
+  checkingInReservationId.value = item.reservationId
+
+  try {
+    await checkInReservation(
+      currentStoreId,
+      item.reservationId,
+      {
+        arrivedAt: null,
+        reasonCode: 'staff_confirmed_arrival',
+        note: 'staff_reservation_today_list'
+      },
+      createReservationCheckInIdempotencyKey(item.reservationId)
+    )
+
+    if (selectedStatus.value === 'confirmed') {
+      selectedStatus.value = 'arrived'
+    } else {
+      void loadTodayView()
+    }
+    void loadCalendarSummary()
+  } catch (error) {
+    checkInApiError.value =
+      error instanceof ReservationCheckInApiError
+        ? error.response
+        : createLocalCheckInError('REQUEST_FAILED', 'reservation.check_in.request_failed')
+  } finally {
+    checkingInReservationId.value = null
+  }
+}
+
+function openReservationSeatDialog(item: ReservationTodayViewItem): void {
+  checkInApiError.value = null
+
+  if (!canRunCurrentDayActions.value) {
+    checkInApiError.value = createLocalCheckInError('RESERVATION_NOT_TODAY', 'reservation.not_today')
+    return
+  }
+
+  selectedSeatReservation.value = item
+  showSeatDialog.value = true
+}
+
+function handleReservationSeated(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
+function openReservationTableSwitchDialog(item: ReservationTodayViewItem): void {
+  checkInApiError.value = null
+
+  if (!canRunCurrentDayActions.value) {
+    checkInApiError.value = createLocalCheckInError('RESERVATION_NOT_TODAY', 'reservation.not_today')
+    return
+  }
+
+  if (!canSwitchTable.value || !item.seatingId) {
+    checkInApiError.value = createLocalCheckInError('FORBIDDEN', 'reservation.forbidden')
+    return
+  }
+
+  selectedSwitchTableReservation.value = item
+  showTableSwitchDialog.value = true
+}
+
+function handleReservationTableSwitched(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
 function handleVisibleMonthChanged(month: string): void {
   visibleMonthKey.value = month
 }
@@ -215,11 +361,44 @@ function createLocalError(code: string, messageKey: string): ReservationTodayVie
   }
 }
 
-function todayDateInput(): string {
+function createLocalCheckInError(
+  code: string,
+  messageKey: string
+): ReservationCheckInApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
+function createReservationCheckInIdempotencyKey(reservationId: string): string {
+  const randomValue =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  return `reservation:check-in:${reservationId}:${randomValue}`
+}
+
+function todayDateInput(timeZone = 'Asia/Singapore'): string {
   const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  const year = part('year')
+  const month = part('month')
+  const day = part('day')
   return `${year}-${month}-${day}`
 }
 
@@ -229,6 +408,20 @@ function monthKeyFromDate(value: string): string {
     return ''
   }
   return `${year}-${month}`
+}
+
+function statusFilterFromQuery(
+  value: unknown
+): ReservationTodayViewStatusFilter | null {
+  const candidate = Array.isArray(value) ? value[0] : value
+
+  if (typeof candidate !== 'string') {
+    return null
+  }
+
+  return statusOptions.some(option => option.value === candidate)
+    ? (candidate as ReservationTodayViewStatusFilter)
+    : null
 }
 </script>
 
@@ -245,12 +438,16 @@ function monthKeyFromDate(value: string): string {
 
     <ReservationQuickActionPanel
       :store-id="storeId"
+      :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
       :selected-date="businessDate"
       @open-create-reservation="openCreateReservationDialog"
+      @show-arrived-reservations="showArrivedReservations"
+      @show-confirmed-reservations="showConfirmedReservations"
     />
 
     <ReservationMonthCalendar
       v-model:selected-date="businessDate"
+      :min-date="storeTodayDate"
       :reservation-counts="reservationCounts"
       @visible-month-changed="handleVisibleMonthChanged"
     />
@@ -259,20 +456,49 @@ function monthKeyFromDate(value: string): string {
       v-model:selected-status="selectedStatus"
       :api-error="apiError"
       :can-cancel-reservation="canCancelReservation"
+      :can-run-current-day-actions="canRunCurrentDayActions"
+      :can-switch-table="canSwitchTable"
+      :checking-in-reservation-id="checkingInReservationId"
       :is-loading="isLoading"
       :items="items"
+      :seating-reservation-id="selectedSeatReservation?.reservationId ?? null"
       :show-empty-state="showEmptyState"
       :status-options="statusOptions"
       :store-id="storeId"
       :store-timezone="storeTimezone"
+      :switching-reservation-id="selectedSwitchTableReservation?.reservationId ?? null"
       @cancelled="handleReservationCancelled"
+      @check-in-requested="handleReservationCheckIn"
+      @seat-requested="openReservationSeatDialog"
+      @switch-table-requested="openReservationTableSwitchDialog"
     />
+
+    <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
+      <h2>操作失败</h2>
+      <p>错误代码：{{ checkInApiError.error.code }}</p>
+      <p>消息键：{{ checkInApiError.error.messageKey }}</p>
+    </section>
 
     <CreateReservationDialog
       v-model:open="showCreateReservationDialog"
+      :min-date="storeTodayDate"
       :selected-date="businessDate"
       :store-id="storeId"
       @created="handleReservationCreated"
+    />
+
+    <ReservationSeatDialog
+      v-model:open="showSeatDialog"
+      :item="selectedSeatReservation"
+      :store-id="storeId"
+      @seated="handleReservationSeated"
+    />
+
+    <ReservationTableSwitchDialog
+      v-model:open="showTableSwitchDialog"
+      :item="selectedSwitchTableReservation"
+      :store-id="storeId"
+      @switched="handleReservationTableSwitched"
     />
 
     <StaffBottomNav :store-id="storeId" active-tab="reservation" />
@@ -320,6 +546,24 @@ function monthKeyFromDate(value: string): string {
 .reservation-workbench__header button:disabled {
   background: #cbd5e1;
   border-color: #cbd5e1;
+}
+
+.reservation-workbench__action-error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.reservation-workbench__action-error h2,
+.reservation-workbench__action-error p {
+  color: #be123c;
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 button:focus-visible,

@@ -205,7 +205,11 @@ public class ReservationTodayViewApplicationService {
             row.customerName(),
             row.customerNickname(),
             maskPhone(row.phoneE164()),
-            row.note()
+            row.note(),
+            row.seatingId(),
+            row.currentResourceType(),
+            row.currentResourceId(),
+            row.currentResourceCode()
         );
     }
 

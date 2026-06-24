@@ -123,12 +123,38 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
           c.displayName as customerName,
           c.nickname as customerNickname,
           c.phoneE164 as phoneE164,
-          r.note as note
+          r.note as note,
+          s.id as seatingId,
+          sr.resourceType as currentResourceType,
+          coalesce(sr.tableId, sr.tableGroupId) as currentResourceId,
+          coalesce(dt.tableCode, tg.groupCode) as currentResourceCode
         from ReservationEntity r
           left join CustomerEntity c
             on c.tenantId = r.tenantId
            and c.id = r.customerId
            and c.deletedAt is null
+          left join SeatingEntity s
+            on s.tenantId = r.tenantId
+           and s.storeId = r.storeId
+           and s.reservationId = r.id
+           and s.status = 'occupied'
+           and s.deletedAt is null
+          left join SeatingResourceEntity sr
+            on sr.tenantId = r.tenantId
+           and sr.storeId = r.storeId
+           and sr.seatingId = s.id
+           and sr.status = 'active'
+           and sr.deletedAt is null
+          left join DiningTableEntity dt
+            on dt.tenantId = r.tenantId
+           and dt.storeId = r.storeId
+           and dt.id = sr.tableId
+           and dt.deletedAt is null
+          left join TableGroupEntity tg
+            on tg.tenantId = r.tenantId
+           and tg.storeId = r.storeId
+           and tg.id = sr.tableGroupId
+           and tg.deletedAt is null
         where r.tenantId = :tenantId
           and r.storeId = :storeId
           and r.businessDate = :businessDate

@@ -238,7 +238,11 @@ public class ReservationPersistenceAdapter implements ReservationRepositoryPort 
             projection.getCustomerName(),
             projection.getCustomerNickname(),
             projection.getPhoneE164(),
-            projection.getNote()
+            projection.getNote(),
+            projection.getSeatingId(),
+            projection.getCurrentResourceType(),
+            projection.getCurrentResourceId(),
+            projection.getCurrentResourceCode()
         );
     }
 

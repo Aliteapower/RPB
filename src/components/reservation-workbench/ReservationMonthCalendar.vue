@@ -9,6 +9,7 @@ interface CalendarDay {
   selected: boolean
   today: boolean
   marked: boolean
+  past: boolean
   reservationCount: number
 }
 
@@ -16,10 +17,12 @@ const props = withDefaults(
   defineProps<{
     selectedDate: string
     markedDates?: string[]
+    minDate?: string
     reservationCounts?: Record<string, number>
   }>(),
   {
     markedDates: () => [],
+    minDate: '',
     reservationCounts: () => ({})
   }
 )
@@ -59,6 +62,7 @@ const monthDays = computed<CalendarDay[]>(() => {
       selected: props.selectedDate === isoDate,
       today: today === isoDate,
       marked: markedDateSet.value.has(isoDate) || reservationCount > 0,
+      past: !!props.minDate && isoDate < props.minDate,
       reservationCount
     })
   }
@@ -146,7 +150,8 @@ function dayAriaLabel(day: CalendarDay): string {
   const prefix = day.selected ? '已选择' : '选择'
   const reservationText =
     day.reservationCount > 0 ? `，${day.reservationCount} 个预订` : '，暂无预订'
-  return `${prefix} ${day.isoDate}${reservationText}`
+  const dateLimitText = day.past ? '，不可创建新预约' : ''
+  return `${prefix} ${day.isoDate}${reservationText}${dateLimitText}`
 }
 </script>
 
@@ -175,6 +180,7 @@ function dayAriaLabel(day: CalendarDay): string {
         class="reservation-calendar__day"
         :class="{
           'is-muted': !day.currentMonth,
+          'is-past': day.past,
           'is-selected': day.selected,
           'is-today': day.today,
           'has-reservation': day.marked
@@ -273,6 +279,14 @@ function dayAriaLabel(day: CalendarDay): string {
 
 .reservation-calendar__day.is-muted {
   color: #cbd5e1;
+}
+
+.reservation-calendar__day.is-past {
+  color: #94a3b8;
+}
+
+.reservation-calendar__day.is-past::after {
+  background: #cbd5e1;
 }
 
 .reservation-calendar__day.is-today {

@@ -36,6 +36,8 @@ class TableResourceListControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000001202");
     private static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000001202");
     private static final UUID GROUP_ID = UUID.fromString("71000000-0000-0000-0000-000000001202");
+    private static final UUID SEATING_ID = UUID.fromString("80000000-0000-0000-0000-000000001202");
+    private static final UUID CLEANING_ID = UUID.fromString("81000000-0000-0000-0000-000000001202");
 
     private TableResourceListApplicationService applicationService;
     private MutableCurrentActorProvider actorProvider;
@@ -57,14 +59,16 @@ class TableResourceListControllerTest {
                 "dining_table",
                 TABLE_ID,
                 "A01",
-                "A01",
-                null,
+                "A01 靠窗",
+                "A区",
                 1,
                 4,
                 "available",
                 true,
                 null,
-                List.of()
+                List.of(),
+                SEATING_ID,
+                null
             ),
             new TableResourceItem(
                 "table_group",
@@ -77,7 +81,9 @@ class TableResourceListControllerTest {
                 "active",
                 true,
                 null,
-                List.of("V01", "V02")
+                List.of("V01", "V02"),
+                null,
+                CLEANING_ID
             )
         )));
 
@@ -90,11 +96,15 @@ class TableResourceListControllerTest {
             .andExpect(jsonPath("$.resources[0].resourceType").value("dining_table"))
             .andExpect(jsonPath("$.resources[0].resourceId").value(TABLE_ID.toString()))
             .andExpect(jsonPath("$.resources[0].code").value("A01"))
+            .andExpect(jsonPath("$.resources[0].displayName").value("A01 靠窗"))
+            .andExpect(jsonPath("$.resources[0].areaName").value("A区"))
             .andExpect(jsonPath("$.resources[0].selectable").value(true))
+            .andExpect(jsonPath("$.resources[0].currentSeatingId").value(SEATING_ID.toString()))
             .andExpect(jsonPath("$.resources[1].resourceType").value("table_group"))
             .andExpect(jsonPath("$.resources[1].resourceId").value(GROUP_ID.toString()))
             .andExpect(jsonPath("$.resources[1].memberTableCodes[0]").value("V01"))
-            .andExpect(jsonPath("$.resources[1].memberTableCodes[1]").value("V02"));
+            .andExpect(jsonPath("$.resources[1].memberTableCodes[1]").value("V02"))
+            .andExpect(jsonPath("$.resources[1].currentCleaningId").value(CLEANING_ID.toString()));
 
         ArgumentCaptor<TableResourceListQuery> queryCaptor = ArgumentCaptor.forClass(TableResourceListQuery.class);
         verify(applicationService).listResources(queryCaptor.capture());

@@ -16,6 +16,10 @@ public record ReservationTodayViewItem(
     String customerName,
     String customerNickname,
     String phoneMasked,
-    String note
+    String note,
+    UUID seatingId,
+    String currentResourceType,
+    UUID currentResourceId,
+    String currentResourceCode
 ) {
 }

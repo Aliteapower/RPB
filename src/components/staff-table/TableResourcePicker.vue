@@ -27,9 +27,32 @@ const isLoading = ref(false)
 const apiError = ref<TableResourceApiErrorResponse | null>(null)
 let loadSequence = 0
 
+const statusLabels: Record<string, string> = {
+  available: '可用',
+  occupied: '占用',
+  cleaning: '清台中',
+  locked: '锁定',
+  reserved: '预留',
+  inactive: '停用',
+  active: '分组',
+  created: '已创建',
+  released: '已释放',
+  ended: '已结束'
+}
+
 const tableResources = computed(() =>
   resources.value.filter(resource => resource.resourceType === 'dining_table')
 )
+const groupedTableResources = computed(() => {
+  const groups = new Map<string, TableResourceItem[]>()
+
+  for (const resource of tableResources.value) {
+    const title = areaTitle(resource)
+    groups.set(title, [...(groups.get(title) ?? []), resource])
+  }
+
+  return Array.from(groups, ([title, items]) => ({ title, items }))
+})
 const groupResources = computed(() =>
   resources.value.filter(resource => resource.resourceType === 'table_group')
 )
@@ -103,6 +126,19 @@ function capacityText(resource: TableResourceItem): string {
   return `${resource.capacityMin}-${resource.capacityMax}人`
 }
 
+function statusText(resource: TableResourceItem): string {
+  return resource.selectable ? statusLabel(resource.status) : `${statusLabel(resource.status)}，当前不可选`
+}
+
+function statusLabel(status: string): string {
+  return statusLabels[status] ?? status
+}
+
+function areaTitle(resource: TableResourceItem): string {
+  const areaName = resource.areaName?.trim()
+  return areaName || '未分区'
+}
+
 function createLocalError(code: string, messageKey: string): TableResourceApiErrorResponse {
   return {
     success: false,
@@ -137,11 +173,16 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       暂无桌台，请先在后台配置桌台。
     </section>
 
-    <section v-if="tableResources.length" class="table-picker__section" aria-label="桌号">
-      <p class="table-picker__section-title">桌号</p>
+    <section
+      v-for="group in groupedTableResources"
+      :key="group.title"
+      class="table-picker__section"
+      :aria-label="`${group.title}桌号`"
+    >
+      <p class="table-picker__section-title">{{ group.title }}</p>
       <div class="table-picker__grid">
         <button
-          v-for="resource in tableResources"
+          v-for="resource in group.items"
           :key="resource.resourceId"
           class="table-picker__resource"
           :class="{ selected: selected(resource), unavailable: !resource.selectable }"
@@ -151,7 +192,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
         >
           <span>{{ resource.displayName || resource.code }}</span>
           <strong>{{ capacityText(resource) }}</strong>
-          <small>{{ resource.status }}</small>
+          <small>{{ statusText(resource) }}</small>
         </button>
       </div>
     </section>
@@ -170,7 +211,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
         >
           <span>{{ resource.displayName || resource.code }}</span>
           <strong>{{ capacityText(resource) }}</strong>
-          <small>{{ resource.memberTableCodes.join(' + ') || resource.status }}</small>
+          <small>{{ resource.memberTableCodes.join(' + ') || statusText(resource) }}</small>
         </button>
       </div>
     </section>

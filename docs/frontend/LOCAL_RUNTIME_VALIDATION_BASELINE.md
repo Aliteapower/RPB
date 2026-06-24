@@ -18,6 +18,12 @@ http://127.0.0.1:5176/stores/20000000-0000-0000-0000-000000000983/staff
 
 The frontend fallback store also uses `20000000-0000-0000-0000-000000000983` when `VITE_DEFAULT_STORE_ID` is not set.
 
+For full-stack local backend restart and known PostgreSQL/Flyway pitfalls, use:
+
+```text
+docs/development/LOCAL_RUNTIME_QUICK_RESTART_GUIDE.md
+```
+
 ## Backend Local Auth
 
 Backend local validation should use:
@@ -40,12 +46,18 @@ reservation.check_in
 reservation.queue
 reservation.today_view
 reservation.seat
+reservation.cancel
 queue.view
 queue.call
 queue.seat
+queue.skip
+queue.rejoin
 walkin.direct_seating.create
 cleaning.start
 cleaning.complete
+table.view
+table.switch
+customer.lookup
 ```
 
 ## Frontend Local Server

@@ -12,6 +12,7 @@ public enum ReservationApiErrorCode {
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "reservation.idempotency_in_progress"),
     IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY(HttpStatus.CONFLICT, "reservation.idempotency_failed_requires_new_key"),
     RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "reservation.not_found"),
+    RESERVATION_NOT_TODAY(HttpStatus.CONFLICT, "reservation.not_today"),
     RESERVATION_STATUS_NOT_CONFIRMED(HttpStatus.CONFLICT, "reservation.status_not_confirmed"),
     RESERVATION_CANNOT_CHECK_IN_CANCELLED(HttpStatus.CONFLICT, "reservation.cannot_check_in_cancelled"),
     RESERVATION_CANNOT_CHECK_IN_NO_SHOW(HttpStatus.CONFLICT, "reservation.cannot_check_in_no_show"),

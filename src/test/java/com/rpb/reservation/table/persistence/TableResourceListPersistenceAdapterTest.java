@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.store.value.StoreId;
+import com.rpb.reservation.table.application.DiningTableResourceRow;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.persistence.adapter.DiningTablePersistenceAdapter;
@@ -17,6 +18,7 @@ import com.rpb.reservation.table.persistence.entity.TableGroupEntity;
 import com.rpb.reservation.table.persistence.mapper.DefaultDiningTableMapper;
 import com.rpb.reservation.table.persistence.mapper.DefaultTableGroupMapper;
 import com.rpb.reservation.table.persistence.repository.DiningTableJpaRepository;
+import com.rpb.reservation.table.persistence.repository.DiningTableResourceProjection;
 import com.rpb.reservation.table.persistence.repository.TableGroupJpaRepository;
 import com.rpb.reservation.table.persistence.repository.TableGroupMemberJpaRepository;
 import com.rpb.reservation.tenant.value.TenantId;
@@ -37,13 +39,41 @@ class TableResourceListPersistenceAdapterTest {
     void diningTableAdapterQueriesVisibleResourcesWithinTenantAndStoreScope() {
         DiningTableJpaRepository repository = mock(DiningTableJpaRepository.class);
         DiningTableEntity entity = diningTableEntity("A01", "available", 1, 4);
-        when(repository.findVisibleResources(TENANT_ID, STORE_ID, "available", 4)).thenReturn(List.of(entity));
+        when(repository.findVisibleResourcesByStatusAndPartySize(TENANT_ID, STORE_ID, "available", 4)).thenReturn(List.of(entity));
         DiningTablePersistenceAdapter adapter = new DiningTablePersistenceAdapter(repository, new DefaultDiningTableMapper());
 
         List<DiningTable> resources = adapter.findVisibleResources(SCOPE, "available", new PartySize(4));
 
         assertThat(resources).extracting(DiningTable::tableCode).containsExactly("A01");
-        verify(repository).findVisibleResources(TENANT_ID, STORE_ID, "available", 4);
+        verify(repository).findVisibleResourcesByStatusAndPartySize(TENANT_ID, STORE_ID, "available", 4);
+    }
+
+    @Test
+    void diningTableAdapterAvoidsNullableStatusParameterWhenOnlyPartySizeIsProvided() {
+        DiningTableJpaRepository repository = mock(DiningTableJpaRepository.class);
+        DiningTableEntity entity = diningTableEntity("A01", "available", 1, 4);
+        when(repository.findVisibleResourcesByPartySize(TENANT_ID, STORE_ID, 4)).thenReturn(List.of(entity));
+        DiningTablePersistenceAdapter adapter = new DiningTablePersistenceAdapter(repository, new DefaultDiningTableMapper());
+
+        List<DiningTable> resources = adapter.findVisibleResources(SCOPE, null, new PartySize(4));
+
+        assertThat(resources).extracting(DiningTable::tableCode).containsExactly("A01");
+        verify(repository).findVisibleResourcesByPartySize(TENANT_ID, STORE_ID, 4);
+    }
+
+    @Test
+    void diningTableAdapterReadsBackendAreaAndDisplayNameForVisibleResourceRows() {
+        DiningTableJpaRepository repository = mock(DiningTableJpaRepository.class);
+        DiningTableResourceProjection row = diningTableResourceRow("A01", "A01 靠窗", "A区", "available", 1, 4);
+        when(repository.findVisibleResourceRowsByPartySize(TENANT_ID, STORE_ID, 4)).thenReturn(List.of(row));
+        DiningTablePersistenceAdapter adapter = new DiningTablePersistenceAdapter(repository, new DefaultDiningTableMapper());
+
+        List<DiningTableResourceRow> resources = adapter.findVisibleResourceRows(SCOPE, null, new PartySize(4));
+
+        assertThat(resources).extracting(DiningTableResourceRow::code).containsExactly("A01");
+        assertThat(resources).extracting(DiningTableResourceRow::displayName).containsExactly("A01 靠窗");
+        assertThat(resources).extracting(DiningTableResourceRow::areaName).containsExactly("A区");
+        verify(repository).findVisibleResourceRowsByPartySize(TENANT_ID, STORE_ID, 4);
     }
 
     @Test
@@ -51,7 +81,7 @@ class TableResourceListPersistenceAdapterTest {
         TableGroupJpaRepository groupRepository = mock(TableGroupJpaRepository.class);
         TableGroupMemberJpaRepository memberRepository = mock(TableGroupMemberJpaRepository.class);
         TableGroupEntity entity = tableGroupEntity("VIP-1", "active", 8, 12);
-        when(groupRepository.findVisibleGroups(TENANT_ID, STORE_ID, "active", 10)).thenReturn(List.of(entity));
+        when(groupRepository.findVisibleGroupsByStatusAndPartySize(TENANT_ID, STORE_ID, "active", 10)).thenReturn(List.of(entity));
         TableGroupPersistenceAdapter adapter = new TableGroupPersistenceAdapter(
             groupRepository,
             memberRepository,
@@ -61,7 +91,25 @@ class TableResourceListPersistenceAdapterTest {
         List<TableGroup> resources = adapter.findVisibleGroups(SCOPE, "active", new PartySize(10));
 
         assertThat(resources).extracting(TableGroup::groupCode).containsExactly("VIP-1");
-        verify(groupRepository).findVisibleGroups(TENANT_ID, STORE_ID, "active", 10);
+        verify(groupRepository).findVisibleGroupsByStatusAndPartySize(TENANT_ID, STORE_ID, "active", 10);
+    }
+
+    @Test
+    void tableGroupAdapterAvoidsNullableStatusParameterWhenOnlyPartySizeIsProvided() {
+        TableGroupJpaRepository groupRepository = mock(TableGroupJpaRepository.class);
+        TableGroupMemberJpaRepository memberRepository = mock(TableGroupMemberJpaRepository.class);
+        TableGroupEntity entity = tableGroupEntity("VIP-1", "active", 8, 12);
+        when(groupRepository.findVisibleGroupsByPartySize(TENANT_ID, STORE_ID, 10)).thenReturn(List.of(entity));
+        TableGroupPersistenceAdapter adapter = new TableGroupPersistenceAdapter(
+            groupRepository,
+            memberRepository,
+            new DefaultTableGroupMapper()
+        );
+
+        List<TableGroup> resources = adapter.findVisibleGroups(SCOPE, null, new PartySize(10));
+
+        assertThat(resources).extracting(TableGroup::groupCode).containsExactly("VIP-1");
+        verify(groupRepository).findVisibleGroupsByPartySize(TENANT_ID, STORE_ID, 10);
     }
 
     private static DiningTableEntity diningTableEntity(String code, String status, int min, int max) {
@@ -82,6 +130,52 @@ class TableResourceListPersistenceAdapterTest {
             null,
             0
         );
+    }
+
+    private static DiningTableResourceProjection diningTableResourceRow(
+        String code,
+        String displayName,
+        String areaName,
+        String status,
+        int min,
+        int max
+    ) {
+        return new DiningTableResourceProjection() {
+            @Override
+            public UUID getResourceId() {
+                return TABLE_ID;
+            }
+
+            @Override
+            public String getCode() {
+                return code;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return displayName;
+            }
+
+            @Override
+            public String getAreaName() {
+                return areaName;
+            }
+
+            @Override
+            public Integer getCapacityMin() {
+                return min;
+            }
+
+            @Override
+            public Integer getCapacityMax() {
+                return max;
+            }
+
+            @Override
+            public String getStatus() {
+                return status;
+            }
+        };
     }
 
     private static TableGroupEntity tableGroupEntity(String code, String status, int min, int max) {

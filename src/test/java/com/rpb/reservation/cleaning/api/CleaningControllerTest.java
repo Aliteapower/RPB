@@ -350,6 +350,7 @@ class CleaningControllerTest {
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
+                "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
                 "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
             );
         assertThat(sourceFiles)
@@ -371,6 +372,8 @@ class CleaningControllerTest {
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+                "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
                 "src/components/staff/StaffBottomNav.vue",
@@ -408,6 +411,8 @@ class CleaningControllerTest {
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+                "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue"

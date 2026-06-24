@@ -14,9 +14,11 @@ import com.rpb.reservation.appgate.domain.AppGateDecision;
 import com.rpb.reservation.reservation.api.ReservationTodayViewApiErrorMapper;
 import com.rpb.reservation.reservation.api.ReservationTodayViewApiMapper;
 import com.rpb.reservation.reservation.api.ReservationTodayViewController;
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
 import com.rpb.reservation.reservation.application.service.ReservationTodayViewApplicationService;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,7 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 class LocalRuntimeReservationTodayViewSecurityTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/today";
+    private static final String CALENDAR_SUMMARY_ENDPOINT = "/api/v1/stores/{storeId}/reservations/calendar-summary";
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000981");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000981");
 
@@ -87,5 +90,28 @@ class LocalRuntimeReservationTodayViewSecurityTest {
             .andExpect(jsonPath("$.statusFilter").value("operational"));
 
         verify(applicationService).getToday(any());
+    }
+
+    @Test
+    void acceptsLocalProfileCalendarSummaryRequestWithoutJwtLoginWhenConfiguredActorHasPermission() throws Exception {
+        when(appGateService.evaluate(any())).thenReturn(AppGateDecision.allow(
+            "reservation_queue",
+            TENANT_ID,
+            STORE_ID,
+            "reservation.today_view"
+        ));
+        when(applicationService.getCalendarSummary(any())).thenReturn(ReservationCalendarSummaryResult.success(
+            STORE_ID,
+            YearMonth.parse("2030-06"),
+            "Asia/Singapore",
+            List.of()
+        ));
+
+        mockMvc.perform(get(CALENDAR_SUMMARY_ENDPOINT, STORE_ID).param("month", "2030-06"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.month").value("2030-06"));
+
+        verify(applicationService).getCalendarSummary(any());
     }
 }

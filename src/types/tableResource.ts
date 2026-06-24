@@ -18,6 +18,8 @@ export interface TableResourceItem {
   selectable: boolean
   selectionDisabledReason?: string | null
   memberTableCodes: string[]
+  currentSeatingId?: string | null
+  currentCleaningId?: string | null
 }
 
 export interface TableResourceListResponse {

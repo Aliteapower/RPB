@@ -51,6 +51,10 @@ class ReservationTodayViewApiIntegrationTest {
     private static final UUID DRAFT_ID = UUID.fromString("50000000-0000-0000-0000-000000000997");
     private static final UUID NEXT_DAY_CONFIRMED_ID = UUID.fromString("50000000-0000-0000-0000-000000000998");
     private static final UUID DRAFT_ONLY_DAY_ID = UUID.fromString("50000000-0000-0000-0000-000000000999");
+    private static final UUID AREA_A_ID = UUID.fromString("61000000-0000-0000-0000-000000000991");
+    private static final UUID TABLE_A01_ID = UUID.fromString("62000000-0000-0000-0000-000000000991");
+    private static final UUID SEATING_ID = UUID.fromString("63000000-0000-0000-0000-000000000991");
+    private static final UUID SEATING_RESOURCE_ID = UUID.fromString("64000000-0000-0000-0000-000000000991");
     private static final LocalDate BUSINESS_DATE = LocalDate.parse("2030-06-20");
 
     @Autowired
@@ -156,6 +160,26 @@ class ReservationTodayViewApiIntegrationTest {
             .andExpect(jsonPath("$.items[0].status").value("cancelled"));
 
         assertReadOnlyBoundary();
+    }
+
+    @Test
+    void seatedReservationsExposeActiveSeatingResourceForTableSwitchFrontend() throws Exception {
+        fixture.allStatusReservations(BUSINESS_DATE);
+        fixture.activeTableSeatingForReservation(SEATED_ID, SEATING_ID, SEATING_RESOURCE_ID, TABLE_A01_ID);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", BUSINESS_DATE.toString())
+                .param("status", "seated"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].reservationId").value(SEATED_ID.toString()))
+            .andExpect(jsonPath("$.items[0].status").value("seated"))
+            .andExpect(jsonPath("$.items[0].seatingId").value(SEATING_ID.toString()))
+            .andExpect(jsonPath("$.items[0].currentResourceType").value("dining_table"))
+            .andExpect(jsonPath("$.items[0].currentResourceId").value(TABLE_A01_ID.toString()))
+            .andExpect(jsonPath("$.items[0].currentResourceCode").value("A01"));
+
+        assertReadOnlyBoundaryWithSeededSeating();
     }
 
     @Test
@@ -310,6 +334,20 @@ class ReservationTodayViewApiIntegrationTest {
         assertThat(fixture.count("table_locks")).isEqualTo(0);
     }
 
+    private void assertReadOnlyBoundaryWithSeededSeating() {
+        assertThat(fixture.count("idempotency_records")).isEqualTo(0);
+        assertThat(fixture.count("business_events")).isEqualTo(0);
+        assertThat(fixture.count("state_transition_logs")).isEqualTo(0);
+        assertThat(fixture.count("audit_logs")).isEqualTo(0);
+        assertThat(fixture.count("app_gate_audit_logs")).isEqualTo(0);
+        assertThat(fixture.count("queue_tickets")).isEqualTo(0);
+        assertThat(fixture.count("seatings")).isEqualTo(1);
+        assertThat(fixture.count("seating_resources")).isEqualTo(1);
+        assertThat(fixture.count("table_locks")).isEqualTo(0);
+        assertThat(fixture.scalarString("select status from dining_tables where id = ?", TABLE_A01_ID))
+            .isEqualTo("occupied");
+    }
+
     private static CurrentActor actor(Set<String> roles, Set<String> permissions, Set<UUID> storeIds) {
         return CurrentActor.storeStaff(
             TENANT_ID,
@@ -412,6 +450,74 @@ class ReservationTodayViewApiIntegrationTest {
                 note,
                 utc(createdAt),
                 utc(createdAt)
+            );
+        }
+
+        void activeTableSeatingForReservation(
+            UUID reservationId,
+            UUID seatingId,
+            UUID seatingResourceId,
+            UUID tableId
+        ) {
+            Instant assignedAt = Instant.parse(BUSINESS_DATE + "T03:00:00Z");
+            jdbc.update(
+                """
+                insert into store_areas (
+                    id, tenant_id, store_id, area_code, display_name, status, sort_order
+                )
+                values (?, ?, ?, 'A', 'A区', 'active', 1)
+                """,
+                AREA_A_ID,
+                TENANT_ID,
+                STORE_ID
+            );
+            jdbc.update(
+                """
+                insert into dining_tables (
+                    id, tenant_id, store_id, area_id, table_code, display_name,
+                    capacity_min, capacity_max, status, is_combinable, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'A01', 'A01', 2, 4, 'occupied', true, ?, ?)
+                """,
+                tableId,
+                TENANT_ID,
+                STORE_ID,
+                AREA_A_ID,
+                utc(assignedAt),
+                utc(assignedAt)
+            );
+            jdbc.update(
+                """
+                insert into seatings (
+                    id, tenant_id, store_id, reservation_id, seating_code, party_size_snapshot,
+                    status, seated_at, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'S-TV-SEATED', 4, 'occupied', ?, ?, ?)
+                """,
+                seatingId,
+                TENANT_ID,
+                STORE_ID,
+                reservationId,
+                utc(assignedAt),
+                utc(assignedAt),
+                utc(assignedAt)
+            );
+            jdbc.update(
+                """
+                insert into seating_resources (
+                    id, tenant_id, store_id, seating_id, resource_type, table_id,
+                    assigned_at, status, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'dining_table', ?, ?, 'active', ?, ?)
+                """,
+                seatingResourceId,
+                TENANT_ID,
+                STORE_ID,
+                seatingId,
+                tableId,
+                utc(assignedAt),
+                utc(assignedAt),
+                utc(assignedAt)
             );
         }
 

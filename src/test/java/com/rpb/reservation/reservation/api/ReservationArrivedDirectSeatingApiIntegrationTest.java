@@ -14,6 +14,7 @@ import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -504,6 +505,12 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
     static class TestSecurityConfiguration {
         @Bean
         @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
+        }
+
+        @Bean
+        @Primary
         TestCurrentActorProvider testCurrentActorProvider() {
             return new TestCurrentActorProvider();
         }
@@ -679,7 +686,7 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
         }
 
         void createActiveLock(UUID tableId, String lockKey) {
-            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            OffsetDateTime now = OffsetDateTime.ofInstant(START_AT.minusSeconds(600), ZoneOffset.UTC);
             jdbc.update(
                 """
                 insert into table_locks (

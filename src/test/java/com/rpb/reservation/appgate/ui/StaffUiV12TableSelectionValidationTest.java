@@ -64,10 +64,42 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("fetchTableResources")
             .contains("/api/v1/stores/${storeId}/tables")
             .contains("resourceType: 'dining_table' | 'table_group'")
+            .contains("areaName")
             .contains("memberTableCodes")
+            .contains("groupedAreaResources")
+            .contains("areaFilterOptions")
+            .contains("selectedArea")
+            .contains("selectArea")
+            .contains("statusFilterCount")
+            .contains("selectionReasonText")
+            .contains("currentSeatingId")
+            .contains("currentCleaningId")
+            .contains("startCleaning")
+            .contains("completeCleaning")
+            .contains("createTableActionIdempotencyKey")
+            .contains("walkInDirectSeatingRoute")
+            .contains("桌台分区")
+            .contains("全部分区")
+            .contains("状态：")
+            .contains("入桌")
+            .contains("换桌")
+            .contains("清桌")
+            .contains("完成清台")
+            .contains("桌台分组")
+            .contains("table-page__resource-actions")
+            .contains("table-page__area-filter")
+            .contains("table-page__area-section")
+            .contains("table-page__resource-card")
+            .contains("table-page__resource-badge")
+            .contains("table-page__resource-meta")
+            .contains("groupedTableResources")
+            .contains("areaTitle")
             .contains("select-table")
             .contains("select-table-group")
             .contains("暂无桌台，请先在后台配置桌台。")
+            .doesNotContain("resource.selectionDisabledReason || '当前不可选'")
+            .doesNotContain("resource.status = '")
+            .doesNotContain("resource.status = \"")
             .doesNotContain("mock")
             .doesNotContain("fake");
     }
@@ -141,6 +173,7 @@ class StaffUiV12TableSelectionValidationTest {
         Path actionsPath = Path.of("src", "components", "reservation-workbench", "ReservationQuickActionPanel.vue");
         Path calendarPath = Path.of("src", "components", "reservation-workbench", "ReservationMonthCalendar.vue");
         Path createDialogPath = Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue");
+        Path seatDialogPath = Path.of("src", "components", "reservation-workbench", "ReservationSeatDialog.vue");
         Path todayListPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListPanel.vue");
         Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
         Path timePickerPath = Path.of("src", "components", "staff", "StaffTimeWheelPicker.vue");
@@ -151,6 +184,7 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(actionsPath)).isTrue();
         assertThat(Files.exists(calendarPath)).isTrue();
         assertThat(Files.exists(createDialogPath)).isTrue();
+        assertThat(Files.exists(seatDialogPath)).isTrue();
         assertThat(Files.exists(todayListPath)).isTrue();
         assertThat(Files.exists(todayListItemPath)).isTrue();
         assertThat(Files.exists(timePickerPath)).isTrue();
@@ -162,6 +196,7 @@ class StaffUiV12TableSelectionValidationTest {
             + Files.readString(actionsPath)
             + Files.readString(calendarPath)
             + Files.readString(createDialogPath)
+            + Files.readString(seatDialogPath)
             + Files.readString(todayListPath)
             + Files.readString(todayListItemPath)
             + Files.readString(timePickerPath)
@@ -177,17 +212,29 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("ReservationTodayListItem")
             .contains("v-model:selected-date=\"businessDate\"")
             .contains("v-model:open=\"showCreateReservationDialog\"")
+            .contains("v-model:open=\"showSeatDialog\"")
             .contains("v-model:selected-status=\"selectedStatus\"")
             .contains("label: '预约到店'")
-            .contains("routeName: 'reservation-check-in'")
+            .contains("action: 'show-confirmed-reservations'")
             .contains("label: '创建预约'")
             .contains("open-create-reservation")
             .contains("label: '预约排队'")
             .contains("routeName: 'reservation-arrived-to-queue'")
             .contains("label: '预约入座'")
-            .contains("routeName: 'reservation-arrived-direct-seating'")
+            .contains("action: 'show-arrived-reservations'")
+            .contains("show-confirmed-reservations")
+            .contains("show-arrived-reservations")
             .contains("createReservation")
             .contains("新增预约")
+            .contains("ReservationSeatDialog")
+            .contains("选择桌号（入桌）")
+            .contains("TableResourcePicker")
+            .contains("seatArrivedReservation")
+            .contains("select-table")
+            .contains("select-table-group")
+            .contains("checkInReservation")
+            .contains("check-in-requested")
+            .contains("seat-requested")
             .contains("StaffTimeWheelPicker")
             .contains("v-model=\"form.time\"")
             .contains("name=\"reservationTime\"")
@@ -199,12 +246,11 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("桌号（可选）")
             .contains("今日预约")
             .contains("当日预约")
+            .contains("label: '已预约'")
             .contains("reservation-today-list")
             .contains("placeholder=\"手机号\"")
             .contains("全部人数")
             .contains("重置")
-            .contains("routeName: 'reservation-check-in'")
-            .contains("routeName: 'reservation-arrived-direct-seating'")
             .contains("fetchMeApps")
             .contains("reservation.cancel")
             .contains("canCancelReservation")
@@ -222,8 +268,22 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("visibleMonthKey")
             .contains("loadCalendarSummary")
             .contains("reservation-calendar__reservation-count")
+            .contains("storeTodayDate")
+            .contains("canCreateReservationForSelectedDate")
+            .contains("canRunCurrentDayActions")
+            .contains(":min-date=\"storeTodayDate\"")
+            .contains(":can-create-reservation-for-selected-date=\"canCreateReservationForSelectedDate\"")
+            .contains(":can-run-current-day-actions=\"canRunCurrentDayActions\"")
+            .contains("isBeforeMinDate")
+            .contains(":min=\"minDate\"")
+            .contains("is-past")
+            .contains("aria-disabled")
+            .contains("仅当日预约可以操作")
             .contains("aria-label")
+            .doesNotContain("routeName: 'reservation-check-in'")
+            .doesNotContain("routeName: 'reservation-arrived-direct-seating'")
             .doesNotContain("name=\"reservationTime\" type=\"time\"")
+            .doesNotContain("label: '已确认'")
             .doesNotContain("复制 ID")
             .doesNotContain("navigator.clipboard")
             .doesNotContain("取消预约需后端契约")
@@ -232,6 +292,79 @@ class StaffUiV12TableSelectionValidationTest {
             .doesNotContain("queueTicketId")
             .doesNotContain("seatingId: request.seatingId")
             .doesNotContain("tableId: request.tableId");
+    }
+
+    @Test
+    void reservationTodayListItemShowsTimeRangeWithoutRepeatingSelectedDate() throws Exception {
+        Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
+
+        assertThat(todayListItemPath).exists();
+
+        String todayListItem = Files.readString(todayListItemPath);
+
+        assertThat(todayListItem)
+            .contains("function formatStoreTime")
+            .contains("hour: '2-digit'")
+            .contains("minute: '2-digit'")
+            .doesNotContain("month: '2-digit'")
+            .doesNotContain("day: '2-digit'")
+            .doesNotContain("part('month')")
+            .doesNotContain("part('day')");
+    }
+
+    @Test
+    void reservationTodayListConnectsSwitchTableToTableSwitchApi() throws Exception {
+        Path pagePath = Path.of("src", "pages", "ReservationTodayViewPage.vue");
+        Path todayListPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListPanel.vue");
+        Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
+        Path switchDialogPath = Path.of("src", "components", "reservation-workbench", "ReservationTableSwitchDialog.vue");
+        Path switchApiPath = Path.of("src", "api", "tableSwitchApi.ts");
+        Path switchTypePath = Path.of("src", "types", "tableSwitch.ts");
+        Path todayViewTypePath = Path.of("src", "types", "reservationTodayView.ts");
+
+        assertThat(pagePath).exists();
+        assertThat(todayListPath).exists();
+        assertThat(todayListItemPath).exists();
+        assertThat(switchDialogPath).exists();
+        assertThat(switchApiPath).exists();
+        assertThat(switchTypePath).exists();
+        assertThat(todayViewTypePath).exists();
+
+        String source = Files.readString(pagePath)
+            + Files.readString(todayListPath)
+            + Files.readString(todayListItemPath)
+            + Files.readString(switchDialogPath)
+            + Files.readString(switchApiPath)
+            + Files.readString(switchTypePath)
+            + Files.readString(todayViewTypePath);
+
+        assertThat(source)
+            .contains("ReservationTableSwitchDialog")
+            .contains("v-model:open=\"showTableSwitchDialog\"")
+            .contains("@switch-table-requested=\"openReservationTableSwitchDialog\"")
+            .contains("@switched=\"handleReservationTableSwitched\"")
+            .contains("canSwitchTable")
+            .contains("table.switch")
+            .contains(":can-switch-table=\"canSwitchTable\"")
+            .contains("switch-table-requested")
+            .contains("currentResourceCode")
+            .contains("tableAssignmentText")
+            .contains("换桌")
+            .contains("选择桌号（换桌）")
+            .contains("TableResourcePicker")
+            .contains("switchTable")
+            .contains("/api/v1/stores/${encodeURIComponent(storeId)}/seatings/${encodeURIComponent(seatingId)}/table-switch")
+            .contains("'Idempotency-Key': idempotencyKey")
+            .contains("createTableSwitchIdempotencyKey")
+            .contains("seatingId?: string | null")
+            .contains("currentResourceType?:")
+            .contains("currentResourceId?: string | null")
+            .contains("loadTodayView()")
+            .contains("loadCalendarSummary()")
+            .doesNotContain("navigator.clipboard")
+            .doesNotContain("routeName: 'reservation-arrived-direct-seating'")
+            .doesNotContain("mock")
+            .doesNotContain("fake");
     }
 
     @Test

@@ -142,6 +142,12 @@ function isTableResourceItem(payload: unknown): payload is TableResourceItem {
     typeof candidate.capacityMax === 'number' &&
     typeof candidate.status === 'string' &&
     typeof candidate.selectable === 'boolean' &&
+    (candidate.currentSeatingId === undefined ||
+      candidate.currentSeatingId === null ||
+      typeof candidate.currentSeatingId === 'string') &&
+    (candidate.currentCleaningId === undefined ||
+      candidate.currentCleaningId === null ||
+      typeof candidate.currentCleaningId === 'string') &&
     Array.isArray(candidate.memberTableCodes) &&
     candidate.memberTableCodes.every(value => typeof value === 'string')
   )

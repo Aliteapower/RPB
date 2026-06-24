@@ -37,8 +37,11 @@ class ReservationCheckInUiImplementationValidationTest {
         assertThat(staffHome)
             .contains("reservation.check_in")
             .contains("canCheckInReservation")
-            .contains("name: 'reservation-check-in'")
-            .contains("hasVisibleOperation");
+            .contains("reservationConfirmedTodayRoute")
+            .contains("name: 'reservation-today-view'")
+            .contains("status: 'confirmed'")
+            .contains("hasVisibleOperation")
+            .doesNotContain("reservation-check-in");
 
         assertThat(apiClient)
             .contains("checkInReservation")

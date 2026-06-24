@@ -101,7 +101,8 @@ public class ReservationCreateApplicationService {
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
-        IdempotencyRepositoryPort idempotencyRepository
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock
     ) {
         this(
             storeRepository,
@@ -112,7 +113,7 @@ public class ReservationCreateApplicationService {
             stateTransitionLogRepository,
             auditLogRepository,
             idempotencyRepository,
-            Clock.systemUTC(),
+            clock,
             new ReservationCodePolicy()
         );
     }

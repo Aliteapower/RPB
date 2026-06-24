@@ -1,6 +1,9 @@
 package com.rpb.reservation.table.application.service;
 
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.cleaning.application.port.out.CleaningRepositoryPort;
+import com.rpb.reservation.seating.application.port.out.SeatingRepositoryPort;
+import com.rpb.reservation.table.application.DiningTableResourceRow;
 import com.rpb.reservation.table.application.TableResourceItem;
 import com.rpb.reservation.table.application.TableResourceListError;
 import com.rpb.reservation.table.application.TableResourceListQuery;
@@ -14,6 +17,7 @@ import com.rpb.reservation.table.status.DiningTableStatus;
 import com.rpb.reservation.table.status.TableGroupStatus;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -24,13 +28,19 @@ public class TableResourceListApplicationService {
 
     private final DiningTableRepositoryPort diningTableRepository;
     private final TableGroupRepositoryPort tableGroupRepository;
+    private final SeatingRepositoryPort seatingRepository;
+    private final CleaningRepositoryPort cleaningRepository;
 
     public TableResourceListApplicationService(
         DiningTableRepositoryPort diningTableRepository,
-        TableGroupRepositoryPort tableGroupRepository
+        TableGroupRepositoryPort tableGroupRepository,
+        SeatingRepositoryPort seatingRepository,
+        CleaningRepositoryPort cleaningRepository
     ) {
         this.diningTableRepository = diningTableRepository;
         this.tableGroupRepository = tableGroupRepository;
+        this.seatingRepository = seatingRepository;
+        this.cleaningRepository = cleaningRepository;
     }
 
     public TableResourceListResult listResources(TableResourceListQuery query) {
@@ -39,9 +49,9 @@ public class TableResourceListApplicationService {
             List<TableResourceItem> resources = new ArrayList<>();
 
             resources.addAll(
-                diningTableRepository.findVisibleResources(query.scope(), query.status(), partySize)
+                diningTableRepository.findVisibleResourceRows(query.scope(), query.status(), partySize)
                     .stream()
-                    .map(this::toDiningTableItem)
+                    .map(table -> toDiningTableItem(query, table))
                     .toList()
             );
 
@@ -60,21 +70,23 @@ public class TableResourceListApplicationService {
         }
     }
 
-    private TableResourceItem toDiningTableItem(DiningTable table) {
-        boolean selectable = table.status() == DiningTableStatus.AVAILABLE;
+    private TableResourceItem toDiningTableItem(TableResourceListQuery query, DiningTableResourceRow table) {
+        boolean selectable = DiningTableStatus.AVAILABLE.code().equals(table.status());
 
         return new TableResourceItem(
             DINING_TABLE_TYPE,
-            table.id().value(),
-            table.tableCode(),
-            table.tableCode(),
-            null,
-            table.capacity().min(),
-            table.capacity().max(),
-            table.status().code(),
+            table.resourceId(),
+            table.code(),
+            table.displayName(),
+            table.areaName(),
+            table.capacityMin(),
+            table.capacityMax(),
+            table.status(),
             selectable,
             selectable ? null : STATUS_UNAVAILABLE,
-            List.of()
+            List.of(),
+            currentSeatingId(table.status(), DINING_TABLE_TYPE, table.resourceId(), query),
+            currentCleaningId(DINING_TABLE_TYPE, table.resourceId(), query)
         );
     }
 
@@ -92,8 +104,26 @@ public class TableResourceListApplicationService {
             group.status().code(),
             selectable,
             selectable ? null : STATUS_UNAVAILABLE,
-            memberTableCodes(query, group)
+            memberTableCodes(query, group),
+            currentSeatingId(group.status().code(), TABLE_GROUP_TYPE, group.id().value(), query),
+            currentCleaningId(TABLE_GROUP_TYPE, group.id().value(), query)
         );
+    }
+
+    private UUID currentSeatingId(String status, String resourceType, UUID resourceId, TableResourceListQuery query) {
+        if (!DiningTableStatus.OCCUPIED.code().equals(status) && !"occupied".equals(status)) {
+            return null;
+        }
+
+        return seatingRepository.findActiveOccupancy(query.scope(), resourceType, resourceId)
+            .map(seating -> seating.id().value())
+            .orElse(null);
+    }
+
+    private UUID currentCleaningId(String resourceType, UUID resourceId, TableResourceListQuery query) {
+        return cleaningRepository.findActiveByResource(query.scope(), resourceType, resourceId)
+            .map(cleaning -> cleaning.id().value())
+            .orElse(null);
     }
 
     private List<String> memberTableCodes(TableResourceListQuery query, TableGroup group) {

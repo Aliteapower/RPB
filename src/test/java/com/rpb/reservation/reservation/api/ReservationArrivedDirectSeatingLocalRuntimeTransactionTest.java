@@ -13,8 +13,10 @@ import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -248,6 +250,12 @@ class ReservationArrivedDirectSeatingLocalRuntimeTransactionTest {
 
     @TestConfiguration
     static class TestSecurityConfiguration {
+        @Bean
+        @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
+        }
+
         @Bean
         @Primary
         TestCurrentActorProvider testCurrentActorProvider() {

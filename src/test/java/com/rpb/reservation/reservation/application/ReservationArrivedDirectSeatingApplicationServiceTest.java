@@ -153,6 +153,27 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
     }
 
     @Test
+    void rejectsSeatingWhenReservationBusinessDateIsNotStoreToday() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.replaceReservationBusinessDate(LocalDate.of(2026, 6, 21));
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationArrivedDirectSeatingError.RESERVATION_NOT_TODAY);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+        assertThat(scenario.seatingRepository.saved).isEmpty();
+        assertThat(scenario.seatingRepository.savedResources).isEmpty();
+        assertThat(scenario.diningTableRepository.saved).isEmpty();
+        assertThat(scenario.diningTableRepository.tables.get(scenario.table.id().value()).status()).isEqualTo(DiningTableStatus.AVAILABLE);
+        assertThat(scenario.businessEventRepository.events).isEmpty();
+        assertThat(scenario.stateTransitionLogRepository.logs).isEmpty();
+        assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::operationCode).contains("reservation.seat.failed");
+        assertThat(scenario.idempotencyRepository.failed).hasSize(1);
+    }
+
+    @Test
     void completedSameHashReplaysStoredResultWithoutMutation() {
         Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
         SeatArrivedReservationCommand command = scenario.commandWithTable(scenario.table.id().value());
@@ -562,13 +583,17 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         }
 
         Reservation reservation(ReservationStatus status) {
+            return reservation(status, LocalDate.of(2026, 6, 20));
+        }
+
+        Reservation reservation(ReservationStatus status, LocalDate businessDate) {
             return new Reservation(
                 reservationId,
                 scope,
                 customerId,
                 new ReservationCode("R-SEAT-1"),
                 new PartySize(4),
-                new BusinessDate(LocalDate.of(2026, 6, 20)),
+                new BusinessDate(businessDate),
                 reservedStartAt,
                 reservedEndAt,
                 reservedStartAt.plusSeconds(15 * 60L),
@@ -581,6 +606,10 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
                 Instant.parse("2026-06-20T04:45:00Z"),
                 null
             );
+        }
+
+        void replaceReservationBusinessDate(LocalDate businessDate) {
+            reservationRepository.reservations.put(reservationId.value(), reservation(ReservationStatus.ARRIVED, businessDate));
         }
 
         DiningTable table(String code, CapacityRange capacity, DiningTableStatus status) {

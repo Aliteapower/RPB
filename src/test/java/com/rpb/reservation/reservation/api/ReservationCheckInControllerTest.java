@@ -209,6 +209,7 @@ class ReservationCheckInControllerTest {
         assertApplicationError(ReservationCheckInError.STORE_ACCESS_DENIED, 403, "FORBIDDEN", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_NOT_FOUND, 404, "RESERVATION_NOT_FOUND", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_STATUS_NOT_CONFIRMED, 409, "RESERVATION_STATUS_NOT_CONFIRMED", "failed");
+        assertApplicationError(ReservationCheckInError.RESERVATION_NOT_TODAY, 409, "RESERVATION_NOT_TODAY", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_CANCELLED, 409, "RESERVATION_CANNOT_CHECK_IN_CANCELLED", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_NO_SHOW, 409, "RESERVATION_CANNOT_CHECK_IN_NO_SHOW", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_COMPLETED, 409, "RESERVATION_CANNOT_CHECK_IN_COMPLETED", "failed");
@@ -318,6 +319,7 @@ class ReservationCheckInControllerTest {
             case "EVENT_WRITE_FAILED" -> "reservation.event_write_failed";
             case "RESERVATION_NOT_FOUND" -> "reservation.not_found";
             case "RESERVATION_STATUS_NOT_CONFIRMED" -> "reservation.status_not_confirmed";
+            case "RESERVATION_NOT_TODAY" -> "reservation.not_today";
             case "RESERVATION_CANNOT_CHECK_IN_CANCELLED" -> "reservation.cannot_check_in_cancelled";
             case "RESERVATION_CANNOT_CHECK_IN_NO_SHOW" -> "reservation.cannot_check_in_no_show";
             case "RESERVATION_CANNOT_CHECK_IN_COMPLETED" -> "reservation.cannot_check_in_completed";

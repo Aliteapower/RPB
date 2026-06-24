@@ -39,6 +39,7 @@ public class ReservationArrivedDirectSeatingApiErrorMapper {
             case STORE_ACCESS_DENIED -> ReservationApiErrorCode.FORBIDDEN;
             case RESERVATION_NOT_FOUND -> ReservationApiErrorCode.RESERVATION_NOT_FOUND;
             case RESERVATION_STATUS_NOT_ARRIVED -> ReservationApiErrorCode.RESERVATION_STATUS_NOT_ARRIVED;
+            case RESERVATION_NOT_TODAY -> ReservationApiErrorCode.RESERVATION_NOT_TODAY;
             case RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING -> ReservationApiErrorCode.RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING;
             case RESERVATION_CANNOT_SEAT_CANCELLED -> ReservationApiErrorCode.RESERVATION_CANNOT_SEAT_CANCELLED;
             case RESERVATION_CANNOT_SEAT_NO_SHOW -> ReservationApiErrorCode.RESERVATION_CANNOT_SEAT_NO_SHOW;

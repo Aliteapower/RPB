@@ -28,4 +28,12 @@ public interface ReservationTodayViewProjection {
     String getPhoneE164();
 
     String getNote();
+
+    UUID getSeatingId();
+
+    String getCurrentResourceType();
+
+    UUID getCurrentResourceId();
+
+    String getCurrentResourceCode();
 }

@@ -3,11 +3,13 @@ package com.rpb.reservation.table.persistence.adapter;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.table.application.DiningTableResourceRow;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.persistence.entity.DiningTableEntity;
 import com.rpb.reservation.table.persistence.mapper.DiningTableMapper;
 import com.rpb.reservation.table.persistence.repository.DiningTableJpaRepository;
+import com.rpb.reservation.table.persistence.repository.DiningTableResourceProjection;
 import com.rpb.reservation.table.value.TableId;
 import java.util.List;
 import java.util.Optional;
@@ -54,12 +56,50 @@ public class DiningTablePersistenceAdapter implements DiningTableRepositoryPort 
 
     @Override
     public List<DiningTable> findVisibleResources(StoreScope scope, String status, PartySize partySize) {
-        return repository.findVisibleResources(
-            scope.tenantId().value(),
-            scope.storeId().value(),
-            status,
-            partySize == null ? null : partySize.value()
-        ).stream().map(mapper::toDomain).toList();
+        UUID tenantId = scope.tenantId().value();
+        UUID storeId = scope.storeId().value();
+        List<DiningTableEntity> entities;
+
+        if (status != null && partySize != null) {
+            entities = repository.findVisibleResourcesByStatusAndPartySize(
+                tenantId,
+                storeId,
+                status,
+                partySize.value()
+            );
+        } else if (status != null) {
+            entities = repository.findVisibleResourcesByStatus(tenantId, storeId, status);
+        } else if (partySize != null) {
+            entities = repository.findVisibleResourcesByPartySize(tenantId, storeId, partySize.value());
+        } else {
+            entities = repository.findVisibleResourcesWithoutFilters(tenantId, storeId);
+        }
+
+        return entities.stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<DiningTableResourceRow> findVisibleResourceRows(StoreScope scope, String status, PartySize partySize) {
+        UUID tenantId = scope.tenantId().value();
+        UUID storeId = scope.storeId().value();
+        List<DiningTableResourceProjection> rows;
+
+        if (status != null && partySize != null) {
+            rows = repository.findVisibleResourceRowsByStatusAndPartySize(
+                tenantId,
+                storeId,
+                status,
+                partySize.value()
+            );
+        } else if (status != null) {
+            rows = repository.findVisibleResourceRowsByStatus(tenantId, storeId, status);
+        } else if (partySize != null) {
+            rows = repository.findVisibleResourceRowsByPartySize(tenantId, storeId, partySize.value());
+        } else {
+            rows = repository.findVisibleResourceRowsWithoutFilters(tenantId, storeId);
+        }
+
+        return rows.stream().map(DiningTablePersistenceAdapter::toResourceRow).toList();
     }
 
     @Override
@@ -109,6 +149,18 @@ public class DiningTablePersistenceAdapter implements DiningTableRepositoryPort 
             mapped.getUpdatedAt(),
             mapped.getDeletedAt(),
             null
+        );
+    }
+
+    private static DiningTableResourceRow toResourceRow(DiningTableResourceProjection projection) {
+        return new DiningTableResourceRow(
+            projection.getResourceId(),
+            projection.getCode(),
+            projection.getDisplayName(),
+            projection.getAreaName(),
+            projection.getCapacityMin(),
+            projection.getCapacityMax(),
+            projection.getStatus()
         );
     }
 }

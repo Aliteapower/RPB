@@ -18,19 +18,27 @@ import ReservationTodayListItem from './ReservationTodayListItem.vue'
 
 const props = defineProps<{
   canCancelReservation: boolean
+  canRunCurrentDayActions: boolean
+  canSwitchTable: boolean
+  checkingInReservationId?: string | null
   items: ReservationTodayViewItem[]
   isLoading: boolean
   apiError: ReservationTodayViewApiErrorResponse | null
+  seatingReservationId?: string | null
   showEmptyState: boolean
   selectedStatus: ReservationTodayViewStatusFilter
   statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: string }>
   storeId: string
   storeTimezone: string
+  switchingReservationId?: string | null
 }>()
 
 const emit = defineEmits<{
   'update:selectedStatus': [value: ReservationTodayViewStatusFilter]
   cancelled: [value: CancelReservationResponse]
+  'check-in-requested': [item: ReservationTodayViewItem]
+  'seat-requested': [item: ReservationTodayViewItem]
+  'switch-table-requested': [item: ReservationTodayViewItem]
 }>()
 
 const phoneFilter = ref('')
@@ -108,6 +116,18 @@ async function handleCancelRequested(item: ReservationTodayViewItem): Promise<vo
   } finally {
     cancellingReservationId.value = null
   }
+}
+
+function handleCheckInRequested(item: ReservationTodayViewItem): void {
+  emit('check-in-requested', item)
+}
+
+function handleSeatRequested(item: ReservationTodayViewItem): void {
+  emit('seat-requested', item)
+}
+
+function handleSwitchTableRequested(item: ReservationTodayViewItem): void {
+  emit('switch-table-requested', item)
 }
 
 function createReservationCancelIdempotencyKey(reservationId: string): string {
@@ -211,11 +231,18 @@ function createLocalCancelError(
         v-for="item in visibleItems"
         :key="item.reservationId"
         :can-cancel-reservation="canCancelReservation"
+        :can-run-current-day-actions="canRunCurrentDayActions"
+        :can-switch-table="canSwitchTable"
         :is-cancelling="cancellingReservationId === item.reservationId"
+        :is-checking-in="checkingInReservationId === item.reservationId"
+        :is-seating="seatingReservationId === item.reservationId"
+        :is-switching="switchingReservationId === item.reservationId"
         :item="item"
-        :store-id="storeId"
         :store-timezone="storeTimezone"
         @cancel-requested="handleCancelRequested"
+        @check-in-requested="handleCheckInRequested"
+        @seat-requested="handleSeatRequested"
+        @switch-table-requested="handleSwitchTableRequested"
       />
     </section>
   </section>

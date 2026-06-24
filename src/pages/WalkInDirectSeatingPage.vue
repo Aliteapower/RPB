@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
@@ -56,6 +56,14 @@ const cleaningRoute = computed(() => ({
 
 const canSubmit = computed(() => !isSubmitting.value && !!storeId.value)
 
+watch(
+  () => route.query,
+  () => {
+    applyRouteSelection()
+  },
+  { immediate: true }
+)
+
 async function submitDirectSeating(): Promise<void> {
   apiError.value = validateForm()
   result.value = null
@@ -107,6 +115,22 @@ function selectTableGroup(tableGroupId: string): void {
   form.tableId = ''
 }
 
+function applyRouteSelection(): void {
+  const tableId = asSingleValue(route.query.tableId)
+  const tableGroupId = asSingleValue(route.query.tableGroupId)
+  const partySize = Number(asSingleValue(route.query.partySize) ?? '')
+
+  if (tableId) {
+    selectTable(tableId)
+  } else if (tableGroupId) {
+    selectTableGroup(tableGroupId)
+  }
+
+  if (Number.isInteger(partySize) && partySize > 0) {
+    form.partySize = partySize
+  }
+}
+
 function toRequest(): SeatWalkInDirectlyRequest {
   return {
     partySize: form.partySize,
@@ -124,6 +148,12 @@ function toRequest(): SeatWalkInDirectlyRequest {
 function optionalValue(value: string): string | null {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
+}
+
+function asSingleValue(value: unknown): string | null {
+  const candidate = Array.isArray(value) ? value[0] : value
+
+  return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : null
 }
 
 function createIdempotencyKey(): string {

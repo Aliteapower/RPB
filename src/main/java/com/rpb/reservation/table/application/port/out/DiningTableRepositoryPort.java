@@ -3,6 +3,7 @@ package com.rpb.reservation.table.application.port.out;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.table.application.DiningTableResourceRow;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.value.TableId;
 import java.util.List;
@@ -19,6 +20,10 @@ public interface DiningTableRepositoryPort {
 
     default List<DiningTable> findVisibleResources(StoreScope scope, String status, PartySize partySize) {
         throw new UnsupportedOperationException("find_visible_dining_table_resources_not_implemented");
+    }
+
+    default List<DiningTableResourceRow> findVisibleResourceRows(StoreScope scope, String status, PartySize partySize) {
+        throw new UnsupportedOperationException("find_visible_dining_table_resource_rows_not_implemented");
     }
 
     DiningTable save(StoreScope scope, DiningTable table);

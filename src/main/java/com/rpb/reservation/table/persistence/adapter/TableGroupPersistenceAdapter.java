@@ -6,6 +6,7 @@ import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
 import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.domain.TableGroupMember;
+import com.rpb.reservation.table.persistence.entity.TableGroupEntity;
 import com.rpb.reservation.table.persistence.entity.TableGroupMemberEntity;
 import com.rpb.reservation.table.persistence.mapper.TableGroupMapper;
 import com.rpb.reservation.table.persistence.repository.TableGroupJpaRepository;
@@ -16,6 +17,7 @@ import com.rpb.reservation.tenant.value.TenantId;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -78,12 +80,26 @@ public class TableGroupPersistenceAdapter implements TableGroupRepositoryPort {
 
     @Override
     public List<TableGroup> findVisibleGroups(StoreScope scope, String status, PartySize partySize) {
-        return groupRepository.findVisibleGroups(
-            scope.tenantId().value(),
-            scope.storeId().value(),
-            status,
-            partySize == null ? null : partySize.value()
-        ).stream().map(mapper::toDomain).toList();
+        UUID tenantId = scope.tenantId().value();
+        UUID storeId = scope.storeId().value();
+        List<TableGroupEntity> entities;
+
+        if (status != null && partySize != null) {
+            entities = groupRepository.findVisibleGroupsByStatusAndPartySize(
+                tenantId,
+                storeId,
+                status,
+                partySize.value()
+            );
+        } else if (status != null) {
+            entities = groupRepository.findVisibleGroupsByStatus(tenantId, storeId, status);
+        } else if (partySize != null) {
+            entities = groupRepository.findVisibleGroupsByPartySize(tenantId, storeId, partySize.value());
+        } else {
+            entities = groupRepository.findVisibleGroupsWithoutFilters(tenantId, storeId);
+        }
+
+        return entities.stream().map(mapper::toDomain).toList();
     }
 
     @Override
