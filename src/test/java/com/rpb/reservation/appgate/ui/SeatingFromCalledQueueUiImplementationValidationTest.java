@@ -41,9 +41,9 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         assertThat(staffHome)
             .contains("queue.seat")
             .contains("canSeatCalledQueueTicket")
-            .contains("name: 'seating-from-called-queue'")
+            .contains("to: queueTicketListRoute.value")
             .contains("排队入座")
-            .contains("输入已叫号排队票 ID 并安排桌台入座")
+            .contains("从已叫号票直接安排桌台")
             .contains("hasVisibleOperation");
         assertForbiddenQueueSeatOperationsAbsent(staffHome);
 

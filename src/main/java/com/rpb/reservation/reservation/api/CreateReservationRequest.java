@@ -13,9 +13,24 @@ public record CreateReservationRequest(
     String customerName,
     String customerNickname,
     String phoneE164,
-    String note
+    String note,
+    UUID tableId,
+    UUID tableGroupId
 ) {
     private static final Pattern E164_PATTERN = Pattern.compile("^[+][1-9][0-9]{1,14}$");
+
+    public CreateReservationRequest(
+        Integer partySize,
+        Instant reservedStartAt,
+        Instant reservedEndAt,
+        UUID customerId,
+        String customerName,
+        String customerNickname,
+        String phoneE164,
+        String note
+    ) {
+        this(partySize, reservedStartAt, reservedEndAt, customerId, customerName, customerNickname, phoneE164, note, null, null);
+    }
 
     public Optional<ReservationApiErrorCode> validateContract() {
         if (partySize == null || partySize <= 0) {
@@ -29,6 +44,9 @@ public record CreateReservationRequest(
         }
         if (hasText(phoneE164) && !E164_PATTERN.matcher(phoneE164.trim()).matches()) {
             return Optional.of(ReservationApiErrorCode.INVALID_PHONE_E164);
+        }
+        if (tableId != null && tableGroupId != null) {
+            return Optional.of(ReservationApiErrorCode.RESOURCE_SELECTION_CONFLICT);
         }
         return Optional.empty();
     }

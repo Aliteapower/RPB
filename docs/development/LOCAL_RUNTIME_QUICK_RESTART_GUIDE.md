@@ -56,7 +56,11 @@ Run this from PowerShell. It starts Spring Boot in a hidden window and writes lo
 ```powershell
 cd D:\RPB
 
-$pg = Get-Content target/local-postgres-current.txt | ConvertFrom-StringData
+$pgPort = (
+  Get-Content target/local-postgres-current.txt |
+  Where-Object { $_ -match '^port=' } |
+  Select-Object -First 1
+) -replace '^port=', ''
 $log = 'D:\RPB\target\local-backend.log'
 
 $permissions = @(
@@ -64,6 +68,8 @@ $permissions = @(
   'reservation.today_view',
   'reservation.check_in',
   'reservation.cancel',
+  'reservation.no_show',
+  'reservation.complete',
   'reservation.seat',
   'reservation.queue',
   'queue.view',
@@ -84,7 +90,7 @@ $permissionArgs = for ($i = 0; $i -lt $permissions.Count; $i++) {
 }
 
 $bootArgs = @(
-  "--spring.datasource.url=jdbc:postgresql://127.0.0.1:$($pg.port)/postgres?stringtype=unspecified",
+  "--spring.datasource.url=jdbc:postgresql://127.0.0.1:$pgPort/postgres?stringtype=unspecified",
   '--spring.datasource.username=postgres',
   '--spring.datasource.password=',
   '--spring.flyway.enabled=false',
@@ -100,7 +106,7 @@ $bootArgString = ($bootArgs -join ' ')
 $cmd =
   'cd /d D:\RPB && ' +
   'set DB_HOST=127.0.0.1&& ' +
-  'set DB_PORT=' + $pg.port + '&& ' +
+  'set DB_PORT=' + $pgPort + '&& ' +
   'set DB_NAME=postgres&& ' +
   'set DB_USERNAME=postgres&& ' +
   'set DB_PASSWORD=&& ' +

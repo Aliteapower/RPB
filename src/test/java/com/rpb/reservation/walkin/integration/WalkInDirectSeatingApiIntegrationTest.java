@@ -21,6 +21,7 @@ import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.SeatWalkInDirectlyRequest;
 import com.rpb.reservation.walkin.application.command.SeatWalkInDirectlyCommand;
 import com.rpb.reservation.walkin.application.service.WalkInDirectSeatingApplicationService;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -117,6 +118,7 @@ class WalkInDirectSeatingApiIntegrationTest {
             "女士",
             "+6598765430",
             SMALL_TABLE_ID,
+            null,
             null,
             null,
             null
@@ -241,7 +243,7 @@ class WalkInDirectSeatingApiIntegrationTest {
 
     @Test
     void invalidPhoneDoesNotWriteBusinessRows() throws Exception {
-        SeatWalkInDirectlyRequest request = new SeatWalkInDirectlyRequest(2, null, "Guest", null, "91234567", null, null, null, null);
+        SeatWalkInDirectlyRequest request = new SeatWalkInDirectlyRequest(2, null, "Guest", null, "91234567", null, null, null, null, null);
 
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-invalid-phone")
@@ -468,7 +470,7 @@ class WalkInDirectSeatingApiIntegrationTest {
     }
 
     private SeatWalkInDirectlyRequest request(int partySize, UUID tableId, UUID tableGroupId) {
-        return new SeatWalkInDirectlyRequest(partySize, null, "Guest", null, null, tableId, tableGroupId, null, null);
+        return new SeatWalkInDirectlyRequest(partySize, null, "Guest", null, null, tableId, tableGroupId, null, null, null);
     }
 
     private void insertRecognizedCustomer() {
@@ -496,6 +498,7 @@ class WalkInDirectSeatingApiIntegrationTest {
             request.phoneE164(),
             request.tableId(),
             request.tableGroupId(),
+            request.temporaryTableIds(),
             "ignored-by-hash",
             ACTOR_ID,
             "staff",

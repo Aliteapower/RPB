@@ -33,6 +33,7 @@ class ReservationTodayViewControllerTest {
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000009701");
     private static final UUID SEATING_ID = UUID.fromString("60000000-0000-0000-0000-000000009701");
     private static final UUID RESOURCE_ID = UUID.fromString("70000000-0000-0000-0000-000000009701");
+    private static final UUID QUEUE_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000009701");
 
     private CapturingReservationTodayViewService applicationService;
     private MutableCurrentActorProvider actorProvider;
@@ -106,7 +107,13 @@ class ReservationTodayViewControllerTest {
                 SEATING_ID,
                 "dining_table",
                 RESOURCE_ID,
-                "A01"
+                "A01",
+                "dining_table",
+                RESOURCE_ID,
+                "A01",
+                QUEUE_TICKET_ID,
+                9,
+                "called"
             ))
         );
 
@@ -128,6 +135,12 @@ class ReservationTodayViewControllerTest {
             .andExpect(jsonPath("$.items[0].currentResourceType").value("dining_table"))
             .andExpect(jsonPath("$.items[0].currentResourceId").value(RESOURCE_ID.toString()))
             .andExpect(jsonPath("$.items[0].currentResourceCode").value("A01"))
+            .andExpect(jsonPath("$.items[0].assignedResourceType").value("dining_table"))
+            .andExpect(jsonPath("$.items[0].assignedResourceId").value(RESOURCE_ID.toString()))
+            .andExpect(jsonPath("$.items[0].assignedResourceCode").value("A01"))
+            .andExpect(jsonPath("$.items[0].queueTicketId").value(QUEUE_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.items[0].queueTicketNumber").value(9))
+            .andExpect(jsonPath("$.items[0].queueTicketStatus").value("called"))
             .andExpect(jsonPath("$.idempotency").doesNotExist());
 
         ReservationTodayViewQuery query = applicationService.todayQuery;

@@ -75,7 +75,7 @@ class CustomerPhoneLookupUiValidationTest {
 
         for (Path path : List.of(
             Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue"),
-            Path.of("src", "pages", "ReservationCreatePage.vue"),
+            Path.of("src", "pages", "WalkInQueuePage.vue"),
             Path.of("src", "pages", "WalkInDirectSeatingPage.vue")
         )) {
             String pageSource = Files.readString(path);

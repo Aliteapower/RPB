@@ -6,12 +6,12 @@ import QueueTicketListPage from '../pages/QueueTicketListPage.vue'
 import ReservationArrivedDirectSeatingPage from '../pages/ReservationArrivedDirectSeatingPage.vue'
 import ReservationArrivedToQueuePage from '../pages/ReservationArrivedToQueuePage.vue'
 import ReservationCheckInPage from '../pages/ReservationCheckInPage.vue'
-import ReservationCreatePage from '../pages/ReservationCreatePage.vue'
 import ReservationTodayViewPage from '../pages/ReservationTodayViewPage.vue'
 import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
 import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
 import TableResourceListPage from '../pages/TableResourceListPage.vue'
 import WalkInDirectSeatingPage from '../pages/WalkInDirectSeatingPage.vue'
+import WalkInQueuePage from '../pages/WalkInQueuePage.vue'
 
 const localValidationStoreId = '20000000-0000-0000-0000-000000000983'
 const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationStoreId
@@ -34,6 +34,11 @@ export const router = createRouter({
       component: WalkInDirectSeatingPage
     },
     {
+      path: '/stores/:storeId/walk-ins/queue',
+      name: 'walk-in-queue',
+      component: WalkInQueuePage
+    },
+    {
       path: '/stores/:storeId/cleaning',
       name: 'cleaning-complete',
       component: CleaningCompletePage
@@ -41,7 +46,13 @@ export const router = createRouter({
     {
       path: '/stores/:storeId/reservations/create',
       name: 'reservation-create',
-      component: ReservationCreatePage
+      redirect: to => ({
+        name: 'reservation-today-view',
+        params: {
+          storeId: to.params.storeId
+        },
+        query: { create: '1' }
+      })
     },
     {
       path: '/stores/:storeId/reservations/today',

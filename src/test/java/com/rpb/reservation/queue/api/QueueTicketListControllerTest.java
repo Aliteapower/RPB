@@ -39,6 +39,7 @@ class QueueTicketListControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000992");
     private static final UUID QUEUE_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000992");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000992");
+    private static final UUID ASSIGNED_RESOURCE_ID = UUID.fromString("70000000-0000-0000-0000-000000000992");
     private static final Instant CREATED_AT = Instant.parse("2030-06-20T03:00:00Z");
     private static final Instant CALLED_AT = Instant.parse("2030-06-20T03:10:00Z");
     private static final Instant HOLD_UNTIL_AT = Instant.parse("2030-06-20T03:13:00Z");
@@ -81,6 +82,9 @@ class QueueTicketListControllerTest {
             .andExpect(jsonPath("$.items[0].reservationStatus").value("arrived"))
             .andExpect(jsonPath("$.items[0].customerName").value("Queue Guest"))
             .andExpect(jsonPath("$.items[0].customerPhoneMasked").value("****5432"))
+            .andExpect(jsonPath("$.items[0].assignedResourceType").value("dining_table"))
+            .andExpect(jsonPath("$.items[0].assignedResourceId").value(ASSIGNED_RESOURCE_ID.toString()))
+            .andExpect(jsonPath("$.items[0].assignedResourceCode").value("A01"))
             .andExpect(jsonPath("$.items[0].createdAt").value(CREATED_AT.toString()))
             .andExpect(jsonPath("$.items[0].calledAt").value(CALLED_AT.toString()))
             .andExpect(jsonPath("$.items[0].holdUntilAt").value(HOLD_UNTIL_AT.toString()))
@@ -174,6 +178,9 @@ class QueueTicketListControllerTest {
                 "arrived",
                 "Queue Guest",
                 "****5432",
+                "dining_table",
+                ASSIGNED_RESOURCE_ID,
+                "A01",
                 CREATED_AT,
                 CALLED_AT,
                 HOLD_UNTIL_AT,

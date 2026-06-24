@@ -22,13 +22,19 @@ import com.rpb.reservation.reservation.api.ReservationCancelApiErrorMapper;
 import com.rpb.reservation.reservation.api.ReservationCancelApiMapper;
 import com.rpb.reservation.reservation.api.ReservationCheckInApiErrorMapper;
 import com.rpb.reservation.reservation.api.ReservationCheckInApiMapper;
+import com.rpb.reservation.reservation.api.ReservationCompleteApiErrorMapper;
+import com.rpb.reservation.reservation.api.ReservationCompleteApiMapper;
 import com.rpb.reservation.reservation.api.ReservationController;
+import com.rpb.reservation.reservation.api.ReservationNoShowApiErrorMapper;
+import com.rpb.reservation.reservation.api.ReservationNoShowApiMapper;
 import com.rpb.reservation.reservation.application.ReservationCheckInResult;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -56,6 +62,10 @@ import org.springframework.test.web.servlet.MockMvc;
     ReservationArrivedToQueueApiErrorMapper.class,
     ReservationCancelApiMapper.class,
     ReservationCancelApiErrorMapper.class,
+    ReservationNoShowApiMapper.class,
+    ReservationNoShowApiErrorMapper.class,
+    ReservationCompleteApiMapper.class,
+    ReservationCompleteApiErrorMapper.class,
     LocalRuntimeCurrentActorProvider.class,
     LocalRuntimeSecurityConfiguration.class
 })
@@ -94,6 +104,12 @@ class LocalRuntimeReservationCheckInSecurityTest {
 
     @MockBean
     private ReservationCancelApplicationService cancelApplicationService;
+
+    @MockBean
+    private ReservationNoShowApplicationService noShowApplicationService;
+
+    @MockBean
+    private ReservationCompleteApplicationService completeApplicationService;
 
     @MockBean
     private AppGateService appGateService;

@@ -115,6 +115,9 @@ public interface QueueTicketJpaRepository extends JpaRepository<QueueTicketEntit
             reservation.status as "reservationStatus",
             customer.display_name as "customerName",
             customer.phone_e164 as "customerPhoneE164",
+            preassignment.resource_type as "assignedResourceType",
+            coalesce(preassignment.table_id, preassignment.table_group_id) as "assignedResourceId",
+            coalesce(assigned_table.table_code, assigned_group.group_code) as "assignedResourceCode",
             ticket.created_at as "createdAt",
             ticket.called_at as "calledAt",
             ticket.expires_at as "expiresAt"
@@ -133,6 +136,22 @@ public interface QueueTicketJpaRepository extends JpaRepository<QueueTicketEntit
           on customer.tenant_id = ticket.tenant_id
          and customer.id = coalesce(ticket.customer_id, reservation.customer_id)
          and customer.deleted_at is null
+        left join reservation_preassignments preassignment
+          on preassignment.tenant_id = ticket.tenant_id
+         and preassignment.store_id = ticket.store_id
+         and preassignment.reservation_id = reservation.id
+         and preassignment.status = 'active'
+         and preassignment.deleted_at is null
+        left join dining_tables assigned_table
+          on assigned_table.tenant_id = ticket.tenant_id
+         and assigned_table.store_id = ticket.store_id
+         and assigned_table.id = preassignment.table_id
+         and assigned_table.deleted_at is null
+        left join table_groups assigned_group
+          on assigned_group.tenant_id = ticket.tenant_id
+         and assigned_group.store_id = ticket.store_id
+         and assigned_group.id = preassignment.table_group_id
+         and assigned_group.deleted_at is null
         where ticket.tenant_id = :tenantId
           and ticket.store_id = :storeId
           and ticket.deleted_at is null

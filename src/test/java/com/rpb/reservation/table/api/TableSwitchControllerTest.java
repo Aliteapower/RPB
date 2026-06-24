@@ -1,6 +1,7 @@
 package com.rpb.reservation.table.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -36,7 +37,6 @@ class TableSwitchControllerTest {
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID SEATING_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
-    private static final UUID CLEANING_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
     private static final UUID FROM_TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000001");
     private static final UUID TO_TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000002");
 
@@ -76,14 +76,14 @@ class TableSwitchControllerTest {
             .andExpect(jsonPath("$.seatingId").value(SEATING_ID.toString()))
             .andExpect(jsonPath("$.fromResource.type").value("TABLE"))
             .andExpect(jsonPath("$.fromResource.id").value(FROM_TABLE_ID.toString()))
-            .andExpect(jsonPath("$.fromResource.status").value("cleaning"))
+            .andExpect(jsonPath("$.fromResource.status").value("available"))
             .andExpect(jsonPath("$.toResource.type").value("TABLE"))
             .andExpect(jsonPath("$.toResource.id").value(TO_TABLE_ID.toString()))
             .andExpect(jsonPath("$.toResource.status").value("occupied"))
-            .andExpect(jsonPath("$.cleaningId").value(CLEANING_ID.toString()))
+            .andExpect(jsonPath("$.cleaningId").value(nullValue()))
             .andExpect(jsonPath("$.seatingStatus").value("occupied"))
             .andExpect(jsonPath("$.events[0]").value("table.switch.completed"))
-            .andExpect(jsonPath("$.events[1]").value("table.cleaning"))
+            .andExpect(jsonPath("$.events[1]").value("table.available"))
             .andExpect(jsonPath("$.events[2]").value("table.occupied"))
             .andExpect(jsonPath("$.idempotency.status").value("completed"))
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
@@ -221,11 +221,11 @@ class TableSwitchControllerTest {
                 SEATING_ID,
                 "dining_table",
                 FROM_TABLE_ID,
-                "cleaning",
+                "available",
                 "dining_table",
                 TO_TABLE_ID,
                 "occupied",
-                CLEANING_ID,
+                null,
                 "occupied"
             );
         }
@@ -233,11 +233,11 @@ class TableSwitchControllerTest {
             SEATING_ID,
             "dining_table",
             FROM_TABLE_ID,
-            "cleaning",
+            "available",
             "dining_table",
             TO_TABLE_ID,
             "occupied",
-            CLEANING_ID,
+            null,
             "occupied",
             "completed",
             List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),

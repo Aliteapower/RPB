@@ -251,7 +251,7 @@ class QueueSkipApplicationServiceTest {
     }
 
     @Test
-    void reservationBackedQueueTicketIsRequired() {
+    void walkInQueueTicketCanBeSkippedWithoutReservation() {
         Scenario scenario = Scenario.ready(QueueTicketStatus.CALLED, ReservationStatus.ARRIVED);
         scenario.queueTicketRepository.persisted.put(
             scenario.queueTicketId.value(),
@@ -260,9 +260,12 @@ class QueueSkipApplicationServiceTest {
 
         QueueSkipResult result = scenario.service().skipQueueTicket(scenario.commandWithKey("idem-no-reservation"));
 
-        assertThat(result.success()).isFalse();
-        assertThat(result.error()).isEqualTo(QueueSkipError.RESERVATION_NOT_FOUND);
-        assertThat(scenario.queueTicketRepository.saved).isEmpty();
+        assertThat(result.success()).isTrue();
+        assertThat(result.reservationId()).isNull();
+        assertThat(result.reservationCode()).isNull();
+        assertThat(result.reservationStatus()).isNull();
+        assertThat(scenario.queueTicketRepository.saved).hasSize(1);
+        assertThat(scenario.queueTicketRepository.saved.getFirst().status()).isEqualTo(QueueTicketStatus.SKIPPED);
     }
 
     @Test

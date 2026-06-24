@@ -49,7 +49,7 @@ public class TableSwitchApiMapper {
             ),
             result.cleaningId(),
             result.seatingStatus(),
-            List.of("table.switch.completed", "table.cleaning", "table.occupied"),
+            List.of("table.switch.completed", "table.available", "table.occupied"),
             ApiIdempotencyResponse.completed(result.replayed())
         );
     }

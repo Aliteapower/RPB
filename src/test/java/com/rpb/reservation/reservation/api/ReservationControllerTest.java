@@ -17,7 +17,9 @@ import com.rpb.reservation.reservation.application.service.ReservationArrivedDir
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.nio.file.Files;
@@ -43,6 +45,8 @@ class ReservationControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+    private static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000000001");
+    private static final UUID TABLE_GROUP_ID = UUID.fromString("71000000-0000-0000-0000-000000000001");
     private static final Instant RESERVED_START_AT = Instant.parse("2030-06-20T11:00:00Z");
     private static final Instant RESERVED_END_AT = Instant.parse("2030-06-20T12:30:00Z");
     private static final Instant HOLD_UNTIL_AT = Instant.parse("2030-06-20T11:15:00Z");
@@ -52,6 +56,8 @@ class ReservationControllerTest {
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
     private ReservationCancelApplicationService cancelApplicationService;
+    private ReservationNoShowApplicationService noShowApplicationService;
+    private ReservationCompleteApplicationService completeApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -62,6 +68,8 @@ class ReservationControllerTest {
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
         cancelApplicationService = mock(ReservationCancelApplicationService.class);
+        noShowApplicationService = mock(ReservationNoShowApplicationService.class);
+        completeApplicationService = mock(ReservationCompleteApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(CurrentActor.storeStaff(
             TENANT_ID,
             ACTOR_ID,
@@ -79,6 +87,8 @@ class ReservationControllerTest {
                 seatingApplicationService,
                 queueApplicationService,
                 cancelApplicationService,
+                noShowApplicationService,
+                completeApplicationService,
                 actorProvider,
                 apiMapper,
                 errorMapper,
@@ -89,7 +99,11 @@ class ReservationControllerTest {
                 new ReservationArrivedToQueueApiMapper(),
                 new ReservationArrivedToQueueApiErrorMapper(),
                 new ReservationCancelApiMapper(),
-                new ReservationCancelApiErrorMapper()
+                new ReservationCancelApiErrorMapper(),
+                new ReservationNoShowApiMapper(),
+                new ReservationNoShowApiErrorMapper(),
+                new ReservationCompleteApiMapper(),
+                new ReservationCompleteApiErrorMapper()
             ))
             .build();
     }
@@ -110,9 +124,11 @@ class ReservationControllerTest {
                       "customerName": " Guest ",
                       "customerNickname": " VIP friend ",
                       "phoneE164": "+6591234567",
-                      "note": " Window seat "
+                      "note": " Window seat ",
+                      "tableId": "%s",
+                      "tableGroupId": null
                     }
-                    """))
+                    """.formatted(TABLE_ID)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.reservationId").value(RESERVATION_ID.toString()))
@@ -150,6 +166,54 @@ class ReservationControllerTest {
         assertThat(command.reservationCode()).isNull();
         assertThat(command.source()).isEqualTo("staff");
         assertThat(command.reasonCode()).isNull();
+        assertThat(command.tableId()).isEqualTo(TABLE_ID);
+        assertThat(command.tableGroupId()).isNull();
+    }
+
+    @Test
+    void mapsTableGroupPreassignmentRequestToCommand() throws Exception {
+        when(applicationService.createReservation(any())).thenReturn(success(false));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-create-group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 8,
+                      "reservedStartAt": "2030-06-20T11:00:00Z",
+                      "reservedEndAt": "2030-06-20T12:30:00Z",
+                      "customerId": "%s",
+                      "tableId": null,
+                      "tableGroupId": "%s"
+                    }
+                    """.formatted(CUSTOMER_ID, TABLE_GROUP_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        ArgumentCaptor<CreateReservationCommand> commandCaptor = ArgumentCaptor.forClass(CreateReservationCommand.class);
+        verify(applicationService).createReservation(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().tableId()).isNull();
+        assertThat(commandCaptor.getValue().tableGroupId()).isEqualTo(TABLE_GROUP_ID);
+    }
+
+    @Test
+    void rejectsRequestWithBothTableAndTableGroupBeforeCallingService() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-resource-conflict")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 4,
+                      "reservedStartAt": "2030-06-20T11:00:00Z",
+                      "reservedEndAt": "2030-06-20T12:30:00Z",
+                      "tableId": "%s",
+                      "tableGroupId": "%s"
+                    }
+                    """.formatted(TABLE_ID, TABLE_GROUP_ID)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_SELECTION_CONFLICT"));
+
+        verifyNoInteractions(applicationService);
     }
 
     @Test
@@ -278,7 +342,9 @@ class ReservationControllerTest {
                 "customerName",
                 "customerNickname",
                 "phoneE164",
-                "note"
+                "note",
+                "tableId",
+                "tableGroupId"
             );
     }
 
@@ -368,9 +434,11 @@ class ReservationControllerTest {
             .filteredOn(path -> path.endsWith("Controller.java"))
             .containsExactlyInAnyOrder(
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInDirectSeatingController.java",
+                "src/main/java/com/rpb/reservation/walkin/api/WalkInQueueController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
                 "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+                "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueTicketListController.java",
@@ -425,12 +493,12 @@ class ReservationControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
                 "src/pages/TableResourceListPage.vue",
-                "src/pages/WalkInDirectSeatingPage.vue"
+                "src/pages/WalkInDirectSeatingPage.vue",
+                "src/pages/WalkInQueuePage.vue"
             );
         assertThat(vueFiles)
             .filteredOn(path -> !Set.of(
@@ -438,7 +506,6 @@ class ReservationControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
@@ -467,6 +534,13 @@ class ReservationControllerTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -550,7 +624,9 @@ class ReservationControllerTest {
               "customerName": "Guest",
               "customerNickname": null,
               "phoneE164": "+6591234567",
-              "note": null
+              "note": null,
+              "tableId": null,
+              "tableGroupId": null
             }
             """;
     }

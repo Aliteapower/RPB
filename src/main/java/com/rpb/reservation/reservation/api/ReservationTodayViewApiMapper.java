@@ -52,7 +52,13 @@ public class ReservationTodayViewApiMapper {
             item.seatingId(),
             item.currentResourceType(),
             item.currentResourceId(),
-            item.currentResourceCode()
+            item.currentResourceCode(),
+            item.assignedResourceType(),
+            item.assignedResourceId(),
+            item.assignedResourceCode(),
+            item.queueTicketId(),
+            item.queueTicketNumber(),
+            item.queueTicketStatus()
         );
     }
 

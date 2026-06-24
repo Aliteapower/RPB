@@ -69,6 +69,11 @@ function buildEndpoint(storeId: string, query: TableResourceQuery): string {
     params.set('includeGroups', String(query.includeGroups))
   }
 
+  const businessDate = query.businessDate?.trim()
+  if (businessDate) {
+    params.set('businessDate', businessDate)
+  }
+
   const queryString = params.toString()
   const path = `/api/v1/stores/${storeId}/tables`
   return queryString ? `${path}?${queryString}` : path
@@ -148,6 +153,12 @@ function isTableResourceItem(payload: unknown): payload is TableResourceItem {
     (candidate.currentCleaningId === undefined ||
       candidate.currentCleaningId === null ||
       typeof candidate.currentCleaningId === 'string') &&
+    (candidate.currentReservationId === undefined ||
+      candidate.currentReservationId === null ||
+      typeof candidate.currentReservationId === 'string') &&
+    (candidate.currentPartySize === undefined ||
+      candidate.currentPartySize === null ||
+      typeof candidate.currentPartySize === 'number') &&
     Array.isArray(candidate.memberTableCodes) &&
     candidate.memberTableCodes.every(value => typeof value === 'string')
   )

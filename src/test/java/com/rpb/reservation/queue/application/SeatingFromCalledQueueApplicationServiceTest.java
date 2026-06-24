@@ -163,6 +163,35 @@ class SeatingFromCalledQueueApplicationServiceTest {
     }
 
     @Test
+    void seatsCalledQueueTicketToTemporaryTableGroupAndPersistsMembers() {
+        Scenario scenario = Scenario.ready(QueueTicketStatus.CALLED, ReservationStatus.ARRIVED);
+
+        SeatingFromCalledQueueResult result = scenario.service()
+            .seatCalledQueueTicket(scenario.commandWithTemporaryTables(
+                scenario.table.id().value(),
+                scenario.groupMemberTable.id().value()
+            ));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.queueTicketStatus()).isEqualTo("seated");
+        assertThat(result.reservationStatus()).isEqualTo("seated");
+        assertThat(result.resourceType()).isEqualTo("table_group");
+        assertThat(result.resourceId()).isNotEqualTo(scenario.group.id().value());
+        assertThat(result.groupMemberStatuses()).containsExactly("occupied", "occupied");
+        assertThat(scenario.tableGroupRepository.saved).hasSize(1);
+        TableGroup temporaryGroup = scenario.tableGroupRepository.saved.getFirst();
+        assertThat(temporaryGroup.groupType()).isEqualTo("temporary");
+        assertThat(temporaryGroup.status()).isEqualTo(TableGroupStatus.OCCUPIED);
+        assertThat(result.resourceId()).isEqualTo(temporaryGroup.id().value());
+        assertThat(scenario.tableGroupRepository.findActiveMembers(scenario.scope, temporaryGroup.id()))
+            .extracting(member -> member.tableId().value())
+            .containsExactly(scenario.table.id().value(), scenario.groupMemberTable.id().value());
+        assertThat(scenario.seatingRepository.savedResources.getFirst().resourceId()).isEqualTo(temporaryGroup.id().value());
+        assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
+            .containsOnly(DiningTableStatus.OCCUPIED);
+    }
+
+    @Test
     void alreadySeatedWithMatchingEvidenceReturnsAlreadySeatedWithoutDuplicateWrites() {
         Scenario scenario = Scenario.ready(QueueTicketStatus.SEATED, ReservationStatus.SEATED);
         Seating existingSeating = scenario.persistExistingQueueSeating(scenario.table.id().value(), "dining_table");
@@ -614,6 +643,23 @@ class SeatingFromCalledQueueApplicationServiceTest {
             return command(tableId, null, idempotencyKey);
         }
 
+        SeatCalledQueueTicketCommand commandWithTemporaryTables(UUID... tableIds) {
+            return new SeatCalledQueueTicketCommand(
+                tenantId.value(),
+                storeId.value(),
+                queueTicketId.value(),
+                null,
+                null,
+                List.of(tableIds),
+                "idem-seat-temporary-group",
+                actorId,
+                "staff",
+                "manual_override",
+                "Host combined tables",
+                "Seat after queue call"
+            );
+        }
+
         SeatCalledQueueTicketCommand command(UUID tableId, UUID tableGroupId, String idempotencyKey) {
             return new SeatCalledQueueTicketCommand(
                 tenantId.value(),
@@ -621,6 +667,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
                 queueTicketId.value(),
                 tableId,
                 tableGroupId,
+                List.of(),
                 idempotencyKey,
                 actorId,
                 "staff",
@@ -887,6 +934,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
     private static final class FakeTableGroupRepository implements TableGroupRepositoryPort {
         final Map<UUID, TableGroup> groups = new HashMap<>();
         final List<TableGroupMember> members = new ArrayList<>();
+        final List<TableGroup> saved = new ArrayList<>();
 
         @Override
         public Optional<TableGroup> findById(StoreScope scope, TableGroupId tableGroupId) {
@@ -910,6 +958,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
 
         @Override
         public TableGroup save(StoreScope scope, TableGroup tableGroup) {
+            saved.add(tableGroup);
             groups.put(tableGroup.id().value(), tableGroup);
             return tableGroup;
         }

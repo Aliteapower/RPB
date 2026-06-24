@@ -4,8 +4,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.common.time.BusinessDate;
+import com.rpb.reservation.common.time.TimeRange;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
+import com.rpb.reservation.tenant.value.TenantId;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -38,12 +49,22 @@ class TableResourceListApiIntegrationTest {
     private static final UUID AREA_A_ID = UUID.fromString("60000000-0000-0000-0000-000000001251");
     private static final UUID AREA_B_ID = UUID.fromString("60000000-0000-0000-0000-000000001252");
     private static final UUID AREA_VIP_ID = UUID.fromString("60000000-0000-0000-0000-000000001253");
+    private static final UUID TABLE_A01_ID = UUID.fromString("70000000-0000-0000-0000-000000001251");
+    private static final UUID TABLE_A02_ID = UUID.fromString("70000000-0000-0000-0000-000000001252");
+    private static final UUID CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000001251");
+    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000001251");
+    private static final UUID PREASSIGNMENT_ID = UUID.fromString("51000000-0000-0000-0000-000000001251");
+    private static final UUID SEATING_ID = UUID.fromString("52000000-0000-0000-0000-000000001251");
+    private static final UUID SEATING_RESOURCE_ID = UUID.fromString("53000000-0000-0000-0000-000000001251");
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private ReservationPreassignmentRepositoryPort preassignmentRepository;
 
     @Autowired
     private TestCurrentActorProvider actorProvider;
@@ -97,6 +118,70 @@ class TableResourceListApiIntegrationTest {
             .andExpect(jsonPath("$.resources[5].areaName").value("包厢"));
     }
 
+    @Test
+    void overlaysReservationPreassignmentForSelectedBusinessDate() throws Exception {
+        createConfirmedReservationWithTablePreassignment();
+
+        Set<ReservationResourceAssignment> assignments = preassignmentRepository.findActiveResourceAssignmentsForDate(
+            new StoreScope(new TenantId(TENANT_ID), STORE_ID),
+            new BusinessDate(LocalDate.of(2026, 6, 24))
+        );
+        assertEquals(1, assignments.size());
+        ReservationResourceAssignment assignment = assignments.iterator().next();
+        assertEquals(RESERVATION_ID, assignment.reservationId());
+        assertEquals(TABLE_A01_ID, assignment.resourceId());
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-24")
+                .param("includeGroups", "false"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resources[0].code").value("A01"))
+            .andExpect(jsonPath("$.resources[0].status").value("reserved"))
+            .andExpect(jsonPath("$.resources[0].selectable").value(false))
+            .andExpect(jsonPath("$.resources[0].selectionDisabledReason").value("reservation_preassigned"))
+            .andExpect(jsonPath("$.resources[0].preassignedReservationId").value(RESERVATION_ID.toString()))
+            .andExpect(jsonPath("$.resources[0].preassignedReservationCode").value("R-TABLE-1251"))
+            .andExpect(jsonPath("$.resources[0].preassignedCustomerName").value("Table Guest"))
+            .andExpect(jsonPath("$.resources[0].preassignedPhoneMasked").value("****1251"))
+            .andExpect(jsonPath("$.resources[0].preassignedReservationStatus").value("confirmed"))
+            .andExpect(jsonPath("$.resources[0].preassignedPartySize").value(2))
+            .andExpect(jsonPath("$.resources[0].preassignedResourceCode").value("A01"));
+    }
+
+    @Test
+    void seatedReservationMovedOffPreassignedTableDoesNotHoldOriginalTable() throws Exception {
+        createSeatedReservationMovedOffPreassignedTable();
+
+        StoreScope scope = new StoreScope(new TenantId(TENANT_ID), STORE_ID);
+        Set<ReservationResourceAssignment> assignments = preassignmentRepository.findActiveResourceAssignmentsForDate(
+            scope,
+            new BusinessDate(LocalDate.of(2026, 6, 24))
+        );
+        assertEquals(0, assignments.size());
+        assertFalse(preassignmentRepository.existsActiveResourceConflict(
+            scope,
+            "dining_table",
+            TABLE_A02_ID,
+            new BusinessDate(LocalDate.of(2026, 6, 24)),
+            new TimeRange(
+                Instant.parse("2026-06-24T06:15:00Z"),
+                Instant.parse("2026-06-24T07:45:00Z")
+            )
+        ));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-24")
+                .param("includeGroups", "false"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resources[1].code").value("A02"))
+            .andExpect(jsonPath("$.resources[1].status").value("available"))
+            .andExpect(jsonPath("$.resources[1].selectable").value(true))
+            .andExpect(jsonPath("$.resources[1].preassignedReservationId").doesNotExist())
+            .andExpect(jsonPath("$.resources[1].preassignedReservationCode").doesNotExist());
+    }
+
     private void createBackendTableSetup() {
         jdbc.update(
             """
@@ -121,8 +206,8 @@ class TableResourceListApiIntegrationTest {
         area(AREA_B_ID, "B", "B区", 2);
         area(AREA_VIP_ID, "VIP", "包厢", 3);
         enableReservationQueueApp();
-        table("70000000-0000-0000-0000-000000001251", AREA_A_ID, "A01", "A01 靠窗", 2, 4);
-        table("70000000-0000-0000-0000-000000001252", AREA_A_ID, "A02", "A02 中央", 2, 4);
+        table(TABLE_A01_ID.toString(), AREA_A_ID, "A01", "A01 靠窗", 2, 4);
+        table(TABLE_A02_ID.toString(), AREA_A_ID, "A02", "A02 中央", 2, 4);
         table("70000000-0000-0000-0000-000000001253", AREA_B_ID, "B01", "B01 四人桌", 2, 6);
         table("70000000-0000-0000-0000-000000001254", AREA_B_ID, "B02", "B02 四人桌", 2, 6);
         table("70000000-0000-0000-0000-000000001255", AREA_VIP_ID, "VIP1", "VIP-1", 2, 10);
@@ -189,6 +274,110 @@ class TableResourceListApiIntegrationTest {
             """,
             TENANT_ID,
             STORE_ID
+        );
+    }
+
+    private void createConfirmedReservationWithTablePreassignment() {
+        jdbc.update(
+            """
+            insert into customers (
+                id, tenant_id, customer_code, customer_type, display_name,
+                phone_e164, status
+            )
+            values (?, ?, 'C-TABLE-1251', 'regular', 'Table Guest',
+                '+6599991251', 'active')
+            """,
+            CUSTOMER_ID,
+            TENANT_ID
+        );
+        jdbc.update(
+            """
+            insert into reservations (
+                id, tenant_id, store_id, customer_id, reservation_code, party_size,
+                business_date, reserved_start_at, reserved_end_at, hold_until_at,
+                status, source_channel
+            )
+            values (?, ?, ?, ?, 'R-TABLE-1251', 2,
+                date '2026-06-24',
+                timestamp with time zone '2026-06-24 13:30:00+08',
+                timestamp with time zone '2026-06-24 15:00:00+08',
+                timestamp with time zone '2026-06-24 13:30:00+08',
+                'confirmed', 'staff')
+            """,
+            RESERVATION_ID,
+            TENANT_ID,
+            STORE_ID,
+            CUSTOMER_ID
+        );
+        jdbc.update(
+            """
+            insert into reservation_preassignments (
+                id, tenant_id, store_id, reservation_id, resource_type, table_id,
+                status, preassigned_at
+            )
+            values (?, ?, ?, ?, 'dining_table', ?, 'active', now())
+            """,
+            PREASSIGNMENT_ID,
+            TENANT_ID,
+            STORE_ID,
+            RESERVATION_ID,
+            TABLE_A01_ID
+        );
+    }
+
+    private void createSeatedReservationMovedOffPreassignedTable() {
+        createConfirmedReservationWithTablePreassignment();
+        jdbc.update(
+            """
+            update reservations
+            set status = 'seated'
+            where id = ?
+            """,
+            RESERVATION_ID
+        );
+        jdbc.update(
+            """
+            update reservation_preassignments
+            set table_id = ?
+            where id = ?
+            """,
+            TABLE_A02_ID,
+            PREASSIGNMENT_ID
+        );
+        jdbc.update(
+            """
+            update dining_tables
+            set status = 'occupied'
+            where id = ?
+            """,
+            TABLE_A01_ID
+        );
+        jdbc.update(
+            """
+            insert into seatings (
+                id, tenant_id, store_id, reservation_id, seating_code, party_size_snapshot,
+                status, seated_at
+            )
+            values (?, ?, ?, ?, 'S-MOVED-1251', 2, 'occupied', timestamp with time zone '2026-06-24 14:15:00+08')
+            """,
+            SEATING_ID,
+            TENANT_ID,
+            STORE_ID,
+            RESERVATION_ID
+        );
+        jdbc.update(
+            """
+            insert into seating_resources (
+                id, tenant_id, store_id, seating_id, resource_type, table_id,
+                assigned_at, status
+            )
+            values (?, ?, ?, ?, 'dining_table', ?, timestamp with time zone '2026-06-24 14:15:00+08', 'active')
+            """,
+            SEATING_RESOURCE_ID,
+            TENANT_ID,
+            STORE_ID,
+            SEATING_ID,
+            TABLE_A01_ID
         );
     }
 

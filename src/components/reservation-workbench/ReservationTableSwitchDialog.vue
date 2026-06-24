@@ -10,13 +10,23 @@ import type {
   SwitchTableResponse,
   TableSwitchApiErrorResponse
 } from '../../types/tableSwitch'
-import type { ReservationTodayViewItem } from '../../types/reservationTodayView'
 import TableResourcePicker from '../staff-table/TableResourcePicker.vue'
+
+interface TableSwitchDialogItem {
+  reservationCode?: string | null
+  customerName?: string | null
+  customerNickname?: string | null
+  partySize: number
+  businessDate?: string | null
+  seatingId?: string | null
+  currentResourceCode?: string | null
+}
 
 const props = defineProps<{
   open: boolean
-  item: ReservationTodayViewItem | null
+  item: TableSwitchDialogItem | null
   storeId: string
+  businessDate?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -42,6 +52,7 @@ const customerLabel = computed(() => {
 const currentResourceLabel = computed(() =>
   props.item?.currentResourceCode ? `当前桌号：${props.item.currentResourceCode}` : '当前桌号：未识别'
 )
+const pickerBusinessDate = computed(() => props.businessDate || props.item?.businessDate || null)
 const canSubmit = computed(
   () =>
     props.open &&
@@ -52,7 +63,7 @@ const canSubmit = computed(
 )
 
 watch(
-  () => [props.open, props.item?.reservationId] as const,
+  () => [props.open, props.item?.seatingId] as const,
   () => {
     selectedTableId.value = ''
     selectedTableGroupId.value = ''
@@ -129,7 +140,7 @@ function toRequest(): SwitchTableRequest {
     tableId: optionalValue(selectedTableId.value),
     tableGroupId: optionalValue(selectedTableGroupId.value),
     reasonCode: 'staff_requested',
-    note: 'staff_reservation_today_switch_table'
+    note: 'staff_table_page_switch_table'
   }
 }
 
@@ -188,7 +199,9 @@ function createLocalError(code: string, messageKey: string): TableSwitchApiError
 
         <TableResourcePicker
           :store-id="storeId"
-          :party-size="item?.partySize ?? null"
+          :party-size="null"
+          :business-date="pickerBusinessDate"
+          :available-only="true"
           :selected-table-id="selectedTableId"
           :selected-table-group-id="selectedTableGroupId"
           @select-table="selectTable"

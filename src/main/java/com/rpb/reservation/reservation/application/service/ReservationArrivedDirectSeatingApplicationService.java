@@ -22,9 +22,12 @@ import com.rpb.reservation.idempotency.status.IdempotencyStatus;
 import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeatingError;
 import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeatingResult;
 import com.rpb.reservation.reservation.application.command.SeatArrivedReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
 import com.rpb.reservation.reservation.application.rule.ReservationArrivedSeatingRule;
 import com.rpb.reservation.reservation.domain.Reservation;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.state.ReservationStateMachine;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationId;
@@ -39,6 +42,10 @@ import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableLockRepositoryPort;
+import com.rpb.reservation.table.application.TemporaryTableGroupError;
+import com.rpb.reservation.table.application.TemporaryTableGroupResult;
+import com.rpb.reservation.table.application.service.TemporaryTableGroupApplicationService;
+import com.rpb.reservation.table.application.service.TemporaryTableGroupCommand;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.domain.TableGroupMember;
@@ -63,6 +70,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -88,12 +96,14 @@ public class ReservationArrivedDirectSeatingApplicationService {
     private final DiningTableRepositoryPort diningTableRepository;
     private final TableGroupRepositoryPort tableGroupRepository;
     private final TableLockRepositoryPort tableLockRepository;
+    private final ReservationPreassignmentRepositoryPort preassignmentRepository;
     private final SeatingRepositoryPort seatingRepository;
     private final BusinessEventRepositoryPort businessEventRepository;
     private final StateTransitionLogRepositoryPort stateTransitionLogRepository;
     private final AuditLogRepositoryPort auditLogRepository;
     private final IdempotencyRepositoryPort idempotencyRepository;
     private final Clock clock;
+    private final TemporaryTableGroupApplicationService temporaryTableGroupService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
     private final DefaultTableCapacityRule tableCapacityRule = new DefaultTableCapacityRule();
@@ -108,7 +118,6 @@ public class ReservationArrivedDirectSeatingApplicationService {
     private final DiningTableStateMachine diningTableStateMachine = new DiningTableStateMachine();
     private final ReservationArrivedSeatingRule reservationArrivedSeatingRule = new ReservationArrivedSeatingRule();
 
-    @Autowired
     public ReservationArrivedDirectSeatingApplicationService(
         StoreRepositoryPort storeRepository,
         ReservationRepositoryPort reservationRepository,
@@ -122,17 +131,57 @@ public class ReservationArrivedDirectSeatingApplicationService {
         IdempotencyRepositoryPort idempotencyRepository,
         Clock clock
     ) {
+        this(
+            storeRepository,
+            reservationRepository,
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            NoopReservationPreassignmentRepository.INSTANCE,
+            seatingRepository,
+            businessEventRepository,
+            stateTransitionLogRepository,
+            auditLogRepository,
+            idempotencyRepository,
+            clock
+        );
+    }
+
+    @Autowired
+    public ReservationArrivedDirectSeatingApplicationService(
+        StoreRepositoryPort storeRepository,
+        ReservationRepositoryPort reservationRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
+        TableLockRepositoryPort tableLockRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        SeatingRepositoryPort seatingRepository,
+        BusinessEventRepositoryPort businessEventRepository,
+        StateTransitionLogRepositoryPort stateTransitionLogRepository,
+        AuditLogRepositoryPort auditLogRepository,
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock
+    ) {
         this.storeRepository = storeRepository;
         this.reservationRepository = reservationRepository;
         this.diningTableRepository = diningTableRepository;
         this.tableGroupRepository = tableGroupRepository;
         this.tableLockRepository = tableLockRepository;
+        this.preassignmentRepository = preassignmentRepository;
         this.seatingRepository = seatingRepository;
         this.businessEventRepository = businessEventRepository;
         this.stateTransitionLogRepository = stateTransitionLogRepository;
         this.auditLogRepository = auditLogRepository;
         this.idempotencyRepository = idempotencyRepository;
         this.clock = clock;
+        this.temporaryTableGroupService = new TemporaryTableGroupApplicationService(
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            preassignmentRepository,
+            seatingRepository,
+            clock
+        );
     }
 
     @Transactional
@@ -182,6 +231,7 @@ public class ReservationArrivedDirectSeatingApplicationService {
             value(command.reservationId()),
             value(command.tableId()),
             value(command.tableGroupId()),
+            values(command.temporaryTableIds()),
             value(command.actorId()),
             normalize(command.actorType()),
             normalize(command.overrideReasonCode()),
@@ -218,7 +268,8 @@ public class ReservationArrivedDirectSeatingApplicationService {
             throw new ApplicationFailure(ReservationArrivedDirectSeatingError.ILLEGAL_STATE_TRANSITION);
         }
 
-        ResourceSelection selection = resolveResource(command, scope, reservation.partySize());
+        ResourceSelection selection = resolveResource(command, scope, reservation);
+        validatePreassignment(scope, reservation, selection);
         require(reservationArrivedSeatingRule.validateReservationSource(reservation.id().value()), ReservationArrivedDirectSeatingError.INVALID_SEATING_SOURCE);
         require(seatingResourceValidator.validate(selection.resourceType(), selection.resourceId()), ReservationArrivedDirectSeatingError.INVALID_SEATING_RESOURCE);
 
@@ -326,12 +377,26 @@ public class ReservationArrivedDirectSeatingApplicationService {
         );
     }
 
-    private ResourceSelection resolveResource(SeatArrivedReservationCommand command, StoreScope scope, PartySize partySize) {
+    private ResourceSelection resolveResource(SeatArrivedReservationCommand command, StoreScope scope, Reservation reservation) {
+        PartySize partySize = reservation.partySize();
+        if (!command.temporaryTableIds().isEmpty()) {
+            TemporaryTableGroupResult result = temporaryTableGroupService.createForSeating(new TemporaryTableGroupCommand(
+                scope,
+                command.temporaryTableIds(),
+                partySize,
+                reservation.businessDate(),
+                reservation.id().value()
+            ));
+            if (!result.success()) {
+                throw new ApplicationFailure(temporaryTableGroupError(result.error()));
+            }
+            return new ResourceSelection(RESOURCE_GROUP, result.group().id().value(), null, result.group(), result.memberTables(), true);
+        }
         if (command.tableId() != null) {
             DiningTable table = diningTableRepository.findById(scope, new TableId(command.tableId()))
                 .orElseThrow(() -> new ApplicationFailure(ReservationArrivedDirectSeatingError.TABLE_NOT_FOUND));
             validateTable(scope, table, partySize, ReservationArrivedDirectSeatingError.TABLE_NOT_AVAILABLE);
-            return new ResourceSelection(RESOURCE_TABLE, table.id().value(), table, null, List.of());
+            return new ResourceSelection(RESOURCE_TABLE, table.id().value(), table, null, List.of(), false);
         }
 
         TableGroup group = tableGroupRepository.findById(scope, new TableGroupId(command.tableGroupId()))
@@ -352,7 +417,18 @@ public class ReservationArrivedDirectSeatingApplicationService {
             validateGroupMemberTable(scope, table);
             memberTables.add(table);
         }
-        return new ResourceSelection(RESOURCE_GROUP, group.id().value(), null, group, memberTables);
+        return new ResourceSelection(RESOURCE_GROUP, group.id().value(), null, group, memberTables, false);
+    }
+
+    private static ReservationArrivedDirectSeatingError temporaryTableGroupError(TemporaryTableGroupError error) {
+        return switch (error) {
+            case MEMBER_REQUIRED -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED;
+            case MEMBER_DUPLICATE -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE;
+            case MEMBER_UNAVAILABLE -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE;
+            case CAPACITY_INSUFFICIENT -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT;
+            case LOCK_CONFLICT -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT;
+            case PREASSIGNMENT_CONFLICT -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+        };
     }
 
     private void validateTable(
@@ -385,6 +461,40 @@ public class ReservationArrivedDirectSeatingApplicationService {
             tableLockRule.evaluate(tableLockRepository.existsActiveConflict(scope, resourceType, resourceId, OffsetDateTime.now(clock))),
             ReservationArrivedDirectSeatingError.TABLE_LOCK_CONFLICT
         );
+    }
+
+    private void validatePreassignment(
+        StoreScope scope,
+        Reservation reservation,
+        ResourceSelection selection
+    ) {
+        ReservationResourceAssignment ownAssignment = preassignmentRepository
+            .findActiveAssignmentForReservation(scope, reservation.id().value())
+            .orElse(null);
+        if (ownAssignment != null && !matches(ownAssignment, selection)) {
+            throw new ApplicationFailure(resourceUnavailableError(selection));
+        }
+
+        ReservationResourceAssignment resourceAssignment = preassignmentRepository
+            .findActiveAssignmentForResource(scope, selection.resourceType(), selection.resourceId(), reservation.businessDate())
+            .orElse(null);
+        if (resourceAssignment != null && !resourceAssignment.reservationId().equals(reservation.id().value())) {
+            throw new ApplicationFailure(resourceUnavailableError(selection));
+        }
+    }
+
+    private static boolean matches(ReservationResourceAssignment assignment, ResourceSelection selection) {
+        return assignment.resourceType().equals(selection.resourceType())
+            && assignment.resourceId().equals(selection.resourceId());
+    }
+
+    private static ReservationArrivedDirectSeatingError resourceUnavailableError(ResourceSelection selection) {
+        if (selection.temporaryGroup()) {
+            return ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+        }
+        return selection.isTable()
+            ? ReservationArrivedDirectSeatingError.TABLE_NOT_AVAILABLE
+            : ReservationArrivedDirectSeatingError.TABLE_GROUP_INVALID;
     }
 
     private Seating createSeating(StoreScope scope, SeatArrivedReservationCommand command, Reservation reservation) {
@@ -736,11 +846,21 @@ public class ReservationArrivedDirectSeatingApplicationService {
         ) {
             return ReservationArrivedDirectSeatingError.INVALID_COMMAND;
         }
-        if (command.tableId() != null && command.tableGroupId() != null) {
+        boolean hasTemporaryTables = command.temporaryTableIds() != null && !command.temporaryTableIds().isEmpty();
+        int selectedTargets = (command.tableId() == null ? 0 : 1)
+            + (command.tableGroupId() == null ? 0 : 1)
+            + (hasTemporaryTables ? 1 : 0);
+        if (selectedTargets > 1) {
             return ReservationArrivedDirectSeatingError.RESOURCE_SELECTION_CONFLICT;
         }
-        if (command.tableId() == null && command.tableGroupId() == null) {
+        if (selectedTargets == 0) {
             return ReservationArrivedDirectSeatingError.RESOURCE_SELECTION_REQUIRED;
+        }
+        if (hasTemporaryTables && command.temporaryTableIds().size() < 2) {
+            return ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED;
+        }
+        if (hasTemporaryTables && command.temporaryTableIds().stream().distinct().count() != command.temporaryTableIds().size()) {
+            return ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE;
         }
         return null;
     }
@@ -911,6 +1031,17 @@ public class ReservationArrivedDirectSeatingApplicationService {
         return value == null ? "" : String.valueOf(value);
     }
 
+    private static String values(List<UUID> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return values.stream()
+            .map(UUID::toString)
+            .sorted()
+            .reduce((left, right) -> left + "," + right)
+            .orElse("");
+    }
+
     private static String escape(String value) {
         return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
@@ -933,10 +1064,57 @@ public class ReservationArrivedDirectSeatingApplicationService {
         UUID resourceId,
         DiningTable table,
         TableGroup group,
-        List<DiningTable> memberTables
+        List<DiningTable> memberTables,
+        boolean temporaryGroup
     ) {
         private boolean isTable() {
             return RESOURCE_TABLE.equals(resourceType);
+        }
+    }
+
+    private enum NoopReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
+        INSTANCE;
+
+        @Override
+        public boolean existsActiveResourceConflict(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            com.rpb.reservation.common.time.BusinessDate businessDate,
+            com.rpb.reservation.common.time.TimeRange timeRange
+        ) {
+            return false;
+        }
+
+        @Override
+        public Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(
+            StoreScope scope,
+            com.rpb.reservation.common.time.BusinessDate businessDate
+        ) {
+            return Set.of();
+        }
+
+        @Override
+        public Optional<ReservationResourceAssignment> findActiveAssignmentForReservation(
+            StoreScope scope,
+            UUID reservationId
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<ReservationResourceAssignment> findActiveAssignmentForResource(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            com.rpb.reservation.common.time.BusinessDate businessDate
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
+            return preassignment;
         }
     }
 

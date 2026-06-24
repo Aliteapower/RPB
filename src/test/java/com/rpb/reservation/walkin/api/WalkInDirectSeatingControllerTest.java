@@ -36,6 +36,8 @@ class WalkInDirectSeatingControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID TABLE_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final UUID TABLE_GROUP_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+    private static final UUID TEMP_TABLE_ID_A = UUID.fromString("70000000-0000-0000-0000-000000000981");
+    private static final UUID TEMP_TABLE_ID_B = UUID.fromString("70000000-0000-0000-0000-000000000982");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WalkInDirectSeatingApplicationService applicationService;
@@ -69,7 +71,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-1001")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", "Boss friend", null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", "Boss friend", null, null, null, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.walkInId").value(walkInId.toString()))
@@ -103,7 +105,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-table")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "+6591234567", TABLE_ID, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "+6591234567", TABLE_ID, null, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.resource.type").value("TABLE"));
 
@@ -120,10 +122,40 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-group")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(4, null, "Group", null, null, null, TABLE_GROUP_ID, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(4, null, "Group", null, null, null, TABLE_GROUP_ID, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.resource.type").value("TABLE_GROUP"))
             .andExpect(jsonPath("$.resource.id").value(TABLE_GROUP_ID.toString()));
+    }
+
+    @Test
+    void seatsWithTemporaryTablesAndMapsMemberIds() throws Exception {
+        when(applicationService.seatWalkInDirectly(any())).thenReturn(success(UUID.randomUUID(), UUID.randomUUID(), "table_group", TABLE_GROUP_ID, false));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-temp-group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 6,
+                      "customerName": "Group",
+                      "tableId": null,
+                      "tableGroupId": null,
+                      "temporaryTableIds": [
+                        "%s",
+                        "%s"
+                      ]
+                    }
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.resource.type").value("TABLE_GROUP"));
+
+        ArgumentCaptor<SeatWalkInDirectlyCommand> commandCaptor = ArgumentCaptor.forClass(SeatWalkInDirectlyCommand.class);
+        verify(applicationService).seatWalkInDirectly(commandCaptor.capture());
+        SeatWalkInDirectlyCommand command = commandCaptor.getValue();
+        assertThat(command.tableId()).isNull();
+        assertThat(command.tableGroupId()).isNull();
+        assertThat(command.temporaryTableIds()).containsExactly(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B);
     }
 
     @Test
@@ -133,7 +165,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-auto")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
     }
@@ -145,7 +177,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-replay")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.idempotency.status").value("completed"))
             .andExpect(jsonPath("$.idempotency.replayed").value(true));
@@ -155,7 +187,7 @@ class WalkInDirectSeatingControllerTest {
     void missingIdempotencyKeyReturnsValidationErrorWithoutCallingService() throws Exception {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("MISSING_IDEMPOTENCY_KEY"))
@@ -169,7 +201,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-invalid-party")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(0, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(0, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("INVALID_PARTY_SIZE"))
             .andExpect(jsonPath("$.error.messageKey").value("walkin.direct_seating.invalid_party_size"));
@@ -180,7 +212,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-invalid-phone")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "91234567", null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "91234567", null, null, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("INVALID_PHONE_E164"))
             .andExpect(jsonPath("$.error.messageKey").value("walkin.direct_seating.invalid_phone_e164"));
@@ -191,9 +223,59 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-resource-conflict")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, TABLE_ID, TABLE_GROUP_ID, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, TABLE_ID, TABLE_GROUP_ID, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("RESOURCE_CONFLICT"));
+    }
+
+    @Test
+    void temporaryTableSelectionValidationStopsBeforeService() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-one-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"partySize": 6, "temporaryTableIds": ["%s"]}
+                    """.formatted(TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-duplicate-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"partySize": 6, "temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-temp-conflict")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"partySize": 6, "tableId": "%s", "temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TABLE_ID, TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_CONFLICT"));
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void requestDtoExposesTemporaryTableIds() {
+        assertThat(SeatWalkInDirectlyRequest.class.getRecordComponents())
+            .extracting(component -> component.getName())
+            .containsExactly(
+                "partySize",
+                "customerId",
+                "customerName",
+                "customerNickname",
+                "phoneE164",
+                "tableId",
+                "tableGroupId",
+                "temporaryTableIds",
+                "overrideReasonCode",
+                "overrideNote"
+            );
     }
 
     @Test
@@ -202,6 +284,12 @@ class WalkInDirectSeatingControllerTest {
         assertApplicationError(WalkInDirectSeatingError.TABLE_RESOURCE_UNAVAILABLE, 409, "TABLE_NOT_AVAILABLE");
         assertApplicationError(WalkInDirectSeatingError.PARTY_SIZE_OUTSIDE_CAPACITY, 409, "TABLE_CAPACITY_INSUFFICIENT");
         assertApplicationError(WalkInDirectSeatingError.INVALID_TABLE_GROUP, 409, "TABLE_GROUP_INVALID");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED, 400, "TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE, 400, "TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE, 409, "TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT, 409, "TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_LOCK_CONFLICT");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT");
         assertApplicationError(WalkInDirectSeatingError.MANUAL_OVERRIDE_REQUIRED, 400, "OVERRIDE_REASON_REQUIRED");
         assertApplicationError(WalkInDirectSeatingError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS");
         assertApplicationError(WalkInDirectSeatingError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY");
@@ -235,7 +323,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-forbidden")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
 
@@ -249,7 +337,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, otherStore)
                 .header("Idempotency-Key", "idem-scope")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("STORE_SCOPE_MISMATCH"));
 
@@ -268,9 +356,11 @@ class WalkInDirectSeatingControllerTest {
             .filteredOn(path -> path.endsWith("Controller.java"))
             .containsExactlyInAnyOrder(
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInDirectSeatingController.java",
+                "src/main/java/com/rpb/reservation/walkin/api/WalkInQueueController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
                 "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+                "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueTicketListController.java",
@@ -319,12 +409,12 @@ class WalkInDirectSeatingControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
                 "src/pages/TableResourceListPage.vue",
-                "src/pages/WalkInDirectSeatingPage.vue"
+                "src/pages/WalkInDirectSeatingPage.vue",
+                "src/pages/WalkInQueuePage.vue"
             );
         assertThat(vueFiles)
             .filteredOn(path -> !Set.of(
@@ -334,8 +424,8 @@ class WalkInDirectSeatingControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
+                "src/pages/WalkInQueuePage.vue",
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
@@ -377,6 +467,13 @@ class WalkInDirectSeatingControllerTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -411,7 +508,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-" + applicationError.name())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().is(expectedStatus))
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value(expectedApiCode))

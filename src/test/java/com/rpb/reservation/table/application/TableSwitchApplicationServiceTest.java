@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Test;
 class TableSwitchApplicationServiceTest {
 
     @Test
-    void switchesOccupiedSeatingFromTableToAvailableTableAndOpensCleaningForPreviousTable() {
+    void switchesOccupiedSeatingFromTableToAvailableTableAndReleasesPreviousTableForImmediateUse() {
         Scenario scenario = Scenario.readyTableToTable();
 
         TableSwitchResult result = scenario.service().switchTable(scenario.commandToTargetTable());
@@ -67,23 +67,23 @@ class TableSwitchApplicationServiceTest {
         assertThat(result.seatingId()).isEqualTo(scenario.seating.id().value());
         assertThat(result.fromResourceType()).isEqualTo("dining_table");
         assertThat(result.fromResourceId()).isEqualTo(scenario.sourceTable.id().value());
-        assertThat(result.fromResourceStatus()).isEqualTo("cleaning");
+        assertThat(result.fromResourceStatus()).isEqualTo("available");
         assertThat(result.toResourceType()).isEqualTo("dining_table");
         assertThat(result.toResourceId()).isEqualTo(scenario.targetTable.id().value());
         assertThat(result.toResourceStatus()).isEqualTo("occupied");
+        assertThat(result.cleaningId()).isNull();
         assertThat(result.seatingStatus()).isEqualTo("occupied");
-        assertThat(scenario.cleaningRepository.saved.getFirst().status()).isEqualTo(CleaningStatus.CLEANING);
-        assertThat(scenario.cleaningRepository.saved.getFirst().resourceId()).isEqualTo(scenario.sourceTable.id().value());
+        assertThat(scenario.cleaningRepository.saved).isEmpty();
         assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
-            .containsExactly(DiningTableStatus.CLEANING, DiningTableStatus.OCCUPIED);
+            .containsExactly(DiningTableStatus.AVAILABLE, DiningTableStatus.OCCUPIED);
         assertThat(scenario.seatingRepository.savedResources).extracting(SeatingResource::status)
             .containsExactly("released", "active");
         assertThat(scenario.seatingRepository.savedResources.getLast().resourceId()).isEqualTo(scenario.targetTable.id().value());
         assertThat(scenario.idempotencyRepository.completed.getFirst().action()).isEqualTo("switch_table");
         assertThat(scenario.businessEventRepository.events).extracting(BusinessEvent::eventType)
-            .containsExactly("table.switch.completed", "table.cleaning", "table.occupied");
+            .containsExactly("table.switch.completed", "table.available", "table.occupied");
         assertThat(scenario.stateTransitionLogRepository.logs).extracting(StateTransitionLog::transitionCode)
-            .contains("table.switch.release_source", "dining_table.cleaning", "table.switch.assign_target", "dining_table.occupy");
+            .contains("table.switch.release_source", "dining_table.available", "table.switch.assign_target", "dining_table.occupy");
         assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::operationCode)
             .contains("table.switch.completed");
     }
@@ -100,7 +100,7 @@ class TableSwitchApplicationServiceTest {
         assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::id)
             .containsExactly(scenario.sourceTable.id(), scenario.groupTableA.id(), scenario.groupTableB.id());
         assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
-            .containsExactly(DiningTableStatus.CLEANING, DiningTableStatus.OCCUPIED, DiningTableStatus.OCCUPIED);
+            .containsExactly(DiningTableStatus.AVAILABLE, DiningTableStatus.OCCUPIED, DiningTableStatus.OCCUPIED);
         assertThat(scenario.seatingRepository.savedResources.getLast().resourceType()).isEqualTo("table_group");
     }
 
@@ -127,27 +127,65 @@ class TableSwitchApplicationServiceTest {
         assertThat(result.success()).isTrue();
         assertThat(result.toResourceType()).isEqualTo("table_group");
         assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
-            .containsExactly(DiningTableStatus.CLEANING, DiningTableStatus.OCCUPIED, DiningTableStatus.OCCUPIED);
+            .containsExactly(DiningTableStatus.AVAILABLE, DiningTableStatus.OCCUPIED, DiningTableStatus.OCCUPIED);
+    }
+
+    @Test
+    void switchAllowsAvailableTableEvenWhenPartySizeIsBelowConfiguredMinimum() {
+        Scenario scenario = Scenario.readyTableToTable();
+        scenario.seatingRepository.seatings.put(
+            scenario.seating.id().value(),
+            new Seating(
+                scenario.seating.id(),
+                scenario.scope,
+                scenario.seating.sourceType(),
+                scenario.seating.sourceId(),
+                scenario.seating.seatingCode(),
+                scenario.seating.manualOverrideReasonCode(),
+                scenario.seating.note(),
+                new PartySize(2),
+                SeatingStatus.OCCUPIED
+            )
+        );
+        scenario.diningTableRepository.tables.put(
+            scenario.targetTable.id().value(),
+            new DiningTable(
+                scenario.targetTable.id(),
+                scenario.scope,
+                scenario.areaId,
+                scenario.targetTable.tableCode(),
+                new CapacityRange(4, 6),
+                DiningTableStatus.AVAILABLE,
+                true
+            )
+        );
+
+        TableSwitchResult result = scenario.service().switchTable(scenario.commandToTargetTable());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.toResourceId()).isEqualTo(scenario.targetTable.id().value());
+        assertThat(scenario.cleaningRepository.saved).isEmpty();
+        assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
+            .containsExactly(DiningTableStatus.AVAILABLE, DiningTableStatus.OCCUPIED);
     }
 
     @Test
     void completedSameHashReplaysStoredResultWithoutDuplicateMutation() {
         Scenario scenario = Scenario.readyTableToTable();
         String hash = TableSwitchApplicationService.requestHash(scenario.commandToTargetTable());
-        UUID cleaningId = UUID.randomUUID();
         scenario.idempotencyRepository.existing = completedRecord(
             hash,
             scenario.seating.id().value(),
             scenario.sourceTable.id().value(),
-            scenario.targetTable.id().value(),
-            cleaningId
+            scenario.targetTable.id().value()
         );
 
         TableSwitchResult result = scenario.service().switchTable(scenario.commandToTargetTable());
 
         assertThat(result.success()).isTrue();
         assertThat(result.replayed()).isTrue();
-        assertThat(result.cleaningId()).isEqualTo(cleaningId);
+        assertThat(result.fromResourceStatus()).isEqualTo("available");
+        assertThat(result.cleaningId()).isNull();
         assertThat(scenario.cleaningRepository.saved).isEmpty();
         assertThat(scenario.diningTableRepository.saved).isEmpty();
         assertThat(scenario.businessEventRepository.events).isEmpty();
@@ -160,8 +198,7 @@ class TableSwitchApplicationServiceTest {
             "different-hash",
             scenario.seating.id().value(),
             scenario.sourceTable.id().value(),
-            scenario.targetTable.id().value(),
-            UUID.randomUUID()
+            scenario.targetTable.id().value()
         );
 
         TableSwitchResult result = scenario.service().switchTable(scenario.commandToTargetTable());
@@ -217,8 +254,7 @@ class TableSwitchApplicationServiceTest {
         String requestHash,
         UUID seatingId,
         UUID fromResourceId,
-        UUID toResourceId,
-        UUID cleaningId
+        UUID toResourceId
     ) {
         return new IdempotencyRecord(
             UUID.randomUUID(),
@@ -230,8 +266,8 @@ class TableSwitchApplicationServiceTest {
             "seating",
             seatingId,
             """
-                {"seatingId":"%s","fromResourceType":"dining_table","fromResourceId":"%s","fromResourceStatus":"cleaning","toResourceType":"dining_table","toResourceId":"%s","toResourceStatus":"occupied","cleaningId":"%s","seatingStatus":"occupied"}
-                """.formatted(seatingId, fromResourceId, toResourceId, cleaningId)
+                {"seatingId":"%s","fromResourceType":"dining_table","fromResourceId":"%s","fromResourceStatus":"available","toResourceType":"dining_table","toResourceId":"%s","toResourceStatus":"occupied","cleaningId":null,"seatingStatus":"occupied"}
+                """.formatted(seatingId, fromResourceId, toResourceId)
         );
     }
 

@@ -11,6 +11,7 @@ import static com.rpb.reservation.reservation.integration.ReservationCreateInteg
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.REPLAY_RESERVATION_ID;
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.START_AT;
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.STORE_ID;
+import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.TABLE_ID;
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -145,6 +146,42 @@ class ReservationCreateApiIntegrationTest {
         assertThat(fixture.countWhere("select count(*) from customers where phone_e164 = '+6591234567'")).isEqualTo(1);
         assertThat(fixture.count("reservations")).isEqualTo(1);
         assertBoundaryTablesRemainEmpty();
+    }
+
+    @Test
+    void createsReservationPreassignmentWhenTableIsSelectedThroughPostgresPath() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "reservation-table-preassignment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 4,
+                      "reservedStartAt": "%s",
+                      "reservedEndAt": "%s",
+                      "customerId": "%s",
+                      "customerName": "Table Guest",
+                      "customerNickname": null,
+                      "phoneE164": null,
+                      "note": null,
+                      "tableId": "%s",
+                      "tableGroupId": null
+                    }
+                    """.formatted(START_AT, END_AT, EXISTING_CUSTOMER_ID, TABLE_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(fixture.count("reservations")).isEqualTo(1);
+        assertThat(fixture.countWhere("""
+            select count(*) from reservation_preassignments
+            where tenant_id = ?
+              and store_id = ?
+              and table_id = ?
+              and table_group_id is null
+              and resource_type = 'dining_table'
+              and status = 'active'
+            """, TENANT_ID, STORE_ID, TABLE_ID)).isEqualTo(1);
+        assertThat(fixture.count("seatings")).isEqualTo(0);
+        assertThat(fixture.count("table_locks")).isEqualTo(0);
     }
 
     @Test
@@ -592,7 +629,6 @@ class ReservationCreateApiIntegrationTest {
             return false;
         }
         return !Set.of(
-            "src/pages/ReservationCreatePage.vue",
             "src/pages/ReservationCheckInPage.vue",
             "src/pages/ReservationArrivedDirectSeatingPage.vue",
             "src/pages/ReservationArrivedToQueuePage.vue",
@@ -625,6 +661,13 @@ class ReservationCreateApiIntegrationTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",

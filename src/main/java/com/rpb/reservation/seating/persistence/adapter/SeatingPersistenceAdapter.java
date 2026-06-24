@@ -1,6 +1,7 @@
 package com.rpb.reservation.seating.persistence.adapter;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.reservation.value.ReservationId;
 import com.rpb.reservation.seating.application.port.out.SeatingRepositoryPort;
 import com.rpb.reservation.seating.domain.Seating;
 import com.rpb.reservation.seating.domain.SeatingResource;
@@ -11,6 +12,7 @@ import com.rpb.reservation.seating.persistence.repository.SeatingJpaRepository;
 import com.rpb.reservation.seating.persistence.repository.SeatingResourceJpaRepository;
 import com.rpb.reservation.seating.value.SeatingId;
 import jakarta.persistence.EntityManager;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -58,6 +60,15 @@ public class SeatingPersistenceAdapter implements SeatingRepositoryPort {
     }
 
     @Override
+    public Optional<Seating> findCurrentByReservation(StoreScope scope, ReservationId reservationId) {
+        return seatingRepository.findCurrentByReservation(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            reservationId.value()
+        ).map(seatingMapper::toDomain);
+    }
+
+    @Override
     public boolean existsActiveResourceOccupancy(StoreScope scope, String resourceType, UUID resourceId) {
         return resourceRepository.existsActiveResourceOccupancy(
             scope.tenantId().value(),
@@ -90,8 +101,13 @@ public class SeatingPersistenceAdapter implements SeatingRepositoryPort {
     @Override
     public Seating save(StoreScope scope, Seating seating) {
         SeatingEntity entity = seatingMapper.toEntity(seating);
-        if (seatingRepository.existsById(seating.id().value())) {
-            return seatingMapper.toDomain(seatingRepository.save(entity));
+        Optional<SeatingEntity> existing = seatingRepository.findByIdAndTenantIdAndStoreIdAndDeletedAtIsNull(
+            seating.id().value(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        );
+        if (existing.isPresent()) {
+            return seatingMapper.toDomain(seatingRepository.save(existingEntity(entity, existing.get())));
         }
         SeatingEntity newEntity = newEntity(entity);
         entityManager.persist(newEntity);
@@ -122,6 +138,28 @@ public class SeatingPersistenceAdapter implements SeatingRepositoryPort {
             entity.getUpdatedAt(),
             entity.getDeletedAt(),
             null
+        );
+    }
+
+    private static SeatingEntity existingEntity(SeatingEntity entity, SeatingEntity existing) {
+        return SeatingEntity.of(
+            entity.getId(),
+            entity.getTenantId(),
+            entity.getStoreId(),
+            entity.getReservationId(),
+            entity.getQueueTicketId(),
+            entity.getWalkInId(),
+            entity.getSeatingCode(),
+            entity.getPartySizeSnapshot(),
+            entity.getStatus(),
+            existing.getSeatedAt(),
+            entity.getCompletedAt(),
+            entity.getManualOverrideReasonCode(),
+            entity.getNote(),
+            existing.getCreatedAt(),
+            OffsetDateTime.now(),
+            existing.getDeletedAt(),
+            existing.getVersion()
         );
     }
 }

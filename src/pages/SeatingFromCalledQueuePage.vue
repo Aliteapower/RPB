@@ -21,6 +21,7 @@ const form = reactive({
   queueTicketId: '',
   tableId: '',
   tableGroupId: '',
+  temporaryTableIds: [] as string[],
   overrideReasonCode: '',
   overrideNote: '',
   note: ''
@@ -41,20 +42,36 @@ const staffHomeRoute = computed(() => ({
 const hasQueueTicketId = computed(() => !!form.queueTicketId.trim())
 const hasTableId = computed(() => !!form.tableId.trim())
 const hasTableGroupId = computed(() => !!form.tableGroupId.trim())
-const hasExactlyOneResource = computed(() => hasTableId.value !== hasTableGroupId.value)
+const hasTemporaryTables = computed(() => form.temporaryTableIds.length > 0)
+const selectedResourceCount = computed(
+  () => Number(hasTableId.value) + Number(hasTableGroupId.value) + Number(hasTemporaryTables.value)
+)
+const hasValidTemporaryTables = computed(
+  () => !hasTemporaryTables.value || form.temporaryTableIds.length >= 2
+)
+const hasExactlyOneResource = computed(
+  () => selectedResourceCount.value === 1 && hasValidTemporaryTables.value
+)
 const resourceSelectionError = computed(() => {
   if (!hasQueueTicketId.value) {
     return null
   }
 
-  if (!hasTableId.value && !hasTableGroupId.value) {
+  if (selectedResourceCount.value === 0) {
     return createLocalError('RESOURCE_SELECTION_REQUIRED', 'queue.seat.resource_selection_required')
       .error
   }
 
-  if (hasTableId.value && hasTableGroupId.value) {
+  if (selectedResourceCount.value > 1) {
     return createLocalError('RESOURCE_SELECTION_CONFLICT', 'queue.seat.resource_selection_conflict')
       .error
+  }
+
+  if (form.temporaryTableIds.length === 1) {
+    return createLocalError(
+      'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED',
+      'queue.seat.temporary_table_group_member_required'
+    ).error
   }
 
   return null
@@ -126,12 +143,19 @@ function validateForm(): SeatingFromCalledQueueApiErrorResponse | null {
     return createLocalError('INVALID_COMMAND', 'queue.seat.queue_ticket_id_required')
   }
 
-  if (!hasTableId.value && !hasTableGroupId.value) {
+  if (selectedResourceCount.value === 0) {
     return createLocalError('RESOURCE_SELECTION_REQUIRED', 'queue.seat.resource_selection_required')
   }
 
-  if (hasTableId.value && hasTableGroupId.value) {
+  if (selectedResourceCount.value > 1) {
     return createLocalError('RESOURCE_SELECTION_CONFLICT', 'queue.seat.resource_selection_conflict')
+  }
+
+  if (form.temporaryTableIds.length === 1) {
+    return createLocalError(
+      'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED',
+      'queue.seat.temporary_table_group_member_required'
+    )
   }
 
   return null
@@ -140,17 +164,26 @@ function validateForm(): SeatingFromCalledQueueApiErrorResponse | null {
 function selectTable(tableId: string): void {
   form.tableId = tableId
   form.tableGroupId = ''
+  form.temporaryTableIds = []
 }
 
 function selectTableGroup(tableGroupId: string): void {
   form.tableGroupId = tableGroupId
   form.tableId = ''
+  form.temporaryTableIds = []
+}
+
+function selectTemporaryTables(tableIds: string[]): void {
+  form.temporaryTableIds = tableIds
+  form.tableId = ''
+  form.tableGroupId = ''
 }
 
 function toRequest(): SeatCalledQueueTicketRequest {
   return {
     tableId: optionalValue(form.tableId),
     tableGroupId: optionalValue(form.tableGroupId),
+    temporaryTableIds: form.temporaryTableIds.length ? form.temporaryTableIds : null,
     overrideReasonCode: optionalValue(form.overrideReasonCode),
     overrideNote: optionalValue(form.overrideNote),
     note: optionalValue(form.note)
@@ -227,13 +260,16 @@ function queryValue(value: unknown): string {
       </label>
 
       <section class="resource-panel" aria-label="桌台选择">
-        <p class="resource-rule">桌台 ID 和桌组 ID 必须二选一</p>
+        <p class="resource-rule">桌台、桌组或临时组合必须三选一</p>
         <TableResourcePicker
           :store-id="storeId"
           :selected-table-id="form.tableId"
           :selected-table-group-id="form.tableGroupId"
+          :selected-temporary-table-ids="form.temporaryTableIds"
+          temporary-selection-enabled
           @select-table="selectTable"
           @select-table-group="selectTableGroup"
+          @select-temporary-tables="selectTemporaryTables"
         />
         <details class="field-group">
           <summary>手动填写资源 ID</summary>

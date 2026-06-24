@@ -31,6 +31,16 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void reservationNoShowPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.RESERVATION_NO_SHOW).isEqualTo("reservation.no_show");
+    }
+
+    @Test
+    void reservationCompletePermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.RESERVATION_COMPLETE).isEqualTo("reservation.complete");
+    }
+
+    @Test
     void queueCallPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.QUEUE_CALL).isEqualTo("queue.call");
     }
@@ -48,6 +58,11 @@ class AppGateRequiredPermissionTest {
     @Test
     void queueRejoinPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.QUEUE_REJOIN).isEqualTo("queue.rejoin");
+    }
+
+    @Test
+    void queueCancelPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.QUEUE_CANCEL).isEqualTo("queue.cancel");
     }
 
     @Test
@@ -71,10 +86,16 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void walkInQueueCreatePermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.WALKIN_QUEUE_CREATE).isEqualTo("walkin.queue.create");
+    }
+
+    @Test
     void reservationQueueEntryPermissionsContainConfirmedRuntimeCapabilities() {
         assertThat(AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS)
             .containsExactlyInAnyOrder(
                 AppGateRequiredPermission.WALKIN_DIRECT_SEATING_CREATE,
+                AppGateRequiredPermission.WALKIN_QUEUE_CREATE,
                 AppGateRequiredPermission.CLEANING_START,
                 AppGateRequiredPermission.CLEANING_COMPLETE,
                 AppGateRequiredPermission.RESERVATION_CREATE,
@@ -83,10 +104,13 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.RESERVATION_TODAY_VIEW,
                 AppGateRequiredPermission.RESERVATION_QUEUE,
                 AppGateRequiredPermission.RESERVATION_CANCEL,
+                AppGateRequiredPermission.RESERVATION_NO_SHOW,
+                AppGateRequiredPermission.RESERVATION_COMPLETE,
                 AppGateRequiredPermission.QUEUE_CALL,
                 AppGateRequiredPermission.QUEUE_SEAT,
                 AppGateRequiredPermission.QUEUE_SKIP,
                 AppGateRequiredPermission.QUEUE_REJOIN,
+                AppGateRequiredPermission.QUEUE_CANCEL,
                 AppGateRequiredPermission.QUEUE_VIEW,
                 AppGateRequiredPermission.TABLE_VIEW,
                 AppGateRequiredPermission.TABLE_SWITCH,

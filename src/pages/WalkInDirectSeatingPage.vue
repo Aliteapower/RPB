@@ -27,6 +27,7 @@ const form = reactive({
   phoneLocal: '',
   tableId: '',
   tableGroupId: '',
+  temporaryTableIds: [] as string[],
   overrideReasonCode: '',
   overrideNote: ''
 })
@@ -54,7 +55,16 @@ const cleaningRoute = computed(() => ({
   }
 }))
 
-const canSubmit = computed(() => !isSubmitting.value && !!storeId.value)
+const hasTableId = computed(() => !!form.tableId.trim())
+const hasTableGroupId = computed(() => !!form.tableGroupId.trim())
+const hasTemporaryTables = computed(() => form.temporaryTableIds.length > 0)
+const selectedResourceCount = computed(
+  () => Number(hasTableId.value) + Number(hasTableGroupId.value) + Number(hasTemporaryTables.value)
+)
+const hasValidResourceSelection = computed(
+  () => selectedResourceCount.value <= 1 && form.temporaryTableIds.length !== 1
+)
+const canSubmit = computed(() => !isSubmitting.value && !!storeId.value && hasValidResourceSelection.value)
 
 watch(
   () => route.query,
@@ -98,8 +108,15 @@ function validateForm(): ApiErrorResponse | null {
     return createLocalError('INVALID_PHONE_E164', 'walkin.direct_seating.invalid_phone_e164')
   }
 
-  if (form.tableId.trim() && form.tableGroupId.trim()) {
+  if (selectedResourceCount.value > 1) {
     return createLocalError('SEATING_RESOURCE_INVALID', 'walkin.direct_seating.resource_invalid')
+  }
+
+  if (form.temporaryTableIds.length === 1) {
+    return createLocalError(
+      'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED',
+      'walkin.direct_seating.temporary_table_group_member_required'
+    )
   }
 
   return null
@@ -108,19 +125,30 @@ function validateForm(): ApiErrorResponse | null {
 function selectTable(tableId: string): void {
   form.tableId = tableId
   form.tableGroupId = ''
+  form.temporaryTableIds = []
 }
 
 function selectTableGroup(tableGroupId: string): void {
   form.tableGroupId = tableGroupId
   form.tableId = ''
+  form.temporaryTableIds = []
+}
+
+function selectTemporaryTables(tableIds: string[]): void {
+  form.temporaryTableIds = tableIds
+  form.tableId = ''
+  form.tableGroupId = ''
 }
 
 function applyRouteSelection(): void {
   const tableId = asSingleValue(route.query.tableId)
   const tableGroupId = asSingleValue(route.query.tableGroupId)
+  const temporaryTableIds = asValueList(route.query.temporaryTableIds)
   const partySize = Number(asSingleValue(route.query.partySize) ?? '')
 
-  if (tableId) {
+  if (temporaryTableIds.length) {
+    selectTemporaryTables(temporaryTableIds)
+  } else if (tableId) {
     selectTable(tableId)
   } else if (tableGroupId) {
     selectTableGroup(tableGroupId)
@@ -140,6 +168,7 @@ function toRequest(): SeatWalkInDirectlyRequest {
     phoneE164: toSingaporePhoneE164(form.phoneLocal),
     tableId: optionalValue(form.tableId),
     tableGroupId: optionalValue(form.tableGroupId),
+    temporaryTableIds: form.temporaryTableIds.length ? form.temporaryTableIds : null,
     overrideReasonCode: optionalValue(form.overrideReasonCode),
     overrideNote: optionalValue(form.overrideNote)
   }
@@ -154,6 +183,13 @@ function asSingleValue(value: unknown): string | null {
   const candidate = Array.isArray(value) ? value[0] : value
 
   return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : null
+}
+
+function asValueList(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : typeof value === 'string' ? [value] : []
+  const ids = values.flatMap(item => item.split(',')).map(item => item.trim()).filter(Boolean)
+
+  return Array.from(new Set(ids))
 }
 
 function createIdempotencyKey(): string {
@@ -218,8 +254,11 @@ function createLocalError(code: string, messageKey: string): ApiErrorResponse {
         :party-size="form.partySize"
         :selected-table-id="form.tableId"
         :selected-table-group-id="form.tableGroupId"
+        :selected-temporary-table-ids="form.temporaryTableIds"
+        temporary-selection-enabled
         @select-table="selectTable"
         @select-table-group="selectTableGroup"
+        @select-temporary-tables="selectTemporaryTables"
       />
 
       <details class="field-group">

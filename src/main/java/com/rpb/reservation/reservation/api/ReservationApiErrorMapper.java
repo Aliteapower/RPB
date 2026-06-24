@@ -48,6 +48,13 @@ public class ReservationApiErrorMapper {
             case INVALID_TIME_RANGE -> ReservationApiErrorCode.INVALID_TIME_RANGE;
             case RESERVATION_START_IN_PAST -> ReservationApiErrorCode.RESERVATION_START_IN_PAST;
             case INVALID_PHONE_E164 -> ReservationApiErrorCode.INVALID_PHONE_E164;
+            case RESOURCE_SELECTION_CONFLICT -> ReservationApiErrorCode.RESOURCE_SELECTION_CONFLICT;
+            case TABLE_NOT_FOUND -> ReservationApiErrorCode.TABLE_NOT_FOUND;
+            case TABLE_NOT_AVAILABLE -> ReservationApiErrorCode.TABLE_NOT_AVAILABLE;
+            case TABLE_CAPACITY_INSUFFICIENT -> ReservationApiErrorCode.TABLE_CAPACITY_INSUFFICIENT;
+            case TABLE_GROUP_NOT_FOUND -> ReservationApiErrorCode.TABLE_GROUP_NOT_FOUND;
+            case TABLE_GROUP_INVALID -> ReservationApiErrorCode.TABLE_GROUP_INVALID;
+            case TABLE_GROUP_CAPACITY_INSUFFICIENT -> ReservationApiErrorCode.TABLE_GROUP_CAPACITY_INSUFFICIENT;
             case CUSTOMER_NOT_FOUND -> ReservationApiErrorCode.CUSTOMER_NOT_FOUND;
             case RESERVATION_DUPLICATE_ACTIVE -> ReservationApiErrorCode.RESERVATION_DUPLICATE_ACTIVE;
             case RESERVATION_CAPACITY_INSUFFICIENT -> ReservationApiErrorCode.RESERVATION_CAPACITY_INSUFFICIENT;

@@ -53,7 +53,6 @@ class LocalRuntimeTableSwitchSecurityTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000981");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000981");
     private static final UUID SEATING_ID = UUID.fromString("40000000-0000-0000-0000-000000000981");
-    private static final UUID CLEANING_ID = UUID.fromString("50000000-0000-0000-0000-000000000981");
     private static final UUID FROM_TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000981");
     private static final UUID TO_TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000982");
 
@@ -81,11 +80,11 @@ class LocalRuntimeTableSwitchSecurityTest {
             SEATING_ID,
             "dining_table",
             FROM_TABLE_ID,
-            "cleaning",
+            "available",
             "dining_table",
             TO_TABLE_ID,
             "occupied",
-            CLEANING_ID,
+            null,
             "occupied",
             "completed",
             List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),

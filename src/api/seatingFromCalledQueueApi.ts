@@ -4,6 +4,8 @@ import type {
   SeatingFromCalledQueueApiErrorResponse
 } from '../types/seatingFromCalledQueue'
 
+type OptionalStringRequestKey = Exclude<keyof SeatCalledQueueTicketRequest, 'temporaryTableIds'>
+
 export class SeatingFromCalledQueueApiError extends Error {
   readonly status: number
   readonly response: SeatingFromCalledQueueApiErrorResponse
@@ -64,6 +66,7 @@ function toApiBody(request: SeatCalledQueueTicketRequest): SeatCalledQueueTicket
 
   addOptionalField(body, 'tableId', request.tableId)
   addOptionalField(body, 'tableGroupId', request.tableGroupId)
+  addTemporaryTableIds(body, request.temporaryTableIds)
   addOptionalField(body, 'overrideReasonCode', request.overrideReasonCode)
   addOptionalField(body, 'overrideNote', request.overrideNote)
   addOptionalField(body, 'note', request.note)
@@ -71,9 +74,20 @@ function toApiBody(request: SeatCalledQueueTicketRequest): SeatCalledQueueTicket
   return body
 }
 
+function addTemporaryTableIds(
+  body: SeatCalledQueueTicketRequest,
+  value: string[] | null | undefined
+): void {
+  const ids = value?.map(item => item.trim()).filter(Boolean) ?? []
+
+  if (ids.length) {
+    body.temporaryTableIds = ids
+  }
+}
+
 function addOptionalField(
   body: SeatCalledQueueTicketRequest,
-  key: keyof SeatCalledQueueTicketRequest,
+  key: OptionalStringRequestKey,
   value: string | null | undefined
 ): void {
   const trimmed = trimToOptional(value)

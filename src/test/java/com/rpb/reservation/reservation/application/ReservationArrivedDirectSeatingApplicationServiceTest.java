@@ -21,9 +21,13 @@ import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositor
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.status.IdempotencyStatus;
 import com.rpb.reservation.reservation.application.command.SeatArrivedReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceTarget;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.domain.Reservation;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationCode;
 import com.rpb.reservation.reservation.value.ReservationId;
@@ -150,6 +154,33 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         assertThat(scenario.stateTransitionLogRepository.logs)
             .filteredOn(log -> log.targetType().equals("dining_table") && log.toStatus().equals("occupied"))
             .hasSize(2);
+    }
+
+    @Test
+    void seatsArrivedReservationToTemporaryTableGroupAndPersistsMembers() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTemporaryTables(
+                scenario.table.id().value(),
+                scenario.groupMemberTable.id().value()
+            ));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resourceType()).isEqualTo("table_group");
+        assertThat(result.resourceId()).isNotEqualTo(scenario.group.id().value());
+        assertThat(result.groupMemberStatuses()).containsExactly("occupied", "occupied");
+        assertThat(scenario.tableGroupRepository.saved).hasSize(1);
+        TableGroup temporaryGroup = scenario.tableGroupRepository.saved.getFirst();
+        assertThat(temporaryGroup.groupType()).isEqualTo("temporary");
+        assertThat(temporaryGroup.status()).isEqualTo(TableGroupStatus.OCCUPIED);
+        assertThat(result.resourceId()).isEqualTo(temporaryGroup.id().value());
+        assertThat(scenario.tableGroupRepository.findActiveMembers(scenario.scope, temporaryGroup.id()))
+            .extracting(member -> member.tableId().value())
+            .containsExactly(scenario.table.id().value(), scenario.groupMemberTable.id().value());
+        assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
+            .containsOnly(DiningTableStatus.OCCUPIED);
+        assertThat(scenario.seatingRepository.savedResources.getFirst().resourceId()).isEqualTo(temporaryGroup.id().value());
     }
 
     @Test
@@ -305,6 +336,48 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         assertThat(neither.success()).isFalse();
         assertThat(neither.error()).isEqualTo(ReservationArrivedDirectSeatingError.RESOURCE_SELECTION_REQUIRED);
         assertThat(scenario.idempotencyRepository.started).isEmpty();
+    }
+
+    @Test
+    void reservationWithPreassignedTableCannotSeatToDifferentResource() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.preassignmentRepository.assign(scenario.assignment(
+            scenario.reservationId.value(),
+            "R-SEAT-1",
+            "arrived",
+            "dining_table",
+            scenario.table.id().value(),
+            "T-01"
+        ));
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithGroup(scenario.group.id().value()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationArrivedDirectSeatingError.TABLE_GROUP_INVALID);
+        assertThat(scenario.seatingRepository.saved).isEmpty();
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+    }
+
+    @Test
+    void tablePreassignedToAnotherReservationCannotBeSeated() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.preassignmentRepository.assign(scenario.assignment(
+            UUID.randomUUID(),
+            "R-OTHER",
+            "arrived",
+            "dining_table",
+            scenario.table.id().value(),
+            "T-01"
+        ));
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationArrivedDirectSeatingError.TABLE_NOT_AVAILABLE);
+        assertThat(scenario.seatingRepository.saved).isEmpty();
+        assertThat(scenario.reservationRepository.saved).isEmpty();
     }
 
     @Test
@@ -500,6 +573,7 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         final FakeDiningTableRepository diningTableRepository = new FakeDiningTableRepository();
         final FakeTableGroupRepository tableGroupRepository = new FakeTableGroupRepository();
         final FakeTableLockRepository tableLockRepository = new FakeTableLockRepository();
+        final FakeReservationPreassignmentRepository preassignmentRepository = new FakeReservationPreassignmentRepository();
         final FakeSeatingRepository seatingRepository = new FakeSeatingRepository();
         final FakeBusinessEventRepository businessEventRepository = new FakeBusinessEventRepository();
         final FakeStateTransitionLogRepository stateTransitionLogRepository = new FakeStateTransitionLogRepository();
@@ -545,6 +619,7 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
                 diningTableRepository,
                 tableGroupRepository,
                 tableLockRepository,
+                preassignmentRepository,
                 seatingRepository,
                 businessEventRepository,
                 stateTransitionLogRepository,
@@ -566,6 +641,23 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
             return command(null, tableGroupId, "idem-seat-group");
         }
 
+        SeatArrivedReservationCommand commandWithTemporaryTables(UUID... tableIds) {
+            return new SeatArrivedReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                reservationId.value(),
+                null,
+                null,
+                List.of(tableIds),
+                "idem-seat-temporary-group",
+                actorId,
+                "staff",
+                null,
+                null,
+                "Host combined tables"
+            );
+        }
+
         SeatArrivedReservationCommand command(UUID tableId, UUID tableGroupId, String key) {
             return new SeatArrivedReservationCommand(
                 tenantId.value(),
@@ -573,12 +665,39 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
                 reservationId.value(),
                 tableId,
                 tableGroupId,
+                List.of(),
                 key,
                 actorId,
                 "staff",
                 null,
                 null,
                 "Host assigned manually"
+            );
+        }
+
+        ReservationResourceAssignment assignment(
+            UUID reservationId,
+            String reservationCode,
+            String reservationStatus,
+            String resourceType,
+            UUID resourceId,
+            String resourceCode
+        ) {
+            return new ReservationResourceAssignment(
+                reservationId,
+                reservationCode,
+                reservationStatus,
+                4,
+                reservedStartAt,
+                reservedEndAt,
+                null,
+                null,
+                resourceType,
+                resourceId,
+                resourceCode,
+                null,
+                null,
+                null
             );
         }
 
@@ -823,6 +942,58 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         public TableGroupMember saveMember(StoreScope scope, TableGroupMember member) {
             members.add(member);
             return member;
+        }
+    }
+
+    private static final class FakeReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
+        final Map<UUID, ReservationResourceAssignment> byReservation = new HashMap<>();
+        final Map<ReservationResourceTarget, ReservationResourceAssignment> byResource = new HashMap<>();
+
+        void assign(ReservationResourceAssignment assignment) {
+            byReservation.put(assignment.reservationId(), assignment);
+            byResource.put(assignment.target(), assignment);
+        }
+
+        @Override
+        public boolean existsActiveResourceConflict(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            BusinessDate businessDate,
+            TimeRange timeRange
+        ) {
+            return byResource.containsKey(new ReservationResourceTarget(resourceType, resourceId));
+        }
+
+        @Override
+        public java.util.Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(
+            StoreScope scope,
+            BusinessDate businessDate
+        ) {
+            return java.util.Set.copyOf(byResource.values());
+        }
+
+        @Override
+        public Optional<ReservationResourceAssignment> findActiveAssignmentForReservation(
+            StoreScope scope,
+            UUID reservationId
+        ) {
+            return Optional.ofNullable(byReservation.get(reservationId));
+        }
+
+        @Override
+        public Optional<ReservationResourceAssignment> findActiveAssignmentForResource(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            BusinessDate businessDate
+        ) {
+            return Optional.ofNullable(byResource.get(new ReservationResourceTarget(resourceType, resourceId)));
+        }
+
+        @Override
+        public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
+            return preassignment;
         }
     }
 

@@ -16,6 +16,8 @@ export interface CreateReservationRequest {
   customerNickname?: string | null
   phoneE164?: string | null
   note?: string | null
+  tableId?: string | null
+  tableGroupId?: string | null
 }
 
 export interface ReservationCustomerProjection {

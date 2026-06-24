@@ -476,6 +476,7 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
             reservationId,
             tableId,
             tableGroupId,
+            List.of(),
             "ignored-by-hash",
             ACTOR_ID,
             "staff",

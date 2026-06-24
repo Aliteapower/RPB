@@ -5,10 +5,18 @@ import {
   cancelReservation,
   ReservationCancelApiError
 } from '../../api/reservationCancelApi'
+import {
+  markReservationNoShow,
+  ReservationStatusActionApiError
+} from '../../api/reservationStatusActionApi'
 import type {
   CancelReservationResponse,
   ReservationCancelApiErrorResponse
 } from '../../types/reservationCancel'
+import type {
+  MarkReservationNoShowResponse,
+  ReservationStatusActionApiErrorResponse
+} from '../../types/reservationStatusAction'
 import type {
   ReservationTodayViewApiErrorResponse,
   ReservationTodayViewItem,
@@ -18,8 +26,8 @@ import ReservationTodayListItem from './ReservationTodayListItem.vue'
 
 const props = defineProps<{
   canCancelReservation: boolean
+  canNoShowReservation: boolean
   canRunCurrentDayActions: boolean
-  canSwitchTable: boolean
   checkingInReservationId?: string | null
   items: ReservationTodayViewItem[]
   isLoading: boolean
@@ -30,21 +38,22 @@ const props = defineProps<{
   statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: string }>
   storeId: string
   storeTimezone: string
-  switchingReservationId?: string | null
 }>()
 
 const emit = defineEmits<{
   'update:selectedStatus': [value: ReservationTodayViewStatusFilter]
   cancelled: [value: CancelReservationResponse]
   'check-in-requested': [item: ReservationTodayViewItem]
+  'no-showed': [value: MarkReservationNoShowResponse]
   'seat-requested': [item: ReservationTodayViewItem]
-  'switch-table-requested': [item: ReservationTodayViewItem]
 }>()
 
 const phoneFilter = ref('')
 const partySizeFilter = ref('')
 const cancellingReservationId = ref<string | null>(null)
+const noShowingReservationId = ref<string | null>(null)
 const cancelApiError = ref<ReservationCancelApiErrorResponse | null>(null)
+const statusActionApiError = ref<ReservationStatusActionApiErrorResponse | null>(null)
 
 const partySizeOptions = computed(() =>
   [...new Set(props.items.map(item => item.partySize))]
@@ -95,6 +104,7 @@ async function handleCancelRequested(item: ReservationTodayViewItem): Promise<vo
   }
 
   cancelApiError.value = null
+  statusActionApiError.value = null
   cancellingReservationId.value = item.reservationId
 
   try {
@@ -118,16 +128,47 @@ async function handleCancelRequested(item: ReservationTodayViewItem): Promise<vo
   }
 }
 
+async function handleNoShowRequested(item: ReservationTodayViewItem): Promise<void> {
+  if (!props.storeId || noShowingReservationId.value) {
+    return
+  }
+
+  if (!props.canNoShowReservation) {
+    statusActionApiError.value = createLocalStatusActionError('FORBIDDEN', 'reservation.forbidden')
+    return
+  }
+
+  statusActionApiError.value = null
+  cancelApiError.value = null
+  noShowingReservationId.value = item.reservationId
+
+  try {
+    const result = await markReservationNoShow(
+      props.storeId,
+      item.reservationId,
+      {
+        reasonCode: 'guest_no_show',
+        note: 'staff_reservation_today_list'
+      },
+      createReservationStatusActionIdempotencyKey('no-show', item.reservationId)
+    )
+    emit('no-showed', result)
+  } catch (error) {
+    statusActionApiError.value =
+      error instanceof ReservationStatusActionApiError
+        ? error.response
+        : createLocalStatusActionError('REQUEST_FAILED', 'reservation.no_show.api_error')
+  } finally {
+    noShowingReservationId.value = null
+  }
+}
+
 function handleCheckInRequested(item: ReservationTodayViewItem): void {
   emit('check-in-requested', item)
 }
 
 function handleSeatRequested(item: ReservationTodayViewItem): void {
   emit('seat-requested', item)
-}
-
-function handleSwitchTableRequested(item: ReservationTodayViewItem): void {
-  emit('switch-table-requested', item)
 }
 
 function createReservationCancelIdempotencyKey(reservationId: string): string {
@@ -139,10 +180,36 @@ function createReservationCancelIdempotencyKey(reservationId: string): string {
   return `reservation:cancel:${reservationId}:${randomValue}`
 }
 
+function createReservationStatusActionIdempotencyKey(action: string, reservationId: string): string {
+  const randomValue =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  return `reservation:${action}:${reservationId}:${randomValue}`
+}
+
 function createLocalCancelError(
   code: string,
   messageKey: string
 ): ReservationCancelApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
+function createLocalStatusActionError(
+  code: string,
+  messageKey: string
+): ReservationStatusActionApiErrorResponse {
   return {
     success: false,
     error: {
@@ -216,6 +283,12 @@ function createLocalCancelError(
       <p>消息键：{{ cancelApiError.error.messageKey }}</p>
     </section>
 
+    <section v-if="statusActionApiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
+      <h3>状态操作失败</h3>
+      <p>错误代码：{{ statusActionApiError.error.code }}</p>
+      <p>消息键：{{ statusActionApiError.error.messageKey }}</p>
+    </section>
+
     <section v-if="showEmptyState" class="reservation-today-list__state" aria-live="polite">
       <h3>今日暂无预约</h3>
       <p>可以切换日期或状态筛选。</p>
@@ -231,18 +304,18 @@ function createLocalCancelError(
         v-for="item in visibleItems"
         :key="item.reservationId"
         :can-cancel-reservation="canCancelReservation"
+        :can-no-show-reservation="canNoShowReservation"
         :can-run-current-day-actions="canRunCurrentDayActions"
-        :can-switch-table="canSwitchTable"
         :is-cancelling="cancellingReservationId === item.reservationId"
         :is-checking-in="checkingInReservationId === item.reservationId"
+        :is-no-showing="noShowingReservationId === item.reservationId"
         :is-seating="seatingReservationId === item.reservationId"
-        :is-switching="switchingReservationId === item.reservationId"
         :item="item"
         :store-timezone="storeTimezone"
         @cancel-requested="handleCancelRequested"
         @check-in-requested="handleCheckInRequested"
+        @no-show-requested="handleNoShowRequested"
         @seat-requested="handleSeatRequested"
-        @switch-table-requested="handleSwitchTableRequested"
       />
     </section>
   </section>

@@ -26,6 +26,7 @@ const emit = defineEmits<{
 
 const selectedTableId = ref('')
 const selectedTableGroupId = ref('')
+const selectedTemporaryTableIds = ref<string[]>([])
 const isSubmitting = ref(false)
 const apiError = ref<ReservationArrivedDirectSeatingApiErrorResponse | null>(null)
 
@@ -39,6 +40,17 @@ const customerLabel = computed(() => {
   const values = [item.customerName, item.customerNickname].filter(Boolean)
   return values.length ? values.join(' / ') : item.reservationCode
 })
+const hasAssignedResource = computed(() => !!props.item?.assignedResourceId)
+const assignedResourceLabel = computed(() => {
+  const item = props.item
+
+  if (!item?.assignedResourceId) {
+    return '未指定'
+  }
+
+  const code = item.assignedResourceCode?.trim() || item.assignedResourceId
+  return item.assignedResourceType === 'table_group' ? `桌组 ${code}` : `桌号 ${code}`
+})
 const canSubmit = computed(
   () =>
     props.open &&
@@ -51,8 +63,19 @@ const canSubmit = computed(
 watch(
   () => [props.open, props.item?.reservationId] as const,
   () => {
-    selectedTableId.value = ''
-    selectedTableGroupId.value = ''
+    if (props.item?.assignedResourceType === 'table_group' && props.item.assignedResourceId) {
+      selectedTableId.value = ''
+      selectedTableGroupId.value = props.item.assignedResourceId
+      selectedTemporaryTableIds.value = []
+    } else if (props.item?.assignedResourceType === 'dining_table' && props.item.assignedResourceId) {
+      selectedTableId.value = props.item.assignedResourceId
+      selectedTableGroupId.value = ''
+      selectedTemporaryTableIds.value = []
+    } else {
+      selectedTableId.value = ''
+      selectedTableGroupId.value = ''
+      selectedTemporaryTableIds.value = []
+    }
     apiError.value = null
   }
 )
@@ -66,11 +89,19 @@ function close(): void {
 function selectTable(tableId: string): void {
   selectedTableId.value = tableId
   selectedTableGroupId.value = ''
+  selectedTemporaryTableIds.value = []
 }
 
 function selectTableGroup(tableGroupId: string): void {
   selectedTableGroupId.value = tableGroupId
   selectedTableId.value = ''
+  selectedTemporaryTableIds.value = []
+}
+
+function selectTemporaryTables(tableIds: string[]): void {
+  selectedTemporaryTableIds.value = tableIds
+  selectedTableId.value = ''
+  selectedTableGroupId.value = ''
 }
 
 async function submit(): Promise<void> {
@@ -110,21 +141,41 @@ function validateForm(): ReservationArrivedDirectSeatingApiErrorResponse | null 
     return createLocalError('INVALID_COMMAND', 'reservation.direct_seating.reservation_required')
   }
 
-  if (!hasExactlyOneResource()) {
+  if (resourceSelectionCount() === 0) {
     return createLocalError('RESOURCE_SELECTION_REQUIRED', 'reservation.resource_selection_required')
+  }
+
+  if (resourceSelectionCount() > 1) {
+    return createLocalError('RESOURCE_SELECTION_CONFLICT', 'reservation.resource_selection_conflict')
+  }
+
+  if (selectedTemporaryTableIds.value.length === 1) {
+    return createLocalError(
+      'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED',
+      'reservation.temporary_table_group_member_required'
+    )
   }
 
   return null
 }
 
 function hasExactlyOneResource(): boolean {
-  return !!selectedTableId.value.trim() !== !!selectedTableGroupId.value.trim()
+  return resourceSelectionCount() === 1 && selectedTemporaryTableIds.value.length !== 1
+}
+
+function resourceSelectionCount(): number {
+  return (
+    Number(!!selectedTableId.value.trim()) +
+    Number(!!selectedTableGroupId.value.trim()) +
+    Number(selectedTemporaryTableIds.value.length > 0)
+  )
 }
 
 function toRequest(): SeatArrivedReservationRequest {
   return {
     tableId: optionalValue(selectedTableId.value),
     tableGroupId: optionalValue(selectedTableGroupId.value),
+    temporaryTableIds: selectedTemporaryTableIds.value.length ? selectedTemporaryTableIds.value : null,
     overrideReasonCode: null,
     overrideNote: null,
     note: 'staff_reservation_today_list'
@@ -186,13 +237,22 @@ function createLocalError(
           为 {{ customerLabel }}（预约）分配座位
         </p>
 
+        <section v-if="hasAssignedResource" class="reservation-seat-dialog__assigned-resource">
+          <span>预约指定</span>
+          <strong>{{ assignedResourceLabel }}</strong>
+        </section>
+
         <TableResourcePicker
+          v-else
           :store-id="storeId"
           :party-size="item?.partySize ?? null"
           :selected-table-id="selectedTableId"
           :selected-table-group-id="selectedTableGroupId"
+          :selected-temporary-table-ids="selectedTemporaryTableIds"
+          temporary-selection-enabled
           @select-table="selectTable"
           @select-table-group="selectTableGroup"
+          @select-temporary-tables="selectTemporaryTables"
         />
 
         <section v-if="apiError" class="reservation-seat-dialog__error" aria-live="assertive">
@@ -283,6 +343,27 @@ function createLocalError(
   font-size: 0.86rem;
   font-weight: 800;
   margin: 0;
+}
+
+.reservation-seat-dialog__assigned-resource {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+}
+
+.reservation-seat-dialog__assigned-resource span {
+  color: #c2410c;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.reservation-seat-dialog__assigned-resource strong {
+  color: #14213d;
+  font-size: 1rem;
+  font-weight: 950;
 }
 
 .reservation-seat-dialog__error {

@@ -4,6 +4,7 @@ export interface TableResourceQuery {
   status?: string
   partySize?: number
   includeGroups?: boolean
+  businessDate?: string
 }
 
 export interface TableResourceItem {
@@ -20,6 +21,20 @@ export interface TableResourceItem {
   memberTableCodes: string[]
   currentSeatingId?: string | null
   currentCleaningId?: string | null
+  currentReservationId?: string | null
+  currentPartySize?: number | null
+  preassignedReservationId?: string | null
+  preassignedReservationCode?: string | null
+  preassignedCustomerName?: string | null
+  preassignedPhoneMasked?: string | null
+  preassignedReservationStatus?: string | null
+  preassignedPartySize?: number | null
+  preassignedStartAt?: string | null
+  preassignedEndAt?: string | null
+  preassignedResourceCode?: string | null
+  preassignedQueueTicketId?: string | null
+  preassignedQueueTicketNumber?: number | null
+  preassignedQueueTicketStatus?: string | null
 }
 
 export interface TableResourceListResponse {

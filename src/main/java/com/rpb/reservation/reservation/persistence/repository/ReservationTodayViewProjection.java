@@ -36,4 +36,16 @@ public interface ReservationTodayViewProjection {
     UUID getCurrentResourceId();
 
     String getCurrentResourceCode();
+
+    String getAssignedResourceType();
+
+    UUID getAssignedResourceId();
+
+    String getAssignedResourceCode();
+
+    UUID getQueueTicketId();
+
+    Integer getQueueTicketNumber();
+
+    String getQueueTicketStatus();
 }

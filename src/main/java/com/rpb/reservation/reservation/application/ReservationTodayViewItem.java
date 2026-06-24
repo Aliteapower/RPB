@@ -20,6 +20,56 @@ public record ReservationTodayViewItem(
     UUID seatingId,
     String currentResourceType,
     UUID currentResourceId,
-    String currentResourceCode
+    String currentResourceCode,
+    String assignedResourceType,
+    UUID assignedResourceId,
+    String assignedResourceCode,
+    UUID queueTicketId,
+    Integer queueTicketNumber,
+    String queueTicketStatus
 ) {
+
+    public ReservationTodayViewItem(
+        UUID reservationId,
+        String reservationCode,
+        String status,
+        int partySize,
+        Instant reservedStartAt,
+        Instant reservedEndAt,
+        Instant holdUntilAt,
+        LocalDate businessDate,
+        String customerName,
+        String customerNickname,
+        String phoneMasked,
+        String note,
+        UUID seatingId,
+        String currentResourceType,
+        UUID currentResourceId,
+        String currentResourceCode
+    ) {
+        this(
+            reservationId,
+            reservationCode,
+            status,
+            partySize,
+            reservedStartAt,
+            reservedEndAt,
+            holdUntilAt,
+            businessDate,
+            customerName,
+            customerNickname,
+            phoneMasked,
+            note,
+            seatingId,
+            currentResourceType,
+            currentResourceId,
+            currentResourceCode,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+    }
 }

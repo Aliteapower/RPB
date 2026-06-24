@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
+import { callQueueTicket, QueueCallApiError } from '../api/queueCallApi'
+import { cancelQueueTicket, QueueCancelApiError } from '../api/queueCancelApi'
 import { listQueueTickets, QueueTicketListApiError } from '../api/queueTicketListApi'
 import { QueueRejoinApiError, rejoinQueueTicket } from '../api/queueRejoinApi'
 import { QueueSkipApiError, skipQueueTicket } from '../api/queueSkipApi'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { MeAppEntry } from '../types/meApps'
+import type {
+  CallQueueTicketResponse,
+  QueueCallApiErrorResponse
+} from '../types/queueCall'
+import type {
+  CancelQueueTicketResponse,
+  QueueCancelApiErrorResponse
+} from '../types/queueCancel'
 import type {
   QueueTicketListApiErrorResponse,
   QueueTicketListItem,
@@ -24,7 +35,15 @@ import type {
   SkipQueueTicketResponse
 } from '../types/queueSkip'
 
-type UiStatusFilter = 'all' | 'waiting' | 'called' | 'seated'
+type UiStatusFilter =
+  | 'all'
+  | 'waiting'
+  | 'called'
+  | 'skipped'
+  | 'rejoined'
+  | 'seated'
+  | 'cancelled'
+  | 'expired'
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -36,8 +55,14 @@ const statusOptions: Array<{ value: UiStatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'waiting', label: '等待中' },
   { value: 'called', label: '已叫号' },
-  { value: 'seated', label: '已入座' }
+  { value: 'skipped', label: '已过号' },
+  { value: 'rejoined', label: '已重回' },
+  { value: 'seated', label: '已入座' },
+  { value: 'cancelled', label: '已取消' },
+  { value: 'expired', label: '已过期' }
 ]
+
+const seatActionLabel = { label: '入桌' }
 
 const statusLabels: Record<string, string> = {
   waiting: '等待中',
@@ -57,6 +82,9 @@ const response = ref<QueueTicketListResponse | null>(null)
 const apiError = ref<QueueTicketListApiErrorResponse | null>(null)
 const apps = ref<MeAppEntry[]>([])
 const appsLoading = ref(false)
+const callApiError = ref<QueueCallApiErrorResponse | null>(null)
+const callSuccess = ref<CallQueueTicketResponse | null>(null)
+const callInFlightTicketIds = ref<Set<string>>(new Set())
 const skipApiError = ref<QueueSkipApiErrorResponse | null>(null)
 const skipSuccess = ref<SkipQueueTicketResponse | null>(null)
 const skipInFlightTicketId = ref<string | null>(null)
@@ -65,6 +93,9 @@ const rejoinApiError = ref<QueueRejoinApiErrorResponse | null>(null)
 const rejoinSuccess = ref<RejoinQueueTicketResponse | null>(null)
 const rejoinInFlightTicketId = ref<string | null>(null)
 const rejoinInFlightTicketIds = ref<Set<string>>(new Set())
+const cancelApiError = ref<QueueCancelApiErrorResponse | null>(null)
+const cancelSuccess = ref<CancelQueueTicketResponse | null>(null)
+const cancelInFlightTicketIds = ref<Set<string>>(new Set())
 let loadSequence = 0
 let appsLoadSequence = 0
 
@@ -80,6 +111,21 @@ const appGateRejoinErrorCodes = new Set([
   'PERMISSION_DENIED'
 ])
 const rejoinErrorCodesThatRefresh = new Set(['QUEUE_TICKET_STATUS_NOT_SKIPPED'])
+const appGateCallErrorCodes = new Set([
+  'TENANT_APP_NOT_ENABLED',
+  'STORE_APP_NOT_ENABLED',
+  'PERMISSION_DENIED'
+])
+const callErrorCodesThatRefresh = new Set(['QUEUE_TICKET_STATUS_NOT_WAITING'])
+const appGateCancelErrorCodes = new Set([
+  'TENANT_APP_NOT_ENABLED',
+  'STORE_APP_NOT_ENABLED',
+  'PERMISSION_DENIED'
+])
+const cancelErrorCodesThatRefresh = new Set([
+  'QUEUE_TICKET_CANNOT_CANCEL_SEATED',
+  'QUEUE_TICKET_CANNOT_CANCEL_EXPIRED'
+])
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const staffHomeRoute = computed(() => ({
@@ -98,6 +144,15 @@ const canSkipQueueTicket = computed(
 )
 const canRejoinQueueTicket = computed(
   () => reservationQueueEntry.value?.permissions.includes('queue.rejoin') ?? false
+)
+const canCallQueueTicket = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.call') ?? false
+)
+const canSeatCalledQueueTicket = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.seat') ?? false
+)
+const canCancelQueueTicket = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.cancel') ?? false
 )
 const showEmptyState = computed(
   () => !isLoading.value && !apiError.value && !!response.value && items.value.length === 0
@@ -245,6 +300,35 @@ function canShowRejoinAction(item: QueueTicketListItem): boolean {
   return canRejoinQueueTicket.value && item.queueTicketStatus === 'skipped'
 }
 
+function canShowCallAction(item: QueueTicketListItem): boolean {
+  return canCallQueueTicket.value && ['waiting', 'rejoined'].includes(item.queueTicketStatus)
+}
+
+function canShowSeatAction(item: QueueTicketListItem): boolean {
+  return canSeatCalledQueueTicket.value && item.queueTicketStatus === 'called'
+}
+
+function canShowCancelAction(item: QueueTicketListItem): boolean {
+  return (
+    canCancelQueueTicket.value &&
+    ['waiting', 'called', 'skipped', 'rejoined'].includes(item.queueTicketStatus)
+  )
+}
+
+function canShowAnyQueueAction(item: QueueTicketListItem): boolean {
+  return (
+    canShowCallAction(item) ||
+    canShowSkipAction(item) ||
+    canShowRejoinAction(item) ||
+    canShowSeatAction(item) ||
+    canShowCancelAction(item)
+  )
+}
+
+function isCallingTicket(item: QueueTicketListItem): boolean {
+  return callInFlightTicketIds.value.has(item.queueTicketId)
+}
+
 function isSkippingTicket(item: QueueTicketListItem): boolean {
   return skipInFlightTicketIds.value.has(item.queueTicketId)
 }
@@ -253,15 +337,39 @@ function isRejoiningTicket(item: QueueTicketListItem): boolean {
   return rejoinInFlightTicketIds.value.has(item.queueTicketId)
 }
 
-function confirmSkipTicket(item: QueueTicketListItem): void {
-  if (!canShowSkipAction(item) || isSkippingTicket(item)) {
+function isCancellingTicket(item: QueueTicketListItem): boolean {
+  return cancelInFlightTicketIds.value.has(item.queueTicketId)
+}
+
+function isTicketActionBusy(item: QueueTicketListItem): boolean {
+  return (
+    isCallingTicket(item) ||
+    isSkippingTicket(item) ||
+    isRejoiningTicket(item) ||
+    isCancellingTicket(item)
+  )
+}
+
+function confirmCallTicket(item: QueueTicketListItem): void {
+  if (!canShowCallAction(item) || isTicketActionBusy(item)) {
     return
   }
 
-  skipApiError.value = null
-  skipSuccess.value = null
-  rejoinApiError.value = null
-  rejoinSuccess.value = null
+  clearQueueActionMessages()
+
+  if (!globalThis.confirm(`确认叫号 #${item.queueTicketNumber}？`)) {
+    return
+  }
+
+  void executeConfirmedCall(item)
+}
+
+function confirmSkipTicket(item: QueueTicketListItem): void {
+  if (!canShowSkipAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  clearQueueActionMessages()
 
   if (!globalThis.confirm(`确认过号 #${item.queueTicketNumber}？`)) {
     return
@@ -271,14 +379,11 @@ function confirmSkipTicket(item: QueueTicketListItem): void {
 }
 
 function confirmRejoinTicket(item: QueueTicketListItem): void {
-  if (!canShowRejoinAction(item) || isRejoiningTicket(item)) {
+  if (!canShowRejoinAction(item) || isTicketActionBusy(item)) {
     return
   }
 
-  rejoinApiError.value = null
-  rejoinSuccess.value = null
-  skipApiError.value = null
-  skipSuccess.value = null
+  clearQueueActionMessages()
 
   if (!globalThis.confirm(`确认重新入队 #${item.queueTicketNumber}？`)) {
     return
@@ -287,10 +392,54 @@ function confirmRejoinTicket(item: QueueTicketListItem): void {
   void executeConfirmedRejoin(item)
 }
 
+function confirmCancelTicket(item: QueueTicketListItem): void {
+  if (!canShowCancelAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  clearQueueActionMessages()
+
+  if (!globalThis.confirm(`确认取消 #${item.queueTicketNumber}？`)) {
+    return
+  }
+
+  void executeConfirmedCancel(item)
+}
+
+async function executeConfirmedCall(item: QueueTicketListItem): Promise<void> {
+  const currentStoreId = storeId.value
+
+  if (!currentStoreId || !canShowCallAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  const idempotencyKey = createCallIdempotencyKey()
+  setCallLoading(item.queueTicketId, true)
+
+  try {
+    const result = await callQueueTicket(currentStoreId, item.queueTicketId, {}, idempotencyKey)
+    callSuccess.value = result
+    await refreshAfterQueueActionSuccess()
+  } catch (error) {
+    const resolvedError =
+      error instanceof QueueCallApiError
+        ? error.response
+        : createCallLocalError('UNKNOWN_ERROR', 'queue.call.unknown_error')
+
+    callApiError.value = resolvedError
+
+    if (shouldRefreshAfterCallError(resolvedError)) {
+      void loadQueueTickets()
+    }
+  } finally {
+    setCallLoading(item.queueTicketId, false)
+  }
+}
+
 async function executeConfirmedSkip(item: QueueTicketListItem): Promise<void> {
   const currentStoreId = storeId.value
 
-  if (!currentStoreId || !canShowSkipAction(item) || isSkippingTicket(item)) {
+  if (!currentStoreId || !canShowSkipAction(item) || isTicketActionBusy(item)) {
     return
   }
 
@@ -320,7 +469,7 @@ async function executeConfirmedSkip(item: QueueTicketListItem): Promise<void> {
 async function executeConfirmedRejoin(item: QueueTicketListItem): Promise<void> {
   const currentStoreId = storeId.value
 
-  if (!currentStoreId || !canShowRejoinAction(item) || isRejoiningTicket(item)) {
+  if (!currentStoreId || !canShowRejoinAction(item) || isTicketActionBusy(item)) {
     return
   }
 
@@ -347,21 +496,61 @@ async function executeConfirmedRejoin(item: QueueTicketListItem): Promise<void> 
   }
 }
 
-async function refreshAfterSkipSuccess(): Promise<void> {
-  const refreshed = await loadQueueTickets()
+async function executeConfirmedCancel(item: QueueTicketListItem): Promise<void> {
+  const currentStoreId = storeId.value
 
-  if (refreshed && refreshed.items.length === 0 && offset.value > 0) {
-    offset.value = Math.max(0, offset.value - refreshed.page.limit)
+  if (!currentStoreId || !canShowCancelAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  const idempotencyKey = createCancelIdempotencyKey()
+  setCancelLoading(item.queueTicketId, true)
+
+  try {
+    const result = await cancelQueueTicket(currentStoreId, item.queueTicketId, {}, idempotencyKey)
+    cancelSuccess.value = result
+    await refreshAfterQueueActionSuccess()
+  } catch (error) {
+    const resolvedError =
+      error instanceof QueueCancelApiError
+        ? error.response
+        : createCancelLocalError('UNKNOWN_ERROR', 'queue.cancel.unknown_error')
+
+    cancelApiError.value = resolvedError
+
+    if (shouldRefreshAfterCancelError(resolvedError)) {
+      void loadQueueTickets()
+    }
+  } finally {
+    setCancelLoading(item.queueTicketId, false)
   }
 }
 
-async function refreshAfterRejoinSuccess(): Promise<void> {
+async function refreshAfterQueueActionSuccess(): Promise<void> {
   const refreshed = await loadQueueTickets()
 
   if (refreshed && refreshed.items.length === 0 && offset.value > 0) {
     offset.value = Math.max(0, offset.value - refreshed.page.limit)
     await loadQueueTickets()
   }
+}
+
+async function refreshAfterSkipSuccess(): Promise<void> {
+  await refreshAfterQueueActionSuccess()
+}
+
+async function refreshAfterRejoinSuccess(): Promise<void> {
+  await refreshAfterQueueActionSuccess()
+}
+
+function shouldRefreshAfterCallError(error: QueueCallApiErrorResponse): boolean {
+  const code = error.error.code
+
+  if (appGateCallErrorCodes.has(code)) {
+    return false
+  }
+
+  return callErrorCodesThatRefresh.has(code)
 }
 
 function shouldRefreshAfterSkipError(error: QueueSkipApiErrorResponse): boolean {
@@ -382,6 +571,28 @@ function shouldRefreshAfterRejoinError(error: QueueRejoinApiErrorResponse): bool
   }
 
   return rejoinErrorCodesThatRefresh.has(code)
+}
+
+function shouldRefreshAfterCancelError(error: QueueCancelApiErrorResponse): boolean {
+  const code = error.error.code
+
+  if (appGateCancelErrorCodes.has(code)) {
+    return false
+  }
+
+  return cancelErrorCodesThatRefresh.has(code)
+}
+
+function setCallLoading(queueTicketId: string, loading: boolean): void {
+  const nextIds = new Set(callInFlightTicketIds.value)
+
+  if (loading) {
+    nextIds.add(queueTicketId)
+  } else {
+    nextIds.delete(queueTicketId)
+  }
+
+  callInFlightTicketIds.value = nextIds
 }
 
 function setSkipLoading(queueTicketId: string, loading: boolean): void {
@@ -418,6 +629,39 @@ function setRejoinLoading(queueTicketId: string, loading: boolean): void {
   rejoinInFlightTicketIds.value = nextIds
 }
 
+function setCancelLoading(queueTicketId: string, loading: boolean): void {
+  const nextIds = new Set(cancelInFlightTicketIds.value)
+
+  if (loading) {
+    nextIds.add(queueTicketId)
+  } else {
+    nextIds.delete(queueTicketId)
+  }
+
+  cancelInFlightTicketIds.value = nextIds
+}
+
+function clearQueueActionMessages(): void {
+  callApiError.value = null
+  callSuccess.value = null
+  skipApiError.value = null
+  skipSuccess.value = null
+  rejoinApiError.value = null
+  rejoinSuccess.value = null
+  cancelApiError.value = null
+  cancelSuccess.value = null
+}
+
+function createCallIdempotencyKey(): string {
+  const prefix = 'queue:call'
+
+  if (globalThis.crypto && 'randomUUID' in globalThis.crypto) {
+    return `${prefix}:${globalThis.crypto.randomUUID()}`
+  }
+
+  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+}
+
 function createIdempotencyKey(): string {
   const prefix = 'queue:skip'
 
@@ -436,6 +680,28 @@ function createRejoinIdempotencyKey(): string {
   }
 
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+}
+
+function createCancelIdempotencyKey(): string {
+  const prefix = 'queue:cancel'
+
+  if (globalThis.crypto && 'randomUUID' in globalThis.crypto) {
+    return `${prefix}:${globalThis.crypto.randomUUID()}`
+  }
+
+  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+}
+
+function queueSeatRoute(item: QueueTicketListItem): RouteLocationRaw {
+  return {
+    name: 'seating-from-called-queue',
+    params: {
+      storeId: storeId.value
+    },
+    query: {
+      queueTicketId: item.queueTicketId
+    }
+  }
 }
 
 function formatStoreDateTime(value: string | null | undefined): string {
@@ -474,6 +740,16 @@ function optionalDisplay(value: string | null | undefined): string {
   return value?.trim() ? value : '未返回'
 }
 
+function assignedResourceText(item: QueueTicketListItem): string {
+  const code = item.assignedResourceCode?.trim()
+
+  if (!code) {
+    return '未指定'
+  }
+
+  return item.assignedResourceType === 'table_group' ? `桌组 ${code}` : `桌号 ${code}`
+}
+
 function isCalledTicket(item: QueueTicketListItem): boolean {
   return item.queueTicketStatus === 'called'
 }
@@ -489,7 +765,35 @@ function createLocalError(code: string, messageKey: string): QueueTicketListApiE
   }
 }
 
+function createCallLocalError(code: string, messageKey: string): QueueCallApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
 function createSkipLocalError(code: string, messageKey: string): QueueSkipApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
+function createCancelLocalError(code: string, messageKey: string): QueueCancelApiErrorResponse {
   return {
     success: false,
     error: {
@@ -562,6 +866,12 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
       <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
     </section>
 
+    <section v-if="callApiError" class="state-panel error-panel" aria-live="assertive">
+      <h2>叫号失败</h2>
+      <p class="error-code">错误代码：{{ callApiError.error.code }}</p>
+      <p class="message-key">消息键：{{ callApiError.error.messageKey }}</p>
+    </section>
+
     <section v-if="skipApiError" class="state-panel error-panel" aria-live="assertive">
       <h2>过号失败</h2>
       <p class="error-code">错误代码：{{ skipApiError.error.code }}</p>
@@ -574,6 +884,17 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
       <p class="message-key">消息键：{{ rejoinApiError.error.messageKey }}</p>
     </section>
 
+    <section v-if="cancelApiError" class="state-panel error-panel" aria-live="assertive">
+      <h2>取消失败</h2>
+      <p class="error-code">错误代码：{{ cancelApiError.error.code }}</p>
+      <p class="message-key">消息键：{{ cancelApiError.error.messageKey }}</p>
+    </section>
+
+    <section v-if="callSuccess" class="state-panel success-panel" aria-live="polite">
+      <h2>{{ callSuccess.alreadyCalled ? '叫号已完成' : '叫号成功' }}</h2>
+      <p>排队号码 #{{ callSuccess.queueTicketNumber }}，保留到 {{ formatStoreDateTime(callSuccess.holdUntilAt) }}</p>
+    </section>
+
     <section v-if="skipSuccess" class="state-panel success-panel" aria-live="polite">
       <h2>{{ skipSuccess.alreadySkipped ? '过号已完成' : '过号成功' }}</h2>
       <p>排队号码 #{{ skipSuccess.queueTicketNumber }}</p>
@@ -582,6 +903,11 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
     <section v-if="rejoinSuccess" class="state-panel success-panel" aria-live="polite">
       <h2>{{ rejoinSuccess.alreadyRejoined ? '重新入队已完成' : '重新入队成功' }}</h2>
       <p>排队号码 #{{ rejoinSuccess.queueTicketNumber }}</p>
+    </section>
+
+    <section v-if="cancelSuccess" class="state-panel success-panel" aria-live="polite">
+      <h2>{{ cancelSuccess.alreadyCancelled ? '取消已完成' : '取消成功' }}</h2>
+      <p>排队号码 #{{ cancelSuccess.queueTicketNumber }}</p>
     </section>
 
     <section v-if="showEmptyState" class="state-panel" aria-live="polite">
@@ -609,15 +935,24 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
         <p class="raw-status">状态代码：{{ item.queueTicketStatus }}</p>
 
         <section
-          v-if="canShowSkipAction(item) || canShowRejoinAction(item)"
+          v-if="canShowAnyQueueAction(item)"
           class="card-actions"
           aria-label="排队票操作"
         >
           <button
+            v-if="canShowCallAction(item)"
+            class="call-button"
+            type="button"
+            :disabled="isTicketActionBusy(item)"
+            @click="confirmCallTicket(item)"
+          >
+            {{ isCallingTicket(item) ? '叫号中...' : '叫号' }}
+          </button>
+          <button
             v-if="canShowSkipAction(item)"
             class="skip-button"
             type="button"
-            :disabled="isSkippingTicket(item)"
+            :disabled="isTicketActionBusy(item)"
             @click="confirmSkipTicket(item)"
           >
             {{ isSkippingTicket(item) ? '过号中...' : '过号' }}
@@ -626,10 +961,26 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
             v-if="canShowRejoinAction(item)"
             class="rejoin-button"
             type="button"
-            :disabled="isRejoiningTicket(item)"
+            :disabled="isTicketActionBusy(item)"
             @click="confirmRejoinTicket(item)"
           >
             {{ isRejoiningTicket(item) ? '入队中...' : '重新入队' }}
+          </button>
+          <RouterLink
+            v-if="canShowSeatAction(item)"
+            class="seat-link"
+            :to="queueSeatRoute(item)"
+          >
+            {{ seatActionLabel.label }}
+          </RouterLink>
+          <button
+            v-if="canShowCancelAction(item)"
+            class="cancel-button"
+            type="button"
+            :disabled="isTicketActionBusy(item)"
+            @click="confirmCancelTicket(item)"
+          >
+            {{ isCancellingTicket(item) ? '取消中...' : '取消' }}
           </button>
         </section>
 
@@ -649,6 +1000,10 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
           <div>
             <dt>预约状态</dt>
             <dd>{{ optionalDisplay(item.reservationStatus) }}</dd>
+          </div>
+          <div>
+            <dt>指定桌号</dt>
+            <dd>{{ assignedResourceText(item) }}</dd>
           </div>
           <div>
             <dt>客户姓名</dt>
@@ -822,21 +1177,34 @@ h2 {
 }
 
 .card-actions {
-  display: flex;
+  display: grid;
   gap: 8px;
-  justify-content: flex-end;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.call-button,
 .skip-button,
-.rejoin-button {
+.rejoin-button,
+.seat-link,
+.cancel-button {
+  align-items: center;
   background: #fff7ed;
   border: 1px solid #fdba74;
   border-radius: 8px;
   color: #c2410c;
+  display: inline-flex;
   font-weight: 800;
+  justify-content: center;
   min-height: 42px;
-  min-width: 88px;
   padding: 0 14px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.call-button {
+  background: #eaf2ff;
+  border-color: #bfdbfe;
+  color: #315f91;
 }
 
 .rejoin-button {
@@ -845,8 +1213,22 @@ h2 {
   color: #176b4d;
 }
 
+.seat-link {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #047857;
+}
+
+.cancel-button {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.call-button:disabled,
 .skip-button:disabled,
-.rejoin-button:disabled {
+.rejoin-button:disabled,
+.cancel-button:disabled {
   background: #f1f5f9;
   border-color: #cbd5e1;
   color: #94a3b8;

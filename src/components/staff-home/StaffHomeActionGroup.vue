@@ -5,6 +5,7 @@ defineProps<{
   actions: StaffHomeActionItem[]
   groupId: string
   heading: string
+  layout?: 'two' | 'three'
 }>()
 </script>
 
@@ -12,7 +13,13 @@ defineProps<{
   <section v-if="actions.length" class="action-section" :aria-labelledby="groupId">
     <h2 :id="groupId" class="section-title">{{ heading }}</h2>
 
-    <div class="action-grid" :class="{ 'single-action-grid': actions.length === 1 }">
+    <div
+      class="action-grid"
+      :class="{
+        'single-action-grid': actions.length === 1,
+        'three-action-grid': layout === 'three'
+      }"
+    >
       <RouterLink
         v-for="action in actions"
         :key="action.id"
@@ -65,6 +72,10 @@ defineProps<{
 
 .single-action-grid {
   grid-template-columns: 1fr;
+}
+
+.three-action-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .operation-link {

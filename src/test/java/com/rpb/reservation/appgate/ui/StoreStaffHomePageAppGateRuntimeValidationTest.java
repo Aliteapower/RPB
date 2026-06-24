@@ -46,6 +46,7 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
         assertAppearsInOrder(
             source,
             "const receptionActions",
+            "label: '现场取号'",
             "label: '散客直接入座'",
             "label: '预约到店'",
             "const reservationActions",
@@ -63,15 +64,15 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
         assertThat(source)
             .contains("walkInRoute")
+            .contains("walkInQueueRoute")
             .contains("cleaningRoute")
             .contains("reservationRoute")
             .contains("reservationTodayViewRoute")
             .contains("reservationConfirmedTodayRoute")
             .contains("reservationArrivedToQueueRoute")
             .contains("queueTicketListRoute")
-            .contains("queueCallRoute")
-            .contains("seatingFromCalledQueueRoute")
             .contains("reservationArrivedTodayRoute")
+            .contains(":layout=\"'three'\"")
             .contains("status: 'confirmed'")
             .contains("status: 'arrived'")
             .contains("group-id=\"staff-section-reception\"")

@@ -28,6 +28,7 @@ import com.rpb.reservation.idempotency.status.IdempotencyStatus;
 import com.rpb.reservation.reservation.application.ReservationCreateError;
 import com.rpb.reservation.reservation.application.ReservationCreateResult;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
 import com.rpb.reservation.reservation.application.rule.ReservationAvailabilityRule;
 import com.rpb.reservation.reservation.application.rule.ReservationCodePolicy;
@@ -35,6 +36,7 @@ import com.rpb.reservation.reservation.application.rule.ReservationDuplicateRule
 import com.rpb.reservation.reservation.application.rule.ReservationHoldPolicy;
 import com.rpb.reservation.reservation.application.rule.ReservationTimeRangeRule;
 import com.rpb.reservation.reservation.domain.Reservation;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationCode;
 import com.rpb.reservation.reservation.value.ReservationId;
@@ -42,6 +44,14 @@ import com.rpb.reservation.store.application.port.out.StorePolicyRepositoryPort;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.store.domain.StorePolicy;
+import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
+import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
+import com.rpb.reservation.table.domain.DiningTable;
+import com.rpb.reservation.table.domain.TableGroup;
+import com.rpb.reservation.table.status.DiningTableStatus;
+import com.rpb.reservation.table.status.TableGroupStatus;
+import com.rpb.reservation.table.value.TableGroupId;
+import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -76,6 +86,9 @@ public class ReservationCreateApplicationService {
     private final StorePolicyRepositoryPort storePolicyRepository;
     private final CustomerRepositoryPort customerRepository;
     private final ReservationRepositoryPort reservationRepository;
+    private final ReservationPreassignmentRepositoryPort preassignmentRepository;
+    private final DiningTableRepositoryPort diningTableRepository;
+    private final TableGroupRepositoryPort tableGroupRepository;
     private final BusinessEventRepositoryPort businessEventRepository;
     private final StateTransitionLogRepositoryPort stateTransitionLogRepository;
     private final AuditLogRepositoryPort auditLogRepository;
@@ -98,6 +111,9 @@ public class ReservationCreateApplicationService {
         StorePolicyRepositoryPort storePolicyRepository,
         CustomerRepositoryPort customerRepository,
         ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
@@ -109,6 +125,9 @@ public class ReservationCreateApplicationService {
             storePolicyRepository,
             customerRepository,
             reservationRepository,
+            preassignmentRepository,
+            diningTableRepository,
+            tableGroupRepository,
             businessEventRepository,
             stateTransitionLogRepository,
             auditLogRepository,
@@ -123,6 +142,9 @@ public class ReservationCreateApplicationService {
         StorePolicyRepositoryPort storePolicyRepository,
         CustomerRepositoryPort customerRepository,
         ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
@@ -135,6 +157,9 @@ public class ReservationCreateApplicationService {
             storePolicyRepository,
             customerRepository,
             reservationRepository,
+            preassignmentRepository,
+            diningTableRepository,
+            tableGroupRepository,
             businessEventRepository,
             stateTransitionLogRepository,
             auditLogRepository,
@@ -149,6 +174,9 @@ public class ReservationCreateApplicationService {
         StorePolicyRepositoryPort storePolicyRepository,
         CustomerRepositoryPort customerRepository,
         ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
@@ -160,6 +188,9 @@ public class ReservationCreateApplicationService {
         this.storePolicyRepository = storePolicyRepository;
         this.customerRepository = customerRepository;
         this.reservationRepository = reservationRepository;
+        this.preassignmentRepository = preassignmentRepository;
+        this.diningTableRepository = diningTableRepository;
+        this.tableGroupRepository = tableGroupRepository;
         this.businessEventRepository = businessEventRepository;
         this.stateTransitionLogRepository = stateTransitionLogRepository;
         this.auditLogRepository = auditLogRepository;
@@ -230,7 +261,9 @@ public class ReservationCreateApplicationService {
             normalize(command.actorType()),
             normalize(command.reservationCode()),
             normalize(command.source()),
-            normalize(command.reasonCode())
+            normalize(command.reasonCode()),
+            value(command.tableId()),
+            value(command.tableGroupId())
         );
         return sha256(normalized);
     }
@@ -270,6 +303,8 @@ public class ReservationCreateApplicationService {
             throw new ApplicationFailure(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT);
         }
 
+        ResourceSelection resourceSelection = resolveResourceSelection(command, scope, partySize, businessDate, timeRange);
+
         ReservationCode reservationCode = resolveReservationCode(command, businessDate, scope);
         Instant persistedAt = Instant.now(clock);
         Reservation reservation = saveReservation(
@@ -284,6 +319,7 @@ public class ReservationCreateApplicationService {
             holdUntilAt,
             persistedAt
         );
+        savePreassignment(scope, reservation, resourceSelection);
 
         List<UUID> eventIds = appendBusinessEvents(scope, command, reservation, started.idempotencyKey());
         List<UUID> transitionIds = appendTransitionLogs(scope, command, reservation, started.idempotencyKey());
@@ -403,6 +439,92 @@ public class ReservationCreateApplicationService {
                     persistedAt,
                     persistedAt,
                     null
+                )
+            );
+        } catch (RuntimeException exception) {
+            throw new ApplicationFailure(ReservationCreateError.REPOSITORY_SAVE_FAILED);
+        }
+    }
+
+    private ResourceSelection resolveResourceSelection(
+        CreateReservationCommand command,
+        StoreScope scope,
+        PartySize partySize,
+        BusinessDate businessDate,
+        TimeRange timeRange
+    ) {
+        if (command.tableId() != null && command.tableGroupId() != null) {
+            throw new ApplicationFailure(ReservationCreateError.RESOURCE_SELECTION_CONFLICT);
+        }
+        if (command.tableId() != null) {
+            DiningTable table = diningTableRepository.findById(scope, new TableId(command.tableId()))
+                .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.TABLE_NOT_FOUND));
+            if (table.status() == DiningTableStatus.INACTIVE) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_NOT_AVAILABLE);
+            }
+            if (!table.capacity().includes(partySize)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_CAPACITY_INSUFFICIENT);
+            }
+            if (hasActivePreassignmentConflict(scope, "dining_table", command.tableId(), businessDate, timeRange)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_NOT_AVAILABLE);
+            }
+            return new ResourceSelection("dining_table", command.tableId());
+        }
+        if (command.tableGroupId() != null) {
+            TableGroup group = tableGroupRepository.findById(scope, new TableGroupId(command.tableGroupId()))
+                .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.TABLE_GROUP_NOT_FOUND));
+            if (group.status() != TableGroupStatus.ACTIVE) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_INVALID);
+            }
+            if (!group.capacity().includes(partySize)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_CAPACITY_INSUFFICIENT);
+            }
+            if (hasActivePreassignmentConflict(scope, "table_group", command.tableGroupId(), businessDate, timeRange)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_INVALID);
+            }
+            return new ResourceSelection("table_group", command.tableGroupId());
+        }
+        return null;
+    }
+
+    private boolean hasActivePreassignmentConflict(
+        StoreScope scope,
+        String resourceType,
+        UUID resourceId,
+        BusinessDate businessDate,
+        TimeRange timeRange
+    ) {
+        try {
+            return preassignmentRepository.existsActiveResourceConflict(
+                scope,
+                resourceType,
+                resourceId,
+                businessDate,
+                timeRange
+            );
+        } catch (RuntimeException exception) {
+            throw new ApplicationFailure(ReservationCreateError.PERSISTENCE_ERROR);
+        }
+    }
+
+    private void savePreassignment(
+        StoreScope scope,
+        Reservation reservation,
+        ResourceSelection resourceSelection
+    ) {
+        if (resourceSelection == null) {
+            return;
+        }
+        try {
+            preassignmentRepository.save(
+                scope,
+                new ReservationPreassignment(
+                    UUID.randomUUID(),
+                    scope,
+                    reservation.id(),
+                    resourceSelection.resourceType(),
+                    resourceSelection.resourceId(),
+                    "active"
                 )
             );
         } catch (RuntimeException exception) {
@@ -614,6 +736,9 @@ public class ReservationCreateApplicationService {
         if (command.reservedStartAt() == null) {
             return ReservationCreateError.INVALID_TIME_RANGE;
         }
+        if (command.tableId() != null && command.tableGroupId() != null) {
+            return ReservationCreateError.RESOURCE_SELECTION_CONFLICT;
+        }
         return null;
     }
 
@@ -733,6 +858,9 @@ public class ReservationCreateApplicationService {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private record ResourceSelection(String resourceType, UUID resourceId) {
     }
 
     private static final class ApplicationFailure extends RuntimeException {

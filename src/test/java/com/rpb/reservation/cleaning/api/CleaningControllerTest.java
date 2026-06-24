@@ -340,9 +340,11 @@ class CleaningControllerTest {
             .filteredOn(path -> path.endsWith("Controller.java"))
             .containsExactlyInAnyOrder(
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInDirectSeatingController.java",
+                "src/main/java/com/rpb/reservation/walkin/api/WalkInQueueController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
                 "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+                "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueTicketListController.java",
@@ -391,12 +393,12 @@ class CleaningControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
                 "src/pages/TableResourceListPage.vue",
-                "src/pages/WalkInDirectSeatingPage.vue"
+                "src/pages/WalkInDirectSeatingPage.vue",
+                "src/pages/WalkInQueuePage.vue"
             );
         assertThat(vueFiles)
             .filteredOn(path -> !Set.of(
@@ -406,8 +408,8 @@ class CleaningControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
+                "src/pages/WalkInQueuePage.vue",
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
@@ -435,6 +437,13 @@ class CleaningControllerTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",

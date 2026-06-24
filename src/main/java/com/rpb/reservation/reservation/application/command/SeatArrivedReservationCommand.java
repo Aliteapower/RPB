@@ -1,5 +1,6 @@
 package com.rpb.reservation.reservation.application.command;
 
+import java.util.List;
 import java.util.UUID;
 
 public record SeatArrivedReservationCommand(
@@ -8,6 +9,7 @@ public record SeatArrivedReservationCommand(
     UUID reservationId,
     UUID tableId,
     UUID tableGroupId,
+    List<UUID> temporaryTableIds,
     String idempotencyKey,
     UUID actorId,
     String actorType,
@@ -15,4 +17,8 @@ public record SeatArrivedReservationCommand(
     String overrideNote,
     String note
 ) {
+
+    public SeatArrivedReservationCommand {
+        temporaryTableIds = temporaryTableIds == null ? List.of() : List.copyOf(temporaryTableIds);
+    }
 }

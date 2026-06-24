@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import type { ReservationTodayViewItem } from '../../types/reservationTodayView'
 
 const cancellableStatuses = new Set(['draft', 'confirmed'])
+const noShowableStatuses = new Set(['confirmed'])
 
 const statusLabels: Record<string, string> = {
   confirmed: '已预约',
@@ -15,23 +16,33 @@ const statusLabels: Record<string, string> = {
   draft: '草稿'
 }
 
+const queueStatusLabels: Record<string, string> = {
+  waiting: '排队中',
+  called: '已叫号',
+  skipped: '已过号',
+  rejoined: '已重回',
+  seated: '已入座',
+  cancelled: '排队已取消',
+  expired: '排队已过期'
+}
+
 const props = defineProps<{
   canCancelReservation: boolean
+  canNoShowReservation: boolean
   canRunCurrentDayActions: boolean
-  canSwitchTable: boolean
   item: ReservationTodayViewItem
   isCancelling?: boolean
   isCheckingIn?: boolean
+  isNoShowing?: boolean
   isSeating?: boolean
-  isSwitching?: boolean
   storeTimezone: string
 }>()
 
 const emit = defineEmits<{
   'cancel-requested': [item: ReservationTodayViewItem]
   'check-in-requested': [item: ReservationTodayViewItem]
+  'no-show-requested': [item: ReservationTodayViewItem]
   'seat-requested': [item: ReservationTodayViewItem]
-  'switch-table-requested': [item: ReservationTodayViewItem]
 }>()
 
 const customerName = computed(() => {
@@ -47,11 +58,11 @@ const statusText = computed(() => statusLabels[props.item.status] ?? props.item.
 const statusClass = computed(() => `status-${props.item.status.replace(/_/g, '-')}`)
 const showCheckIn = computed(() => props.item.status === 'confirmed')
 const showSeat = computed(() => props.item.status === 'arrived')
-const showSwitchTable = computed(() => props.item.status === 'seated' && !!props.item.seatingId)
+const showNoShow = computed(() => noShowableStatuses.has(props.item.status))
 const canCheckIn = computed(() => showCheckIn.value && props.canRunCurrentDayActions)
 const canSeat = computed(() => showSeat.value && props.canRunCurrentDayActions)
-const canSwitchTableAction = computed(
-  () => showSwitchTable.value && props.canSwitchTable && props.canRunCurrentDayActions
+const canNoShowAction = computed(
+  () => showNoShow.value && props.canNoShowReservation && props.canRunCurrentDayActions
 )
 const canCancel = computed(
   () => props.canCancelReservation && cancellableStatuses.has(props.item.status)
@@ -60,17 +71,47 @@ const currentDayActionTitle = computed(() =>
   props.canRunCurrentDayActions ? undefined : '仅当日预约可以操作'
 )
 const tableAssignmentText = computed(() => {
-  const code = props.item.currentResourceCode?.trim()
+  const currentCode = props.item.currentResourceCode?.trim()
 
-  if (code) {
-    return `桌号：${code}`
+  if (currentCode) {
+    const label = props.item.status === 'completed' ? '已完成' : '已入桌'
+    return `桌号：${currentCode}（${label}）`
   }
 
-  return props.item.status === 'seated' ? '桌号：已入桌' : '桌号：未分配'
+  const assignedCode = props.item.assignedResourceCode?.trim()
+
+  if (assignedCode) {
+    const label = props.item.assignedResourceType === 'table_group' ? '桌组' : '桌号'
+    return `${label}：${assignedCode}（预约指定）`
+  }
+
+  return props.item.status === 'seated' ? '桌号：已入桌' : '桌号：未指定'
+})
+const queueAssignmentText = computed(() => {
+  if (!props.item.queueTicketId) {
+    return null
+  }
+
+  const status = props.item.queueTicketStatus?.trim()
+  const statusText = status ? queueStatusLabels[status] ?? status : '已排队'
+  const numberText =
+    typeof props.item.queueTicketNumber === 'number'
+      ? `#${props.item.queueTicketNumber}`
+      : '排队票'
+
+  return `${numberText} · ${statusText}`
 })
 
 function requestCancel(): void {
   emit('cancel-requested', props.item)
+}
+
+function requestNoShow(): void {
+  if (!canNoShowAction.value) {
+    return
+  }
+
+  emit('no-show-requested', props.item)
 }
 
 function requestCheckIn(): void {
@@ -87,14 +128,6 @@ function requestSeat(): void {
   }
 
   emit('seat-requested', props.item)
-}
-
-function requestSwitchTable(): void {
-  if (!canSwitchTableAction.value) {
-    return
-  }
-
-  emit('switch-table-requested', props.item)
 }
 
 function formatStoreTime(value: string): string {
@@ -129,6 +162,7 @@ function optionalDisplay(value: string | null | undefined): string {
       </div>
       <p>{{ timeRange }}</p>
       <p>{{ item.partySize }}人 · {{ tableAssignmentText }}</p>
+      <p v-if="queueAssignmentText">{{ queueAssignmentText }}</p>
     </div>
 
     <div class="reservation-today-list-item__actions" aria-label="预约操作">
@@ -159,14 +193,14 @@ function optionalDisplay(value: string | null | undefined): string {
       </button>
 
       <button
-        v-if="showSwitchTable && canSwitchTable"
-        class="reservation-today-list-item__action reservation-today-list-item__action--secondary"
-        :disabled="!canSwitchTableAction || isSwitching"
+        v-if="showNoShow && canNoShowReservation"
+        class="reservation-today-list-item__action reservation-today-list-item__action--danger"
+        :disabled="!canNoShowAction || isNoShowing"
         :title="currentDayActionTitle"
         type="button"
-        @click="requestSwitchTable"
+        @click="requestNoShow"
       >
-        {{ isSwitching ? '换桌中' : '换桌' }}
+        {{ isNoShowing ? '爽约中' : '爽约' }}
       </button>
 
       <button
@@ -240,7 +274,7 @@ function optionalDisplay(value: string | null | undefined): string {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
-  max-width: 164px;
+  max-width: 214px;
 }
 
 .reservation-today-list-item__status,

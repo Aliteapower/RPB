@@ -16,7 +16,21 @@ public record TableResourceItemResponse(
     String selectionDisabledReason,
     List<String> memberTableCodes,
     UUID currentSeatingId,
-    UUID currentCleaningId
+    UUID currentCleaningId,
+    UUID currentReservationId,
+    Integer currentPartySize,
+    UUID preassignedReservationId,
+    String preassignedReservationCode,
+    String preassignedCustomerName,
+    String preassignedPhoneMasked,
+    String preassignedReservationStatus,
+    Integer preassignedPartySize,
+    java.time.Instant preassignedStartAt,
+    java.time.Instant preassignedEndAt,
+    String preassignedResourceCode,
+    UUID preassignedQueueTicketId,
+    Integer preassignedQueueTicketNumber,
+    String preassignedQueueTicketStatus
 ) {
 
     public TableResourceItemResponse {

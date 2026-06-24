@@ -7,8 +7,17 @@ import com.rpb.reservation.cleaning.domain.Cleaning;
 import com.rpb.reservation.cleaning.status.CleaningStatus;
 import com.rpb.reservation.cleaning.value.CleaningId;
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.common.time.BusinessDate;
+import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.common.value.CapacityRange;
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceTarget;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
+import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
+import com.rpb.reservation.store.domain.Store;
+import com.rpb.reservation.store.domain.StorePolicy;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
@@ -26,9 +35,16 @@ import com.rpb.reservation.table.status.TableGroupStatus;
 import com.rpb.reservation.table.value.TableGroupId;
 import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -57,18 +73,25 @@ class TableResourceListApplicationServiceTest {
         tableGroups.groups.add(group(GROUP_VIP_ID, "VIP-1", 8, 12, TableGroupStatus.ACTIVE));
         tableGroups.members.add(member(GROUP_VIP_ID, TABLE_A1_ID));
         tableGroups.members.add(member(GROUP_VIP_ID, TABLE_A2_ID));
+        UUID reservationId = UUID.fromString("50000000-0000-0000-0000-000000001201");
         FakeSeatingRepository seatings = new FakeSeatingRepository();
         seatings.activeOccupancies.add(new ActiveOccupancy(
             DINING_TABLE_TYPE,
             TABLE_A2_ID.value(),
-            new Seating(SEATING_ID, SCOPE, "walk_in", UUID.randomUUID(), "S-1", new PartySize(4), SeatingStatus.OCCUPIED)
+            new Seating(SEATING_ID, SCOPE, "reservation", reservationId, "S-1", new PartySize(4), SeatingStatus.OCCUPIED)
         ));
         FakeCleaningRepository cleanings = new FakeCleaningRepository();
         cleanings.activeCleanings.add(new Cleaning(CLEANING_ID, SCOPE, SEATING_ID, DINING_TABLE_TYPE, UUID.fromString("70000000-0000-0000-0000-000000001203"), CleaningStatus.CLEANING));
 
-        TableResourceListApplicationService service = new TableResourceListApplicationService(diningTables, tableGroups, seatings, cleanings);
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            tableGroups,
+            seatings,
+            cleanings,
+            new FakeReservationPreassignmentRepository()
+        );
 
-        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, true));
+        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, true, null));
 
         assertThat(result.success()).isTrue();
         assertThat(result.resources()).extracting(TableResourceItem::code)
@@ -82,9 +105,90 @@ class TableResourceListApplicationServiceTest {
         assertThat(result.resources().get(1).areaName()).isEqualTo("A区");
         assertThat(result.resources().get(1).selectionDisabledReason()).isEqualTo("status_unavailable");
         assertThat(result.resources().get(1).currentSeatingId()).isEqualTo(SEATING_ID.value());
+        assertThat(result.resources().get(1).currentReservationId()).isEqualTo(reservationId);
+        assertThat(result.resources().get(1).currentPartySize()).isEqualTo(4);
         assertThat(result.resources().get(2).currentCleaningId()).isEqualTo(CLEANING_ID.value());
         assertThat(result.resources().get(3).resourceType()).isEqualTo("table_group");
         assertThat(result.resources().get(3).memberTableCodes()).containsExactly("A01", "A02");
+    }
+
+    @Test
+    void doesNotExposeCompletedSeatingAsSwitchableCurrentOccupancy() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01", "A区", 1, 4, "occupied"));
+        UUID reservationId = UUID.fromString("50000000-0000-0000-0000-000000001299");
+        FakeSeatingRepository seatings = new FakeSeatingRepository();
+        seatings.activeOccupancies.add(new ActiveOccupancy(
+            DINING_TABLE_TYPE,
+            TABLE_A1_ID.value(),
+            new Seating(SEATING_ID, SCOPE, "reservation", reservationId, "S-1", new PartySize(2), SeatingStatus.COMPLETED)
+        ));
+
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            new FakeTableGroupRepository(),
+            seatings,
+            new FakeCleaningRepository(),
+            new FakeReservationPreassignmentRepository()
+        );
+
+        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, false, null));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resources()).hasSize(1);
+        TableResourceItem table = result.resources().getFirst();
+        assertThat(table.status()).isEqualTo("occupied");
+        assertThat(table.selectable()).isFalse();
+        assertThat(table.currentSeatingId()).isNull();
+        assertThat(table.currentReservationId()).isNull();
+        assertThat(table.currentPartySize()).isNull();
+    }
+
+    @Test
+    void futureBusinessDateTreatsCurrentOccupancyAndCleaningAsAvailableWhenNotPreassigned() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01", "A区", 1, 4, "occupied"));
+        diningTables.rows.add(tableRow(TABLE_A2_ID, "A02", "A02", "A区", 2, 6, "cleaning"));
+        diningTables.rows.add(tableRow(new TableId(UUID.fromString("70000000-0000-0000-0000-000000001204")), "A03", "A03", "A区", 2, 6, "inactive"));
+        FakeSeatingRepository seatings = new FakeSeatingRepository();
+        seatings.activeOccupancies.add(new ActiveOccupancy(
+            DINING_TABLE_TYPE,
+            TABLE_A1_ID.value(),
+            new Seating(SEATING_ID, SCOPE, "walk_in", UUID.randomUUID(), "S-1", new PartySize(4), SeatingStatus.OCCUPIED)
+        ));
+        FakeCleaningRepository cleanings = new FakeCleaningRepository();
+        cleanings.activeCleanings.add(new Cleaning(CLEANING_ID, SCOPE, SEATING_ID, DINING_TABLE_TYPE, TABLE_A2_ID.value(), CleaningStatus.CLEANING));
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            new FakeTableGroupRepository(),
+            seatings,
+            cleanings,
+            new FakeReservationPreassignmentRepository(),
+            new FakeStoreRepository(),
+            Clock.fixed(Instant.parse("2026-06-24T02:00:00Z"), ZoneOffset.UTC)
+        );
+
+        TableResourceListResult result = service.listResources(
+            new TableResourceListQuery(SCOPE, null, null, false, new BusinessDate(LocalDate.of(2026, 6, 30)))
+        );
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resources()).extracting(TableResourceItem::code).containsExactly("A01", "A02", "A03");
+        assertThat(result.resources().get(0).status()).isEqualTo("available");
+        assertThat(result.resources().get(0).selectable()).isTrue();
+        assertThat(result.resources().get(0).currentSeatingId()).isNull();
+        assertThat(result.resources().get(1).status()).isEqualTo("available");
+        assertThat(result.resources().get(1).selectable()).isTrue();
+        assertThat(result.resources().get(1).currentCleaningId()).isNull();
+        assertThat(result.resources().get(2).status()).isEqualTo("inactive");
+        assertThat(result.resources().get(2).selectable()).isFalse();
+
+        TableResourceListResult availableResult = service.listResources(
+            new TableResourceListQuery(SCOPE, "available", null, false, new BusinessDate(LocalDate.of(2026, 6, 30)))
+        );
+
+        assertThat(availableResult.success()).isTrue();
+        assertThat(availableResult.resources()).extracting(TableResourceItem::code).containsExactly("A01", "A02");
     }
 
     @Test
@@ -99,10 +203,11 @@ class TableResourceListApplicationServiceTest {
             diningTables,
             tableGroups,
             new FakeSeatingRepository(),
-            new FakeCleaningRepository()
+            new FakeCleaningRepository(),
+            new FakeReservationPreassignmentRepository()
         );
 
-        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, "available", 4, true));
+        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, "available", 4, true, null));
 
         assertThat(result.success()).isTrue();
         assertThat(result.resources()).extracting(TableResourceItem::code).containsExactly("A01");
@@ -116,13 +221,137 @@ class TableResourceListApplicationServiceTest {
             new FakeDiningTableRepository(),
             new FakeTableGroupRepository(),
             new FakeSeatingRepository(),
-            new FakeCleaningRepository()
+            new FakeCleaningRepository(),
+            new FakeReservationPreassignmentRepository()
         );
 
-        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, true));
+        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, true, null));
 
         assertThat(result.success()).isTrue();
         assertThat(result.resources()).isEmpty();
+    }
+
+    @Test
+    void overlaysActiveReservationPreassignmentsForSelectedBusinessDate() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01", "A区", 1, 4, "available"));
+        diningTables.rows.add(tableRow(TABLE_A2_ID, "A02", "A02", "A区", 2, 6, "available"));
+        FakeReservationPreassignmentRepository preassignments = new FakeReservationPreassignmentRepository();
+        UUID reservationId = UUID.fromString("50000000-0000-0000-0000-000000001201");
+        UUID queueTicketId = UUID.fromString("52000000-0000-0000-0000-000000001201");
+        preassignments.assignments.add(new ReservationResourceAssignment(
+            reservationId,
+            "R-TABLE-1201",
+            "arrived",
+            3,
+            java.time.Instant.parse("2030-06-20T10:00:00Z"),
+            java.time.Instant.parse("2030-06-20T11:30:00Z"),
+            "王先生",
+            "****1201",
+            DINING_TABLE_TYPE,
+            TABLE_A1_ID.value(),
+            "A01",
+            queueTicketId,
+            8,
+            "called"
+        ));
+
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            new FakeTableGroupRepository(),
+            new FakeSeatingRepository(),
+            new FakeCleaningRepository(),
+            preassignments
+        );
+
+        TableResourceListResult result = service.listResources(
+            new TableResourceListQuery(SCOPE, null, null, true, new BusinessDate(java.time.LocalDate.of(2030, 6, 20)))
+        );
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resources()).extracting(TableResourceItem::code).containsExactly("A01", "A02");
+        assertThat(result.resources().get(0).status()).isEqualTo("reserved");
+        assertThat(result.resources().get(0).selectable()).isFalse();
+        assertThat(result.resources().get(0).selectionDisabledReason()).isEqualTo("reservation_preassigned");
+        assertThat(result.resources().get(0).preassignedReservationId()).isEqualTo(reservationId);
+        assertThat(result.resources().get(0).preassignedReservationCode()).isEqualTo("R-TABLE-1201");
+        assertThat(result.resources().get(0).preassignedCustomerName()).isEqualTo("王先生");
+        assertThat(result.resources().get(0).preassignedPhoneMasked()).isEqualTo("****1201");
+        assertThat(result.resources().get(0).preassignedReservationStatus()).isEqualTo("arrived");
+        assertThat(result.resources().get(0).preassignedPartySize()).isEqualTo(3);
+        assertThat(result.resources().get(0).preassignedResourceCode()).isEqualTo("A01");
+        assertThat(result.resources().get(0).preassignedQueueTicketId()).isEqualTo(queueTicketId);
+        assertThat(result.resources().get(0).preassignedQueueTicketNumber()).isEqualTo(8);
+        assertThat(result.resources().get(0).preassignedQueueTicketStatus()).isEqualTo("called");
+        assertThat(result.resources().get(1).status()).isEqualTo("available");
+    }
+
+    @Test
+    void ignoresSeatedPreassignmentWhenReservationNoLongerOccupiesThatResource() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01", "A区", 1, 4, "available"));
+        FakeReservationPreassignmentRepository preassignments = new FakeReservationPreassignmentRepository();
+        UUID reservationId = UUID.fromString("50000000-0000-0000-0000-000000001202");
+        preassignments.assignments.add(new ReservationResourceAssignment(
+            reservationId,
+            "R-TABLE-1202",
+            "seated",
+            2,
+            java.time.Instant.parse("2030-06-20T10:00:00Z"),
+            java.time.Instant.parse("2030-06-20T11:30:00Z"),
+            "张先生",
+            "****1202",
+            DINING_TABLE_TYPE,
+            TABLE_A1_ID.value(),
+            "A01",
+            null,
+            null,
+            null
+        ));
+
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            new FakeTableGroupRepository(),
+            new FakeSeatingRepository(),
+            new FakeCleaningRepository(),
+            preassignments
+        );
+
+        TableResourceListResult result = service.listResources(
+            new TableResourceListQuery(SCOPE, null, null, true, new BusinessDate(java.time.LocalDate.of(2030, 6, 20)))
+        );
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resources()).hasSize(1);
+        assertThat(result.resources().getFirst().status()).isEqualTo("available");
+        assertThat(result.resources().getFirst().selectable()).isTrue();
+        assertThat(result.resources().getFirst().preassignedReservationId()).isNull();
+        assertThat(result.resources().getFirst().preassignedReservationCode()).isNull();
+    }
+
+    @Test
+    void reservedStatusFilterUsesSelectedBusinessDatePreassignments() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01", "A区", 1, 4, "available"));
+        diningTables.rows.add(tableRow(TABLE_A2_ID, "A02", "A02", "A区", 2, 6, "available"));
+        FakeReservationPreassignmentRepository preassignments = new FakeReservationPreassignmentRepository();
+        preassignments.targets.add(new ReservationResourceTarget(DINING_TABLE_TYPE, TABLE_A2_ID.value()));
+
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            new FakeTableGroupRepository(),
+            new FakeSeatingRepository(),
+            new FakeCleaningRepository(),
+            preassignments
+        );
+
+        TableResourceListResult result = service.listResources(
+            new TableResourceListQuery(SCOPE, "reserved", null, true, new BusinessDate(java.time.LocalDate.of(2030, 6, 20)))
+        );
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resources()).extracting(TableResourceItem::code).containsExactly("A02");
+        assertThat(result.resources().getFirst().status()).isEqualTo("reserved");
     }
 
     private static DiningTable table(TableId id, String code, int min, int max, DiningTableStatus status) {
@@ -314,6 +543,79 @@ class TableResourceListApplicationServiceTest {
         @Override
         public Cleaning save(StoreScope scope, Cleaning cleaning) {
             return cleaning;
+        }
+    }
+
+    private static final class FakeReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
+        private final Set<ReservationResourceAssignment> assignments = new HashSet<>();
+        private final Set<ReservationResourceTarget> targets = new HashSet<>();
+
+        @Override
+        public boolean existsActiveResourceConflict(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            BusinessDate businessDate,
+            TimeRange timeRange
+        ) {
+            return targets.contains(new ReservationResourceTarget(resourceType, resourceId));
+        }
+
+        @Override
+        public Set<ReservationResourceTarget> findActiveResourceTargetsForDate(StoreScope scope, BusinessDate businessDate) {
+            return targets;
+        }
+
+        @Override
+        public Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(StoreScope scope, BusinessDate businessDate) {
+            if (!assignments.isEmpty()) {
+                return assignments;
+            }
+            return targets.stream()
+                .map(target -> new ReservationResourceAssignment(
+                    UUID.randomUUID(),
+                    "R-PREASSIGNED",
+                    "confirmed",
+                    4,
+                    null,
+                    null,
+                    null,
+                    null,
+                    target.resourceType(),
+                    target.resourceId(),
+                    null,
+                    null,
+                    null,
+                    null
+                ))
+                .collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
+            return preassignment;
+        }
+    }
+
+    private static final class FakeStoreRepository implements StoreRepositoryPort {
+        @Override
+        public Optional<Store> findById(StoreScope scope) {
+            return Optional.of(Store.skeleton(scope.storeId(), scope.tenantId(), "S-1201", "Asia/Singapore", "zh-SG", "operational"));
+        }
+
+        @Override
+        public Optional<StorePolicy> findCurrentPolicy(StoreScope scope, OffsetDateTime at) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Store save(StoreScope scope, Store store) {
+            return store;
+        }
+
+        @Override
+        public StorePolicy savePolicy(StoreScope scope, StorePolicy policy) {
+            return policy;
         }
     }
 }

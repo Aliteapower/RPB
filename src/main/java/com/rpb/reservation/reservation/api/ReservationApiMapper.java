@@ -33,7 +33,9 @@ public class ReservationApiMapper {
             trimToNull(actor.actorType()),
             null,
             "staff",
-            null
+            null,
+            request.tableId(),
+            request.tableGroupId()
         );
     }
 

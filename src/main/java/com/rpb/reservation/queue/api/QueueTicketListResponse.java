@@ -29,6 +29,9 @@ public record QueueTicketListResponse(
         String reservationStatus,
         String customerName,
         String customerPhoneMasked,
+        String assignedResourceType,
+        UUID assignedResourceId,
+        String assignedResourceCode,
         @JsonFormat(shape = JsonFormat.Shape.STRING)
         Instant createdAt,
         @JsonFormat(shape = JsonFormat.Shape.STRING)

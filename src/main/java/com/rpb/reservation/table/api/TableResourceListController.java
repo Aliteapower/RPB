@@ -4,6 +4,7 @@ import static com.rpb.reservation.appgate.domain.AppGateRequiredPermission.TABLE
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.table.application.TableResourceItem;
 import com.rpb.reservation.table.application.TableResourceListQuery;
@@ -12,6 +13,8 @@ import com.rpb.reservation.table.application.service.TableResourceListApplicatio
 import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -62,7 +65,8 @@ public class TableResourceListController {
         @PathVariable UUID storeId,
         @RequestParam(value = "status", required = false) String status,
         @RequestParam(value = "partySize", required = false) String partySize,
-        @RequestParam(value = "includeGroups", required = false) String includeGroups
+        @RequestParam(value = "includeGroups", required = false) String includeGroups,
+        @RequestParam(value = "businessDate", required = false) String businessDate
     ) {
         Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
         if (currentActor.isEmpty()) {
@@ -86,12 +90,17 @@ public class TableResourceListController {
         if (partySize != null && parsedPartySize == null) {
             return errorMapper.toResponse(TableResourceListApiErrorCode.INVALID_PARTY_SIZE);
         }
+        BusinessDate parsedBusinessDate = parseBusinessDate(businessDate);
+        if (businessDate != null && parsedBusinessDate == null) {
+            return errorMapper.toResponse(TableResourceListApiErrorCode.INVALID_BUSINESS_DATE);
+        }
 
         TableResourceListQuery query = new TableResourceListQuery(
             new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId)),
             normalizedStatus,
             parsedPartySize,
-            !"false".equalsIgnoreCase(normalize(includeGroups))
+            !"false".equalsIgnoreCase(normalize(includeGroups)),
+            parsedBusinessDate
         );
         TableResourceListResult result = applicationService.listResources(query);
         if (!result.success()) {
@@ -122,7 +131,21 @@ public class TableResourceListController {
             item.selectionDisabledReason(),
             item.memberTableCodes(),
             item.currentSeatingId(),
-            item.currentCleaningId()
+            item.currentCleaningId(),
+            item.currentReservationId(),
+            item.currentPartySize(),
+            item.preassignedReservationId(),
+            item.preassignedReservationCode(),
+            item.preassignedCustomerName(),
+            item.preassignedPhoneMasked(),
+            item.preassignedReservationStatus(),
+            item.preassignedPartySize(),
+            item.preassignedStartAt(),
+            item.preassignedEndAt(),
+            item.preassignedResourceCode(),
+            item.preassignedQueueTicketId(),
+            item.preassignedQueueTicketNumber(),
+            item.preassignedQueueTicketStatus()
         );
     }
 
@@ -136,6 +159,18 @@ public class TableResourceListController {
             int parsed = Integer.parseInt(normalized);
             return parsed > 0 ? parsed : null;
         } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private static BusinessDate parseBusinessDate(String value) {
+        String normalized = normalize(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return new BusinessDate(LocalDate.parse(normalized));
+        } catch (DateTimeParseException exception) {
             return null;
         }
     }

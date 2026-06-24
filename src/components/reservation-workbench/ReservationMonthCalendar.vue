@@ -16,14 +16,18 @@ interface CalendarDay {
 const props = withDefaults(
   defineProps<{
     selectedDate: string
+    calendarLabel?: string
     markedDates?: string[]
     minDate?: string
     reservationCounts?: Record<string, number>
+    showCountInAria?: boolean
   }>(),
   {
+    calendarLabel: '预约日历',
     markedDates: () => [],
     minDate: '',
-    reservationCounts: () => ({})
+    reservationCounts: () => ({}),
+    showCountInAria: true
   }
 )
 
@@ -148,15 +152,18 @@ function reservationCountLabel(count: number): string {
 
 function dayAriaLabel(day: CalendarDay): string {
   const prefix = day.selected ? '已选择' : '选择'
-  const reservationText =
-    day.reservationCount > 0 ? `，${day.reservationCount} 个预订` : '，暂无预订'
+  const reservationText = props.showCountInAria
+    ? day.reservationCount > 0
+      ? `，${day.reservationCount} 个预订`
+      : '，暂无预订'
+    : ''
   const dateLimitText = day.past ? '，不可创建新预约' : ''
   return `${prefix} ${day.isoDate}${reservationText}${dateLimitText}`
 }
 </script>
 
 <template>
-  <section class="reservation-calendar" aria-label="预约日历">
+  <section class="reservation-calendar" :aria-label="calendarLabel">
     <header class="reservation-calendar__header">
       <button type="button" aria-label="上个月" @click="previousMonth">‹</button>
       <h2>{{ monthTitle }}</h2>

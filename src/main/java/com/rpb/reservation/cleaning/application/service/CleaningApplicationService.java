@@ -220,7 +220,7 @@ public class CleaningApplicationService {
 
         Seating seating = seatingRepository.findById(scope, new SeatingId(command.seatingId()))
             .orElseThrow(() -> new ApplicationFailure(CleaningApplicationError.SEATING_NOT_FOUND));
-        if (seating.status() != SeatingStatus.OCCUPIED) {
+        if (seating.status() != SeatingStatus.OCCUPIED && seating.status() != SeatingStatus.COMPLETED) {
             throw new ApplicationFailure(CleaningApplicationError.TABLE_NOT_OCCUPIED);
         }
 
@@ -265,7 +265,8 @@ public class CleaningApplicationService {
             seating.manualOverrideReasonCode(),
             seating.note(),
             seating.partySizeSnapshot(),
-            SeatingStatus.CLEANING_TRIGGERED
+            SeatingStatus.CLEANING_TRIGGERED,
+            seating.completedAt()
         ));
 
         List<UUID> eventIds = appendBusinessEvents(

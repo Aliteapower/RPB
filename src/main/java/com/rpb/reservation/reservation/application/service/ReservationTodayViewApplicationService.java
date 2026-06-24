@@ -209,7 +209,13 @@ public class ReservationTodayViewApplicationService {
             row.seatingId(),
             row.currentResourceType(),
             row.currentResourceId(),
-            row.currentResourceCode()
+            row.currentResourceCode(),
+            row.assignedResourceType(),
+            row.assignedResourceId(),
+            row.assignedResourceCode(),
+            row.queueTicketId(),
+            row.queueTicketNumber(),
+            row.queueTicketStatus()
         );
     }
 

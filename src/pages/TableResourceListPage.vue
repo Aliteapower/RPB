@@ -8,9 +8,24 @@ import {
   startCleaning
 } from '../api/cleaningApi'
 import {
+  completeReservation,
+  ReservationStatusActionApiError
+} from '../api/reservationStatusActionApi'
+import {
+  ReservationArrivedDirectSeatingApiError,
+  seatArrivedReservation
+} from '../api/reservationArrivedDirectSeatingApi'
+import { getReservationCalendarSummary } from '../api/reservationCalendarSummaryApi'
+import {
+  SeatingFromCalledQueueApiError,
+  seatCalledQueueTicket
+} from '../api/seatingFromCalledQueueApi'
+import {
   fetchTableResources,
   TableResourceApiError
 } from '../api/tableResourceApi'
+import ReservationMonthCalendar from '../components/reservation-workbench/ReservationMonthCalendar.vue'
+import ReservationTableSwitchDialog from '../components/reservation-workbench/ReservationTableSwitchDialog.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
@@ -19,8 +34,12 @@ import type {
   TableResourceListResponse
 } from '../types/tableResource'
 import type { CleaningApiErrorResponse } from '../types/cleaning'
+import type { ReservationArrivedDirectSeatingApiErrorResponse } from '../types/reservationArrivedDirectSeating'
+import type { ReservationStatusActionApiErrorResponse } from '../types/reservationStatusAction'
+import type { SeatingFromCalledQueueApiErrorResponse } from '../types/seatingFromCalledQueue'
+import type { SwitchTableResponse } from '../types/tableSwitch'
 
-type StatusFilter = 'all' | 'available' | 'occupied' | 'cleaning' | 'active'
+type StatusFilter = 'all' | 'available' | 'reserved' | 'occupied' | 'cleaning' | 'active'
 type AreaFilter = 'all' | string
 
 interface SummaryItem {
@@ -35,12 +54,19 @@ interface AreaFilterOption {
   count: number
 }
 
+type TableActionErrorResponse =
+  | CleaningApiErrorResponse
+  | ReservationArrivedDirectSeatingApiErrorResponse
+  | ReservationStatusActionApiErrorResponse
+  | SeatingFromCalledQueueApiErrorResponse
+
 const route = useRoute()
 const storeContext = useStoreContextStore()
 
 const statusOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'available', label: '可用' },
+  { value: 'reserved', label: '预留' },
   { value: 'occupied', label: '占用' },
   { value: 'cleaning', label: '清台' },
   { value: 'active', label: '分组' }
@@ -59,18 +85,46 @@ const statusLabels: Record<string, string> = {
   ended: '已结束'
 }
 
+const reservationStatusLabels: Record<string, string> = {
+  confirmed: '待到店',
+  arrived: '已到店',
+  seated: '已入桌',
+  cancelled: '已取消',
+  no_show: '爽约',
+  completed: '已完成'
+}
+
+const queueStatusLabels: Record<string, string> = {
+  waiting: '排队中',
+  called: '已叫号',
+  skipped: '已过号',
+  rejoined: '已重回',
+  seated: '已入座',
+  cancelled: '排队已取消',
+  expired: '排队已过期'
+}
+
 const partySizeOptions = [2, 4, 6, 8, 10, 12]
 
 const selectedStatus = ref<StatusFilter>('all')
 const selectedArea = ref<AreaFilter>('all')
+const selectedBusinessDate = ref(todayDateInput())
 const partySize = ref<number | null>(null)
+const temporaryGroupMode = ref(false)
+const selectedTemporaryTableIds = ref<string[]>([])
 const isLoading = ref(false)
 const startingCleaningResourceId = ref<string | null>(null)
 const completingCleaningResourceId = ref<string | null>(null)
+const seatingResourceId = ref<string | null>(null)
+const showTableSwitchDialog = ref(false)
+const selectedSwitchResource = ref<TableResourceItem | null>(null)
 const response = ref<TableResourceListResponse | null>(null)
 const apiError = ref<TableResourceApiErrorResponse | null>(null)
-const actionError = ref<CleaningApiErrorResponse | null>(null)
+const actionError = ref<TableActionErrorResponse | null>(null)
+const visibleMonthKey = ref(monthKeyFromDate(selectedBusinessDate.value))
+const reservationCounts = ref<Record<string, number>>({})
 let loadSequence = 0
+let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const resources = computed(() => response.value?.resources ?? [])
@@ -87,6 +141,10 @@ const statusFilteredTableResources = computed(() => {
 
   if (selectedStatus.value === 'all') {
     return allTableResources.value
+  }
+
+  if (selectedStatus.value === 'cleaning') {
+    return allTableResources.value.filter(isCleaningWorkflowResource)
   }
 
   return allTableResources.value.filter(resource => resource.status === selectedStatus.value)
@@ -130,12 +188,70 @@ const summaryItems = computed<SummaryItem[]>(() =>
   }))
 )
 const displayedResourceCount = computed(() => tableResources.value.length + displayedGroupResources.value.length)
+const isSelectedBusinessDateToday = computed(() => selectedBusinessDate.value === todayDateInput())
+const tableSwitchDialogItem = computed(() => {
+  const resource = selectedSwitchResource.value
+
+  if (!resource?.currentSeatingId) {
+    return null
+  }
+
+  return {
+    reservationCode: resource.code,
+    customerName: resource.preassignedReservationId
+      ? preassignedCustomerText(resource)
+      : resource.displayName || resource.code,
+    partySize: resource.currentPartySize ?? resource.preassignedPartySize ?? resource.capacityMin,
+    businessDate: selectedBusinessDate.value,
+    seatingId: resource.currentSeatingId,
+    currentResourceCode: resource.displayName || resource.code
+  }
+})
 const partySizeValue = computed({
   get: () => (partySize.value === null ? '' : String(partySize.value)),
   set: value => {
     partySize.value = value ? Number(value) : null
   }
 })
+const selectedTemporaryTableIdSet = computed(() => new Set(selectedTemporaryTableIds.value))
+const selectedTemporaryTableResources = computed(() =>
+  allTableResources.value.filter(resource => selectedTemporaryTableIdSet.value.has(resource.resourceId))
+)
+const temporaryGroupCapacity = computed(() =>
+  selectedTemporaryTableResources.value.reduce(
+    (capacity, resource) => ({
+      min: capacity.min + resource.capacityMin,
+      max: capacity.max + resource.capacityMax
+    }),
+    { min: 0, max: 0 }
+  )
+)
+const temporaryGroupPartySize = computed(() => {
+  const capacity = temporaryGroupCapacity.value
+
+  if (capacity.max <= 0) {
+    return partySize.value ?? 0
+  }
+
+  const requestedPartySize = partySize.value ?? capacity.min
+  return Math.min(Math.max(requestedPartySize, capacity.min), capacity.max)
+})
+const canSeatTemporaryGroup = computed(
+  () =>
+    isSelectedBusinessDateToday.value &&
+    selectedTemporaryTableIds.value.length >= 2 &&
+    temporaryGroupPartySize.value > 0
+)
+const temporaryGroupRoute = computed(() => ({
+  name: 'walk-in-direct-seating',
+  params: {
+    storeId: storeId.value
+  },
+  query: {
+    temporaryTableIds: selectedTemporaryTableIds.value,
+    partySize: temporaryGroupPartySize.value
+  }
+}))
 const showNoConfiguredResources = computed(
   () => !isLoading.value && !apiError.value && !!response.value && resources.value.length === 0
 )
@@ -149,9 +265,24 @@ const showFilteredEmpty = computed(
 )
 
 watch(
-  [storeId, partySize],
+  [storeId, partySize, selectedBusinessDate],
   () => {
     void loadResources()
+  },
+  { immediate: true }
+)
+
+watch(
+  selectedBusinessDate,
+  nextBusinessDate => {
+    visibleMonthKey.value = monthKeyFromDate(nextBusinessDate)
+  }
+)
+
+watch(
+  [storeId, visibleMonthKey],
+  () => {
+    void loadCalendarSummary()
   },
   { immediate: true }
 )
@@ -161,6 +292,33 @@ watch(
   options => {
     if (!options.some(option => option.value === selectedArea.value)) {
       selectedArea.value = 'all'
+    }
+  }
+)
+
+watch(
+  isSelectedBusinessDateToday,
+  today => {
+    if (!today) {
+      temporaryGroupMode.value = false
+      selectedTemporaryTableIds.value = []
+    }
+  }
+)
+
+watch(
+  allTableResources,
+  currentResources => {
+    const currentIds = new Set(currentResources.map(resource => resource.resourceId))
+    selectedTemporaryTableIds.value = selectedTemporaryTableIds.value.filter(id => currentIds.has(id))
+  }
+)
+
+watch(
+  showTableSwitchDialog,
+  open => {
+    if (!open) {
+      selectedSwitchResource.value = null
     }
   }
 )
@@ -181,7 +339,8 @@ async function loadResources(): Promise<void> {
   try {
     const result = await fetchTableResources(currentStoreId, {
       partySize: partySize.value ?? undefined,
-      includeGroups: true
+      includeGroups: true,
+      businessDate: selectedBusinessDate.value
     })
 
     if (sequence === loadSequence) {
@@ -201,6 +360,31 @@ async function loadResources(): Promise<void> {
   }
 }
 
+async function loadCalendarSummary(): Promise<void> {
+  const currentStoreId = storeId.value
+  const currentMonth = visibleMonthKey.value
+  const sequence = ++calendarSummaryLoadSequence
+
+  if (!currentStoreId || !currentMonth) {
+    reservationCounts.value = {}
+    return
+  }
+
+  try {
+    const result = await getReservationCalendarSummary(currentStoreId, currentMonth)
+
+    if (sequence === calendarSummaryLoadSequence) {
+      reservationCounts.value = Object.fromEntries(
+        result.days.map(day => [day.businessDate, day.reservationCount])
+      )
+    }
+  } catch {
+    if (sequence === calendarSummaryLoadSequence) {
+      reservationCounts.value = {}
+    }
+  }
+}
+
 function selectStatus(status: StatusFilter): void {
   selectedStatus.value = status
 }
@@ -209,10 +393,41 @@ function selectArea(area: AreaFilter): void {
   selectedArea.value = area
 }
 
+function toggleTemporaryGroupMode(): void {
+  if (!isSelectedBusinessDateToday.value) {
+    temporaryGroupMode.value = false
+    selectedTemporaryTableIds.value = []
+    return
+  }
+
+  temporaryGroupMode.value = !temporaryGroupMode.value
+
+  if (!temporaryGroupMode.value) {
+    selectedTemporaryTableIds.value = []
+  }
+}
+
+function toggleTemporaryTable(resource: TableResourceItem): void {
+  if (!canToggleTemporaryTable(resource)) {
+    return
+  }
+
+  if (isTemporaryTableSelected(resource)) {
+    selectedTemporaryTableIds.value = selectedTemporaryTableIds.value.filter(id => id !== resource.resourceId)
+  } else {
+    selectedTemporaryTableIds.value = [...selectedTemporaryTableIds.value, resource.resourceId]
+  }
+}
+
+function clearTemporaryGroupSelection(): void {
+  selectedTemporaryTableIds.value = []
+}
+
 async function startResourceCleaning(resource: TableResourceItem): Promise<void> {
   const currentStoreId = storeId.value
+  const seatingId = resource.currentSeatingId
 
-  if (!currentStoreId || !resource.currentSeatingId || activeTableActionInProgress.value) {
+  if (!currentStoreId || !seatingId || !canStartCleaning(resource) || activeTableActionInProgress.value) {
     actionError.value = createCleaningLocalError('SEATING_NOT_FOUND', 'cleaning.seating_not_found')
     return
   }
@@ -221,9 +436,10 @@ async function startResourceCleaning(resource: TableResourceItem): Promise<void>
   startingCleaningResourceId.value = resource.resourceId
 
   try {
+    await completeReservationForResourceIfNeeded(currentStoreId, resource)
     await startCleaning(
       currentStoreId,
-      resource.currentSeatingId,
+      seatingId,
       {
         reasonCode: 'staff_table_page_clear',
         note: `table_resource:${resource.resourceType}:${resource.code}`
@@ -233,7 +449,7 @@ async function startResourceCleaning(resource: TableResourceItem): Promise<void>
     await loadResources()
   } catch (error) {
     actionError.value =
-      error instanceof CleaningApiError
+      error instanceof CleaningApiError || error instanceof ReservationStatusActionApiError
         ? error.response
         : createCleaningLocalError('REQUEST_FAILED', 'cleaning.request_failed')
   } finally {
@@ -241,10 +457,34 @@ async function startResourceCleaning(resource: TableResourceItem): Promise<void>
   }
 }
 
+async function completeReservationForResourceIfNeeded(
+  currentStoreId: string,
+  resource: TableResourceItem
+): Promise<void> {
+  const reservationId =
+    resource.currentReservationId ??
+    (resource.preassignedReservationStatus === 'seated' ? resource.preassignedReservationId : null)
+
+  if (!reservationId) {
+    return
+  }
+
+  await completeReservation(
+    currentStoreId,
+    reservationId,
+    {
+      reasonCode: 'guest_finished',
+      note: `table_resource:${resource.resourceType}:${resource.code}`
+    },
+    createTableActionIdempotencyKey('reservation-complete', resource.resourceId)
+  )
+}
+
 async function completeResourceCleaning(resource: TableResourceItem): Promise<void> {
   const currentStoreId = storeId.value
+  const cleaningId = resource.currentCleaningId
 
-  if (!currentStoreId || !resource.currentCleaningId || activeTableActionInProgress.value) {
+  if (!currentStoreId || !cleaningId || !canCompleteCleaning(resource) || activeTableActionInProgress.value) {
     actionError.value = createCleaningLocalError('CLEANING_NOT_FOUND', 'cleaning.not_found')
     return
   }
@@ -255,7 +495,7 @@ async function completeResourceCleaning(resource: TableResourceItem): Promise<vo
   try {
     await completeCleaning(
       currentStoreId,
-      resource.currentCleaningId,
+      cleaningId,
       {
         reasonCode: 'staff_table_page_complete_clear',
         note: `table_resource:${resource.resourceType}:${resource.code}`
@@ -273,6 +513,76 @@ async function completeResourceCleaning(resource: TableResourceItem): Promise<vo
   }
 }
 
+async function seatAssignedReservation(resource: TableResourceItem): Promise<void> {
+  const currentStoreId = storeId.value
+  const reservationId = resource.preassignedReservationId
+
+  if (!currentStoreId || !reservationId || !canSeatAssignedReservation(resource) || activeTableActionInProgress.value) {
+    actionError.value = createCleaningLocalError('RESERVATION_NOT_FOUND', 'reservation.not_found')
+    return
+  }
+
+  actionError.value = null
+  seatingResourceId.value = resource.resourceId
+
+  try {
+    await seatArrivedReservation(
+      currentStoreId,
+      reservationId,
+      {
+        ...resourceSeatRequest(resource),
+        overrideReasonCode: null,
+        overrideNote: null,
+        note: 'staff_table_resource_preassigned_seating'
+      },
+      createTableActionIdempotencyKey('reservation-seat', resource.resourceId)
+    )
+    await loadResources()
+  } catch (error) {
+    actionError.value =
+      error instanceof ReservationArrivedDirectSeatingApiError
+        ? error.response
+        : createCleaningLocalError('REQUEST_FAILED', 'reservation.direct_seating.unknown_error')
+  } finally {
+    seatingResourceId.value = null
+  }
+}
+
+async function seatCalledAssignedQueue(resource: TableResourceItem): Promise<void> {
+  const currentStoreId = storeId.value
+  const queueTicketId = resource.preassignedQueueTicketId
+
+  if (!currentStoreId || !queueTicketId || !canSeatCalledQueue(resource) || activeTableActionInProgress.value) {
+    actionError.value = createCleaningLocalError('QUEUE_TICKET_NOT_FOUND', 'queue.ticket_not_found')
+    return
+  }
+
+  actionError.value = null
+  seatingResourceId.value = resource.resourceId
+
+  try {
+    await seatCalledQueueTicket(
+      currentStoreId,
+      queueTicketId,
+      {
+        ...resourceSeatRequest(resource),
+        overrideReasonCode: null,
+        overrideNote: null,
+        note: 'staff_table_resource_called_queue_seating'
+      },
+      createTableActionIdempotencyKey('queue-seat', resource.resourceId)
+    )
+    await loadResources()
+  } catch (error) {
+    actionError.value =
+      error instanceof SeatingFromCalledQueueApiError
+        ? error.response
+        : createCleaningLocalError('REQUEST_FAILED', 'queue.seat.unknown_error')
+  } finally {
+    seatingResourceId.value = null
+  }
+}
+
 function statusFilterCount(status: StatusFilter): number {
   if (status === 'all') {
     return allTableResources.value.length
@@ -280,6 +590,10 @@ function statusFilterCount(status: StatusFilter): number {
 
   if (status === 'active') {
     return groupResources.value.length
+  }
+
+  if (status === 'cleaning') {
+    return allTableResources.value.filter(isCleaningWorkflowResource).length
   }
 
   return allTableResources.value.filter(resource => resource.status === status).length
@@ -301,24 +615,174 @@ function membersText(resource: TableResourceItem): string {
   return resource.memberTableCodes.length ? resource.memberTableCodes.join(' + ') : '暂无成员'
 }
 
+function preassignedReservationText(resource: TableResourceItem): string {
+  if (!resource.preassignedReservationId) {
+    return ''
+  }
+
+  const customer = preassignedCustomerText(resource)
+  const partySize = resource.preassignedPartySize ? `${resource.preassignedPartySize}人` : ''
+  const timeRange = preassignedTimeRange(resource)
+  const status = resource.preassignedReservationStatus
+    ? reservationStatusLabels[resource.preassignedReservationStatus] ?? resource.preassignedReservationStatus
+    : ''
+
+  return [customer, timeRange, partySize, status].filter(Boolean).join(' · ')
+}
+
+function preassignedCustomerText(resource: TableResourceItem): string {
+  const name = resource.preassignedCustomerName?.trim()
+  const phone = resource.preassignedPhoneMasked?.trim()
+
+  if (name && phone) {
+    return `${name} ${phone}`
+  }
+  return name || phone || '预约客户'
+}
+
+function preassignedQueueText(resource: TableResourceItem): string {
+  if (!resource.preassignedQueueTicketId) {
+    return ''
+  }
+
+  const numberText =
+    typeof resource.preassignedQueueTicketNumber === 'number'
+      ? `#${resource.preassignedQueueTicketNumber}`
+      : '排队票'
+  const status = resource.preassignedQueueTicketStatus
+    ? queueStatusLabels[resource.preassignedQueueTicketStatus] ?? resource.preassignedQueueTicketStatus
+    : '已排队'
+
+  return `${numberText} · ${status}`
+}
+
+function preassignedTimeRange(resource: TableResourceItem): string {
+  if (!resource.preassignedStartAt || !resource.preassignedEndAt) {
+    return ''
+  }
+
+  return `${formatStoreTime(resource.preassignedStartAt)}-${formatStoreTime(resource.preassignedEndAt)}`
+}
+
 function canStartCleaning(resource: TableResourceItem): boolean {
-  return resource.status === 'occupied' && !!resource.currentSeatingId
+  return isClearableOccupiedResource(resource)
+}
+
+function isCleaningWorkflowResource(resource: TableResourceItem): boolean {
+  return resource.status === 'cleaning' || isClearableOccupiedResource(resource)
+}
+
+function isClearableOccupiedResource(resource: TableResourceItem): boolean {
+  return (
+    isSelectedBusinessDateToday.value &&
+    resource.status === 'occupied' &&
+    !!resource.currentSeatingId
+  )
 }
 
 const activeTableActionInProgress = computed(
-  () => !!startingCleaningResourceId.value || !!completingCleaningResourceId.value
+  () => !!startingCleaningResourceId.value || !!completingCleaningResourceId.value || !!seatingResourceId.value
 )
+
+function canSwitchResource(resource: TableResourceItem): boolean {
+  return (
+    resource.status === 'occupied' &&
+    !!resource.currentSeatingId &&
+    isSelectedBusinessDateToday.value &&
+    !activeTableActionInProgress.value
+  )
+}
+
+function switchResourceTitle(resource: TableResourceItem): string | undefined {
+  if (canSwitchResource(resource)) {
+    return undefined
+  }
+
+  return resource.currentSeatingId ? '仅当日已入桌可换桌' : '缺少入桌记录，暂不能换桌'
+}
+
+function openTableSwitchDialog(resource: TableResourceItem): void {
+  if (!canSwitchResource(resource)) {
+    return
+  }
+
+  actionError.value = null
+  selectedSwitchResource.value = resource
+  showTableSwitchDialog.value = true
+}
+
+function handleTableSwitched(_response: SwitchTableResponse): void {
+  void loadResources()
+  void loadCalendarSummary()
+}
 
 function isStartingCleaning(resource: TableResourceItem): boolean {
   return startingCleaningResourceId.value === resource.resourceId
 }
 
 function canCompleteCleaning(resource: TableResourceItem): boolean {
-  return !!resource.currentCleaningId
+  return isSelectedBusinessDateToday.value && !!resource.currentCleaningId
 }
 
 function isCompletingCleaning(resource: TableResourceItem): boolean {
   return completingCleaningResourceId.value === resource.resourceId
+}
+
+function canSeatAssignedReservation(resource: TableResourceItem): boolean {
+  return (
+    isSelectedBusinessDateToday.value &&
+    resource.status === 'reserved' &&
+    resource.preassignedReservationStatus === 'arrived' &&
+    !resource.preassignedQueueTicketId &&
+    !!resource.preassignedReservationId
+  )
+}
+
+function canSeatCalledQueue(resource: TableResourceItem): boolean {
+  return (
+    isSelectedBusinessDateToday.value &&
+    resource.status === 'reserved' &&
+    resource.preassignedQueueTicketStatus === 'called' &&
+    !!resource.preassignedQueueTicketId
+  )
+}
+
+function canSeatWalkInResource(resource: TableResourceItem): boolean {
+  return isSelectedBusinessDateToday.value && resource.selectable
+}
+
+function canToggleTemporaryTable(resource: TableResourceItem): boolean {
+  return (
+    resource.resourceType === 'dining_table' &&
+    isSelectedBusinessDateToday.value &&
+    (resource.selectable || isTemporaryTableSelected(resource))
+  )
+}
+
+function isTemporaryTableSelected(resource: TableResourceItem): boolean {
+  return selectedTemporaryTableIdSet.value.has(resource.resourceId)
+}
+
+function temporaryGroupCapacityText(): string {
+  const capacity = temporaryGroupCapacity.value
+
+  return capacity.max > 0 ? `${capacity.min}-${capacity.max}人` : '未选择'
+}
+
+function isSeatingResource(resource: TableResourceItem): boolean {
+  return seatingResourceId.value === resource.resourceId
+}
+
+function preassignedPendingActionText(resource: TableResourceItem): string {
+  if (resource.preassignedQueueTicketStatus) {
+    return queueStatusLabels[resource.preassignedQueueTicketStatus] ?? resource.preassignedQueueTicketStatus
+  }
+
+  if (resource.preassignedReservationStatus) {
+    return reservationStatusLabels[resource.preassignedReservationStatus] ?? resource.preassignedReservationStatus
+  }
+
+  return '预约预留'
 }
 
 function walkInDirectSeatingRoute(resource: TableResourceItem): Record<string, unknown> {
@@ -334,9 +798,18 @@ function walkInDirectSeatingRoute(resource: TableResourceItem): Record<string, u
   }
 }
 
+function resourceSeatRequest(resource: TableResourceItem): {
+  tableId?: string | null
+  tableGroupId?: string | null
+} {
+  return resource.resourceType === 'dining_table'
+    ? { tableId: resource.resourceId, tableGroupId: null }
+    : { tableId: null, tableGroupId: resource.resourceId }
+}
+
 function selectionReasonText(resource: TableResourceItem): string {
   if (resource.selectable) {
-    return '可入桌'
+    return isSelectedBusinessDateToday.value ? '可入桌' : '仅查看'
   }
 
   const reasonLabels: Record<string, string> = {
@@ -344,7 +817,8 @@ function selectionReasonText(resource: TableResourceItem): string {
     capacity_mismatch: '人数不匹配',
     locked: '桌台已锁定',
     occupied: '桌台已占用',
-    cleaning: '正在清台'
+    cleaning: '正在清台',
+    reservation_preassigned: '已被预约预留'
   }
   const reason = resource.selectionDisabledReason?.trim()
   return reason ? reasonLabels[reason] ?? '当前不可选' : '当前不可选'
@@ -388,6 +862,51 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
 
   return `table:${action}:${resourceId}:${randomValue}`
 }
+
+function handleVisibleMonthChanged(month: string): void {
+  visibleMonthKey.value = month
+}
+
+function monthKeyFromDate(value: string): string {
+  const [year, month] = value.split('-')
+  if (!year || !month) {
+    return ''
+  }
+  return `${year}-${month}`
+}
+
+function formatStoreTime(value: string): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Singapore',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date)
+
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  return `${part('hour')}:${part('minute')}`
+}
+
+function todayDateInput(timeZone = 'Asia/Singapore'): string {
+  const date = new Date()
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  const year = part('year')
+  const month = part('month')
+  const day = part('day')
+  return `${year}-${month}-${day}`
+}
 </script>
 
 <template>
@@ -408,43 +927,68 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
     </section>
 
     <section class="summary-row" aria-label="桌台概览">
-      <div
+      <button
         v-for="item in summaryItems"
         :key="item.key"
         class="summary-row__item"
-        :class="`summary-row__item--${item.key}`"
+        :class="[`summary-row__item--${item.key}`, { selected: selectedStatus === item.key }]"
+        :aria-pressed="selectedStatus === item.key"
+        type="button"
+        @click="selectStatus(item.key)"
       >
         <strong>{{ item.value }}</strong>
         <span>{{ item.label }}</span>
-      </div>
+      </button>
     </section>
 
-    <section class="filter-panel" aria-label="桌台筛选">
-      <div class="status-options">
-        <button
-          v-for="option in statusOptions"
-          :key="option.value"
-          :aria-pressed="selectedStatus === option.value"
-          :class="{ selected: selectedStatus === option.value }"
-          type="button"
-          @click="selectStatus(option.value)"
-        >
-          <span>{{ option.label }}</span>
-          <strong>{{ statusFilterCount(option.value) }}</strong>
-        </button>
+    <ReservationMonthCalendar
+      calendar-label="桌台日历"
+      :reservation-counts="reservationCounts"
+      v-model:selected-date="selectedBusinessDate"
+      @visible-month-changed="handleVisibleMonthChanged"
+    />
+
+    <section class="filter-panel" aria-label="桌台辅助筛选">
+      <div class="filter-panel__fields">
+        <label class="party-size-field">
+          <span>人数</span>
+          <select v-model="partySizeValue" name="partySize">
+            <option value="">不限</option>
+            <option v-for="option in partySizeOptions" :key="option" :value="String(option)">
+              {{ option }} 人
+            </option>
+          </select>
+        </label>
       </div>
 
-      <label class="party-size-field">
-        <span>人数</span>
-        <select v-model="partySizeValue" name="partySize">
-          <option value="">不限</option>
-          <option v-for="option in partySizeOptions" :key="option" :value="String(option)">
-            {{ option }} 人
-          </option>
-        </select>
-      </label>
-
       <p class="filter-panel__total">共 {{ displayedResourceCount }} 个</p>
+    </section>
+
+    <section class="temporary-group-panel" aria-label="临时桌组">
+      <div>
+        <strong>临时桌组</strong>
+        <span>{{ temporaryGroupCapacityText() }} · 已选 {{ selectedTemporaryTableIds.length }} 张</span>
+      </div>
+      <div class="temporary-group-panel__actions">
+        <button type="button" :disabled="!isSelectedBusinessDateToday" @click="toggleTemporaryGroupMode">
+          {{ temporaryGroupMode ? '退出选择' : '组合桌台' }}
+        </button>
+        <button
+          type="button"
+          :disabled="!selectedTemporaryTableIds.length"
+          @click="clearTemporaryGroupSelection"
+        >
+          清空
+        </button>
+        <RouterLink
+          v-if="canSeatTemporaryGroup"
+          class="temporary-group-panel__seat"
+          :to="temporaryGroupRoute"
+        >
+          临时入桌
+        </RouterLink>
+        <button v-else class="temporary-group-panel__seat" disabled type="button">临时入桌</button>
+      </div>
     </section>
 
     <section v-if="isLoading" class="state-panel" aria-live="polite">
@@ -505,7 +1049,10 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
             v-for="resource in area.items"
             :key="resource.resourceId"
             class="table-page__resource-card"
-            :class="statusClass(resource.status)"
+            :class="[
+              statusClass(resource.status),
+              { 'table-page__resource-card--temp-selected': isTemporaryTableSelected(resource) }
+            ]"
           >
             <div class="table-page__resource-title">
               <strong>{{ resource.displayName || resource.code }}</strong>
@@ -515,9 +1062,54 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
             <p class="table-page__resource-note">
               状态：{{ statusLabel(resource.status) }}，{{ selectionReasonText(resource) }}
             </p>
+            <section
+              v-if="resource.preassignedReservationId"
+              class="table-page__assignment"
+              aria-label="预约指定资源"
+            >
+              <span>预约指定</span>
+              <strong>{{ preassignedReservationText(resource) }}</strong>
+              <small v-if="preassignedQueueText(resource)">{{ preassignedQueueText(resource) }}</small>
+            </section>
             <div class="table-page__resource-actions" aria-label="桌台操作">
+              <button
+                v-if="temporaryGroupMode"
+                class="table-page__resource-action"
+                :class="{ 'table-page__resource-action--primary': isTemporaryTableSelected(resource) }"
+                :disabled="!canToggleTemporaryTable(resource)"
+                type="button"
+                @click="toggleTemporaryTable(resource)"
+              >
+                {{ isTemporaryTableSelected(resource) ? '移出组合' : '加入组合' }}
+              </button>
+              <button
+                v-if="canSeatCalledQueue(resource)"
+                class="table-page__resource-action table-page__resource-action--primary"
+                :disabled="isSeatingResource(resource)"
+                type="button"
+                @click="seatCalledAssignedQueue(resource)"
+              >
+                {{ isSeatingResource(resource) ? '入桌中' : '叫号入桌' }}
+              </button>
+              <button
+                v-else-if="canSeatAssignedReservation(resource)"
+                class="table-page__resource-action table-page__resource-action--primary"
+                :disabled="isSeatingResource(resource)"
+                type="button"
+                @click="seatAssignedReservation(resource)"
+              >
+                {{ isSeatingResource(resource) ? '入桌中' : '预约入桌' }}
+              </button>
+              <button
+                v-else-if="resource.status === 'reserved'"
+                class="table-page__resource-action"
+                disabled
+                type="button"
+              >
+                {{ preassignedPendingActionText(resource) }}
+              </button>
               <RouterLink
-                v-if="resource.selectable"
+                v-if="canSeatWalkInResource(resource)"
                 class="table-page__resource-action table-page__resource-action--primary"
                 :to="walkInDirectSeatingRoute(resource)"
               >
@@ -526,9 +1118,10 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
               <button
                 v-if="resource.status === 'occupied'"
                 class="table-page__resource-action"
-                disabled
-                title="换桌需后端换桌契约"
+                :disabled="!canSwitchResource(resource)"
+                :title="switchResourceTitle(resource)"
                 type="button"
+                @click="openTableSwitchDialog(resource)"
               >
                 换桌
               </button>
@@ -539,7 +1132,7 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
                 type="button"
                 @click="startResourceCleaning(resource)"
               >
-                {{ isStartingCleaning(resource) ? '清桌中' : '清桌' }}
+                {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
               </button>
               <button
                 v-if="resource.status === 'cleaning'"
@@ -579,9 +1172,44 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
           </div>
           <p class="table-page__resource-meta">{{ capacityText(resource) }}</p>
           <p class="table-page__resource-members">{{ membersText(resource) }}</p>
+          <section
+            v-if="resource.preassignedReservationId"
+            class="table-page__assignment"
+            aria-label="预约指定桌组"
+          >
+            <span>预约指定</span>
+            <strong>{{ preassignedReservationText(resource) }}</strong>
+            <small v-if="preassignedQueueText(resource)">{{ preassignedQueueText(resource) }}</small>
+          </section>
           <div class="table-page__resource-actions" aria-label="桌台分组操作">
+            <button
+              v-if="canSeatCalledQueue(resource)"
+              class="table-page__resource-action table-page__resource-action--primary"
+              :disabled="isSeatingResource(resource)"
+              type="button"
+              @click="seatCalledAssignedQueue(resource)"
+            >
+              {{ isSeatingResource(resource) ? '入桌中' : '叫号入桌' }}
+            </button>
+            <button
+              v-else-if="canSeatAssignedReservation(resource)"
+              class="table-page__resource-action table-page__resource-action--primary"
+              :disabled="isSeatingResource(resource)"
+              type="button"
+              @click="seatAssignedReservation(resource)"
+            >
+              {{ isSeatingResource(resource) ? '入桌中' : '预约入桌' }}
+            </button>
+            <button
+              v-else-if="resource.status === 'reserved'"
+              class="table-page__resource-action"
+              disabled
+              type="button"
+            >
+              {{ preassignedPendingActionText(resource) }}
+            </button>
             <RouterLink
-              v-if="resource.selectable"
+              v-if="canSeatWalkInResource(resource)"
               class="table-page__resource-action table-page__resource-action--primary"
               :to="walkInDirectSeatingRoute(resource)"
             >
@@ -590,9 +1218,10 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
             <button
               v-if="resource.status === 'occupied'"
               class="table-page__resource-action"
-              disabled
-              title="换桌需后端换桌契约"
+              :disabled="!canSwitchResource(resource)"
+              :title="switchResourceTitle(resource)"
               type="button"
+              @click="openTableSwitchDialog(resource)"
             >
               换桌
             </button>
@@ -603,7 +1232,7 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
               type="button"
               @click="startResourceCleaning(resource)"
             >
-              {{ isStartingCleaning(resource) ? '清桌中' : '清桌' }}
+              {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
             </button>
             <button
               v-if="resource.status === 'cleaning'"
@@ -618,6 +1247,14 @@ function createTableActionIdempotencyKey(action: string, resourceId: string): st
         </article>
       </div>
     </section>
+
+    <ReservationTableSwitchDialog
+      v-model:open="showTableSwitchDialog"
+      :business-date="selectedBusinessDate"
+      :item="tableSwitchDialogItem"
+      :store-id="storeId"
+      @switched="handleTableSwitched"
+    />
 
     <StaffBottomNav :store-id="storeId" active-tab="table" />
   </main>
@@ -664,7 +1301,6 @@ h3 {
 }
 
 .top-bar button,
-.status-options button,
 .table-page__area-filter button {
   border: 1px solid #fed7aa;
   border-radius: 999px;
@@ -711,19 +1347,30 @@ h3 {
 .summary-row {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .summary-row__item {
   background: #ffffff;
   border: 1px solid #dbe3ee;
   border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
   display: grid;
+  font: inherit;
   gap: 4px;
   min-height: 64px;
   padding: 10px 6px;
   place-items: center;
   text-align: center;
+}
+
+.summary-row__item.selected {
+  box-shadow: inset 0 0 0 2px rgba(249, 115, 22, 0.28);
+}
+
+.summary-row__item.selected span {
+  color: #0f172a;
 }
 
 .summary-row__item strong {
@@ -738,23 +1385,53 @@ h3 {
   font-weight: 900;
 }
 
+.summary-row__item--available {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
 .summary-row__item--available strong {
-  color: #059669;
+  color: #047857;
+}
+
+.summary-row__item--reserved {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.summary-row__item--reserved strong {
+  color: #92400e;
+}
+
+.summary-row__item--occupied {
+  background: #eef5ff;
+  border-color: #93c5fd;
 }
 
 .summary-row__item--occupied strong {
-  color: #2563eb;
+  color: #1d4ed8;
+}
+
+.summary-row__item--cleaning {
+  background: #fff7ed;
+  border-color: #fdba74;
 }
 
 .summary-row__item--cleaning strong {
-  color: #94a3b8;
+  color: #c2410c;
+}
+
+.summary-row__item--active {
+  background: #f4f0ff;
+  border-color: #c4b5fd;
 }
 
 .summary-row__item--active strong {
-  color: #7c3aed;
+  color: #6d28d9;
 }
 
 .filter-panel,
+.temporary-group-panel,
 .table-page__area-list,
 .table-page__group-section {
   background: #ffffff;
@@ -769,13 +1446,68 @@ h3 {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.status-options {
+.temporary-group-panel {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.temporary-group-panel div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.temporary-group-panel strong {
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.temporary-group-panel span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.temporary-group-panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.status-options button,
+.temporary-group-panel__actions button,
+.temporary-group-panel__seat {
+  align-items: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.temporary-group-panel__seat {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #047857;
+}
+
+.temporary-group-panel__actions button:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
+.temporary-group-panel__seat[disabled] {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
 .table-page__area-filter button {
   align-items: center;
   background: #ffffff;
@@ -784,23 +1516,27 @@ h3 {
   gap: 6px;
 }
 
-.status-options button strong,
 .table-page__area-filter button strong {
   font-size: 0.78rem;
 }
 
-.status-options button.selected,
 .table-page__area-filter button.selected {
   background: #f97316;
   border-color: #f97316;
   color: #ffffff;
 }
 
+.filter-panel__fields {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .party-size-field {
   align-items: center;
   display: flex;
   gap: 8px;
-  grid-column: 1 / -1;
 }
 
 .party-size-field select {
@@ -878,6 +1614,10 @@ h3 {
   padding: 12px;
 }
 
+.table-page__resource-card--temp-selected {
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.28);
+}
+
 .table-page__resource-title {
   align-items: start;
   display: grid;
@@ -912,6 +1652,34 @@ h3 {
 
 .table-page__resource-note {
   color: #64748b;
+}
+
+.table-page__assignment {
+  background: rgba(255, 247, 237, 0.78);
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+}
+
+.table-page__assignment span {
+  color: #c2410c;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.table-page__assignment strong,
+.table-page__assignment small {
+  color: #315f91;
+  font-size: 0.75rem;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.table-page__assignment strong {
+  color: #14213d;
 }
 
 .table-page__resource-actions {

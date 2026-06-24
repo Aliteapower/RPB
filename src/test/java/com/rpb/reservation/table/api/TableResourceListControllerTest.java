@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
+import java.time.LocalDate;
 import com.rpb.reservation.table.application.TableResourceItem;
 import com.rpb.reservation.table.application.TableResourceListQuery;
 import com.rpb.reservation.table.application.TableResourceListResult;
@@ -38,6 +39,7 @@ class TableResourceListControllerTest {
     private static final UUID GROUP_ID = UUID.fromString("71000000-0000-0000-0000-000000001202");
     private static final UUID SEATING_ID = UUID.fromString("80000000-0000-0000-0000-000000001202");
     private static final UUID CLEANING_ID = UUID.fromString("81000000-0000-0000-0000-000000001202");
+    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000001202");
 
     private TableResourceListApplicationService applicationService;
     private MutableCurrentActorProvider actorProvider;
@@ -68,7 +70,9 @@ class TableResourceListControllerTest {
                 null,
                 List.of(),
                 SEATING_ID,
-                null
+                null,
+                RESERVATION_ID,
+                3
             ),
             new TableResourceItem(
                 "table_group",
@@ -90,7 +94,8 @@ class TableResourceListControllerTest {
         mockMvc.perform(get(ENDPOINT, STORE_ID)
                 .param("status", "available")
                 .param("partySize", "4")
-                .param("includeGroups", "true"))
+                .param("includeGroups", "true")
+                .param("businessDate", "2030-06-20"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.resources[0].resourceType").value("dining_table"))
@@ -100,6 +105,8 @@ class TableResourceListControllerTest {
             .andExpect(jsonPath("$.resources[0].areaName").value("A区"))
             .andExpect(jsonPath("$.resources[0].selectable").value(true))
             .andExpect(jsonPath("$.resources[0].currentSeatingId").value(SEATING_ID.toString()))
+            .andExpect(jsonPath("$.resources[0].currentReservationId").value(RESERVATION_ID.toString()))
+            .andExpect(jsonPath("$.resources[0].currentPartySize").value(3))
             .andExpect(jsonPath("$.resources[1].resourceType").value("table_group"))
             .andExpect(jsonPath("$.resources[1].resourceId").value(GROUP_ID.toString()))
             .andExpect(jsonPath("$.resources[1].memberTableCodes[0]").value("V01"))
@@ -114,6 +121,7 @@ class TableResourceListControllerTest {
         assertThat(query.status()).isEqualTo("available");
         assertThat(query.partySize()).isEqualTo(4);
         assertThat(query.includeGroups()).isTrue();
+        assertThat(query.businessDate().value()).isEqualTo(LocalDate.parse("2030-06-20"));
     }
 
     @Test
@@ -121,6 +129,7 @@ class TableResourceListControllerTest {
         Method method = TableResourceListController.class.getMethod(
             "listTableResources",
             UUID.class,
+            String.class,
             String.class,
             String.class,
             String.class
@@ -159,6 +168,15 @@ class TableResourceListControllerTest {
         mockMvc.perform(get(ENDPOINT, STORE_ID).param("partySize", "0"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("INVALID_PARTY_SIZE"));
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void invalidBusinessDateReturnsBadRequestWithoutCallingService() throws Exception {
+        mockMvc.perform(get(ENDPOINT, STORE_ID).param("businessDate", "20-06-2030"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("INVALID_BUSINESS_DATE"));
 
         verifyNoInteractions(applicationService);
     }

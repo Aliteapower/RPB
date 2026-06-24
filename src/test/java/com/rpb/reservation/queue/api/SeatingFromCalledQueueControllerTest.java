@@ -39,6 +39,8 @@ class SeatingFromCalledQueueControllerTest {
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000991");
     private static final UUID TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000991");
     private static final UUID TABLE_GROUP_ID = UUID.fromString("70000000-0000-0000-0000-000000000991");
+    private static final UUID TEMP_TABLE_ID_A = UUID.fromString("70000000-0000-0000-0000-000000000981");
+    private static final UUID TEMP_TABLE_ID_B = UUID.fromString("70000000-0000-0000-0000-000000000982");
     private static final UUID SEATING_ID = UUID.fromString("80000000-0000-0000-0000-000000000991");
 
     private SeatingFromCalledQueueApplicationService applicationService;
@@ -143,6 +145,36 @@ class SeatingFromCalledQueueControllerTest {
     }
 
     @Test
+    void seatsCalledQueueTicketToTemporaryTablesAndMapsMemberIds() throws Exception {
+        when(applicationService.seatCalledQueueTicket(any())).thenReturn(tableGroupSuccess());
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "idem-temp-group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tableId": null,
+                      "tableGroupId": null,
+                      "temporaryTableIds": [
+                        "%s",
+                        "%s"
+                      ],
+                      "note": " Combine tables "
+                    }
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resourceType").value("table_group"));
+
+        ArgumentCaptor<SeatCalledQueueTicketCommand> commandCaptor = ArgumentCaptor.forClass(SeatCalledQueueTicketCommand.class);
+        verify(applicationService).seatCalledQueueTicket(commandCaptor.capture());
+        SeatCalledQueueTicketCommand command = commandCaptor.getValue();
+        assertThat(command.tableId()).isNull();
+        assertThat(command.tableGroupId()).isNull();
+        assertThat(command.temporaryTableIds()).containsExactly(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B);
+        assertThat(command.note()).isEqualTo("Combine tables");
+    }
+
+    @Test
     void alreadySeatedReturnsOkWithoutEvents() throws Exception {
         when(applicationService.seatCalledQueueTicket(any())).thenReturn(SeatingFromCalledQueueResult.alreadySeated(
             QUEUE_TICKET_ID,
@@ -231,10 +263,51 @@ class SeatingFromCalledQueueControllerTest {
     }
 
     @Test
+    void temporaryTableSelectionValidationStopsBeforeService() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "idem-empty-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"temporaryTableIds": []}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "idem-one-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"temporaryTableIds": ["%s"]}
+                    """.formatted(TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "idem-duplicate-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "idem-conflicting-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"tableId": "%s", "temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TABLE_ID, TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_SELECTION_CONFLICT"));
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
     void requestDtoOnlyExposesAllowedFields() {
         assertThat(SeatCalledQueueTicketRequest.class.getRecordComponents())
             .extracting(component -> component.getName())
-            .containsExactly("tableId", "tableGroupId", "overrideReasonCode", "overrideNote", "note");
+            .containsExactly("tableId", "tableGroupId", "temporaryTableIds", "overrideReasonCode", "overrideNote", "note");
     }
 
     @Test
@@ -282,6 +355,12 @@ class SeatingFromCalledQueueControllerTest {
         assertApplicationError(SeatingFromCalledQueueError.TABLE_GROUP_INVALID, 409, "TABLE_GROUP_INVALID", "failed");
         assertApplicationError(SeatingFromCalledQueueError.TABLE_GROUP_MEMBER_UNAVAILABLE, 409, "TABLE_GROUP_MEMBER_UNAVAILABLE", "failed");
         assertApplicationError(SeatingFromCalledQueueError.TABLE_GROUP_CAPACITY_INSUFFICIENT, 409, "TABLE_GROUP_CAPACITY_INSUFFICIENT", "failed");
+        assertApplicationError(SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED, 400, "TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED", "failed");
+        assertApplicationError(SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE, 400, "TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE", "failed");
+        assertApplicationError(SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE, 409, "TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE", "failed");
+        assertApplicationError(SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT, 409, "TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT", "failed");
+        assertApplicationError(SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_LOCK_CONFLICT", "failed");
+        assertApplicationError(SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT", "failed");
         assertApplicationError(SeatingFromCalledQueueError.IDEMPOTENCY_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS", "started");
         assertApplicationError(SeatingFromCalledQueueError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY", "failed");
         assertApplicationError(SeatingFromCalledQueueError.IDEMPOTENCY_CONFLICT, 409, "IDEMPOTENCY_CONFLICT", "conflict");

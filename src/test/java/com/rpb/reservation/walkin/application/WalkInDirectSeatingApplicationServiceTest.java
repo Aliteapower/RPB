@@ -107,6 +107,31 @@ class WalkInDirectSeatingApplicationServiceTest {
     }
 
     @Test
+    void seatsWalkInWithTemporaryTableGroupAndPersistsMembers() {
+        Scenario scenario = Scenario.ready();
+        DiningTable second = scenario.secondAvailableTable();
+        scenario.diningTableRepository.tables.put(second.id().value(), second);
+
+        WalkInDirectSeatingResult result = scenario.service().seatWalkInDirectly(scenario.commandWithTemporaryTables(
+            scenario.recommendedTable.id().value(),
+            second.id().value()
+        ));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resourceType()).isEqualTo("table_group");
+        assertThat(result.resourceId()).isNotEqualTo(scenario.group.id().value());
+        assertThat(scenario.tableGroupRepository.groups.get(result.resourceId()).groupType()).isEqualTo("temporary");
+        assertThat(scenario.tableGroupRepository.groups.get(result.resourceId()).status()).isEqualTo(TableGroupStatus.OCCUPIED);
+        assertThat(scenario.tableGroupRepository.findActiveMembers(scenario.scope, new TableGroupId(result.resourceId())))
+            .extracting(member -> member.tableId().value())
+            .containsExactly(scenario.recommendedTable.id().value(), second.id().value());
+        assertThat(scenario.tableLockRepository.saved.getFirst().resourceType()).isEqualTo("table_group");
+        assertThat(scenario.tableLockRepository.saved.getFirst().resourceId()).isEqualTo(result.resourceId());
+        assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status)
+            .containsOnly(DiningTableStatus.OCCUPIED);
+    }
+
+    @Test
     void completedSameHashReplaysStoredResultWithoutCreatingNewOccupancy() {
         Scenario scenario = Scenario.ready();
         String hash = WalkInDirectSeatingApplicationService.requestHash(scenario.autoCommand());
@@ -213,6 +238,7 @@ class WalkInDirectSeatingApplicationServiceTest {
             null,
             scenario.recommendedTable.id().value(),
             scenario.group.id().value(),
+            List.of(),
             "idem-both",
             scenario.actorId,
             "staff",
@@ -469,6 +495,7 @@ class WalkInDirectSeatingApplicationServiceTest {
                 null,
                 null,
                 null,
+                List.of(),
                 "idem-1001",
                 actorId,
                 "staff",
@@ -492,6 +519,7 @@ class WalkInDirectSeatingApplicationServiceTest {
                 null,
                 tableId,
                 null,
+                List.of(),
                 "idem-" + tableId,
                 actorId,
                 "staff",
@@ -511,7 +539,28 @@ class WalkInDirectSeatingApplicationServiceTest {
                 null,
                 null,
                 tableGroupId,
+                List.of(),
                 "idem-group",
+                actorId,
+                "staff",
+                null,
+                null
+            );
+        }
+
+        SeatWalkInDirectlyCommand commandWithTemporaryTables(UUID... tableIds) {
+            return new SeatWalkInDirectlyCommand(
+                tenantId.value(),
+                storeId.value(),
+                4,
+                null,
+                "Group Guest",
+                null,
+                null,
+                null,
+                null,
+                List.of(tableIds),
+                "idem-temporary-group",
                 actorId,
                 "staff",
                 null,

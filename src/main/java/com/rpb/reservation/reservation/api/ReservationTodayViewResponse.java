@@ -43,7 +43,13 @@ public record ReservationTodayViewResponse(
         UUID seatingId,
         String currentResourceType,
         UUID currentResourceId,
-        String currentResourceCode
+        String currentResourceCode,
+        String assignedResourceType,
+        UUID assignedResourceId,
+        String assignedResourceCode,
+        UUID queueTicketId,
+        Integer queueTicketNumber,
+        String queueTicketStatus
     ) {
     }
 }

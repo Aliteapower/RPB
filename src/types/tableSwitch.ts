@@ -32,7 +32,7 @@ export interface SwitchTableResponse {
   seatingId: string
   fromResource: TableSwitchResourceResponse
   toResource: TableSwitchResourceResponse
-  cleaningId: string
+  cleaningId: string | null
   seatingStatus: string
   events: string[]
   idempotency: TableSwitchIdempotency

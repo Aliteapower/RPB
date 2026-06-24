@@ -14,9 +14,49 @@ public record QueueTicketListItem(
     String reservationStatus,
     String customerName,
     String customerPhoneMasked,
+    String assignedResourceType,
+    UUID assignedResourceId,
+    String assignedResourceCode,
     Instant createdAt,
     Instant calledAt,
     Instant holdUntilAt,
     Instant expiresAt
 ) {
+
+    public QueueTicketListItem(
+        UUID queueTicketId,
+        int queueTicketNumber,
+        String queueTicketStatus,
+        int partySize,
+        String partySizeGroup,
+        UUID reservationId,
+        String reservationCode,
+        String reservationStatus,
+        String customerName,
+        String customerPhoneMasked,
+        Instant createdAt,
+        Instant calledAt,
+        Instant holdUntilAt,
+        Instant expiresAt
+    ) {
+        this(
+            queueTicketId,
+            queueTicketNumber,
+            queueTicketStatus,
+            partySize,
+            partySizeGroup,
+            reservationId,
+            reservationCode,
+            reservationStatus,
+            customerName,
+            customerPhoneMasked,
+            null,
+            null,
+            null,
+            createdAt,
+            calledAt,
+            holdUntilAt,
+            expiresAt
+        );
+    }
 }

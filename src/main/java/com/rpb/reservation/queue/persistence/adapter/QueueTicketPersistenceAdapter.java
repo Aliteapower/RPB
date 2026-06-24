@@ -137,6 +137,9 @@ public class QueueTicketPersistenceAdapter implements QueueTicketRepositoryPort 
             projection.getReservationStatus(),
             projection.getCustomerName(),
             projection.getCustomerPhoneE164(),
+            projection.getAssignedResourceType(),
+            projection.getAssignedResourceId(),
+            projection.getAssignedResourceCode(),
             projection.getCreatedAt(),
             projection.getCalledAt(),
             projection.getExpiresAt()

@@ -16,6 +16,7 @@ export interface SeatWalkInDirectlyRequest {
   phoneE164?: string | null
   tableId?: string | null
   tableGroupId?: string | null
+  temporaryTableIds?: string[] | null
   overrideReasonCode?: string | null
   overrideNote?: string | null
 }

@@ -40,9 +40,9 @@ class QueueCallUiImplementationValidationTest {
         assertThat(staffHome)
             .contains("queue.call")
             .contains("canCallQueueTicket")
-            .contains("name: 'queue-call'")
+            .contains("to: queueTicketListRoute.value")
             .contains("排队叫号")
-            .contains("输入排队记录 ID 并执行叫号")
+            .contains("从列表选择排队票一键叫号")
             .contains("hasVisibleOperation");
         assertForbiddenQueueOperationsAbsent(staffHome);
 

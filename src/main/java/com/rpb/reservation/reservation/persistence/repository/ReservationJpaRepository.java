@@ -127,7 +127,13 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
           s.id as seatingId,
           sr.resourceType as currentResourceType,
           coalesce(sr.tableId, sr.tableGroupId) as currentResourceId,
-          coalesce(dt.tableCode, tg.groupCode) as currentResourceCode
+          coalesce(dt.tableCode, tg.groupCode) as currentResourceCode,
+          rp.resourceType as assignedResourceType,
+          coalesce(rp.tableId, rp.tableGroupId) as assignedResourceId,
+          coalesce(assignedDt.tableCode, assignedTg.groupCode) as assignedResourceCode,
+          qt.id as queueTicketId,
+          qt.ticketNumber as queueTicketNumber,
+          qt.status as queueTicketStatus
         from ReservationEntity r
           left join CustomerEntity c
             on c.tenantId = r.tenantId
@@ -137,14 +143,23 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
             on s.tenantId = r.tenantId
            and s.storeId = r.storeId
            and s.reservationId = r.id
-           and s.status = 'occupied'
+           and s.status in ('occupied', 'completed', 'cleaning_triggered')
            and s.deletedAt is null
           left join SeatingResourceEntity sr
             on sr.tenantId = r.tenantId
            and sr.storeId = r.storeId
            and sr.seatingId = s.id
-           and sr.status = 'active'
+           and sr.status in ('active', 'released')
            and sr.deletedAt is null
+           and sr.assignedAt = (
+             select max(latestSr.assignedAt)
+             from SeatingResourceEntity latestSr
+             where latestSr.tenantId = sr.tenantId
+               and latestSr.storeId = sr.storeId
+               and latestSr.seatingId = sr.seatingId
+               and latestSr.status in ('active', 'released')
+               and latestSr.deletedAt is null
+           )
           left join DiningTableEntity dt
             on dt.tenantId = r.tenantId
            and dt.storeId = r.storeId
@@ -155,6 +170,28 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
            and tg.storeId = r.storeId
            and tg.id = sr.tableGroupId
            and tg.deletedAt is null
+          left join ReservationPreassignmentEntity rp
+            on rp.tenantId = r.tenantId
+           and rp.storeId = r.storeId
+           and rp.reservationId = r.id
+           and rp.status = 'active'
+           and rp.deletedAt is null
+          left join DiningTableEntity assignedDt
+            on assignedDt.tenantId = r.tenantId
+           and assignedDt.storeId = r.storeId
+           and assignedDt.id = rp.tableId
+           and assignedDt.deletedAt is null
+          left join TableGroupEntity assignedTg
+            on assignedTg.tenantId = r.tenantId
+           and assignedTg.storeId = r.storeId
+           and assignedTg.id = rp.tableGroupId
+           and assignedTg.deletedAt is null
+          left join QueueTicketEntity qt
+            on qt.tenantId = r.tenantId
+           and qt.storeId = r.storeId
+           and qt.reservationId = r.id
+           and qt.status in ('waiting', 'called', 'skipped', 'rejoined', 'seated')
+           and qt.deletedAt is null
         where r.tenantId = :tenantId
           and r.storeId = :storeId
           and r.businessDate = :businessDate

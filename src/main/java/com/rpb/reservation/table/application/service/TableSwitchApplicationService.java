@@ -11,15 +11,11 @@ import com.rpb.reservation.audit.rule.DefaultBusinessEventRule;
 import com.rpb.reservation.audit.rule.DefaultStateTransitionRule;
 import com.rpb.reservation.cleaning.application.port.out.CleaningRepositoryPort;
 import com.rpb.reservation.cleaning.application.validator.CleaningResourceValidator;
-import com.rpb.reservation.cleaning.domain.Cleaning;
-import com.rpb.reservation.cleaning.status.CleaningStatus;
-import com.rpb.reservation.cleaning.value.CleaningId;
 import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.state.TransitionResult;
 import com.rpb.reservation.common.value.IdempotencyKey;
-import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -43,7 +39,6 @@ import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.domain.TableGroupMember;
 import com.rpb.reservation.table.group.rule.DefaultTableGroupValidationRule;
 import com.rpb.reservation.table.rule.DefaultTableAvailabilityRule;
-import com.rpb.reservation.table.rule.DefaultTableCapacityRule;
 import com.rpb.reservation.table.rule.DefaultTableLockRule;
 import com.rpb.reservation.table.state.DiningTableStateMachine;
 import com.rpb.reservation.table.status.DiningTableStatus;
@@ -71,7 +66,7 @@ public class TableSwitchApplicationService {
     private static final String RESOURCE_TABLE = "dining_table";
     private static final String RESOURCE_GROUP = "table_group";
     private static final String EVENT_SWITCH_COMPLETED = "table.switch.completed";
-    private static final String EVENT_TABLE_CLEANING = "table.cleaning";
+    private static final String EVENT_TABLE_AVAILABLE = "table.available";
     private static final String EVENT_TABLE_OCCUPIED = "table.occupied";
     private static final String OPERATION_SWITCH_COMPLETED = "table.switch.completed";
     private static final String OPERATION_SWITCH_FAILED = "table.switch.failed";
@@ -88,7 +83,6 @@ public class TableSwitchApplicationService {
     private final IdempotencyRepositoryPort idempotencyRepository;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
-    private final DefaultTableCapacityRule tableCapacityRule = new DefaultTableCapacityRule();
     private final DefaultTableLockRule tableLockRule = new DefaultTableLockRule();
     private final DefaultTableGroupValidationRule tableGroupValidationRule = new DefaultTableGroupValidationRule();
     private final DefaultSeatingResourceValidator seatingResourceValidator = new DefaultSeatingResourceValidator();
@@ -195,22 +189,9 @@ public class TableSwitchApplicationService {
         }
 
         ResourceContext source = sourceForRelease(scope, sourceResource.resourceType(), sourceResource.resourceId());
-        ResourceContext target = targetResource(command, scope, seating.partySizeSnapshot(), source);
+        ResourceContext target = targetResource(command, scope, source);
 
-        UUID cleaningUuid = UUID.randomUUID();
-        Cleaning cleaning = cleaningRepository.save(
-            scope,
-            new Cleaning(
-                new CleaningId(cleaningUuid),
-                scope,
-                seating.id(),
-                source.resourceType(),
-                source.resourceId(),
-                CleaningStatus.CLEANING
-            )
-        );
-
-        transitionTables(scope, source.tables(), DiningTableStatus.CLEANING);
+        transitionTables(scope, source.tables(), DiningTableStatus.AVAILABLE);
         seatingRepository.saveResource(scope, new SeatingResource(
             sourceResource.id(),
             scope,
@@ -225,21 +206,21 @@ public class TableSwitchApplicationService {
         );
         transitionTables(scope, target.tables(), DiningTableStatus.OCCUPIED);
 
-        String metadata = metadata(seating, source, target, cleaning.id().value(), command.reasonCode(), command.note(), started.idempotencyKey());
+        String metadata = metadata(seating, source, target, null, command.reasonCode(), command.note(), started.idempotencyKey());
         List<UUID> eventIds = appendBusinessEvents(scope, command, source, target, metadata);
         List<UUID> transitionIds = appendTransitionLogs(scope, command, sourceResource, targetSeatingResource, source, target, metadata);
         AuditLog auditLog = appendCompletedAudit(scope, command, seating, metadata);
 
-        IdempotencyRecord completed = completeIdempotency(scope, started, seating, source, target, cleaning);
+        IdempotencyRecord completed = completeIdempotency(scope, started, seating, source, target);
         return TableSwitchResult.success(
             seating.id().value(),
             source.resourceType(),
             source.resourceId(),
-            DiningTableStatus.CLEANING.code(),
+            DiningTableStatus.AVAILABLE.code(),
             target.resourceType(),
             target.resourceId(),
             DiningTableStatus.OCCUPIED.code(),
-            cleaning.id().value(),
+            null,
             seating.status().code(),
             completed.status().code(),
             eventIds,
@@ -284,14 +265,14 @@ public class TableSwitchApplicationService {
         throw new ApplicationFailure(TableSwitchError.INVALID_COMMAND);
     }
 
-    private ResourceContext targetResource(SwitchTableCommand command, StoreScope scope, PartySize partySize, ResourceContext source) {
+    private ResourceContext targetResource(SwitchTableCommand command, StoreScope scope, ResourceContext source) {
         if (command.tableId() != null) {
             if (RESOURCE_TABLE.equals(source.resourceType()) && source.resourceId().equals(command.tableId())) {
                 throw new ApplicationFailure(TableSwitchError.TARGET_SAME_AS_CURRENT);
             }
             DiningTable table = diningTableRepository.findById(scope, new TableId(command.tableId()))
                 .orElseThrow(() -> new ApplicationFailure(TableSwitchError.TABLE_NOT_FOUND));
-            validateTargetTable(scope, table, partySize, TableSwitchError.TABLE_NOT_AVAILABLE, TableSwitchError.TABLE_CAPACITY_INSUFFICIENT);
+            validateTargetTable(scope, table, TableSwitchError.TABLE_NOT_AVAILABLE);
             return new ResourceContext(RESOURCE_TABLE, table.id().value(), List.of(table));
         }
 
@@ -303,7 +284,6 @@ public class TableSwitchApplicationService {
         require(tableAvailabilityRule.evaluate(group), TableSwitchError.TABLE_GROUP_INVALID);
         List<TableGroupMember> members = tableGroupRepository.findActiveMembers(scope, group.id());
         require(tableGroupValidationRule.evaluate(group, members), TableSwitchError.TABLE_GROUP_INVALID);
-        require(tableCapacityRule.evaluate(partySize, group.capacity()), TableSwitchError.TABLE_GROUP_CAPACITY_INSUFFICIENT);
         requireNoLock(scope, RESOURCE_GROUP, group.id().value());
         if (seatingRepository.existsActiveResourceOccupancy(scope, RESOURCE_GROUP, group.id().value())) {
             throw new ApplicationFailure(TableSwitchError.TABLE_RESOURCE_UNAVAILABLE);
@@ -322,12 +302,9 @@ public class TableSwitchApplicationService {
     private void validateTargetTable(
         StoreScope scope,
         DiningTable table,
-        PartySize partySize,
-        TableSwitchError unavailableError,
-        TableSwitchError capacityError
+        TableSwitchError unavailableError
     ) {
         require(tableAvailabilityRule.evaluate(table), unavailableError);
-        require(tableCapacityRule.evaluate(partySize, table.capacity()), capacityError);
         requireNoLock(scope, RESOURCE_TABLE, table.id().value());
         if (seatingRepository.existsActiveResourceOccupancy(scope, RESOURCE_TABLE, table.id().value())) {
             throw new ApplicationFailure(unavailableError);
@@ -396,7 +373,7 @@ public class TableSwitchApplicationService {
     ) {
         List<BusinessEvent> events = List.of(
             new BusinessEvent(UUID.randomUUID(), EVENT_SWITCH_COMPLETED, "seating", command.seatingId(), command.actorType(), command.actorId(), command.actorType(), metadata),
-            new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_CLEANING, source.resourceType(), source.resourceId(), command.actorType(), command.actorId(), command.actorType(), metadata),
+            new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_AVAILABLE, source.resourceType(), source.resourceId(), command.actorType(), command.actorId(), command.actorType(), metadata),
             new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_OCCUPIED, target.resourceType(), target.resourceId(), command.actorType(), command.actorId(), command.actorType(), metadata)
         );
         List<UUID> ids = new ArrayList<>();
@@ -423,7 +400,7 @@ public class TableSwitchApplicationService {
         List<StateTransitionLog> logs = new ArrayList<>();
         logs.add(newTransition("seating_resource", sourceResource.id(), "active", "released", "table.switch.release_source", command, metadata));
         logs.add(newTransition("seating_resource", targetResource.id(), "created", "active", "table.switch.assign_target", command, metadata));
-        logs.add(newTransition(source.resourceType(), source.resourceId(), "occupied", "cleaning", transitionCode(source.resourceType(), "cleaning"), command, metadata));
+        logs.add(newTransition(source.resourceType(), source.resourceId(), "occupied", "available", transitionCode(source.resourceType(), "available"), command, metadata));
         logs.add(newTransition(target.resourceType(), target.resourceId(), "available", "occupied", transitionCode(target.resourceType(), "occupy"), command, metadata));
 
         List<UUID> ids = new ArrayList<>();
@@ -507,18 +484,17 @@ public class TableSwitchApplicationService {
         IdempotencyRecord started,
         Seating seating,
         ResourceContext source,
-        ResourceContext target,
-        Cleaning cleaning
+        ResourceContext target
     ) {
         String snapshot = snapshot(
             seating.id().value(),
             source.resourceType(),
             source.resourceId(),
-            DiningTableStatus.CLEANING.code(),
+            DiningTableStatus.AVAILABLE.code(),
             target.resourceType(),
             target.resourceId(),
             DiningTableStatus.OCCUPIED.code(),
-            cleaning.id().value(),
+            null,
             seating.status().code()
         );
         IdempotencyRecord completionPayload = new IdempotencyRecord(
@@ -567,7 +543,7 @@ public class TableSwitchApplicationService {
             extract(snapshot, "toResourceType"),
             UUID.fromString(extract(snapshot, "toResourceId")),
             extract(snapshot, "toResourceStatus"),
-            UUID.fromString(extract(snapshot, "cleaningId")),
+            extractUuidOrNull(snapshot, "cleaningId"),
             extract(snapshot, "seatingStatus")
         );
     }
@@ -632,14 +608,14 @@ public class TableSwitchApplicationService {
         IdempotencyKey idempotencyKey
     ) {
         return """
-            {"seatingId":"%s","fromResourceType":"%s","fromResourceId":"%s","toResourceType":"%s","toResourceId":"%s","cleaningId":"%s","reasonCode":%s,"note":%s,"idempotencyKey":"%s"}
+            {"seatingId":"%s","fromResourceType":"%s","fromResourceId":"%s","toResourceType":"%s","toResourceId":"%s","cleaningId":%s,"reasonCode":%s,"note":%s,"idempotencyKey":"%s"}
             """.formatted(
             seating.id().value(),
             source.resourceType(),
             source.resourceId(),
             target.resourceType(),
             target.resourceId(),
-            cleaningId,
+            jsonNullable(cleaningId),
             jsonNullable(reasonCode),
             jsonNullable(note),
             escape(idempotencyKey.value())
@@ -658,7 +634,7 @@ public class TableSwitchApplicationService {
         String seatingStatus
     ) {
         return """
-            {"seatingId":"%s","fromResourceType":"%s","fromResourceId":"%s","fromResourceStatus":"%s","toResourceType":"%s","toResourceId":"%s","toResourceStatus":"%s","cleaningId":"%s","seatingStatus":"%s"}
+            {"seatingId":"%s","fromResourceType":"%s","fromResourceId":"%s","fromResourceStatus":"%s","toResourceType":"%s","toResourceId":"%s","toResourceStatus":"%s","cleaningId":%s,"seatingStatus":"%s"}
             """.formatted(
             seatingId,
             fromResourceType,
@@ -667,9 +643,26 @@ public class TableSwitchApplicationService {
             toResourceType,
             toResourceId,
             toResourceStatus,
-            cleaningId,
+            jsonNullable(cleaningId),
             seatingStatus
         ).trim();
+    }
+
+    private static UUID extractUuidOrNull(String json, String key) {
+        String value = extractNullable(json, key);
+        return value == null ? null : UUID.fromString(value);
+    }
+
+    private static String extractNullable(String json, String key) {
+        if (json == null) {
+            throw new IllegalArgumentException("snapshot_missing");
+        }
+        Pattern nullValue = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*null");
+        Matcher nullMatcher = nullValue.matcher(json);
+        if (nullMatcher.find()) {
+            return null;
+        }
+        return extract(json, key);
     }
 
     private static String extract(String json, String key) {
@@ -695,6 +688,10 @@ public class TableSwitchApplicationService {
 
     private static String jsonNullable(String value) {
         return hasText(value) ? "\"" + escape(value.trim()) + "\"" : "null";
+    }
+
+    private static String jsonNullable(UUID value) {
+        return value == null ? "null" : "\"" + value + "\"";
     }
 
     private static String normalize(String value) {

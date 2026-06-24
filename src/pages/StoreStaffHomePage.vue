@@ -52,6 +52,9 @@ const canSeatArrivedReservation = computed(() =>
 const canSeatWalkInDirectly = computed(() =>
   hasPermission('walkin.direct_seating.create')
 )
+const canCreateWalkInQueue = computed(() =>
+  hasPermission('walkin.queue.create')
+)
 const canHandleCleaning = computed(() =>
   hasPermission('cleaning.start') && hasPermission('cleaning.complete')
 )
@@ -59,7 +62,7 @@ const canViewTables = computed(() =>
   hasPermission('table.view')
 )
 const hasReceptionOperations = computed(
-  () => canSeatWalkInDirectly.value || canCheckInReservation.value
+  () => canCreateWalkInQueue.value || canSeatWalkInDirectly.value || canCheckInReservation.value
 )
 const hasReservationOperations = computed(
   () =>
@@ -164,6 +167,12 @@ const walkInRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
+const walkInQueueRoute = computed(() => ({
+  name: 'walk-in-queue',
+  params: {
+    storeId: storeId.value
+  }
+}))
 const cleaningRoute = computed(() => ({
   name: 'cleaning-complete',
   params: {
@@ -209,18 +218,6 @@ const queueTicketListRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
-const queueCallRoute = computed(() => ({
-  name: 'queue-call',
-  params: {
-    storeId: storeId.value
-  }
-}))
-const seatingFromCalledQueueRoute = computed(() => ({
-  name: 'seating-from-called-queue',
-  params: {
-    storeId: storeId.value
-  }
-}))
 const reservationArrivedTodayRoute = computed(() => ({
   name: 'reservation-today-view',
   params: {
@@ -231,6 +228,17 @@ const reservationArrivedTodayRoute = computed(() => ({
   }
 }))
 const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
+  canCreateWalkInQueue.value
+    ? {
+        id: 'walkin-queue',
+        label: '现场取号',
+        description: '现场客人取号加入排队',
+        symbol: '号',
+        to: walkInQueueRoute.value,
+        tone: 'queue',
+        emphasis: true
+      }
+    : null,
   canSeatWalkInDirectly.value
     ? {
         id: 'walkin-direct-seating',
@@ -312,9 +320,9 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'queue-call',
         label: '排队叫号',
-        description: '输入排队记录 ID 并执行叫号',
+        description: '从列表选择排队票一键叫号',
         symbol: '叫',
-        to: queueCallRoute.value,
+        to: queueTicketListRoute.value,
         tone: 'queue',
         emphasis: true
       }
@@ -323,9 +331,9 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
     ? {
         id: 'seating-from-called-queue',
         label: '排队入座',
-        description: '输入已叫号排队票 ID 并安排桌台入座',
+        description: '从已叫号票直接安排桌台',
         symbol: '座',
-        to: seatingFromCalledQueueRoute.value,
+        to: queueTicketListRoute.value,
         tone: 'success'
       }
     : null
@@ -429,6 +437,7 @@ function hasPermission(permission: string): boolean {
         <StaffHomeActionGroup
           group-id="staff-section-reception"
           heading="接待"
+          :layout="'three'"
           :actions="receptionActions"
         />
         <StaffHomeActionGroup

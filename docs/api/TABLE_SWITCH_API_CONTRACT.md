@@ -3,7 +3,7 @@
 ## Scope
 
 Table Switch API V1 changes the active seating resource for an occupied seating.
-It keeps the seating active, moves the previous table resource into cleaning, and
+It keeps the seating active, releases the previous table resource to available, and
 occupies the target table resource.
 
 This contract does not implement frontend wiring, migrations, POS integration,
@@ -52,18 +52,18 @@ Created on first success, OK on idempotent replay.
   "fromResource": {
     "type": "TABLE",
     "id": "60000000-0000-0000-0000-000000000001",
-    "status": "cleaning"
+    "status": "available"
   },
   "toResource": {
     "type": "TABLE",
     "id": "60000000-0000-0000-0000-000000000002",
     "status": "occupied"
   },
-  "cleaningId": "50000000-0000-0000-0000-000000000001",
+  "cleaningId": null,
   "seatingStatus": "occupied",
   "events": [
     "table.switch.completed",
-    "table.cleaning",
+    "table.available",
     "table.occupied"
   ],
   "idempotency": {
@@ -79,14 +79,14 @@ Created on first success, OK on idempotent replay.
 - Source seating must have exactly one active `SeatingResource`.
 - Source active resource may be `dining_table` or `table_group`.
 - Target must be different from the source active resource.
-- Target table must be `available`, capacity-compatible, unlocked, and not actively occupied.
-- Target group must be `active`, valid, capacity-compatible, unlocked, not actively occupied, and all member tables must be available, unlocked, and not actively occupied.
-- Source table member statuses move from `occupied` to `cleaning`.
+- Target table must be `available`, unlocked, and not actively occupied. Capacity does not hide or reject an otherwise empty table during table switch.
+- Target group must be `active`, valid, unlocked, not actively occupied, and all member tables must be available, unlocked, and not actively occupied. Capacity does not hide or reject an otherwise empty group during table switch.
+- Source table member statuses move from `occupied` to `available`.
 - Source seating resource status moves from `active` to `released`.
 - A new active seating resource is created for the target resource.
 - Target table member statuses move from `available` to `occupied`.
 - Seating status remains `occupied`.
-- A cleaning record is opened for the released source resource.
+- No cleaning record is opened for the released source resource.
 
 ## Idempotency
 
@@ -106,8 +106,8 @@ switch_table
 
 Successful switch writes:
 
-- `BusinessEvent`: `table.switch.completed`, `table.cleaning`, `table.occupied`
-- `StateTransitionLog`: source seating resource active to released, target seating resource created to active, source resource occupied to cleaning, target resource available to occupied
+- `BusinessEvent`: `table.switch.completed`, `table.available`, `table.occupied`
+- `StateTransitionLog`: source seating resource active to released, target seating resource created to active, source resource occupied to available, target resource available to occupied
 - `AuditLog`: `table.switch.completed`
 
 Failure writes a best-effort failure audit:
@@ -135,8 +135,6 @@ Stable API error codes include:
 | 409 | TABLE_SWITCH_TARGET_SAME_AS_CURRENT |
 | 409 | TABLE_NOT_AVAILABLE |
 | 409 | TABLE_GROUP_INVALID |
-| 409 | TABLE_CAPACITY_INSUFFICIENT |
-| 409 | TABLE_GROUP_CAPACITY_INSUFFICIENT |
 | 409 | TABLE_LOCK_CONFLICT |
 | 409 | TABLE_RESOURCE_UNAVAILABLE |
 | 409 | CLEANING_ALREADY_ACTIVE |
@@ -150,5 +148,6 @@ Stable API error codes include:
 ## Database
 
 No migration is added. The API uses existing seating, seating resource, dining
-table, table group, cleaning, idempotency, audit, business event, and state
-transition tables.
+table, table group, idempotency, audit, business event, and state transition
+tables. It reads active cleaning state defensively but does not create cleaning
+records during table switch.

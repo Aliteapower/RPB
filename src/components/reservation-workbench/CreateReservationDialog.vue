@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 import { createReservation, ReservationCreateApiError } from '../../api/reservationCreateApi'
+import { fetchTableResources, TableResourceApiError } from '../../api/tableResourceApi'
 import { formatReservationCreateErrorMessage } from '../../utils/reservationCreateMessages'
 import StaffGuestContactLookup from '../staff/StaffGuestContactLookup.vue'
 import StaffTimeWheelPicker from '../staff/StaffTimeWheelPicker.vue'
@@ -15,6 +16,10 @@ import type {
   CreateReservationResponse,
   ReservationApiErrorResponse
 } from '../../types/reservation'
+import type {
+  TableResourceApiErrorResponse,
+  TableResourceItem
+} from '../../types/tableResource'
 
 const props = withDefaults(
   defineProps<{
@@ -46,6 +51,10 @@ const form = reactive({
 
 const isSubmitting = ref(false)
 const apiError = ref<ReservationApiErrorResponse | null>(null)
+const tableResourceOptions = ref<TableResourceItem[]>([])
+const isLoadingTableResources = ref(false)
+const tableResourceApiError = ref<TableResourceApiErrorResponse | null>(null)
+let tableResourceLoadSequence = 0
 
 const canSubmit = computed(
   () =>
@@ -57,6 +66,11 @@ const canSubmit = computed(
     !isBeforeMinDate(form.businessDate) &&
     Number.isInteger(form.partySize) &&
     form.partySize > 0
+)
+const selectedResource = computed(() =>
+  tableResourceOptions.value.find(
+    resource => resource.selectable && resourceOptionValue(resource) === form.tablePreference
+  ) ?? null
 )
 
 watch(
@@ -84,6 +98,13 @@ watch(
     if (props.open) {
       applyDefaultFutureDateTime(props.selectedDate)
     }
+  }
+)
+
+watch(
+  [() => props.open, () => props.storeId, () => form.businessDate, () => form.partySize],
+  () => {
+    void loadTableResources()
   }
 )
 
@@ -142,6 +163,8 @@ function validateForm(): ReservationApiErrorResponse | null {
 }
 
 function toRequest(): CreateReservationRequest {
+  const resource = selectedResource.value
+
   return {
     partySize: form.partySize,
     reservedStartAt: toIsoInstant() ?? '',
@@ -149,8 +172,92 @@ function toRequest(): CreateReservationRequest {
     customerId: optionalValue(form.customerId),
     customerName: optionalValue(form.customerName),
     customerNickname: optionalValue(form.customerSalutation),
-    phoneE164: toSingaporePhoneE164(form.phoneLocal)
+    phoneE164: toSingaporePhoneE164(form.phoneLocal),
+    tableId: resource && resource.resourceType === 'dining_table' ? resource.resourceId : null,
+    tableGroupId: resource && resource.resourceType === 'table_group' ? resource.resourceId : null
   }
+}
+
+async function loadTableResources(): Promise<void> {
+  const sequence = ++tableResourceLoadSequence
+  tableResourceApiError.value = null
+
+  if (
+    !props.open ||
+    !props.storeId ||
+    !form.businessDate ||
+    !Number.isInteger(form.partySize) ||
+    form.partySize <= 0
+  ) {
+    tableResourceOptions.value = []
+    isLoadingTableResources.value = false
+    form.tablePreference = 'unassigned'
+    return
+  }
+
+  isLoadingTableResources.value = true
+
+  try {
+    const result = await fetchTableResources(props.storeId, {
+      partySize: form.partySize,
+      includeGroups: true,
+      businessDate: form.businessDate
+    })
+
+    if (sequence === tableResourceLoadSequence) {
+      tableResourceOptions.value = result.resources
+      ensureSelectedResourceStillAvailable()
+    }
+  } catch (error) {
+    if (sequence === tableResourceLoadSequence) {
+      tableResourceOptions.value = []
+      form.tablePreference = 'unassigned'
+      tableResourceApiError.value =
+        error instanceof TableResourceApiError
+          ? error.response
+          : createTableResourceLocalError('REQUEST_FAILED', 'table.resources.request_failed')
+    }
+  } finally {
+    if (sequence === tableResourceLoadSequence) {
+      isLoadingTableResources.value = false
+    }
+  }
+}
+
+function ensureSelectedResourceStillAvailable(): void {
+  if (form.tablePreference === 'unassigned') {
+    return
+  }
+
+  if (!selectedResource.value) {
+    form.tablePreference = 'unassigned'
+  }
+}
+
+function resourceOptionValue(resource: TableResourceItem): string {
+  return `${resource.resourceType}:${resource.resourceId}`
+}
+
+function resourceOptionLabel(resource: TableResourceItem): string {
+  const statusText = resource.selectable ? '可选' : statusDisabledText(resource)
+  return `${resourceKindLabel(resource)} ${resource.displayName || resource.code} · ${resource.capacityMin}-${resource.capacityMax}人 · ${statusText}`
+}
+
+function resourceKindLabel(resource: TableResourceItem): string {
+  return resource.resourceType === 'table_group' ? '桌组' : '桌号'
+}
+
+function statusDisabledText(resource: TableResourceItem): string {
+  const reasonLabels: Record<string, string> = {
+    status_unavailable: '不可选',
+    capacity_mismatch: '人数不匹配',
+    locked: '已锁定',
+    occupied: '已占用',
+    cleaning: '清台中',
+    reservation_preassigned: '已预留'
+  }
+  const reason = resource.selectionDisabledReason?.trim()
+  return reason ? reasonLabels[reason] ?? '不可选' : '不可选'
 }
 
 function toIsoInstant(): string | null {
@@ -186,6 +293,20 @@ function createLocalError(code: string, messageKey: string): ReservationApiError
     },
     idempotency: {
       status: 'failed'
+    }
+  }
+}
+
+function createTableResourceLocalError(
+  code: string,
+  messageKey: string
+): TableResourceApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
     }
   }
 }
@@ -254,9 +375,27 @@ function isBeforeMinDate(value: string): boolean {
 
         <label>
           <span>桌号（可选）</span>
-          <select v-model="form.tablePreference" name="tablePreference">
+          <select
+            v-model="form.tablePreference"
+            :disabled="isSubmitting || isLoadingTableResources"
+            name="tablePreference"
+          >
             <option value="unassigned">未指定</option>
+            <option
+              v-for="resource in tableResourceOptions"
+              :key="`${resource.resourceType}:${resource.resourceId}`"
+              :disabled="!resource.selectable"
+              :value="resourceOptionValue(resource)"
+            >
+              {{ resourceOptionLabel(resource) }}
+            </option>
           </select>
+          <small v-if="isLoadingTableResources" class="reservation-create-dialog__hint">
+            正在读取桌台
+          </small>
+          <small v-else-if="tableResourceApiError" class="reservation-create-dialog__hint">
+            桌台列表读取失败
+          </small>
         </label>
 
         <section v-if="apiError" class="reservation-create-dialog__error" aria-live="assertive">
@@ -374,6 +513,12 @@ function isBeforeMinDate(value: string): boolean {
   font-size: 0.82rem;
   font-weight: 800;
   padding: 9px 11px;
+}
+
+.reservation-create-dialog__hint {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
 .reservation-create-dialog__panel footer {

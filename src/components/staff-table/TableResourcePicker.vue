@@ -15,16 +15,24 @@ const props = defineProps<{
   partySize?: number | null
   selectedTableId?: string | null
   selectedTableGroupId?: string | null
+  selectedTemporaryTableIds?: string[] | null
+  businessDate?: string | null
+  availableOnly?: boolean
+  temporarySelectionEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
   'select-table': [tableId: string]
   'select-table-group': [tableGroupId: string]
+  'select-temporary-tables': [tableIds: string[]]
 }>()
+
+type SelectionMode = 'single' | 'temporary'
 
 const resources = ref<TableResourceItem[]>([])
 const isLoading = ref(false)
 const apiError = ref<TableResourceApiErrorResponse | null>(null)
+const selectionMode = ref<SelectionMode>('single')
 let loadSequence = 0
 
 const statusLabels: Record<string, string> = {
@@ -40,8 +48,11 @@ const statusLabels: Record<string, string> = {
   ended: '已结束'
 }
 
+const displayedResources = computed(() =>
+  props.availableOnly ? resources.value.filter(resource => resource.selectable) : resources.value
+)
 const tableResources = computed(() =>
-  resources.value.filter(resource => resource.resourceType === 'dining_table')
+  displayedResources.value.filter(resource => resource.resourceType === 'dining_table')
 )
 const groupedTableResources = computed(() => {
   const groups = new Map<string, TableResourceItem[]>()
@@ -54,16 +65,41 @@ const groupedTableResources = computed(() => {
   return Array.from(groups, ([title, items]) => ({ title, items }))
 })
 const groupResources = computed(() =>
-  resources.value.filter(resource => resource.resourceType === 'table_group')
+  displayedResources.value.filter(resource => resource.resourceType === 'table_group')
 )
+const selectedTemporaryTableIds = computed(() => props.selectedTemporaryTableIds ?? [])
+const selectedTemporaryTableIdSet = computed(() => new Set(selectedTemporaryTableIds.value))
+const temporarySelectionCount = computed(() => selectedTemporaryTableIds.value.length)
+const showGroupResources = computed(() => selectionMode.value === 'single' && groupResources.value.length > 0)
 const showEmpty = computed(
-  () => !isLoading.value && !apiError.value && resources.value.length === 0
+  () => !isLoading.value && !apiError.value && displayedResources.value.length === 0
+)
+const emptyText = computed(() => (props.availableOnly ? '暂无可用桌台。' : '暂无桌台，请先在后台配置桌台。'))
+const pickerSubtitle = computed(() =>
+  selectionMode.value === 'temporary'
+    ? `临时组合 · 已选 ${temporarySelectionCount.value} 张`
+    : '后台已配置资源'
 )
 
 watch(
-  () => [props.storeId, props.partySize] as const,
+  () => [props.storeId, props.partySize, props.businessDate] as const,
   () => {
     void loadResources()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [props.temporarySelectionEnabled, temporarySelectionCount.value] as const,
+  ([enabled, count]) => {
+    if (!enabled) {
+      selectionMode.value = 'single'
+      return
+    }
+
+    if (count > 0) {
+      selectionMode.value = 'temporary'
+    }
   },
   { immediate: true }
 )
@@ -83,7 +119,8 @@ async function loadResources(): Promise<void> {
   try {
     const result = await fetchTableResources(props.storeId, {
       partySize: props.partySize ?? undefined,
-      includeGroups: true
+      includeGroups: true,
+      businessDate: props.businessDate?.trim() || undefined
     })
 
     if (sequence === loadSequence) {
@@ -104,7 +141,12 @@ async function loadResources(): Promise<void> {
 }
 
 function chooseResource(resource: TableResourceItem): void {
-  if (!resource.selectable) {
+  if (!canChooseResource(resource)) {
+    return
+  }
+
+  if (selectionMode.value === 'temporary') {
+    toggleTemporaryTable(resource.resourceId)
     return
   }
 
@@ -116,7 +158,51 @@ function chooseResource(resource: TableResourceItem): void {
   emit('select-table-group', resource.resourceId)
 }
 
+function switchSelectionMode(mode: SelectionMode): void {
+  if (mode === 'temporary' && !props.temporarySelectionEnabled) {
+    return
+  }
+
+  if (selectionMode.value === mode) {
+    return
+  }
+
+  selectionMode.value = mode
+
+  if (mode === 'temporary') {
+    emit('select-temporary-tables', selectedTemporaryTableIds.value)
+    return
+  }
+
+  if (selectedTemporaryTableIds.value.length) {
+    emit('select-temporary-tables', [])
+  }
+}
+
+function toggleTemporaryTable(tableId: string): void {
+  const selected = new Set(selectedTemporaryTableIds.value)
+
+  if (selected.has(tableId)) {
+    selected.delete(tableId)
+  } else {
+    selected.add(tableId)
+  }
+
+  emit('select-temporary-tables', Array.from(selected))
+}
+
+function canChooseResource(resource: TableResourceItem): boolean {
+  return (
+    resource.selectable &&
+    (selectionMode.value === 'single' || resource.resourceType === 'dining_table')
+  )
+}
+
 function selected(resource: TableResourceItem): boolean {
+  if (selectionMode.value === 'temporary') {
+    return resource.resourceType === 'dining_table' && selectedTemporaryTableIdSet.value.has(resource.resourceId)
+  }
+
   return resource.resourceType === 'dining_table'
     ? props.selectedTableId === resource.resourceId
     : props.selectedTableGroupId === resource.resourceId
@@ -156,9 +242,34 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
     <header class="table-picker__header">
       <div>
         <p>桌号及分组</p>
-        <strong>选择后台已配置的可用资源</strong>
+        <strong>{{ pickerSubtitle }}</strong>
       </div>
-      <button type="button" :disabled="isLoading" @click="loadResources">刷新</button>
+      <div class="table-picker__header-actions">
+        <div
+          v-if="temporarySelectionEnabled"
+          class="table-picker__mode"
+          aria-label="资源选择模式"
+          role="group"
+        >
+          <button
+            type="button"
+            :class="{ selected: selectionMode === 'single' }"
+            :aria-pressed="selectionMode === 'single'"
+            @click="switchSelectionMode('single')"
+          >
+            单桌/桌组
+          </button>
+          <button
+            type="button"
+            :class="{ selected: selectionMode === 'temporary' }"
+            :aria-pressed="selectionMode === 'temporary'"
+            @click="switchSelectionMode('temporary')"
+          >
+            临时组合
+          </button>
+        </div>
+        <button class="table-picker__refresh" type="button" :disabled="isLoading" @click="loadResources">刷新</button>
+      </div>
     </header>
 
     <section v-if="isLoading" class="table-picker__state" aria-live="polite">
@@ -170,7 +281,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
     </section>
 
     <section v-if="showEmpty" class="table-picker__state" aria-live="polite">
-      暂无桌台，请先在后台配置桌台。
+      {{ emptyText }}
     </section>
 
     <section
@@ -185,9 +296,13 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
           v-for="resource in group.items"
           :key="resource.resourceId"
           class="table-picker__resource"
-          :class="{ selected: selected(resource), unavailable: !resource.selectable }"
+          :class="{
+            selected: selected(resource),
+            unavailable: !canChooseResource(resource),
+            'table-picker__resource--temporary': selectionMode === 'temporary'
+          }"
           type="button"
-          :disabled="!resource.selectable"
+          :disabled="!canChooseResource(resource)"
           @click="chooseResource(resource)"
         >
           <span>{{ resource.displayName || resource.code }}</span>
@@ -197,7 +312,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       </div>
     </section>
 
-    <section v-if="groupResources.length" class="table-picker__section" aria-label="桌组">
+    <section v-if="showGroupResources" class="table-picker__section" aria-label="桌组">
       <p class="table-picker__section-title">分组</p>
       <div class="table-picker__grid">
         <button
@@ -250,7 +365,25 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
   margin-top: 3px;
 }
 
-.table-picker__header button {
+.table-picker__header-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: end;
+}
+
+.table-picker__mode {
+  background: #f8fafc;
+  border: 1px solid #d8e0eb;
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.table-picker__mode button,
+.table-picker__refresh {
   background: #fff7ed;
   border: 1px solid #fed7aa;
   border-radius: 999px;
@@ -261,7 +394,21 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
   padding: 0 12px;
 }
 
-.table-picker__header button:disabled {
+.table-picker__mode button {
+  background: transparent;
+  border-color: transparent;
+  color: #64748b;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.table-picker__mode button.selected {
+  background: #ffffff;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.table-picker__refresh:disabled {
   color: #94a3b8;
 }
 
@@ -329,6 +476,12 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
   background: #ecfdf5;
   border-color: #10b981;
   box-shadow: inset 0 0 0 1px #10b981;
+}
+
+.table-picker__resource--temporary.selected {
+  background: #eff6ff;
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
 }
 
 .table-picker__resource.unavailable {

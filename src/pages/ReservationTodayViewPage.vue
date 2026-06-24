@@ -16,7 +16,6 @@ import CreateReservationDialog from '../components/reservation-workbench/CreateR
 import ReservationMonthCalendar from '../components/reservation-workbench/ReservationMonthCalendar.vue'
 import ReservationQuickActionPanel from '../components/reservation-workbench/ReservationQuickActionPanel.vue'
 import ReservationSeatDialog from '../components/reservation-workbench/ReservationSeatDialog.vue'
-import ReservationTableSwitchDialog from '../components/reservation-workbench/ReservationTableSwitchDialog.vue'
 import ReservationTodayListPanel from '../components/reservation-workbench/ReservationTodayListPanel.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
@@ -55,9 +54,7 @@ const checkInApiError = ref<ReservationCheckInApiErrorResponse | null>(null)
 const apps = ref<MeAppEntry[]>([])
 const showCreateReservationDialog = ref(false)
 const showSeatDialog = ref(false)
-const showTableSwitchDialog = ref(false)
 const selectedSeatReservation = ref<ReservationTodayViewItem | null>(null)
-const selectedSwitchTableReservation = ref<ReservationTodayViewItem | null>(null)
 const checkingInReservationId = ref<string | null>(null)
 const visibleMonthKey = ref(monthKeyFromDate(businessDate.value))
 const reservationCounts = ref<Record<string, number>>({})
@@ -81,8 +78,8 @@ const reservationQueueEntry = computed(() =>
 const canCancelReservation = computed(
   () => reservationQueueEntry.value?.permissions.includes('reservation.cancel') ?? false
 )
-const canSwitchTable = computed(
-  () => reservationQueueEntry.value?.permissions.includes('table.switch') ?? false
+const canNoShowReservation = computed(
+  () => reservationQueueEntry.value?.permissions.includes('reservation.no_show') ?? false
 )
 
 watch(
@@ -112,19 +109,20 @@ watch(
 )
 
 watch(
+  () => route.query.create,
+  create => {
+    if (isOpenCreateQuery(create)) {
+      openCreateReservationDialog()
+    }
+  },
+  { immediate: true }
+)
+
+watch(
   showSeatDialog,
   open => {
     if (!open) {
       selectedSeatReservation.value = null
-    }
-  }
-)
-
-watch(
-  showTableSwitchDialog,
-  open => {
-    if (!open) {
-      selectedSwitchTableReservation.value = null
     }
   }
 )
@@ -264,6 +262,11 @@ function handleReservationCancelled(): void {
   void loadCalendarSummary()
 }
 
+function handleReservationNoShowed(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
 async function handleReservationCheckIn(item: ReservationTodayViewItem): Promise<void> {
   const currentStoreId = storeId.value
 
@@ -320,28 +323,6 @@ function openReservationSeatDialog(item: ReservationTodayViewItem): void {
 }
 
 function handleReservationSeated(): void {
-  void loadTodayView()
-  void loadCalendarSummary()
-}
-
-function openReservationTableSwitchDialog(item: ReservationTodayViewItem): void {
-  checkInApiError.value = null
-
-  if (!canRunCurrentDayActions.value) {
-    checkInApiError.value = createLocalCheckInError('RESERVATION_NOT_TODAY', 'reservation.not_today')
-    return
-  }
-
-  if (!canSwitchTable.value || !item.seatingId) {
-    checkInApiError.value = createLocalCheckInError('FORBIDDEN', 'reservation.forbidden')
-    return
-  }
-
-  selectedSwitchTableReservation.value = item
-  showTableSwitchDialog.value = true
-}
-
-function handleReservationTableSwitched(): void {
   void loadTodayView()
   void loadCalendarSummary()
 }
@@ -423,6 +404,11 @@ function statusFilterFromQuery(
     ? (candidate as ReservationTodayViewStatusFilter)
     : null
 }
+
+function isOpenCreateQuery(value: unknown): boolean {
+  const candidate = Array.isArray(value) ? value[0] : value
+  return candidate === '1' || candidate === 'true'
+}
 </script>
 
 <template>
@@ -456,8 +442,8 @@ function statusFilterFromQuery(
       v-model:selected-status="selectedStatus"
       :api-error="apiError"
       :can-cancel-reservation="canCancelReservation"
+      :can-no-show-reservation="canNoShowReservation"
       :can-run-current-day-actions="canRunCurrentDayActions"
-      :can-switch-table="canSwitchTable"
       :checking-in-reservation-id="checkingInReservationId"
       :is-loading="isLoading"
       :items="items"
@@ -466,11 +452,10 @@ function statusFilterFromQuery(
       :status-options="statusOptions"
       :store-id="storeId"
       :store-timezone="storeTimezone"
-      :switching-reservation-id="selectedSwitchTableReservation?.reservationId ?? null"
       @cancelled="handleReservationCancelled"
       @check-in-requested="handleReservationCheckIn"
+      @no-showed="handleReservationNoShowed"
       @seat-requested="openReservationSeatDialog"
-      @switch-table-requested="openReservationTableSwitchDialog"
     />
 
     <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
@@ -492,13 +477,6 @@ function statusFilterFromQuery(
       :item="selectedSeatReservation"
       :store-id="storeId"
       @seated="handleReservationSeated"
-    />
-
-    <ReservationTableSwitchDialog
-      v-model:open="showTableSwitchDialog"
-      :item="selectedSwitchTableReservation"
-      :store-id="storeId"
-      @switched="handleReservationTableSwitched"
     />
 
     <StaffBottomNav :store-id="storeId" active-tab="reservation" />

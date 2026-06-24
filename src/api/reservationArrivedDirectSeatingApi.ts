@@ -95,10 +95,16 @@ function toApiBody(request: SeatArrivedReservationRequest): SeatArrivedReservati
   return {
     tableId: request.tableId ?? null,
     tableGroupId: request.tableGroupId ?? null,
+    temporaryTableIds: temporaryTableIdsOrNull(request.temporaryTableIds),
     overrideReasonCode: request.overrideReasonCode ?? null,
     overrideNote: request.overrideNote ?? null,
     note: request.note ?? null
   }
+}
+
+function temporaryTableIdsOrNull(value: string[] | null | undefined): string[] | null {
+  const ids = value?.map(item => item.trim()).filter(Boolean) ?? []
+  return ids.length ? ids : null
 }
 
 async function readJson(response: Response): Promise<unknown> {

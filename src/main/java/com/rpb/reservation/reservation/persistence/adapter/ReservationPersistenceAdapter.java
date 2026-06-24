@@ -242,7 +242,13 @@ public class ReservationPersistenceAdapter implements ReservationRepositoryPort 
             projection.getSeatingId(),
             projection.getCurrentResourceType(),
             projection.getCurrentResourceId(),
-            projection.getCurrentResourceCode()
+            projection.getCurrentResourceCode(),
+            projection.getAssignedResourceType(),
+            projection.getAssignedResourceId(),
+            projection.getAssignedResourceCode(),
+            projection.getQueueTicketId(),
+            projection.getQueueTicketNumber(),
+            projection.getQueueTicketStatus()
         );
     }
 

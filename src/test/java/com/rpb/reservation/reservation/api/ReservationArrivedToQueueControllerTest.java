@@ -18,7 +18,9 @@ import com.rpb.reservation.reservation.application.service.ReservationArrivedDir
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.lang.reflect.Method;
@@ -50,6 +52,8 @@ class ReservationArrivedToQueueControllerTest {
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
     private ReservationCancelApplicationService cancelApplicationService;
+    private ReservationNoShowApplicationService noShowApplicationService;
+    private ReservationCompleteApplicationService completeApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -60,6 +64,8 @@ class ReservationArrivedToQueueControllerTest {
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
         cancelApplicationService = mock(ReservationCancelApplicationService.class);
+        noShowApplicationService = mock(ReservationNoShowApplicationService.class);
+        completeApplicationService = mock(ReservationCompleteApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.queue"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders
             .standaloneSetup(new ReservationController(
@@ -68,6 +74,8 @@ class ReservationArrivedToQueueControllerTest {
                 seatingApplicationService,
                 queueApplicationService,
                 cancelApplicationService,
+                noShowApplicationService,
+                completeApplicationService,
                 actorProvider,
                 new ReservationApiMapper(),
                 new ReservationApiErrorMapper(),
@@ -78,7 +86,11 @@ class ReservationArrivedToQueueControllerTest {
                 new ReservationArrivedToQueueApiMapper(),
                 new ReservationArrivedToQueueApiErrorMapper(),
                 new ReservationCancelApiMapper(),
-                new ReservationCancelApiErrorMapper()
+                new ReservationCancelApiErrorMapper(),
+                new ReservationNoShowApiMapper(),
+                new ReservationNoShowApiErrorMapper(),
+                new ReservationCompleteApiMapper(),
+                new ReservationCompleteApiErrorMapper()
             ))
             .build();
     }

@@ -524,6 +524,7 @@ class SeatingFromCalledQueueApiIntegrationTest {
             queueTicketId,
             tableId,
             tableGroupId,
+            List.of(),
             "ignored-by-hash",
             ACTOR_ID,
             "staff",

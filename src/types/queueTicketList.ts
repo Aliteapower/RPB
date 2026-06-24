@@ -25,6 +25,9 @@ export interface QueueTicketListItem {
   reservationStatus?: string | null
   customerName?: string | null
   customerPhoneMasked?: string | null
+  assignedResourceType?: 'dining_table' | 'table_group' | (string & {}) | null
+  assignedResourceId?: string | null
+  assignedResourceCode?: string | null
   createdAt: string
   calledAt?: string | null
   holdUntilAt?: string | null

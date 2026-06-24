@@ -95,13 +95,13 @@ class StaffCommonGuestInputUiValidationTest {
 
     @Test
     void staffGuestInputPatternIsSharedByExistingCustomerEntryPages() throws Exception {
-        Path reservationCreatePath = Path.of("src", "pages", "ReservationCreatePage.vue");
+        Path walkInQueuePath = Path.of("src", "pages", "WalkInQueuePage.vue");
         Path walkInDirectSeatingPath = Path.of("src", "pages", "WalkInDirectSeatingPage.vue");
 
-        assertThat(Files.exists(reservationCreatePath)).isTrue();
+        assertThat(Files.exists(walkInQueuePath)).isTrue();
         assertThat(Files.exists(walkInDirectSeatingPath)).isTrue();
 
-        assertUsesSharedGuestInputPattern(Files.readString(reservationCreatePath));
+        assertUsesSharedGuestInputPattern(Files.readString(walkInQueuePath));
         assertUsesSharedGuestInputPattern(Files.readString(walkInDirectSeatingPath));
     }
 

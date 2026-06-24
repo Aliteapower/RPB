@@ -183,6 +183,26 @@ class ReservationTodayViewApiIntegrationTest {
     }
 
     @Test
+    void completedReservationsExposeLastSeatedTableResource() throws Exception {
+        fixture.allStatusReservations(BUSINESS_DATE);
+        fixture.completedTableSeatingForReservation(COMPLETED_ID, SEATING_ID, SEATING_RESOURCE_ID, TABLE_A01_ID);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", BUSINESS_DATE.toString())
+                .param("status", "completed"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].reservationId").value(COMPLETED_ID.toString()))
+            .andExpect(jsonPath("$.items[0].status").value("completed"))
+            .andExpect(jsonPath("$.items[0].seatingId").value(SEATING_ID.toString()))
+            .andExpect(jsonPath("$.items[0].currentResourceType").value("dining_table"))
+            .andExpect(jsonPath("$.items[0].currentResourceId").value(TABLE_A01_ID.toString()))
+            .andExpect(jsonPath("$.items[0].currentResourceCode").value("A01"));
+
+        assertReadOnlyBoundaryWithSeededCompletedSeating();
+    }
+
+    @Test
     void calendarSummaryReturnsReservationCountsForEachReservedDateInMonthWithoutDrafts() throws Exception {
         fixture.allStatusReservations(BUSINESS_DATE);
         fixture.reservation(
@@ -346,6 +366,20 @@ class ReservationTodayViewApiIntegrationTest {
         assertThat(fixture.count("table_locks")).isEqualTo(0);
         assertThat(fixture.scalarString("select status from dining_tables where id = ?", TABLE_A01_ID))
             .isEqualTo("occupied");
+    }
+
+    private void assertReadOnlyBoundaryWithSeededCompletedSeating() {
+        assertThat(fixture.count("idempotency_records")).isEqualTo(0);
+        assertThat(fixture.count("business_events")).isEqualTo(0);
+        assertThat(fixture.count("state_transition_logs")).isEqualTo(0);
+        assertThat(fixture.count("audit_logs")).isEqualTo(0);
+        assertThat(fixture.count("app_gate_audit_logs")).isEqualTo(0);
+        assertThat(fixture.count("queue_tickets")).isEqualTo(0);
+        assertThat(fixture.count("seatings")).isEqualTo(1);
+        assertThat(fixture.count("seating_resources")).isEqualTo(1);
+        assertThat(fixture.count("table_locks")).isEqualTo(0);
+        assertThat(fixture.scalarString("select status from dining_tables where id = ?", TABLE_A01_ID))
+            .isEqualTo("available");
     }
 
     private static CurrentActor actor(Set<String> roles, Set<String> permissions, Set<UUID> storeIds) {
@@ -518,6 +552,76 @@ class ReservationTodayViewApiIntegrationTest {
                 utc(assignedAt),
                 utc(assignedAt),
                 utc(assignedAt)
+            );
+        }
+
+        void completedTableSeatingForReservation(
+            UUID reservationId,
+            UUID seatingId,
+            UUID seatingResourceId,
+            UUID tableId
+        ) {
+            Instant assignedAt = Instant.parse(BUSINESS_DATE + "T03:00:00Z");
+            jdbc.update(
+                """
+                insert into store_areas (
+                    id, tenant_id, store_id, area_code, display_name, status, sort_order
+                )
+                values (?, ?, ?, 'A', 'A区', 'active', 1)
+                """,
+                AREA_A_ID,
+                TENANT_ID,
+                STORE_ID
+            );
+            jdbc.update(
+                """
+                insert into dining_tables (
+                    id, tenant_id, store_id, area_id, table_code, display_name,
+                    capacity_min, capacity_max, status, is_combinable, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'A01', 'A01', 2, 4, 'available', true, ?, ?)
+                """,
+                tableId,
+                TENANT_ID,
+                STORE_ID,
+                AREA_A_ID,
+                utc(assignedAt),
+                utc(assignedAt)
+            );
+            jdbc.update(
+                """
+                insert into seatings (
+                    id, tenant_id, store_id, reservation_id, seating_code, party_size_snapshot,
+                    status, seated_at, completed_at, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'S-TV-COMPLETED', 4, 'completed', ?, ?, ?, ?)
+                """,
+                seatingId,
+                TENANT_ID,
+                STORE_ID,
+                reservationId,
+                utc(assignedAt),
+                utc(assignedAt.plusSeconds(90 * 60L)),
+                utc(assignedAt),
+                utc(assignedAt.plusSeconds(90 * 60L))
+            );
+            jdbc.update(
+                """
+                insert into seating_resources (
+                    id, tenant_id, store_id, seating_id, resource_type, table_id,
+                    assigned_at, released_at, status, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'dining_table', ?, ?, ?, 'released', ?, ?)
+                """,
+                seatingResourceId,
+                TENANT_ID,
+                STORE_ID,
+                seatingId,
+                tableId,
+                utc(assignedAt),
+                utc(assignedAt.plusSeconds(90 * 60L)),
+                utc(assignedAt),
+                utc(assignedAt.plusSeconds(90 * 60L))
             );
         }
 
