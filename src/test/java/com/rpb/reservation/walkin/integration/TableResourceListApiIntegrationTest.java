@@ -1,6 +1,8 @@
 package com.rpb.reservation.walkin.integration;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -30,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -56,6 +59,9 @@ class TableResourceListApiIntegrationTest {
     private static final UUID PREASSIGNMENT_ID = UUID.fromString("51000000-0000-0000-0000-000000001251");
     private static final UUID SEATING_ID = UUID.fromString("52000000-0000-0000-0000-000000001251");
     private static final UUID SEATING_RESOURCE_ID = UUID.fromString("53000000-0000-0000-0000-000000001251");
+    private static final UUID TEMP_GROUP_WALK_IN_ID = UUID.fromString("54000000-0000-0000-0000-000000001251");
+    private static final UUID TEMP_GROUP_SEATING_ID = UUID.fromString("55000000-0000-0000-0000-000000001251");
+    private static final UUID TEMP_GROUP_SEATING_RESOURCE_ID = UUID.fromString("56000000-0000-0000-0000-000000001251");
 
     @Autowired
     private MockMvc mockMvc;
@@ -180,6 +186,176 @@ class TableResourceListApiIntegrationTest {
             .andExpect(jsonPath("$.resources[1].selectable").value(true))
             .andExpect(jsonPath("$.resources[1].preassignedReservationId").doesNotExist())
             .andExpect(jsonPath("$.resources[1].preassignedReservationCode").doesNotExist());
+    }
+
+    @Test
+    void savesAndDissolvesTemporaryTableGroupForTablePageManagement() throws Exception {
+        actorProvider.actor.set(CurrentActor.storeStaff(
+            TENANT_ID,
+            ACTOR_ID,
+            "staff",
+            Set.of("store_staff"),
+            Set.of("table.view", "table.switch"),
+            Set.of(STORE_ID)
+        ));
+
+        mockMvc.perform(post("/api/v1/stores/{storeId}/tables/temporary-groups", STORE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"groupName":"A区临组1","businessDate":"2026-06-25","tableIds":["%s","%s"]}
+                    """.formatted(TABLE_A01_ID, TABLE_A02_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.groupName").value("A区临组1"))
+            .andExpect(jsonPath("$.groupType").value("temporary"))
+            .andExpect(jsonPath("$.status").value("created"))
+            .andExpect(jsonPath("$.tableIds.length()").value(2));
+
+        UUID groupId = jdbc.queryForObject(
+            "select id from table_groups where tenant_id = ? and store_id = ? and group_code = ? and deleted_at is null",
+            UUID.class,
+            TENANT_ID,
+            STORE_ID,
+            "A区临组1"
+        );
+        assertEquals(2, jdbc.queryForObject(
+            "select count(*) from table_group_members where table_group_id = ? and deleted_at is null",
+            Integer.class,
+            groupId
+        ));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-25")
+                .param("includeGroups", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resources[0].code").value("A01"))
+            .andExpect(jsonPath("$.resources[0].selectable").value(false))
+            .andExpect(jsonPath("$.resources[0].selectionDisabledReason").value("temporary_group_member"))
+            .andExpect(jsonPath("$.resources[6].resourceType").value("table_group"))
+            .andExpect(jsonPath("$.resources[6].groupType").value("temporary"))
+            .andExpect(jsonPath("$.resources[6].code").value("A区临组1"))
+            .andExpect(jsonPath("$.resources[6].status").value("created"))
+            .andExpect(jsonPath("$.resources[6].selectable").value(true))
+            .andExpect(jsonPath("$.resources[6].memberTableCodes[0]").value("A01"))
+            .andExpect(jsonPath("$.resources[6].memberTableCodes[1]").value("A02"));
+
+        mockMvc.perform(delete("/api/v1/stores/{storeId}/tables/temporary-groups/{tableGroupId}", STORE_ID, groupId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tableGroupId").value(groupId.toString()));
+
+        assertEquals(0, jdbc.queryForObject(
+            "select count(*) from table_groups where id = ? and deleted_at is null",
+            Integer.class,
+            groupId
+        ));
+        assertEquals(0, jdbc.queryForObject(
+            "select count(*) from table_group_members where table_group_id = ? and deleted_at is null",
+            Integer.class,
+            groupId
+        ));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-25")
+                .param("includeGroups", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resources.length()").value(6))
+            .andExpect(jsonPath("$.resources[0].selectable").value(true))
+            .andExpect(jsonPath("$.resources[0].selectionDisabledReason").doesNotExist());
+    }
+
+    @Test
+    void seatedTemporaryTableGroupIsExposedAsOccupiedAndCannotBeDissolved() throws Exception {
+        actorProvider.actor.set(CurrentActor.storeStaff(
+            TENANT_ID,
+            ACTOR_ID,
+            "staff",
+            Set.of("store_staff"),
+            Set.of("table.view", "table.switch"),
+            Set.of(STORE_ID)
+        ));
+
+        mockMvc.perform(post("/api/v1/stores/{storeId}/tables/temporary-groups", STORE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"groupName":"A区临组入桌","businessDate":"2026-06-25","tableIds":["%s","%s"]}
+                    """.formatted(TABLE_A01_ID, TABLE_A02_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        UUID groupId = jdbc.queryForObject(
+            "select id from table_groups where tenant_id = ? and store_id = ? and group_code = ? and deleted_at is null",
+            UUID.class,
+            TENANT_ID,
+            STORE_ID,
+            "A区临组入桌"
+        );
+        createActiveTemporaryGroupSeating(groupId);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-25")
+                .param("includeGroups", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resources[6].resourceType").value("table_group"))
+            .andExpect(jsonPath("$.resources[6].groupType").value("temporary"))
+            .andExpect(jsonPath("$.resources[6].code").value("A区临组入桌"))
+            .andExpect(jsonPath("$.resources[6].status").value("occupied"))
+            .andExpect(jsonPath("$.resources[6].selectable").value(false))
+            .andExpect(jsonPath("$.resources[6].selectionDisabledReason").value("status_unavailable"))
+            .andExpect(jsonPath("$.resources[6].currentSeatingId").value(TEMP_GROUP_SEATING_ID.toString()))
+            .andExpect(jsonPath("$.resources[6].currentPartySize").value(4));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-25")
+                .param("status", "occupied")
+                .param("includeGroups", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resources[0].code").value("A01"))
+            .andExpect(jsonPath("$.resources[1].code").value("A02"))
+            .andExpect(jsonPath("$.resources[2].code").value("A区临组入桌"));
+
+        mockMvc.perform(delete("/api/v1/stores/{storeId}/tables/temporary-groups/{tableGroupId}", STORE_ID, groupId))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("GROUP_NOT_DISSOLVABLE"));
+    }
+
+    @Test
+    void temporaryTableGroupIsScopedToRequestedBusinessDate() throws Exception {
+        actorProvider.actor.set(CurrentActor.storeStaff(
+            TENANT_ID,
+            ACTOR_ID,
+            "staff",
+            Set.of("store_staff"),
+            Set.of("table.view", "table.switch"),
+            Set.of(STORE_ID)
+        ));
+
+        mockMvc.perform(post("/api/v1/stores/{storeId}/tables/temporary-groups", STORE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"groupName":"A区临组跨日","businessDate":"2026-06-25","tableIds":["%s","%s"]}
+                    """.formatted(TABLE_A01_ID, TABLE_A02_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-25")
+                .param("includeGroups", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resources[0].selectable").value(false))
+            .andExpect(jsonPath("$.resources[0].selectionDisabledReason").value("temporary_group_member"))
+            .andExpect(jsonPath("$.resources[6].code").value("A区临组跨日"));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-06-26")
+                .param("includeGroups", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resources.length()").value(6))
+            .andExpect(jsonPath("$.resources[0].selectable").value(true))
+            .andExpect(jsonPath("$.resources[0].selectionDisabledReason").doesNotExist());
     }
 
     private void createBackendTableSetup() {
@@ -322,6 +498,56 @@ class TableResourceListApiIntegrationTest {
             STORE_ID,
             RESERVATION_ID,
             TABLE_A01_ID
+        );
+    }
+
+    private void createActiveTemporaryGroupSeating(UUID groupId) {
+        jdbc.update(
+            "update dining_tables set status = 'occupied' where id in (?, ?)",
+            TABLE_A01_ID,
+            TABLE_A02_ID
+        );
+        jdbc.update(
+            """
+            insert into walk_ins (
+                id, tenant_id, store_id, walk_in_code, party_size, business_date,
+                arrived_at, status
+            )
+            values (?, ?, ?, 'W-TMP-GROUP-1251', 4, date '2026-06-25',
+                timestamp with time zone '2026-06-25 13:10:00+08', 'seated')
+            """,
+            TEMP_GROUP_WALK_IN_ID,
+            TENANT_ID,
+            STORE_ID
+        );
+        jdbc.update(
+            """
+            insert into seatings (
+                id, tenant_id, store_id, walk_in_id, seating_code, party_size_snapshot,
+                status, seated_at
+            )
+            values (?, ?, ?, ?, 'S-TMP-GROUP-1251', 4,
+                'occupied', timestamp with time zone '2026-06-25 13:15:00+08')
+            """,
+            TEMP_GROUP_SEATING_ID,
+            TENANT_ID,
+            STORE_ID,
+            TEMP_GROUP_WALK_IN_ID
+        );
+        jdbc.update(
+            """
+            insert into seating_resources (
+                id, tenant_id, store_id, seating_id, resource_type, table_group_id,
+                assigned_at, status
+            )
+            values (?, ?, ?, ?, 'table_group', ?,
+                timestamp with time zone '2026-06-25 13:15:00+08', 'active')
+            """,
+            TEMP_GROUP_SEATING_RESOURCE_ID,
+            TENANT_ID,
+            STORE_ID,
+            TEMP_GROUP_SEATING_ID,
+            groupId
         );
     }
 

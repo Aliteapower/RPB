@@ -24,9 +24,16 @@ import {
   fetchTableResources,
   TableResourceApiError
 } from '../api/tableResourceApi'
-import ReservationMonthCalendar from '../components/reservation-workbench/ReservationMonthCalendar.vue'
+import {
+  dissolveTemporaryTableGroup,
+  saveTemporaryTableGroup,
+  TemporaryTableGroupApiError
+} from '../api/temporaryTableGroupApi'
 import ReservationTableSwitchDialog from '../components/reservation-workbench/ReservationTableSwitchDialog.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwitcher.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   TableResourceApiErrorResponse,
@@ -38,6 +45,7 @@ import type { ReservationArrivedDirectSeatingApiErrorResponse } from '../types/r
 import type { ReservationStatusActionApiErrorResponse } from '../types/reservationStatusAction'
 import type { SeatingFromCalledQueueApiErrorResponse } from '../types/seatingFromCalledQueue'
 import type { SwitchTableResponse } from '../types/tableSwitch'
+import type { TemporaryTableGroupApiErrorResponse } from '../types/temporaryTableGroup'
 
 type StatusFilter = 'all' | 'available' | 'reserved' | 'occupied' | 'cleaning' | 'active'
 type AreaFilter = 'all' | string
@@ -59,9 +67,11 @@ type TableActionErrorResponse =
   | ReservationArrivedDirectSeatingApiErrorResponse
   | ReservationStatusActionApiErrorResponse
   | SeatingFromCalledQueueApiErrorResponse
+  | TemporaryTableGroupApiErrorResponse
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
+const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
 const statusOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
@@ -111,8 +121,11 @@ const selectedArea = ref<AreaFilter>('all')
 const selectedBusinessDate = ref(todayDateInput())
 const partySize = ref<number | null>(null)
 const temporaryGroupMode = ref(false)
+const temporaryGroupName = ref('')
 const selectedTemporaryTableIds = ref<string[]>([])
 const isLoading = ref(false)
+const savingTemporaryGroup = ref(false)
+const dissolvingTemporaryGroupId = ref<string | null>(null)
 const startingCleaningResourceId = ref<string | null>(null)
 const completingCleaningResourceId = ref<string | null>(null)
 const seatingResourceId = ref<string | null>(null)
@@ -127,6 +140,8 @@ let loadSequence = 0
 let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
+const appStatusLabel = computed(() => (isLoading.value ? '刷新中' : '桌台'))
 const resources = computed(() => response.value?.resources ?? [])
 const allTableResources = computed(() =>
   resources.value.filter(resource => resource.resourceType === 'dining_table')
@@ -134,20 +149,27 @@ const allTableResources = computed(() =>
 const groupResources = computed(() =>
   resources.value.filter(resource => resource.resourceType === 'table_group')
 )
+const displayableTableResources = computed(() =>
+  allTableResources.value.filter(resource => !isTemporaryGroupMember(resource))
+)
 const statusFilteredTableResources = computed(() => {
   if (selectedStatus.value === 'active') {
     return []
   }
 
   if (selectedStatus.value === 'all') {
-    return allTableResources.value
+    return displayableTableResources.value
+  }
+
+  if (selectedStatus.value === 'available') {
+    return displayableTableResources.value.filter(resource => resource.selectable)
   }
 
   if (selectedStatus.value === 'cleaning') {
-    return allTableResources.value.filter(isCleaningWorkflowResource)
+    return displayableTableResources.value.filter(isCleaningWorkflowResource)
   }
 
-  return allTableResources.value.filter(resource => resource.status === selectedStatus.value)
+  return displayableTableResources.value.filter(resource => resource.status === selectedStatus.value)
 })
 const tableResources = computed(() =>
   selectedArea.value === 'all'
@@ -214,6 +236,14 @@ const partySizeValue = computed({
   }
 })
 const selectedTemporaryTableIdSet = computed(() => new Set(selectedTemporaryTableIds.value))
+const activeTableActionInProgress = computed(
+  () =>
+    savingTemporaryGroup.value ||
+    !!dissolvingTemporaryGroupId.value ||
+    !!startingCleaningResourceId.value ||
+    !!completingCleaningResourceId.value ||
+    !!seatingResourceId.value
+)
 const selectedTemporaryTableResources = computed(() =>
   allTableResources.value.filter(resource => selectedTemporaryTableIdSet.value.has(resource.resourceId))
 )
@@ -242,6 +272,12 @@ const canSeatTemporaryGroup = computed(
     selectedTemporaryTableIds.value.length >= 2 &&
     temporaryGroupPartySize.value > 0
 )
+const canSaveTemporaryGroup = computed(
+  () =>
+    temporaryGroupName.value.trim().length > 0 &&
+    selectedTemporaryTableIds.value.length >= 2 &&
+    !activeTableActionInProgress.value
+)
 const temporaryGroupRoute = computed(() => ({
   name: 'walk-in-direct-seating',
   params: {
@@ -263,7 +299,6 @@ const showFilteredEmpty = computed(
     resources.value.length > 0 &&
     displayedResourceCount.value === 0
 )
-
 watch(
   [storeId, partySize, selectedBusinessDate],
   () => {
@@ -276,6 +311,9 @@ watch(
   selectedBusinessDate,
   nextBusinessDate => {
     visibleMonthKey.value = monthKeyFromDate(nextBusinessDate)
+    temporaryGroupName.value = ''
+    selectedTemporaryTableIds.value = []
+    actionError.value = null
   }
 )
 
@@ -292,16 +330,6 @@ watch(
   options => {
     if (!options.some(option => option.value === selectedArea.value)) {
       selectedArea.value = 'all'
-    }
-  }
-)
-
-watch(
-  isSelectedBusinessDateToday,
-  today => {
-    if (!today) {
-      temporaryGroupMode.value = false
-      selectedTemporaryTableIds.value = []
     }
   }
 )
@@ -394,12 +422,6 @@ function selectArea(area: AreaFilter): void {
 }
 
 function toggleTemporaryGroupMode(): void {
-  if (!isSelectedBusinessDateToday.value) {
-    temporaryGroupMode.value = false
-    selectedTemporaryTableIds.value = []
-    return
-  }
-
   temporaryGroupMode.value = !temporaryGroupMode.value
 
   if (!temporaryGroupMode.value) {
@@ -421,6 +443,63 @@ function toggleTemporaryTable(resource: TableResourceItem): void {
 
 function clearTemporaryGroupSelection(): void {
   selectedTemporaryTableIds.value = []
+}
+
+async function saveSelectedTemporaryGroup(): Promise<void> {
+  const currentStoreId = storeId.value
+  const groupName = temporaryGroupName.value.trim()
+
+  if (!currentStoreId || !canSaveTemporaryGroup.value) {
+    actionError.value = createTemporaryGroupLocalError('GROUP_NAME_REQUIRED', 'table.temporary_group.group_name_required')
+    return
+  }
+
+  actionError.value = null
+  savingTemporaryGroup.value = true
+
+  try {
+    await saveTemporaryTableGroup(currentStoreId, {
+      groupName,
+      tableIds: selectedTemporaryTableIds.value,
+      businessDate: selectedBusinessDate.value
+    })
+    temporaryGroupName.value = ''
+    selectedTemporaryTableIds.value = []
+    temporaryGroupMode.value = false
+    selectedStatus.value = 'active'
+    await loadResources()
+  } catch (error) {
+    actionError.value =
+      error instanceof TemporaryTableGroupApiError
+        ? error.response
+        : createTemporaryGroupLocalError('REQUEST_FAILED', 'table.temporary_group.request_failed')
+  } finally {
+    savingTemporaryGroup.value = false
+  }
+}
+
+async function dissolveTemporaryGroup(resource: TableResourceItem): Promise<void> {
+  const currentStoreId = storeId.value
+
+  if (!currentStoreId || !canDissolveTemporaryGroup(resource) || activeTableActionInProgress.value) {
+    actionError.value = createTemporaryGroupLocalError('GROUP_NOT_DISSOLVABLE', 'table.temporary_group.group_not_dissolvable')
+    return
+  }
+
+  actionError.value = null
+  dissolvingTemporaryGroupId.value = resource.resourceId
+
+  try {
+    await dissolveTemporaryTableGroup(currentStoreId, resource.resourceId)
+    await loadResources()
+  } catch (error) {
+    actionError.value =
+      error instanceof TemporaryTableGroupApiError
+        ? error.response
+        : createTemporaryGroupLocalError('REQUEST_FAILED', 'table.temporary_group.request_failed')
+  } finally {
+    dissolvingTemporaryGroupId.value = null
+  }
 }
 
 async function startResourceCleaning(resource: TableResourceItem): Promise<void> {
@@ -585,7 +664,11 @@ async function seatCalledAssignedQueue(resource: TableResourceItem): Promise<voi
 
 function statusFilterCount(status: StatusFilter): number {
   if (status === 'all') {
-    return allTableResources.value.length
+    return displayableTableResources.value.length
+  }
+
+  if (status === 'available') {
+    return displayableTableResources.value.filter(resource => resource.selectable).length
   }
 
   if (status === 'active') {
@@ -593,10 +676,10 @@ function statusFilterCount(status: StatusFilter): number {
   }
 
   if (status === 'cleaning') {
-    return allTableResources.value.filter(isCleaningWorkflowResource).length
+    return displayableTableResources.value.filter(isCleaningWorkflowResource).length
   }
 
-  return allTableResources.value.filter(resource => resource.status === status).length
+  return displayableTableResources.value.filter(resource => resource.status === status).length
 }
 
 function statusLabel(status: string): string {
@@ -605,6 +688,45 @@ function statusLabel(status: string): string {
 
 function statusClass(status: string): string {
   return `status-${status.replace(/_/g, '-')}`
+}
+
+function isTemporaryGroupMember(resource: TableResourceItem): boolean {
+  return (
+    resource.resourceType === 'dining_table' &&
+    resource.selectionDisabledReason?.trim() === 'temporary_group_member'
+  )
+}
+
+function isTemporaryGroupResource(resource: TableResourceItem): boolean {
+  return (
+    resource.resourceType === 'table_group' &&
+    resource.groupType === 'temporary' &&
+    resource.status === 'created'
+  )
+}
+
+function resourceDisplayStatusLabel(resource: TableResourceItem): string {
+  if (isTemporaryGroupMember(resource)) {
+    return '临时组占用'
+  }
+
+  if (isTemporaryGroupResource(resource)) {
+    return '临时组'
+  }
+
+  return statusLabel(resource.status)
+}
+
+function resourceDisplayStatusClass(resource: TableResourceItem): string {
+  if (isTemporaryGroupMember(resource)) {
+    return 'status-temporary-group-member'
+  }
+
+  if (isTemporaryGroupResource(resource)) {
+    return 'status-temporary-group'
+  }
+
+  return statusClass(resource.status)
 }
 
 function capacityText(resource: TableResourceItem): string {
@@ -680,10 +802,6 @@ function isClearableOccupiedResource(resource: TableResourceItem): boolean {
   )
 }
 
-const activeTableActionInProgress = computed(
-  () => !!startingCleaningResourceId.value || !!completingCleaningResourceId.value || !!seatingResourceId.value
-)
-
 function canSwitchResource(resource: TableResourceItem): boolean {
   return (
     resource.status === 'occupied' &&
@@ -754,9 +872,20 @@ function canSeatWalkInResource(resource: TableResourceItem): boolean {
 function canToggleTemporaryTable(resource: TableResourceItem): boolean {
   return (
     resource.resourceType === 'dining_table' &&
-    isSelectedBusinessDateToday.value &&
     (resource.selectable || isTemporaryTableSelected(resource))
   )
+}
+
+function canDissolveTemporaryGroup(resource: TableResourceItem): boolean {
+  return (
+    resource.resourceType === 'table_group' &&
+    resource.groupType === 'temporary' &&
+    resource.status === 'created'
+  )
+}
+
+function isDissolvingTemporaryGroup(resource: TableResourceItem): boolean {
+  return dissolvingTemporaryGroupId.value === resource.resourceId
 }
 
 function isTemporaryTableSelected(resource: TableResourceItem): boolean {
@@ -798,6 +927,10 @@ function walkInDirectSeatingRoute(resource: TableResourceItem): Record<string, u
   }
 }
 
+function walkInActionText(resource: TableResourceItem): string {
+  return isTemporaryGroupResource(resource) ? '临时入桌' : '入桌'
+}
+
 function resourceSeatRequest(resource: TableResourceItem): {
   tableId?: string | null
   tableGroupId?: string | null
@@ -809,7 +942,7 @@ function resourceSeatRequest(resource: TableResourceItem): {
 
 function selectionReasonText(resource: TableResourceItem): string {
   if (resource.selectable) {
-    return isSelectedBusinessDateToday.value ? '可入桌' : '仅查看'
+    return isSelectedBusinessDateToday.value ? '可入桌' : '可组合'
   }
 
   const reasonLabels: Record<string, string> = {
@@ -818,7 +951,8 @@ function selectionReasonText(resource: TableResourceItem): string {
     locked: '桌台已锁定',
     occupied: '桌台已占用',
     cleaning: '正在清台',
-    reservation_preassigned: '已被预约预留'
+    reservation_preassigned: '已被预约预留',
+    temporary_group_member: '已加入临时桌组'
   }
   const reason = resource.selectionDisabledReason?.trim()
   return reason ? reasonLabels[reason] ?? '当前不可选' : '当前不可选'
@@ -850,6 +984,17 @@ function createCleaningLocalError(code: string, messageKey: string): CleaningApi
     },
     idempotency: {
       status: 'failed'
+    }
+  }
+}
+
+function createTemporaryGroupLocalError(code: string, messageKey: string): TemporaryTableGroupApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
     }
   }
 }
@@ -907,70 +1052,71 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
   const day = part('day')
   return `${year}-${month}-${day}`
 }
+
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return '默认门店'
+  }
+
+  return `门店 ${value.slice(0, 8)}`
+}
 </script>
 
 <template>
-  <main class="staff-workbench-shell staff-workbench-shell--padded table-page">
-    <section class="top-bar">
-      <div>
-        <p>食刻 · 管理</p>
-        <h1>桌台</h1>
-      </div>
-      <button type="button" :disabled="isLoading" @click="loadResources">刷新</button>
-    </section>
+  <main class="staff-workbench-shell table-page">
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="selectedBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    >
+      <template #action>
+        <button type="button" :disabled="isLoading" @click="loadResources">
+          {{ isLoading ? '刷新中' : '刷新' }}
+        </button>
+      </template>
+    </StaffHomeTopBar>
 
-    <section class="flow-strip" aria-label="桌台资源来源">
-      <span>后台开台</span>
-      <span>桌号</span>
-      <span>桌组</span>
-      <span>员工选择</span>
-    </section>
+    <div class="table-page-body">
+      <StaffBusinessDateSwitcher
+        calendar-label="桌台日历"
+        :today-date="currentBusinessDate"
+        :reservation-counts="reservationCounts"
+        v-model:selected-date="selectedBusinessDate"
+        @visible-month-changed="handleVisibleMonthChanged"
+      />
 
-    <section class="summary-row" aria-label="桌台概览">
-      <button
-        v-for="item in summaryItems"
-        :key="item.key"
-        class="summary-row__item"
-        :class="[`summary-row__item--${item.key}`, { selected: selectedStatus === item.key }]"
-        :aria-pressed="selectedStatus === item.key"
-        type="button"
-        @click="selectStatus(item.key)"
-      >
-        <strong>{{ item.value }}</strong>
-        <span>{{ item.label }}</span>
-      </button>
-    </section>
-
-    <ReservationMonthCalendar
-      calendar-label="桌台日历"
-      :reservation-counts="reservationCounts"
-      v-model:selected-date="selectedBusinessDate"
-      @visible-month-changed="handleVisibleMonthChanged"
-    />
-
-    <section class="filter-panel" aria-label="桌台辅助筛选">
-      <div class="filter-panel__fields">
-        <label class="party-size-field">
-          <span>人数</span>
-          <select v-model="partySizeValue" name="partySize">
-            <option value="">不限</option>
-            <option v-for="option in partySizeOptions" :key="option" :value="String(option)">
-              {{ option }} 人
-            </option>
-          </select>
-        </label>
-      </div>
-
-      <p class="filter-panel__total">共 {{ displayedResourceCount }} 个</p>
-    </section>
+      <section class="summary-row" aria-label="桌台概览">
+        <button
+          v-for="item in summaryItems"
+          :key="item.key"
+          class="summary-row__item"
+          :class="[`summary-row__item--${item.key}`, { selected: selectedStatus === item.key }]"
+          :aria-pressed="selectedStatus === item.key"
+          type="button"
+          @click="selectStatus(item.key)"
+        >
+          <strong>{{ item.value }}</strong>
+          <span>{{ item.label }}</span>
+        </button>
+      </section>
 
     <section class="temporary-group-panel" aria-label="临时桌组">
       <div>
         <strong>临时桌组</strong>
         <span>{{ temporaryGroupCapacityText() }} · 已选 {{ selectedTemporaryTableIds.length }} 张</span>
       </div>
+      <label class="temporary-group-panel__name">
+        <span>组名</span>
+        <input
+          v-model.trim="temporaryGroupName"
+          name="temporaryGroupName"
+          placeholder="例如 A区临组1"
+          type="text"
+        />
+      </label>
       <div class="temporary-group-panel__actions">
-        <button type="button" :disabled="!isSelectedBusinessDateToday" @click="toggleTemporaryGroupMode">
+        <button type="button" @click="toggleTemporaryGroupMode">
           {{ temporaryGroupMode ? '退出选择' : '组合桌台' }}
         </button>
         <button
@@ -979,6 +1125,14 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
           @click="clearTemporaryGroupSelection"
         >
           清空
+        </button>
+        <button
+          class="temporary-group-panel__save"
+          type="button"
+          :disabled="!canSaveTemporaryGroup"
+          @click="saveSelectedTemporaryGroup"
+        >
+          {{ savingTemporaryGroup ? '保存中' : '保存分组' }}
         </button>
         <RouterLink
           v-if="canSeatTemporaryGroup"
@@ -1014,9 +1168,20 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
     </section>
 
     <section v-if="groupedAreaResources.length" class="table-page__area-list" aria-label="桌台分区">
-      <header class="table-page__section-heading">
+      <header class="table-page__section-heading table-page__area-heading">
         <h2>桌台分区</h2>
-        <span>{{ tableResources.length }} 个</span>
+        <div class="table-page__area-tools">
+          <label class="table-area-party-filter">
+            <span>人数</span>
+            <select v-model="partySizeValue" name="partySize">
+              <option value="">不限</option>
+              <option v-for="option in partySizeOptions" :key="option" :value="String(option)">
+                {{ option }} 人
+              </option>
+            </select>
+          </label>
+          <span>共 {{ tableResources.length }} 个</span>
+        </div>
       </header>
 
       <div class="table-page__area-filter" aria-label="分区过滤">
@@ -1050,17 +1215,17 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
             :key="resource.resourceId"
             class="table-page__resource-card"
             :class="[
-              statusClass(resource.status),
+              resourceDisplayStatusClass(resource),
               { 'table-page__resource-card--temp-selected': isTemporaryTableSelected(resource) }
             ]"
           >
             <div class="table-page__resource-title">
               <strong>{{ resource.displayName || resource.code }}</strong>
-              <span class="table-page__resource-badge">{{ statusLabel(resource.status) }}</span>
+              <span class="table-page__resource-badge">{{ resourceDisplayStatusLabel(resource) }}</span>
             </div>
             <p class="table-page__resource-meta">{{ capacityText(resource) }}</p>
             <p class="table-page__resource-note">
-              状态：{{ statusLabel(resource.status) }}，{{ selectionReasonText(resource) }}
+              状态：{{ resourceDisplayStatusLabel(resource) }}，{{ selectionReasonText(resource) }}
             </p>
             <section
               v-if="resource.preassignedReservationId"
@@ -1113,7 +1278,7 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
                 class="table-page__resource-action table-page__resource-action--primary"
                 :to="walkInDirectSeatingRoute(resource)"
               >
-                入桌
+                {{ walkInActionText(resource) }}
               </RouterLink>
               <button
                 v-if="resource.status === 'occupied'"
@@ -1164,11 +1329,11 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
           v-for="resource in displayedGroupResources"
           :key="resource.resourceId"
           class="table-page__resource-card table-page__resource-card--group"
-          :class="statusClass(resource.status)"
+          :class="resourceDisplayStatusClass(resource)"
         >
           <div class="table-page__resource-title">
             <strong>{{ resource.displayName || resource.code }}</strong>
-            <span class="table-page__resource-badge">{{ statusLabel(resource.status) }}</span>
+            <span class="table-page__resource-badge">{{ resourceDisplayStatusLabel(resource) }}</span>
           </div>
           <p class="table-page__resource-meta">{{ capacityText(resource) }}</p>
           <p class="table-page__resource-members">{{ membersText(resource) }}</p>
@@ -1182,6 +1347,15 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
             <small v-if="preassignedQueueText(resource)">{{ preassignedQueueText(resource) }}</small>
           </section>
           <div class="table-page__resource-actions" aria-label="桌台分组操作">
+            <button
+              v-if="canDissolveTemporaryGroup(resource)"
+              class="table-page__resource-action table-page__resource-action--danger"
+              :disabled="isDissolvingTemporaryGroup(resource) || activeTableActionInProgress"
+              type="button"
+              @click="dissolveTemporaryGroup(resource)"
+            >
+              {{ isDissolvingTemporaryGroup(resource) ? '解散中' : '解散' }}
+            </button>
             <button
               v-if="canSeatCalledQueue(resource)"
               class="table-page__resource-action table-page__resource-action--primary"
@@ -1213,7 +1387,7 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
               class="table-page__resource-action table-page__resource-action--primary"
               :to="walkInDirectSeatingRoute(resource)"
             >
-              入桌
+              {{ walkInActionText(resource) }}
             </RouterLink>
             <button
               v-if="resource.status === 'occupied'"
@@ -1248,6 +1422,8 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
       </div>
     </section>
 
+    </div>
+
     <ReservationTableSwitchDialog
       v-model:open="showTableSwitchDialog"
       :business-date="selectedBusinessDate"
@@ -1261,16 +1437,13 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
 </template>
 
 <style scoped>
-.top-bar {
-  align-items: center;
+.table-page-body {
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 12px 14px calc(128px + env(safe-area-inset-bottom));
 }
 
-.top-bar p,
-.party-size-field span,
-.filter-panel__total,
+.table-area-party-filter span,
 .table-page__section-heading span,
 .table-page__area-section header span {
   color: #64748b;
@@ -1300,48 +1473,12 @@ h3 {
   font-size: 0.9rem;
 }
 
-.top-bar button,
 .table-page__area-filter button {
   border: 1px solid #fed7aa;
   border-radius: 999px;
   font-weight: 900;
   min-height: 38px;
   padding: 0 13px;
-}
-
-.top-bar button {
-  background: #f97316;
-  color: #ffffff;
-}
-
-.top-bar button:disabled {
-  background: #cbd5e1;
-  border-color: #cbd5e1;
-}
-
-.flow-strip {
-  align-items: center;
-  background: #fff7ed;
-  border: 1px solid #fdba74;
-  border-radius: 8px;
-  color: #c2410c;
-  display: flex;
-  font-size: 0.78rem;
-  font-weight: 900;
-  gap: 8px;
-  min-height: 42px;
-  overflow-x: auto;
-  padding: 0 10px;
-}
-
-.flow-strip span {
-  flex: 0 0 auto;
-}
-
-.flow-strip span + span::before {
-  color: #94a3b8;
-  content: '>';
-  margin-right: 8px;
 }
 
 .summary-row {
@@ -1430,7 +1567,6 @@ h3 {
   color: #6d28d9;
 }
 
-.filter-panel,
 .temporary-group-panel,
 .table-page__area-list,
 .table-page__group-section {
@@ -1440,10 +1576,6 @@ h3 {
   display: grid;
   gap: 12px;
   padding: 12px;
-}
-
-.filter-panel {
-  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .temporary-group-panel {
@@ -1474,6 +1606,23 @@ h3 {
   gap: 8px;
 }
 
+.temporary-group-panel__name {
+  display: grid;
+  gap: 6px;
+}
+
+.temporary-group-panel__name input {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
 .temporary-group-panel__actions button,
 .temporary-group-panel__seat {
   align-items: center;
@@ -1494,6 +1643,12 @@ h3 {
   background: #ecfdf5;
   border-color: #bbf7d0;
   color: #047857;
+}
+
+.temporary-group-panel__save {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
 }
 
 .temporary-group-panel__actions button:disabled {
@@ -1526,34 +1681,22 @@ h3 {
   color: #ffffff;
 }
 
-.filter-panel__fields {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.party-size-field {
+.table-area-party-filter {
   align-items: center;
   display: flex;
   gap: 8px;
 }
 
-.party-size-field select {
+.table-area-party-filter select {
   appearance: none;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   color: #0f172a;
-  flex: 0 1 140px;
   font-weight: 850;
   min-height: 38px;
   padding: 0 30px 0 12px;
-}
-
-.filter-panel__total {
-  align-self: center;
-  justify-self: end;
+  width: 102px;
 }
 
 .state-panel {
@@ -1581,6 +1724,18 @@ h3 {
   justify-content: space-between;
 }
 
+.table-page__area-heading {
+  gap: 10px;
+}
+
+.table-page__area-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .table-page__area-section {
   display: grid;
   gap: 10px;
@@ -1600,7 +1755,7 @@ h3 {
 .table-page__resource-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .table-page__resource-card {
@@ -1762,6 +1917,26 @@ h3 {
 .status-active .table-page__resource-badge {
   background: #ede9fe;
   color: #6d28d9;
+}
+
+.status-temporary-group {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.status-temporary-group .table-page__resource-badge {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-temporary-group-member {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.status-temporary-group-member .table-page__resource-badge {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .status-locked,

@@ -368,6 +368,7 @@ class WalkInDirectSeatingControllerTest {
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
+                "src/main/java/com/rpb/reservation/table/api/TemporaryTableGroupController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
                 "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
             );
@@ -395,6 +396,7 @@ class WalkInDirectSeatingControllerTest {
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
                 "src/components/staff/StaffBottomNav.vue",
+                "src/components/staff/StaffBusinessDateSwitcher.vue",
                 "src/components/staff/StaffGuestContactLookup.vue",
                 "src/components/staff/StaffGuestNameField.vue",
                 "src/components/staff/StaffSingaporePhoneField.vue",

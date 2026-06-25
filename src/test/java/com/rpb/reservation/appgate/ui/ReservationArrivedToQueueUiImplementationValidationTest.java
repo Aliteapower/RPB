@@ -56,7 +56,8 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
             .contains("ReservationQuickActionPanel")
             .contains("routeName: 'reservation-arrived-to-queue'")
             .contains("label: '预约排队'")
-            .contains("已到店预约进入排队")
+            .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
+            .doesNotContain("已到店预约进入排队")
             .doesNotContain("取消预约需后端契约")
             .doesNotContain("queueArrivedReservation")
             .doesNotContain("reservationArrivedToQueueApi");
@@ -89,28 +90,50 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
             .contains("idempotency");
 
         assertThat(page)
+            .contains("StaffHomeTopBar")
+            .contains("StaffBottomNav")
+            .contains("staff-workbench-shell")
             .contains("<h1>预约排队</h1>")
+            .contains("getReservationTodayView")
+            .contains("checkInReservation")
+            .contains("ReservationTodayViewItem")
+            .contains("ReservationCheckInApiError")
+            .contains("status: 'operational'")
+            .contains("queueReservation(item: ReservationTodayViewItem)")
+            .contains("canQueueReservation(item)")
+            .contains("shouldCheckInBeforeQueue(item)")
+            .contains("createReservationCheckInIdempotencyKey")
+            .contains("queue-ticket-list")
+            .contains("reservation-today-view")
+            .contains("router.push(queueTicketListRoute.value)")
+            .contains(":business-date=\"displayedBusinessDate\"")
+            .contains("进入排队线")
+            .contains("到店取号")
+            .contains("可取号预约")
+            .contains("现场取号")
             .contains("reservationId")
-            .contains("partySizeGroup")
-            .contains("reasonCode")
-            .contains("note")
-            .contains("partySizeOptions")
-            .contains("自动推导")
-            .contains("1-2")
-            .contains("3-4")
-            .contains("5-6")
-            .contains("7+")
             .contains("createIdempotencyKey")
             .contains("reservation:queue")
-            .contains("lastIdempotencyKey")
             .contains("queueArrivedReservation")
-            .contains("queueTicketNumber")
-            .contains("queueTicketStatus")
-            .contains("reservationStatus")
-            .contains("alreadyQueued")
-            .contains("idempotency")
             .contains("error.code")
             .contains("error.messageKey");
+        assertThat(page)
+            .doesNotContain("预约 ID")
+            .doesNotContain("复制预约")
+            .doesNotContain("复制 ID")
+            .doesNotContain("name=\"reservationId\"")
+            .doesNotContain("partySizeOptions")
+            .doesNotContain("lastIdempotencyKey")
+            .doesNotContain("idempotency-key")
+            .doesNotContain("idempotency.status")
+            .doesNotContain("alreadyQueued")
+            .doesNotContain("business-date-badge")
+            .doesNotContain("StaffHomeWorkflowStrip")
+            .doesNotContain("no-reservation-quick-ticket")
+            .doesNotContain("快速取号")
+            .doesNotContain("无预约到店取号")
+            .doesNotContain("page-shell")
+            .doesNotContain("返回员工首页");
         assertForbiddenFormFieldsAbsent(page);
     }
 
@@ -134,6 +157,35 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
                 "src/pages/ReservationNoShowPage.vue",
                 "src/pages/ReservationCancellationPage.vue"
             );
+    }
+
+    @Test
+    void reservationTodayListSeparatesDirectReservationSeatingFromCalledQueueSeating() throws Exception {
+        Path todayViewPath = Path.of("src", "pages", "ReservationTodayViewPage.vue");
+        Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
+
+        assertThat(todayViewPath).exists();
+        assertThat(todayListItemPath).exists();
+
+        String todayView = Files.readString(todayViewPath);
+        String todayListItem = Files.readString(todayListItemPath);
+
+        assertThat(todayListItem)
+            .contains("const queueTicketStatus")
+            .contains("const showDirectSeat")
+            .contains("const showQueueSeat")
+            .contains("queueTicketStatus.value === 'called'")
+            .contains("const seatActionText")
+            .contains("排队入座")
+            .contains("resourceLabel")
+            .doesNotContain("const showSeat = computed(() => props.item.status === 'arrived')");
+
+        assertThat(todayView)
+            .contains("useRouter")
+            .contains("router.push({")
+            .contains("name: 'seating-from-called-queue'")
+            .contains("queueTicketId")
+            .contains("showSeatDialog.value = true");
     }
 
     private static void assertForbiddenBodyFieldsAbsent(String source) {

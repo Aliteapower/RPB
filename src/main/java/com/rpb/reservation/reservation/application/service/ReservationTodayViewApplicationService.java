@@ -15,6 +15,7 @@ import com.rpb.reservation.reservation.application.port.out.ReservationTodayView
 import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.status.ReservationStatus;
+import com.rpb.reservation.queue.application.QueueTicketDisplayNumbers;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.tenant.value.TenantId;
@@ -215,6 +216,7 @@ public class ReservationTodayViewApplicationService {
             row.assignedResourceCode(),
             row.queueTicketId(),
             row.queueTicketNumber(),
+            QueueTicketDisplayNumbers.fromGroupCode(row.queueTicketGroupCode(), row.queueTicketNumber()),
             row.queueTicketStatus()
         );
     }

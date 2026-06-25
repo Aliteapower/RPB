@@ -47,5 +47,7 @@ public interface ReservationTodayViewProjection {
 
     Integer getQueueTicketNumber();
 
+    String getQueueTicketGroupCode();
+
     String getQueueTicketStatus();
 }

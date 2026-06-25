@@ -196,6 +196,20 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void createsActiveReservationPreassignmentWhenTemporaryTableGroupIsSelected() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithTableGroup(scenario.temporaryGroup.id()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.preassignmentRepository.saved).hasSize(1);
+        ReservationPreassignment preassignment = scenario.preassignmentRepository.saved.getFirst();
+        assertThat(preassignment.resourceType()).isEqualTo("table_group");
+        assertThat(preassignment.resourceId()).isEqualTo(scenario.temporaryGroup.id().value());
+        assertThat(preassignment.status()).isEqualTo("active");
+    }
+
+    @Test
     void rejectsCapacityUnavailableUsingV1FallbackCapacity() {
         Scenario scenario = Scenario.ready();
         scenario.reservationRepository.capacityUsage = 49;
@@ -523,6 +537,14 @@ class ReservationCreateApplicationServiceTest {
             new com.rpb.reservation.common.value.CapacityRange(6, 10),
             TableGroupStatus.ACTIVE
         );
+        final TableGroup temporaryGroup = new TableGroup(
+            new TableGroupId(UUID.randomUUID()),
+            scope,
+            "临组1",
+            "temporary",
+            new com.rpb.reservation.common.value.CapacityRange(6, 10),
+            TableGroupStatus.CREATED
+        );
         final Customer existingCustomer = new Customer(
             new CustomerId(UUID.randomUUID()),
             scope.tenantScope(),
@@ -557,6 +579,7 @@ class ReservationCreateApplicationServiceTest {
             scenario.diningTableRepository.tables.put(scenario.tableA1.id(), scenario.tableA1);
             scenario.diningTableRepository.tables.put(scenario.smallTable.id(), scenario.smallTable);
             scenario.tableGroupRepository.groups.put(scenario.groupVip.id(), scenario.groupVip);
+            scenario.tableGroupRepository.groups.put(scenario.temporaryGroup.id(), scenario.temporaryGroup);
             return scenario;
         }
 

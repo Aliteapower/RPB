@@ -245,7 +245,8 @@ function createLocalError(
         <TableResourcePicker
           v-else
           :store-id="storeId"
-          :party-size="item?.partySize ?? null"
+          :party-size="null"
+          :available-only="true"
           :selected-table-id="selectedTableId"
           :selected-table-group-id="selectedTableGroupId"
           :selected-temporary-table-ids="selectedTemporaryTableIds"

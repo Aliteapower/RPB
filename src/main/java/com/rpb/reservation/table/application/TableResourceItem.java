@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record TableResourceItem(
     String resourceType,
+    String groupType,
     UUID resourceId,
     String code,
     String displayName,
@@ -52,6 +53,7 @@ public record TableResourceItem(
     ) {
         this(
             resourceType,
+            null,
             resourceId,
             code,
             displayName,
@@ -98,6 +100,7 @@ public record TableResourceItem(
     ) {
         this(
             resourceType,
+            null,
             resourceId,
             code,
             displayName,
@@ -110,6 +113,18 @@ public record TableResourceItem(
             memberTableCodes,
             currentSeatingId,
             currentCleaningId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             null,
             null
         );
@@ -134,6 +149,7 @@ public record TableResourceItem(
     ) {
         this(
             resourceType,
+            null,
             resourceId,
             code,
             displayName,

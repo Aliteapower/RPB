@@ -140,6 +140,9 @@ function isTableResourceItem(payload: unknown): payload is TableResourceItem {
   const candidate = payload as Partial<TableResourceItem>
   return (
     (candidate.resourceType === 'dining_table' || candidate.resourceType === 'table_group') &&
+    (candidate.groupType === undefined ||
+      candidate.groupType === null ||
+      typeof candidate.groupType === 'string') &&
     typeof candidate.resourceId === 'string' &&
     typeof candidate.code === 'string' &&
     typeof candidate.displayName === 'string' &&

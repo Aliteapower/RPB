@@ -22,6 +22,8 @@ import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableLockRepositoryPort;
 import com.rpb.reservation.table.application.service.TemporaryTableGroupApplicationService;
+import com.rpb.reservation.table.application.service.DissolveTemporaryTableGroupCommand;
+import com.rpb.reservation.table.application.service.SaveTemporaryTableGroupCommand;
 import com.rpb.reservation.table.application.service.TemporaryTableGroupCommand;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.domain.TableGroup;
@@ -55,6 +57,7 @@ class TemporaryTableGroupApplicationServiceTest {
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
     private static final StoreScope SCOPE = new StoreScope(new TenantId(TENANT_ID), new StoreId(STORE_ID));
     private static final BusinessDate BUSINESS_DATE = new BusinessDate(LocalDate.of(2026, 6, 24));
+    private static final BusinessDate FUTURE_BUSINESS_DATE = new BusinessDate(LocalDate.of(2026, 6, 26));
     private static final Clock CLOCK = Clock.fixed(OffsetDateTime.parse("2026-06-24T10:00:00Z").toInstant(), ZoneOffset.UTC);
 
     @Test
@@ -67,12 +70,114 @@ class TemporaryTableGroupApplicationServiceTest {
         assertThat(result.error()).isNull();
         assertThat(result.group().groupType()).isEqualTo("temporary");
         assertThat(result.group().status()).isEqualTo(TableGroupStatus.OCCUPIED);
-        assertThat(result.group().capacity()).isEqualTo(new CapacityRange(4, 8));
+        assertThat(result.group().capacity()).isEqualTo(new CapacityRange(2, 8));
         assertThat(result.memberTables()).extracting(table -> table.id().value()).containsExactly(TABLE_A_ID, TABLE_B_ID);
         assertThat(scenario.tableGroupRepository.saved).containsExactly(result.group());
         assertThat(scenario.tableGroupRepository.members)
             .extracting(member -> member.tableId().value())
             .containsExactly(TABLE_A_ID, TABLE_B_ID);
+    }
+
+    @Test
+    void savesCreatedTemporaryGroupWithStaffProvidedNameForTablePageManagement() {
+        Scenario scenario = Scenario.ready();
+
+        TemporaryTableGroupResult result = scenario.service().saveForManagement(managementCommand("A区临组1", TABLE_A_ID, TABLE_B_ID));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.error()).isNull();
+        assertThat(result.group().groupCode()).isEqualTo("A区临组1");
+        assertThat(result.group().groupType()).isEqualTo("temporary");
+        assertThat(result.group().status()).isEqualTo(TableGroupStatus.CREATED);
+        assertThat(result.group().capacity()).isEqualTo(new CapacityRange(2, 8));
+        assertThat(result.members()).extracting(member -> member.tableId().value()).containsExactly(TABLE_A_ID, TABLE_B_ID);
+    }
+
+    @Test
+    void savesFutureBusinessDateTemporaryGroupWithoutCurrentDayOccupancyOrLockBlocking() {
+        Scenario scenario = Scenario.ready();
+        scenario.diningTableRepository.tables.put(TABLE_A_ID, table(TABLE_A_ID, DiningTableStatus.OCCUPIED, true));
+        scenario.diningTableRepository.tables.put(TABLE_B_ID, table(TABLE_B_ID, DiningTableStatus.LOCKED, true));
+        scenario.seatingRepository.occupiedResourceIds.add(TABLE_A_ID);
+        scenario.tableLockRepository.conflictedResourceIds.add(TABLE_B_ID);
+
+        TemporaryTableGroupResult result = scenario.service().saveForManagement(
+            managementCommand("26号预约临组", FUTURE_BUSINESS_DATE, TABLE_A_ID, TABLE_B_ID)
+        );
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.error()).isNull();
+        assertThat(result.group().activeFromAt().toLocalDate()).isEqualTo(FUTURE_BUSINESS_DATE.value());
+        assertThat(result.group().activeUntilAt().toLocalDate()).isEqualTo(FUTURE_BUSINESS_DATE.value().plusDays(1));
+        assertThat(result.members()).extracting(member -> member.tableId().value()).containsExactly(TABLE_A_ID, TABLE_B_ID);
+    }
+
+    @Test
+    void rejectsManagedGroupNameConflictAndActiveTemporaryMemberReuse() {
+        Scenario scenario = Scenario.ready();
+        scenario.tableGroupRepository.existingCodes.add("A区临组1");
+
+        assertThat(scenario.service().saveForManagement(managementCommand("A区临组1", TABLE_A_ID, TABLE_B_ID)).error())
+            .isEqualTo(TemporaryTableGroupError.GROUP_NAME_CONFLICT);
+
+        scenario = Scenario.ready();
+        TableGroup existing = new TableGroup(
+            new TableGroupId(UUID.fromString("71000000-0000-0000-0000-000000000001")),
+            SCOPE,
+            "已存在临组",
+            "temporary",
+            new CapacityRange(2, 8),
+            TableGroupStatus.CREATED
+        );
+        scenario.tableGroupRepository.groups.put(existing.id().value(), existing);
+        scenario.tableGroupRepository.members.add(new TableGroupMember(UUID.randomUUID(), SCOPE, existing.id(), new TableId(TABLE_A_ID), "temporary_member"));
+
+        assertThat(scenario.service().saveForManagement(managementCommand("新临组", TABLE_A_ID, TABLE_B_ID)).error())
+            .isEqualTo(TemporaryTableGroupError.MEMBER_UNAVAILABLE);
+    }
+
+    @Test
+    void dissolvesOnlyCreatedTemporaryGroup() {
+        Scenario scenario = Scenario.ready();
+        TemporaryTableGroupResult saved = scenario.service().saveForManagement(managementCommand("A区临组1", TABLE_A_ID, TABLE_B_ID));
+
+        TemporaryTableGroupResult dissolved = scenario.service().dissolveForManagement(new DissolveTemporaryTableGroupCommand(
+            SCOPE,
+            saved.group().id().value()
+        ));
+
+        assertThat(dissolved.success()).isTrue();
+        assertThat(scenario.tableGroupRepository.deletedGroupIds).containsExactly(saved.group().id());
+
+        Scenario fixedScenario = Scenario.ready();
+        TableGroup fixed = new TableGroup(
+            new TableGroupId(UUID.fromString("71000000-0000-0000-0000-000000000002")),
+            SCOPE,
+            "固定组",
+            "fixed",
+            new CapacityRange(2, 8),
+            TableGroupStatus.ACTIVE
+        );
+        fixedScenario.tableGroupRepository.groups.put(fixed.id().value(), fixed);
+
+        assertThat(fixedScenario.service().dissolveForManagement(new DissolveTemporaryTableGroupCommand(SCOPE, fixed.id().value())).error())
+            .isEqualTo(TemporaryTableGroupError.GROUP_NOT_TEMPORARY);
+    }
+
+    @Test
+    void rejectsDissolvingCreatedTemporaryGroupWithActiveGroupOccupancy() {
+        Scenario scenario = Scenario.ready();
+        TemporaryTableGroupResult saved = scenario.service().saveForManagement(managementCommand("A区临组1", TABLE_A_ID, TABLE_B_ID));
+        scenario.seatingRepository.occupiedGroupResourceIds.add(saved.group().id().value());
+
+        TemporaryTableGroupResult dissolved = scenario.service().dissolveForManagement(new DissolveTemporaryTableGroupCommand(
+            SCOPE,
+            saved.group().id().value()
+        ));
+
+        assertThat(dissolved.success()).isFalse();
+        assertThat(dissolved.error()).isEqualTo(TemporaryTableGroupError.GROUP_NOT_DISSOLVABLE);
+        assertThat(scenario.tableGroupRepository.deletedGroupIds).isEmpty();
     }
 
     @Test
@@ -155,6 +260,19 @@ class TemporaryTableGroupApplicationServiceTest {
             new PartySize(partySize),
             BUSINESS_DATE,
             sourceReservationId
+        );
+    }
+
+    private static SaveTemporaryTableGroupCommand managementCommand(String groupName, UUID... tableIds) {
+        return managementCommand(groupName, BUSINESS_DATE, tableIds);
+    }
+
+    private static SaveTemporaryTableGroupCommand managementCommand(String groupName, BusinessDate businessDate, UUID... tableIds) {
+        return new SaveTemporaryTableGroupCommand(
+            SCOPE,
+            groupName,
+            List.of(tableIds),
+            businessDate
         );
     }
 
@@ -242,6 +360,8 @@ class TemporaryTableGroupApplicationServiceTest {
 
     private static final class FakeTableGroupRepository implements TableGroupRepositoryPort {
         final Map<UUID, TableGroup> groups = new HashMap<>();
+        final Set<String> existingCodes = new HashSet<>();
+        final List<TableGroupId> deletedGroupIds = new ArrayList<>();
         final List<TableGroup> saved = new ArrayList<>();
         final List<TableGroupMember> members = new ArrayList<>();
 
@@ -261,6 +381,17 @@ class TemporaryTableGroupApplicationServiceTest {
         }
 
         @Override
+        public List<TableGroup> findActiveTemporaryGroupsForTable(StoreScope scope, TableId tableId) {
+            return members.stream()
+                .filter(member -> member.scope().equals(scope) && member.tableId().equals(tableId))
+                .map(TableGroupMember::tableGroupId)
+                .map(groupId -> groups.get(groupId.value()))
+                .filter(group -> group != null && "temporary".equals(group.groupType()))
+                .filter(group -> group.status() == TableGroupStatus.CREATED || group.status() == TableGroupStatus.LOCKED || group.status() == TableGroupStatus.OCCUPIED)
+                .toList();
+        }
+
+        @Override
         public List<TableGroup> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate) {
             return groups.values().stream().filter(group -> group.scope().equals(scope)).toList();
         }
@@ -269,6 +400,7 @@ class TemporaryTableGroupApplicationServiceTest {
         public TableGroup save(StoreScope scope, TableGroup tableGroup) {
             saved.add(tableGroup);
             groups.put(tableGroup.id().value(), tableGroup);
+            existingCodes.add(tableGroup.groupCode());
             return tableGroup;
         }
 
@@ -276,6 +408,18 @@ class TemporaryTableGroupApplicationServiceTest {
         public TableGroupMember saveMember(StoreScope scope, TableGroupMember member) {
             members.add(member);
             return member;
+        }
+
+        @Override
+        public boolean existsActiveGroupCode(StoreScope scope, String groupCode) {
+            return existingCodes.contains(groupCode);
+        }
+
+        @Override
+        public void softDeleteGroupAndMembers(StoreScope scope, TableGroupId tableGroupId, OffsetDateTime deletedAt) {
+            deletedGroupIds.add(tableGroupId);
+            groups.remove(tableGroupId.value());
+            members.removeIf(member -> member.tableGroupId().equals(tableGroupId));
         }
     }
 
@@ -344,6 +488,7 @@ class TemporaryTableGroupApplicationServiceTest {
 
     private static final class FakeSeatingRepository implements SeatingRepositoryPort {
         final Set<UUID> occupiedResourceIds = new HashSet<>();
+        final Set<UUID> occupiedGroupResourceIds = new HashSet<>();
 
         @Override
         public Optional<Seating> findById(StoreScope scope, SeatingId seatingId) {
@@ -362,7 +507,8 @@ class TemporaryTableGroupApplicationServiceTest {
 
         @Override
         public boolean existsActiveResourceOccupancy(StoreScope scope, String resourceType, UUID resourceId) {
-            return "dining_table".equals(resourceType) && occupiedResourceIds.contains(resourceId);
+            return ("dining_table".equals(resourceType) && occupiedResourceIds.contains(resourceId))
+                || ("table_group".equals(resourceType) && occupiedGroupResourceIds.contains(resourceId));
         }
 
         @Override

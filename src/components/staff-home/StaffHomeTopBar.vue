@@ -1,9 +1,18 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+
+const props = defineProps<{
   appStatusLabel: string
+  businessDate?: string | null
   currentTimeText: string
   storeLabel: string
 }>()
+
+const displayBusinessDate = computed(() => props.businessDate?.trim() ?? '')
+const displayAppStatus = computed(() => {
+  const status = props.appStatusLabel.trim()
+  return status === '应用可用' ? '' : status
+})
 </script>
 
 <template>
@@ -16,10 +25,19 @@ defineProps<{
       </div>
     </div>
 
-    <div class="topbar-meta" aria-label="当前门店和应用状态">
-      <span class="time-pill">{{ currentTimeText }}</span>
-      <span class="store-pill">{{ storeLabel }}</span>
-      <span class="app-pill">{{ appStatusLabel }}</span>
+    <div class="topbar-meta" aria-label="营业日期、门店和应用状态">
+      <div class="topbar-row topbar-row--time">
+        <div v-if="displayBusinessDate" class="topbar-business-date" aria-label="营业日期">
+          <span>营业日期</span>
+          <time :datetime="displayBusinessDate">{{ displayBusinessDate }}</time>
+        </div>
+        <span class="time-pill">{{ currentTimeText }}</span>
+      </div>
+      <div class="topbar-row topbar-row--store">
+        <span class="store-pill">{{ storeLabel }}</span>
+        <span v-if="displayAppStatus" class="app-pill">{{ displayAppStatus }}</span>
+        <slot name="action" />
+      </div>
     </div>
   </header>
 </template>
@@ -81,12 +99,45 @@ h1 {
 }
 
 .topbar-meta {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.topbar-row {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
   min-width: 0;
+  width: 100%;
+}
+
+.topbar-business-date {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  min-height: 26px;
+  padding: 0 9px;
+}
+
+.topbar-business-date span {
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 850;
+}
+
+.topbar-business-date time {
+  color: #0f172a;
+  font-size: 0.74rem;
+  font-weight: 950;
+  line-height: 1;
 }
 
 .time-pill,
@@ -98,7 +149,7 @@ h1 {
   line-height: 1;
   max-width: 120px;
   overflow: hidden;
-  padding: 7px 9px;
+  padding: 6px 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -118,7 +169,41 @@ h1 {
   color: #c2410c;
 }
 
+:slotted(button) {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #c2410c;
+  font-size: 0.74rem;
+  font-weight: 900;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+:slotted(button:disabled) {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
 @media (max-width: 420px) {
+  .staff-topbar {
+    gap: 8px;
+  }
+
+  .topbar-row {
+    gap: 5px;
+  }
+
+  .topbar-business-date {
+    gap: 5px;
+    padding: 0 8px;
+  }
+
+  .topbar-business-date span {
+    display: none;
+  }
+
   .store-pill {
     max-width: 86px;
   }

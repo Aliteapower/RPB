@@ -57,6 +57,7 @@ class SeatingFromCalledQueueApiIntegrationTest {
     private static final UUID CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000000992");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000992");
     private static final UUID OTHER_RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000993");
+    private static final UUID WALK_IN_ID = UUID.fromString("54000000-0000-0000-0000-000000000992");
     private static final UUID AREA_ID = UUID.fromString("51000000-0000-0000-0000-000000000992");
     private static final UUID TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000992");
     private static final UUID SMALL_TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000993");
@@ -140,6 +141,51 @@ class SeatingFromCalledQueueApiIntegrationTest {
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
 
         assertSuccessfulTableSeating("queue-seat-table-success", QUEUE_TICKET_ID, RESERVATION_ID, TABLE_ID);
+    }
+
+    @Test
+    void seatsCalledWalkInQueueTicketToTableThroughApiAndUpdatesWalkIn() throws Exception {
+        fixture.walkIn(WALK_IN_ID, "queued", 4);
+        fixture.walkInQueueTicket(QUEUE_TICKET_ID, WALK_IN_ID, "called", CALLED_AT, EXPIRES_AT, 12, 1, 4);
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "queue-seat-walk-in-success")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(tableBody(TABLE_ID)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.queueTicketId").value(QUEUE_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.queueTicketStatus").value("seated"))
+            .andExpect(jsonPath("$.reservationId").doesNotExist())
+            .andExpect(jsonPath("$.reservationCode").doesNotExist())
+            .andExpect(jsonPath("$.reservationStatus").doesNotExist())
+            .andExpect(jsonPath("$.resourceType").value("table"))
+            .andExpect(jsonPath("$.resourceId").value(TABLE_ID.toString()))
+            .andExpect(jsonPath("$.events[0]").value("queue_ticket.seated"))
+            .andExpect(jsonPath("$.events[1]").value("walk_in.seated"))
+            .andExpect(jsonPath("$.events[2]").value("seating.created"))
+            .andExpect(jsonPath("$.events[3]").value("table.occupied"));
+
+        assertThat(fixture.count("reservations")).isEqualTo(0);
+        assertThat(fixture.scalarString("select status from queue_tickets where id = ?", QUEUE_TICKET_ID)).isEqualTo("seated");
+        assertThat(fixture.scalarString("select status from walk_ins where id = ?", WALK_IN_ID)).isEqualTo("seated");
+        assertThat(fixture.scalarInteger("""
+            select count(*) from seatings
+            where reservation_id is null
+              and queue_ticket_id = ?
+              and walk_in_id is null
+              and status = 'occupied'
+            """, QUEUE_TICKET_ID)).isEqualTo(1);
+        assertThat(fixture.scalarString("select status from dining_tables where id = ?", TABLE_ID)).isEqualTo("occupied");
+        assertThat(fixture.countWhere("""
+            select count(*) from business_events
+            where event_type in ('queue_ticket.seated', 'walk_in.seated', 'seating.created', 'table.occupied')
+            """)).isEqualTo(4);
+        assertThat(fixture.countWhere("""
+            select count(*) from state_transition_logs
+            where transition_code in ('queue_ticket.seat', 'walk_in.seat_from_queue', 'seating.occupy', 'dining_table.occupy')
+            """)).isEqualTo(4);
+        assertBoundaryNoDownstreamSlices();
     }
 
     @Test
@@ -705,6 +751,63 @@ class SeatingFromCalledQueueApiIntegrationTest {
                 CUSTOMER_ID,
                 reservationId,
                 ticketNumber,
+                BUSINESS_DATE,
+                status,
+                queuePosition,
+                calledAt == null ? null : utc(calledAt),
+                expiresAt == null ? null : utc(expiresAt)
+            );
+        }
+
+        void walkIn(UUID walkInId, String status, int partySize) {
+            jdbc.update(
+                """
+                insert into walk_ins (
+                    id, tenant_id, store_id, customer_id, walk_in_code, party_size,
+                    business_date, arrived_at, status, note, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'W-QSEAT-API', ?, ?, ?, ?, 'Queued walk-in',
+                    now(), now())
+                """,
+                walkInId,
+                TENANT_ID,
+                STORE_ID,
+                CUSTOMER_ID,
+                partySize,
+                BUSINESS_DATE,
+                utc(CALLED_AT.minusSeconds(900)),
+                status
+            );
+        }
+
+        void walkInQueueTicket(
+            UUID queueTicketId,
+            UUID walkInId,
+            String status,
+            Instant calledAt,
+            Instant expiresAt,
+            int ticketNumber,
+            int queuePosition,
+            int partySize
+        ) {
+            jdbc.update(
+                """
+                insert into queue_tickets (
+                    id, tenant_id, store_id, queue_group_id, customer_id, reservation_id,
+                    walk_in_id, ticket_number, party_size, business_date, status,
+                    queue_position, called_at, expires_at, note, created_at, updated_at
+                )
+                values (?, ?, ?, ?, ?, null, ?, ?, ?, ?, ?,
+                    ?, ?, ?, 'Existing called walk-in ticket', now(), now())
+                """,
+                queueTicketId,
+                TENANT_ID,
+                STORE_ID,
+                QUEUE_GROUP_ID,
+                CUSTOMER_ID,
+                walkInId,
+                ticketNumber,
+                partySize,
                 BUSINESS_DATE,
                 status,
                 queuePosition,

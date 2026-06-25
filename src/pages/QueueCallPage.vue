@@ -139,6 +139,11 @@ function optionalDisplay(value: string | number | null | undefined): string {
   return value?.trim() ? value : '未返回'
 }
 
+function queueTicketDisplayText(value: CallQueueTicketResponse): string {
+  const displayNumber = value.queueTicketDisplayNumber?.trim() || String(value.queueTicketNumber)
+  return `#${displayNumber}`
+}
+
 function createIdempotencyKey(): string {
   const prefix = 'queue:call'
   if (globalThis.crypto && 'randomUUID' in globalThis.crypto) {
@@ -218,7 +223,7 @@ function queryValue(value: unknown): string {
       <h2>{{ result.alreadyCalled ? '已叫号' : '叫号成功' }}</h2>
       <div class="call-highlight ticket-highlight">
         <span>排队号码</span>
-        <strong>{{ result.queueTicketNumber }}</strong>
+        <strong>{{ queueTicketDisplayText(result) }}</strong>
       </div>
       <div class="call-highlight status-highlight">
         <span>叫号状态</span>

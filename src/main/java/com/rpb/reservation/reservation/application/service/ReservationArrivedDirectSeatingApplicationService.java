@@ -428,6 +428,8 @@ public class ReservationArrivedDirectSeatingApplicationService {
             case CAPACITY_INSUFFICIENT -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT;
             case LOCK_CONFLICT -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT;
             case PREASSIGNMENT_CONFLICT -> ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+            case GROUP_NAME_REQUIRED, GROUP_NAME_CONFLICT, GROUP_NOT_FOUND, GROUP_NOT_TEMPORARY, GROUP_NOT_DISSOLVABLE ->
+                ReservationArrivedDirectSeatingError.INVALID_COMMAND;
         };
     }
 

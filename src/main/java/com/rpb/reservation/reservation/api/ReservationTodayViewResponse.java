@@ -49,6 +49,7 @@ public record ReservationTodayViewResponse(
         String assignedResourceCode,
         UUID queueTicketId,
         Integer queueTicketNumber,
+        String queueTicketDisplayNumber,
         String queueTicketStatus
     ) {
     }

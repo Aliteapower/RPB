@@ -4,7 +4,7 @@
 
 Use this guide when the full local development stack needs a fast restart against the existing local PostgreSQL runtime.
 
-This captures the 2026-06-24 restart pitfalls so future development does not wait through repeated failed Spring Boot starts.
+This captures the 2026-06-24 and 2026-06-25 restart pitfalls so future development does not wait through repeated failed Spring Boot starts.
 
 ## Known Good Local Baseline
 
@@ -36,6 +36,60 @@ Get-NetTCPConnection -LocalPort 5176,8080 -ErrorAction SilentlyContinue |
 ```
 
 If frontend `5176` is already listening, do not restart it unless frontend assets are stale.
+
+## Start Existing Local PostgreSQL If Needed
+
+The pointer file may exist even when the local validation PostgreSQL process has stopped. In that case Spring Boot reaches JPA and then fails with `Connection to 127.0.0.1:<port> refused`.
+
+First check the pointer port, not the system PostgreSQL service on `5432`:
+
+```powershell
+cd D:\RPB
+
+$pointer = Get-Content target/local-postgres-current.txt
+$pgPort = (
+  $pointer |
+  Where-Object { $_ -match '^port=' } |
+  Select-Object -First 1
+) -replace '^port=', ''
+$pgDataDir = (
+  $pointer |
+  Where-Object { $_ -match '^dataDir=' } |
+  Select-Object -First 1
+) -replace '^dataDir=', ''
+
+Get-NetTCPConnection -LocalPort ([int] $pgPort) -State Listen -ErrorAction SilentlyContinue |
+  Select-Object LocalAddress,LocalPort,State,OwningProcess
+```
+
+If the command returns no listener, start the existing data directory. Do not create a new cluster for a quick restart.
+
+```powershell
+cd D:\RPB
+
+$pointer = Get-Content target/local-postgres-current.txt
+$pgPort = (
+  $pointer |
+  Where-Object { $_ -match '^port=' } |
+  Select-Object -First 1
+) -replace '^port=', ''
+$pgDataDir = (
+  $pointer |
+  Where-Object { $_ -match '^dataDir=' } |
+  Select-Object -First 1
+) -replace '^dataDir=', ''
+
+$pgCtl = (Get-Command pg_ctl.exe -ErrorAction SilentlyContinue).Source
+if (-not $pgCtl) {
+  $pgCtl = 'C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe'
+}
+
+& $pgCtl -D $pgDataDir -o "`"-p`" `"$pgPort`" `"-h`" `"127.0.0.1`"" -w start
+```
+
+Expected successful output includes `listening on IPv4 address "127.0.0.1", port <port>` and `database system is ready to accept connections`.
+
+If another `postgres.exe` is already running on `5432`, leave it alone. It is the system PostgreSQL service and is not the same runtime as `target/local-postgres-current.txt`.
 
 ## Stop Only The Old Backend
 
@@ -77,7 +131,9 @@ $permissions = @(
   'queue.seat',
   'queue.skip',
   'queue.rejoin',
+  'queue.cancel',
   'walkin.direct_seating.create',
+  'walkin.queue.create',
   'cleaning.start',
   'cleaning.complete',
   'table.view',
@@ -158,6 +214,8 @@ Expected:
 
 - `/api/me/apps` returns `reservation_queue`.
 - `reservation_queue.permissions` contains `table.switch`.
+- `reservation_queue.permissions` contains `walkin.queue.create`.
+- `reservation_queue.permissions` contains `queue.cancel`.
 - Table resources use `/api/v1/stores/{storeId}/tables`.
 - Do not use the old `/table-resources` path; it is not the frontend path.
 
@@ -175,9 +233,12 @@ npm run dev -- --host 127.0.0.1 --port 5176
 | Symptom | Evidence | Cause | Fix |
 | --- | --- | --- | --- |
 | Maven fails immediately | `Unknown lifecycle phase ".run.profiles=local"` | PowerShell parsed `-Dspring-boot.run.profiles=local` incorrectly inside a command string | Use the `cmd.exe /c` wrapper above, or quote Maven `-D...` arguments carefully |
+| Spring fails at JPA startup | `Connection to 127.0.0.1:<pointer-port> refused` | `target/local-postgres-current.txt` points to a local PostgreSQL data directory, but that process is not listening | Run `Start Existing Local PostgreSQL If Needed`, then restart only the backend |
 | Spring fails before JPA | `The server requested SCRAM-based authentication, but no password was provided` | App started against default `localhost:5432/reservation_platform` with `reservation_app` and blank password | Read `target/local-postgres-current.txt`; use `DB_NAME=postgres`, `DB_USERNAME=postgres`, blank password for this local trust database |
 | Spring fails at Flyway | `Unsupported Database: PostgreSQL 17.10` | Current Flyway runtime does not support the local PostgreSQL version used by the validation database | Use `--spring.flyway.enabled=false` only after migrations have already been applied to the local validation DB |
 | `/tables` or switch UI hidden | `/api/me/apps` lacks `table.view` or `table.switch` | Local auth permission list is incomplete | Include `table.view` and `table.switch` in `rpb.local-auth.permissions` |
+| Walk-in quick ticket returns `appgate.permission_denied` | `/api/me/apps` lacks `walkin.queue.create` | Local auth permission list is incomplete | Include `walkin.queue.create` in `rpb.local-auth.permissions` |
+| Queue cancel button returns `appgate.permission_denied` | `/api/me/apps` lacks `queue.cancel` | Local auth permission list is incomplete | Include `queue.cancel` in `rpb.local-auth.permissions` |
 | Direct table resource check returns 403 | Request was sent to `/table-resources` | That is not the current frontend/backend route | Use `/api/v1/stores/{storeId}/tables` |
 | Change table button does not show | Today reservation item has no `seatingId` | No active seating resource exists, or the seating is already cleaning/released | This is expected; switch table only applies to active occupied seatings |
 

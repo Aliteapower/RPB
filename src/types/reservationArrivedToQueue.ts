@@ -25,6 +25,7 @@ export interface QueueArrivedReservationResponse {
   reservationStatus: string
   queueTicketId: string
   queueTicketNumber: number
+  queueTicketDisplayNumber: string
   queueTicketStatus: string
   queueGroupId: string
   queueGroupCode?: string | null

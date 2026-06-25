@@ -927,6 +927,34 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         }
 
         @Override
+        public List<TableGroup> findActiveTemporaryGroupsForTable(
+            StoreScope scope,
+            TableId tableId,
+            OffsetDateTime businessStartAt,
+            OffsetDateTime businessEndAt
+        ) {
+            return members.stream()
+                .filter(member -> member.scope().equals(scope) && member.tableId().equals(tableId))
+                .map(TableGroupMember::tableGroupId)
+                .map(groupId -> groups.get(groupId.value()))
+                .filter(group -> group != null && group.scope().equals(scope))
+                .filter(group -> "temporary".equals(group.groupType()))
+                .filter(group -> group.status() == TableGroupStatus.CREATED
+                    || group.status() == TableGroupStatus.LOCKED
+                    || group.status() == TableGroupStatus.OCCUPIED)
+                .filter(group -> overlaps(group, businessStartAt, businessEndAt))
+                .toList();
+        }
+
+        private static boolean overlaps(TableGroup group, OffsetDateTime businessStartAt, OffsetDateTime businessEndAt) {
+            if (group.activeFromAt() == null) {
+                return true;
+            }
+            return group.activeFromAt().isBefore(businessEndAt)
+                && (group.activeUntilAt() == null || group.activeUntilAt().isAfter(businessStartAt));
+        }
+
+        @Override
         public List<TableGroup> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate) {
             return groups.values().stream().filter(group -> group.scope().equals(scope)).toList();
         }

@@ -21,7 +21,16 @@ public interface QueueTicketRepositoryPort {
 
     boolean existsActiveSourceTicket(StoreScope scope, String sourceType, UUID sourceId);
 
-    default QueueTicketListRows findQueueTicketList(StoreScope scope, QueueTicketStatus status, int limit, int offset) {
+    default QueueTicketListRows findQueueTicketList(
+        StoreScope scope,
+        QueueTicketStatus status,
+        BusinessDate businessDate,
+        int limit,
+        int offset,
+        String tableArea,
+        Integer partySize,
+        String phoneDigits
+    ) {
         throw new UnsupportedOperationException("Queue ticket list read is not implemented by this repository.");
     }
 

@@ -1,6 +1,7 @@
 package com.rpb.reservation.table.application.service;
 
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.cleaning.application.port.out.CleaningRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
@@ -22,8 +23,10 @@ import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.domain.TableGroupMember;
 import com.rpb.reservation.table.status.DiningTableStatus;
 import com.rpb.reservation.table.status.TableGroupStatus;
+import com.rpb.reservation.table.value.TableId;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -42,6 +45,8 @@ public class TableResourceListApplicationService {
     private static final String TABLE_GROUP_TYPE = "table_group";
     private static final String STATUS_UNAVAILABLE = "status_unavailable";
     private static final String RESERVATION_PREASSIGNED = "reservation_preassigned";
+    private static final String TEMPORARY_GROUP_MEMBER = "temporary_group_member";
+    private static final String TEMPORARY_GROUP_TYPE = "temporary";
     private static final ZoneId DEFAULT_STORE_ZONE = ZoneId.of("Asia/Singapore");
     private static final Set<String> RESERVATION_PREASSIGNMENT_HOLD_STATUSES = Set.of("confirmed", "arrived");
     private static final Set<String> DATE_SCOPED_AVAILABLE_TABLE_STATUSES = Set.of(
@@ -109,17 +114,25 @@ public class TableResourceListApplicationService {
             Map<ReservationResourceTarget, ReservationResourceAssignment> preassignedAssignments = preassignedAssignments(query);
             boolean liveOperationalDate = liveOperationalDate(query);
             String repositoryStatus = repositoryStatus(query, liveOperationalDate);
+            String groupRepositoryStatus = groupRepositoryStatus(query, liveOperationalDate);
+            BusinessWindow businessWindow = businessWindow(query);
 
             resources.addAll(
                 diningTableRepository.findVisibleResourceRows(query.scope(), repositoryStatus, partySize)
                     .stream()
-                    .map(table -> toDiningTableItem(query, table, preassignedAssignments, liveOperationalDate))
+                    .map(table -> toDiningTableItem(query, table, preassignedAssignments, liveOperationalDate, businessWindow))
                     .toList()
             );
 
             if (query.includeGroups()) {
                 resources.addAll(
-                    tableGroupRepository.findVisibleGroups(query.scope(), repositoryStatus, partySize)
+                    tableGroupRepository.findVisibleGroups(
+                        query.scope(),
+                        groupRepositoryStatus,
+                        partySize,
+                        businessWindow.startAt(),
+                        businessWindow.endAt()
+                    )
                         .stream()
                         .map(group -> toTableGroupItem(query, group, preassignedAssignments, liveOperationalDate))
                         .toList()
@@ -136,19 +149,30 @@ public class TableResourceListApplicationService {
         TableResourceListQuery query,
         DiningTableResourceRow table,
         Map<ReservationResourceTarget, ReservationResourceAssignment> preassignedAssignments,
-        boolean liveOperationalDate
+        boolean liveOperationalDate,
+        BusinessWindow businessWindow
     ) {
         ReservationResourceAssignment preassignment = preassignedAssignments.get(new ReservationResourceTarget(DINING_TABLE_TYPE, table.resourceId()));
         String baseStatus = effectiveDiningTableStatus(table.status(), liveOperationalDate);
         boolean preassigned = holdsTable(preassignment)
             && DiningTableStatus.AVAILABLE.code().equals(baseStatus);
+        boolean temporaryGroupMember = !preassigned
+            && DiningTableStatus.AVAILABLE.code().equals(baseStatus)
+            && liveOperationalDate
+            && !tableGroupRepository.findActiveTemporaryGroupsForTable(
+                query.scope(),
+                new TableId(table.resourceId()),
+                businessWindow.startAt(),
+                businessWindow.endAt()
+            ).isEmpty();
         String status = preassigned ? DiningTableStatus.RESERVED.code() : baseStatus;
-        boolean selectable = DiningTableStatus.AVAILABLE.code().equals(status);
+        boolean selectable = DiningTableStatus.AVAILABLE.code().equals(status) && !temporaryGroupMember;
         Seating currentSeating = currentSeating(status, DINING_TABLE_TYPE, table.resourceId(), query, liveOperationalDate);
         ReservationResourceAssignment visiblePreassignment = visiblePreassignment(preassignment, currentSeating, preassigned);
 
         return new TableResourceItem(
             DINING_TABLE_TYPE,
+            null,
             table.resourceId(),
             table.code(),
             table.displayName(),
@@ -157,7 +181,7 @@ public class TableResourceListApplicationService {
             table.capacityMax(),
             status,
             selectable,
-            selectable ? null : preassigned ? RESERVATION_PREASSIGNED : STATUS_UNAVAILABLE,
+            selectable ? null : preassigned ? RESERVATION_PREASSIGNED : temporaryGroupMember ? TEMPORARY_GROUP_MEMBER : STATUS_UNAVAILABLE,
             List.of(),
             currentSeatingId(currentSeating),
             currentCleaningId(DINING_TABLE_TYPE, table.resourceId(), query, liveOperationalDate),
@@ -186,15 +210,18 @@ public class TableResourceListApplicationService {
     ) {
         ReservationResourceAssignment preassignment = preassignedAssignments.get(new ReservationResourceTarget(TABLE_GROUP_TYPE, group.id().value()));
         TableGroupStatus baseStatus = effectiveTableGroupStatus(group.status(), liveOperationalDate);
-        boolean preassigned = holdsTable(preassignment)
+        Seating currentSeating = activeOccupancy(TABLE_GROUP_TYPE, group.id().value(), query, liveOperationalDate);
+        boolean occupied = currentSeating != null;
+        boolean preassigned = !occupied
+            && holdsTable(preassignment)
             && baseStatus == TableGroupStatus.ACTIVE;
-        String status = preassigned ? DiningTableStatus.RESERVED.code() : baseStatus.code();
-        boolean selectable = baseStatus == TableGroupStatus.ACTIVE && !preassigned;
-        Seating currentSeating = currentSeating(status, TABLE_GROUP_TYPE, group.id().value(), query, liveOperationalDate);
+        String status = occupied ? TableGroupStatus.OCCUPIED.code() : preassigned ? DiningTableStatus.RESERVED.code() : baseStatus.code();
+        boolean selectable = !occupied && isSelectableGroup(group, baseStatus) && !preassigned;
         ReservationResourceAssignment visiblePreassignment = visiblePreassignment(preassignment, currentSeating, preassigned);
 
         return new TableResourceItem(
             TABLE_GROUP_TYPE,
+            group.groupType(),
             group.id().value(),
             group.groupCode(),
             group.groupCode(),
@@ -277,6 +304,13 @@ public class TableResourceListApplicationService {
         return query.status();
     }
 
+    private static String groupRepositoryStatus(TableResourceListQuery query, boolean liveOperationalDate) {
+        if (liveOperationalDate && TableGroupStatus.OCCUPIED.code().equals(query.status())) {
+            return null;
+        }
+        return repositoryStatus(query, liveOperationalDate);
+    }
+
     private static List<TableResourceItem> applyStatusFilter(
         TableResourceListQuery query,
         List<TableResourceItem> resources
@@ -297,6 +331,13 @@ public class TableResourceListApplicationService {
             return null;
         }
 
+        return activeOccupancy(resourceType, resourceId, query, liveOperationalDate);
+    }
+
+    private Seating activeOccupancy(String resourceType, UUID resourceId, TableResourceListQuery query, boolean liveOperationalDate) {
+        if (!liveOperationalDate) {
+            return null;
+        }
         return seatingRepository.findActiveOccupancy(query.scope(), resourceType, resourceId)
             .filter(seating -> seating.status() == SeatingStatus.OCCUPIED)
             .orElse(null);
@@ -332,13 +373,28 @@ public class TableResourceListApplicationService {
     }
 
     private LocalDate currentBusinessDate(TableResourceListQuery query) {
-        ZoneId zoneId = storeRepository == null
+        return LocalDate.now(clock.withZone(storeZoneId(query)));
+    }
+
+    private BusinessWindow businessWindow(TableResourceListQuery query) {
+        ZoneId zoneId = storeZoneId(query);
+        LocalDate businessDate = query.businessDate() == null
+            ? LocalDate.now(clock.withZone(zoneId))
+            : query.businessDate().value();
+        return new BusinessWindow(
+            new BusinessDate(businessDate),
+            businessDate.atStartOfDay(zoneId).toOffsetDateTime(),
+            businessDate.plusDays(1).atStartOfDay(zoneId).toOffsetDateTime()
+        );
+    }
+
+    private ZoneId storeZoneId(TableResourceListQuery query) {
+        return storeRepository == null
             ? DEFAULT_STORE_ZONE
             : storeRepository.findById(query.scope())
                 .map(Store::timezone)
                 .map(TableResourceListApplicationService::zoneId)
                 .orElse(DEFAULT_STORE_ZONE);
-        return LocalDate.now(clock.withZone(zoneId));
     }
 
     private static String effectiveDiningTableStatus(String status, boolean liveOperationalDate) {
@@ -353,6 +409,11 @@ public class TableResourceListApplicationService {
             return status;
         }
         return TableGroupStatus.ACTIVE;
+    }
+
+    private static boolean isSelectableGroup(TableGroup group, TableGroupStatus status) {
+        return status == TableGroupStatus.ACTIVE
+            || (TEMPORARY_GROUP_TYPE.equals(group.groupType()) && status == TableGroupStatus.CREATED);
     }
 
     private static ZoneId zoneId(String timezone) {
@@ -371,5 +432,8 @@ public class TableResourceListApplicationService {
             .flatMap(java.util.Optional::stream)
             .map(DiningTable::tableCode)
             .toList();
+    }
+
+    private record BusinessWindow(BusinessDate businessDate, OffsetDateTime startAt, OffsetDateTime endAt) {
     }
 }

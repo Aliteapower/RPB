@@ -299,6 +299,33 @@ class WalkInDirectSeatingApiIntegrationTest {
     }
 
     @Test
+    void expiredActiveTableLockIsExpiredBeforeCreatingNewSeatingLock() throws Exception {
+        fixture.createExpiredActiveLock(SMALL_TABLE_ID, "expired-lock-recommended");
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-expired-lock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(request(2, SMALL_TABLE_ID, null))))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resource.type").value("TABLE"))
+            .andExpect(jsonPath("$.resource.id").value(SMALL_TABLE_ID.toString()));
+
+        assertSuccessfulTableSeating("idem-expired-lock", SMALL_TABLE_ID);
+        assertThat(fixture.scalarInteger("""
+            select count(*) from table_locks
+            where resource_id = ?
+              and status = 'expired'
+              and lock_key = 'expired-lock-recommended'
+            """, SMALL_TABLE_ID)).isEqualTo(1);
+        assertThat(fixture.scalarInteger("""
+            select count(*) from table_locks
+            where resource_id = ?
+              and status = 'active'
+            """, SMALL_TABLE_ID)).isEqualTo(1);
+    }
+
+    @Test
     void capacityInsufficientFailsWithoutCreatingWalkInOrSeating() throws Exception {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-capacity")
@@ -323,15 +350,17 @@ class WalkInDirectSeatingApiIntegrationTest {
     }
 
     @Test
-    void overrideMissingFailsWithoutCreatingWalkInOrSeating() throws Exception {
+    void selectedAvailableTableSeatsWithoutOverrideReason() throws Exception {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-override")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request(2, SECOND_TABLE_ID, null))))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.code").value("OVERRIDE_REASON_REQUIRED"));
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resource.type").value("TABLE"))
+            .andExpect(jsonPath("$.resource.id").value(SECOND_TABLE_ID.toString()));
 
-        assertApplicationFailureWithoutSeating("idem-override");
+        assertSuccessfulTableSeating("idem-override", SECOND_TABLE_ID);
     }
 
     @Test

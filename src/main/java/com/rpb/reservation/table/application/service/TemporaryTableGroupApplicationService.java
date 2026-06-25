@@ -2,6 +2,7 @@ package com.rpb.reservation.table.application.service;
 
 import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.CapacityRange;
 import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.seating.application.port.out.SeatingRepositoryPort;
@@ -16,12 +17,14 @@ import com.rpb.reservation.table.domain.TableGroupMember;
 import com.rpb.reservation.table.rule.DefaultTableAvailabilityRule;
 import com.rpb.reservation.table.rule.DefaultTableCapacityRule;
 import com.rpb.reservation.table.rule.DefaultTableLockRule;
+import com.rpb.reservation.table.status.DiningTableStatus;
 import com.rpb.reservation.table.status.TableGroupStatus;
 import com.rpb.reservation.table.value.TableGroupId;
 import com.rpb.reservation.table.value.TableId;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,6 +34,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class TemporaryTableGroupApplicationService {
@@ -38,6 +42,7 @@ public class TemporaryTableGroupApplicationService {
     public static final String RESOURCE_GROUP = "table_group";
     private static final String GROUP_TYPE = "temporary";
     private static final String MEMBER_ROLE = "temporary_member";
+    private static final ZoneId DEFAULT_STORE_ZONE = ZoneId.of("Asia/Singapore");
 
     private final DiningTableRepositoryPort diningTableRepository;
     private final TableGroupRepositoryPort tableGroupRepository;
@@ -65,6 +70,7 @@ public class TemporaryTableGroupApplicationService {
         this.clock = clock;
     }
 
+    @Transactional
     public TemporaryTableGroupResult createForSeating(TemporaryTableGroupCommand command) {
         TemporaryTableGroupError validationError = validateCommand(command);
         if (validationError != null) {
@@ -86,6 +92,7 @@ public class TemporaryTableGroupApplicationService {
         }
 
         CapacityRange capacity = combinedCapacity(memberTables);
+        ActiveWindow activeWindow = activeWindow(command.businessDate());
         if (!tableCapacityRule.evaluate(command.partySize(), capacity).accepted()) {
             return TemporaryTableGroupResult.failure(TemporaryTableGroupError.CAPACITY_INSUFFICIENT);
         }
@@ -98,7 +105,9 @@ public class TemporaryTableGroupApplicationService {
                 nextGroupCode(),
                 GROUP_TYPE,
                 capacity,
-                TableGroupStatus.OCCUPIED
+                TableGroupStatus.OCCUPIED,
+                activeWindow.startAt(),
+                activeWindow.endAt()
             )
         );
         List<TableGroupMember> members = new ArrayList<>();
@@ -111,7 +120,98 @@ public class TemporaryTableGroupApplicationService {
         return TemporaryTableGroupResult.success(group, memberTables, members);
     }
 
+    @Transactional
+    public TemporaryTableGroupResult saveForManagement(SaveTemporaryTableGroupCommand command) {
+        TemporaryTableGroupError validationError = validateManagementCommand(command);
+        if (validationError != null) {
+            return TemporaryTableGroupResult.failure(validationError);
+        }
+
+        if (tableGroupRepository.existsActiveGroupCode(command.scope(), command.groupName())) {
+            return TemporaryTableGroupResult.failure(TemporaryTableGroupError.GROUP_NAME_CONFLICT);
+        }
+
+        List<DiningTable> memberTables = new ArrayList<>();
+        for (UUID tableId : command.tableIds()) {
+            DiningTable table = diningTableRepository.findById(command.scope(), new TableId(tableId)).orElse(null);
+            TemporaryTableGroupError memberError = validateManagedMember(command, table);
+            if (memberError != null) {
+                return TemporaryTableGroupResult.failure(memberError);
+            }
+            memberTables.add(table);
+        }
+
+        CapacityRange capacity = combinedCapacity(memberTables);
+        ActiveWindow activeWindow = activeWindow(command.businessDate());
+        TableGroup group = tableGroupRepository.save(
+            command.scope(),
+            new TableGroup(
+                new TableGroupId(UUID.randomUUID()),
+                command.scope(),
+                command.groupName(),
+                GROUP_TYPE,
+                capacity,
+                TableGroupStatus.CREATED,
+                activeWindow.startAt(),
+                activeWindow.endAt()
+            )
+        );
+
+        List<TableGroupMember> members = new ArrayList<>();
+        for (DiningTable table : memberTables) {
+            members.add(tableGroupRepository.saveMember(
+                command.scope(),
+                new TableGroupMember(UUID.randomUUID(), command.scope(), group.id(), table.id(), MEMBER_ROLE)
+            ));
+        }
+        return TemporaryTableGroupResult.success(group, memberTables, members);
+    }
+
+    @Transactional
+    public TemporaryTableGroupResult dissolveForManagement(DissolveTemporaryTableGroupCommand command) {
+        TableGroup group = tableGroupRepository.findById(
+            command.scope(),
+            new TableGroupId(command.tableGroupId())
+        ).orElse(null);
+
+        if (group == null) {
+            return TemporaryTableGroupResult.failure(TemporaryTableGroupError.GROUP_NOT_FOUND);
+        }
+        if (!GROUP_TYPE.equals(group.groupType())) {
+            return TemporaryTableGroupResult.failure(TemporaryTableGroupError.GROUP_NOT_TEMPORARY);
+        }
+        if (group.status() != TableGroupStatus.CREATED) {
+            return TemporaryTableGroupResult.failure(TemporaryTableGroupError.GROUP_NOT_DISSOLVABLE);
+        }
+        if (seatingRepository.existsActiveResourceOccupancy(command.scope(), RESOURCE_GROUP, group.id().value())) {
+            return TemporaryTableGroupResult.failure(TemporaryTableGroupError.GROUP_NOT_DISSOLVABLE);
+        }
+
+        List<TableGroupMember> members = tableGroupRepository.findActiveMembers(command.scope(), group.id());
+        List<DiningTable> memberTables = loadMemberTables(command.scope(), members);
+        tableGroupRepository.softDeleteGroupAndMembers(
+            command.scope(),
+            group.id(),
+            OffsetDateTime.now(clock)
+        );
+        return TemporaryTableGroupResult.success(group, memberTables, members);
+    }
+
     private TemporaryTableGroupError validateCommand(TemporaryTableGroupCommand command) {
+        if (command.tableIds().size() < 2) {
+            return TemporaryTableGroupError.MEMBER_REQUIRED;
+        }
+        Set<UUID> distinct = new HashSet<>(command.tableIds());
+        if (distinct.size() != command.tableIds().size()) {
+            return TemporaryTableGroupError.MEMBER_DUPLICATE;
+        }
+        return null;
+    }
+
+    private TemporaryTableGroupError validateManagementCommand(SaveTemporaryTableGroupCommand command) {
+        if (command.groupName() == null || command.groupName().isBlank()) {
+            return TemporaryTableGroupError.GROUP_NAME_REQUIRED;
+        }
         if (command.tableIds().size() < 2) {
             return TemporaryTableGroupError.MEMBER_REQUIRED;
         }
@@ -141,6 +241,15 @@ public class TemporaryTableGroupApplicationService {
         if (seatingRepository.existsActiveResourceOccupancy(command.scope(), RESOURCE_TABLE, table.id().value())) {
             return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
         }
+        ActiveWindow activeWindow = activeWindow(command.businessDate());
+        if (!tableGroupRepository.findActiveTemporaryGroupsForTable(
+            command.scope(),
+            table.id(),
+            activeWindow.startAt(),
+            activeWindow.endAt()
+        ).isEmpty()) {
+            return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
+        }
         if (preassignmentRepository.findActiveAssignmentForResource(
             command.scope(),
             RESOURCE_TABLE,
@@ -152,15 +261,89 @@ public class TemporaryTableGroupApplicationService {
         return null;
     }
 
+    private TemporaryTableGroupError validateManagedMember(SaveTemporaryTableGroupCommand command, DiningTable table) {
+        if (table == null || !table.scope().equals(command.scope()) || !table.combinable()) {
+            return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
+        }
+
+        if (isLiveBusinessDate(command.businessDate())) {
+            TemporaryTableGroupError liveError = validateLiveManagedMember(command, table);
+            if (liveError != null) {
+                return liveError;
+            }
+        } else if (table.status() == DiningTableStatus.INACTIVE) {
+            return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
+        }
+
+        ActiveWindow activeWindow = activeWindow(command.businessDate());
+        if (!tableGroupRepository.findActiveTemporaryGroupsForTable(
+            command.scope(),
+            table.id(),
+            activeWindow.startAt(),
+            activeWindow.endAt()
+        ).isEmpty()) {
+            return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
+        }
+        if (preassignmentRepository.findActiveAssignmentForResource(
+            command.scope(),
+            RESOURCE_TABLE,
+            table.id().value(),
+            command.businessDate()
+        ).isPresent()) {
+            return TemporaryTableGroupError.PREASSIGNMENT_CONFLICT;
+        }
+        return null;
+    }
+
+    private TemporaryTableGroupError validateLiveManagedMember(SaveTemporaryTableGroupCommand command, DiningTable table) {
+        RuleDecision availability = tableAvailabilityRule.evaluate(table);
+        if (!availability.accepted()) {
+            return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
+        }
+        if (!tableLockRule.evaluate(tableLockRepository.existsActiveConflict(
+            command.scope(),
+            RESOURCE_TABLE,
+            table.id().value(),
+            OffsetDateTime.now(clock)
+        )).accepted()) {
+            return TemporaryTableGroupError.LOCK_CONFLICT;
+        }
+        if (seatingRepository.existsActiveResourceOccupancy(command.scope(), RESOURCE_TABLE, table.id().value())) {
+            return TemporaryTableGroupError.MEMBER_UNAVAILABLE;
+        }
+        return null;
+    }
+
     private static CapacityRange combinedCapacity(List<DiningTable> memberTables) {
-        int min = memberTables.stream().mapToInt(table -> table.capacity().min()).sum();
+        int min = memberTables.stream().mapToInt(table -> table.capacity().min()).min().orElseThrow();
         int max = memberTables.stream().mapToInt(table -> table.capacity().max()).sum();
         return new CapacityRange(min, max);
+    }
+
+    private List<DiningTable> loadMemberTables(StoreScope scope, List<TableGroupMember> members) {
+        List<DiningTable> tables = new ArrayList<>();
+        for (TableGroupMember member : members) {
+            diningTableRepository.findById(scope, member.tableId()).ifPresent(tables::add);
+        }
+        return tables;
+    }
+
+    private static ActiveWindow activeWindow(BusinessDate businessDate) {
+        OffsetDateTime startAt = businessDate.value().atStartOfDay(DEFAULT_STORE_ZONE).toOffsetDateTime();
+        OffsetDateTime endAt = businessDate.value().plusDays(1).atStartOfDay(DEFAULT_STORE_ZONE).toOffsetDateTime();
+        return new ActiveWindow(startAt, endAt);
+    }
+
+    private boolean isLiveBusinessDate(BusinessDate businessDate) {
+        return businessDate.value().equals(LocalDate.now(clock.withZone(DEFAULT_STORE_ZONE)));
     }
 
     private String nextGroupCode() {
         LocalDate date = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
         String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
         return "TMP-" + DateTimeFormatter.BASIC_ISO_DATE.format(date) + "-" + suffix;
+    }
+
+    private record ActiveWindow(OffsetDateTime startAt, OffsetDateTime endAt) {
     }
 }

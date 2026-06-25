@@ -77,7 +77,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -422,7 +421,6 @@ public class WalkInDirectSeatingApplicationService {
             if (!result.success()) {
                 throw new ApplicationFailure(temporaryTableGroupError(result.error()));
             }
-            validateManualOverride(command, result.group().id().value(), null);
             return new ResourceSelection(RESOURCE_GROUP, result.group().id().value(), null, result.group(), result.memberTables());
         }
 
@@ -430,7 +428,6 @@ public class WalkInDirectSeatingApplicationService {
             DiningTable selected = diningTableRepository.findById(scope, new TableId(command.tableId()))
                 .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.TABLE_RESOURCE_UNAVAILABLE));
             validateTable(selected, partySize);
-            validateManualOverride(command, selected.id().value(), tableCandidates.stream().findFirst().map(table -> table.id().value()).orElse(null));
             return new ResourceSelection(RESOURCE_TABLE, selected.id().value(), selected, null, List.of());
         }
 
@@ -439,7 +436,6 @@ public class WalkInDirectSeatingApplicationService {
                 .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.INVALID_TABLE_GROUP));
             List<TableGroupMember> members = tableGroupRepository.findActiveMembers(scope, selected.id());
             validateGroup(selected, members, partySize);
-            validateManualOverride(command, selected.id().value(), groupCandidates.stream().findFirst().map(group -> group.id().value()).orElse(null));
             return new ResourceSelection(RESOURCE_GROUP, selected.id().value(), null, selected, loadMemberTables(scope, members));
         }
 
@@ -476,6 +472,8 @@ public class WalkInDirectSeatingApplicationService {
             case CAPACITY_INSUFFICIENT -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT;
             case LOCK_CONFLICT -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT;
             case PREASSIGNMENT_CONFLICT -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+            case GROUP_NAME_REQUIRED, GROUP_NAME_CONFLICT, GROUP_NOT_FOUND, GROUP_NOT_TEMPORARY, GROUP_NOT_DISSOLVABLE ->
+                WalkInDirectSeatingError.INVALID_COMMAND;
         };
     }
 
@@ -498,14 +496,6 @@ public class WalkInDirectSeatingApplicationService {
         require(tableAvailabilityRule.evaluate(group), WalkInDirectSeatingError.INVALID_TABLE_GROUP);
         require(tableGroupValidationRule.evaluate(group, members), WalkInDirectSeatingError.INVALID_TABLE_GROUP);
         require(tableCapacityRule.evaluate(partySize, group.capacity()), WalkInDirectSeatingError.PARTY_SIZE_OUTSIDE_CAPACITY);
-    }
-
-    private void validateManualOverride(SeatWalkInDirectlyCommand command, UUID selectedResourceId, UUID recommendedResourceId) {
-        boolean selectedRecommended = recommendedResourceId == null || Objects.equals(selectedResourceId, recommendedResourceId);
-        require(
-            tableAssignmentRule.evaluateManualOverride(selectedRecommended, command.overrideReasonCode(), command.overrideNote()),
-            WalkInDirectSeatingError.MANUAL_OVERRIDE_REQUIRED
-        );
     }
 
     private List<DiningTable> occupyTables(StoreScope scope, ResourceSelection selection) {

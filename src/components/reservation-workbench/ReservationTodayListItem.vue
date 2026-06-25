@@ -56,8 +56,14 @@ const timeRange = computed(
 )
 const statusText = computed(() => statusLabels[props.item.status] ?? props.item.status)
 const statusClass = computed(() => `status-${props.item.status.replace(/_/g, '-')}`)
+const queueTicketStatus = computed(() => props.item.queueTicketStatus?.trim() ?? '')
+const hasQueueTicket = computed(() => !!props.item.queueTicketId?.trim())
 const showCheckIn = computed(() => props.item.status === 'confirmed')
-const showSeat = computed(() => props.item.status === 'arrived')
+const showDirectSeat = computed(() => props.item.status === 'arrived' && !hasQueueTicket.value)
+const showQueueSeat = computed(
+  () => props.item.status === 'arrived' && hasQueueTicket.value && queueTicketStatus.value === 'called'
+)
+const showSeat = computed(() => showDirectSeat.value || showQueueSeat.value)
 const showNoShow = computed(() => noShowableStatuses.has(props.item.status))
 const canCheckIn = computed(() => showCheckIn.value && props.canRunCurrentDayActions)
 const canSeat = computed(() => showSeat.value && props.canRunCurrentDayActions)
@@ -70,22 +76,23 @@ const canCancel = computed(
 const currentDayActionTitle = computed(() =>
   props.canRunCurrentDayActions ? undefined : '仅当日预约可以操作'
 )
+const seatActionText = computed(() => (showQueueSeat.value ? '排队入座' : '入桌'))
+const seatLoadingText = computed(() => (showQueueSeat.value ? '跳转中' : '入桌中'))
 const tableAssignmentText = computed(() => {
   const currentCode = props.item.currentResourceCode?.trim()
 
   if (currentCode) {
     const label = props.item.status === 'completed' ? '已完成' : '已入桌'
-    return `桌号：${currentCode}（${label}）`
+    return `${resourceLabel(props.item.currentResourceType)}：${currentCode}（${label}）`
   }
 
   const assignedCode = props.item.assignedResourceCode?.trim()
 
   if (assignedCode) {
-    const label = props.item.assignedResourceType === 'table_group' ? '桌组' : '桌号'
-    return `${label}：${assignedCode}（预约指定）`
+    return `${resourceLabel(props.item.assignedResourceType)}：${assignedCode}（预约指定）`
   }
 
-  return props.item.status === 'seated' ? '桌号：已入桌' : '桌号：未指定'
+  return props.item.status === 'seated' ? '桌台：已入桌' : '桌台：未指定'
 })
 const queueAssignmentText = computed(() => {
   if (!props.item.queueTicketId) {
@@ -94,10 +101,7 @@ const queueAssignmentText = computed(() => {
 
   const status = props.item.queueTicketStatus?.trim()
   const statusText = status ? queueStatusLabels[status] ?? status : '已排队'
-  const numberText =
-    typeof props.item.queueTicketNumber === 'number'
-      ? `#${props.item.queueTicketNumber}`
-      : '排队票'
+  const numberText = queueTicketDisplayText(props.item)
 
   return `${numberText} · ${statusText}`
 })
@@ -151,6 +155,26 @@ function formatStoreTime(value: string): string {
 function optionalDisplay(value: string | null | undefined): string {
   return value?.trim() ? value : '未填写'
 }
+
+function queueTicketDisplayText(item: ReservationTodayViewItem): string {
+  const displayNumber =
+    item.queueTicketDisplayNumber?.trim() ||
+    (typeof item.queueTicketNumber === 'number' ? String(item.queueTicketNumber) : '')
+
+  return displayNumber ? `#${displayNumber}` : '排队票'
+}
+
+function resourceLabel(type: string | null | undefined): string {
+  if (type === 'table_group') {
+    return '桌组'
+  }
+
+  if (type === 'dining_table') {
+    return '桌号'
+  }
+
+  return '桌台'
+}
 </script>
 
 <template>
@@ -189,7 +213,7 @@ function optionalDisplay(value: string | null | undefined): string {
         type="button"
         @click="requestSeat"
       >
-        {{ isSeating ? '入桌中' : '入桌' }}
+        {{ isSeating ? seatLoadingText : seatActionText }}
       </button>
 
       <button

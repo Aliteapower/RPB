@@ -87,19 +87,36 @@ public class QueueTicketPersistenceAdapter implements QueueTicketRepositoryPort 
     }
 
     @Override
-    public QueueTicketListRows findQueueTicketList(StoreScope scope, QueueTicketStatus status, int limit, int offset) {
+    public QueueTicketListRows findQueueTicketList(
+        StoreScope scope,
+        QueueTicketStatus status,
+        BusinessDate businessDate,
+        int limit,
+        int offset,
+        String tableArea,
+        Integer partySize,
+        String phoneDigits
+    ) {
         String statusCode = status == null ? null : status.code();
         List<QueueTicketListRow> rows = repository.findQueueTicketListRows(
             scope.tenantId().value(),
             scope.storeId().value(),
+            businessDate.value(),
             statusCode,
+            tableArea,
+            partySize,
+            phoneDigits,
             limit,
             offset
         ).stream().map(QueueTicketPersistenceAdapter::toListRow).toList();
         int total = repository.countQueueTicketListRows(
             scope.tenantId().value(),
             scope.storeId().value(),
-            statusCode
+            businessDate.value(),
+            statusCode,
+            tableArea,
+            partySize,
+            phoneDigits
         );
         return new QueueTicketListRows(rows, total);
     }
@@ -140,6 +157,9 @@ public class QueueTicketPersistenceAdapter implements QueueTicketRepositoryPort 
             projection.getAssignedResourceType(),
             projection.getAssignedResourceId(),
             projection.getAssignedResourceCode(),
+            projection.getAssignedResourceGroupType(),
+            projection.getAssignedResourceLabel(),
+            projection.getAssignedResourceAreaName(),
             projection.getCreatedAt(),
             projection.getCalledAt(),
             projection.getExpiresAt()

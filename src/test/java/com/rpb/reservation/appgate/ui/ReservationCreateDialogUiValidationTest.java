@@ -19,6 +19,7 @@ class ReservationCreateDialogUiValidationTest {
         assertThat(messagePath).exists();
 
         String dialogSource = Files.readString(dialogPath);
+        String pickerSource = Files.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
         String timeSource = Files.readString(timePath);
         String messageSource = Files.readString(messagePath);
 
@@ -26,16 +27,51 @@ class ReservationCreateDialogUiValidationTest {
             .contains("fetchTableResources")
             .contains("tableResourceOptions")
             .contains("loadTableResources")
+            .contains("TableResourcePicker")
+            .contains("temporary-selection-enabled")
+            .contains("@select-temporary-tables=\"selectTemporaryTables\"")
+            .contains("v-model:selection-mode=\"tablePickerSelectionMode\"")
+            .contains(":show-selection-mode-controls=\"false\"")
+            .contains(":available-only=\"true\"")
+            .contains("saveTemporaryTableGroup")
+            .contains("saveTemporaryGroupForReservation")
+            .contains("toggleTemporaryGroupMode")
+            .contains("tableIds: form.temporaryTableIds")
+            .contains("businessDate: form.businessDate")
+            .contains("fetchTableResources(props.storeId, {\n      includeGroups: true,")
+            .contains("组合桌台")
+            .contains("保存分组")
             .contains("tableId:")
             .contains("tableGroupId:")
             .contains("resource.resourceType === 'dining_table'")
             .contains("resource.resourceType === 'table_group'")
+            .contains("form.tablePreference = `table_group:${result.tableGroupId}`")
             .contains("defaultFutureReservationDateTime")
             .contains("isReservationStartInPast")
             .contains("formatReservationCreateErrorMessage")
             .contains("RESERVATION_START_IN_PAST")
             .contains("reservation.start_in_past")
+            .doesNotContain("fetchTableResources(props.storeId, {\n      partySize: form.partySize")
+            .doesNotContain(":party-size=\"form.partySize\"")
+            .doesNotContain("temporaryTableIds: form.temporaryTableIds")
             .doesNotContain("{{ apiError.error.messageKey }}");
+        assertAppearsInOrder(
+            dialogSource,
+            "reservation-create-table-picker__temporary-panel",
+            "<TableResourcePicker"
+        );
+
+        assertThat(pickerSource)
+            .contains("selectedArea")
+            .contains("areaFilterOptions")
+            .contains("selectArea")
+            .contains("桌台分区")
+            .contains("全部分区")
+            .contains("areaName")
+            .contains("displayableResources.value.filter(resource => resource.selectable)")
+            .contains("filterGroupResourceByArea")
+            .contains("resourceAreaMatches")
+            .contains("@click=\"selectArea(option.value)\"");
 
         assertThat(timeSource)
             .contains("export function defaultFutureReservationDateTime")
@@ -73,5 +109,16 @@ class ReservationCreateDialogUiValidationTest {
             .contains("route.query.create")
             .contains("openCreateReservationDialog")
             .contains("showCreateReservationDialog.value = true");
+    }
+
+    private static void assertAppearsInOrder(String source, String... expectedFragments) {
+        int cursor = 0;
+        for (String fragment : expectedFragments) {
+            int index = source.indexOf(fragment, cursor);
+            assertThat(index)
+                .as("Expected fragment <%s> after offset %s", fragment, cursor)
+                .isGreaterThanOrEqualTo(0);
+            cursor = index + fragment.length();
+        }
     }
 }

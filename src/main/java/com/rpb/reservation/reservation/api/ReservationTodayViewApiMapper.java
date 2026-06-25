@@ -58,6 +58,7 @@ public class ReservationTodayViewApiMapper {
             item.assignedResourceCode(),
             item.queueTicketId(),
             item.queueTicketNumber(),
+            item.queueTicketDisplayNumber(),
             item.queueTicketStatus()
         );
     }

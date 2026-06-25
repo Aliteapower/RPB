@@ -21,6 +21,7 @@ public record QueueTicketListResponse(
     public record ItemResponse(
         UUID queueTicketId,
         int queueTicketNumber,
+        String queueTicketDisplayNumber,
         String queueTicketStatus,
         int partySize,
         String partySizeGroup,
@@ -32,6 +33,9 @@ public record QueueTicketListResponse(
         String assignedResourceType,
         UUID assignedResourceId,
         String assignedResourceCode,
+        String assignedResourceGroupType,
+        String assignedResourceLabel,
+        String assignedResourceAreaName,
         @JsonFormat(shape = JsonFormat.Shape.STRING)
         Instant createdAt,
         @JsonFormat(shape = JsonFormat.Shape.STRING)

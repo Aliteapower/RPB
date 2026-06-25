@@ -22,7 +22,9 @@ public class DefaultTableGroupMapper implements TableGroupMapper {
             entity.getGroupCode(),
             entity.getGroupType(),
             new CapacityRange(entity.getCapacityMin(), entity.getCapacityMax()),
-            statusFromCode(entity.getStatus())
+            statusFromCode(entity.getStatus()),
+            entity.getActiveFromAt(),
+            entity.getActiveUntilAt()
         );
     }
 
@@ -39,8 +41,8 @@ public class DefaultTableGroupMapper implements TableGroupMapper {
             domain.groupCode(),
             domain.capacity().min(),
             domain.capacity().max(),
-            null,
-            null,
+            domain.activeFromAt(),
+            domain.activeUntilAt(),
             now,
             now,
             null,

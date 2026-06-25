@@ -42,6 +42,7 @@ the requested store.
 | `status` | No | Optional status filter such as `available`, `occupied`, `cleaning`, `locked`, `reserved`, or `inactive`. |
 | `partySize` | No | Optional positive integer. When present, only resources whose capacity range includes the party size are returned. |
 | `includeGroups` | No | Optional boolean. Defaults to `true`. When `false`, table groups are omitted. |
+| `businessDate` | No | Optional `yyyy-MM-dd` business date. When present, reservation preassignments and temporary table groups for that date are overlaid on the resource list. Temporary groups scoped to other business dates must not be returned. |
 
 ## Success Response
 
@@ -53,6 +54,7 @@ Single table response item:
   "resources": [
     {
       "resourceType": "dining_table",
+      "groupType": null,
       "resourceId": "70000000-0000-0000-0000-000000000001",
       "code": "A01",
       "displayName": "A01",
@@ -73,6 +75,7 @@ Group response item:
 ```json
 {
   "resourceType": "table_group",
+  "groupType": "fixed",
   "resourceId": "71000000-0000-0000-0000-000000000001",
   "code": "VIP-1",
   "displayName": "VIP-1",
@@ -107,7 +110,9 @@ The frontend should display:
 | --- | --- |
 | Dining table `available` | `true` |
 | Dining table `occupied`, `cleaning`, `locked`, `reserved`, `inactive` | `false` |
+| Dining table already in an active temporary group | `false` |
 | Table group `active` | `true` |
+| Temporary table group `created` | `true` |
 | Table group `locked`, `occupied`, `released`, `inactive`, `deleted`, `ended` | `false` |
 
 `selectionDisabledReason` should be a stable short code when `selectable` is
@@ -115,7 +120,12 @@ false, for example:
 
 ```text
 status_unavailable
+temporary_group_member
 ```
+
+Temporary table groups are scoped to a single business date. A temporary group
+created for `2026-06-25` must not be returned or block member tables when the
+resource list is requested for `2026-06-26`.
 
 ## Error Response
 

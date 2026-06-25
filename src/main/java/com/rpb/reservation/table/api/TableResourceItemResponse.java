@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record TableResourceItemResponse(
     String resourceType,
+    String groupType,
     UUID resourceId,
     String code,
     String displayName,

@@ -73,6 +73,9 @@ class AppGateGuardIntegrationTest {
                 UUID.class,
                 String.class,
                 String.class,
+                String.class,
+                String.class,
+                String.class,
                 String.class
             ),
             "queue.view"

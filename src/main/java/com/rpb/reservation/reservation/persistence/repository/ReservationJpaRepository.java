@@ -133,16 +133,31 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
           coalesce(assignedDt.tableCode, assignedTg.groupCode) as assignedResourceCode,
           qt.id as queueTicketId,
           qt.ticketNumber as queueTicketNumber,
+          qg.groupCode as queueTicketGroupCode,
           qt.status as queueTicketStatus
         from ReservationEntity r
           left join CustomerEntity c
             on c.tenantId = r.tenantId
            and c.id = r.customerId
            and c.deletedAt is null
+          left join QueueTicketEntity qt
+            on qt.tenantId = r.tenantId
+           and qt.storeId = r.storeId
+           and qt.reservationId = r.id
+           and qt.status in ('waiting', 'called', 'skipped', 'rejoined', 'seated')
+           and qt.deletedAt is null
+          left join QueueGroupEntity qg
+            on qg.tenantId = qt.tenantId
+           and qg.storeId = qt.storeId
+           and qg.id = qt.queueGroupId
+           and qg.deletedAt is null
           left join SeatingEntity s
             on s.tenantId = r.tenantId
            and s.storeId = r.storeId
-           and s.reservationId = r.id
+           and (
+             s.reservationId = r.id
+             or s.queueTicketId = qt.id
+           )
            and s.status in ('occupied', 'completed', 'cleaning_triggered')
            and s.deletedAt is null
           left join SeatingResourceEntity sr
@@ -186,12 +201,6 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
            and assignedTg.storeId = r.storeId
            and assignedTg.id = rp.tableGroupId
            and assignedTg.deletedAt is null
-          left join QueueTicketEntity qt
-            on qt.tenantId = r.tenantId
-           and qt.storeId = r.storeId
-           and qt.reservationId = r.id
-           and qt.status in ('waiting', 'called', 'skipped', 'rejoined', 'seated')
-           and qt.deletedAt is null
         where r.tenantId = :tenantId
           and r.storeId = :storeId
           and r.businessDate = :businessDate

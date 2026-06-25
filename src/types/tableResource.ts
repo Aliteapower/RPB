@@ -9,6 +9,7 @@ export interface TableResourceQuery {
 
 export interface TableResourceItem {
   resourceType: 'dining_table' | 'table_group'
+  groupType?: 'fixed' | 'temporary' | string | null
   resourceId: string
   code: string
   displayName: string

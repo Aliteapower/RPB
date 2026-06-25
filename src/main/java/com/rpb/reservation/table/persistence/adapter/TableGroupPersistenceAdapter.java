@@ -70,6 +70,44 @@ public class TableGroupPersistenceAdapter implements TableGroupRepositoryPort {
     }
 
     @Override
+    public List<TableGroup> findActiveTemporaryGroupsForTable(StoreScope scope, TableId tableId) {
+        return memberRepository.findActiveTemporaryMembersForTable(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            tableId.value()
+        ).stream()
+            .map(TableGroupMemberEntity::getTableGroupId)
+            .distinct()
+            .map(groupId -> findById(scope, new TableGroupId(groupId)))
+            .flatMap(Optional::stream)
+            .toList();
+    }
+
+    @Override
+    public List<TableGroup> findActiveTemporaryGroupsForTable(
+        StoreScope scope,
+        TableId tableId,
+        OffsetDateTime businessStartAt,
+        OffsetDateTime businessEndAt
+    ) {
+        if (businessStartAt == null || businessEndAt == null) {
+            return findActiveTemporaryGroupsForTable(scope, tableId);
+        }
+        return memberRepository.findActiveTemporaryMembersForTableInBusinessWindow(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            tableId.value(),
+            businessStartAt,
+            businessEndAt
+        ).stream()
+            .map(TableGroupMemberEntity::getTableGroupId)
+            .distinct()
+            .map(groupId -> findById(scope, new TableGroupId(groupId)))
+            .flatMap(Optional::stream)
+            .toList();
+    }
+
+    @Override
     public List<TableGroup> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate) {
         return groupRepository.findAvailableCandidates(
             scope.tenantId().value(),
@@ -103,8 +141,67 @@ public class TableGroupPersistenceAdapter implements TableGroupRepositoryPort {
     }
 
     @Override
+    public List<TableGroup> findVisibleGroups(
+        StoreScope scope,
+        String status,
+        PartySize partySize,
+        OffsetDateTime businessStartAt,
+        OffsetDateTime businessEndAt
+    ) {
+        if (businessStartAt == null || businessEndAt == null) {
+            return findVisibleGroups(scope, status, partySize);
+        }
+        UUID tenantId = scope.tenantId().value();
+        UUID storeId = scope.storeId().value();
+        List<TableGroupEntity> entities;
+
+        if (status != null && partySize != null) {
+            entities = groupRepository.findVisibleGroupsByStatusAndPartySizeForBusinessWindow(
+                tenantId,
+                storeId,
+                status,
+                partySize.value(),
+                businessStartAt,
+                businessEndAt
+            );
+        } else if (status != null) {
+            entities = groupRepository.findVisibleGroupsByStatusForBusinessWindow(
+                tenantId,
+                storeId,
+                status,
+                businessStartAt,
+                businessEndAt
+            );
+        } else if (partySize != null) {
+            entities = groupRepository.findVisibleGroupsByPartySizeForBusinessWindow(
+                tenantId,
+                storeId,
+                partySize.value(),
+                businessStartAt,
+                businessEndAt
+            );
+        } else {
+            entities = groupRepository.findVisibleGroupsWithoutFiltersForBusinessWindow(
+                tenantId,
+                storeId,
+                businessStartAt,
+                businessEndAt
+            );
+        }
+
+        return entities.stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public TableGroup save(StoreScope scope, TableGroup tableGroup) {
-        return mapper.toDomain(groupRepository.save(mapper.toEntity(tableGroup)));
+        TableGroupEntity mapped = mapper.toEntity(tableGroup);
+        TableGroupEntity entity = groupRepository.findByIdAndTenantIdAndStoreIdAndDeletedAtIsNull(
+            tableGroup.id().value(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).map(existing -> existingEntity(mapped, existing))
+            .orElseGet(() -> newEntity(mapped));
+        return mapper.toDomain(groupRepository.save(entity));
     }
 
     @Override
@@ -123,6 +220,31 @@ public class TableGroupPersistenceAdapter implements TableGroupRepositoryPort {
         return toMemberDomain(memberRepository.save(entity));
     }
 
+    @Override
+    public boolean existsActiveGroupCode(StoreScope scope, String groupCode) {
+        return groupRepository.existsByTenantIdAndStoreIdAndGroupCodeAndDeletedAtIsNull(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            groupCode
+        );
+    }
+
+    @Override
+    public void softDeleteGroupAndMembers(StoreScope scope, TableGroupId tableGroupId, OffsetDateTime deletedAt) {
+        memberRepository.softDeleteMembersForGroup(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            tableGroupId.value(),
+            deletedAt
+        );
+        groupRepository.softDeleteGroup(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            tableGroupId.value(),
+            deletedAt
+        );
+    }
+
     private TableGroupMember toMemberDomain(TableGroupMemberEntity entity) {
         return new TableGroupMember(
             entity.getId(),
@@ -130,6 +252,46 @@ public class TableGroupPersistenceAdapter implements TableGroupRepositoryPort {
             new TableGroupId(entity.getTableGroupId()),
             new TableId(entity.getTableId()),
             entity.getMemberRole()
+        );
+    }
+
+    private static TableGroupEntity existingEntity(TableGroupEntity mapped, TableGroupEntity existing) {
+        return TableGroupEntity.of(
+            mapped.getId(),
+            mapped.getTenantId(),
+            mapped.getStoreId(),
+            mapped.getGroupCode(),
+            mapped.getGroupType(),
+            mapped.getStatus(),
+            mapped.getDisplayName(),
+            mapped.getCapacityMin(),
+            mapped.getCapacityMax(),
+            existing.getActiveFromAt(),
+            existing.getActiveUntilAt(),
+            existing.getCreatedAt(),
+            mapped.getUpdatedAt(),
+            existing.getDeletedAt(),
+            existing.getVersion()
+        );
+    }
+
+    private static TableGroupEntity newEntity(TableGroupEntity mapped) {
+        return TableGroupEntity.of(
+            mapped.getId(),
+            mapped.getTenantId(),
+            mapped.getStoreId(),
+            mapped.getGroupCode(),
+            mapped.getGroupType(),
+            mapped.getStatus(),
+            mapped.getDisplayName(),
+            mapped.getCapacityMin(),
+            mapped.getCapacityMax(),
+            mapped.getActiveFromAt(),
+            mapped.getActiveUntilAt(),
+            mapped.getCreatedAt(),
+            mapped.getUpdatedAt(),
+            mapped.getDeletedAt(),
+            null
         );
     }
 }

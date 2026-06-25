@@ -140,9 +140,9 @@ function isSeatCalledQueueTicketResponse(
     typeof candidate.queueTicketId === 'string' &&
     typeof candidate.queueTicketNumber === 'number' &&
     typeof candidate.queueTicketStatus === 'string' &&
-    typeof candidate.reservationId === 'string' &&
-    typeof candidate.reservationCode === 'string' &&
-    typeof candidate.reservationStatus === 'string' &&
+    isOptionalString(candidate.reservationId) &&
+    isOptionalString(candidate.reservationCode) &&
+    isOptionalString(candidate.reservationStatus) &&
     typeof candidate.seatingId === 'string' &&
     typeof candidate.seatingStatus === 'string' &&
     typeof candidate.resourceType === 'string' &&
@@ -151,6 +151,10 @@ function isSeatCalledQueueTicketResponse(
     Array.isArray(candidate.events) &&
     !!candidate.idempotency
   )
+}
+
+function isOptionalString(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === 'string'
 }
 
 function unknownError(httpStatus?: number): SeatingFromCalledQueueApiErrorResponse {

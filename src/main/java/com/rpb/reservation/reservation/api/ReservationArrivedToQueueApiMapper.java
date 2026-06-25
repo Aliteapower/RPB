@@ -2,6 +2,7 @@ package com.rpb.reservation.reservation.api;
 
 import com.rpb.reservation.reservation.application.ReservationArrivedToQueueResult;
 import com.rpb.reservation.reservation.application.command.QueueArrivedReservationCommand;
+import com.rpb.reservation.queue.application.QueueTicketDisplayNumbers;
 import com.rpb.reservation.walkin.api.ApiIdempotencyResponse;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.util.UUID;
@@ -38,6 +39,7 @@ public class ReservationArrivedToQueueApiMapper {
             result.reservationStatus(),
             result.queueTicketId(),
             result.queueTicketNumber(),
+            QueueTicketDisplayNumbers.fromGroupCode(result.partySizeGroup(), result.queueTicketNumber()),
             result.queueTicketStatus(),
             result.queueGroupId(),
             result.queueGroupCode(),

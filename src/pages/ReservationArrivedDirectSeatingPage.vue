@@ -242,6 +242,7 @@ function queryValue(value: unknown): string {
         <p class="resource-rule">桌台、桌组或临时组合必须三选一</p>
         <TableResourcePicker
           :store-id="storeId"
+          :available-only="true"
           :selected-table-id="form.tableId"
           :selected-table-group-id="form.tableGroupId"
           :selected-temporary-table-ids="form.temporaryTableIds"

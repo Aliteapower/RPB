@@ -3,10 +3,15 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import { createReservation, ReservationCreateApiError } from '../../api/reservationCreateApi'
 import { fetchTableResources, TableResourceApiError } from '../../api/tableResourceApi'
+import {
+  saveTemporaryTableGroup,
+  TemporaryTableGroupApiError
+} from '../../api/temporaryTableGroupApi'
 import { formatReservationCreateErrorMessage } from '../../utils/reservationCreateMessages'
 import StaffGuestContactLookup from '../staff/StaffGuestContactLookup.vue'
 import StaffTimeWheelPicker from '../staff/StaffTimeWheelPicker.vue'
 import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../staff/staffGuestContact'
+import TableResourcePicker from '../staff-table/TableResourcePicker.vue'
 import {
   defaultFutureReservationDateTime,
   isReservationStartInPast
@@ -20,6 +25,7 @@ import type {
   TableResourceApiErrorResponse,
   TableResourceItem
 } from '../../types/tableResource'
+import type { TemporaryTableGroupApiErrorResponse } from '../../types/temporaryTableGroup'
 
 const props = withDefaults(
   defineProps<{
@@ -38,6 +44,8 @@ const emit = defineEmits<{
   created: [response: CreateReservationResponse]
 }>()
 
+type TablePickerSelectionMode = 'single' | 'temporary'
+
 const form = reactive({
   customerId: '',
   customerName: '',
@@ -46,14 +54,20 @@ const form = reactive({
   businessDate: props.selectedDate,
   time: '',
   partySize: 2,
-  tablePreference: 'unassigned'
+  tablePreference: 'unassigned',
+  temporaryTableIds: [] as string[]
 })
 
 const isSubmitting = ref(false)
 const apiError = ref<ReservationApiErrorResponse | null>(null)
+const temporaryGroupName = ref('')
+const isSavingTemporaryGroup = ref(false)
+const temporaryGroupApiError = ref<TemporaryTableGroupApiErrorResponse | null>(null)
 const tableResourceOptions = ref<TableResourceItem[]>([])
 const isLoadingTableResources = ref(false)
 const tableResourceApiError = ref<TableResourceApiErrorResponse | null>(null)
+const isTablePickerOpen = ref(false)
+const tablePickerSelectionMode = ref<TablePickerSelectionMode>('single')
 let tableResourceLoadSequence = 0
 
 const canSubmit = computed(
@@ -72,6 +86,47 @@ const selectedResource = computed(() =>
     resource => resource.selectable && resourceOptionValue(resource) === form.tablePreference
   ) ?? null
 )
+const selectedTableId = computed(() =>
+  selectedResource.value?.resourceType === 'dining_table'
+    ? selectedResource.value.resourceId
+    : null
+)
+const selectedTableGroupId = computed(() =>
+  selectedResource.value?.resourceType === 'table_group'
+    ? selectedResource.value.resourceId
+    : null
+)
+const tablePreferenceDisplay = computed(() =>
+  selectedResource.value ? resourceDisplayName(selectedResource.value) : '未指定'
+)
+const tablePreferenceMeta = computed(() => {
+  const resource = selectedResource.value
+
+  if (resource) {
+    return `${resourceCapacityText(resource)} · ${resourcePickerStatusText(resource)}`
+  }
+
+  if (isLoadingTableResources.value) {
+    return '正在读取桌台'
+  }
+
+  if (tableResourceApiError.value) {
+    return '桌台列表读取失败'
+  }
+
+  return '点击选择桌号'
+})
+const canSaveTemporaryGroup = computed(
+  () =>
+    props.open &&
+    !!props.storeId &&
+    !!form.businessDate &&
+    !isSubmitting.value &&
+    !isSavingTemporaryGroup.value &&
+    temporaryGroupName.value.trim().length > 0 &&
+    form.temporaryTableIds.length >= 2
+)
+const isTemporaryGroupMode = computed(() => tablePickerSelectionMode.value === 'temporary')
 
 watch(
   () => props.open,
@@ -79,8 +134,13 @@ watch(
     if (open) {
       apiError.value = null
       applyDefaultFutureDateTime(props.selectedDate)
+    } else {
+      isTablePickerOpen.value = false
+      clearTemporaryGroupDraft()
+      tablePickerSelectionMode.value = 'single'
     }
-  }
+  },
+  { immediate: true }
 )
 
 watch(
@@ -102,9 +162,17 @@ watch(
 )
 
 watch(
-  [() => props.open, () => props.storeId, () => form.businessDate, () => form.partySize],
+  [() => props.open, () => props.storeId, () => form.businessDate],
   () => {
     void loadTableResources()
+  },
+  { immediate: true }
+)
+
+watch(
+  [() => form.businessDate, () => form.partySize],
+  () => {
+    clearTemporaryGroupDraft()
   }
 )
 
@@ -185,9 +253,7 @@ async function loadTableResources(): Promise<void> {
   if (
     !props.open ||
     !props.storeId ||
-    !form.businessDate ||
-    !Number.isInteger(form.partySize) ||
-    form.partySize <= 0
+    !form.businessDate
   ) {
     tableResourceOptions.value = []
     isLoadingTableResources.value = false
@@ -199,7 +265,6 @@ async function loadTableResources(): Promise<void> {
 
   try {
     const result = await fetchTableResources(props.storeId, {
-      partySize: form.partySize,
       includeGroups: true,
       businessDate: form.businessDate
     })
@@ -234,17 +299,114 @@ function ensureSelectedResourceStillAvailable(): void {
   }
 }
 
+function openTablePicker(): void {
+  if (!isSubmitting.value) {
+    tablePickerSelectionMode.value = form.temporaryTableIds.length > 0 ? 'temporary' : 'single'
+    isTablePickerOpen.value = true
+  }
+}
+
+function closeTablePicker(): void {
+  isTablePickerOpen.value = false
+  clearTemporaryGroupDraft()
+  tablePickerSelectionMode.value = 'single'
+}
+
+function clearTablePreference(): void {
+  form.tablePreference = 'unassigned'
+  clearTemporaryGroupDraft()
+  tablePickerSelectionMode.value = 'single'
+}
+
+function selectTable(tableId: string): void {
+  form.tablePreference = `dining_table:${tableId}`
+  clearTemporaryGroupDraft()
+  tablePickerSelectionMode.value = 'single'
+  isTablePickerOpen.value = false
+}
+
+function selectTableGroup(tableGroupId: string): void {
+  form.tablePreference = `table_group:${tableGroupId}`
+  clearTemporaryGroupDraft()
+  tablePickerSelectionMode.value = 'single'
+  isTablePickerOpen.value = false
+}
+
+function selectTemporaryTables(tableIds: string[]): void {
+  form.tablePreference = 'unassigned'
+  form.temporaryTableIds = tableIds
+  tablePickerSelectionMode.value = tableIds.length > 0 ? 'temporary' : tablePickerSelectionMode.value
+  temporaryGroupApiError.value = null
+}
+
+function toggleTemporaryGroupMode(): void {
+  if (isTemporaryGroupMode.value) {
+    tablePickerSelectionMode.value = 'single'
+    clearTemporaryGroupDraft()
+    return
+  }
+
+  form.tablePreference = 'unassigned'
+  temporaryGroupApiError.value = null
+  tablePickerSelectionMode.value = 'temporary'
+}
+
+async function saveTemporaryGroupForReservation(): Promise<void> {
+  const groupName = temporaryGroupName.value.trim()
+
+  if (!props.storeId || !canSaveTemporaryGroup.value) {
+    temporaryGroupApiError.value = createTemporaryGroupLocalError(
+      'GROUP_NAME_REQUIRED',
+      'table.temporary_group.group_name_required'
+    )
+    return
+  }
+
+  temporaryGroupApiError.value = null
+  isSavingTemporaryGroup.value = true
+
+  try {
+    const result = await saveTemporaryTableGroup(props.storeId, {
+      groupName,
+      tableIds: form.temporaryTableIds,
+      businessDate: form.businessDate
+    })
+
+    form.tablePreference = `table_group:${result.tableGroupId}`
+    clearTemporaryGroupDraft()
+    tablePickerSelectionMode.value = 'single'
+    await loadTableResources()
+    isTablePickerOpen.value = false
+  } catch (error) {
+    temporaryGroupApiError.value =
+      error instanceof TemporaryTableGroupApiError
+        ? error.response
+        : createTemporaryGroupLocalError('REQUEST_FAILED', 'table.temporary_group.request_failed')
+  } finally {
+    isSavingTemporaryGroup.value = false
+  }
+}
+
+function clearTemporaryGroupDraft(): void {
+  form.temporaryTableIds = []
+  temporaryGroupName.value = ''
+  temporaryGroupApiError.value = null
+}
+
 function resourceOptionValue(resource: TableResourceItem): string {
   return `${resource.resourceType}:${resource.resourceId}`
 }
 
-function resourceOptionLabel(resource: TableResourceItem): string {
-  const statusText = resource.selectable ? '可选' : statusDisabledText(resource)
-  return `${resourceKindLabel(resource)} ${resource.displayName || resource.code} · ${resource.capacityMin}-${resource.capacityMax}人 · ${statusText}`
+function resourceDisplayName(resource: TableResourceItem): string {
+  return resource.displayName || resource.code
 }
 
-function resourceKindLabel(resource: TableResourceItem): string {
-  return resource.resourceType === 'table_group' ? '桌组' : '桌号'
+function resourceCapacityText(resource: TableResourceItem): string {
+  return `${resource.capacityMax}人`
+}
+
+function resourcePickerStatusText(resource: TableResourceItem): string {
+  return resource.selectable ? '空闲' : statusDisabledText(resource)
 }
 
 function statusDisabledText(resource: TableResourceItem): string {
@@ -311,6 +473,20 @@ function createTableResourceLocalError(
   }
 }
 
+function createTemporaryGroupLocalError(
+  code: string,
+  messageKey: string
+): TemporaryTableGroupApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    }
+  }
+}
+
 function resetAfterSuccess(): void {
   form.customerId = ''
   form.customerName = ''
@@ -318,6 +494,7 @@ function resetAfterSuccess(): void {
   form.phoneLocal = ''
   form.partySize = 2
   form.tablePreference = 'unassigned'
+  clearTemporaryGroupDraft()
 }
 
 function applyDefaultFutureDateTime(selectedDate: string): void {
@@ -373,30 +550,124 @@ function isBeforeMinDate(value: string): boolean {
           <input v-model.number="form.partySize" min="1" name="partySize" type="number" />
         </label>
 
-        <label>
+        <div class="reservation-create-dialog__field">
           <span>桌号（可选）</span>
-          <select
-            v-model="form.tablePreference"
-            :disabled="isSubmitting || isLoadingTableResources"
-            name="tablePreference"
-          >
-            <option value="unassigned">未指定</option>
-            <option
-              v-for="resource in tableResourceOptions"
-              :key="`${resource.resourceType}:${resource.resourceId}`"
-              :disabled="!resource.selectable"
-              :value="resourceOptionValue(resource)"
+          <div class="reservation-create-dialog__table-field">
+            <button
+              class="reservation-create-dialog__table-trigger"
+              type="button"
+              :disabled="isSubmitting"
+              @click="openTablePicker"
             >
-              {{ resourceOptionLabel(resource) }}
-            </option>
-          </select>
+              <strong>{{ tablePreferenceDisplay }}</strong>
+              <small>{{ tablePreferenceMeta }}</small>
+            </button>
+            <button
+              v-if="selectedResource"
+              class="reservation-create-dialog__table-clear"
+              type="button"
+              :disabled="isSubmitting"
+              @click="clearTablePreference"
+            >
+              未指定
+            </button>
+          </div>
           <small v-if="isLoadingTableResources" class="reservation-create-dialog__hint">
             正在读取桌台
           </small>
           <small v-else-if="tableResourceApiError" class="reservation-create-dialog__hint">
             桌台列表读取失败
           </small>
-        </label>
+        </div>
+
+        <section
+          v-if="isTablePickerOpen"
+          class="reservation-create-table-picker"
+          aria-label="选择预约桌号弹窗"
+          aria-modal="true"
+          role="dialog"
+        >
+          <div class="reservation-create-table-picker__backdrop" @click="closeTablePicker"></div>
+          <div class="reservation-create-table-picker__panel">
+            <header>
+              <h3>选择预约桌号</h3>
+              <button type="button" aria-label="关闭桌号选择" @click="closeTablePicker">
+                ×
+              </button>
+            </header>
+
+            <p class="reservation-create-table-picker__summary">
+              当前选择：{{ tablePreferenceDisplay }}
+            </p>
+
+            <section class="reservation-create-table-picker__temporary-panel" aria-label="预约临时分组">
+              <div>
+                <strong>临时分组</strong>
+                <span>{{ form.businessDate }} · 已选 {{ form.temporaryTableIds.length }} 张</span>
+              </div>
+              <label>
+                <span>组名</span>
+                <input
+                  v-model.trim="temporaryGroupName"
+                  name="reservationTemporaryGroupName"
+                  placeholder="例如 A区临组1"
+                  type="text"
+                />
+              </label>
+              <p
+                v-if="temporaryGroupApiError"
+                class="reservation-create-table-picker__temporary-error"
+                aria-live="assertive"
+              >
+                {{ temporaryGroupApiError.error.messageKey }}
+              </p>
+              <div class="reservation-create-table-picker__temporary-actions">
+                <button
+                  type="button"
+                  :disabled="isSavingTemporaryGroup"
+                  @click="toggleTemporaryGroupMode"
+                >
+                  {{ isTemporaryGroupMode ? '退出选择' : '组合桌台' }}
+                </button>
+                <button
+                  type="button"
+                  :disabled="form.temporaryTableIds.length === 0 || isSavingTemporaryGroup"
+                  @click="clearTemporaryGroupDraft"
+                >
+                  清空
+                </button>
+                <button
+                  class="reservation-create-table-picker__temporary-save"
+                  type="button"
+                  :disabled="!canSaveTemporaryGroup"
+                  @click="saveTemporaryGroupForReservation"
+                >
+                  {{ isSavingTemporaryGroup ? '保存中' : '保存分组' }}
+                </button>
+              </div>
+            </section>
+
+            <TableResourcePicker
+              v-model:selection-mode="tablePickerSelectionMode"
+              :store-id="storeId"
+              :party-size="null"
+              :business-date="form.businessDate"
+              :selected-table-id="selectedTableId"
+              :selected-table-group-id="selectedTableGroupId"
+              :selected-temporary-table-ids="form.temporaryTableIds"
+              :show-selection-mode-controls="false"
+              :available-only="true"
+              temporary-selection-enabled
+              @select-table="selectTable"
+              @select-table-group="selectTableGroup"
+              @select-temporary-tables="selectTemporaryTables"
+            />
+
+            <footer>
+              <button type="button" @click="closeTablePicker">取消</button>
+            </footer>
+          </div>
+        </section>
 
         <section v-if="apiError" class="reservation-create-dialog__error" aria-live="assertive">
           {{ formatReservationCreateErrorMessage(apiError.error.messageKey) }}
@@ -479,7 +750,8 @@ function isBeforeMinDate(value: string): boolean {
   width: 32px;
 }
 
-.reservation-create-dialog__panel label {
+.reservation-create-dialog__panel label,
+.reservation-create-dialog__field {
   color: #0f172a;
   display: grid;
   font-size: 0.82rem;
@@ -521,6 +793,57 @@ function isBeforeMinDate(value: string): boolean {
   font-weight: 800;
 }
 
+.reservation-create-dialog__table-field {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.reservation-create-dialog__table-trigger {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  color: #0f172a;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-height: 46px;
+  min-width: 0;
+  padding: 7px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.reservation-create-dialog__table-trigger strong {
+  font-size: 0.9rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.reservation-create-dialog__table-trigger small {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.reservation-create-dialog__table-trigger:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.reservation-create-dialog__table-clear {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 900;
+  min-height: 46px;
+  padding: 0 12px;
+}
+
 .reservation-create-dialog__panel footer {
   display: grid;
   gap: 10px;
@@ -559,5 +882,170 @@ function isBeforeMinDate(value: string): boolean {
 .reservation-create-dialog__panel select:focus-visible {
   outline: 3px solid rgba(249, 115, 22, 0.28);
   outline-offset: 2px;
+}
+
+.reservation-create-table-picker {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 86;
+}
+
+.reservation-create-table-picker__backdrop {
+  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.46);
+  inset: 0;
+  position: absolute;
+}
+
+.reservation-create-table-picker__panel {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+  display: grid;
+  gap: 12px;
+  max-height: min(88dvh, 640px);
+  max-width: 430px;
+  overflow-y: auto;
+  padding: 24px 20px 22px;
+  position: relative;
+  width: min(100%, 430px);
+}
+
+.reservation-create-table-picker__panel header {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.reservation-create-table-picker__panel h3 {
+  color: #14213d;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.reservation-create-table-picker__panel h3::before {
+  color: #5b7cff;
+  content: '▦';
+  font-size: 0.95rem;
+  margin-right: 8px;
+}
+
+.reservation-create-table-picker__panel header button {
+  background: transparent;
+  border: 0;
+  color: #94a3b8;
+  font-size: 1.55rem;
+  font-weight: 800;
+  height: 32px;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+}
+
+.reservation-create-table-picker__summary {
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.reservation-create-table-picker__panel footer {
+  padding-top: 2px;
+}
+
+.reservation-create-table-picker__panel footer button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 950;
+  min-height: 40px;
+  padding: 0 16px;
+  width: 100%;
+}
+
+.reservation-create-table-picker__temporary-panel {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.reservation-create-table-picker__temporary-panel > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.reservation-create-table-picker__temporary-panel strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.reservation-create-table-picker__temporary-panel span,
+.reservation-create-table-picker__temporary-panel label span {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.reservation-create-table-picker__temporary-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.reservation-create-table-picker__temporary-panel input {
+  background: #ffffff;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  color: #0f172a;
+  min-height: 38px;
+  outline: none;
+  padding: 7px 12px;
+  width: 100%;
+}
+
+.reservation-create-table-picker__temporary-error {
+  color: #be123c;
+  font-size: 0.8rem;
+  font-weight: 850;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reservation-create-table-picker__temporary-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reservation-create-table-picker__temporary-actions button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 950;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.reservation-create-table-picker__temporary-actions .reservation-create-table-picker__temporary-save {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+
+.reservation-create-table-picker__temporary-actions button:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
 }
 </style>

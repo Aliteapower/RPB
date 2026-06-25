@@ -2,6 +2,7 @@ package com.rpb.reservation.walkin.api;
 
 import com.rpb.reservation.walkin.application.WalkInQueueResult;
 import com.rpb.reservation.walkin.application.command.QueueWalkInCommand;
+import com.rpb.reservation.queue.application.QueueTicketDisplayNumbers;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -34,6 +35,7 @@ public class WalkInQueueApiMapper {
             result.walkInId(),
             result.queueTicketId(),
             result.queueTicketNumber(),
+            QueueTicketDisplayNumbers.fromGroupCode(result.partySizeGroup(), result.queueTicketNumber()),
             result.queueTicketStatus(),
             result.partySize(),
             result.partySizeGroup(),

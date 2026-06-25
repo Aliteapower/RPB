@@ -1,42 +1,44 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import {
   SeatingFromCalledQueueApiError,
   seatCalledQueueTicket
 } from '../api/seatingFromCalledQueueApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import StaffHomeWorkflowStrip from '../components/staff-home/StaffHomeWorkflowStrip.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import TableResourcePicker from '../components/staff-table/TableResourcePicker.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   SeatCalledQueueTicketRequest,
-  SeatCalledQueueTicketResponse,
   SeatingFromCalledQueueApiErrorResponse
 } from '../types/seatingFromCalledQueue'
 
 const route = useRoute()
+const router = useRouter()
 const storeContext = useStoreContextStore()
+const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
 const form = reactive({
   queueTicketId: '',
   tableId: '',
   tableGroupId: '',
-  temporaryTableIds: [] as string[],
-  overrideReasonCode: '',
-  overrideNote: '',
-  note: ''
+  temporaryTableIds: [] as string[]
 })
 
 const isSubmitting = ref(false)
-const result = ref<SeatCalledQueueTicketResponse | null>(null)
 const apiError = ref<SeatingFromCalledQueueApiErrorResponse | null>(null)
-const lastIdempotencyKey = ref('')
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
-const staffHomeRoute = computed(() => ({
-  name: 'store-staff-home',
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
+const appStatusLabel = computed(() => (isSubmitting.value ? '入座中' : '排队入座'))
+const tableResourceListRoute = computed(() => ({
+  name: 'table-resource-list',
   params: {
-    storeId: storeId.value
+    storeId: storeId.value || ''
   }
 }))
 const hasQueueTicketId = computed(() => !!form.queueTicketId.trim())
@@ -57,11 +59,6 @@ const resourceSelectionError = computed(() => {
     return null
   }
 
-  if (selectedResourceCount.value === 0) {
-    return createLocalError('RESOURCE_SELECTION_REQUIRED', 'queue.seat.resource_selection_required')
-      .error
-  }
-
   if (selectedResourceCount.value > 1) {
     return createLocalError('RESOURCE_SELECTION_CONFLICT', 'queue.seat.resource_selection_conflict')
       .error
@@ -76,6 +73,13 @@ const resourceSelectionError = computed(() => {
 
   return null
 })
+const resourceSelectionHint = computed(() => {
+  if (!hasQueueTicketId.value || selectedResourceCount.value !== 0) {
+    return ''
+  }
+
+  return '请选择桌台、桌组，或在临时组合中选择至少 2 张桌台'
+})
 const canSubmit = computed(
   () =>
     !isSubmitting.value &&
@@ -83,15 +87,9 @@ const canSubmit = computed(
     hasQueueTicketId.value &&
     hasExactlyOneResource.value
 )
-const seatedQueueStatus = computed(() => result.value?.queueTicketStatus === 'seated')
-const seatedReservationStatus = computed(() => result.value?.reservationStatus === 'seated')
-const eventsDisplay = computed(() => {
-  if (!result.value?.events.length) {
-    return '[]'
-  }
-
-  return result.value.events.join(', ')
-})
+const queueTicketContextText = computed(() =>
+  hasQueueTicketId.value ? '已从排队列表带入' : '请从排队列表选择已叫号排队票'
+)
 
 watch(
   () => route.query.queueTicketId,
@@ -107,23 +105,22 @@ watch(
 
 async function submitQueueSeating(): Promise<void> {
   apiError.value = validateForm()
-  result.value = null
 
   if (apiError.value || !storeId.value) {
     return
   }
 
   const idempotencyKey = createIdempotencyKey()
-  lastIdempotencyKey.value = idempotencyKey
   isSubmitting.value = true
 
   try {
-    result.value = await seatCalledQueueTicket(
+    await seatCalledQueueTicket(
       storeId.value,
       form.queueTicketId.trim(),
       toRequest(),
       idempotencyKey
     )
+    await router.push(tableResourceListRoute.value)
   } catch (error) {
     apiError.value =
       error instanceof SeatingFromCalledQueueApiError
@@ -162,45 +159,41 @@ function validateForm(): SeatingFromCalledQueueApiErrorResponse | null {
 }
 
 function selectTable(tableId: string): void {
+  clearSubmissionError()
   form.tableId = tableId
   form.tableGroupId = ''
   form.temporaryTableIds = []
 }
 
 function selectTableGroup(tableGroupId: string): void {
+  clearSubmissionError()
   form.tableGroupId = tableGroupId
   form.tableId = ''
   form.temporaryTableIds = []
 }
 
 function selectTemporaryTables(tableIds: string[]): void {
+  clearSubmissionError()
   form.temporaryTableIds = tableIds
   form.tableId = ''
   form.tableGroupId = ''
+}
+
+function clearSubmissionError(): void {
+  apiError.value = null
 }
 
 function toRequest(): SeatCalledQueueTicketRequest {
   return {
     tableId: optionalValue(form.tableId),
     tableGroupId: optionalValue(form.tableGroupId),
-    temporaryTableIds: form.temporaryTableIds.length ? form.temporaryTableIds : null,
-    overrideReasonCode: optionalValue(form.overrideReasonCode),
-    overrideNote: optionalValue(form.overrideNote),
-    note: optionalValue(form.note)
+    temporaryTableIds: form.temporaryTableIds.length ? form.temporaryTableIds : null
   }
 }
 
 function optionalValue(value: string): string | null {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
-}
-
-function optionalDisplay(value: string | number | boolean | null | undefined): string {
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-
-  return value?.trim() ? value : '未返回'
 }
 
 function createIdempotencyKey(): string {
@@ -229,6 +222,14 @@ function createLocalError(
   }
 }
 
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return '默认门店'
+  }
+
+  return `门店 ${value.slice(0, 8)}`
+}
+
 function queryValue(value: unknown): string {
   if (Array.isArray(value)) {
     return typeof value[0] === 'string' ? value[0] : ''
@@ -239,290 +240,163 @@ function queryValue(value: unknown): string {
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>排队入座</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
-    </section>
+  <main class="staff-workbench-shell queue-seating-workbench">
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="currentBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    />
 
-    <form class="queue-seating-form" @submit.prevent="submitQueueSeating">
-      <label class="queue-ticket-id-field">
-        <span>排队票 ID</span>
-        <input
-          v-model="form.queueTicketId"
-          autocomplete="off"
-          name="queueTicketId"
-          required
-          type="text"
-        />
-      </label>
+    <div class="queue-seating-workbench-body">
+      <StaffHomeWorkflowStrip />
 
-      <section class="resource-panel" aria-label="桌台选择">
-        <p class="resource-rule">桌台、桌组或临时组合必须三选一</p>
-        <TableResourcePicker
-          :store-id="storeId"
-          :selected-table-id="form.tableId"
-          :selected-table-group-id="form.tableGroupId"
-          :selected-temporary-table-ids="form.temporaryTableIds"
-          temporary-selection-enabled
-          @select-table="selectTable"
-          @select-table-group="selectTableGroup"
-          @select-temporary-tables="selectTemporaryTables"
-        />
-        <details class="field-group">
-          <summary>手动填写资源 ID</summary>
-          <label>
-            <span>桌台 ID</span>
-            <input v-model="form.tableId" autocomplete="off" name="tableId" type="text" />
-          </label>
-          <label>
-            <span>桌组 ID</span>
-            <input v-model="form.tableGroupId" autocomplete="off" name="tableGroupId" type="text" />
-          </label>
-        </details>
-        <p v-if="resourceSelectionError" class="resource-error">
-          错误代码：{{ resourceSelectionError.code }}<br />
-          消息键：{{ resourceSelectionError.messageKey }}
-        </p>
-      </section>
+      <form class="queue-seating-form" @submit.prevent="submitQueueSeating">
+        <header class="queue-seating-heading">
+          <div>
+            <p>排队管理</p>
+            <h1>排队入座</h1>
+          </div>
+          <span class="queue-source-pill">{{ queueTicketContextText }}</span>
+        </header>
 
-      <details class="field-group">
-        <summary>调整信息</summary>
-        <label>
-          <span>调整原因代码（可选）</span>
-          <input v-model="form.overrideReasonCode" name="overrideReasonCode" type="text" />
-        </label>
-        <label>
-          <span>调整说明（可选）</span>
-          <textarea v-model="form.overrideNote" name="overrideNote" rows="3" />
-        </label>
-      </details>
+        <section class="queue-ticket-context" aria-label="排队票来源">
+          <span>入座来源</span>
+          <strong>{{ hasQueueTicketId ? '排队列表已选中' : '缺少排队票' }}</strong>
+        </section>
 
-      <details class="field-group">
-        <summary>备注</summary>
-        <label>
-          <span>备注（可选）</span>
-          <textarea v-model="form.note" name="note" rows="3" />
-        </label>
-      </details>
+        <section class="resource-panel" aria-label="桌台选择">
+          <TableResourcePicker
+            :store-id="storeId"
+            :available-only="true"
+            :selected-table-id="form.tableId"
+            :selected-table-group-id="form.tableGroupId"
+            :selected-temporary-table-ids="form.temporaryTableIds"
+            temporary-selection-enabled
+            @select-table="selectTable"
+            @select-table-group="selectTableGroup"
+            @select-temporary-tables="selectTemporaryTables"
+          />
+          <p v-if="resourceSelectionError" class="resource-error">
+            错误代码：{{ resourceSelectionError.code }}<br />
+            消息键：{{ resourceSelectionError.messageKey }}
+          </p>
+          <p v-if="resourceSelectionHint" class="resource-hint">
+            {{ resourceSelectionHint }}
+          </p>
+        </section>
 
-      <button class="submit-button" :disabled="!canSubmit" type="submit">
-        {{ isSubmitting ? '提交中...' : '确认入座' }}
-      </button>
-    </form>
+        <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
+          <h2>入座失败</h2>
+          <p class="error-code">错误代码：{{ apiError.error.code }}</p>
+          <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+        </section>
 
-    <section v-if="result" class="result-panel success-panel" aria-live="polite">
-      <h2>{{ result.alreadySeated ? '已入座' : '入座成功' }}</h2>
-      <div class="queue-highlight ticket-highlight">
-        <span>排队号码</span>
-        <strong>{{ result.queueTicketNumber }}</strong>
-      </div>
-      <div class="queue-highlight status-highlight">
-        <span>排队状态</span>
-        <strong>{{ result.queueTicketStatus }}</strong>
-      </div>
-      <div class="queue-highlight status-highlight">
-        <span>预约状态</span>
-        <strong>{{ result.reservationStatus }}</strong>
-      </div>
-      <div class="queue-highlight">
-        <span>预约编号</span>
-        <strong>{{ result.reservationCode }}</strong>
-      </div>
-      <div class="queue-highlight seating-highlight">
-        <span>入座记录 ID</span>
-        <strong>{{ result.seatingId }}</strong>
-      </div>
-      <div class="queue-highlight">
-        <span>资源</span>
-        <strong>{{ result.resourceType }} {{ result.resourceId }}</strong>
-      </div>
-      <div class="queue-highlight already-seated-highlight">
-        <span>是否已入座</span>
-        <strong>{{ result.alreadySeated }}</strong>
-      </div>
-      <p v-if="seatedQueueStatus" class="seated-note">排队状态：seated</p>
-      <p v-if="seatedReservationStatus" class="seated-note">预约状态：seated</p>
-      <p v-if="result.alreadySeated" class="seated-note">该排队票已有入座记录，本次按成功展示。</p>
-      <dl>
-        <div>
-          <dt>排队记录 ID</dt>
-          <dd>{{ result.queueTicketId }}</dd>
-        </div>
-        <div>
-          <dt>预约 ID</dt>
-          <dd>{{ result.reservationId }}</dd>
-        </div>
-        <div>
-          <dt>入座状态</dt>
-          <dd>{{ result.seatingStatus }}</dd>
-        </div>
-        <div>
-          <dt>资源类型</dt>
-          <dd>{{ result.resourceType }}</dd>
-        </div>
-        <div>
-          <dt>资源 ID</dt>
-          <dd>{{ result.resourceId }}</dd>
-        </div>
-        <div>
-          <dt>事件</dt>
-          <dd>{{ eventsDisplay }}</dd>
-        </div>
-        <div>
-          <dt>幂等状态</dt>
-          <dd>{{ result.idempotency.status }}</dd>
-        </div>
-        <div>
-          <dt>幂等重放</dt>
-          <dd>{{ optionalDisplay(result.idempotency.replayed ?? false) }}</dd>
-        </div>
-      </dl>
-    </section>
+        <button class="submit-button" :disabled="!canSubmit" type="submit">
+          {{ isSubmitting ? '入座中...' : '确认入座' }}
+        </button>
+      </form>
+    </div>
 
-    <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>入座失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
-    </section>
-
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
-    </p>
+    <StaffBottomNav :store-id="storeId" active-tab="queue" />
   </main>
 </template>
 
 <style scoped>
-.page-shell {
+.queue-seating-workbench-body {
   display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 620px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
-}
-
-.page-header {
-  display: grid;
-  gap: 4px;
-}
-
-.eyebrow,
-.store-context,
-.idempotency-key,
-.resource-rule,
-.seated-note {
-  color: #667085;
-  font-size: 0.82rem;
-  margin: 0;
-}
-
-.seated-note {
-  color: #176b4d;
-  font-weight: 800;
-}
-
-.home-link {
-  color: #315f91;
-  font-size: 0.86rem;
-  font-weight: 800;
-  justify-self: start;
-  text-decoration: none;
-}
-
-h1,
-h2 {
-  color: #14213d;
-  letter-spacing: 0;
-  margin: 0;
-}
-
-h1 {
-  font-size: 1.7rem;
-  line-height: 1.15;
-}
-
-h2 {
-  font-size: 1rem;
+  gap: 14px;
+  padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
 }
 
 .queue-seating-form,
 .result-panel {
   background: #ffffff;
-  border: 1px solid #d8e0eb;
-  border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
 }
 
 .queue-seating-form {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   padding: 14px;
 }
 
-label {
+.queue-seating-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.queue-seating-heading > div {
   display: grid;
-  gap: 6px;
+  gap: 3px;
+  min-width: 0;
 }
 
-label span,
-summary,
-dt,
-.queue-highlight span {
-  color: #41516a;
-  font-size: 0.86rem;
-  font-weight: 700;
+.queue-seating-heading p,
+.queue-ticket-context span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
 }
 
-input,
-textarea {
-  background: #fbfcfe;
-  border: 1px solid #c8d3e2;
-  border-radius: 6px;
-  color: #182536;
-  min-height: 44px;
-  outline: none;
-  padding: 10px 11px;
-  width: 100%;
+h1,
+h2,
+.queue-ticket-context strong {
+  color: #0f172a;
+  letter-spacing: 0;
+  margin: 0;
 }
 
-input:focus,
-textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+h1 {
+  font-size: 1.24rem;
+  line-height: 1.15;
 }
 
-.queue-ticket-id-field {
+h2 {
+  font-size: 0.98rem;
+}
+
+.queue-source-pill {
+  align-items: center;
   background: #fff7ed;
   border: 1px solid #fed7aa;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 999px;
+  color: #c2410c;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 
-.queue-ticket-id-field input {
-  background: #ffffff;
-  font-size: 1.05rem;
-  font-weight: 800;
-  min-height: 56px;
-}
-
-.resource-panel,
-.field-group {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+.queue-ticket-context {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
   padding: 10px 12px;
 }
 
-.resource-panel {
-  display: grid;
-  gap: 12px;
+.queue-ticket-context strong {
+  font-size: 0.96rem;
 }
 
-.resource-rule {
-  color: #315f91;
-  font-weight: 800;
+.resource-panel {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  padding: 10px 12px;
 }
 
 .resource-error {
@@ -533,22 +407,23 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
-.field-group[open] {
-  display: grid;
-  gap: 12px;
-}
-
-summary {
-  cursor: pointer;
-  min-height: 32px;
+.resource-hint {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin: 0;
+  padding: 9px 10px;
 }
 
 .submit-button {
-  background: #176b4d;
+  background: #197a55;
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 900;
   min-height: 52px;
   padding: 0 16px;
 }
@@ -560,72 +435,12 @@ summary {
 
 .result-panel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   padding: 14px;
 }
 
-.success-panel {
-  border-color: #a7d7be;
-}
-
 .error-panel {
-  border-color: #f4b8b8;
-}
-
-.queue-highlight {
-  background: #eef6f1;
-  border: 1px solid #b8d8c4;
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  padding: 11px;
-}
-
-.ticket-highlight {
-  background: #fff7ed;
-  border-color: #fed7aa;
-}
-
-.ticket-highlight strong {
-  color: #c2410c;
-  font-size: 1.55rem;
-}
-
-.status-highlight {
-  background: #eaf2ff;
-  border-color: #b8cdf6;
-}
-
-.seating-highlight {
-  background: #f0f9ff;
-  border-color: #bae6fd;
-}
-
-.already-seated-highlight {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-.queue-highlight strong {
-  color: #14213d;
-  font-size: 1.1rem;
-  overflow-wrap: anywhere;
-}
-
-dl {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-dt,
-dd {
-  margin: 0;
-}
-
-dd {
-  color: #1d2736;
-  overflow-wrap: anywhere;
+  border-color: #fecaca;
 }
 
 .error-code {
@@ -645,12 +460,8 @@ dd {
 }
 
 @media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
-  }
-
-  h1 {
-    font-size: 2rem;
+  .queue-seating-workbench-body {
+    padding-top: 16px;
   }
 }
 </style>

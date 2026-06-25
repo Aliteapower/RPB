@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
 import {
@@ -13,11 +13,13 @@ import {
   ReservationTodayViewApiError
 } from '../api/reservationTodayViewApi'
 import CreateReservationDialog from '../components/reservation-workbench/CreateReservationDialog.vue'
-import ReservationMonthCalendar from '../components/reservation-workbench/ReservationMonthCalendar.vue'
 import ReservationQuickActionPanel from '../components/reservation-workbench/ReservationQuickActionPanel.vue'
 import ReservationSeatDialog from '../components/reservation-workbench/ReservationSeatDialog.vue'
 import ReservationTodayListPanel from '../components/reservation-workbench/ReservationTodayListPanel.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwitcher.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { ReservationCheckInApiErrorResponse } from '../types/reservationCheckIn'
 import type {
@@ -30,7 +32,9 @@ import type { MeAppEntry } from '../types/meApps'
 import type { CreateReservationResponse } from '../types/reservation'
 
 const route = useRoute()
+const router = useRouter()
 const storeContext = useStoreContextStore()
+const { currentTimeText } = useCurrentClock()
 
 const statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: string }> = [
   { value: 'operational', label: '进行中' },
@@ -63,6 +67,8 @@ let appsLoadSequence = 0
 let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
+const appStatusLabel = computed(() => (isLoading.value ? '加载中' : '今日预约'))
 const items = computed(() => response.value?.items ?? [])
 const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || '后端默认')
 const storeTimezone = computed(() => response.value?.storeTimezone || 'Asia/Singapore')
@@ -318,6 +324,25 @@ function openReservationSeatDialog(item: ReservationTodayViewItem): void {
     return
   }
 
+  const queueTicketId = item.queueTicketId?.trim()
+
+  if (queueTicketId) {
+    if (item.queueTicketStatus?.trim() !== 'called') {
+      return
+    }
+
+    void router.push({
+      name: 'seating-from-called-queue',
+      params: {
+        storeId: storeId.value
+      },
+      query: {
+        queueTicketId
+      }
+    })
+    return
+  }
+
   selectedSeatReservation.value = item
   showSeatDialog.value = true
 }
@@ -383,6 +408,14 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
   return `${year}-${month}-${day}`
 }
 
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return '默认门店'
+  }
+
+  return `门店 ${value.slice(0, 8)}`
+}
+
 function monthKeyFromDate(value: string): string {
   const [year, month] = value.split('-')
   if (!year || !month) {
@@ -412,57 +445,64 @@ function isOpenCreateQuery(value: unknown): boolean {
 </script>
 
 <template>
-  <main class="staff-workbench-shell staff-workbench-shell--padded reservation-workbench">
-    <section class="reservation-workbench__header">
-      <div>
-        <p>门店员工</p>
-        <h1>今日预约</h1>
-        <span>门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }} · {{ displayedBusinessDate }}</span>
-      </div>
-      <button type="button" :disabled="isLoading" @click="refreshReservationWorkbench">刷新</button>
-    </section>
+  <main class="staff-workbench-shell reservation-workbench">
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="displayedBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    >
+      <template #action>
+        <button type="button" :disabled="isLoading" @click="refreshReservationWorkbench">
+          {{ isLoading ? '刷新中' : '刷新' }}
+        </button>
+      </template>
+    </StaffHomeTopBar>
 
-    <ReservationQuickActionPanel
-      :store-id="storeId"
-      :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
-      :selected-date="businessDate"
-      @open-create-reservation="openCreateReservationDialog"
-      @show-arrived-reservations="showArrivedReservations"
-      @show-confirmed-reservations="showConfirmedReservations"
-    />
+    <div class="reservation-workbench-body">
+      <StaffBusinessDateSwitcher
+        v-model:selected-date="businessDate"
+        :today-date="storeTodayDate"
+        :reservation-counts="reservationCounts"
+        calendar-label="预约日历"
+        @visible-month-changed="handleVisibleMonthChanged"
+      />
 
-    <ReservationMonthCalendar
-      v-model:selected-date="businessDate"
-      :min-date="storeTodayDate"
-      :reservation-counts="reservationCounts"
-      @visible-month-changed="handleVisibleMonthChanged"
-    />
+      <ReservationQuickActionPanel
+        :store-id="storeId"
+        :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
+        :selected-date="businessDate"
+        @open-create-reservation="openCreateReservationDialog"
+        @show-arrived-reservations="showArrivedReservations"
+        @show-confirmed-reservations="showConfirmedReservations"
+      />
 
-    <ReservationTodayListPanel
-      v-model:selected-status="selectedStatus"
-      :api-error="apiError"
-      :can-cancel-reservation="canCancelReservation"
-      :can-no-show-reservation="canNoShowReservation"
-      :can-run-current-day-actions="canRunCurrentDayActions"
-      :checking-in-reservation-id="checkingInReservationId"
-      :is-loading="isLoading"
-      :items="items"
-      :seating-reservation-id="selectedSeatReservation?.reservationId ?? null"
-      :show-empty-state="showEmptyState"
-      :status-options="statusOptions"
-      :store-id="storeId"
-      :store-timezone="storeTimezone"
-      @cancelled="handleReservationCancelled"
-      @check-in-requested="handleReservationCheckIn"
-      @no-showed="handleReservationNoShowed"
-      @seat-requested="openReservationSeatDialog"
-    />
+      <ReservationTodayListPanel
+        v-model:selected-status="selectedStatus"
+        :api-error="apiError"
+        :can-cancel-reservation="canCancelReservation"
+        :can-no-show-reservation="canNoShowReservation"
+        :can-run-current-day-actions="canRunCurrentDayActions"
+        :checking-in-reservation-id="checkingInReservationId"
+        :is-loading="isLoading"
+        :items="items"
+        :seating-reservation-id="selectedSeatReservation?.reservationId ?? null"
+        :show-empty-state="showEmptyState"
+        :status-options="statusOptions"
+        :store-id="storeId"
+        :store-timezone="storeTimezone"
+        @cancelled="handleReservationCancelled"
+        @check-in-requested="handleReservationCheckIn"
+        @no-showed="handleReservationNoShowed"
+        @seat-requested="openReservationSeatDialog"
+      />
 
-    <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
-      <h2>操作失败</h2>
-      <p>错误代码：{{ checkInApiError.error.code }}</p>
-      <p>消息键：{{ checkInApiError.error.messageKey }}</p>
-    </section>
+      <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
+        <h2>操作失败</h2>
+        <p>错误代码：{{ checkInApiError.error.code }}</p>
+        <p>消息键：{{ checkInApiError.error.messageKey }}</p>
+      </section>
+    </div>
 
     <CreateReservationDialog
       v-model:open="showCreateReservationDialog"
@@ -484,46 +524,10 @@ function isOpenCreateQuery(value: unknown): boolean {
 </template>
 
 <style scoped>
-.reservation-workbench__header {
-  align-items: center;
+.reservation-workbench-body {
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.reservation-workbench__header p,
-.reservation-workbench__header span {
-  color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 800;
-  margin: 0;
-}
-
-.reservation-workbench__header h1 {
-  color: #14213d;
-  letter-spacing: 0;
-  margin: 0;
-}
-
-.reservation-workbench__header h1 {
-  font-size: 1.35rem;
-  line-height: 1.15;
-}
-
-.reservation-workbench__header button {
-  background: #f97316;
-  border: 1px solid #f97316;
-  border-radius: 999px;
-  color: #ffffff;
-  font-size: 0.86rem;
-  font-weight: 900;
-  min-height: 38px;
-  padding: 0 14px;
-}
-
-.reservation-workbench__header button:disabled {
-  background: #cbd5e1;
-  border-color: #cbd5e1;
+  gap: 14px;
+  padding: 12px 14px calc(128px + env(safe-area-inset-bottom));
 }
 
 .reservation-workbench__action-error {

@@ -63,6 +63,17 @@ function buildEndpoint(storeId: string, query: QueueTicketListQuery): string {
     params.set('status', status)
   }
 
+  const tableArea = query.tableArea?.trim()
+  if (tableArea) {
+    params.set('tableArea', tableArea)
+  }
+
+  const phone = query.phone?.trim()
+  if (phone) {
+    params.set('phone', phone)
+  }
+
+  setNumberParam(params, 'partySize', query.partySize)
   setNumberParam(params, 'limit', query.limit)
   setNumberParam(params, 'offset', query.offset)
 
@@ -153,6 +164,7 @@ function isQueueTicketListItem(payload: unknown): payload is QueueTicketListItem
   return (
     typeof candidate.queueTicketId === 'string' &&
     typeof candidate.queueTicketNumber === 'number' &&
+    typeof candidate.queueTicketDisplayNumber === 'string' &&
     typeof candidate.queueTicketStatus === 'string' &&
     typeof candidate.partySize === 'number' &&
     typeof candidate.partySizeGroup === 'string' &&
@@ -162,6 +174,12 @@ function isQueueTicketListItem(payload: unknown): payload is QueueTicketListItem
     isOptionalString(candidate.reservationStatus) &&
     isOptionalString(candidate.customerName) &&
     isOptionalString(candidate.customerPhoneMasked) &&
+    isOptionalString(candidate.assignedResourceType) &&
+    isOptionalString(candidate.assignedResourceId) &&
+    isOptionalString(candidate.assignedResourceCode) &&
+    isOptionalString(candidate.assignedResourceGroupType) &&
+    isOptionalString(candidate.assignedResourceLabel) &&
+    isOptionalString(candidate.assignedResourceAreaName) &&
     isOptionalString(candidate.calledAt) &&
     isOptionalString(candidate.holdUntilAt) &&
     isOptionalString(candidate.expiresAt)

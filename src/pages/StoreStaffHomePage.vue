@@ -14,7 +14,7 @@ import type { MeAppEntry } from '../types/meApps'
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
-const { currentTimeText } = useCurrentClock()
+const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
@@ -121,7 +121,7 @@ const appStatusLabel = computed(() => {
     return '无入口'
   }
 
-  return '应用可用'
+  return '首页'
 })
 const appStatusTitle = computed(() => {
   if (appsLoading.value) {
@@ -415,6 +415,7 @@ function hasPermission(permission: string): boolean {
   <main class="staff-workbench-shell staff-shell">
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
+      :business-date="currentBusinessDate"
       :current-time-text="currentTimeText"
       :store-label="storeLabel"
     />

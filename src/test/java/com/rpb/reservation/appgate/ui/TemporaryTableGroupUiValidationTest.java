@@ -27,9 +27,15 @@ class TemporaryTableGroupUiValidationTest {
             .contains("selectedTemporaryTableIds")
             .contains("temporarySelectionEnabled")
             .contains("'select-temporary-tables'")
+            .contains("'update:selection-mode'")
+            .contains("showSelectionModeControls")
             .contains("selectionMode")
             .contains("toggleTemporaryTable")
-            .contains("临时组合");
+            .contains("临时组合")
+            .contains("isTemporaryGroupMember")
+            .contains("resourceUnavailableReasonText")
+            .contains("临时组占用")
+            .doesNotContain("`${statusLabel(resource.status)}，当前不可选`");
 
         assertThat(reservationPage + queuePage + walkInPage + seatDialog)
             .contains("temporaryTableIds: [] as string[]")
@@ -44,10 +50,20 @@ class TemporaryTableGroupUiValidationTest {
             .contains("selectedTemporaryTableIds")
             .contains("temporaryGroupRoute")
             .contains("temporaryTableIds: selectedTemporaryTableIds.value")
+            .contains("displayableTableResources")
+            .contains("isTemporaryGroupMember")
+            .contains("resourceDisplayStatusLabel")
+            .contains("resourceDisplayStatusClass")
+            .contains("resource.selectable")
+            .contains("临时组占用")
             .contains("临时桌组")
             .contains("组合桌台")
             .contains("加入组合")
-            .contains("临时入桌");
+            .contains("临时入桌")
+            .doesNotContain("后台开台")
+            .doesNotContain("员工选择")
+            .doesNotContain("table-page-breadcrumb")
+            .doesNotContain("statusLabel(resource.status) }}，{{ selectionReasonText(resource)");
 
         assertThat(reservationApi + queueApi + walkInApi + reservationTypes + queueTypes + walkInTypes)
             .contains("temporaryTableIds")

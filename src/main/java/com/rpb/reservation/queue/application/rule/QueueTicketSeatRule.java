@@ -11,7 +11,7 @@ public class QueueTicketSeatRule {
             if (queueTicket.calledAt() == null || queueTicket.expiresAt() == null) {
                 return SeatingFromCalledQueueError.QUEUE_TICKET_CALL_EVIDENCE_INCOMPLETE;
             }
-            if (queueTicket.reservationId() == null || queueTicket.walkInId() != null) {
+            if (queueTicket.reservationId() == null && queueTicket.walkInId() == null) {
                 return SeatingFromCalledQueueError.QUEUE_TICKET_SOURCE_NOT_RESERVATION;
             }
             return null;

@@ -126,6 +126,7 @@ function isQueueArrivedReservationResponse(
     typeof candidate.reservationStatus === 'string' &&
     typeof candidate.queueTicketId === 'string' &&
     typeof candidate.queueTicketNumber === 'number' &&
+    typeof candidate.queueTicketDisplayNumber === 'string' &&
     typeof candidate.queueTicketStatus === 'string' &&
     typeof candidate.queueGroupId === 'string' &&
     typeof candidate.partySize === 'number' &&

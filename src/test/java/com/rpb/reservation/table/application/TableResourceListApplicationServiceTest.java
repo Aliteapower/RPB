@@ -113,6 +113,94 @@ class TableResourceListApplicationServiceTest {
     }
 
     @Test
+    void createdTemporaryGroupIsSelectableAndMemberTablesAreBlockedAsSingleTables() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01 靠窗", "A区", 2, 4, "available"));
+        diningTables.rows.add(tableRow(TABLE_A2_ID, "A02", "A02 中央", "A区", 2, 4, "available"));
+        diningTables.tables.add(table(TABLE_A1_ID, "A01", 2, 4, DiningTableStatus.AVAILABLE));
+        diningTables.tables.add(table(TABLE_A2_ID, "A02", 2, 4, DiningTableStatus.AVAILABLE));
+        FakeTableGroupRepository tableGroups = new FakeTableGroupRepository();
+        tableGroups.groups.add(new TableGroup(
+            GROUP_VIP_ID,
+            SCOPE,
+            "A区临组1",
+            "temporary",
+            new CapacityRange(4, 8),
+            TableGroupStatus.CREATED
+        ));
+        tableGroups.members.add(member(GROUP_VIP_ID, TABLE_A1_ID));
+        tableGroups.members.add(member(GROUP_VIP_ID, TABLE_A2_ID));
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            tableGroups,
+            new FakeSeatingRepository(),
+            new FakeCleaningRepository(),
+            new FakeReservationPreassignmentRepository()
+        );
+
+        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, true, null));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resources()).extracting(TableResourceItem::code).containsExactly("A01", "A02", "A区临组1");
+        assertThat(result.resources().get(0).selectable()).isFalse();
+        assertThat(result.resources().get(0).selectionDisabledReason()).isEqualTo("temporary_group_member");
+        assertThat(result.resources().get(2).groupType()).isEqualTo("temporary");
+        assertThat(result.resources().get(2).status()).isEqualTo("created");
+        assertThat(result.resources().get(2).selectable()).isTrue();
+        assertThat(result.resources().get(2).memberTableCodes()).containsExactly("A01", "A02");
+    }
+
+    @Test
+    void activeSeatingOccupancyTurnsCreatedTemporaryGroupIntoOccupiedResource() {
+        FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
+        diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01 靠窗", "A区", 2, 4, "occupied"));
+        diningTables.rows.add(tableRow(TABLE_A2_ID, "A02", "A02 中央", "A区", 2, 4, "occupied"));
+        diningTables.tables.add(table(TABLE_A1_ID, "A01", 2, 4, DiningTableStatus.OCCUPIED));
+        diningTables.tables.add(table(TABLE_A2_ID, "A02", 2, 4, DiningTableStatus.OCCUPIED));
+        FakeTableGroupRepository tableGroups = new FakeTableGroupRepository();
+        tableGroups.groups.add(new TableGroup(
+            GROUP_VIP_ID,
+            SCOPE,
+            "A区临组1",
+            "temporary",
+            new CapacityRange(4, 8),
+            TableGroupStatus.CREATED
+        ));
+        tableGroups.members.add(member(GROUP_VIP_ID, TABLE_A1_ID));
+        tableGroups.members.add(member(GROUP_VIP_ID, TABLE_A2_ID));
+        FakeSeatingRepository seatings = new FakeSeatingRepository();
+        seatings.activeOccupancies.add(new ActiveOccupancy(
+            TABLE_GROUP_TYPE,
+            GROUP_VIP_ID.value(),
+            new Seating(SEATING_ID, SCOPE, "queue_ticket", UUID.randomUUID(), "S-1", new PartySize(4), SeatingStatus.OCCUPIED)
+        ));
+        TableResourceListApplicationService service = new TableResourceListApplicationService(
+            diningTables,
+            tableGroups,
+            seatings,
+            new FakeCleaningRepository(),
+            new FakeReservationPreassignmentRepository()
+        );
+
+        TableResourceListResult result = service.listResources(new TableResourceListQuery(SCOPE, null, null, true, null));
+
+        assertThat(result.success()).isTrue();
+        TableResourceItem group = result.resources().getLast();
+        assertThat(group.groupType()).isEqualTo("temporary");
+        assertThat(group.status()).isEqualTo("occupied");
+        assertThat(group.selectable()).isFalse();
+        assertThat(group.selectionDisabledReason()).isEqualTo("status_unavailable");
+        assertThat(group.currentSeatingId()).isEqualTo(SEATING_ID.value());
+        assertThat(group.currentPartySize()).isEqualTo(4);
+
+        TableResourceListResult occupiedResult = service.listResources(new TableResourceListQuery(SCOPE, "occupied", null, true, null));
+
+        assertThat(occupiedResult.success()).isTrue();
+        assertThat(occupiedResult.resources()).extracting(TableResourceItem::code)
+            .contains("A区临组1");
+    }
+
+    @Test
     void doesNotExposeCompletedSeatingAsSwitchableCurrentOccupancy() {
         FakeDiningTableRepository diningTables = new FakeDiningTableRepository();
         diningTables.rows.add(tableRow(TABLE_A1_ID, "A01", "A01", "A区", 1, 4, "occupied"));
@@ -442,6 +530,17 @@ class TableResourceListApplicationServiceTest {
                 .filter(member -> member.tableId().equals(tableId))
                 .map(TableGroupMember::tableGroupId)
                 .flatMap(groupId -> findById(scope, groupId).stream())
+                .toList();
+        }
+
+        @Override
+        public List<TableGroup> findActiveTemporaryGroupsForTable(StoreScope scope, TableId tableId) {
+            return members.stream()
+                .filter(member -> member.tableId().equals(tableId))
+                .map(TableGroupMember::tableGroupId)
+                .flatMap(groupId -> findById(scope, groupId).stream())
+                .filter(group -> "temporary".equals(group.groupType()))
+                .filter(group -> group.status() == TableGroupStatus.CREATED || group.status() == TableGroupStatus.LOCKED || group.status() == TableGroupStatus.OCCUPIED)
                 .toList();
         }
 

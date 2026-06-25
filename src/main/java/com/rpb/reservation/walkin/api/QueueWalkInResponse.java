@@ -8,6 +8,7 @@ public record QueueWalkInResponse(
     UUID walkInId,
     UUID queueTicketId,
     int queueTicketNumber,
+    String queueTicketDisplayNumber,
     String queueTicketStatus,
     int partySize,
     String partySizeGroup,

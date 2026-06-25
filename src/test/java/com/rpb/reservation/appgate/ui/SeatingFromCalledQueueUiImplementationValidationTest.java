@@ -81,34 +81,81 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
             .contains("idempotency");
 
         assertThat(page)
+            .contains("StaffHomeTopBar")
+            .contains("StaffHomeWorkflowStrip")
+            .contains("StaffBottomNav")
+            .contains("queue-seating-workbench")
+            .contains("queue-seating-workbench-body")
             .contains("<h1>排队入座</h1>")
             .contains("route.query.queueTicketId")
             .contains("queueTicketId")
             .contains("tableId")
             .contains("tableGroupId")
-            .contains("overrideReasonCode")
-            .contains("overrideNote")
-            .contains("note")
             .contains("hasExactlyOneResource")
             .contains("RESOURCE_SELECTION_REQUIRED")
             .contains("RESOURCE_SELECTION_CONFLICT")
             .contains("createIdempotencyKey")
             .contains("queue:seat")
-            .contains("lastIdempotencyKey")
             .contains("seatCalledQueueTicket")
-            .contains("queueTicketNumber")
-            .contains("queueTicketStatus")
-            .contains("reservationStatus")
-            .contains("seatingId")
-            .contains("seatingStatus")
-            .contains("resourceType")
-            .contains("resourceId")
-            .contains("alreadySeated")
-            .contains("eventsDisplay")
-            .contains("idempotency")
+            .contains("router.push(tableResourceListRoute.value)")
             .contains("error.code")
-            .contains("error.messageKey");
+            .contains("error.messageKey")
+            .doesNotContain("page-shell")
+            .doesNotContain("返回员工首页")
+            .doesNotContain("store-context")
+            .doesNotContain("name=\"queueTicketId\"")
+            .doesNotContain("排队票 ID")
+            .doesNotContain("手动填写资源 ID")
+            .doesNotContain("调整信息")
+            .doesNotContain("备注")
+            .doesNotContain("overrideReasonCode")
+            .doesNotContain("overrideNote")
+            .doesNotContain("lastIdempotencyKey")
+            .doesNotContain("eventsDisplay")
+            .doesNotContain("幂等键")
+            .doesNotContain("资源 ID");
         assertForbiddenFormFieldsAbsent(page);
+    }
+
+    @Test
+    void seatingFromCalledQueueUiDoesNotShowRequiredResourceAsInitialError() throws Exception {
+        String page = Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+
+        int errorStart = page.indexOf("const resourceSelectionError = computed");
+        int hintStart = page.indexOf("const resourceSelectionHint = computed");
+        assertThat(errorStart).isGreaterThanOrEqualTo(0);
+        assertThat(hintStart).isGreaterThan(errorStart);
+
+        String inlineSelectionError = page.substring(errorStart, hintStart);
+
+        assertThat(inlineSelectionError)
+            .doesNotContain("selectedResourceCount.value === 0")
+            .contains("selectedResourceCount.value > 1")
+            .contains("form.temporaryTableIds.length === 1");
+        assertThat(page)
+            .contains("resourceSelectionHint")
+            .contains("请选择桌台、桌组，或在临时组合中选择至少 2 张桌台")
+            .contains("v-if=\"resourceSelectionHint\"")
+            .contains("v-if=\"resourceSelectionError\"");
+    }
+
+    @Test
+    void queueSeatingApiAcceptsWalkInSuccessResponseWithoutReservationFields() throws Exception {
+        String apiClient = Files.readString(Path.of("src", "api", "seatingFromCalledQueueApi.ts"));
+        String types = Files.readString(Path.of("src", "types", "seatingFromCalledQueue.ts"));
+
+        assertThat(types)
+            .contains("reservationId?: string | null")
+            .contains("reservationCode?: string | null")
+            .contains("reservationStatus?: string | null");
+
+        assertThat(apiClient)
+            .contains("isOptionalString(candidate.reservationId)")
+            .contains("isOptionalString(candidate.reservationCode)")
+            .contains("isOptionalString(candidate.reservationStatus)")
+            .doesNotContain("typeof candidate.reservationId === 'string' &&")
+            .doesNotContain("typeof candidate.reservationCode === 'string' &&")
+            .doesNotContain("typeof candidate.reservationStatus === 'string' &&");
     }
 
     @Test

@@ -55,6 +55,9 @@ class ReservationTodayViewApiIntegrationTest {
     private static final UUID TABLE_A01_ID = UUID.fromString("62000000-0000-0000-0000-000000000991");
     private static final UUID SEATING_ID = UUID.fromString("63000000-0000-0000-0000-000000000991");
     private static final UUID SEATING_RESOURCE_ID = UUID.fromString("64000000-0000-0000-0000-000000000991");
+    private static final UUID QUEUE_GROUP_ID = UUID.fromString("65000000-0000-0000-0000-000000000991");
+    private static final UUID QUEUE_TICKET_ID = UUID.fromString("66000000-0000-0000-0000-000000000991");
+    private static final UUID TEMP_TABLE_GROUP_ID = UUID.fromString("67000000-0000-0000-0000-000000000991");
     private static final LocalDate BUSINESS_DATE = LocalDate.parse("2030-06-20");
 
     @Autowired
@@ -180,6 +183,35 @@ class ReservationTodayViewApiIntegrationTest {
             .andExpect(jsonPath("$.items[0].currentResourceCode").value("A01"));
 
         assertReadOnlyBoundaryWithSeededSeating();
+    }
+
+    @Test
+    void seatedReservationsExposeQueueTicketSeatingResourceForTemporaryTableGroup() throws Exception {
+        fixture.allStatusReservations(BUSINESS_DATE);
+        fixture.queueTicketSeatingForTemporaryTableGroup(
+            SEATED_ID,
+            QUEUE_GROUP_ID,
+            QUEUE_TICKET_ID,
+            SEATING_ID,
+            SEATING_RESOURCE_ID,
+            TEMP_TABLE_GROUP_ID
+        );
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", BUSINESS_DATE.toString())
+                .param("status", "seated"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].reservationId").value(SEATED_ID.toString()))
+            .andExpect(jsonPath("$.items[0].status").value("seated"))
+            .andExpect(jsonPath("$.items[0].queueTicketId").value(QUEUE_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.items[0].queueTicketStatus").value("seated"))
+            .andExpect(jsonPath("$.items[0].seatingId").value(SEATING_ID.toString()))
+            .andExpect(jsonPath("$.items[0].currentResourceType").value("table_group"))
+            .andExpect(jsonPath("$.items[0].currentResourceId").value(TEMP_TABLE_GROUP_ID.toString()))
+            .andExpect(jsonPath("$.items[0].currentResourceCode").value("TMP-TV"));
+
+        assertReadOnlyBoundaryWithSeededQueueTicketGroupSeating();
     }
 
     @Test
@@ -380,6 +412,22 @@ class ReservationTodayViewApiIntegrationTest {
         assertThat(fixture.count("table_locks")).isEqualTo(0);
         assertThat(fixture.scalarString("select status from dining_tables where id = ?", TABLE_A01_ID))
             .isEqualTo("available");
+    }
+
+    private void assertReadOnlyBoundaryWithSeededQueueTicketGroupSeating() {
+        assertThat(fixture.count("idempotency_records")).isEqualTo(0);
+        assertThat(fixture.count("business_events")).isEqualTo(0);
+        assertThat(fixture.count("state_transition_logs")).isEqualTo(0);
+        assertThat(fixture.count("audit_logs")).isEqualTo(0);
+        assertThat(fixture.count("app_gate_audit_logs")).isEqualTo(0);
+        assertThat(fixture.count("queue_groups")).isEqualTo(1);
+        assertThat(fixture.count("queue_tickets")).isEqualTo(1);
+        assertThat(fixture.count("seatings")).isEqualTo(1);
+        assertThat(fixture.count("seating_resources")).isEqualTo(1);
+        assertThat(fixture.count("table_groups")).isEqualTo(1);
+        assertThat(fixture.count("table_locks")).isEqualTo(0);
+        assertThat(fixture.scalarString("select status from table_groups where id = ?", TEMP_TABLE_GROUP_ID))
+            .isEqualTo("occupied");
     }
 
     private static CurrentActor actor(Set<String> roles, Set<String> permissions, Set<UUID> storeIds) {
@@ -622,6 +670,99 @@ class ReservationTodayViewApiIntegrationTest {
                 utc(assignedAt.plusSeconds(90 * 60L)),
                 utc(assignedAt),
                 utc(assignedAt.plusSeconds(90 * 60L))
+            );
+        }
+
+        void queueTicketSeatingForTemporaryTableGroup(
+            UUID reservationId,
+            UUID queueGroupId,
+            UUID queueTicketId,
+            UUID seatingId,
+            UUID seatingResourceId,
+            UUID tableGroupId
+        ) {
+            Instant assignedAt = Instant.parse(BUSINESS_DATE + "T03:00:00Z");
+            jdbc.update(
+                """
+                insert into queue_groups (
+                    id, tenant_id, store_id, group_code, min_party_size, max_party_size,
+                    display_i18n_key, status, sort_order
+                )
+                values (?, ?, ?, 'Q-TV', 1, 12, 'queue.group.today_view', 'active', 1)
+                """,
+                queueGroupId,
+                TENANT_ID,
+                STORE_ID
+            );
+            jdbc.update(
+                """
+                insert into queue_tickets (
+                    id, tenant_id, store_id, queue_group_id, reservation_id,
+                    ticket_number, party_size, business_date, status, queue_position,
+                    called_at, expires_at, created_at, updated_at
+                )
+                values (?, ?, ?, ?, ?, 8, 4, ?, 'seated', null, ?, ?, ?, ?)
+                """,
+                queueTicketId,
+                TENANT_ID,
+                STORE_ID,
+                queueGroupId,
+                reservationId,
+                BUSINESS_DATE,
+                utc(assignedAt.minusSeconds(300)),
+                utc(assignedAt.plusSeconds(300)),
+                utc(assignedAt.minusSeconds(900)),
+                utc(assignedAt)
+            );
+            jdbc.update(
+                """
+                insert into table_groups (
+                    id, tenant_id, store_id, group_code, group_type, status,
+                    display_name, capacity_min, capacity_max, active_from_at,
+                    created_at, updated_at
+                )
+                values (?, ?, ?, 'TMP-TV', 'temporary', 'occupied',
+                    'TMP-TV', 2, 10, ?, ?, ?)
+                """,
+                tableGroupId,
+                TENANT_ID,
+                STORE_ID,
+                utc(assignedAt.minusSeconds(600)),
+                utc(assignedAt.minusSeconds(600)),
+                utc(assignedAt)
+            );
+            jdbc.update(
+                """
+                insert into seatings (
+                    id, tenant_id, store_id, queue_ticket_id, seating_code, party_size_snapshot,
+                    status, seated_at, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'S-TV-QUEUE-GROUP', 4, 'occupied', ?, ?, ?)
+                """,
+                seatingId,
+                TENANT_ID,
+                STORE_ID,
+                queueTicketId,
+                utc(assignedAt),
+                utc(assignedAt),
+                utc(assignedAt)
+            );
+            jdbc.update(
+                """
+                insert into seating_resources (
+                    id, tenant_id, store_id, seating_id, resource_type, table_group_id,
+                    assigned_at, status, created_at, updated_at
+                )
+                values (?, ?, ?, ?, 'table_group', ?, ?, 'active', ?, ?)
+                """,
+                seatingResourceId,
+                TENANT_ID,
+                STORE_ID,
+                seatingId,
+                tableGroupId,
+                utc(assignedAt),
+                utc(assignedAt),
+                utc(assignedAt)
             );
         }
 

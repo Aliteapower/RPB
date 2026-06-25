@@ -179,27 +179,33 @@ class QueueCallApiIntegrationTest {
     }
 
     @Test
-    void alreadyCalledWithNewKeyReturnsAlreadyCalledWithoutDuplicateBusinessEvidence() throws Exception {
+    void repeatCallWithNewKeyRefreshesCalledHoldAndWritesBusinessEvidence() throws Exception {
         fixture.reservation(RESERVATION_ID, "R-CALL-ALREADY", "arrived", 4);
         fixture.queueTicket(QUEUE_TICKET_ID, RESERVATION_ID, "called", CALLED_AT, POLICY_HOLD_UNTIL_AT, 12, 1);
+        Instant repeatCalledAt = CALLED_AT.plusSeconds(90);
+        Instant repeatHoldUntilAt = repeatCalledAt.plus(Duration.between(CALLED_AT, POLICY_HOLD_UNTIL_AT));
 
         mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
-                .header("Idempotency-Key", "call-already")
+                .header("Idempotency-Key", "call-repeat")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(requestJson(CALLED_AT)))
+                .content(requestJson(repeatCalledAt)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.queueTicketStatus").value("called"))
             .andExpect(jsonPath("$.reservationStatus").value("arrived"))
-            .andExpect(jsonPath("$.calledAt").value(CALLED_AT.toString()))
-            .andExpect(jsonPath("$.holdUntilAt").value(POLICY_HOLD_UNTIL_AT.toString()))
-            .andExpect(jsonPath("$.alreadyCalled").value(true))
-            .andExpect(jsonPath("$.events").isEmpty())
+            .andExpect(jsonPath("$.calledAt").value(repeatCalledAt.toString()))
+            .andExpect(jsonPath("$.holdUntilAt").value(repeatHoldUntilAt.toString()))
+            .andExpect(jsonPath("$.alreadyCalled").value(false))
+            .andExpect(jsonPath("$.events[0]").value("queue_ticket.called"))
             .andExpect(jsonPath("$.idempotency.status").value("completed"));
 
-        assertThat(fixture.countWhere("select count(*) from business_events where event_type = 'queue_ticket.called'")).isEqualTo(0);
-        assertThat(fixture.countWhere("select count(*) from state_transition_logs where transition_code = 'queue_ticket.call'")).isEqualTo(0);
-        assertThat(fixture.countWhere("select count(*) from audit_logs where operation_code = 'queue.call'")).isEqualTo(0);
-        assertThat(fixture.scalarString("select status from idempotency_records where idempotency_key = ?", "call-already"))
+        assertThat(fixture.scalarOffsetDateTime("select called_at from queue_tickets where id = ?", QUEUE_TICKET_ID))
+            .isEqualTo(OffsetDateTime.ofInstant(repeatCalledAt, ZoneOffset.UTC));
+        assertThat(fixture.scalarOffsetDateTime("select expires_at from queue_tickets where id = ?", QUEUE_TICKET_ID))
+            .isEqualTo(OffsetDateTime.ofInstant(repeatHoldUntilAt, ZoneOffset.UTC));
+        assertThat(fixture.countWhere("select count(*) from business_events where event_type = 'queue_ticket.called'")).isEqualTo(1);
+        assertThat(fixture.countWhere("select count(*) from state_transition_logs where transition_code = 'queue_ticket.call'")).isEqualTo(1);
+        assertThat(fixture.countWhere("select count(*) from audit_logs where operation_code = 'queue.call'")).isEqualTo(1);
+        assertThat(fixture.scalarString("select status from idempotency_records where idempotency_key = ?", "call-repeat"))
             .isEqualTo("completed");
         assertBoundaryTablesRemainUnchanged();
     }

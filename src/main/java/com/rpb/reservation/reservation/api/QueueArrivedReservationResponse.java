@@ -15,6 +15,7 @@ public record QueueArrivedReservationResponse(
     String reservationStatus,
     UUID queueTicketId,
     int queueTicketNumber,
+    String queueTicketDisplayNumber,
     String queueTicketStatus,
     UUID queueGroupId,
     String queueGroupCode,

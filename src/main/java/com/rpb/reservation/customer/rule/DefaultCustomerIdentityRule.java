@@ -14,13 +14,6 @@ public class DefaultCustomerIdentityRule implements CustomerIdentityRule {
     }
 
     public RuleDecision evaluate(UUID customerId, String customerName, String customerNickname, E164Phone phone) {
-        if (customerId != null || hasText(customerName) || hasText(customerNickname) || (phone != null && phone.isPresent())) {
-            return RuleDecision.allow();
-        }
-        return RuleDecision.deny("invalid_customer_identity");
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
+        return RuleDecision.allow();
     }
 }

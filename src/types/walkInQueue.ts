@@ -26,6 +26,7 @@ export interface QueueWalkInResponse {
   walkInId: string
   queueTicketId: string
   queueTicketNumber: number
+  queueTicketDisplayNumber: string
   queueTicketStatus: string
   partySize: number
   partySizeGroup: string

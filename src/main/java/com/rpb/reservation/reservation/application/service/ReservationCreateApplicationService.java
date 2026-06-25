@@ -48,8 +48,8 @@ import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.domain.TableGroup;
+import com.rpb.reservation.table.rule.DefaultTableAvailabilityRule;
 import com.rpb.reservation.table.status.DiningTableStatus;
-import com.rpb.reservation.table.status.TableGroupStatus;
 import com.rpb.reservation.table.value.TableGroupId;
 import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
@@ -104,6 +104,7 @@ public class ReservationCreateApplicationService {
     private final ReservationTimeRangeRule reservationTimeRangeRule = new ReservationTimeRangeRule();
     private final ReservationAvailabilityRule reservationAvailabilityRule = new ReservationAvailabilityRule();
     private final ReservationDuplicateRule reservationDuplicateRule = new ReservationDuplicateRule();
+    private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
 
     @Autowired
     public ReservationCreateApplicationService(
@@ -473,9 +474,7 @@ public class ReservationCreateApplicationService {
         if (command.tableGroupId() != null) {
             TableGroup group = tableGroupRepository.findById(scope, new TableGroupId(command.tableGroupId()))
                 .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.TABLE_GROUP_NOT_FOUND));
-            if (group.status() != TableGroupStatus.ACTIVE) {
-                throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_INVALID);
-            }
+            require(tableAvailabilityRule.evaluate(group), ReservationCreateError.TABLE_GROUP_INVALID);
             if (!group.capacity().includes(partySize)) {
                 throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_CAPACITY_INSUFFICIENT);
             }

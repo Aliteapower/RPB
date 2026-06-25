@@ -26,9 +26,9 @@ export interface SeatCalledQueueTicketResponse {
   queueTicketId: string
   queueTicketNumber: number
   queueTicketStatus: string
-  reservationId: string
-  reservationCode: string
-  reservationStatus: string
+  reservationId?: string | null
+  reservationCode?: string | null
+  reservationStatus?: string | null
   seatingId: string
   seatingStatus: string
   resourceType: string

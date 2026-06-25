@@ -10,6 +10,13 @@ import type {
   TableResourceItem
 } from '../../types/tableResource'
 
+type SelectionMode = 'single' | 'temporary'
+type AreaFilterOption = {
+  value: string
+  label: string
+  count: number
+}
+
 const props = defineProps<{
   storeId: string
   partySize?: number | null
@@ -19,20 +26,22 @@ const props = defineProps<{
   businessDate?: string | null
   availableOnly?: boolean
   temporarySelectionEnabled?: boolean
+  selectionMode?: SelectionMode | null
+  showSelectionModeControls?: boolean
 }>()
 
 const emit = defineEmits<{
   'select-table': [tableId: string]
   'select-table-group': [tableGroupId: string]
   'select-temporary-tables': [tableIds: string[]]
+  'update:selection-mode': [mode: SelectionMode]
 }>()
-
-type SelectionMode = 'single' | 'temporary'
 
 const resources = ref<TableResourceItem[]>([])
 const isLoading = ref(false)
 const apiError = ref<TableResourceApiErrorResponse | null>(null)
 const selectionMode = ref<SelectionMode>('single')
+const selectedArea = ref('all')
 let loadSequence = 0
 
 const statusLabels: Record<string, string> = {
@@ -48,16 +57,53 @@ const statusLabels: Record<string, string> = {
   ended: '已结束'
 }
 
+const displayableResources = computed(() =>
+  resources.value.filter(resource => !isTemporaryGroupMember(resource))
+)
 const displayedResources = computed(() =>
-  props.availableOnly ? resources.value.filter(resource => resource.selectable) : resources.value
+  props.availableOnly ? displayableResources.value.filter(resource => resource.selectable) : displayableResources.value
 )
 const tableResources = computed(() =>
   displayedResources.value.filter(resource => resource.resourceType === 'dining_table')
 )
+const filteredTableResources = computed(() =>
+  selectedArea.value === 'all'
+    ? tableResources.value
+    : tableResources.value.filter(resource => resourceAreaMatches(resource, selectedArea.value))
+)
+const tableAreaByCode = computed(() => {
+  const areaMap = new Map<string, string>()
+
+  for (const resource of displayableResources.value) {
+    if (resource.resourceType !== 'dining_table') {
+      continue
+    }
+
+    const area = areaTitle(resource)
+    for (const code of tableIdentityKeys(resource)) {
+      areaMap.set(code, area)
+    }
+  }
+
+  return areaMap
+})
+const areaFilterOptions = computed<AreaFilterOption[]>(() => {
+  const areaCounts = new Map<string, number>()
+
+  for (const resource of tableResources.value) {
+    const title = areaTitle(resource)
+    areaCounts.set(title, (areaCounts.get(title) ?? 0) + 1)
+  }
+
+  return [
+    { value: 'all', label: '全部分区', count: tableResources.value.length },
+    ...Array.from(areaCounts, ([label, count]) => ({ value: label, label, count }))
+  ]
+})
 const groupedTableResources = computed(() => {
   const groups = new Map<string, TableResourceItem[]>()
 
-  for (const resource of tableResources.value) {
+  for (const resource of filteredTableResources.value) {
     const title = areaTitle(resource)
     groups.set(title, [...(groups.get(title) ?? []), resource])
   }
@@ -67,18 +113,35 @@ const groupedTableResources = computed(() => {
 const groupResources = computed(() =>
   displayedResources.value.filter(resource => resource.resourceType === 'table_group')
 )
+const temporaryGroupResources = computed(() =>
+  groupResources.value.filter(resource => resource.groupType === 'temporary')
+)
+const visibleGroupResources = computed(() =>
+  (selectionMode.value === 'temporary' ? temporaryGroupResources.value : groupResources.value)
+    .filter(resource => selectedArea.value === 'all' || filterGroupResourceByArea(resource, selectedArea.value))
+)
 const selectedTemporaryTableIds = computed(() => props.selectedTemporaryTableIds ?? [])
 const selectedTemporaryTableIdSet = computed(() => new Set(selectedTemporaryTableIds.value))
 const temporarySelectionCount = computed(() => selectedTemporaryTableIds.value.length)
-const showGroupResources = computed(() => selectionMode.value === 'single' && groupResources.value.length > 0)
+const showGroupResources = computed(() => visibleGroupResources.value.length > 0)
+const displayedResourceCount = computed(() => filteredTableResources.value.length + visibleGroupResources.value.length)
 const showEmpty = computed(
-  () => !isLoading.value && !apiError.value && displayedResources.value.length === 0
+  () => !isLoading.value && !apiError.value && displayedResourceCount.value === 0
 )
-const emptyText = computed(() => (props.availableOnly ? '暂无可用桌台。' : '暂无桌台，请先在后台配置桌台。'))
+const emptyText = computed(() => {
+  if (selectedArea.value !== 'all') {
+    return props.availableOnly ? '当前分区暂无可用桌台。' : '当前分区暂无桌台。'
+  }
+
+  return props.availableOnly ? '暂无可用桌台。' : '暂无桌台，请先在后台配置桌台。'
+})
 const pickerSubtitle = computed(() =>
   selectionMode.value === 'temporary'
     ? `临时组合 · 已选 ${temporarySelectionCount.value} 张`
     : '后台已配置资源'
+)
+const shouldShowSelectionModeControls = computed(
+  () => props.temporarySelectionEnabled && props.showSelectionModeControls !== false
 )
 
 watch(
@@ -93,12 +156,34 @@ watch(
   () => [props.temporarySelectionEnabled, temporarySelectionCount.value] as const,
   ([enabled, count]) => {
     if (!enabled) {
-      selectionMode.value = 'single'
+      setSelectionMode('single', { clearTemporarySelection: false, notifyParent: false })
       return
     }
 
     if (count > 0) {
-      selectionMode.value = 'temporary'
+      setSelectionMode('temporary', { clearTemporarySelection: false, notifyParent: false })
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.selectionMode,
+  mode => {
+    if (!mode) {
+      return
+    }
+
+    setSelectionMode(mode, { clearTemporarySelection: false, notifyParent: false })
+  },
+  { immediate: true }
+)
+
+watch(
+  areaFilterOptions,
+  options => {
+    if (!options.some(option => option.value === selectedArea.value)) {
+      selectedArea.value = 'all'
     }
   },
   { immediate: true }
@@ -145,7 +230,7 @@ function chooseResource(resource: TableResourceItem): void {
     return
   }
 
-  if (selectionMode.value === 'temporary') {
+  if (selectionMode.value === 'temporary' && resource.resourceType === 'dining_table') {
     toggleTemporaryTable(resource.resourceId)
     return
   }
@@ -159,6 +244,17 @@ function chooseResource(resource: TableResourceItem): void {
 }
 
 function switchSelectionMode(mode: SelectionMode): void {
+  setSelectionMode(mode, { clearTemporarySelection: mode === 'single', notifyParent: true })
+}
+
+function selectArea(area: string): void {
+  selectedArea.value = area
+}
+
+function setSelectionMode(
+  mode: SelectionMode,
+  options: { clearTemporarySelection: boolean; notifyParent: boolean }
+): void {
   if (mode === 'temporary' && !props.temporarySelectionEnabled) {
     return
   }
@@ -169,12 +265,16 @@ function switchSelectionMode(mode: SelectionMode): void {
 
   selectionMode.value = mode
 
+  if (options.notifyParent) {
+    emit('update:selection-mode', mode)
+  }
+
   if (mode === 'temporary') {
     emit('select-temporary-tables', selectedTemporaryTableIds.value)
     return
   }
 
-  if (selectedTemporaryTableIds.value.length) {
+  if (options.clearTemporarySelection && selectedTemporaryTableIds.value.length) {
     emit('select-temporary-tables', [])
   }
 }
@@ -192,15 +292,24 @@ function toggleTemporaryTable(tableId: string): void {
 }
 
 function canChooseResource(resource: TableResourceItem): boolean {
+  if (!resource.selectable) {
+    return false
+  }
+
   return (
-    resource.selectable &&
-    (selectionMode.value === 'single' || resource.resourceType === 'dining_table')
+    selectionMode.value === 'single' ||
+    resource.resourceType === 'dining_table' ||
+    isTemporaryModeSavedGroup(resource)
   )
 }
 
 function selected(resource: TableResourceItem): boolean {
   if (selectionMode.value === 'temporary') {
-    return resource.resourceType === 'dining_table' && selectedTemporaryTableIdSet.value.has(resource.resourceId)
+    if (resource.resourceType === 'dining_table') {
+      return selectedTemporaryTableIdSet.value.has(resource.resourceId)
+    }
+
+    return isTemporaryModeSavedGroup(resource) && props.selectedTableGroupId === resource.resourceId
   }
 
   return resource.resourceType === 'dining_table'
@@ -208,16 +317,65 @@ function selected(resource: TableResourceItem): boolean {
     : props.selectedTableGroupId === resource.resourceId
 }
 
+function isTemporaryModeSavedGroup(resource: TableResourceItem): boolean {
+  return selectionMode.value === 'temporary' && resource.resourceType === 'table_group' && resource.groupType === 'temporary'
+}
+
 function capacityText(resource: TableResourceItem): string {
   return `${resource.capacityMin}-${resource.capacityMax}人`
 }
 
 function statusText(resource: TableResourceItem): string {
-  return resource.selectable ? statusLabel(resource.status) : `${statusLabel(resource.status)}，当前不可选`
+  return resource.selectable ? statusLabel(resource.status) : resourceUnavailableReasonText(resource)
 }
 
 function statusLabel(status: string): string {
   return statusLabels[status] ?? status
+}
+
+function isTemporaryGroupMember(resource: TableResourceItem): boolean {
+  return (
+    resource.resourceType === 'dining_table' &&
+    resource.selectionDisabledReason?.trim() === 'temporary_group_member'
+  )
+}
+
+function filterGroupResourceByArea(resource: TableResourceItem, area: string): boolean {
+  if (resource.areaName?.trim()) {
+    return resourceAreaMatches(resource, area)
+  }
+
+  return resource.memberTableCodes.some(code => tableAreaByCode.value.get(code) === area)
+}
+
+function resourceAreaMatches(resource: TableResourceItem, area: string): boolean {
+  return areaTitle(resource) === area
+}
+
+function tableIdentityKeys(resource: TableResourceItem): string[] {
+  return [resource.code, resource.displayName]
+    .map(value => value?.trim())
+    .filter((value): value is string => !!value)
+}
+
+function resourceUnavailableReasonText(resource: TableResourceItem): string {
+  if (isTemporaryGroupMember(resource)) {
+    return '临时组占用'
+  }
+
+  const reasonLabels: Record<string, string> = {
+    status_unavailable: '当前状态不可选',
+    capacity_mismatch: '人数不匹配',
+    locked: '桌台已锁定',
+    occupied: '桌台已占用',
+    cleaning: '正在清台',
+    reservation_preassigned: '已被预约预留',
+    temporary_group_member: '临时组占用'
+  }
+  const reason = resource.selectionDisabledReason?.trim()
+  const reasonText = reason ? reasonLabels[reason] ?? '当前不可选' : '当前不可选'
+
+  return `${statusLabel(resource.status)}，${reasonText}`
 }
 
 function areaTitle(resource: TableResourceItem): string {
@@ -246,7 +404,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       </div>
       <div class="table-picker__header-actions">
         <div
-          v-if="temporarySelectionEnabled"
+          v-if="shouldShowSelectionModeControls"
           class="table-picker__mode"
           aria-label="资源选择模式"
           role="group"
@@ -284,6 +442,23 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       {{ emptyText }}
     </section>
 
+    <section v-if="areaFilterOptions.length > 1" class="table-picker__area-filter" aria-label="桌台分区">
+      <span>桌台分区</span>
+      <div>
+        <button
+          v-for="option in areaFilterOptions"
+          :key="option.value"
+          type="button"
+          :class="{ selected: selectedArea === option.value }"
+          :aria-pressed="selectedArea === option.value"
+          @click="selectArea(option.value)"
+        >
+          {{ option.label }}
+          <small>{{ option.count }}</small>
+        </button>
+      </div>
+    </section>
+
     <section
       v-for="group in groupedTableResources"
       :key="group.title"
@@ -316,12 +491,16 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       <p class="table-picker__section-title">分组</p>
       <div class="table-picker__grid">
         <button
-          v-for="resource in groupResources"
+          v-for="resource in visibleGroupResources"
           :key="resource.resourceId"
           class="table-picker__resource table-picker__resource--group"
-          :class="{ selected: selected(resource), unavailable: !resource.selectable }"
+          :class="{
+            selected: selected(resource),
+            unavailable: !canChooseResource(resource),
+            'table-picker__resource--temporary': selectionMode === 'temporary'
+          }"
           type="button"
-          :disabled="!resource.selectable"
+          :disabled="!canChooseResource(resource)"
           @click="chooseResource(resource)"
         >
           <span>{{ resource.displayName || resource.code }}</span>
@@ -426,6 +605,48 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
   background: #fff1f2;
   border-color: #fecdd3;
   color: #be123c;
+}
+
+.table-picker__area-filter {
+  display: grid;
+  gap: 8px;
+}
+
+.table-picker__area-filter > span {
+  color: #14213d;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.table-picker__area-filter > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-picker__area-filter button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #1e3a5f;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 900;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.table-picker__area-filter button.selected {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+}
+
+.table-picker__area-filter small {
+  font-size: 0.74rem;
+  font-weight: 900;
 }
 
 .table-picker__section {

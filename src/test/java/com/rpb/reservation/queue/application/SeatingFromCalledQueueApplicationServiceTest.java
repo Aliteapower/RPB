@@ -53,6 +53,9 @@ import com.rpb.reservation.table.status.TableGroupStatus;
 import com.rpb.reservation.table.value.TableGroupId;
 import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
+import com.rpb.reservation.walkin.application.port.out.WalkInRepositoryPort;
+import com.rpb.reservation.walkin.domain.WalkIn;
+import com.rpb.reservation.walkin.value.WalkInId;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -129,6 +132,43 @@ class SeatingFromCalledQueueApplicationServiceTest {
         assertThat(scenario.idempotencyRepository.completed.getFirst().targetType()).isEqualTo("seating");
 
         assertBoundaryUnchanged(scenario);
+    }
+
+    @Test
+    void seatsCalledWalkInQueueTicketToSingleTable() {
+        Scenario scenario = Scenario.readyWalkIn(QueueTicketStatus.CALLED);
+
+        SeatingFromCalledQueueResult result = scenario.service()
+            .seatCalledQueueTicket(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.error()).isNull();
+        assertThat(result.queueTicketId()).isEqualTo(scenario.queueTicketId.value());
+        assertThat(result.queueTicketNumber()).isEqualTo(22);
+        assertThat(result.queueTicketStatus()).isEqualTo("seated");
+        assertThat(result.reservationId()).isNull();
+        assertThat(result.reservationCode()).isNull();
+        assertThat(result.reservationStatus()).isNull();
+        assertThat(result.resourceType()).isEqualTo("dining_table");
+        assertThat(result.resourceId()).isEqualTo(scenario.table.id().value());
+        assertThat(result.seatingStatus()).isEqualTo("occupied");
+        assertThat(result.events()).containsExactly("queue_ticket.seated", "walk_in.seated", "seating.created", "table.occupied");
+
+        assertThat(scenario.queueTicketRepository.saved).hasSize(1);
+        assertThat(scenario.queueTicketRepository.saved.getFirst().status()).isEqualTo(QueueTicketStatus.SEATED);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+        assertThat(scenario.walkInRepository.saved).hasSize(1);
+        assertThat(scenario.walkInRepository.saved.getFirst().status()).isEqualTo("seated");
+        assertThat(scenario.seatingRepository.saved).hasSize(1);
+        assertThat(scenario.seatingRepository.saved.getFirst().sourceType()).isEqualTo("queue_ticket");
+        assertThat(scenario.seatingRepository.saved.getFirst().sourceId()).isEqualTo(scenario.queueTicketId.value());
+        assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status).contains(DiningTableStatus.OCCUPIED);
+        assertThat(scenario.stateTransitionLogRepository.logs)
+            .anySatisfy(log -> {
+                assertThat(log.targetType()).isEqualTo("walk_in");
+                assertThat(log.fromStatus()).isEqualTo("queued");
+                assertThat(log.toStatus()).isEqualTo("seated");
+            });
     }
 
     @Test
@@ -547,6 +587,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
         final QueueTicketId queueTicketId = new QueueTicketId(UUID.randomUUID());
         final UUID queueGroupId = UUID.randomUUID();
         final ReservationId reservationId = new ReservationId(UUID.randomUUID());
+        final WalkInId walkInId = new WalkInId(UUID.randomUUID());
         final CustomerId customerId = new CustomerId(UUID.randomUUID());
         final Store store = new Store(storeId, tenantId, "STORE-1", "Asia/Singapore", "zh-CN", "active");
         final DiningTable table = table("T1", new CapacityRange(2, 4), DiningTableStatus.AVAILABLE);
@@ -555,7 +596,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
             new TableGroupId(UUID.randomUUID()),
             scope,
             "G1",
-            "temporary",
+            "fixed",
             new CapacityRange(2, 8),
             TableGroupStatus.ACTIVE
         );
@@ -565,6 +606,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
         final FakeDiningTableRepository diningTableRepository = new FakeDiningTableRepository();
         final FakeTableGroupRepository tableGroupRepository = new FakeTableGroupRepository();
         final FakeTableLockRepository tableLockRepository = new FakeTableLockRepository();
+        final FakeWalkInRepository walkInRepository = new FakeWalkInRepository();
         final FakeSeatingRepository seatingRepository = new FakeSeatingRepository();
         final FakeBusinessEventRepository businessEventRepository = new FakeBusinessEventRepository();
         final FakeStateTransitionLogRepository stateTransitionLogRepository = new FakeStateTransitionLogRepository();
@@ -614,6 +656,33 @@ class SeatingFromCalledQueueApplicationServiceTest {
             return scenario;
         }
 
+        static Scenario readyWalkIn(QueueTicketStatus ticketStatus) {
+            Scenario scenario = new Scenario();
+            scenario.queueTicketRepository.persisted.put(
+                scenario.queueTicketId.value(),
+                scenario.walkInQueueTicket(ticketStatus)
+            );
+            scenario.walkInRepository.walkIns.put(scenario.walkInId.value(), scenario.walkIn("queued"));
+            scenario.diningTableRepository.tables.put(scenario.table.id().value(), scenario.table);
+            scenario.diningTableRepository.tables.put(scenario.groupMemberTable.id().value(), scenario.groupMemberTable);
+            scenario.tableGroupRepository.groups.put(scenario.group.id().value(), scenario.group);
+            scenario.tableGroupRepository.members.add(new TableGroupMember(
+                UUID.randomUUID(),
+                scenario.scope,
+                scenario.group.id(),
+                scenario.table.id(),
+                "primary"
+            ));
+            scenario.tableGroupRepository.members.add(new TableGroupMember(
+                UUID.randomUUID(),
+                scenario.scope,
+                scenario.group.id(),
+                scenario.groupMemberTable.id(),
+                "member"
+            ));
+            return scenario;
+        }
+
         SeatingFromCalledQueueApplicationService service() {
             return new SeatingFromCalledQueueApplicationService(
                 storeRepository,
@@ -622,6 +691,7 @@ class SeatingFromCalledQueueApplicationServiceTest {
                 diningTableRepository,
                 tableGroupRepository,
                 tableLockRepository,
+                walkInRepository,
                 seatingRepository,
                 businessEventRepository,
                 stateTransitionLogRepository,
@@ -694,6 +764,29 @@ class SeatingFromCalledQueueApplicationServiceTest {
                 status == QueueTicketStatus.WAITING ? null : now.plusSeconds(60),
                 "queue ticket note"
             );
+        }
+
+        QueueTicket walkInQueueTicket(QueueTicketStatus status) {
+            return new QueueTicket(
+                queueTicketId,
+                scope,
+                queueGroupId,
+                customerId,
+                null,
+                walkInId.value(),
+                new QueueTicketNumber(22),
+                new PartySize(4),
+                new BusinessDate(LocalDate.of(2026, 6, 20)),
+                status,
+                3,
+                status == QueueTicketStatus.WAITING ? null : now.minusSeconds(120),
+                status == QueueTicketStatus.WAITING ? null : now.plusSeconds(60),
+                "queue ticket note"
+            );
+        }
+
+        WalkIn walkIn(String status) {
+            return new WalkIn(walkInId, scope, new PartySize(4), status);
         }
 
         Reservation reservation(ReservationStatus status) {
@@ -952,6 +1045,34 @@ class SeatingFromCalledQueueApplicationServiceTest {
         }
 
         @Override
+        public List<TableGroup> findActiveTemporaryGroupsForTable(
+            StoreScope scope,
+            TableId tableId,
+            OffsetDateTime businessStartAt,
+            OffsetDateTime businessEndAt
+        ) {
+            return members.stream()
+                .filter(member -> member.scope().equals(scope) && member.tableId().equals(tableId))
+                .map(TableGroupMember::tableGroupId)
+                .map(groupId -> groups.get(groupId.value()))
+                .filter(group -> group != null && group.scope().equals(scope))
+                .filter(group -> "temporary".equals(group.groupType()))
+                .filter(group -> group.status() == TableGroupStatus.CREATED
+                    || group.status() == TableGroupStatus.LOCKED
+                    || group.status() == TableGroupStatus.OCCUPIED)
+                .filter(group -> overlaps(group, businessStartAt, businessEndAt))
+                .toList();
+        }
+
+        private static boolean overlaps(TableGroup group, OffsetDateTime businessStartAt, OffsetDateTime businessEndAt) {
+            if (group.activeFromAt() == null) {
+                return true;
+            }
+            return group.activeFromAt().isBefore(businessEndAt)
+                && (group.activeUntilAt() == null || group.activeUntilAt().isAfter(businessStartAt));
+        }
+
+        @Override
         public List<TableGroup> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate) {
             return groups.values().stream().filter(group -> group.scope().equals(scope)).toList();
         }
@@ -991,6 +1112,37 @@ class SeatingFromCalledQueueApplicationServiceTest {
         @Override
         public TableLock release(StoreScope scope, UUID tableLockId, OffsetDateTime releasedAt) {
             throw new UnsupportedOperationException("not used by seating from called queue");
+        }
+    }
+
+    private static final class FakeWalkInRepository implements WalkInRepositoryPort {
+        final Map<UUID, WalkIn> walkIns = new HashMap<>();
+        final List<WalkIn> saved = new ArrayList<>();
+
+        @Override
+        public Optional<WalkIn> findById(StoreScope scope, WalkInId walkInId) {
+            return Optional.ofNullable(walkIns.get(walkInId.value()))
+                .filter(walkIn -> walkIn.scope().equals(scope));
+        }
+
+        @Override
+        public Optional<WalkIn> findByCode(StoreScope scope, String walkInCode) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<WalkIn> findArrivals(StoreScope scope, BusinessDate businessDate, String statusCode) {
+            return walkIns.values().stream()
+                .filter(walkIn -> walkIn.scope().equals(scope))
+                .filter(walkIn -> walkIn.status().equals(statusCode))
+                .toList();
+        }
+
+        @Override
+        public WalkIn save(StoreScope scope, WalkIn walkIn) {
+            saved.add(walkIn);
+            walkIns.put(walkIn.id().value(), walkIn);
+            return walkIn;
         }
     }
 

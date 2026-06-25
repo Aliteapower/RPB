@@ -84,6 +84,20 @@ class WalkInDirectSeatingApplicationServiceTest {
     }
 
     @Test
+    void seatsWalkInWithoutCustomerInformation() {
+        Scenario scenario = Scenario.ready();
+
+        WalkInDirectSeatingResult result = scenario.service().seatWalkInDirectly(scenario.anonymousCommand());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.error()).isNull();
+        assertThat(scenario.customerRepository.saved).hasSize(1);
+        assertThat(scenario.customerRepository.saved.getFirst().phone().isPresent()).isFalse();
+        assertThat(scenario.customerRepository.saved.getFirst().displayName()).isNull();
+        assertThat(scenario.customerRepository.saved.getFirst().nickname()).isNull();
+    }
+
+    @Test
     void seatsWalkInWithSpecifiedTable() {
         Scenario scenario = Scenario.ready();
 
@@ -317,15 +331,39 @@ class WalkInDirectSeatingApplicationServiceTest {
     }
 
     @Test
-    void manualOverrideMissingIsRejectedWhenSelectedTableIsNotRecommended() {
+    void selectedAvailableTableDoesNotRequireManualOverride() {
         Scenario scenario = Scenario.ready();
         DiningTable selected = scenario.secondAvailableTable();
         scenario.diningTableRepository.tables.put(selected.id().value(), selected);
 
         WalkInDirectSeatingResult result = scenario.service().seatWalkInDirectly(scenario.commandWithTable(selected.id().value()));
 
-        assertThat(result.success()).isFalse();
-        assertThat(result.error()).isEqualTo(WalkInDirectSeatingError.MANUAL_OVERRIDE_REQUIRED);
+        assertThat(result.success()).isTrue();
+        assertThat(result.resourceId()).isEqualTo(selected.id().value());
+        assertThat(scenario.seatingRepository.saved.getFirst().manualOverrideReasonCode()).isNull();
+    }
+
+    @Test
+    void selectedAvailableTableGroupDoesNotRequireManualOverride() {
+        Scenario scenario = Scenario.ready();
+        DiningTable selectedMember = scenario.secondAvailableTable();
+        TableGroup selectedGroup = scenario.secondAvailableGroup();
+        scenario.diningTableRepository.tables.put(selectedMember.id().value(), selectedMember);
+        scenario.tableGroupRepository.groups.put(selectedGroup.id().value(), selectedGroup);
+        scenario.tableGroupRepository.candidates.add(selectedGroup);
+        scenario.tableGroupRepository.members.add(new TableGroupMember(
+            UUID.randomUUID(),
+            scenario.scope,
+            selectedGroup.id(),
+            selectedMember.id(),
+            "primary"
+        ));
+
+        WalkInDirectSeatingResult result = scenario.service().seatWalkInDirectly(scenario.commandWithGroup(selectedGroup.id().value()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.resourceId()).isEqualTo(selectedGroup.id().value());
+        assertThat(scenario.seatingRepository.saved.getFirst().manualOverrideReasonCode()).isNull();
     }
 
     @Test
@@ -484,6 +522,26 @@ class WalkInDirectSeatingApplicationServiceTest {
             return autoCommandWithPartySize(2);
         }
 
+        SeatWalkInDirectlyCommand anonymousCommand() {
+            return new SeatWalkInDirectlyCommand(
+                tenantId.value(),
+                storeId.value(),
+                2,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                "idem-anonymous",
+                actorId,
+                "staff",
+                null,
+                null
+            );
+        }
+
         SeatWalkInDirectlyCommand autoCommandWithPartySize(Integer partySize) {
             return new SeatWalkInDirectlyCommand(
                 tenantId.value(),
@@ -589,6 +647,17 @@ class WalkInDirectSeatingApplicationServiceTest {
                 new CapacityRange(1, 4),
                 DiningTableStatus.AVAILABLE,
                 true
+            );
+        }
+
+        TableGroup secondAvailableGroup() {
+            return new TableGroup(
+                new TableGroupId(UUID.randomUUID()),
+                scope,
+                "G-02",
+                "fixed",
+                new CapacityRange(2, 12),
+                TableGroupStatus.ACTIVE
             );
         }
     }
@@ -699,6 +768,34 @@ class WalkInDirectSeatingApplicationServiceTest {
         @Override
         public List<TableGroup> findActiveGroupsForTable(StoreScope scope, TableId tableId) {
             return List.of();
+        }
+
+        @Override
+        public List<TableGroup> findActiveTemporaryGroupsForTable(
+            StoreScope scope,
+            TableId tableId,
+            OffsetDateTime businessStartAt,
+            OffsetDateTime businessEndAt
+        ) {
+            return members.stream()
+                .filter(member -> member.scope().equals(scope) && member.tableId().equals(tableId))
+                .map(TableGroupMember::tableGroupId)
+                .map(groupId -> groups.get(groupId.value()))
+                .filter(group -> group != null && group.scope().equals(scope))
+                .filter(group -> "temporary".equals(group.groupType()))
+                .filter(group -> group.status() == TableGroupStatus.CREATED
+                    || group.status() == TableGroupStatus.LOCKED
+                    || group.status() == TableGroupStatus.OCCUPIED)
+                .filter(group -> overlaps(group, businessStartAt, businessEndAt))
+                .toList();
+        }
+
+        private static boolean overlaps(TableGroup group, OffsetDateTime businessStartAt, OffsetDateTime businessEndAt) {
+            if (group.activeFromAt() == null) {
+                return true;
+            }
+            return group.activeFromAt().isBefore(businessEndAt)
+                && (group.activeUntilAt() == null || group.activeUntilAt().isAfter(businessStartAt));
         }
 
         @Override

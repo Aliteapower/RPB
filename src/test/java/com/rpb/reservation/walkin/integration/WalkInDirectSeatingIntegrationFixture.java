@@ -118,6 +118,26 @@ final class WalkInDirectSeatingIntegrationFixture {
         );
     }
 
+    void createExpiredActiveLock(UUID tableId, String lockKey) {
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update(
+            """
+            insert into table_locks (
+                id, tenant_id, store_id, resource_type, resource_id, lock_key, lock_owner,
+                locked_until_at, source_type, source_id, idempotency_key, status, locked_at
+            )
+            values (gen_random_uuid(), ?, ?, 'dining_table', ?, ?, 'staff',
+                ?, 'manual', null, null, 'active', ?)
+            """,
+            TENANT_ID,
+            STORE_ID,
+            tableId,
+            lockKey,
+            now.minusMinutes(1),
+            now.minusMinutes(4)
+        );
+    }
+
     void idempotencyRecord(String key, String hash, String status, UUID walkInId, UUID seatingId, UUID resourceId) {
         String snapshot = switch (status) {
             case "completed" -> """

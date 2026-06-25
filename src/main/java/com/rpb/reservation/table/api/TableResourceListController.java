@@ -120,6 +120,7 @@ public class TableResourceListController {
     private static TableResourceItemResponse toResponse(TableResourceItem item) {
         return new TableResourceItemResponse(
             item.resourceType(),
+            item.groupType(),
             item.resourceId(),
             item.code(),
             item.displayName(),

@@ -4,9 +4,9 @@ import { RouterLink } from 'vue-router'
 
 interface ReservationQuickAction {
   label: string
-  subtitle: string
   symbol: string
   tone: string
+  disabledTitle?: string
   disabled?: boolean
   routeName?: string
   action?: 'create-reservation' | 'show-confirmed-reservations' | 'show-arrived-reservations'
@@ -27,29 +27,26 @@ const emit = defineEmits<{
 const entries = computed<ReservationQuickAction[]>(() => [
   {
     label: '预约到店',
-    subtitle: '确认预约客人已到店',
     action: 'show-confirmed-reservations',
     symbol: '到',
     tone: 'primary'
   },
   {
     label: '创建预约',
-    subtitle: props.canCreateReservationForSelectedDate ? '登记新的门店预约' : '过去日期不可创建预约',
     action: 'create-reservation',
     disabled: !props.canCreateReservationForSelectedDate,
+    disabledTitle: '过去日期不可创建预约',
     symbol: '约',
     tone: 'plain'
   },
   {
     label: '预约排队',
-    subtitle: '已到店预约进入排队',
     routeName: 'reservation-arrived-to-queue',
     symbol: '排',
     tone: 'plain'
   },
   {
     label: '预约入座',
-    subtitle: '为已到店预约安排桌台',
     action: 'show-arrived-reservations',
     symbol: '入',
     tone: 'plain'
@@ -110,7 +107,6 @@ function triggerAction(entry: ReservationQuickAction): void {
         >
           <span class="reservation-actions__symbol" aria-hidden="true">{{ entry.symbol }}</span>
           <strong>{{ entry.label }}</strong>
-          <small>{{ entry.subtitle }}</small>
         </RouterLink>
 
         <button
@@ -119,13 +115,12 @@ function triggerAction(entry: ReservationQuickAction): void {
           :class="`reservation-actions__entry--${entry.tone}`"
           :aria-disabled="entry.disabled ? 'true' : 'false'"
           :disabled="entry.disabled"
-          :title="entry.disabled ? entry.subtitle : undefined"
+          :title="entry.disabled ? entry.disabledTitle : undefined"
           type="button"
           @click="triggerAction(entry)"
         >
           <span class="reservation-actions__symbol" aria-hidden="true">{{ entry.symbol }}</span>
           <strong>{{ entry.label }}</strong>
-          <small>{{ entry.subtitle }}</small>
         </button>
       </template>
     </div>
@@ -139,8 +134,8 @@ function triggerAction(entry: ReservationQuickAction): void {
   border-radius: 8px;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .reservation-actions header {
@@ -165,8 +160,8 @@ function triggerAction(entry: ReservationQuickAction): void {
 
 .reservation-actions__grid {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .reservation-actions__entry {
@@ -176,11 +171,11 @@ function triggerAction(entry: ReservationQuickAction): void {
   border-radius: 8px;
   color: #0f172a;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   justify-items: center;
-  min-height: 100px;
+  min-height: 76px;
   min-width: 0;
-  padding: 12px 8px;
+  padding: 10px 4px;
   text-align: center;
   text-decoration: none;
 }
@@ -196,23 +191,17 @@ function triggerAction(entry: ReservationQuickAction): void {
   border-radius: 999px;
   color: #f97316;
   display: inline-flex;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   font-weight: 950;
-  height: 34px;
+  height: 30px;
   justify-content: center;
-  width: 34px;
+  width: 30px;
 }
 
 .reservation-actions__entry strong {
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   font-weight: 950;
-}
-
-.reservation-actions__entry small {
-  color: #315f91;
-  font-size: 0.74rem;
-  font-weight: 800;
-  line-height: 1.3;
+  line-height: 1.15;
 }
 
 .reservation-actions__entry:focus-visible {

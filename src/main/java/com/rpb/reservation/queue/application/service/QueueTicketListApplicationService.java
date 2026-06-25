@@ -3,10 +3,12 @@ package com.rpb.reservation.queue.application.service;
 import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.queue.application.QueueTicketListError;
 import com.rpb.reservation.queue.application.QueueTicketListItem;
 import com.rpb.reservation.queue.application.QueueTicketListPage;
 import com.rpb.reservation.queue.application.QueueTicketListResult;
+import com.rpb.reservation.queue.application.QueueTicketDisplayNumbers;
 import com.rpb.reservation.queue.application.port.out.QueueTicketListRow;
 import com.rpb.reservation.queue.application.port.out.QueueTicketListRows;
 import com.rpb.reservation.queue.application.port.out.QueueTicketRepositoryPort;
@@ -15,6 +17,10 @@ import com.rpb.reservation.queue.status.QueueTicketStatus;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.tenant.value.TenantId;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -31,15 +37,25 @@ public class QueueTicketListApplicationService {
 
     private final StoreRepositoryPort storeRepository;
     private final QueueTicketRepositoryPort queueTicketRepository;
+    private final Clock clock;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
 
     @Autowired
     public QueueTicketListApplicationService(
         StoreRepositoryPort storeRepository,
-        QueueTicketRepositoryPort queueTicketRepository
+        QueueTicketRepositoryPort queueTicketRepository,
+        Clock clock
     ) {
         this.storeRepository = storeRepository;
         this.queueTicketRepository = queueTicketRepository;
+        this.clock = clock;
+    }
+
+    public QueueTicketListApplicationService(
+        StoreRepositoryPort storeRepository,
+        QueueTicketRepositoryPort queueTicketRepository
+    ) {
+        this(storeRepository, queueTicketRepository, Clock.systemUTC());
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +79,19 @@ public class QueueTicketListApplicationService {
             return QueueTicketListResult.failure(QueueTicketListError.INVALID_OFFSET);
         }
 
+        Integer partySizeFilter;
+        if (hasText(query.partySize())) {
+            partySizeFilter = resolveOptionalPositiveInteger(query.partySize());
+            if (partySizeFilter == null) {
+                return QueueTicketListResult.failure(QueueTicketListError.INVALID_QUERY);
+            }
+        } else {
+            partySizeFilter = null;
+        }
+
+        String tableAreaFilter = trimToNull(query.tableArea());
+        String phoneDigitsFilter = normalizePhoneDigits(query.phone());
+
         StoreScope scope = new StoreScope(new TenantId(query.tenantId()), query.storeId());
         Store store = storeRepository.findById(scope).orElse(null);
         if (store == null) {
@@ -78,7 +107,17 @@ public class QueueTicketListApplicationService {
         }
 
         try {
-            QueueTicketListRows rows = queueTicketRepository.findQueueTicketList(scope, statusFilter.status(), limit, offset);
+            BusinessDate businessDate = new BusinessDate(LocalDate.now(clock.withZone(zoneId(store.timezone()))));
+            QueueTicketListRows rows = queueTicketRepository.findQueueTicketList(
+                scope,
+                statusFilter.status(),
+                businessDate,
+                limit,
+                offset,
+                tableAreaFilter,
+                partySizeFilter,
+                phoneDigitsFilter
+            );
             List<QueueTicketListItem> items = rows.rows().stream()
                 .map(QueueTicketListApplicationService::toItem)
                 .toList();
@@ -93,6 +132,7 @@ public class QueueTicketListApplicationService {
         return new QueueTicketListItem(
             row.queueTicketId(),
             row.queueTicketNumber(),
+            QueueTicketDisplayNumbers.fromGroupCode(row.partySizeGroup(), row.queueTicketNumber()),
             row.queueTicketStatus(),
             row.partySize(),
             row.partySizeGroup(),
@@ -104,6 +144,9 @@ public class QueueTicketListApplicationService {
             row.assignedResourceType(),
             row.assignedResourceId(),
             row.assignedResourceCode(),
+            row.assignedResourceGroupType(),
+            row.assignedResourceLabel(),
+            row.assignedResourceAreaName(),
             row.createdAt(),
             row.calledAt(),
             row.expiresAt(),
@@ -148,6 +191,14 @@ public class QueueTicketListApplicationService {
         return parsed;
     }
 
+    private static Integer resolveOptionalPositiveInteger(String rawValue) {
+        Integer parsed = parseOptionalInteger(rawValue, 0);
+        if (parsed == null || parsed <= 0) {
+            return null;
+        }
+        return parsed;
+    }
+
     private static Integer parseOptionalInteger(String rawValue, int defaultValue) {
         if (!hasText(rawValue)) {
             return defaultValue;
@@ -166,6 +217,29 @@ public class QueueTicketListApplicationService {
         String value = phoneE164.trim();
         int start = Math.max(0, value.length() - 4);
         return "****" + value.substring(start);
+    }
+
+    private static String normalizePhoneDigits(String rawPhone) {
+        if (!hasText(rawPhone)) {
+            return null;
+        }
+        String digits = rawPhone.replaceAll("\\D", "");
+        return digits.isBlank() ? null : digits;
+    }
+
+    private static String trimToNull(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static ZoneId zoneId(String timezone) {
+        try {
+            return ZoneId.of(timezone);
+        } catch (RuntimeException exception) {
+            return ZoneOffset.UTC;
+        }
     }
 
     private static boolean hasText(String value) {

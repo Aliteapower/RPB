@@ -108,6 +108,7 @@ function isQueueWalkInResponse(payload: unknown): payload is QueueWalkInResponse
     typeof candidate.walkInId === 'string' &&
     typeof candidate.queueTicketId === 'string' &&
     typeof candidate.queueTicketNumber === 'number' &&
+    typeof candidate.queueTicketDisplayNumber === 'string' &&
     typeof candidate.queueTicketStatus === 'string' &&
     typeof candidate.partySize === 'number' &&
     typeof candidate.partySizeGroup === 'string' &&

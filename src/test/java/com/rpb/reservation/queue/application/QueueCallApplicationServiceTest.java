@@ -106,26 +106,33 @@ class QueueCallApplicationServiceTest {
     }
 
     @Test
-    void alreadyCalledWithEvidenceReturnsSuccessLikeResultWithoutDuplicateWrites() {
+    void repeatCallOnCalledQueueTicketRefreshesHoldAndWritesNewEvidence() {
         Scenario scenario = Scenario.ready(QueueTicketStatus.CALLED, ReservationStatus.ARRIVED);
         Instant existingCalledAt = Instant.parse("2026-06-20T03:20:00Z");
         Instant existingExpiresAt = Instant.parse("2026-06-20T03:23:00Z");
+        scenario.storeRepository.policy = Optional.of(scenario.storePolicy(5));
         scenario.queueTicketRepository.persisted.put(
             scenario.queueTicketId.value(),
             scenario.queueTicket(QueueTicketStatus.CALLED, existingCalledAt, existingExpiresAt)
         );
 
-        QueueCallResult result = scenario.service().callQueueTicket(scenario.commandWithKey("idem-already-called"));
+        QueueCallResult result = scenario.service().callQueueTicket(scenario.commandWithKey("idem-repeat-call"));
 
         assertThat(result.success()).isTrue();
-        assertThat(result.alreadyCalled()).isTrue();
-        assertThat(result.calledAt()).isEqualTo(existingCalledAt);
-        assertThat(result.holdUntilAt()).isEqualTo(existingExpiresAt);
-        assertThat(result.events()).isEmpty();
-        assertThat(scenario.queueTicketRepository.saved).isEmpty();
-        assertThat(scenario.businessEventRepository.events).isEmpty();
-        assertThat(scenario.stateTransitionLogRepository.logs).isEmpty();
-        assertThat(scenario.auditLogRepository.logs).isEmpty();
+        assertThat(result.alreadyCalled()).isFalse();
+        assertThat(result.calledAt()).isEqualTo(scenario.now);
+        assertThat(result.holdUntilAt()).isEqualTo(scenario.now.plusSeconds(5 * 60L));
+        assertThat(result.events()).containsExactly("queue_ticket.called");
+        assertThat(scenario.queueTicketRepository.saved).hasSize(1);
+        QueueTicket saved = scenario.queueTicketRepository.saved.getFirst();
+        assertThat(saved.status()).isEqualTo(QueueTicketStatus.CALLED);
+        assertThat(saved.calledAt()).isEqualTo(scenario.now);
+        assertThat(saved.expiresAt()).isEqualTo(scenario.now.plusSeconds(5 * 60L));
+        assertThat(scenario.businessEventRepository.events).extracting(BusinessEvent::eventType).containsExactly("queue_ticket.called");
+        assertThat(scenario.stateTransitionLogRepository.logs).hasSize(1);
+        assertThat(scenario.stateTransitionLogRepository.logs.getFirst().fromStatus()).isEqualTo("called");
+        assertThat(scenario.stateTransitionLogRepository.logs.getFirst().toStatus()).isEqualTo("called");
+        assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::operationCode).contains("queue.call");
         assertThat(scenario.idempotencyRepository.completed).hasSize(1);
     }
 

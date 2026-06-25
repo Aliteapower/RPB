@@ -36,6 +36,7 @@ export interface ReservationTodayViewItem {
   assignedResourceCode?: string | null
   queueTicketId?: string | null
   queueTicketNumber?: number | null
+  queueTicketDisplayNumber?: string | null
   queueTicketStatus?: string | null
 }
 
