@@ -1,44 +1,67 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, type RouteLocationRaw } from 'vue-router'
 
-import { fetchMeApps } from '../api/meAppsApi'
+import {
+  getStaffHomeOverview,
+  StaffHomeOverviewApiError
+} from '../api/staffHomeOverviewApi'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
-import StaffHomeActionGroup from '../components/staff-home/StaffHomeActionGroup.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
-import StaffHomeWorkflowStrip from '../components/staff-home/StaffHomeWorkflowStrip.vue'
-import type { StaffHomeActionItem } from '../components/staff-home/staffHomeActions'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
+import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
-import type { MeAppEntry } from '../types/meApps'
+import type {
+  StaffHomeOverviewApiErrorResponse,
+  StaffHomeOverviewResponse
+} from '../types/staffHomeOverview'
+
+interface KpiItem {
+  key: string
+  label: string
+  value: number
+  unit: string
+  detail: string
+  tone: 'reservation' | 'arrival' | 'queue' | 'table'
+}
+
+interface StatusRow {
+  key: string
+  label: string
+  value: number
+  detail: string
+}
+
+interface OperationToolbarItem {
+  id: string
+  label: string
+  description: string
+  symbol: string
+  to: RouteLocationRaw
+  tone: 'reservation' | 'queue' | 'success'
+}
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
+const authSession = useAuthSessionStore()
 const { currentBusinessDate, currentTimeText } = useCurrentClock()
+
+const overview = ref<StaffHomeOverviewResponse | null>(null)
+const apiError = ref<StaffHomeOverviewApiErrorResponse | null>(null)
+const isLoading = ref(false)
+let overviewLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const apps = ref<MeAppEntry[]>([])
-const appsLoading = ref(false)
-const appsLoadFailed = ref(false)
-let loadSequence = 0
-
-const reservationQueueEntry = computed(() =>
-  apps.value.find(app => app.appKey === 'reservation_queue' && app.entryVisible)
-)
-const hasReservationQueue = computed(() => !!reservationQueueEntry.value)
-const canCreateReservation = computed(() => hasPermission('reservation.create'))
-const canViewTodayReservations = computed(() =>
-  hasPermission('reservation.today_view')
+const displayedBusinessDate = computed(() => overview.value?.businessDate ?? currentBusinessDate.value)
+const currentPermissions = computed(() => authSession.user?.permissions ?? [])
+const hasReservationQueue = computed(() =>
+  currentPermissions.value.some(permission =>
+    permission.startsWith('reservation.') || permission.startsWith('queue.')
+  )
 )
 const canCheckInReservation = computed(() =>
   hasPermission('reservation.check_in')
-)
-const canQueueArrivedReservation = computed(() =>
-  hasPermission('reservation.queue')
-)
-const canViewQueueTickets = computed(() =>
-  hasPermission('queue.view')
 )
 const canCallQueueTicket = computed(() =>
   hasPermission('queue.call')
@@ -46,157 +69,20 @@ const canCallQueueTicket = computed(() =>
 const canSeatCalledQueueTicket = computed(() =>
   hasPermission('queue.seat')
 )
-const canSeatArrivedReservation = computed(() =>
-  hasPermission('reservation.seat')
-)
-const canSeatWalkInDirectly = computed(() =>
-  hasPermission('walkin.direct_seating.create')
-)
-const canCreateWalkInQueue = computed(() =>
-  hasPermission('walkin.queue.create')
-)
-const canHandleCleaning = computed(() =>
-  hasPermission('cleaning.start') && hasPermission('cleaning.complete')
-)
-const canViewTables = computed(() =>
-  hasPermission('table.view')
-)
-const hasReceptionOperations = computed(
-  () => canCreateWalkInQueue.value || canSeatWalkInDirectly.value || canCheckInReservation.value
-)
-const hasReservationOperations = computed(
-  () =>
-    canCreateReservation.value ||
-    canViewTodayReservations.value ||
-    canQueueArrivedReservation.value ||
-    canSeatArrivedReservation.value
-)
-const hasQueueOperations = computed(
-  () =>
-    canViewQueueTickets.value ||
-    canCallQueueTicket.value ||
-    canSeatCalledQueueTicket.value
-)
-const hasTableTurnoverOperations = computed(() => canHandleCleaning.value || canViewTables.value)
 const hasVisibleOperation = computed(
-  () =>
-    hasReceptionOperations.value ||
-    hasReservationOperations.value ||
-    hasQueueOperations.value ||
-    hasTableTurnoverOperations.value
+  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value
 )
-const appStatusTone = computed(() => {
-  if (appsLoading.value) {
-    return 'loading'
-  }
-
-  if (appsLoadFailed.value) {
-    return 'error'
-  }
-
-  if (!hasReservationQueue.value) {
-    return 'empty'
-  }
-
-  if (!hasVisibleOperation.value) {
-    return 'limited'
-  }
-
-  return 'ready'
-})
 const appStatusLabel = computed(() => {
-  if (appsLoading.value) {
-    return '检查中'
+  if (isLoading.value) {
+    return '刷新中'
   }
 
-  if (appsLoadFailed.value) {
+  if (apiError.value) {
     return '暂不可用'
-  }
-
-  if (!hasReservationQueue.value) {
-    return '暂无应用'
-  }
-
-  if (!hasVisibleOperation.value) {
-    return '无入口'
   }
 
   return '首页'
 })
-const appStatusTitle = computed(() => {
-  if (appsLoading.value) {
-    return '应用检查中'
-  }
-
-  if (appsLoadFailed.value) {
-    return '应用暂不可用'
-  }
-
-  if (!hasReservationQueue.value) {
-    return '暂无可见应用'
-  }
-
-  if (!hasVisibleOperation.value) {
-    return '当前权限无可用入口'
-  }
-
-  return '可用入口已按权限展示'
-})
-const appStatusDetail = computed(() => {
-  if (appsLoading.value) {
-    return '正在读取当前门店 App Gate。'
-  }
-
-  if (appsLoadFailed.value) {
-    return '请稍后重试或联系管理员检查应用权限。'
-  }
-
-  if (!hasReservationQueue.value) {
-    return '当前门店没有可见的 reservation_queue 应用入口。'
-  }
-
-  if (!hasVisibleOperation.value) {
-    return '应用可见，但当前账号没有已开放的操作权限。'
-  }
-
-  return '入口不会展示未授权业务操作。'
-})
-const walkInRoute = computed(() => ({
-  name: 'walk-in-direct-seating',
-  params: {
-    storeId: storeId.value
-  }
-}))
-const walkInQueueRoute = computed(() => ({
-  name: 'walk-in-queue',
-  params: {
-    storeId: storeId.value
-  }
-}))
-const cleaningRoute = computed(() => ({
-  name: 'cleaning-complete',
-  params: {
-    storeId: storeId.value
-  }
-}))
-const tableResourceListRoute = computed(() => ({
-  name: 'table-resource-list',
-  params: {
-    storeId: storeId.value
-  }
-}))
-const reservationRoute = computed(() => ({
-  name: 'reservation-create',
-  params: {
-    storeId: storeId.value
-  }
-}))
-const reservationTodayViewRoute = computed(() => ({
-  name: 'reservation-today-view',
-  params: {
-    storeId: storeId.value
-  }
-}))
 const reservationConfirmedTodayRoute = computed(() => ({
   name: 'reservation-today-view',
   params: {
@@ -206,50 +92,13 @@ const reservationConfirmedTodayRoute = computed(() => ({
     status: 'confirmed'
   }
 }))
-const reservationArrivedToQueueRoute = computed(() => ({
-  name: 'reservation-arrived-to-queue',
-  params: {
-    storeId: storeId.value
-  }
-}))
 const queueTicketListRoute = computed(() => ({
   name: 'queue-ticket-list',
   params: {
     storeId: storeId.value
   }
 }))
-const reservationArrivedTodayRoute = computed(() => ({
-  name: 'reservation-today-view',
-  params: {
-    storeId: storeId.value
-  },
-  query: {
-    status: 'arrived'
-  }
-}))
-const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
-  canCreateWalkInQueue.value
-    ? {
-        id: 'walkin-queue',
-        label: '现场取号',
-        description: '现场客人取号加入排队',
-        symbol: '号',
-        to: walkInQueueRoute.value,
-        tone: 'queue',
-        emphasis: true
-      }
-    : null,
-  canSeatWalkInDirectly.value
-    ? {
-        id: 'walkin-direct-seating',
-        label: '散客直接入座',
-        description: '现场客人不排队直接安排桌台',
-        symbol: '入',
-        to: walkInRoute.value,
-        tone: 'primary',
-        emphasis: true
-      }
-    : null,
+const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactToolbarItems([
   canCheckInReservation.value
     ? {
         id: 'reservation-confirmed-today',
@@ -257,63 +106,7 @@ const receptionActions = computed<StaffHomeActionItem[]>(() => compactActions([
         description: '从今日预约确认客人到店',
         symbol: '到',
         to: reservationConfirmedTodayRoute.value,
-        tone: 'primary',
-        emphasis: true
-      }
-    : null
-]))
-const reservationActions = computed<StaffHomeActionItem[]>(() => compactActions([
-  canCreateReservation.value
-    ? {
-        id: 'reservation-create',
-        label: '创建预约',
-        description: '登记新的门店预约',
-        symbol: '约',
-        to: reservationRoute.value,
         tone: 'reservation'
-      }
-    : null,
-  canViewTodayReservations.value
-    ? {
-        id: 'reservation-today-view',
-        label: '今日预约',
-        description: '查看当前营业日预约',
-        symbol: '今',
-        to: reservationTodayViewRoute.value,
-        tone: 'reservation'
-      }
-    : null,
-  canQueueArrivedReservation.value
-    ? {
-        id: 'reservation-arrived-to-queue',
-        label: '预约排队',
-        description: '将到店预约加入排队',
-        symbol: '排',
-        to: reservationArrivedToQueueRoute.value,
-        tone: 'reservation'
-      }
-    : null,
-  canSeatArrivedReservation.value
-    ? {
-        id: 'reservation-arrived-today-seating',
-        label: '预约入座',
-        description: '从已到店预约选择桌台',
-        symbol: '座',
-        to: reservationArrivedTodayRoute.value,
-        tone: 'success'
-      }
-    : null
-]))
-const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
-  canViewQueueTickets.value
-    ? {
-        id: 'queue-ticket-list',
-        label: '排队列表',
-        description: '查看当前排队票状态',
-        symbol: '列',
-        to: queueTicketListRoute.value,
-        tone: 'queue',
-        emphasis: true
       }
     : null,
   canCallQueueTicket.value
@@ -323,8 +116,7 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
         description: '从列表选择排队票一键叫号',
         symbol: '叫',
         to: queueTicketListRoute.value,
-        tone: 'queue',
-        emphasis: true
+        tone: 'queue'
       }
     : null,
   canSeatCalledQueueTicket.value
@@ -338,64 +130,190 @@ const queueActions = computed<StaffHomeActionItem[]>(() => compactActions([
       }
     : null
 ]))
-const tableTurnoverActions = computed<StaffHomeActionItem[]>(() => compactActions([
-  canViewTables.value
-    ? {
-        id: 'table-resource-list',
-        label: '桌台列表',
-        description: '查看后台配置的桌号及分组',
-        symbol: '桌',
-        to: tableResourceListRoute.value,
-        tone: 'support'
-      }
-    : null,
-  canHandleCleaning.value
-    ? {
-        id: 'cleaning-complete',
-        label: '清台处理',
-        description: '处理已离店桌台清洁',
-        symbol: '清',
-        to: cleaningRoute.value,
-        tone: 'support'
-      }
-    : null
-]))
+const showOperationToolbar = computed(() => hasVisibleOperation.value && operationToolbarItems.value.length > 0)
+const activeQueueTickets = computed(() => {
+  const queue = overview.value?.queue
+  return (queue?.waitingTickets ?? 0) + (queue?.calledTickets ?? 0)
+})
+const activeQueuePartySize = computed(() => {
+  const queue = overview.value?.queue
+  return (queue?.waitingPartySize ?? 0) + (queue?.calledPartySize ?? 0)
+})
+const arrivedReservationGroups = computed(() => {
+  const reservation = overview.value?.reservation
+  return (reservation?.arrivedReservations ?? 0) + (reservation?.seatedReservations ?? 0)
+})
+const arrivedReservationPartySize = computed(() => {
+  const reservation = overview.value?.reservation
+  return (reservation?.arrivedPartySize ?? 0) + (reservation?.seatedPartySize ?? 0)
+})
+const primaryKpis = computed<KpiItem[]>(() => {
+  const reservation = overview.value?.reservation
+  const queue = overview.value?.queue
+  const tables = overview.value?.tables
+
+  return [
+    {
+      key: 'reservations',
+      label: '今日预约',
+      value: reservation?.totalReservations ?? 0,
+      unit: '组',
+      detail: `${reservation?.totalPartySize ?? 0} 人`,
+      tone: 'reservation'
+    },
+    {
+      key: 'arrived',
+      label: '已到店',
+      value: arrivedReservationGroups.value,
+      unit: '组',
+      detail: `${arrivedReservationPartySize.value} 人`,
+      tone: 'arrival'
+    },
+    {
+      key: 'queue',
+      label: '当前排队',
+      value: activeQueueTickets.value,
+      unit: '组',
+      detail: `${activeQueuePartySize.value} 人`,
+      tone: 'queue'
+    },
+    {
+      key: 'tables',
+      label: '可用桌台',
+      value: tables?.availableTables ?? 0,
+      unit: '张',
+      detail: `共 ${tables?.totalTables ?? 0} 张`,
+      tone: 'table'
+    }
+  ]
+})
+const queueRows = computed<StatusRow[]>(() => {
+  const queue = overview.value?.queue
+  return [
+    {
+      key: 'waiting',
+      label: '等待中',
+      value: queue?.waitingTickets ?? 0,
+      detail: `${queue?.waitingPartySize ?? 0} 人`
+    },
+    {
+      key: 'called',
+      label: '已叫号',
+      value: queue?.calledTickets ?? 0,
+      detail: `${queue?.calledPartySize ?? 0} 人`
+    },
+    {
+      key: 'skipped',
+      label: '已过号',
+      value: queue?.skippedTickets ?? 0,
+      detail: '可重回或取消'
+    }
+  ]
+})
+const tableRows = computed<StatusRow[]>(() => {
+  const tables = overview.value?.tables
+  return [
+    {
+      key: 'available',
+      label: '可用',
+      value: tables?.availableTables ?? 0,
+      detail: '可安排入座'
+    },
+    {
+      key: 'occupied',
+      label: '占用',
+      value: tables?.occupiedTables ?? 0,
+      detail: '当前服务中'
+    },
+    {
+      key: 'reserved',
+      label: '预留',
+      value: tables?.reservedTables ?? 0,
+      detail: '预约占用'
+    },
+    {
+      key: 'cleaning',
+      label: '清台',
+      value: tables?.cleaningTables ?? 0,
+      detail: '待恢复可用'
+    },
+    {
+      key: 'temporary',
+      label: '临时组',
+      value: tables?.temporaryGroups ?? 0,
+      detail: '按桌组使用'
+    }
+  ]
+})
+const overviewHint = computed(() => {
+  if (apiError.value) {
+    return '今日概览暂不可用'
+  }
+
+  if (!overview.value) {
+    return '正在读取今日营业数据'
+  }
+
+  if (activeQueueTickets.value > 0) {
+    return `排队 ${activeQueueTickets.value} 组，优先看等待和已叫号`
+  }
+
+  return '当前没有排队压力'
+})
+const errorText = computed(() => apiError.value?.error.messageKey ?? 'staff_home.overview.unknown_error')
 
 watch(
-  storeId,
-  async nextStoreId => {
-    const sequence = ++loadSequence
-    apps.value = []
-    appsLoadFailed.value = false
-
-    if (!nextStoreId) {
-      appsLoading.value = false
-      return
-    }
-
-    appsLoading.value = true
-
-    try {
-      const response = await fetchMeApps(nextStoreId)
-
-      if (sequence === loadSequence) {
-        apps.value = response.apps
-      }
-    } catch {
-      if (sequence === loadSequence) {
-        appsLoadFailed.value = true
-      }
-    } finally {
-      if (sequence === loadSequence) {
-        appsLoading.value = false
-      }
-    }
+  [storeId, currentBusinessDate],
+  async ([nextStoreId, nextBusinessDate]) => {
+    await loadOverview(nextStoreId, nextBusinessDate)
   },
   { immediate: true }
 )
 
-function compactActions(actions: Array<StaffHomeActionItem | null>): StaffHomeActionItem[] {
-  return actions.filter((action): action is StaffHomeActionItem => action !== null)
+async function reloadOverview(): Promise<void> {
+  await loadOverview(storeId.value, currentBusinessDate.value)
+}
+
+async function loadOverview(nextStoreId: string | undefined, businessDate: string): Promise<void> {
+  const sequence = ++overviewLoadSequence
+  overview.value = null
+  apiError.value = null
+
+  if (!nextStoreId) {
+    isLoading.value = false
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    const response = await getStaffHomeOverview(nextStoreId, { businessDate })
+
+    if (sequence === overviewLoadSequence) {
+      overview.value = response
+    }
+  } catch (error) {
+    if (sequence === overviewLoadSequence) {
+      apiError.value = error instanceof StaffHomeOverviewApiError
+        ? error.response
+        : createLocalError()
+    }
+  } finally {
+    if (sequence === overviewLoadSequence) {
+      isLoading.value = false
+    }
+  }
+}
+
+function createLocalError(): StaffHomeOverviewApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code: 'REQUEST_FAILED',
+      messageKey: 'staff_home.overview.request_failed',
+      details: {}
+    }
+  }
 }
 
 function formatStoreLabel(value: string | undefined): string {
@@ -406,8 +324,12 @@ function formatStoreLabel(value: string | undefined): string {
   return `门店 ${value.slice(0, 8)}`
 }
 
+function compactToolbarItems(actions: Array<OperationToolbarItem | null>): OperationToolbarItem[] {
+  return actions.filter((action): action is OperationToolbarItem => action !== null)
+}
+
 function hasPermission(permission: string): boolean {
-  return reservationQueueEntry.value?.permissions.includes(permission) ?? false
+  return currentPermissions.value.includes(permission)
 }
 </script>
 
@@ -415,56 +337,109 @@ function hasPermission(permission: string): boolean {
   <main class="staff-workbench-shell staff-shell">
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
-      :business-date="currentBusinessDate"
+      :business-date="displayedBusinessDate"
       :current-time-text="currentTimeText"
       :store-label="storeLabel"
-    />
+    >
+      <template #action>
+        <button class="topbar-refresh" type="button" :disabled="isLoading" @click="reloadOverview">
+          刷新
+        </button>
+      </template>
+    </StaffHomeTopBar>
 
-    <div class="workbench-body">
-      <StaffHomeWorkflowStrip />
-
-      <section
-        class="app-state"
-        :class="`tone-${appStatusTone}`"
-        aria-label="应用可用状态"
-      >
+    <div class="home-overview-body">
+      <section class="date-strip" aria-label="今日营业日期">
         <div>
-          <p>{{ appStatusTitle }}</p>
-          <strong>{{ appStatusDetail }}</strong>
+          <span>今日</span>
+          <strong>{{ displayedBusinessDate }}</strong>
         </div>
+        <em>{{ overviewHint }}</em>
       </section>
 
-      <nav v-if="hasVisibleOperation" class="operation-groups" aria-label="门店员工操作">
-        <StaffHomeActionGroup
-          group-id="staff-section-reception"
-          heading="接待"
-          :layout="'three'"
-          :actions="receptionActions"
-        />
-        <StaffHomeActionGroup
-          group-id="staff-section-reservation"
-          heading="预约管理"
-          :actions="reservationActions"
-        />
-        <StaffHomeActionGroup
-          group-id="staff-section-queue"
-          heading="排队管理"
-          :actions="queueActions"
-        />
-        <StaffHomeActionGroup
-          group-id="staff-section-table-turnover"
-          heading="桌台流转"
-          :actions="tableTurnoverActions"
-        />
+      <section v-if="apiError" class="overview-error" aria-label="今日概览加载失败">
+        <strong>今日概览暂不可用</strong>
+        <span>{{ errorText }}</span>
+      </section>
+
+      <nav v-if="showOperationToolbar" class="operation-toolbar" aria-label="门店员工操作">
+        <RouterLink
+          v-for="item in operationToolbarItems"
+          :key="item.id"
+          class="operation-tool"
+          :class="`operation-tool--${item.tone}`"
+          :to="item.to"
+        >
+          <span class="operation-symbol" aria-hidden="true">{{ item.symbol }}</span>
+          <span class="operation-copy">
+            <strong>{{ item.label }}</strong>
+            <em>{{ item.description }}</em>
+          </span>
+        </RouterLink>
       </nav>
 
       <section
-        v-else-if="hasReservationQueue && !appsLoading"
+        v-else-if="hasReservationQueue && authSession.loaded"
         class="empty-state"
         aria-label="当前权限无可用入口"
       >
         <p>当前权限无可用入口</p>
         <strong>入口会按 App Gate 权限自动显示。</strong>
+      </section>
+
+      <section class="kpi-grid" aria-label="今日概览">
+        <article
+          v-for="item in primaryKpis"
+          :key="item.key"
+          class="kpi-card"
+          :class="`kpi-card--${item.tone}`"
+        >
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}<small>{{ item.unit }}</small></strong>
+          <em>{{ item.detail }}</em>
+        </article>
+      </section>
+
+      <section class="overview-section" aria-label="当前排队人数组">
+        <header>
+          <div>
+            <span>当前排队</span>
+            <strong>{{ activeQueueTickets }} 组 / {{ activeQueuePartySize }} 人</strong>
+          </div>
+        </header>
+        <div class="party-size-row">
+          <div
+            v-for="group in overview?.partySizeGroups ?? []"
+            :key="group.label"
+            class="party-size-chip"
+          >
+            <strong>{{ group.label }}</strong>
+            <span>{{ group.groups }}组 / {{ group.partySize }}人</span>
+          </div>
+        </div>
+        <div class="status-grid">
+          <div v-for="row in queueRows" :key="row.key" class="status-item">
+            <span>{{ row.label }}</span>
+            <strong>{{ row.value }}</strong>
+            <em>{{ row.detail }}</em>
+          </div>
+        </div>
+      </section>
+
+      <section class="overview-section" aria-label="桌台状态">
+        <header>
+          <div>
+            <span>桌台状态</span>
+            <strong>{{ overview?.tables.availableTables ?? 0 }} 可用 / {{ overview?.tables.totalTables ?? 0 }} 总桌</strong>
+          </div>
+        </header>
+        <div class="status-grid status-grid--tables">
+          <div v-for="row in tableRows" :key="row.key" class="status-item">
+            <span>{{ row.label }}</span>
+            <strong>{{ row.value }}</strong>
+            <em>{{ row.detail }}</em>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -473,76 +448,333 @@ function hasPermission(permission: string): boolean {
 </template>
 
 <style scoped>
-.workbench-body {
+.home-overview-body {
   display: grid;
-  gap: 16px;
-  padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
+  gap: 14px;
+  padding: 12px 14px calc(92px + env(safe-area-inset-bottom));
 }
 
-.app-state {
-  align-items: center;
+.topbar-refresh {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  color: #c2410c;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.topbar-refresh:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.date-strip,
+.overview-section,
+.overview-error {
   background: #ffffff;
   border: 1px solid #dbe3ee;
-  border-left: 4px solid #94a3b8;
   border-radius: 10px;
-  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
-  display: flex;
-  min-height: 64px;
-  padding: 12px 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
-.app-state p,
-.empty-state p {
+.date-strip {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 10px 12px;
+}
+
+.date-strip div,
+.overview-section header div {
+  display: grid;
+  gap: 2px;
+}
+
+.date-strip span,
+.overview-section header span,
+.kpi-card span,
+.status-item span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.date-strip strong,
+.overview-section header strong {
   color: #0f172a;
-  font-size: 0.92rem;
+  font-size: 1rem;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.date-strip em {
+  color: #c2410c;
+  font-size: 0.74rem;
+  font-style: normal;
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1.25;
-  margin: 0;
+  max-width: 52%;
+  text-align: right;
 }
 
-.app-state strong,
-.empty-state strong {
-  color: #64748b;
-  display: block;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.35;
-  margin-top: 4px;
-}
-
-.tone-ready {
-  border-left-color: #22c55e;
-}
-
-.tone-loading,
-.tone-limited {
-  border-left-color: #f97316;
-}
-
-.tone-empty {
-  border-left-color: #64748b;
-}
-
-.tone-error {
-  border-left-color: #ef4444;
-}
-
-.operation-groups {
+.overview-error {
   display: grid;
-  gap: 18px;
+  gap: 4px;
+  padding: 12px;
+}
+
+.overview-error strong {
+  color: #991b1b;
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.overview-error span {
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.operation-toolbar {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 8px;
+}
+
+.operation-tool {
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #0f172a;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  min-height: 66px;
+  padding: 8px;
+  text-decoration: none;
+}
+
+.operation-symbol {
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 999px;
+  color: #475569;
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 950;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.operation-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.operation-copy strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.18;
+}
+
+.operation-copy em {
+  color: #64748b;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.operation-tool--reservation .operation-symbol {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.operation-tool--queue .operation-symbol {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.operation-tool--success .operation-symbol {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.operation-tool:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, 0.28);
+  outline-offset: 2px;
 }
 
 .empty-state {
   background: #ffffff;
   border: 1px dashed #cbd5e1;
   border-radius: 10px;
-  padding: 18px 14px;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
 }
 
-@media (min-width: 720px) {
-  .workbench-body {
-    padding-top: 16px;
+.empty-state p {
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.empty-state strong {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.kpi-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kpi-card {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 5px;
+  min-height: 104px;
+  padding: 12px;
+}
+
+.kpi-card strong {
+  color: #0f172a;
+  font-size: 1.62rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.kpi-card small {
+  font-size: 0.72rem;
+  font-weight: 900;
+  margin-left: 2px;
+}
+
+.kpi-card em,
+.status-item em {
+  color: #475569;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.kpi-card--reservation {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.kpi-card--arrival {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.kpi-card--queue {
+  background: #fefce8;
+  border-color: #facc15;
+}
+
+.kpi-card--table {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.overview-section {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.overview-section header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.party-size-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.party-size-chip {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 8px;
+}
+
+.party-size-chip strong {
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.party-size-chip span {
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.status-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.status-grid--tables {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.status-item {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 8px;
+}
+
+.status-item strong {
+  color: #0f172a;
+  font-size: 1.2rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+@media (max-width: 420px) {
+  .party-size-row,
+  .status-grid--tables,
+  .operation-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

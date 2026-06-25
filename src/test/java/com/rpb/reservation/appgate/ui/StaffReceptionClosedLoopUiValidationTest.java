@@ -9,22 +9,29 @@ import org.junit.jupiter.api.Test;
 class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
-    void staffHomeExposesThreeReceptionActionsIncludingWalkInQueue() throws Exception {
+    void staffHomeShowsTodayOverviewInsteadOfReceptionActionGrid() throws Exception {
         String staffHome = Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
-        String actionGroup = Files.readString(Path.of("src", "components", "staff-home", "StaffHomeActionGroup.vue"));
 
         assertThat(staffHome)
-            .contains("hasPermission('walkin.queue.create')")
-            .contains("walkInQueueRoute")
-            .contains("id: 'walkin-queue'")
-            .contains("label: '现场取号'")
-            .contains("接待")
-            .contains(":layout=\"'three'\"");
+            .contains("getStaffHomeOverview")
+            .contains("StaffHomeTopBar")
+            .contains("StaffBottomNav")
+            .contains("displayedBusinessDate")
+            .contains("label: '今日预约'")
+            .contains("label: '已到店'")
+            .contains("label: '当前排队'")
+            .contains("label: '可用桌台'")
+            .contains("aria-label=\"今日概览\"")
+            .contains("aria-label=\"当前排队人数组\"")
+            .contains("aria-label=\"桌台状态\"")
+            .contains("active-tab=\"home\"");
 
-        assertThat(actionGroup)
-            .contains("layout?: 'two' | 'three'")
-            .contains("three-action-grid")
-            .contains("grid-template-columns: repeat(3, minmax(0, 1fr))");
+        assertThat(staffHome)
+            .doesNotContain("hasPermission('walkin.queue.create')")
+            .doesNotContain("walkInQueueRoute")
+            .doesNotContain("StaffHomeActionGroup")
+            .doesNotContain("StaffHomeWorkflowStrip")
+            .doesNotContain(":layout=\"'three'\"");
     }
 
     @Test
@@ -67,6 +74,7 @@ class StaffReceptionClosedLoopUiValidationTest {
             .contains("queue-workbench-body")
             .contains("queue-management-panel")
             .contains("queue-status-tabs")
+            .contains("营业日期 {{ currentBusinessDate }}")
             .contains("当日排队管理")
             .contains("compact-ticket-card")
             .contains("compact-ticket-main")
@@ -84,7 +92,8 @@ class StaffReceptionClosedLoopUiValidationTest {
             .doesNotContain("goNext")
             .doesNotContain("StaffHomeWorkflowStrip")
             .doesNotContain("预约编号")
-            .doesNotContain("reservationCode");
+            .doesNotContain("reservationCode")
+            .doesNotContain("<p class=\"section-kicker\">排队管理</p>");
     }
 
     @Test

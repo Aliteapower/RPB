@@ -8,7 +8,6 @@ const props = defineProps<{
   storeLabel: string
 }>()
 
-const displayBusinessDate = computed(() => props.businessDate?.trim() ?? '')
 const displayAppStatus = computed(() => {
   const status = props.appStatusLabel.trim()
   return status === '应用可用' ? '' : status
@@ -25,12 +24,8 @@ const displayAppStatus = computed(() => {
       </div>
     </div>
 
-    <div class="topbar-meta" aria-label="营业日期、门店和应用状态">
+    <div class="topbar-meta" aria-label="门店和应用状态">
       <div class="topbar-row topbar-row--time">
-        <div v-if="displayBusinessDate" class="topbar-business-date" aria-label="营业日期">
-          <span>营业日期</span>
-          <time :datetime="displayBusinessDate">{{ displayBusinessDate }}</time>
-        </div>
         <span class="time-pill">{{ currentTimeText }}</span>
       </div>
       <div class="topbar-row topbar-row--store">
@@ -115,31 +110,6 @@ h1 {
   width: 100%;
 }
 
-.topbar-business-date {
-  align-items: center;
-  background: #f8fafc;
-  border: 1px solid #dbe3ee;
-  border-radius: 999px;
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: 7px;
-  min-height: 26px;
-  padding: 0 9px;
-}
-
-.topbar-business-date span {
-  color: #64748b;
-  font-size: 0.66rem;
-  font-weight: 850;
-}
-
-.topbar-business-date time {
-  color: #0f172a;
-  font-size: 0.74rem;
-  font-weight: 950;
-  line-height: 1;
-}
-
 .time-pill,
 .store-pill,
 .app-pill {
@@ -193,15 +163,6 @@ h1 {
 
   .topbar-row {
     gap: 5px;
-  }
-
-  .topbar-business-date {
-    gap: 5px;
-    padding: 0 8px;
-  }
-
-  .topbar-business-date span {
-    display: none;
   }
 
   .store-pill {

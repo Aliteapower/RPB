@@ -105,6 +105,30 @@ public interface QueueTicketJpaRepository extends JpaRepository<QueueTicketEntit
 
     @Query(value = """
         select
+            ticket.status as "status",
+            queue_group.group_code as "partySizeGroup",
+            count(*) as "ticketCount",
+            coalesce(sum(ticket.party_size), 0) as "partySizeTotal"
+        from queue_tickets ticket
+        join queue_groups queue_group
+          on queue_group.id = ticket.queue_group_id
+         and queue_group.tenant_id = ticket.tenant_id
+         and queue_group.store_id = ticket.store_id
+         and queue_group.deleted_at is null
+        where ticket.tenant_id = :tenantId
+          and ticket.store_id = :storeId
+          and ticket.business_date = :businessDate
+          and ticket.deleted_at is null
+        group by ticket.status, queue_group.group_code
+        """, nativeQuery = true)
+    List<QueueTicketOverviewMetricProjection> findOverviewMetrics(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("businessDate") LocalDate businessDate
+    );
+
+    @Query(value = """
+        select
             ticket.id as "queueTicketId",
             ticket.ticket_number as "queueTicketNumber",
             ticket.status as "queueTicketStatus",

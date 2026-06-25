@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import CleaningCompletePage from '../pages/CleaningCompletePage.vue'
+import LoginPage from '../pages/LoginPage.vue'
+import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
+import PlatformTenantsPage from '../pages/PlatformTenantsPage.vue'
 import QueueCallPage from '../pages/QueueCallPage.vue'
 import QueueTicketListPage from '../pages/QueueTicketListPage.vue'
 import ReservationArrivedDirectSeatingPage from '../pages/ReservationArrivedDirectSeatingPage.vue'
@@ -10,8 +13,14 @@ import ReservationTodayViewPage from '../pages/ReservationTodayViewPage.vue'
 import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
 import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
 import TableResourceListPage from '../pages/TableResourceListPage.vue'
+import TenantAdminSettingsPage from '../pages/TenantAdminSettingsPage.vue'
+import TenantAdminStaffFormPage from '../pages/TenantAdminStaffFormPage.vue'
+import TenantAdminStaffPage from '../pages/TenantAdminStaffPage.vue'
+import TenantAdminTableFormPage from '../pages/TenantAdminTableFormPage.vue'
+import TenantAdminTablesPage from '../pages/TenantAdminTablesPage.vue'
 import WalkInDirectSeatingPage from '../pages/WalkInDirectSeatingPage.vue'
 import WalkInQueuePage from '../pages/WalkInQueuePage.vue'
+import { useAuthSessionStore } from '../stores/authSession'
 
 const localValidationStoreId = '20000000-0000-0000-0000-000000000983'
 const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationStoreId
@@ -20,13 +29,89 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/login',
+      name: 'login',
+      component: LoginPage,
+      meta: { public: true }
+    },
+    {
       path: '/',
-      redirect: `/stores/${defaultStoreId}/staff`
+      redirect: () => {
+        const auth = useAuthSessionStore()
+        return auth.loaded && auth.isPlatformAdmin ? auth.platformHomeRoute : `/stores/${defaultStoreId}/staff`
+      }
+    },
+    {
+      path: '/platform/tenants',
+      name: 'platform-tenants',
+      component: PlatformTenantsPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/tenants/new',
+      name: 'platform-tenant-create',
+      component: PlatformTenantFormPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/tenants/:tenantId/edit',
+      name: 'platform-tenant-edit',
+      component: PlatformTenantFormPage,
+      meta: { requiresPlatformAdmin: true }
     },
     {
       path: '/stores/:storeId/staff',
       name: 'store-staff-home',
       component: StoreStaffHomePage
+    },
+    {
+      path: '/stores/:storeId/admin',
+      redirect: to => ({
+        name: 'tenant-admin-staff',
+        params: { storeId: to.params.storeId }
+      })
+    },
+    {
+      path: '/stores/:storeId/admin/staff',
+      name: 'tenant-admin-staff',
+      component: TenantAdminStaffPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/staff/new',
+      name: 'tenant-admin-staff-create',
+      component: TenantAdminStaffFormPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/staff/:staffId/edit',
+      name: 'tenant-admin-staff-edit',
+      component: TenantAdminStaffFormPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/tables',
+      name: 'tenant-admin-tables',
+      component: TenantAdminTablesPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/tables/new',
+      name: 'tenant-admin-table-create',
+      component: TenantAdminTableFormPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/tables/:tableId/edit',
+      name: 'tenant-admin-table-edit',
+      component: TenantAdminTableFormPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/settings',
+      name: 'tenant-admin-settings',
+      component: TenantAdminSettingsPage,
+      meta: { requiresTenantAdmin: true }
     },
     {
       path: '/stores/:storeId/walk-ins/direct-seating',
@@ -99,4 +184,36 @@ export const router = createRouter({
       redirect: `/stores/${defaultStoreId}/staff`
     }
   ]
+})
+
+router.beforeEach(async to => {
+  const auth = useAuthSessionStore()
+
+  if (to.meta.public) {
+    return true
+  }
+
+  await auth.ensureCurrentUser()
+  if (!auth.isAuthenticated) {
+    return {
+      name: 'login',
+      query: { redirect: to.fullPath }
+    }
+  }
+
+  if (to.meta.requiresPlatformAdmin && !auth.user?.roles.includes('platform_admin')) {
+    return auth.defaultStoreRoute
+  }
+
+  if (to.meta.requiresTenantAdmin) {
+    if (!auth.isTenantAdmin) {
+      return auth.defaultHomeRoute
+    }
+    const routeStoreId = String(to.params.storeId || '')
+    if (routeStoreId && !auth.user?.storeIds.includes(routeStoreId)) {
+      return auth.tenantAdminHomeRoute
+    }
+  }
+
+  return true
 })

@@ -2,14 +2,16 @@ package com.rpb.reservation.queue.persistence.adapter;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
-import com.rpb.reservation.queue.application.port.out.QueueTicketRepositoryPort;
 import com.rpb.reservation.queue.application.port.out.QueueTicketListRow;
 import com.rpb.reservation.queue.application.port.out.QueueTicketListRows;
+import com.rpb.reservation.queue.application.port.out.QueueTicketOverviewMetric;
+import com.rpb.reservation.queue.application.port.out.QueueTicketRepositoryPort;
 import com.rpb.reservation.queue.domain.QueueTicket;
 import com.rpb.reservation.queue.persistence.entity.QueueTicketEntity;
 import com.rpb.reservation.queue.persistence.mapper.QueueTicketMapper;
 import com.rpb.reservation.queue.persistence.repository.QueueTicketJpaRepository;
 import com.rpb.reservation.queue.persistence.repository.QueueTicketListProjection;
+import com.rpb.reservation.queue.persistence.repository.QueueTicketOverviewMetricProjection;
 import com.rpb.reservation.queue.policy.QueueTicketNumberConflictException;
 import com.rpb.reservation.queue.status.QueueTicketStatus;
 import com.rpb.reservation.queue.value.QueueTicketId;
@@ -87,6 +89,15 @@ public class QueueTicketPersistenceAdapter implements QueueTicketRepositoryPort 
     }
 
     @Override
+    public List<QueueTicketOverviewMetric> findOverviewMetrics(StoreScope scope, BusinessDate businessDate) {
+        return repository.findOverviewMetrics(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            businessDate.value()
+        ).stream().map(QueueTicketPersistenceAdapter::toOverviewMetric).toList();
+    }
+
+    @Override
     public QueueTicketListRows findQueueTicketList(
         StoreScope scope,
         QueueTicketStatus status,
@@ -119,6 +130,15 @@ public class QueueTicketPersistenceAdapter implements QueueTicketRepositoryPort 
             phoneDigits
         );
         return new QueueTicketListRows(rows, total);
+    }
+
+    private static QueueTicketOverviewMetric toOverviewMetric(QueueTicketOverviewMetricProjection projection) {
+        return new QueueTicketOverviewMetric(
+            projection.getStatus(),
+            projection.getPartySizeGroup(),
+            projection.getTicketCount(),
+            projection.getPartySizeTotal()
+        );
     }
 
     @Override

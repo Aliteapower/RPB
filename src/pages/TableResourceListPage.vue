@@ -940,24 +940,6 @@ function resourceSeatRequest(resource: TableResourceItem): {
     : { tableId: null, tableGroupId: resource.resourceId }
 }
 
-function selectionReasonText(resource: TableResourceItem): string {
-  if (resource.selectable) {
-    return isSelectedBusinessDateToday.value ? '可入桌' : '可组合'
-  }
-
-  const reasonLabels: Record<string, string> = {
-    status_unavailable: '当前状态不可选',
-    capacity_mismatch: '人数不匹配',
-    locked: '桌台已锁定',
-    occupied: '桌台已占用',
-    cleaning: '正在清台',
-    reservation_preassigned: '已被预约预留',
-    temporary_group_member: '已加入临时桌组'
-  }
-  const reason = resource.selectionDisabledReason?.trim()
-  return reason ? reasonLabels[reason] ?? '当前不可选' : '当前不可选'
-}
-
 function areaTitle(resource: TableResourceItem): string {
   const areaName = resource.areaName?.trim()
   return areaName || '未分区'
@@ -1224,9 +1206,6 @@ function formatStoreLabel(value: string | undefined): string {
               <span class="table-page__resource-badge">{{ resourceDisplayStatusLabel(resource) }}</span>
             </div>
             <p class="table-page__resource-meta">{{ capacityText(resource) }}</p>
-            <p class="table-page__resource-note">
-              状态：{{ resourceDisplayStatusLabel(resource) }}，{{ selectionReasonText(resource) }}
-            </p>
             <section
               v-if="resource.preassignedReservationId"
               class="table-page__assignment"
@@ -1797,16 +1776,11 @@ h3 {
 }
 
 .table-page__resource-meta,
-.table-page__resource-note,
 .table-page__resource-members {
   color: #315f91;
   font-size: 0.78rem;
   font-weight: 850;
   margin: 0;
-}
-
-.table-page__resource-note {
-  color: #64748b;
 }
 
 .table-page__assignment {

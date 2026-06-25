@@ -1072,7 +1072,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
       <section class="queue-management-panel" aria-label="当日排队管理">
         <header class="queue-panel-heading">
           <div>
-            <p class="section-kicker">排队管理</p>
+            <p class="section-kicker">营业日期 {{ currentBusinessDate }}</p>
             <h1>当日排队管理</h1>
           </div>
           <button type="button" :disabled="isLoading" @click="refresh">

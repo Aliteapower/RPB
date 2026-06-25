@@ -45,18 +45,25 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
             .doesNotContain("path: '/stores/:storeId/seating/from-queue'");
 
         assertThat(staffHome)
-            .contains("reservation.queue")
-            .contains("canQueueArrivedReservation")
-            .contains("name: 'reservation-arrived-to-queue'")
-            .contains("预约排队")
-            .contains("hasVisibleOperation");
+            .contains("getStaffHomeOverview")
+            .contains("StaffHomeTopBar")
+            .contains("StaffBottomNav")
+            .contains("aria-label=\"今日概览\"")
+            .contains("active-tab=\"home\"");
         assertForbiddenQueueOperationsAbsent(staffHome);
 
         assertThat(todayWorkbenchSource)
             .contains("ReservationQuickActionPanel")
             .contains("routeName: 'reservation-arrived-to-queue'")
-            .contains("label: '预约排队'")
-            .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
+            .contains("label: '预约转排队'")
+            .contains("routeName: 'walk-in-queue'")
+            .contains("label: '现场取号'")
+            .contains("label: '创建预约'")
+            .contains("grid-template-columns: repeat(3, minmax(0, 1fr))")
+            .doesNotContain("label: '预约到店'")
+            .doesNotContain("label: '预约入座'")
+            .doesNotContain("show-confirmed-reservations")
+            .doesNotContain("show-arrived-reservations")
             .doesNotContain("已到店预约进入排队")
             .doesNotContain("取消预约需后端契约")
             .doesNotContain("queueArrivedReservation")

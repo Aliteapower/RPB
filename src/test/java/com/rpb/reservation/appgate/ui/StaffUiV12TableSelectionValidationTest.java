@@ -80,7 +80,6 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("selectedArea")
             .contains("selectArea")
             .contains("statusFilterCount")
-            .contains("selectionReasonText")
             .contains("currentSeatingId")
             .contains("currentCleaningId")
             .contains("currentReservationId")
@@ -131,7 +130,6 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("叫号入桌")
             .contains("桌台分区")
             .contains("全部分区")
-            .contains("状态：")
             .contains("入桌")
             .contains("换桌")
             .contains("清台")
@@ -180,6 +178,7 @@ class StaffUiV12TableSelectionValidationTest {
             .doesNotContain("resource.resourceType === 'dining_table' &&\n    isSelectedBusinessDateToday.value &&")
             .doesNotContain(":disabled=\"!isSelectedBusinessDateToday\"")
             .doesNotContain("v-if=\"resource.selectable\"")
+            .doesNotContain("状态：{{ resourceDisplayStatusLabel(resource) }}，{{ selectionReasonText(resource) }}")
             .doesNotContain("statusLabel(resource.status) }}，{{ selectionReasonText(resource)")
             .doesNotContain("class=\"status-options\"")
             .doesNotContain("business-date-field")
@@ -325,15 +324,17 @@ class StaffUiV12TableSelectionValidationTest {
     }
 
     @Test
-    void staffHomeTopBarOwnsBusinessDateForReservationQueueAndTablePages() throws Exception {
+    void staffHomeTopBarKeepsDatePropCompatibilityButDoesNotRenderBusinessDateChip() throws Exception {
         String topBar = Files.readString(Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"));
 
         assertThat(topBar)
             .contains("businessDate?: string | null")
-            .contains("displayBusinessDate")
-            .contains("aria-label=\"营业日期\"")
-            .contains("class=\"topbar-business-date\"")
-            .contains("<slot name=\"action\" />");
+            .contains("<slot name=\"action\" />")
+            .contains("aria-label=\"门店和应用状态\"")
+            .doesNotContain("displayBusinessDate")
+            .doesNotContain("aria-label=\"营业日期\"")
+            .doesNotContain("topbar-business-date")
+            .doesNotContain("<span>营业日期</span>");
 
         assertThat(Files.readString(Path.of("src", "components", "staff-home", "useCurrentClock.ts")))
             .contains("currentBusinessDate")
@@ -341,12 +342,14 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("timeZone = 'Asia/Singapore'");
 
         assertThat(Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue")))
-            .contains(":business-date=\"currentBusinessDate\"")
+            .contains(":business-date=\"displayedBusinessDate\"")
+            .contains("getStaffHomeOverview")
             .contains("return '首页'");
         assertThat(Files.readString(Path.of("src", "pages", "WalkInQueuePage.vue")))
             .contains(":business-date=\"currentBusinessDate\"");
         assertThat(Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue")))
             .contains(":business-date=\"currentBusinessDate\"")
+            .contains("营业日期 {{ currentBusinessDate }}")
             .contains("reservationQueueEntry.value ? '排队' : '暂无应用'");
         assertThat(Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue")))
             .contains(":business-date=\"currentBusinessDate\"");
@@ -467,16 +470,12 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("v-model:open=\"showCreateReservationDialog\"")
             .contains("v-model:open=\"showSeatDialog\"")
             .contains("v-model:selected-status=\"selectedStatus\"")
-            .contains("label: '预约到店'")
-            .contains("action: 'show-confirmed-reservations'")
             .contains("label: '创建预约'")
             .contains("open-create-reservation")
-            .contains("label: '预约排队'")
+            .contains("label: '现场取号'")
+            .contains("routeName: 'walk-in-queue'")
+            .contains("label: '预约转排队'")
             .contains("routeName: 'reservation-arrived-to-queue'")
-            .contains("label: '预约入座'")
-            .contains("action: 'show-arrived-reservations'")
-            .contains("show-confirmed-reservations")
-            .contains("show-arrived-reservations")
             .contains("createReservation")
             .contains("新增预约")
             .contains("ReservationSeatDialog")
@@ -550,6 +549,10 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("aria-label")
             .doesNotContain("routeName: 'reservation-check-in'")
             .doesNotContain("routeName: 'reservation-arrived-direct-seating'")
+            .doesNotContain("label: '预约到店'")
+            .doesNotContain("label: '预约入座'")
+            .doesNotContain("show-confirmed-reservations")
+            .doesNotContain("show-arrived-reservations")
             .doesNotContain("name=\"reservationTime\" type=\"time\"")
             .doesNotContain("label: '已确认'")
             .doesNotContain("复制 ID")
@@ -581,7 +584,7 @@ class StaffUiV12TableSelectionValidationTest {
             "<ReservationTodayListPanel"
         );
         assertThat(actionPanelSource)
-            .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
+            .contains("grid-template-columns: repeat(3, minmax(0, 1fr))")
             .doesNotContain("<small>")
             .doesNotContain("确认预约客人已到店")
             .doesNotContain("登记新的门店预约")

@@ -11,6 +11,8 @@ import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -35,6 +37,11 @@ public class LocalRuntimeCurrentActorProvider implements CurrentActorProvider {
 
     @Override
     public Optional<CurrentActor> currentActor() {
+        Optional<CurrentActor> sessionActor = sessionActor();
+        if (sessionActor.isPresent()) {
+            return sessionActor;
+        }
+
         HttpServletRequest request = currentRequest().orElse(null);
         UUID tenantId = uuidValue(header(request, TENANT_ID_HEADER)).orElse(properties.getTenantId());
         UUID actorId = uuidValue(header(request, ACTOR_ID_HEADER)).orElse(properties.getActorId());
@@ -49,6 +56,22 @@ public class LocalRuntimeCurrentActorProvider implements CurrentActorProvider {
         Set<UUID> storeIds = uuidSet(header(request, STORE_IDS_HEADER), properties.getStoreIds());
 
         return Optional.of(CurrentActor.storeStaff(tenantId, actorId, actorType, roles, permissions, storeIds));
+    }
+
+    private static Optional<CurrentActor> sessionActor() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return Optional.empty();
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof CurrentActor currentActor) {
+            return Optional.of(currentActor);
+        }
+        Object details = authentication.getDetails();
+        if (details instanceof CurrentActor currentActor) {
+            return Optional.of(currentActor);
+        }
+        return Optional.empty();
     }
 
     private static Optional<HttpServletRequest> currentRequest() {

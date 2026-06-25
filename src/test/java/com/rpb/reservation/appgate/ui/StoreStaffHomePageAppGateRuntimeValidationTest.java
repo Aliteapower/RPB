@@ -12,83 +12,58 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
     private static final String LOCAL_VALIDATION_STORE_ID = "20000000-0000-0000-0000-000000000983";
 
     @Test
-    void staffHomeRendersReservationQueueOperationsOnlyBehindMeAppsEntry() throws Exception {
+    void staffHomeUsesPersistentOverviewApiInsteadOfDuplicatedEntryGrid() throws Exception {
         String source = readStaffHomeSources();
 
         assertThat(source)
-            .contains("fetchMeApps")
-            .contains("reservation_queue")
-            .contains("const hasReservationQueue")
-            .contains("const hasVisibleOperation")
-            .contains("const hasReceptionOperations")
-            .contains("const hasReservationOperations")
-            .contains("const hasQueueOperations")
-            .contains("const hasTableTurnoverOperations")
-            .contains("StaffHomeActionGroup")
+            .contains("getStaffHomeOverview")
+            .contains("StaffHomeOverviewApiError")
             .contains("StaffHomeTopBar")
-            .contains("StaffHomeWorkflowStrip")
-            .contains("<nav v-if=\"hasVisibleOperation\" class=\"operation-groups\"")
-            .contains("v-if=\"actions.length\"")
-            .doesNotContain("class=\"operation-section\"")
-            .doesNotContain("section-eyebrow")
-            .contains("reservation.check_in")
-            .contains("reservation.seat");
+            .contains("StaffBottomNav")
+            .contains("overview")
+            .contains("primaryKpis")
+            .contains("partySizeGroups")
+            .contains("activeQueueTickets")
+            .contains("arrivedReservationGroups")
+            .contains(":business-date=\"displayedBusinessDate\"")
+            .contains("active-tab=\"home\"");
+
         assertThat(source)
-            .doesNotContain("<nav class=\"operation-groups\"")
-            .doesNotContain("queue.skip")
-            .doesNotContain("queue.rejoin");
+            .doesNotContain("fetchMeApps")
+            .doesNotContain("StaffHomeActionGroup")
+            .doesNotContain("StaffHomeWorkflowStrip")
+            .doesNotContain("StaffHomeActionItem")
+            .doesNotContain("<nav v-if=\"hasVisibleOperation\"")
+            .doesNotContain("const receptionActions")
+            .doesNotContain("const reservationActions")
+            .doesNotContain("const queueActions")
+            .doesNotContain("const tableTurnoverActions");
     }
 
     @Test
-    void staffHomeLightweightWorkbenchPreservesGroupedTenEntryBaseline() throws Exception {
+    void staffHomeFocusesOnTodayOperationalJudgementNotBackofficeBi() throws Exception {
         String source = readStaffHomeSources();
 
         assertAppearsInOrder(
             source,
-            "const receptionActions",
-            "label: '现场取号'",
-            "label: '散客直接入座'",
-            "label: '预约到店'",
-            "const reservationActions",
-            "label: '创建预约'",
             "label: '今日预约'",
-            "label: '预约排队'",
-            "label: '预约入座'",
-            "const queueActions",
-            "label: '排队列表'",
-            "label: '排队叫号'",
-            "label: '排队入座'",
-            "const tableTurnoverActions",
-            "label: '清台处理'"
+            "label: '已到店'",
+            "label: '当前排队'",
+            "label: '可用桌台'"
         );
 
         assertThat(source)
-            .contains("walkInRoute")
-            .contains("walkInQueueRoute")
-            .contains("cleaningRoute")
-            .contains("reservationRoute")
-            .contains("reservationTodayViewRoute")
-            .contains("reservationConfirmedTodayRoute")
-            .contains("reservationArrivedToQueueRoute")
-            .contains("queueTicketListRoute")
-            .contains("reservationArrivedTodayRoute")
-            .contains(":layout=\"'three'\"")
-            .contains("status: 'confirmed'")
-            .contains("status: 'arrived'")
-            .contains("group-id=\"staff-section-reception\"")
-            .contains("heading=\"接待\"")
-            .contains(":actions=\"receptionActions\"")
-            .contains("group-id=\"staff-section-reservation\"")
-            .contains("heading=\"预约管理\"")
-            .contains(":actions=\"reservationActions\"")
-            .contains("group-id=\"staff-section-queue\"")
-            .contains("heading=\"排队管理\"")
-            .contains(":actions=\"queueActions\"")
-            .contains("group-id=\"staff-section-table-turnover\"")
-            .contains("heading=\"桌台流转\"")
-            .contains(":actions=\"tableTurnoverActions\"")
-            .doesNotContain("reservation-check-in")
-            .doesNotContain("reservation-arrived-direct-seating");
+            .contains("今日概览")
+            .contains("当前排队人数组")
+            .contains("桌台状态")
+            .contains("waitingTickets")
+            .contains("calledTickets")
+            .contains("availableTables")
+            .contains("temporaryGroups")
+            .doesNotContain("周趋势")
+            .doesNotContain("月趋势")
+            .doesNotContain("报表")
+            .doesNotContain("BI");
     }
 
     @Test
@@ -147,10 +122,7 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
         for (Path path : List.of(
             Path.of("src", "pages", "StoreStaffHomePage.vue"),
-            Path.of("src", "components", "staff-home", "StaffHomeActionGroup.vue"),
             Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"),
-            Path.of("src", "components", "staff-home", "StaffHomeWorkflowStrip.vue"),
-            Path.of("src", "components", "staff-home", "staffHomeActions.ts"),
             Path.of("src", "components", "staff-home", "useCurrentClock.ts")
         )) {
             if (Files.exists(path)) {

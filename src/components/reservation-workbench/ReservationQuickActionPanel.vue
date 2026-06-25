@@ -9,7 +9,8 @@ interface ReservationQuickAction {
   disabledTitle?: string
   disabled?: boolean
   routeName?: string
-  action?: 'create-reservation' | 'show-confirmed-reservations' | 'show-arrived-reservations'
+  includeBusinessDateQuery?: boolean
+  action?: 'create-reservation'
 }
 
 const props = defineProps<{
@@ -20,35 +21,28 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'open-create-reservation': []
-  'show-confirmed-reservations': []
-  'show-arrived-reservations': []
 }>()
 
 const entries = computed<ReservationQuickAction[]>(() => [
-  {
-    label: '预约到店',
-    action: 'show-confirmed-reservations',
-    symbol: '到',
-    tone: 'primary'
-  },
   {
     label: '创建预约',
     action: 'create-reservation',
     disabled: !props.canCreateReservationForSelectedDate,
     disabledTitle: '过去日期不可创建预约',
     symbol: '约',
+    tone: 'primary'
+  },
+  {
+    label: '现场取号',
+    routeName: 'walk-in-queue',
+    symbol: '取',
     tone: 'plain'
   },
   {
-    label: '预约排队',
+    label: '预约转排队',
     routeName: 'reservation-arrived-to-queue',
+    includeBusinessDateQuery: true,
     symbol: '排',
-    tone: 'plain'
-  },
-  {
-    label: '预约入座',
-    action: 'show-arrived-reservations',
-    symbol: '入',
     tone: 'plain'
   }
 ])
@@ -57,13 +51,13 @@ function actionKey(entry: ReservationQuickAction): string {
   return entry.routeName ?? entry.action ?? entry.label
 }
 
-function routeFor(routeName: string) {
+function routeFor(entry: ReservationQuickAction) {
   return {
-    name: routeName,
+    name: entry.routeName,
     params: {
       storeId: props.storeId
     },
-    query: props.selectedDate
+    query: entry.includeBusinessDateQuery && props.selectedDate
       ? {
           businessDate: props.selectedDate
         }
@@ -78,14 +72,6 @@ function triggerAction(entry: ReservationQuickAction): void {
 
   if (entry.action === 'create-reservation') {
     emit('open-create-reservation')
-  }
-
-  if (entry.action === 'show-confirmed-reservations') {
-    emit('show-confirmed-reservations')
-  }
-
-  if (entry.action === 'show-arrived-reservations') {
-    emit('show-arrived-reservations')
   }
 }
 </script>
@@ -103,7 +89,7 @@ function triggerAction(entry: ReservationQuickAction): void {
           v-if="entry.routeName"
           class="reservation-actions__entry"
           :class="`reservation-actions__entry--${entry.tone}`"
-          :to="routeFor(entry.routeName)"
+          :to="routeFor(entry)"
         >
           <span class="reservation-actions__symbol" aria-hidden="true">{{ entry.symbol }}</span>
           <strong>{{ entry.label }}</strong>
@@ -161,7 +147,7 @@ function triggerAction(entry: ReservationQuickAction): void {
 .reservation-actions__grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .reservation-actions__entry {

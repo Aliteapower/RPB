@@ -241,7 +241,7 @@ class QueueSkipControllerTest {
 
         try (var paths = Files.walk(Path.of("src", "main", "resources", "db", "migration"))) {
             assertThat(paths.filter(Files::isRegularFile).map(path -> path.getFileName().toString()).toList())
-                .noneMatch(path -> path.startsWith("V003"));
+                .noneMatch(path -> path.startsWith("V003") && !"V003__auth_minimal_login.sql".equals(path));
         }
     }
 

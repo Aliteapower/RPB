@@ -445,9 +445,11 @@ class ReservationControllerTest {
                 "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
+                "src/main/java/com/rpb/reservation/staffhome/api/StaffHomeOverviewController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
                 "src/main/java/com/rpb/reservation/table/api/TemporaryTableGroupController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
+                "src/main/java/com/rpb/reservation/auth/api/AuthController.java",
                 "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
             );
         assertThat(sourceFiles)
@@ -490,6 +492,7 @@ class ReservationControllerTest {
                 "src/components/staff-home/StaffHomeWorkflowStrip.vue",
                 "src/components/staff-table/TableResourcePicker.vue",
                 "src/pages/CleaningCompletePage.vue",
+                "src/pages/LoginPage.vue",
                 "src/pages/QueueCallPage.vue",
                 "src/pages/QueueTicketListPage.vue",
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",

@@ -241,14 +241,6 @@ function openCreateReservationDialog(): void {
   showCreateReservationDialog.value = true
 }
 
-function showConfirmedReservations(): void {
-  selectedStatus.value = 'confirmed'
-}
-
-function showArrivedReservations(): void {
-  selectedStatus.value = 'arrived'
-}
-
 function handleReservationCreated(result: CreateReservationResponse): void {
   const shouldReload =
     businessDate.value === result.businessDate && selectedStatus.value === 'operational'
@@ -473,8 +465,6 @@ function isOpenCreateQuery(value: unknown): boolean {
         :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
         :selected-date="businessDate"
         @open-create-reservation="openCreateReservationDialog"
-        @show-arrived-reservations="showArrivedReservations"
-        @show-confirmed-reservations="showConfirmedReservations"
       />
 
       <ReservationTodayListPanel
