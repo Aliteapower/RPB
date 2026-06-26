@@ -100,6 +100,10 @@ function openEditPage(tenant: PlatformTenant): void {
   void router.push({ name: 'platform-tenant-edit', params: { tenantId: tenant.id } })
 }
 
+function openBillingPage(tenant: PlatformTenant): void {
+  void router.push({ name: 'platform-tenant-billing', params: { tenantId: tenant.id } })
+}
+
 async function deleteSelectedTenant(tenant: PlatformTenant): Promise<void> {
   if (saving.value || !window.confirm(`删除租户 ${tenant.tenantCode}？`)) {
     return
@@ -196,6 +200,7 @@ function apiErrorText(error: unknown): string {
         :saving="saving"
         :status-options="statusOptions"
         @edit="openEditPage"
+        @billing="openBillingPage"
         @delete="deleteSelectedTenant"
         @restore="restoreSelectedTenant"
       />

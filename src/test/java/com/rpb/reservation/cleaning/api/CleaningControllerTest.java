@@ -361,6 +361,8 @@ class CleaningControllerTest {
                 "src/main/java/com/rpb/reservation/auth/api/AuthController.java",
                 "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java",
                 "src/main/java/com/rpb/reservation/platform/api/PlatformTenantController.java",
+                "src/main/java/com/rpb/reservation/platformbilling/api/PlatformProductLineController.java",
+                "src/main/java/com/rpb/reservation/platformbilling/api/PlatformTenantProductSubscriptionController.java",
                 "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminController.java"
             );
         assertThat(sourceFiles)
@@ -405,6 +407,8 @@ class CleaningControllerTest {
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/LoginPage.vue",
                 "src/pages/PlatformCallScreenSeedPage.vue",
+                "src/pages/PlatformProductLinesPage.vue",
+                "src/pages/PlatformTenantBillingPage.vue",
                 "src/pages/PlatformTenantFormPage.vue",
                 "src/pages/PlatformTenantsPage.vue",
                 "src/pages/QueueCallPage.vue",

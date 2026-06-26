@@ -3,6 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import CleaningCompletePage from '../pages/CleaningCompletePage.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import PlatformCallScreenSeedPage from '../pages/PlatformCallScreenSeedPage.vue'
+import PlatformProductLinesPage from '../pages/PlatformProductLinesPage.vue'
+import PlatformTenantBillingPage from '../pages/PlatformTenantBillingPage.vue'
 import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
 import PlatformTenantsPage from '../pages/PlatformTenantsPage.vue'
 import QueueCallPage from '../pages/QueueCallPage.vue'
@@ -60,6 +62,18 @@ export const router = createRouter({
       path: '/platform/tenants/:tenantId/edit',
       name: 'platform-tenant-edit',
       component: PlatformTenantFormPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/tenants/:tenantId/billing',
+      name: 'platform-tenant-billing',
+      component: PlatformTenantBillingPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/settings/product-lines',
+      name: 'platform-product-lines',
+      component: PlatformProductLinesPage,
       meta: { requiresPlatformAdmin: true }
     },
     {

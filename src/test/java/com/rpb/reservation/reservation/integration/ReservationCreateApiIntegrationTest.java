@@ -539,7 +539,7 @@ class ReservationCreateApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.apps[0].appKey").value("reservation_queue"))
-            .andExpect(jsonPath("$.apps[0].appName").value("订位排号系统"))
+            .andExpect(jsonPath("$.apps[0].appName").value("预约排队叫号产线"))
             .andExpect(jsonPath("$.apps[0].entryRoute").value("/stores/" + STORE_ID + "/staff"))
             .andExpect(jsonPath("$.apps[0].entryVisible").value(true))
             .andExpect(jsonPath("$.apps[0].permissions[0]").exists());
