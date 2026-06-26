@@ -71,6 +71,11 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void queueDisplayViewPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.QUEUE_DISPLAY_VIEW).isEqualTo("queue.display.view");
+    }
+
+    @Test
     void tableViewPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.TABLE_VIEW).isEqualTo("table.view");
     }
@@ -112,6 +117,7 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.QUEUE_REJOIN,
                 AppGateRequiredPermission.QUEUE_CANCEL,
                 AppGateRequiredPermission.QUEUE_VIEW,
+                AppGateRequiredPermission.QUEUE_DISPLAY_VIEW,
                 AppGateRequiredPermission.TABLE_VIEW,
                 AppGateRequiredPermission.TABLE_SWITCH,
                 AppGateRequiredPermission.CUSTOMER_LOOKUP

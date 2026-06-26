@@ -17,6 +17,7 @@ public final class AppGateRequiredPermission {
     public static final String QUEUE_SKIP = "queue.skip";
     public static final String QUEUE_REJOIN = "queue.rejoin";
     public static final String QUEUE_CANCEL = "queue.cancel";
+    public static final String QUEUE_DISPLAY_VIEW = "queue.display.view";
     public static final String TABLE_VIEW = "table.view";
     public static final String TABLE_SWITCH = "table.switch";
     public static final String CUSTOMER_LOOKUP = "customer.lookup";
@@ -40,6 +41,7 @@ public final class AppGateRequiredPermission {
         QUEUE_SKIP,
         QUEUE_REJOIN,
         QUEUE_CANCEL,
+        QUEUE_DISPLAY_VIEW,
         TABLE_VIEW,
         TABLE_SWITCH,
         CUSTOMER_LOOKUP,

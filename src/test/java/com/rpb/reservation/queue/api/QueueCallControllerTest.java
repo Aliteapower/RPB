@@ -236,7 +236,6 @@ class QueueCallControllerTest {
                     && Set.of(
                         "src/pages/QueueSkipPage.vue",
                         "src/pages/QueueRejoinPage.vue",
-                        "src/pages/QueueDisplayPage.vue",
                         "src/pages/QueueWorkbenchPage.vue"
                     ).contains(path));
         }

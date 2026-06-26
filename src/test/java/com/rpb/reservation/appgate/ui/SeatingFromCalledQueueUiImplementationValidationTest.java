@@ -172,7 +172,6 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
                 "src/pages/QueuePage.vue",
                 "src/pages/QueueSkipPage.vue",
                 "src/pages/QueueRejoinPage.vue",
-                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueWorkbenchPage.vue",
                 "src/pages/SeatingFromQueuePage.vue",
                 "src/pages/TableMapPage.vue",
@@ -189,7 +188,6 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/seatingFromCalledQueueApi.ts")
             .doesNotContain(
-                "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
                 "src/api/queueCallFromListApi.ts",
                 "src/api/queueSeatFromListApi.ts",

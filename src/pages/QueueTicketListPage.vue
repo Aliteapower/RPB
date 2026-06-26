@@ -263,6 +263,13 @@ const canSeatCalledQueueTicket = computed(
 const canCancelQueueTicket = computed(
   () => reservationQueueEntry.value?.permissions.includes('queue.cancel') ?? false
 )
+const canOpenQueueDisplay = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.display.view') ?? false
+)
+const queueDisplayRoute = computed<RouteLocationRaw>(() => ({
+  name: 'queue-display',
+  params: { storeId: storeId.value }
+}))
 const showEmptyState = computed(
   () => !isLoading.value && !apiError.value && !!response.value && visibleItems.value.length === 0
 )
@@ -1075,9 +1082,22 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
             <p class="section-kicker">营业日期 {{ currentBusinessDate }}</p>
             <h1>当日排队管理</h1>
           </div>
-          <button type="button" :disabled="isLoading" @click="refresh">
-            {{ isLoading ? '刷新中' : '刷新' }}
-          </button>
+          <div class="queue-heading-actions">
+            <RouterLink
+              v-if="canOpenQueueDisplay"
+              aria-label="打开叫号终端屏"
+              class="queue-display-link"
+              :to="queueDisplayRoute"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span aria-hidden="true" class="queue-display-icon" />
+              大屏
+            </RouterLink>
+            <button type="button" :disabled="isLoading" @click="refresh">
+              {{ isLoading ? '刷新中' : '刷新' }}
+            </button>
+          </div>
         </header>
 
         <div class="queue-toolbar today-queue-management">
@@ -1341,6 +1361,13 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
   min-width: 0;
 }
 
+.queue-heading-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .section-kicker,
 .queue-status-tabs p,
 .compact-ticket-info p {
@@ -1369,6 +1396,7 @@ h2 {
 }
 
 .queue-panel-heading button,
+.queue-display-link,
 .status-options button,
 .filter-chip,
 .reset-filter-button,
@@ -1393,6 +1421,36 @@ h2 {
   border: 1px solid #cbd5e1;
   color: #315f91;
   padding: 0 14px;
+}
+
+.queue-display-link {
+  background: #f97316;
+  border: 1px solid #f97316;
+  color: #ffffff;
+  min-height: 42px;
+  padding: 0 13px;
+}
+
+.queue-display-icon {
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  box-sizing: border-box;
+  display: inline-block;
+  height: 12px;
+  margin-right: 6px;
+  position: relative;
+  width: 15px;
+}
+
+.queue-display-icon::after {
+  background: currentColor;
+  border-radius: 999px;
+  bottom: -5px;
+  content: '';
+  height: 2px;
+  left: 4px;
+  position: absolute;
+  width: 5px;
 }
 
 .queue-toolbar {

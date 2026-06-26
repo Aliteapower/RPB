@@ -359,6 +359,9 @@ class WalkInDirectSeatingControllerTest {
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInQueueController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
                 "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/CallScreenAdminController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenSeedController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/QueueDisplayController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
@@ -372,7 +375,9 @@ class WalkInDirectSeatingControllerTest {
                 "src/main/java/com/rpb/reservation/table/api/TemporaryTableGroupController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
                 "src/main/java/com/rpb/reservation/auth/api/AuthController.java",
-                "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
+                "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java",
+                "src/main/java/com/rpb/reservation/platform/api/PlatformTenantController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminController.java"
             );
         assertThat(sourceFiles)
             .noneMatch(WalkInDirectSeatingControllerTest::isForbiddenQueueApiFile);
@@ -390,6 +395,11 @@ class WalkInDirectSeatingControllerTest {
             .containsExactlyInAnyOrder(
                 "src/App.vue",
                 "src/components/DateTimeWheelPicker.vue",
+                "src/components/erp/ErpPagination.vue",
+                "src/components/erp/ErpQueryToolbar.vue",
+                "src/components/platform/PlatformAdminNav.vue",
+                "src/components/platform/PlatformTenantForm.vue",
+                "src/components/platform/PlatformTenantTable.vue",
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
@@ -407,9 +417,14 @@ class WalkInDirectSeatingControllerTest {
                 "src/components/staff-home/StaffHomeTopBar.vue",
                 "src/components/staff-home/StaffHomeWorkflowStrip.vue",
                 "src/components/staff-table/TableResourcePicker.vue",
+                "src/components/tenant-admin/TenantAdminNav.vue",
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/LoginPage.vue",
+                "src/pages/PlatformCallScreenSeedPage.vue",
+                "src/pages/PlatformTenantFormPage.vue",
+                "src/pages/PlatformTenantsPage.vue",
                 "src/pages/QueueCallPage.vue",
+                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueTicketListPage.vue",
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
@@ -418,12 +433,19 @@ class WalkInDirectSeatingControllerTest {
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
                 "src/pages/TableResourceListPage.vue",
+                "src/pages/TenantAdminCallScreenPage.vue",
+                "src/pages/TenantAdminSettingsPage.vue",
+                "src/pages/TenantAdminStaffFormPage.vue",
+                "src/pages/TenantAdminStaffPage.vue",
+                "src/pages/TenantAdminTableFormPage.vue",
+                "src/pages/TenantAdminTablesPage.vue",
                 "src/pages/WalkInDirectSeatingPage.vue",
                 "src/pages/WalkInQueuePage.vue"
             );
         assertThat(vueFiles)
             .filteredOn(path -> !Set.of(
                 "src/pages/QueueCallPage.vue",
+                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueTicketListPage.vue",
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",

@@ -2,9 +2,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import CleaningCompletePage from '../pages/CleaningCompletePage.vue'
 import LoginPage from '../pages/LoginPage.vue'
+import PlatformCallScreenSeedPage from '../pages/PlatformCallScreenSeedPage.vue'
 import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
 import PlatformTenantsPage from '../pages/PlatformTenantsPage.vue'
 import QueueCallPage from '../pages/QueueCallPage.vue'
+import QueueDisplayPage from '../pages/QueueDisplayPage.vue'
 import QueueTicketListPage from '../pages/QueueTicketListPage.vue'
 import ReservationArrivedDirectSeatingPage from '../pages/ReservationArrivedDirectSeatingPage.vue'
 import ReservationArrivedToQueuePage from '../pages/ReservationArrivedToQueuePage.vue'
@@ -13,6 +15,7 @@ import ReservationTodayViewPage from '../pages/ReservationTodayViewPage.vue'
 import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
 import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
 import TableResourceListPage from '../pages/TableResourceListPage.vue'
+import TenantAdminCallScreenPage from '../pages/TenantAdminCallScreenPage.vue'
 import TenantAdminSettingsPage from '../pages/TenantAdminSettingsPage.vue'
 import TenantAdminStaffFormPage from '../pages/TenantAdminStaffFormPage.vue'
 import TenantAdminStaffPage from '../pages/TenantAdminStaffPage.vue'
@@ -57,6 +60,12 @@ export const router = createRouter({
       path: '/platform/tenants/:tenantId/edit',
       name: 'platform-tenant-edit',
       component: PlatformTenantFormPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/call-screen/text-seed',
+      name: 'platform-call-screen-text-seed',
+      component: PlatformCallScreenSeedPage,
       meta: { requiresPlatformAdmin: true }
     },
     {
@@ -114,6 +123,12 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
+      path: '/stores/:storeId/admin/call-screen',
+      name: 'tenant-admin-call-screen',
+      component: TenantAdminCallScreenPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
       path: '/stores/:storeId/walk-ins/direct-seating',
       name: 'walk-in-direct-seating',
       component: WalkInDirectSeatingPage
@@ -163,6 +178,11 @@ export const router = createRouter({
       path: '/stores/:storeId/queue-tickets/call',
       name: 'queue-call',
       component: QueueCallPage
+    },
+    {
+      path: '/stores/:storeId/queue-display',
+      name: 'queue-display',
+      component: QueueDisplayPage
     },
     {
       path: '/stores/:storeId/queue-tickets/seating/direct',

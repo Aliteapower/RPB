@@ -196,6 +196,7 @@ $permissions = @(
   'reservation.seat',
   'reservation.queue',
   'queue.view',
+  'queue.display.view',
   'queue.call',
   'queue.seat',
   'queue.skip',
@@ -207,7 +208,8 @@ $permissions = @(
   'cleaning.complete',
   'table.view',
   'table.switch',
-  'customer.lookup'
+  'customer.lookup',
+  'platform.call_screen_ad.manage'
 )
 
 $permissionArgs = for ($i = 0; $i -lt $permissions.Count; $i++) {
@@ -288,6 +290,8 @@ Expected:
 - `reservation_queue.permissions` contains `table.switch`.
 - `reservation_queue.permissions` contains `walkin.queue.create`.
 - `reservation_queue.permissions` contains `queue.cancel`.
+- `reservation_queue.permissions` contains `queue.display.view`.
+- Platform text seed maintenance requires `platform_admin` plus `platform.call_screen_ad.manage`; existing platform sessions with `platform.tenant.manage` are also accepted for compatibility. The local validation migration grants the dedicated permission to the `sysadmin` account; do not grant it to tenant admin or store staff accounts.
 - Table resources use `/api/v1/stores/{storeId}/tables`.
 - Staff home today overview uses `/api/v1/stores/{storeId}/staff-home/overview`.
 - Do not use the old `/table-resources` path; it is not the frontend path.

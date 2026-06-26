@@ -81,6 +81,15 @@ class AuthMigrationTest {
               and permission.permission_code = 'platform.tenant.manage'
               and permission.deleted_at is null
             """)).isEqualTo(1);
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_account_permissions permission
+            join auth_accounts account on account.id = permission.account_id
+            where account.username = 'sysadmin'
+              and permission.permission_code = 'platform.call_screen_ad.manage'
+              and permission.deleted_at is null
+            """)).isEqualTo(1);
     }
 
     @Test

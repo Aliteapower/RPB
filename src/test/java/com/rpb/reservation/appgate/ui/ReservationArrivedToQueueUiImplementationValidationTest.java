@@ -158,7 +158,6 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
                 "src/pages/QueuePage.vue",
                 "src/pages/QueueSkipPage.vue",
                 "src/pages/QueueRejoinPage.vue",
-                "src/pages/QueueDisplayPage.vue",
                 "src/pages/SeatingFromQueuePage.vue",
                 "src/pages/TableMapPage.vue",
                 "src/pages/ReservationNoShowPage.vue",

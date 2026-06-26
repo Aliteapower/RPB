@@ -83,7 +83,6 @@ class QueueSkipUiImplementationValidationTest {
             .doesNotContain(
                 "src/pages/QueueSkipPage.vue",
                 "src/pages/QueueRejoinPage.vue",
-                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueWorkbenchPage.vue",
                 "src/pages/TableMapPage.vue",
                 "src/pages/ReservationNoShowPage.vue",
@@ -99,7 +98,6 @@ class QueueSkipUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/queueSkipApi.ts")
             .doesNotContain(
-                "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
                 "src/api/tableMapApi.ts",
                 "src/api/autoAssignmentApi.ts",

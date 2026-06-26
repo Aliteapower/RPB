@@ -31,7 +31,8 @@ async function logoutFromPlatform(): Promise<void> {
         <strong>平台后台</strong>
       </div>
       <nav class="nav-list">
-        <RouterLink class="nav-item nav-item--active" to="/platform/tenants">租户管理</RouterLink>
+        <RouterLink class="nav-item" to="/platform/tenants">租户管理</RouterLink>
+        <RouterLink class="nav-item" to="/platform/call-screen/text-seed">叫号模板</RouterLink>
         <span class="nav-item nav-item--disabled">基础设置</span>
       </nav>
     </div>
@@ -93,7 +94,7 @@ async function logoutFromPlatform(): Promise<void> {
   text-decoration: none;
 }
 
-.nav-item--active {
+.nav-item.router-link-active {
   color: #ffffff;
   background: #0f766e;
 }
