@@ -17,6 +17,7 @@ import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
@@ -767,10 +768,10 @@ public class ReservationCreateApplicationService {
     }
 
     private static String source(CreateReservationCommand command) {
-        if (hasText(command.source())) {
-            return command.source().trim();
-        }
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromSourceOrActor(
+            command == null ? null : command.source(),
+            command == null ? null : command.actorType()
+        );
     }
 
     private static String snapshot(Reservation reservation) {

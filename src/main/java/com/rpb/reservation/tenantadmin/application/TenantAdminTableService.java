@@ -80,11 +80,11 @@ public class TenantAdminTableService {
     public TenantAdminTable updateTable(StoreScope scope, UUID tableId, TenantAdminTableMutationCommand command) {
         TenantAdminTable existing = repository.findById(scope, tableId)
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_NOT_FOUND));
-        if (!MAINTAINABLE_STATUSES.contains(existing.status())) {
-            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_IN_USE);
-        }
         NormalizedTableInput input = normalizeUpdate(existing, command);
         try {
+            if (!MAINTAINABLE_STATUSES.contains(existing.status())) {
+                return updateBusyTableSortOrders(scope, existing, input);
+            }
             return repository.update(
                     scope,
                     tableId,
@@ -148,7 +148,9 @@ public class TenantAdminTableService {
                 continue;
             }
             if (!MAINTAINABLE_STATUSES.contains(existing.status())) {
-                throw new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_IN_USE);
+                updateBusyTableSortOrders(scope, existing, input);
+                updated++;
+                continue;
             }
             repository.update(
                 scope,
@@ -165,6 +167,33 @@ public class TenantAdminTableService {
         }
 
         return new TenantAdminTableImportSummary(rows.size(), created, updated);
+    }
+
+    private TenantAdminTable updateBusyTableSortOrders(
+        StoreScope scope,
+        TenantAdminTable existing,
+        NormalizedTableInput input
+    ) {
+        if (
+            !input.enabled()
+                || !existing.areaName().equals(input.areaName())
+                || !existing.tableCode().equals(input.tableCode())
+                || existing.capacity() != input.capacity()
+        ) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_IN_USE);
+        }
+        return repository.update(
+                scope,
+                existing.id(),
+                existing.areaName(),
+                areaCode(existing.areaName()),
+                input.areaSortOrder(),
+                existing.tableCode(),
+                input.tableSortOrder(),
+                existing.capacity(),
+                existing.status()
+            )
+            .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_NOT_FOUND));
     }
 
     private List<ExcelRow> readRows(byte[] content) {
@@ -216,7 +245,7 @@ public class TenantAdminTableService {
             requiredText(command.tableCode()),
             requiredCapacity(command.capacity()),
             command.enabled() == null || command.enabled(),
-            command.areaSortOrder(),
+            optionalSortOrder(command.areaSortOrder()),
             optionalSortOrder(command.tableSortOrder())
         );
     }
@@ -238,8 +267,14 @@ public class TenantAdminTableService {
         );
     }
 
-    private static int optionalSortOrder(Integer sortOrder) {
-        return sortOrder == null ? 0 : sortOrder;
+    private static Integer optionalSortOrder(Integer sortOrder) {
+        if (sortOrder == null) {
+            return null;
+        }
+        if (sortOrder < 0) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return sortOrder;
     }
 
     private static int requiredCapacity(Integer capacity) {
@@ -291,7 +326,7 @@ public class TenantAdminTableService {
         int capacity,
         boolean enabled,
         Integer areaSortOrder,
-        int tableSortOrder
+        Integer tableSortOrder
     ) {
     }
 }

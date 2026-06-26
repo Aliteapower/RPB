@@ -1260,25 +1260,25 @@ function formatStoreLabel(value: string | undefined): string {
               >
                 {{ walkInActionText(resource) }}
               </RouterLink>
-              <button
-                v-if="resource.status === 'occupied'"
-                class="table-page__resource-action"
-                :disabled="!canSwitchResource(resource)"
-                :title="switchResourceTitle(resource)"
-                type="button"
-                @click="openTableSwitchDialog(resource)"
-              >
-                换桌
-              </button>
-              <button
-                v-if="resource.status === 'occupied'"
-                class="table-page__resource-action table-page__resource-action--danger"
-                :disabled="!canStartCleaning(resource) || isStartingCleaning(resource)"
-                type="button"
-                @click="startResourceCleaning(resource)"
-              >
-                {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
-              </button>
+              <div v-if="resource.status === 'occupied'" class="table-page__resource-action-pair">
+                <button
+                  class="table-page__resource-action"
+                  :disabled="!canSwitchResource(resource)"
+                  :title="switchResourceTitle(resource)"
+                  type="button"
+                  @click="openTableSwitchDialog(resource)"
+                >
+                  换桌
+                </button>
+                <button
+                  class="table-page__resource-action table-page__resource-action--danger"
+                  :disabled="!canStartCleaning(resource) || isStartingCleaning(resource)"
+                  type="button"
+                  @click="startResourceCleaning(resource)"
+                >
+                  {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
+                </button>
+              </div>
               <button
                 v-if="resource.status === 'cleaning'"
                 class="table-page__resource-action table-page__resource-action--primary"
@@ -1369,25 +1369,25 @@ function formatStoreLabel(value: string | undefined): string {
             >
               {{ walkInActionText(resource) }}
             </RouterLink>
-            <button
-              v-if="resource.status === 'occupied'"
-              class="table-page__resource-action"
-              :disabled="!canSwitchResource(resource)"
-              :title="switchResourceTitle(resource)"
-              type="button"
-              @click="openTableSwitchDialog(resource)"
-            >
-              换桌
-            </button>
-            <button
-              v-if="resource.status === 'occupied'"
-              class="table-page__resource-action table-page__resource-action--danger"
-              :disabled="!canStartCleaning(resource) || isStartingCleaning(resource)"
-              type="button"
-              @click="startResourceCleaning(resource)"
-            >
-              {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
-            </button>
+            <div v-if="resource.status === 'occupied'" class="table-page__resource-action-pair">
+              <button
+                class="table-page__resource-action"
+                :disabled="!canSwitchResource(resource)"
+                :title="switchResourceTitle(resource)"
+                type="button"
+                @click="openTableSwitchDialog(resource)"
+              >
+                换桌
+              </button>
+              <button
+                class="table-page__resource-action table-page__resource-action--danger"
+                :disabled="!canStartCleaning(resource) || isStartingCleaning(resource)"
+                type="button"
+                @click="startResourceCleaning(resource)"
+              >
+                {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
+              </button>
+            </div>
             <button
               v-if="resource.status === 'cleaning'"
               class="table-page__resource-action table-page__resource-action--primary"
@@ -1735,6 +1735,10 @@ h3 {
 .table-page__resource-grid {
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.table-page__resource-grid--groups {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1820,6 +1824,13 @@ h3 {
   margin-top: 2px;
 }
 
+.table-page__resource-action-pair {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
 .table-page__resource-action {
   align-items: center;
   background: #eff6ff;
@@ -1833,6 +1844,13 @@ h3 {
   min-height: 30px;
   padding: 0 12px;
   text-decoration: none;
+}
+
+.table-page__resource-action-pair .table-page__resource-action {
+  font-size: 0.68rem;
+  min-width: 0;
+  padding: 0 4px;
+  white-space: nowrap;
 }
 
 .table-page__resource-action--primary {
@@ -1965,6 +1983,11 @@ select:focus-visible {
 
   .table-page__resource-grid {
     gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .table-page__resource-grid--groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

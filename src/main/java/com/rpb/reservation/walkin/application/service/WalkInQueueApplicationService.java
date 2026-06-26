@@ -16,6 +16,7 @@ import com.rpb.reservation.common.scope.TenantScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
@@ -600,7 +601,7 @@ public class WalkInQueueApplicationService {
     }
 
     private static String source(QueueWalkInCommand command) {
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromActorType(command == null ? null : command.actorType());
     }
 
     private static String jsonNullable(String value) {

@@ -16,6 +16,7 @@ import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.state.TransitionResult;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -127,15 +128,16 @@ public class TableSwitchApplicationService {
         StoreScope scope = new StoreScope(new TenantId(command.tenantId()), command.storeId());
         IdempotencyKey idempotencyKey = new IdempotencyKey(command.idempotencyKey());
         String requestHash = requestHash(command);
+        String source = source(command.actorType());
 
-        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, command.actorType(), ACTION, idempotencyKey);
+        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, source, ACTION, idempotencyKey);
         if (existing.isPresent()) {
             return resolveExistingIdempotency(existing.get(), requestHash);
         }
 
         IdempotencyRecord started;
         try {
-            started = idempotencyRepository.start(scope, command.actorType(), ACTION, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
+            started = idempotencyRepository.start(scope, source, ACTION, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
         } catch (RuntimeException exception) {
             return TableSwitchResult.failure(TableSwitchError.REPOSITORY_SAVE_FAILED);
         }
@@ -371,10 +373,11 @@ public class TableSwitchApplicationService {
         ResourceContext target,
         String metadata
     ) {
+        String sourceCategory = source(command.actorType());
         List<BusinessEvent> events = List.of(
-            new BusinessEvent(UUID.randomUUID(), EVENT_SWITCH_COMPLETED, "seating", command.seatingId(), command.actorType(), command.actorId(), command.actorType(), metadata),
-            new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_AVAILABLE, source.resourceType(), source.resourceId(), command.actorType(), command.actorId(), command.actorType(), metadata),
-            new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_OCCUPIED, target.resourceType(), target.resourceId(), command.actorType(), command.actorId(), command.actorType(), metadata)
+            new BusinessEvent(UUID.randomUUID(), EVENT_SWITCH_COMPLETED, "seating", command.seatingId(), command.actorType(), command.actorId(), sourceCategory, metadata),
+            new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_AVAILABLE, source.resourceType(), source.resourceId(), command.actorType(), command.actorId(), sourceCategory, metadata),
+            new BusinessEvent(UUID.randomUUID(), EVENT_TABLE_OCCUPIED, target.resourceType(), target.resourceId(), command.actorType(), command.actorId(), sourceCategory, metadata)
         );
         List<UUID> ids = new ArrayList<>();
         for (BusinessEvent event : events) {
@@ -433,7 +436,7 @@ public class TableSwitchApplicationService {
             transitionCode,
             command.actorType(),
             command.actorId(),
-            command.actorType(),
+            source(command.actorType()),
             metadata
         );
     }
@@ -444,7 +447,7 @@ public class TableSwitchApplicationService {
             OPERATION_SWITCH_COMPLETED,
             "seating",
             seating.id().value(),
-            command.actorType(),
+            source(command.actorType()),
             command.actorType(),
             command.actorId(),
             metadata
@@ -459,6 +462,7 @@ public class TableSwitchApplicationService {
 
     private void appendFailureAudit(StoreScope scope, SwitchTableCommand command, IdempotencyKey idempotencyKey, TableSwitchError error) {
         try {
+            String actorType = command == null ? "staff" : command.actorType();
             auditLogRepository.append(
                 scope,
                 new AuditLog(
@@ -466,8 +470,8 @@ public class TableSwitchApplicationService {
                     OPERATION_SWITCH_FAILED,
                     "seating",
                     command == null ? null : command.seatingId(),
-                    command == null ? "staff" : command.actorType(),
-                    command == null ? "staff" : command.actorType(),
+                    source(actorType),
+                    actorType,
                     command == null ? null : command.actorId(),
                     """
                         {"failureReason":"%s","idempotencyKey":"%s"}
@@ -589,6 +593,10 @@ public class TableSwitchApplicationService {
         if (!decision.accepted()) {
             throw new ApplicationFailure(fromRuleCode(decision.violationCode(), fallback));
         }
+    }
+
+    private static String source(String actorType) {
+        return OperationSource.fromActorType(actorType);
     }
 
     private static String transitionCode(String resourceType, String status) {

@@ -213,6 +213,86 @@ class TenantAdminApiIntegrationTest {
     }
 
     @Test
+    void tenantAdminCreatesNewAreasAndTablesAtEndWhenSortOrderIsMissing() throws Exception {
+        Cookie session = login("20000000");
+
+        createTable(session, "Codex 大厅", "CX40", 4, true, 30, 10);
+
+        int maxAreaSortBeforeNewArea = maxAreaSortOrder();
+        UUID appendedTableId = createTableWithoutSortOrder(session, "Codex 大厅", "CX41", 4, true);
+        UUID newAreaTableId = createTableWithoutSortOrder(session, "Codex 二楼", "CX50", 6, true);
+
+        assertThat(countWhere("""
+            select count(*)
+            from dining_tables table_record
+            join store_areas area on area.id = table_record.area_id
+            where table_record.id = ?
+              and table_record.tenant_id = ?
+              and table_record.store_id = ?
+              and table_record.sort_order = 11
+              and area.sort_order = 30
+              and area.display_name = 'Codex 大厅'
+            """, appendedTableId, VALIDATION_TENANT_ID, VALIDATION_STORE_ID)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from dining_tables table_record
+            join store_areas area on area.id = table_record.area_id
+            where table_record.id = ?
+              and table_record.tenant_id = ?
+              and table_record.store_id = ?
+              and table_record.sort_order = 0
+              and area.sort_order = ?
+              and area.display_name = 'Codex 二楼'
+            """, newAreaTableId, VALIDATION_TENANT_ID, VALIDATION_STORE_ID, maxAreaSortBeforeNewArea + 1)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminAllowsSortOnlyPatchWhenBusyTableKeepsBusinessFields() throws Exception {
+        Cookie session = login("20000000");
+        UUID tableId = createTable(session, "Codex 大厅", "CX60", 4, true, 10, 1);
+        jdbc.update(
+            "update dining_tables set status = 'occupied' where id = ? and tenant_id = ? and store_id = ?",
+            tableId,
+            VALIDATION_TENANT_ID,
+            VALIDATION_STORE_ID
+        );
+
+        mockMvc.perform(patch(basePath() + "/tables/{tableId}", tableId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "areaName":"Codex 大厅",
+                      "tableCode":"CX60",
+                      "capacity":4,
+                      "enabled":true,
+                      "areaSortOrder":20,
+                      "tableSortOrder":9
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.table.status").value("occupied"))
+            .andExpect(jsonPath("$.table.areaSortOrder").value(20))
+            .andExpect(jsonPath("$.table.tableSortOrder").value(9));
+
+        mockMvc.perform(patch(basePath() + "/tables/{tableId}", tableId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "areaName":"Codex 大厅",
+                      "tableCode":"CX60",
+                      "capacity":6,
+                      "enabled":true,
+                      "areaSortOrder":20,
+                      "tableSortOrder":9
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.error.code").value("TABLE_IN_USE"));
+    }
+
+    @Test
     void tenantAdminExportsAndImportsTablesByOverwritingExistingTableCode() throws Exception {
         Cookie session = login("20000000");
         createTable(session, "Codex 大厅", "CX01", 4, true, 10, 10);
@@ -257,6 +337,47 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.tables[1].enabled").value(true))
             .andExpect(jsonPath("$.tables[1].areaSortOrder").value(1))
             .andExpect(jsonPath("$.tables[1].tableSortOrder").value(2));
+    }
+
+    @Test
+    void tenantAdminImportPreservesBusyTableStatusWhenReimportingEnabledTable() throws Exception {
+        Cookie session = login("20000000");
+        UUID tableId = createTable(session, "Codex 大厅", "CX30", 4, true, 10, 1);
+        jdbc.update(
+            "update dining_tables set status = 'occupied' where id = ? and tenant_id = ? and store_id = ?",
+            tableId,
+            VALIDATION_TENANT_ID,
+            VALIDATION_STORE_ID
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "tables.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            busyTableImportWorkbook()
+        );
+
+        mockMvc.perform(multipart(basePath() + "/tables/import")
+                .file(file)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.imported.totalRows").value(1))
+            .andExpect(jsonPath("$.imported.updated").value(1));
+
+        assertThat(countWhere("""
+            select count(*)
+            from dining_tables table_record
+            join store_areas area on area.id = table_record.area_id
+            where table_record.id = ?
+              and table_record.tenant_id = ?
+              and table_record.store_id = ?
+              and table_record.status = 'occupied'
+              and table_record.sort_order = 9
+              and area.sort_order = 5
+              and table_record.capacity_max = 4
+              and area.display_name = 'Codex 大厅'
+            """, tableId, VALIDATION_TENANT_ID, VALIDATION_STORE_ID)).isEqualTo(1);
     }
 
     @Test
@@ -363,6 +484,47 @@ class TenantAdminApiIntegrationTest {
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).path("table").path("id").asText());
     }
 
+    private UUID createTableWithoutSortOrder(
+        Cookie session,
+        String areaName,
+        String tableCode,
+        int capacity,
+        boolean enabled
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(post(basePath() + "/tables")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "areaName":"%s",
+                      "tableCode":"%s",
+                      "capacity":%d,
+                      "enabled":%s
+                    }
+                    """.formatted(areaName, tableCode, capacity, enabled))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.table.tableCode").value(tableCode))
+            .andReturn();
+        return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).path("table").path("id").asText());
+    }
+
+    private int maxAreaSortOrder() {
+        Integer maxSortOrder = jdbc.queryForObject(
+            """
+            select coalesce(max(sort_order), 0)
+            from store_areas
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """,
+            Integer.class,
+            VALIDATION_TENANT_ID,
+            VALIDATION_STORE_ID
+        );
+        return maxSortOrder == null ? 0 : maxSortOrder;
+    }
+
     private byte[] tableImportWorkbook() throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("tables");
@@ -389,6 +551,30 @@ class TenantAdminApiIntegrationTest {
             created.createCell(3).setCellValue("CX99");
             created.createCell(4).setCellValue(8);
             created.createCell(5).setCellValue("启用");
+
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    private byte[] busyTableImportWorkbook() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("tables");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("大类排序");
+            header.createCell(1).setCellValue("桌号排序");
+            header.createCell(2).setCellValue("分区组");
+            header.createCell(3).setCellValue("桌号");
+            header.createCell(4).setCellValue("人数");
+            header.createCell(5).setCellValue("启用");
+
+            Row existing = sheet.createRow(1);
+            existing.createCell(0).setCellValue(5);
+            existing.createCell(1).setCellValue(9);
+            existing.createCell(2).setCellValue("Codex 大厅");
+            existing.createCell(3).setCellValue("CX30");
+            existing.createCell(4).setCellValue(4);
+            existing.createCell(5).setCellValue("启用");
 
             workbook.write(output);
             return output.toByteArray();

@@ -17,6 +17,7 @@ import com.rpb.reservation.common.state.TransitionResult;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
@@ -198,10 +199,11 @@ public class WalkInDirectSeatingApplicationService {
         StoreScope scope = new StoreScope(new TenantId(command.tenantId()), command.storeId());
         IdempotencyKey idempotencyKey = new IdempotencyKey(command.idempotencyKey());
         String requestHash = requestHash(command);
+        String source = source(command.actorType());
 
         Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(
             scope,
-            command.actorType(),
+            source,
             ACTION,
             idempotencyKey
         );
@@ -211,7 +213,7 @@ public class WalkInDirectSeatingApplicationService {
 
         IdempotencyRecord started;
         try {
-            started = idempotencyRepository.start(scope, command.actorType(), ACTION, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
+            started = idempotencyRepository.start(scope, source, ACTION, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
         } catch (RuntimeException exception) {
             return WalkInDirectSeatingResult.failure(WalkInDirectSeatingError.REPOSITORY_SAVE_FAILED);
         }
@@ -598,7 +600,7 @@ public class WalkInDirectSeatingApplicationService {
             "walk_in_direct_seating.completed",
             "seating",
             seating.id().value(),
-            command.actorType(),
+            source(command.actorType()),
             command.actorType(),
             command.actorId(),
             metadata
@@ -620,7 +622,7 @@ public class WalkInDirectSeatingApplicationService {
                     "walk_in_direct_seating.failed",
                     "walk_in_direct_seating",
                     null,
-                    command.actorType(),
+                    source(command.actorType()),
                     command.actorType(),
                     command.actorId(),
                     "{\"failureReason\":\"" + escape(error.code()) + "\"}"
@@ -639,7 +641,7 @@ public class WalkInDirectSeatingApplicationService {
             targetId,
             command.actorType(),
             command.actorId(),
-            command.actorType(),
+            source(command.actorType()),
             metadata
         );
     }
@@ -662,7 +664,7 @@ public class WalkInDirectSeatingApplicationService {
             transitionCode,
             command.actorType(),
             command.actorId(),
-            command.actorType(),
+            source(command.actorType()),
             metadata
         );
     }
@@ -754,6 +756,10 @@ public class WalkInDirectSeatingApplicationService {
                 ? fallback
                 : WalkInDirectSeatingError.fromCode(decision.violationCode()));
         }
+    }
+
+    private static String source(String actorType) {
+        return OperationSource.fromActorType(actorType);
     }
 
     private static String snapshot(UUID walkInId, UUID seatingId, String resourceType, UUID resourceId, int partySizeSnapshot) {

@@ -141,11 +141,12 @@ public class TenantAdminTableRepository {
         String areaCode,
         Integer areaSortOrder,
         String tableCode,
-        int tableSortOrder,
+        Integer tableSortOrder,
         int capacity,
         String status
     ) {
         UUID areaId = findOrCreateArea(scope, areaName, areaCode, areaSortOrder).id();
+        int resolvedTableSortOrder = tableSortOrder == null ? nextTableSortOrder(scope, areaId) : tableSortOrder;
         jdbc.update(
             """
             insert into dining_tables (
@@ -162,7 +163,7 @@ public class TenantAdminTableRepository {
             tableCode,
             capacity,
             status,
-            tableSortOrder
+            resolvedTableSortOrder
         );
         return findById(scope, tableId).orElseThrow();
     }
@@ -231,12 +232,46 @@ public class TenantAdminTableRepository {
                 scope.storeId().value(),
                 areaCode,
                 areaName,
-                sortOrder == null ? 0 : sortOrder
+                sortOrder == null ? nextAreaSortOrder(scope) : sortOrder
             );
         } catch (DataIntegrityViolationException ignored) {
             return findArea(scope, areaCode).orElseThrow();
         }
         return new TenantAdminArea(areaId, areaCode, areaName);
+    }
+
+    private int nextAreaSortOrder(StoreScope scope) {
+        Integer maxSortOrder = jdbc.queryForObject(
+            """
+            select max(sort_order)
+            from store_areas
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """,
+            Integer.class,
+            scope.tenantId().value(),
+            scope.storeId().value()
+        );
+        return maxSortOrder == null ? 0 : maxSortOrder + 1;
+    }
+
+    private int nextTableSortOrder(StoreScope scope, UUID areaId) {
+        Integer maxSortOrder = jdbc.queryForObject(
+            """
+            select max(sort_order)
+            from dining_tables
+            where tenant_id = ?
+              and store_id = ?
+              and area_id = ?
+              and deleted_at is null
+            """,
+            Integer.class,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            areaId
+        );
+        return maxSortOrder == null ? 0 : maxSortOrder + 1;
     }
 
     private Optional<TenantAdminArea> findArea(StoreScope scope, String areaCode) {

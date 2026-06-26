@@ -139,6 +139,7 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("availableOnly")
             .contains("桌台分组")
             .contains("table-page__resource-actions")
+            .contains("table-page__resource-action-pair")
             .contains("table-page__area-filter")
             .contains("table-page__area-section")
             .contains("table-page__resource-card")
@@ -203,7 +204,8 @@ class StaffUiV12TableSelectionValidationTest {
             "class=\"table-area-party-filter\""
         );
         assertThat(tablePageSource)
-            .contains("grid-template-columns: repeat(3, minmax(0, 1fr));")
+            .contains(".table-page__resource-grid {\n  display: grid;\n  gap: 10px;\n  grid-template-columns: repeat(4, minmax(0, 1fr));")
+            .contains(".table-page__resource-grid--groups {\n  grid-template-columns: repeat(3, minmax(0, 1fr));")
             .doesNotContain("class=\"filter-panel\"")
             .contains(".summary-row__item--available {\n  background: #ecfdf5;\n  border-color: #86efac;")
             .contains(".summary-row__item--reserved {\n  background: #fef3c7;\n  border-color: #f59e0b;")

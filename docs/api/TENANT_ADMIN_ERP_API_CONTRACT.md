@@ -23,7 +23,7 @@ Endpoints:
 | `POST` | `/api/v1/stores/{storeId}/tenant-admin/tables` | Create dining table and area if needed. |
 | `GET` | `/api/v1/stores/{storeId}/tenant-admin/tables/export` | Export dining table setup as `.xlsx`. |
 | `POST` | `/api/v1/stores/{storeId}/tenant-admin/tables/import` | Import `.xlsx`; existing table codes in the current store are overwritten, missing codes are created. |
-| `PATCH` | `/api/v1/stores/{storeId}/tenant-admin/tables/{tableId}` | Update table area, code, capacity, enabled state. |
+| `PATCH` | `/api/v1/stores/{storeId}/tenant-admin/tables/{tableId}` | Update table area, code, capacity, enabled state, and sort order. |
 | `GET` | `/api/v1/stores/{storeId}/tenant-admin/settings` | Read store basics and active policy. |
 | `PATCH` | `/api/v1/stores/{storeId}/tenant-admin/settings` | Update store basics and active policy. |
 
@@ -39,7 +39,12 @@ Table response fields:
 | `capacity` | Maximum party size for the table. |
 | `enabled` | `true` maps to `available`; `false` maps to `inactive`. |
 
-Table create/update accepts `areaSortOrder` and `tableSortOrder`. Missing sort values default to `0` for backward compatibility.
+Table create/update accepts `areaSortOrder` and `tableSortOrder`.
+
+- Create with missing `areaSortOrder` creates a new area at the end of the store area order; existing areas keep their current area order.
+- Create with missing `tableSortOrder` creates the table at the end of its area table order.
+- Update with missing sort values keeps the existing sort values.
+- Existing busy rows, such as `occupied`, may be reordered when area name, table code, capacity, and enabled shape are unchanged. Business field changes still return `TABLE_IN_USE`.
 
 Excel import/export contract:
 
@@ -56,6 +61,7 @@ Import overwrite rule:
 
 - Match existing rows by current `storeId` + `tableCode`.
 - Existing rows are updated when the table is maintainable (`available` or `inactive`).
+- Existing busy rows, such as `occupied`, keep their current runtime status. Import may update their area/table sort order only when `分区组`, `人数`, and `启用=true` still match a safe active table shape.
 - Missing rows are created.
 - Import never writes another tenant or store because the endpoint resolves tenant/store from the authenticated tenant admin actor.
 

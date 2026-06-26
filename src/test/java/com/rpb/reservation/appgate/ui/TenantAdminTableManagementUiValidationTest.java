@@ -23,6 +23,14 @@ class TenantAdminTableManagementUiValidationTest {
             .contains("桌号排序")
             .contains("areaSortOrder")
             .contains("tableSortOrder")
+            .contains("updateTable")
+            .contains("moveArea")
+            .contains("moveTable")
+            .contains("sort-icon-button")
+            .contains("上移分区组")
+            .contains("下移分区组")
+            .contains("上移桌号")
+            .contains("下移桌号")
             .contains("启用")
             .contains("停用");
 
@@ -31,6 +39,8 @@ class TenantAdminTableManagementUiValidationTest {
             .contains("tableSortOrder")
             .contains("大类排序")
             .contains("桌号排序")
+            .contains("placeholder=\"自动\"")
+            .contains("optionalSortOrder")
             .contains("enabled");
 
         assertThat(api)

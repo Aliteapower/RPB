@@ -89,6 +89,29 @@ class TableSwitchApplicationServiceTest {
     }
 
     @Test
+    void platformAdminActorUsesStaffSourceWhenSwitchingTable() {
+        Scenario scenario = Scenario.readyTableToTable();
+
+        TableSwitchResult result = scenario.service().switchTable(scenario.commandToTargetTable("platform_admin"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.idempotencyRepository.queriedSources).containsExactly("staff");
+        assertThat(scenario.idempotencyRepository.started.getFirst().source()).isEqualTo("staff");
+        assertThat(scenario.businessEventRepository.events).extracting(BusinessEvent::actorType)
+            .containsOnly("platform_admin");
+        assertThat(scenario.businessEventRepository.events).extracting(BusinessEvent::source)
+            .containsOnly("staff");
+        assertThat(scenario.stateTransitionLogRepository.logs).extracting(StateTransitionLog::actorType)
+            .containsOnly("platform_admin");
+        assertThat(scenario.stateTransitionLogRepository.logs).extracting(StateTransitionLog::triggeredBy)
+            .containsOnly("staff");
+        assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::actorType)
+            .containsOnly("platform_admin");
+        assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::source)
+            .containsOnly("staff");
+    }
+
+    @Test
     void switchesOccupiedSeatingFromTableToAvailableGroupAndOccupiesAllMemberTables() {
         Scenario scenario = Scenario.readyTableToGroup();
 
@@ -373,6 +396,10 @@ class TableSwitchApplicationServiceTest {
         }
 
         SwitchTableCommand commandToTargetTable() {
+            return commandToTargetTable("staff");
+        }
+
+        SwitchTableCommand commandToTargetTable(String actorType) {
             return new SwitchTableCommand(
                 tenantId.value(),
                 storeId.value(),
@@ -381,7 +408,7 @@ class TableSwitchApplicationServiceTest {
                 null,
                 "idem-switch",
                 actorId,
-                "staff",
+                actorType,
                 "guest_requested",
                 "move away from entrance"
             );
@@ -714,12 +741,14 @@ class TableSwitchApplicationServiceTest {
 
     private static final class FakeIdempotencyRepository implements IdempotencyRepositoryPort {
         IdempotencyRecord existing;
+        final List<String> queriedSources = new ArrayList<>();
         final List<IdempotencyRecord> started = new ArrayList<>();
         final List<IdempotencyRecord> completed = new ArrayList<>();
         final List<IdempotencyRecord> failed = new ArrayList<>();
 
         @Override
         public Optional<IdempotencyRecord> findByScopeActionKey(StoreScope scope, String source, String action, IdempotencyKey key) {
+            queriedSources.add(source);
             return Optional.ofNullable(existing);
         }
 

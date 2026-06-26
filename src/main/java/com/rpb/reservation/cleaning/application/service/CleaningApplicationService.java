@@ -24,6 +24,7 @@ import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.state.TransitionResult;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -121,15 +122,16 @@ public class CleaningApplicationService {
         StoreScope scope = new StoreScope(new TenantId(command.tenantId()), command.storeId());
         IdempotencyKey idempotencyKey = new IdempotencyKey(command.idempotencyKey());
         String requestHash = requestHash(command);
+        String source = source(command.actorType());
 
-        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, command.actorType(), ACTION_START, idempotencyKey);
+        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, source, ACTION_START, idempotencyKey);
         if (existing.isPresent()) {
             return resolveExistingIdempotency(existing.get(), requestHash);
         }
 
         IdempotencyRecord started;
         try {
-            started = idempotencyRepository.start(scope, command.actorType(), ACTION_START, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
+            started = idempotencyRepository.start(scope, source, ACTION_START, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
         } catch (RuntimeException exception) {
             return CleaningApplicationResult.failure(CleaningApplicationError.REPOSITORY_SAVE_FAILED);
         }
@@ -159,15 +161,16 @@ public class CleaningApplicationService {
         StoreScope scope = new StoreScope(new TenantId(command.tenantId()), command.storeId());
         IdempotencyKey idempotencyKey = new IdempotencyKey(command.idempotencyKey());
         String requestHash = requestHash(command);
+        String source = source(command.actorType());
 
-        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, command.actorType(), ACTION_COMPLETE, idempotencyKey);
+        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, source, ACTION_COMPLETE, idempotencyKey);
         if (existing.isPresent()) {
             return resolveExistingIdempotency(existing.get(), requestHash);
         }
 
         IdempotencyRecord started;
         try {
-            started = idempotencyRepository.start(scope, command.actorType(), ACTION_COMPLETE, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
+            started = idempotencyRepository.start(scope, source, ACTION_COMPLETE, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
         } catch (RuntimeException exception) {
             return CleaningApplicationResult.failure(CleaningApplicationError.REPOSITORY_SAVE_FAILED);
         }
@@ -477,6 +480,7 @@ public class CleaningApplicationService {
         List<EventSpec> events
     ) {
         List<UUID> ids = new ArrayList<>();
+        String source = source(actorType);
         for (EventSpec spec : events) {
             BusinessEvent event = new BusinessEvent(
                 UUID.randomUUID(),
@@ -485,7 +489,7 @@ public class CleaningApplicationService {
                 spec.targetId(),
                 actorType,
                 actorId,
-                actorType,
+                source,
                 enrichMetadata(spec.metadata(), idempotencyKey)
             );
             require(businessEventRule.evaluate(event.eventType(), event.targetType(), event.targetId(), event.actorType()), CleaningApplicationError.BUSINESS_EVENT_WRITE_FAILED);
@@ -506,6 +510,7 @@ public class CleaningApplicationService {
         List<TransitionSpec> transitions
     ) {
         List<UUID> ids = new ArrayList<>();
+        String source = source(actorType);
         for (TransitionSpec spec : transitions) {
             StateTransitionLog log = new StateTransitionLog(
                 UUID.randomUUID(),
@@ -516,7 +521,7 @@ public class CleaningApplicationService {
                 spec.transitionCode(),
                 actorType,
                 actorId,
-                actorType,
+                source,
                 enrichMetadata(spec.metadata(), idempotencyKey)
             );
             require(stateTransitionRule.evaluate(log.targetType(), log.targetId(), log.toStatus(), log.transitionCode(), log.actorType()), CleaningApplicationError.STATE_TRANSITION_WRITE_FAILED);
@@ -543,7 +548,7 @@ public class CleaningApplicationService {
             operationCode,
             "cleaning",
             cleaningId,
-            actorType,
+            source(actorType),
             actorType,
             actorId,
             enrichMetadata(metadata, idempotencyKey)
@@ -574,7 +579,7 @@ public class CleaningApplicationService {
                     operationCode,
                     "cleaning",
                     null,
-                    actorType,
+                    source(actorType),
                     actorType,
                     actorId,
                     """
@@ -705,6 +710,10 @@ public class CleaningApplicationService {
             CleaningApplicationError error = CleaningApplicationError.fromCode(decision.violationCode());
             throw new ApplicationFailure(error == CleaningApplicationError.INVALID_COMMAND ? fallback : error);
         }
+    }
+
+    private static String source(String actorType) {
+        return OperationSource.fromActorType(actorType);
     }
 
     private static String transitionCode(String resourceType, String status) {

@@ -24,13 +24,24 @@ const pageTitle = computed(() => (mode.value === 'create' ? '新增桌号' : '�
 const storeId = computed(() => String(route.params.storeId || ''))
 const tableId = computed(() => String(route.params.tableId || ''))
 
-const form = reactive<TenantAdminTableMutation>({
+interface TableFormState {
+  areaName: string
+  tableCode: string
+  capacity: number
+  enabled: boolean
+  areaSortOrder: number | null
+  tableSortOrder: number | null
+}
+
+type SortField = 'areaSortOrder' | 'tableSortOrder'
+
+const form = reactive<TableFormState>({
   areaName: '',
   tableCode: '',
   capacity: 4,
   enabled: true,
-  areaSortOrder: 0,
-  tableSortOrder: 0
+  areaSortOrder: null,
+  tableSortOrder: null
 })
 
 onMounted(() => {
@@ -82,14 +93,30 @@ async function submitTable(): Promise<void> {
 }
 
 function toPayload(): TenantAdminTableMutation {
-  return {
+  const payload: TenantAdminTableMutation = {
     areaName: form.areaName.trim(),
     tableCode: form.tableCode.trim(),
     capacity: Number(form.capacity),
-    enabled: form.enabled,
-    areaSortOrder: Number(form.areaSortOrder),
-    tableSortOrder: Number(form.tableSortOrder)
+    enabled: form.enabled
   }
+  const areaSortOrder = optionalSortOrder(form.areaSortOrder)
+  const tableSortOrder = optionalSortOrder(form.tableSortOrder)
+  if (areaSortOrder !== undefined) {
+    payload.areaSortOrder = areaSortOrder
+  }
+  if (tableSortOrder !== undefined) {
+    payload.tableSortOrder = tableSortOrder
+  }
+  return payload
+}
+
+function setSortOrder(field: SortField, event: Event): void {
+  const value = (event.target as HTMLInputElement).value
+  form[field] = value === '' ? null : Number(value)
+}
+
+function optionalSortOrder(value: number | null): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function apiErrorText(error: unknown): string {
@@ -110,7 +137,7 @@ function apiErrorText(error: unknown): string {
     return '桌号正在使用，暂不能修改'
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查分区组、桌号和人数'
+    return '请检查分区组、桌号、人数和排序'
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
     return '没有该店面的后台权限'
@@ -152,11 +179,23 @@ function apiErrorText(error: unknown): string {
         </label>
         <label>
           <span>大类排序</span>
-          <input v-model.number="form.areaSortOrder" type="number" min="0" required />
+          <input
+            :value="form.areaSortOrder ?? ''"
+            type="number"
+            min="0"
+            placeholder="自动"
+            @input="setSortOrder('areaSortOrder', $event)"
+          />
         </label>
         <label>
           <span>桌号排序</span>
-          <input v-model.number="form.tableSortOrder" type="number" min="0" required />
+          <input
+            :value="form.tableSortOrder ?? ''"
+            type="number"
+            min="0"
+            placeholder="自动"
+            @input="setSortOrder('tableSortOrder', $event)"
+          />
         </label>
         <label class="check-row">
           <input v-model="form.enabled" type="checkbox" />
