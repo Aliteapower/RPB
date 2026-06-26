@@ -28,7 +28,9 @@ const form = reactive<TenantAdminTableMutation>({
   areaName: '',
   tableCode: '',
   capacity: 4,
-  enabled: true
+  enabled: true,
+  areaSortOrder: 0,
+  tableSortOrder: 0
 })
 
 onMounted(() => {
@@ -46,7 +48,9 @@ async function loadTable(): Promise<void> {
       areaName: response.table.areaName,
       tableCode: response.table.tableCode,
       capacity: response.table.capacity,
-      enabled: response.table.enabled
+      enabled: response.table.enabled,
+      areaSortOrder: response.table.areaSortOrder,
+      tableSortOrder: response.table.tableSortOrder
     })
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -82,7 +86,9 @@ function toPayload(): TenantAdminTableMutation {
     areaName: form.areaName.trim(),
     tableCode: form.tableCode.trim(),
     capacity: Number(form.capacity),
-    enabled: form.enabled
+    enabled: form.enabled,
+    areaSortOrder: Number(form.areaSortOrder),
+    tableSortOrder: Number(form.tableSortOrder)
   }
 }
 
@@ -143,6 +149,14 @@ function apiErrorText(error: unknown): string {
         <label>
           <span>人数</span>
           <input v-model.number="form.capacity" type="number" min="1" max="999" required />
+        </label>
+        <label>
+          <span>大类排序</span>
+          <input v-model.number="form.areaSortOrder" type="number" min="0" required />
+        </label>
+        <label>
+          <span>桌号排序</span>
+          <input v-model.number="form.tableSortOrder" type="number" min="0" required />
         </label>
         <label class="check-row">
           <input v-model="form.enabled" type="checkbox" />

@@ -40,6 +40,7 @@ public class DefaultDiningTableMapper implements DiningTableMapper {
             domain.capacity().min(),
             domain.capacity().max(),
             domain.status().code(),
+            0,
             domain.combinable(),
             now,
             now,

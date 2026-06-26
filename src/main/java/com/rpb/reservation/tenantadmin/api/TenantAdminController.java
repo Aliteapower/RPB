@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.tenantadmin.application.TenantAdminSearchCommand;
+import com.rpb.reservation.tenantadmin.application.TenantAdminServiceErrorCode;
 import com.rpb.reservation.tenantadmin.application.TenantAdminServiceException;
 import com.rpb.reservation.tenantadmin.application.TenantAdminSettingsCommand;
 import com.rpb.reservation.tenantadmin.application.TenantAdminSettingsService;
@@ -15,22 +16,27 @@ import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/tenant-admin")
 public class TenantAdminController {
     private static final String TENANT_ADMIN = "tenant_admin";
     private static final String TENANT_ADMIN_MANAGE = "tenant.admin.manage";
+    private static final String EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final TenantAdminStaffService staffService;
     private final TenantAdminTableService tableService;
@@ -116,6 +122,28 @@ public class TenantAdminController {
         return ResponseEntity.status(201).body(TenantAdminTableResponse.from(
             tableService.createTable(scope, toCommand(request))
         ));
+    }
+
+    @GetMapping(value = "/tables/export", produces = EXCEL_MEDIA_TYPE)
+    public ResponseEntity<byte[]> exportTables(@PathVariable UUID storeId) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"tenant-admin-tables.xlsx\"")
+            .contentType(MediaType.parseMediaType(EXCEL_MEDIA_TYPE))
+            .body(tableService.exportTables(scope));
+    }
+
+    @PostMapping(value = "/tables/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TenantAdminTableImportResponse> importTables(
+        @PathVariable UUID storeId,
+        @RequestPart("file") MultipartFile file
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        try {
+            return ResponseEntity.ok(TenantAdminTableImportResponse.from(tableService.importTables(scope, file.getBytes())));
+        } catch (java.io.IOException exception) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
     }
 
     @GetMapping("/tables/{tableId}")
@@ -209,7 +237,9 @@ public class TenantAdminController {
             request.areaName(),
             request.tableCode(),
             request.capacity(),
-            request.enabled()
+            request.enabled(),
+            request.areaSortOrder(),
+            request.tableSortOrder()
         );
     }
 

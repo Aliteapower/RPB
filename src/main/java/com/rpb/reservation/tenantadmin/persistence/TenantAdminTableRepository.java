@@ -29,19 +29,43 @@ public class TenantAdminTableRepository {
         args.add(criteria.offset());
         return jdbc.query(
             """
-            select table_record.id, area.display_name as area_name, table_record.table_code,
-                   table_record.capacity_max, table_record.status,
+            select table_record.id, area.id as area_id, area.display_name as area_name,
+                   area.sort_order as area_sort_order, table_record.table_code,
+                   table_record.sort_order as table_sort_order, table_record.capacity_max, table_record.status,
                    table_record.created_at, table_record.updated_at
             from dining_tables table_record
             join store_areas area on area.id = table_record.area_id
              and area.tenant_id = table_record.tenant_id
              and area.store_id = table_record.store_id
             %s
-            order by area.sort_order, area.display_name, table_record.table_code
+            order by area.sort_order, area.display_name, table_record.sort_order, table_record.table_code
             limit ? offset ?
             """.formatted(where.sql()),
             (rs, rowNum) -> table(rs),
             args.toArray()
+        );
+    }
+
+    public List<TenantAdminTable> listAll(StoreScope scope) {
+        return jdbc.query(
+            """
+            select table_record.id, area.id as area_id, area.display_name as area_name,
+                   area.sort_order as area_sort_order, table_record.table_code,
+                   table_record.sort_order as table_sort_order, table_record.capacity_max, table_record.status,
+                   table_record.created_at, table_record.updated_at
+            from dining_tables table_record
+            join store_areas area on area.id = table_record.area_id
+             and area.tenant_id = table_record.tenant_id
+             and area.store_id = table_record.store_id
+            where table_record.tenant_id = ?
+              and table_record.store_id = ?
+              and table_record.deleted_at is null
+              and area.deleted_at is null
+            order by area.sort_order, area.display_name, table_record.sort_order, table_record.table_code
+            """,
+            (rs, rowNum) -> table(rs),
+            scope.tenantId().value(),
+            scope.storeId().value()
         );
     }
 
@@ -65,8 +89,9 @@ public class TenantAdminTableRepository {
     public Optional<TenantAdminTable> findById(StoreScope scope, UUID tableId) {
         return jdbc.query(
             """
-            select table_record.id, area.display_name as area_name, table_record.table_code,
-                   table_record.capacity_max, table_record.status,
+            select table_record.id, area.id as area_id, area.display_name as area_name,
+                   area.sort_order as area_sort_order, table_record.table_code,
+                   table_record.sort_order as table_sort_order, table_record.capacity_max, table_record.status,
                    table_record.created_at, table_record.updated_at
             from dining_tables table_record
             join store_areas area on area.id = table_record.area_id
@@ -85,23 +110,49 @@ public class TenantAdminTableRepository {
         ).stream().findFirst();
     }
 
+    public Optional<TenantAdminTable> findByTableCode(StoreScope scope, String tableCode) {
+        return jdbc.query(
+            """
+            select table_record.id, area.id as area_id, area.display_name as area_name,
+                   area.sort_order as area_sort_order, table_record.table_code,
+                   table_record.sort_order as table_sort_order, table_record.capacity_max, table_record.status,
+                   table_record.created_at, table_record.updated_at
+            from dining_tables table_record
+            join store_areas area on area.id = table_record.area_id
+             and area.tenant_id = table_record.tenant_id
+             and area.store_id = table_record.store_id
+            where table_record.table_code = ?
+              and table_record.tenant_id = ?
+              and table_record.store_id = ?
+              and table_record.deleted_at is null
+              and area.deleted_at is null
+            """,
+            (rs, rowNum) -> table(rs),
+            tableCode,
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).stream().findFirst();
+    }
+
     public TenantAdminTable insert(
         StoreScope scope,
         UUID tableId,
         String areaName,
         String areaCode,
+        Integer areaSortOrder,
         String tableCode,
+        int tableSortOrder,
         int capacity,
         String status
     ) {
-        UUID areaId = findOrCreateArea(scope, areaName, areaCode).id();
+        UUID areaId = findOrCreateArea(scope, areaName, areaCode, areaSortOrder).id();
         jdbc.update(
             """
             insert into dining_tables (
                 id, tenant_id, store_id, area_id, table_code, display_name,
-                capacity_min, capacity_max, status, is_combinable
+                capacity_min, capacity_max, status, sort_order, is_combinable
             )
-            values (?, ?, ?, ?, ?, ?, 1, ?, ?, true)
+            values (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, true)
             """,
             tableId,
             scope.tenantId().value(),
@@ -110,7 +161,8 @@ public class TenantAdminTableRepository {
             tableCode,
             tableCode,
             capacity,
-            status
+            status,
+            tableSortOrder
         );
         return findById(scope, tableId).orElseThrow();
     }
@@ -120,11 +172,13 @@ public class TenantAdminTableRepository {
         UUID tableId,
         String areaName,
         String areaCode,
+        Integer areaSortOrder,
         String tableCode,
+        int tableSortOrder,
         int capacity,
         String status
     ) {
-        UUID areaId = findOrCreateArea(scope, areaName, areaCode).id();
+        UUID areaId = findOrCreateArea(scope, areaName, areaCode, areaSortOrder).id();
         jdbc.update(
             """
             update dining_tables
@@ -134,6 +188,7 @@ public class TenantAdminTableRepository {
                 capacity_min = 1,
                 capacity_max = ?,
                 status = ?,
+                sort_order = ?,
                 updated_at = now(),
                 version = version + 1
             where id = ?
@@ -146,6 +201,7 @@ public class TenantAdminTableRepository {
             tableCode,
             capacity,
             status,
+            tableSortOrder,
             tableId,
             scope.tenantId().value(),
             scope.storeId().value()
@@ -153,9 +209,12 @@ public class TenantAdminTableRepository {
         return findById(scope, tableId);
     }
 
-    private TenantAdminArea findOrCreateArea(StoreScope scope, String areaName, String areaCode) {
+    private TenantAdminArea findOrCreateArea(StoreScope scope, String areaName, String areaCode, Integer sortOrder) {
         Optional<TenantAdminArea> existing = findArea(scope, areaCode);
         if (existing.isPresent()) {
+            if (sortOrder != null) {
+                updateAreaSort(scope, existing.get().id(), sortOrder);
+            }
             return existing.get();
         }
         UUID areaId = UUID.randomUUID();
@@ -165,13 +224,14 @@ public class TenantAdminTableRepository {
                 insert into store_areas (
                     id, tenant_id, store_id, area_code, display_name, status, sort_order
                 )
-                values (?, ?, ?, ?, ?, 'active', 0)
+                values (?, ?, ?, ?, ?, 'active', ?)
                 """,
                 areaId,
                 scope.tenantId().value(),
                 scope.storeId().value(),
                 areaCode,
-                areaName
+                areaName,
+                sortOrder == null ? 0 : sortOrder
             );
         } catch (DataIntegrityViolationException ignored) {
             return findArea(scope, areaCode).orElseThrow();
@@ -198,6 +258,25 @@ public class TenantAdminTableRepository {
             scope.storeId().value(),
             areaCode
         ).stream().findFirst();
+    }
+
+    private void updateAreaSort(StoreScope scope, UUID areaId, int sortOrder) {
+        jdbc.update(
+            """
+            update store_areas
+            set sort_order = ?,
+                updated_at = now(),
+                version = version + 1
+            where id = ?
+              and tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """,
+            sortOrder,
+            areaId,
+            scope.tenantId().value(),
+            scope.storeId().value()
+        );
     }
 
     private static WhereClause whereClause(StoreScope scope, String keyword) {
@@ -230,8 +309,11 @@ public class TenantAdminTableRepository {
         String status = rs.getString("status");
         return new TenantAdminTable(
             rs.getObject("id", UUID.class),
+            rs.getObject("area_id", UUID.class),
             rs.getString("area_name"),
+            rs.getInt("area_sort_order"),
             rs.getString("table_code"),
+            rs.getInt("table_sort_order"),
             rs.getInt("capacity_max"),
             status,
             !"inactive".equals(status),

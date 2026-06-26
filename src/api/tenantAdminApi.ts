@@ -26,8 +26,11 @@ export interface TenantAdminStaffMutation {
 
 export interface TenantAdminTable {
   id: string
+  areaId: string
   areaName: string
+  areaSortOrder: number
   tableCode: string
+  tableSortOrder: number
   capacity: number
   status: string
   enabled: boolean
@@ -40,6 +43,8 @@ export interface TenantAdminTableMutation {
   tableCode: string
   capacity: number
   enabled: boolean
+  areaSortOrder?: number
+  tableSortOrder?: number
 }
 
 export interface TenantAdminSettings {
@@ -82,6 +87,15 @@ export interface TenantAdminTableResponse {
   table: TenantAdminTable
 }
 
+export interface TenantAdminTableImportResponse {
+  success: true
+  imported: {
+    totalRows: number
+    created: number
+    updated: number
+  }
+}
+
 export interface TenantAdminSettingsResponse {
   success: true
   settings: TenantAdminSettings
@@ -114,6 +128,10 @@ interface TextResponse {
   readonly ok: boolean
   readonly status: number
   text(): Promise<string>
+}
+
+interface BlobResponse extends TextResponse {
+  blob(): Promise<Blob>
 }
 
 export async function listStaff(
@@ -190,6 +208,23 @@ export async function updateTable(
   })
 }
 
+export async function exportTables(
+  storeId: string,
+  fetcher?: TenantAdminFetcher
+): Promise<Blob> {
+  return requestBlob(`${baseEndpoint(storeId)}/tables/export`, fetcher)
+}
+
+export async function importTables(
+  storeId: string,
+  file: File,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminTableImportResponse> {
+  const form = new FormData()
+  form.append('file', file)
+  return requestForm(`${baseEndpoint(storeId)}/tables/import`, form, fetcher)
+}
+
 export async function getSettings(
   storeId: string,
   fetcher?: TenantAdminFetcher
@@ -258,6 +293,69 @@ async function requestJson<T>(
   return payload as T
 }
 
+async function requestForm<T>(
+  endpoint: string,
+  form: FormData,
+  fetcher?: TenantAdminFetcher
+): Promise<T> {
+  let response: TextResponse
+
+  try {
+    const activeFetcher = fetcher ?? resolveFetch()
+    if (activeFetcher) {
+      response = await activeFetcher(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+        body: form
+      })
+    } else {
+      response = await xhrFormRequest(endpoint, form)
+    }
+  } catch {
+    throw new TenantAdminApiError(0, unknownError())
+  }
+
+  const payload = await readJson(response)
+  if (!response.ok || isTenantAdminApiErrorResponse(payload)) {
+    throw new TenantAdminApiError(
+      response.status,
+      isTenantAdminApiErrorResponse(payload) ? payload : unknownError(response.status)
+    )
+  }
+
+  return payload as T
+}
+
+async function requestBlob(endpoint: string, fetcher?: TenantAdminFetcher): Promise<Blob> {
+  let response: BlobResponse
+
+  try {
+    const activeFetcher = fetcher ?? resolveFetch()
+    if (activeFetcher) {
+      response = await activeFetcher(endpoint, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      })
+    } else {
+      response = await xhrBlobRequest(endpoint)
+    }
+  } catch {
+    throw new TenantAdminApiError(0, unknownError())
+  }
+
+  if (!response.ok) {
+    const payload = await readJson(response)
+    throw new TenantAdminApiError(
+      response.status,
+      isTenantAdminApiErrorResponse(payload) ? payload : unknownError(response.status)
+    )
+  }
+
+  return response.blob()
+}
+
 async function sendRequest(
   endpoint: string,
   options: {
@@ -321,6 +419,47 @@ function xhrRequest(
     xhr.onerror = () => reject(new TypeError('Network request failed'))
     xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
     xhr.send(options.body)
+  })
+}
+
+function xhrFormRequest(endpoint: string, form: FormData): Promise<TextResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', endpoint, true)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: async () => xhr.responseText
+      })
+    }
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
+    xhr.send(form)
+  })
+}
+
+function xhrBlobRequest(endpoint: string): Promise<BlobResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('GET', endpoint, true)
+    xhr.withCredentials = true
+    xhr.responseType = 'blob'
+    xhr.setRequestHeader('Accept', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    xhr.onload = () => {
+      const blob = xhr.response as Blob
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: async () => blob.text(),
+        blob: async () => blob
+      })
+    }
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
+    xhr.send()
   })
 }
 

@@ -124,6 +124,7 @@ class TableResourceListPersistenceAdapterTest {
             min,
             max,
             status,
+            0,
             true,
             now,
             now,

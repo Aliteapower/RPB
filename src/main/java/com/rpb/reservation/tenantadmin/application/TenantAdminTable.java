@@ -5,8 +5,11 @@ import java.util.UUID;
 
 public record TenantAdminTable(
     UUID id,
+    UUID areaId,
     String areaName,
+    int areaSortOrder,
     String tableCode,
+    int tableSortOrder,
     int capacity,
     String status,
     boolean enabled,

@@ -4,6 +4,7 @@ import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALI
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -12,7 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.io.ByteArrayOutputStream;
 import java.util.UUID;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -64,7 +69,7 @@ class TenantAdminApiIntegrationTest {
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
         jdbc.update("delete from dining_tables where table_code like 'CX%'");
-        jdbc.update("delete from store_areas where area_code like 'CX%'");
+        jdbc.update("delete from store_areas where area_code like 'CX%' or display_name like 'Codex%'");
         jdbc.update(
             "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
             PASSWORD_393930_HASH
@@ -120,7 +125,9 @@ class TenantAdminApiIntegrationTest {
                       "areaName":"Codex 包间",
                       "tableCode":"CX02",
                       "capacity":6,
-                      "enabled":false
+                      "enabled":false,
+                      "areaSortOrder":20,
+                      "tableSortOrder":3
                     }
                     """)
                 .cookie(session))
@@ -128,7 +135,9 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.table.tableCode").value("CX02"))
             .andExpect(jsonPath("$.table.areaName").value("Codex 包间"))
             .andExpect(jsonPath("$.table.capacity").value(6))
-            .andExpect(jsonPath("$.table.enabled").value(false));
+            .andExpect(jsonPath("$.table.enabled").value(false))
+            .andExpect(jsonPath("$.table.areaSortOrder").value(20))
+            .andExpect(jsonPath("$.table.tableSortOrder").value(3));
 
         assertThat(countWhere("""
             select count(*)
@@ -138,6 +147,8 @@ class TenantAdminApiIntegrationTest {
               and table_record.tenant_id = ?
               and table_record.store_id = ?
               and table_record.status = 'inactive'
+              and table_record.sort_order = 3
+              and area.sort_order = 20
               and area.display_name = 'Codex 包间'
             """, tableId, VALIDATION_TENANT_ID, VALIDATION_STORE_ID)).isEqualTo(1);
 
@@ -177,6 +188,75 @@ class TenantAdminApiIntegrationTest {
               and policy.effective_to_at is null
               and policy.deleted_at is null
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminListsTablesByAreaAndChildSortOrder() throws Exception {
+        Cookie session = login("20000000");
+
+        createTable(session, "Codex 二楼", "CX20", 4, true, 20, 1);
+        createTable(session, "Codex 大厅", "CX12", 2, true, 10, 20);
+        createTable(session, "Codex 大厅", "CX11", 2, true, 10, 10);
+
+        mockMvc.perform(get(basePath() + "/tables")
+                .param("keyword", "CX")
+                .param("limit", "10")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tables[0].tableCode").value("CX11"))
+            .andExpect(jsonPath("$.tables[0].areaSortOrder").value(10))
+            .andExpect(jsonPath("$.tables[0].tableSortOrder").value(10))
+            .andExpect(jsonPath("$.tables[1].tableCode").value("CX12"))
+            .andExpect(jsonPath("$.tables[2].tableCode").value("CX20"))
+            .andExpect(jsonPath("$.tables[2].areaSortOrder").value(20))
+            .andExpect(jsonPath("$.tables[2].tableSortOrder").value(1));
+    }
+
+    @Test
+    void tenantAdminExportsAndImportsTablesByOverwritingExistingTableCode() throws Exception {
+        Cookie session = login("20000000");
+        createTable(session, "Codex 大厅", "CX01", 4, true, 10, 10);
+
+        mockMvc.perform(get(basePath() + "/tables/export").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(result -> assertThat(result.getResponse().getContentType())
+                .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .andExpect(result -> assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .contains("tenant-admin-tables.xlsx"));
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "tables.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            tableImportWorkbook()
+        );
+
+        mockMvc.perform(multipart(basePath() + "/tables/import")
+                .file(file)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.imported.totalRows").value(2))
+            .andExpect(jsonPath("$.imported.updated").value(1))
+            .andExpect(jsonPath("$.imported.created").value(1));
+
+        mockMvc.perform(get(basePath() + "/tables")
+                .param("keyword", "CX")
+                .param("limit", "10")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tables[0].tableCode").value("CX01"))
+            .andExpect(jsonPath("$.tables[0].areaName").value("Codex 包间"))
+            .andExpect(jsonPath("$.tables[0].capacity").value(6))
+            .andExpect(jsonPath("$.tables[0].enabled").value(false))
+            .andExpect(jsonPath("$.tables[0].areaSortOrder").value(1))
+            .andExpect(jsonPath("$.tables[0].tableSortOrder").value(1))
+            .andExpect(jsonPath("$.tables[1].tableCode").value("CX99"))
+            .andExpect(jsonPath("$.tables[1].areaName").value("Codex 包间"))
+            .andExpect(jsonPath("$.tables[1].capacity").value(8))
+            .andExpect(jsonPath("$.tables[1].enabled").value(true))
+            .andExpect(jsonPath("$.tables[1].areaSortOrder").value(1))
+            .andExpect(jsonPath("$.tables[1].tableSortOrder").value(2));
     }
 
     @Test
@@ -251,22 +331,68 @@ class TenantAdminApiIntegrationTest {
     }
 
     private UUID createTable(Cookie session) throws Exception {
+        return createTable(session, "Codex 大厅", "CX01", 4, true, 0, 0);
+    }
+
+    private UUID createTable(
+        Cookie session,
+        String areaName,
+        String tableCode,
+        int capacity,
+        boolean enabled,
+        int areaSortOrder,
+        int tableSortOrder
+    ) throws Exception {
         MvcResult result = mockMvc.perform(post(basePath() + "/tables")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "areaName":"Codex 大厅",
-                      "tableCode":"CX01",
-                      "capacity":4,
-                      "enabled":true
+                      "areaName":"%s",
+                      "tableCode":"%s",
+                      "capacity":%d,
+                      "enabled":%s,
+                      "areaSortOrder":%d,
+                      "tableSortOrder":%d
                     }
-                    """)
+                    """.formatted(areaName, tableCode, capacity, enabled, areaSortOrder, tableSortOrder))
                 .cookie(session))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.table.tableCode").value("CX01"))
+            .andExpect(jsonPath("$.table.tableCode").value(tableCode))
             .andReturn();
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).path("table").path("id").asText());
+    }
+
+    private byte[] tableImportWorkbook() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("tables");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("大类排序");
+            header.createCell(1).setCellValue("桌号排序");
+            header.createCell(2).setCellValue("分区组");
+            header.createCell(3).setCellValue("桌号");
+            header.createCell(4).setCellValue("人数");
+            header.createCell(5).setCellValue("启用");
+
+            Row existing = sheet.createRow(1);
+            existing.createCell(0).setCellValue(1);
+            existing.createCell(1).setCellValue(1);
+            existing.createCell(2).setCellValue("Codex 包间");
+            existing.createCell(3).setCellValue("CX01");
+            existing.createCell(4).setCellValue(6);
+            existing.createCell(5).setCellValue("停用");
+
+            Row created = sheet.createRow(2);
+            created.createCell(0).setCellValue(1);
+            created.createCell(1).setCellValue(2);
+            created.createCell(2).setCellValue("Codex 包间");
+            created.createCell(3).setCellValue("CX99");
+            created.createCell(4).setCellValue(8);
+            created.createCell(5).setCellValue("启用");
+
+            workbook.write(output);
+            return output.toByteArray();
+        }
     }
 
     private Cookie login(String username) throws Exception {

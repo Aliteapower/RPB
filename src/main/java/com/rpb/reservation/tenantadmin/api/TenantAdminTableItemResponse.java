@@ -6,8 +6,11 @@ import java.util.UUID;
 
 public record TenantAdminTableItemResponse(
     UUID id,
+    UUID areaId,
     String areaName,
+    int areaSortOrder,
     String tableCode,
+    int tableSortOrder,
     int capacity,
     String status,
     boolean enabled,
@@ -17,8 +20,11 @@ public record TenantAdminTableItemResponse(
     public static TenantAdminTableItemResponse from(TenantAdminTable table) {
         return new TenantAdminTableItemResponse(
             table.id(),
+            table.areaId(),
             table.areaName(),
+            table.areaSortOrder(),
             table.tableCode(),
+            table.tableSortOrder(),
             table.capacity(),
             table.status(),
             table.enabled(),

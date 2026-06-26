@@ -4,6 +4,8 @@ public record TenantAdminTableMutationCommand(
     String areaName,
     String tableCode,
     Integer capacity,
-    Boolean enabled
+    Boolean enabled,
+    Integer areaSortOrder,
+    Integer tableSortOrder
 ) {
 }

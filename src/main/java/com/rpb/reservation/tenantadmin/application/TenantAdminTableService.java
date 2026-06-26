@@ -1,7 +1,11 @@
 package com.rpb.reservation.tenantadmin.application;
 
+import com.rpb.reservation.common.excel.ExcelColumn;
+import com.rpb.reservation.common.excel.ExcelRow;
+import com.rpb.reservation.common.excel.ExcelWorkbookService;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.tenantadmin.persistence.TenantAdminTableRepository;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -13,11 +17,28 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantAdminTableService {
     private static final Set<String> MAINTAINABLE_STATUSES = Set.of("available", "inactive");
     private static final int MAX_CAPACITY = 999;
+    private static final String TABLES_SHEET_NAME = "tables";
+    private static final String AREA_SORT_HEADER = "大类排序";
+    private static final String TABLE_SORT_HEADER = "桌号排序";
+    private static final String AREA_NAME_HEADER = "分区组";
+    private static final String TABLE_CODE_HEADER = "桌号";
+    private static final String CAPACITY_HEADER = "人数";
+    private static final String ENABLED_HEADER = "启用";
+    private static final List<String> TABLE_IMPORT_HEADERS = List.of(
+        AREA_SORT_HEADER,
+        TABLE_SORT_HEADER,
+        AREA_NAME_HEADER,
+        TABLE_CODE_HEADER,
+        CAPACITY_HEADER,
+        ENABLED_HEADER
+    );
 
     private final TenantAdminTableRepository repository;
+    private final ExcelWorkbookService excelWorkbookService;
 
-    public TenantAdminTableService(TenantAdminTableRepository repository) {
+    public TenantAdminTableService(TenantAdminTableRepository repository, ExcelWorkbookService excelWorkbookService) {
         this.repository = repository;
+        this.excelWorkbookService = excelWorkbookService;
     }
 
     @Transactional(readOnly = true)
@@ -44,7 +65,9 @@ public class TenantAdminTableService {
                 UUID.randomUUID(),
                 input.areaName(),
                 areaCode(input.areaName()),
+                input.areaSortOrder(),
                 input.tableCode(),
+                input.tableSortOrder(),
                 input.capacity(),
                 statusFromEnabled(input.enabled())
             );
@@ -67,7 +90,9 @@ public class TenantAdminTableService {
                     tableId,
                     input.areaName(),
                     areaCode(input.areaName()),
+                    input.areaSortOrder(),
                     input.tableCode(),
+                    input.tableSortOrder(),
                     input.capacity(),
                     statusFromEnabled(input.enabled())
                 )
@@ -75,6 +100,111 @@ public class TenantAdminTableService {
         } catch (DataIntegrityViolationException exception) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_CODE_CONFLICT);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportTables(StoreScope scope) {
+        List<ExcelColumn<TenantAdminTable>> columns = List.of(
+            new ExcelColumn<>(AREA_SORT_HEADER, TenantAdminTable::areaSortOrder),
+            new ExcelColumn<>(TABLE_SORT_HEADER, TenantAdminTable::tableSortOrder),
+            new ExcelColumn<>(AREA_NAME_HEADER, TenantAdminTable::areaName),
+            new ExcelColumn<>(TABLE_CODE_HEADER, TenantAdminTable::tableCode),
+            new ExcelColumn<>(CAPACITY_HEADER, TenantAdminTable::capacity),
+            new ExcelColumn<>(ENABLED_HEADER, table -> table.enabled() ? "启用" : "停用")
+        );
+        return excelWorkbookService.writeSheet(TABLES_SHEET_NAME, columns, repository.listAll(scope));
+    }
+
+    @Transactional
+    public TenantAdminTableImportSummary importTables(StoreScope scope, byte[] content) {
+        List<ExcelRow> rows = readRows(content);
+        int created = 0;
+        int updated = 0;
+
+        for (ExcelRow row : rows) {
+            TenantAdminTableExcelRow tableRow = toTableRow(row);
+            NormalizedTableInput input = new NormalizedTableInput(
+                tableRow.areaName(),
+                tableRow.tableCode(),
+                tableRow.capacity(),
+                tableRow.enabled(),
+                tableRow.areaSortOrder(),
+                tableRow.tableSortOrder()
+            );
+            TenantAdminTable existing = repository.findByTableCode(scope, input.tableCode()).orElse(null);
+            if (existing == null) {
+                repository.insert(
+                    scope,
+                    UUID.randomUUID(),
+                    input.areaName(),
+                    areaCode(input.areaName()),
+                    input.areaSortOrder(),
+                    input.tableCode(),
+                    input.tableSortOrder(),
+                    input.capacity(),
+                    statusFromEnabled(input.enabled())
+                );
+                created++;
+                continue;
+            }
+            if (!MAINTAINABLE_STATUSES.contains(existing.status())) {
+                throw new TenantAdminServiceException(TenantAdminServiceErrorCode.TABLE_IN_USE);
+            }
+            repository.update(
+                scope,
+                existing.id(),
+                input.areaName(),
+                areaCode(input.areaName()),
+                input.areaSortOrder(),
+                input.tableCode(),
+                input.tableSortOrder(),
+                input.capacity(),
+                statusFromEnabled(input.enabled())
+            );
+            updated++;
+        }
+
+        return new TenantAdminTableImportSummary(rows.size(), created, updated);
+    }
+
+    private List<ExcelRow> readRows(byte[] content) {
+        try {
+            return excelWorkbookService.readFirstSheet(content, TABLE_IMPORT_HEADERS);
+        } catch (IllegalArgumentException exception) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private static TenantAdminTableExcelRow toTableRow(ExcelRow row) {
+        return new TenantAdminTableExcelRow(
+            requiredInteger(row.cell(AREA_SORT_HEADER)),
+            requiredInteger(row.cell(TABLE_SORT_HEADER)),
+            requiredText(row.cell(AREA_NAME_HEADER)),
+            requiredText(row.cell(TABLE_CODE_HEADER)),
+            requiredCapacity(requiredInteger(row.cell(CAPACITY_HEADER))),
+            requiredEnabled(row.cell(ENABLED_HEADER))
+        );
+    }
+
+    private static int requiredInteger(String value) {
+        String normalized = requiredText(value);
+        try {
+            if (normalized.endsWith(".0")) {
+                normalized = normalized.substring(0, normalized.length() - 2);
+            }
+            return Integer.parseInt(normalized);
+        } catch (NumberFormatException exception) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private static boolean requiredEnabled(String value) {
+        String normalized = requiredText(value).toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "true", "1", "yes", "y", "是", "启用" -> true;
+            case "false", "0", "no", "n", "否", "停用" -> false;
+            default -> throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        };
     }
 
     private static NormalizedTableInput normalizeCreate(TenantAdminTableMutationCommand command) {
@@ -85,7 +215,9 @@ public class TenantAdminTableService {
             requiredText(command.areaName()),
             requiredText(command.tableCode()),
             requiredCapacity(command.capacity()),
-            command.enabled() == null || command.enabled()
+            command.enabled() == null || command.enabled(),
+            command.areaSortOrder(),
+            optionalSortOrder(command.tableSortOrder())
         );
     }
 
@@ -100,8 +232,14 @@ public class TenantAdminTableService {
             firstText(command.areaName(), existing.areaName()),
             firstText(command.tableCode(), existing.tableCode()),
             command.capacity() == null ? existing.capacity() : requiredCapacity(command.capacity()),
-            command.enabled() == null ? existing.enabled() : command.enabled()
+            command.enabled() == null ? existing.enabled() : command.enabled(),
+            command.areaSortOrder() == null ? existing.areaSortOrder() : optionalSortOrder(command.areaSortOrder()),
+            command.tableSortOrder() == null ? existing.tableSortOrder() : optionalSortOrder(command.tableSortOrder())
         );
+    }
+
+    private static int optionalSortOrder(Integer sortOrder) {
+        return sortOrder == null ? 0 : sortOrder;
     }
 
     private static int requiredCapacity(Integer capacity) {
@@ -151,7 +289,9 @@ public class TenantAdminTableService {
         String areaName,
         String tableCode,
         int capacity,
-        boolean enabled
+        boolean enabled,
+        Integer areaSortOrder,
+        int tableSortOrder
     ) {
     }
 }

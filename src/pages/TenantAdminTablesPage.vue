@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
+  exportTables,
+  importTables,
   listTables,
   TenantAdminApiError,
   type TenantAdminPage,
@@ -19,9 +21,11 @@ const auth = useAuthSessionStore()
 const tables = ref<TenantAdminTable[]>([])
 const loading = ref(false)
 const errorText = ref('')
+const successText = ref('')
 const keyword = ref('')
 const limit = ref(20)
 const offset = ref(0)
+const fileInput = ref<HTMLInputElement | null>(null)
 const page = ref<TenantAdminPage>({
   limit: 20,
   offset: 0,
@@ -45,6 +49,7 @@ onMounted(() => {
 async function loadTables(nextOffset = offset.value): Promise<void> {
   loading.value = true
   errorText.value = ''
+  successText.value = ''
   try {
     const response = await listTables(storeId.value, {
       keyword: keyword.value,
@@ -80,6 +85,55 @@ function openEditPage(item: TenantAdminTable): void {
   void router.push({ name: 'tenant-admin-table-edit', params: { storeId: storeId.value, tableId: item.id } })
 }
 
+async function downloadTables(): Promise<void> {
+  if (loading.value) {
+    return
+  }
+  loading.value = true
+  errorText.value = ''
+  successText.value = ''
+  try {
+    const blob = await exportTables(storeId.value)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'tenant-admin-tables.xlsx'
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+function pickImportFile(): void {
+  fileInput.value?.click()
+}
+
+async function uploadTables(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || loading.value) {
+    return
+  }
+
+  loading.value = true
+  errorText.value = ''
+  successText.value = ''
+  try {
+    const response = await importTables(storeId.value, file)
+    const message = `导入完成：新增 ${response.imported.created}，覆盖 ${response.imported.updated}`
+    await loadTables(0)
+    successText.value = message
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    loading.value = false
+  }
+}
+
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
     return '操作失败'
@@ -93,6 +147,9 @@ function apiErrorText(error: unknown): string {
   }
   if (error.response.error.code === 'FORBIDDEN') {
     return '没有租户后台权限'
+  }
+  if (error.response.error.code === 'REQUEST_INVALID') {
+    return '请检查 Excel 表头、分区组、桌号、人数和启用状态'
   }
   return '操作失败'
 }
@@ -127,6 +184,19 @@ function apiErrorText(error: unknown): string {
           </div>
         </template>
         <template #actions>
+          <button class="secondary-button" type="button" :disabled="loading" @click="downloadTables">
+            导出 Excel
+          </button>
+          <button class="secondary-button" type="button" :disabled="loading" @click="pickImportFile">
+            导入 Excel
+          </button>
+          <input
+            ref="fileInput"
+            class="hidden-file"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            @change="uploadTables"
+          />
           <button class="primary-button" type="button" @click="openCreatePage">
             新增桌号
           </button>
@@ -134,12 +204,15 @@ function apiErrorText(error: unknown): string {
       </ErpQueryToolbar>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
+      <p v-if="successText" class="success-banner" role="status">{{ successText }}</p>
 
       <div class="erp-table-wrap">
         <table>
           <thead>
             <tr>
+              <th>大类排序</th>
               <th>分区组</th>
+              <th>桌号排序</th>
               <th>桌号</th>
               <th>人数</th>
               <th>启用</th>
@@ -148,13 +221,15 @@ function apiErrorText(error: unknown): string {
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="5" class="empty-cell">加载中</td>
+              <td colspan="7" class="empty-cell">加载中</td>
             </tr>
             <tr v-else-if="tables.length === 0">
-              <td colspan="5" class="empty-cell">暂无桌号</td>
+              <td colspan="7" class="empty-cell">暂无桌号</td>
             </tr>
             <tr v-for="item in tables" v-else :key="item.id">
+              <td>{{ item.areaSortOrder }}</td>
               <td>{{ item.areaName }}</td>
+              <td>{{ item.tableSortOrder }}</td>
               <td><strong>{{ item.tableCode }}</strong></td>
               <td>{{ item.capacity }}</td>
               <td>
@@ -232,16 +307,31 @@ function apiErrorText(error: unknown): string {
   color: #0f172a;
 }
 
+.secondary-button,
 .primary-button {
   min-height: 36px;
-  border: 0;
-  border-radius: 6px;
   padding: 0 14px;
-  color: #ffffff;
-  background: #0f766e;
+  border-radius: 6px;
   font: inherit;
   font-weight: 800;
   cursor: pointer;
+}
+
+.secondary-button {
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.primary-button {
+  border: 0;
+  color: #ffffff;
+  background: #0f766e;
+}
+
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .error-banner {
@@ -251,6 +341,19 @@ function apiErrorText(error: unknown): string {
   border-radius: 6px;
   color: #991b1b;
   background: #fff1f2;
+}
+
+.success-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.hidden-file {
+  display: none;
 }
 
 .erp-table-wrap {
@@ -263,7 +366,7 @@ function apiErrorText(error: unknown): string {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 680px;
+  min-width: 820px;
 }
 
 th,
@@ -326,6 +429,7 @@ tr:last-child td {
   }
 
   .summary-strip,
+  .secondary-button,
   .primary-button {
     width: 100%;
   }
