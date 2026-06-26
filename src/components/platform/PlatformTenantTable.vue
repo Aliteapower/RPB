@@ -7,6 +7,7 @@ defineProps<{
   loading: boolean
   saving: boolean
   statusOptions: TenantStatusOption[]
+  billingOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -60,10 +61,12 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
             <td>{{ new Date(tenant.updatedAt).toLocaleString() }}</td>
             <td>
               <div class="row-actions">
-                <button type="button" class="text-action" @click="emit('edit', tenant)">编辑</button>
-                <button type="button" class="text-action" @click="emit('billing', tenant)">计费</button>
+                <button v-if="!billingOnly" type="button" class="text-action" @click="emit('edit', tenant)">编辑</button>
+                <button type="button" class="text-action" @click="emit('billing', tenant)">
+                  {{ billingOnly ? '订阅/计费' : '计费' }}
+                </button>
                 <button
-                  v-if="tenant.deleted"
+                  v-if="!billingOnly && tenant.deleted"
                   type="button"
                   class="text-action"
                   :disabled="saving"
@@ -72,7 +75,7 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
                   恢复
                 </button>
                 <button
-                  v-else
+                  v-else-if="!billingOnly"
                   type="button"
                   class="text-action danger"
                   :disabled="saving"

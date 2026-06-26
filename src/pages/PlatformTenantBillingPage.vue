@@ -32,17 +32,46 @@ const savedText = ref('')
 const form = reactive({
   appKey: 'reservation_queue',
   billingCycle: 'monthly' as ProductBillingCycle,
-  currentPeriodStart: '',
-  currentPeriodEnd: '',
-  amount: 0,
+  durationCount: 1,
   currency: 'SGD',
   paymentNote: ''
 })
 
+interface BillingRow {
+  productLine: PlatformProductLine
+  subscription: TenantProductSubscription | null
+}
+
+const billingRows = computed<BillingRow[]>(() => productLines.value.map(productLine => ({
+  productLine,
+  subscription: subscriptions.value.find(subscription => subscription.appKey === productLine.appKey) ?? null
+})))
+const selectedProductLine = computed(() => productLines.value.find(productLine => productLine.appKey === form.appKey) ?? null)
+const selectedSubscription = computed(() => subscriptions.value.find(subscription => subscription.appKey === form.appKey) ?? null)
+const selectedPrice = computed(() => selectedProductLine.value?.prices.find(price => price.billingCycle === form.billingCycle) ?? null)
+const selectedUnitPrice = computed(() => selectedPrice.value?.amount ?? 0)
+const selectedCurrency = computed(() => selectedPrice.value?.currency ?? (form.currency.trim().toUpperCase() || 'SGD'))
+const safeDurationCount = computed(() => Math.max(1, Number(form.durationCount) || 1))
+const calculatedAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
+const durationUnitLabel = computed(() => form.billingCycle === 'yearly' ? '年' : '个月')
+const primaryActionLabel = computed(() => {
+  const subscription = selectedSubscription.value
+  if (!subscription) {
+    return '购买'
+  }
+  if (subscription.billingCycle === 'legacy_grant') {
+    return '转付费'
+  }
+  if (subscription.status === 'cancelled') {
+    return '重新开通'
+  }
+  if (subscription.status === 'suspended') {
+    return '恢复并续费'
+  }
+  return '续费'
+})
+
 onMounted(() => {
-  const now = new Date()
-  form.currentPeriodStart = toInputValue(now)
-  form.currentPeriodEnd = toInputValue(new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000))
   void loadBilling()
 })
 
@@ -71,8 +100,70 @@ async function purchaseSelectedProduct(): Promise<void> {
   await saveMutation(() => purchaseProductSubscription(tenantId.value, mutationPayload()))
 }
 
+async function submitSelectedProductMutation(): Promise<void> {
+  const subscription = selectedSubscription.value
+  if (!subscription) {
+    await purchaseSelectedProduct()
+    return
+  }
+  if (subscription.billingCycle === 'legacy_grant') {
+    await convertLegacyProduct(subscription)
+    return
+  }
+  await renewSelectedProduct(subscription)
+}
+
+async function purchaseBillingRow(row: BillingRow): Promise<void> {
+  selectBillingRow(row)
+  await purchaseSelectedProduct()
+}
+
+async function renewBillingRow(row: BillingRow): Promise<void> {
+  if (!row.subscription) {
+    return
+  }
+  selectBillingRow(row)
+  await renewSelectedProduct(row.subscription)
+}
+
+async function convertLegacyBillingRow(row: BillingRow): Promise<void> {
+  if (!row.subscription) {
+    return
+  }
+  selectBillingRow(row)
+  await convertLegacyProduct(row.subscription)
+}
+
+async function suspendBillingRow(row: BillingRow): Promise<void> {
+  if (!row.subscription) {
+    return
+  }
+  selectBillingRow(row)
+  await suspendSelectedProduct(row.subscription)
+}
+
+async function cancelBillingRow(row: BillingRow): Promise<void> {
+  if (!row.subscription) {
+    return
+  }
+  selectBillingRow(row)
+  await cancelSelectedProduct(row.subscription)
+}
+
+async function toggleProductLine(row: BillingRow, event: Event): Promise<void> {
+  selectBillingRow(row)
+  const checked = event.target instanceof HTMLInputElement && event.target.checked
+  if (checked) {
+    await submitSelectedProductMutation()
+    return
+  }
+  if (row.subscription && canCancel(row.subscription)) {
+    await cancelSelectedProduct(row.subscription)
+  }
+}
+
 async function renewSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
-  await saveMutation(() => renewProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version)))
+  await saveMutation(() => renewProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
 }
 
 async function convertLegacyProduct(subscription: TenantProductSubscription): Promise<void> {
@@ -81,7 +172,7 @@ async function convertLegacyProduct(subscription: TenantProductSubscription): Pr
     errorText.value = '历史赠送只能转月付或年付'
     return
   }
-  await saveMutation(() => convertLegacyProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version)))
+  await saveMutation(() => convertLegacyProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
 }
 
 async function suspendSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
@@ -110,15 +201,14 @@ async function saveMutation(action: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function mutationPayload(version?: number) {
+function mutationPayload(version?: number, appKey = form.appKey) {
   return {
     idempotencyKey: newIdempotencyKey(),
-    appKey: form.appKey,
+    appKey,
     billingCycle: form.billingCycle,
-    currentPeriodStart: toIso(form.currentPeriodStart),
-    currentPeriodEnd: form.billingCycle === 'manual' && !form.currentPeriodEnd ? null : toIso(form.currentPeriodEnd),
-    amount: Number(form.amount) || 0,
-    currency: form.currency.trim().toUpperCase() || 'SGD',
+    durationCount: safeDurationCount.value,
+    amount: calculatedAmount.value,
+    currency: selectedCurrency.value,
     paymentNote: form.paymentNote.trim() || null,
     version
   }
@@ -134,6 +224,14 @@ function statusPayload(version: number, fallbackNote: string) {
 
 function newIdempotencyKey(): string {
   return `manual-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function selectBillingRow(row: BillingRow): void {
+  const changingProductLine = form.appKey !== row.productLine.appKey
+  form.appKey = row.productLine.appKey
+  if (changingProductLine && (row.subscription?.billingCycle === 'monthly' || row.subscription?.billingCycle === 'yearly')) {
+    form.billingCycle = row.subscription.billingCycle
+  }
 }
 
 function billingCycleLabel(cycle: ProductBillingCycle): string {
@@ -162,15 +260,39 @@ function statusLabel(subscription: TenantProductSubscription): string {
   return '已取消'
 }
 
-function toInputValue(value: Date): string {
-  return value.toISOString().slice(0, 16)
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return '永久有效'
+  }
+  return new Date(value).toLocaleString()
 }
 
-function toIso(value: string): string | null {
-  if (!value) {
-    return null
-  }
-  return new Date(value).toISOString()
+function formatAmount(value: number): string {
+  return Number(value || 0).toFixed(2)
+}
+
+function isProductLineChecked(row: BillingRow): boolean {
+  return row.subscription?.status === 'active' && row.subscription.effectiveStatus !== 'expired'
+}
+
+function canRenew(subscription: TenantProductSubscription): boolean {
+  return subscription.billingCycle !== 'legacy_grant'
+}
+
+function canSuspend(subscription: TenantProductSubscription): boolean {
+  return subscription.status === 'active'
+}
+
+function canCancel(subscription: TenantProductSubscription): boolean {
+  return subscription.status !== 'cancelled'
+}
+
+function canConvertLegacy(subscription: TenantProductSubscription): boolean {
+  return subscription.billingCycle === 'legacy_grant' && subscription.status === 'active'
+}
+
+function canReactivate(subscription: TenantProductSubscription): boolean {
+  return subscription.status === 'cancelled'
 }
 
 function apiErrorText(error: unknown): string {
@@ -220,45 +342,85 @@ function apiErrorText(error: unknown): string {
                 <th>产品线</th>
                 <th>计费周期</th>
                 <th>状态</th>
-                <th>有效期</th>
+                <th>有效期开始</th>
+                <th>有效期结束</th>
+                <th>金额</th>
+                <th>币种</th>
                 <th>授权</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="6" class="table-empty">加载中</td>
+                <td colspan="9" class="table-empty">加载中</td>
               </tr>
-              <tr v-else-if="subscriptions.length === 0">
-                <td colspan="6" class="table-empty">暂无订阅</td>
+              <tr v-else-if="billingRows.length === 0">
+                <td colspan="9" class="table-empty">暂无产品线</td>
               </tr>
-              <tr v-for="subscription in subscriptions" v-else :key="subscription.id">
-                <td>{{ subscription.productLineName }}</td>
-                <td>{{ billingCycleLabel(subscription.billingCycle) }}</td>
-                <td>{{ statusLabel(subscription) }}</td>
+              <tr v-for="row in billingRows" v-else :key="row.productLine.appKey">
                 <td>
-                  <span v-if="subscription.currentPeriodEnd">{{ new Date(subscription.currentPeriodEnd).toLocaleString() }}</span>
-                  <span v-else>永久有效</span>
+                  <label class="product-line-check">
+                    <input
+                      type="checkbox"
+                      :checked="isProductLineChecked(row)"
+                      :disabled="saving"
+                      @change="toggleProductLine(row, $event)"
+                    >
+                    <span>{{ row.productLine.displayName }}</span>
+                  </label>
                 </td>
-                <td>{{ subscription.entitlementStatus }}</td>
+                <td>{{ row.subscription ? billingCycleLabel(row.subscription.billingCycle) : '-' }}</td>
+                <td>{{ row.subscription ? statusLabel(row.subscription) : '未开通' }}</td>
+                <td>{{ row.subscription ? formatDateTime(row.subscription.currentPeriodStart) : '-' }}</td>
+                <td>{{ row.subscription ? formatDateTime(row.subscription.currentPeriodEnd) : '-' }}</td>
+                <td>{{ row.subscription ? formatAmount(row.subscription.amount) : '-' }}</td>
+                <td>{{ row.subscription?.currency ?? row.productLine.prices[0]?.currency ?? '-' }}</td>
+                <td>{{ row.subscription?.entitlementStatus ?? '-' }}</td>
                 <td>
                   <div class="row-actions">
-                    <button type="button" class="text-action" :disabled="saving" @click="renewSelectedProduct(subscription)">
-                      续费
-                    </button>
                     <button
-                      v-if="subscription.billingCycle === 'legacy_grant'"
+                      v-if="!row.subscription"
                       type="button"
                       class="text-action"
                       :disabled="saving"
-                      @click="convertLegacyProduct(subscription)"
+                      @click="purchaseBillingRow(row)"
+                    >
+                      开通
+                    </button>
+                    <button
+                      v-if="row.subscription && canRenew(row.subscription)"
+                      type="button"
+                      class="text-action"
+                      :disabled="saving"
+                      @click="renewBillingRow(row)"
+                    >
+                      {{ canReactivate(row.subscription) ? '重新开通' : row.subscription.status === 'suspended' ? '恢复并续费' : '续费' }}
+                    </button>
+                    <button
+                      v-if="row.subscription && canConvertLegacy(row.subscription)"
+                      type="button"
+                      class="text-action"
+                      :disabled="saving"
+                      @click="convertLegacyBillingRow(row)"
                     >
                       转付费
                     </button>
-                    <button type="button" class="text-action" :disabled="saving" @click="suspendSelectedProduct(subscription)">
+                    <button
+                      v-if="row.subscription && canSuspend(row.subscription)"
+                      type="button"
+                      class="text-action"
+                      :disabled="saving"
+                      @click="suspendBillingRow(row)"
+                    >
                       暂停
                     </button>
-                    <button type="button" class="text-action danger" :disabled="saving" @click="cancelSelectedProduct(subscription)">
+                    <button
+                      v-if="row.subscription && canCancel(row.subscription)"
+                      type="button"
+                      class="text-action danger"
+                      :disabled="saving"
+                      @click="cancelBillingRow(row)"
+                    >
                       取消
                     </button>
                   </div>
@@ -268,7 +430,7 @@ function apiErrorText(error: unknown): string {
           </table>
         </section>
 
-        <form class="edit-panel" @submit.prevent="purchaseSelectedProduct">
+        <form class="edit-panel" @submit.prevent="submitSelectedProductMutation">
           <h2>手工购买 / 续费</h2>
           <label>
             <span>产品线</span>
@@ -283,31 +445,33 @@ function apiErrorText(error: unknown): string {
             <select v-model="form.billingCycle">
               <option value="monthly">月付</option>
               <option value="yearly">年付</option>
-              <option value="manual">手工</option>
             </select>
           </label>
           <label>
-            <span>开始时间</span>
-            <input v-model="form.currentPeriodStart" type="datetime-local">
+            <span>购买数量</span>
+            <div class="duration-row">
+              <input v-model.number="form.durationCount" type="number" min="1" :max="form.billingCycle === 'monthly' ? 120 : 10">
+              <span>{{ durationUnitLabel }}</span>
+            </div>
           </label>
-          <label>
-            <span>结束时间</span>
-            <input v-model="form.currentPeriodEnd" type="datetime-local">
-          </label>
-          <label>
-            <span>金额</span>
-            <input v-model.number="form.amount" type="number" min="0" step="0.01">
-          </label>
+          <div class="quote-summary">
+            <span>标准单价</span>
+            <strong>{{ formatAmount(selectedUnitPrice) }} {{ selectedCurrency }} / {{ durationUnitLabel }}</strong>
+          </div>
+          <div class="quote-summary">
+            <span>本次金额</span>
+            <strong>{{ formatAmount(calculatedAmount) }} {{ selectedCurrency }}</strong>
+          </div>
           <label>
             <span>币种</span>
-            <input v-model.trim="form.currency" maxlength="3">
+            <input v-model.trim="form.currency" maxlength="3" :placeholder="selectedCurrency">
           </label>
           <label>
             <span>备注</span>
             <textarea v-model.trim="form.paymentNote" rows="4" />
           </label>
           <button class="primary-button" type="submit" :disabled="saving || loading">
-            {{ saving ? '保存中' : '购买' }}
+            {{ saving ? '保存中' : primaryActionLabel }}
           </button>
         </form>
       </div>
@@ -409,6 +573,39 @@ function apiErrorText(error: unknown): string {
   gap: 10px;
 }
 
+.product-line-check,
+.duration-row,
+.quote-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.product-line-check input {
+  width: 16px;
+  height: 16px;
+}
+
+.duration-row input {
+  flex: 1;
+}
+
+.duration-row span,
+.quote-summary span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quote-summary {
+  justify-content: space-between;
+  min-height: 34px;
+}
+
+.quote-summary strong {
+  color: #0f172a;
+}
+
 .text-action {
   border: 0;
   padding: 0;
@@ -426,6 +623,10 @@ function apiErrorText(error: unknown): string {
 .text-action:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.muted-text {
+  color: #94a3b8;
 }
 
 .edit-panel {

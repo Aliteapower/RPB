@@ -150,6 +150,41 @@ class PlatformBillingMigrationTest {
 
         assertThat(countWhere("select count(*) from tenant_product_subscriptions")).isEqualTo(subscriptionCountBeforeReplay);
         assertThat(countWhere("select count(*) from tenant_product_subscription_events")).isEqualTo(eventCountBeforeReplay);
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V010__platform_product_line_prices.sql");
+
+        assertThat(tableExists("platform_product_line_prices")).isTrue();
+        assertThat(indexExists("ux_platform_product_line_prices_scope")).isTrue();
+        assertThat(constraintExists("ck_platform_product_line_prices_cycle")).isTrue();
+        assertThat(constraintExists("ck_platform_product_line_prices_amount")).isTrue();
+        assertThat(constraintExists("ck_platform_product_line_prices_currency")).isTrue();
+        assertThat(countWhere("""
+            select count(*)
+            from platform_product_line_prices
+            where app_key = 'reservation_queue'
+              and billing_cycle in ('monthly', 'yearly')
+              and amount = 0
+              and currency = 'SGD'
+              and status = 'active'
+            """)).isEqualTo(2);
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            insert into platform_product_line_prices (app_key, billing_cycle, amount, currency, status)
+            values ('reservation_queue', 'weekly', 1, 'SGD', 'active')
+            """
+        )).hasMessageContaining("ck_platform_product_line_prices_cycle");
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            insert into platform_product_line_prices (app_key, billing_cycle, amount, currency, status)
+            values ('reservation_queue', 'monthly', -1, 'SGD', 'active')
+            """
+        )).hasMessageContaining("ck_platform_product_line_prices_amount");
+
+        int priceCountBeforeReplay = countWhere("select count(*) from platform_product_line_prices");
+        DATABASE.applyMigration("src/main/resources/db/migration/V010__platform_product_line_prices.sql");
+        assertThat(countWhere("select count(*) from platform_product_line_prices")).isEqualTo(priceCountBeforeReplay);
     }
 
     private static void insertTenantAndStore(UUID tenantId, UUID storeId, String tenantCode, String storeCode, String currency) {

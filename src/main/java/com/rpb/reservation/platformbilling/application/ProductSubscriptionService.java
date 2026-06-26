@@ -4,6 +4,7 @@ import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionEventR
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionRepository;
 import com.rpb.reservation.platformbilling.persistence.TenantProductEntitlementSyncGateway;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -24,15 +25,24 @@ public class ProductSubscriptionService {
     private final ProductSubscriptionRepository subscriptions;
     private final ProductSubscriptionEventRepository events;
     private final TenantProductEntitlementSyncGateway entitlements;
+    private final SubscriptionQuoteService quoteService;
+    private final BillingPeriodCalculator periodCalculator;
+    private final Clock clock;
 
     public ProductSubscriptionService(
         ProductSubscriptionRepository subscriptions,
         ProductSubscriptionEventRepository events,
-        TenantProductEntitlementSyncGateway entitlements
+        TenantProductEntitlementSyncGateway entitlements,
+        SubscriptionQuoteService quoteService,
+        BillingPeriodCalculator periodCalculator,
+        Clock clock
     ) {
         this.subscriptions = subscriptions;
         this.events = events;
         this.entitlements = entitlements;
+        this.quoteService = quoteService;
+        this.periodCalculator = periodCalculator;
+        this.clock = clock;
     }
 
     public List<ProductSubscription> listSubscriptions(UUID tenantId) {
@@ -63,20 +73,21 @@ public class ProductSubscriptionService {
         if (subscriptions.findByTenantIdAndAppKey(tenantId, normalized.appKey()).isPresent()) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_CONFLICT);
         }
+        PreparedMutation prepared = prepareMutation("purchase", null, normalized);
 
         ProductSubscription created = subscriptions.create(new ProductSubscriptionDraft(
             tenantId,
-            normalized.appKey(),
-            normalized.billingCycle(),
+            prepared.command().appKey(),
+            prepared.command().billingCycle(),
             ACTIVE,
-            normalized.currentPeriodStart(),
-            normalized.currentPeriodEnd(),
-            normalized.amount(),
-            normalized.currency(),
-            normalized.paymentNote(),
+            prepared.command().currentPeriodStart(),
+            prepared.command().currentPeriodEnd(),
+            prepared.command().amount(),
+            prepared.command().currency(),
+            prepared.command().paymentNote(),
             operator.userId()
         ));
-        appendEvent(created, "purchase", normalized.idempotencyKey(), operator.userId());
+        appendEvent(created, "purchase", normalized.idempotencyKey(), operator.userId(), prepared.quote());
         entitlements.enableTenantApp(
             tenantId,
             created.appKey(),
@@ -84,7 +95,7 @@ public class ProductSubscriptionService {
             created.currentPeriodEnd(),
             operator.userId()
         );
-        return new ProductSubscriptionMutationResult(false, afterEnabledSync(created));
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(created), prepared.quote());
     }
 
     @Transactional
@@ -109,23 +120,24 @@ public class ProductSubscriptionService {
             && !normalized.currentPeriodEnd().isAfter(current.currentPeriodEnd())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_CONFLICT);
         }
+        PreparedMutation prepared = prepareMutation("renew", current, normalized);
 
         ProductSubscription updated = subscriptions.update(new ProductSubscriptionUpdate(
             tenantId,
             subscriptionId,
-            normalized.billingCycle(),
+            prepared.command().billingCycle(),
             ACTIVE,
-            normalized.currentPeriodStart(),
-            normalized.currentPeriodEnd(),
-            normalized.amount(),
-            normalized.currency(),
-            normalized.paymentNote(),
+            prepared.command().currentPeriodStart(),
+            prepared.command().currentPeriodEnd(),
+            prepared.command().amount(),
+            prepared.command().currency(),
+            prepared.command().paymentNote(),
             operator.userId(),
             current.version()
         ));
-        appendEvent(updated, "renew", normalized.idempotencyKey(), operator.userId());
+        appendEvent(updated, "renew", normalized.idempotencyKey(), operator.userId(), prepared.quote());
         entitlements.enableTenantApp(tenantId, updated.appKey(), updated.currentPeriodStart(), updated.currentPeriodEnd(), operator.userId());
-        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updated));
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updated), prepared.quote());
     }
 
     @Transactional
@@ -173,22 +185,23 @@ public class ProductSubscriptionService {
             return replay.get();
         }
         checkVersion(current, normalized.version());
+        PreparedMutation prepared = prepareMutation("convert_from_legacy", current, normalized);
         ProductSubscription updated = subscriptions.update(new ProductSubscriptionUpdate(
             tenantId,
             subscriptionId,
-            normalized.billingCycle(),
+            prepared.command().billingCycle(),
             ACTIVE,
-            normalized.currentPeriodStart(),
-            normalized.currentPeriodEnd(),
-            normalized.amount(),
-            normalized.currency(),
-            normalized.paymentNote(),
+            prepared.command().currentPeriodStart(),
+            prepared.command().currentPeriodEnd(),
+            prepared.command().amount(),
+            prepared.command().currency(),
+            prepared.command().paymentNote(),
             operator.userId(),
             current.version()
         ));
-        appendEvent(updated, "convert_from_legacy", normalized.idempotencyKey(), operator.userId());
+        appendEvent(updated, "convert_from_legacy", normalized.idempotencyKey(), operator.userId(), prepared.quote());
         entitlements.enableTenantApp(tenantId, updated.appKey(), updated.currentPeriodStart(), updated.currentPeriodEnd(), operator.userId());
-        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updated));
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updated), prepared.quote());
     }
 
     private ProductSubscriptionMutationResult updateStatus(
@@ -219,7 +232,7 @@ public class ProductSubscriptionService {
             operator.userId(),
             current.version()
         ));
-        appendEvent(updated, eventType, normalized.idempotencyKey(), operator.userId());
+        appendEvent(updated, eventType, normalized.idempotencyKey(), operator.userId(), null);
         if (SUSPENDED.equals(nextStatus)) {
             entitlements.suspendTenantApp(tenantId, updated.appKey(), operator.userId());
         } else {
@@ -275,6 +288,7 @@ public class ProductSubscriptionService {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
         if ((cycle.equals("monthly") || cycle.equals("yearly"))
+            && command.durationCount() == null
             && (command.currentPeriodStart() == null || command.currentPeriodEnd() == null)) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
@@ -283,8 +297,11 @@ public class ProductSubscriptionService {
             && !command.currentPeriodEnd().isAfter(command.currentPeriodStart())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
-        BigDecimal amount = command.amount() == null ? BigDecimal.ZERO : command.amount();
-        if (amount.signum() < 0) {
+        BigDecimal amount = command.amount();
+        if (amount == null && command.durationCount() == null) {
+            amount = BigDecimal.ZERO;
+        }
+        if (amount != null && amount.signum() < 0) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
         String currency = blank(command.currency()) ? "SGD" : command.currency().trim().toUpperCase();
@@ -300,6 +317,7 @@ public class ProductSubscriptionService {
             amount,
             currency,
             textOrNull(command.paymentNote()),
+            command.durationCount(),
             command.version()
         );
     }
@@ -321,7 +339,40 @@ public class ProductSubscriptionService {
         }
     }
 
-    private void appendEvent(ProductSubscription subscription, String eventType, String idempotencyKey, UUID operatorUserId) {
+    private PreparedMutation prepareMutation(String operation, ProductSubscription current, ProductSubscriptionCommand command) {
+        if (command.durationCount() == null) {
+            return new PreparedMutation(command, null);
+        }
+        BillingDuration duration = new BillingDuration(command.billingCycle(), command.durationCount());
+        BillingPeriodCalculation period = periodCalculator.calculate(
+            operation,
+            current,
+            duration,
+            OffsetDateTime.now(clock)
+        );
+        SubscriptionQuote quote = quoteService.quote(command.appKey(), duration, command.amount(), command.currency());
+        ProductSubscriptionCommand prepared = new ProductSubscriptionCommand(
+            command.idempotencyKey(),
+            command.appKey(),
+            command.billingCycle(),
+            period.periodStart(),
+            period.periodEnd(),
+            quote.finalAmount(),
+            quote.currency(),
+            command.paymentNote(),
+            command.durationCount(),
+            command.version()
+        );
+        return new PreparedMutation(prepared, quote);
+    }
+
+    private void appendEvent(
+        ProductSubscription subscription,
+        String eventType,
+        String idempotencyKey,
+        UUID operatorUserId,
+        SubscriptionQuote quote
+    ) {
         events.append(new ProductSubscriptionEventDraft(
             subscription.id(),
             subscription.tenantId(),
@@ -335,8 +386,12 @@ public class ProductSubscriptionService {
             subscription.currency(),
             subscription.paymentNote(),
             idempotencyKey,
-            operatorUserId
+            operatorUserId,
+            quote == null ? "{}" : quote.eventPayloadJson()
         ));
+    }
+
+    private record PreparedMutation(ProductSubscriptionCommand command, SubscriptionQuote quote) {
     }
 
     private static ProductSubscription withEffectiveStatus(ProductSubscription subscription) {

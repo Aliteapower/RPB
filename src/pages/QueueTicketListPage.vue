@@ -14,6 +14,7 @@ import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
+import { formatAppGateErrorMessage, formatAppGateErrorTitle } from '../utils/appGateErrorMessages'
 import type { MeAppEntry } from '../types/meApps'
 import type {
   CallQueueTicketResponse,
@@ -1187,33 +1188,28 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
         </section>
 
         <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>加载失败</h2>
-          <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-          <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+          <h2>{{ formatAppGateErrorTitle(apiError.error, '加载失败') }}</h2>
+          <p>{{ formatAppGateErrorMessage(apiError.error, '暂时无法读取排队列表，请稍后重试。') }}</p>
         </section>
 
         <section v-if="callApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>叫号失败</h2>
-          <p class="error-code">错误代码：{{ callApiError.error.code }}</p>
-          <p class="message-key">消息键：{{ callApiError.error.messageKey }}</p>
+          <h2>{{ formatAppGateErrorTitle(callApiError.error, '叫号失败') }}</h2>
+          <p>{{ formatAppGateErrorMessage(callApiError.error, '暂时无法叫号，请稍后重试。') }}</p>
         </section>
 
         <section v-if="skipApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>过号失败</h2>
-          <p class="error-code">错误代码：{{ skipApiError.error.code }}</p>
-          <p class="message-key">消息键：{{ skipApiError.error.messageKey }}</p>
+          <h2>{{ formatAppGateErrorTitle(skipApiError.error, '过号失败') }}</h2>
+          <p>{{ formatAppGateErrorMessage(skipApiError.error, '暂时无法过号，请稍后重试。') }}</p>
         </section>
 
         <section v-if="rejoinApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>重新入队失败</h2>
-          <p class="error-code">错误代码：{{ rejoinApiError.error.code }}</p>
-          <p class="message-key">消息键：{{ rejoinApiError.error.messageKey }}</p>
+          <h2>{{ formatAppGateErrorTitle(rejoinApiError.error, '重新入队失败') }}</h2>
+          <p>{{ formatAppGateErrorMessage(rejoinApiError.error, '暂时无法重回队列，请稍后重试。') }}</p>
         </section>
 
         <section v-if="cancelApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>取消失败</h2>
-          <p class="error-code">错误代码：{{ cancelApiError.error.code }}</p>
-          <p class="message-key">消息键：{{ cancelApiError.error.messageKey }}</p>
+          <h2>{{ formatAppGateErrorTitle(cancelApiError.error, '取消失败') }}</h2>
+          <p>{{ formatAppGateErrorMessage(cancelApiError.error, '暂时无法取消排队，请稍后重试。') }}</p>
         </section>
 
         <section v-if="callSuccess" class="state-panel success-panel" aria-live="polite">

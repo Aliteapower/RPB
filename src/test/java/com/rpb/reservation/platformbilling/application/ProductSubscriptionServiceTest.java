@@ -5,10 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionEventRepository;
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionRepository;
+import com.rpb.reservation.platformbilling.persistence.PlatformProductLinePriceRepository;
 import com.rpb.reservation.platformbilling.persistence.TenantProductEntitlementSyncGateway;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,9 +29,11 @@ class ProductSubscriptionServiceTest {
     private static final OffsetDateTime JAN_1 = OffsetDateTime.parse("2026-01-01T00:00:00Z");
     private static final OffsetDateTime JAN_31 = OffsetDateTime.parse("2026-01-31T23:59:59Z");
     private static final OffsetDateTime FEB_28 = OffsetDateTime.parse("2026-02-28T23:59:59Z");
+    private static final Clock CLOCK = Clock.fixed(JAN_1.toInstant(), ZoneOffset.UTC);
 
     private FakeProductSubscriptionRepository subscriptions;
     private FakeProductSubscriptionEventRepository events;
+    private FakeProductLinePriceRepository prices;
     private FakeEntitlementSyncGateway syncGateway;
     private ProductSubscriptionService service;
 
@@ -35,8 +41,16 @@ class ProductSubscriptionServiceTest {
     void setUp() {
         subscriptions = new FakeProductSubscriptionRepository();
         events = new FakeProductSubscriptionEventRepository();
+        prices = new FakeProductLinePriceRepository();
         syncGateway = new FakeEntitlementSyncGateway();
-        service = new ProductSubscriptionService(subscriptions, events, syncGateway);
+        service = new ProductSubscriptionService(
+            subscriptions,
+            events,
+            syncGateway,
+            new SubscriptionQuoteService(prices),
+            new BillingPeriodCalculator(),
+            CLOCK
+        );
     }
 
     @Test
@@ -74,6 +88,41 @@ class ProductSubscriptionServiceTest {
         assertThat(result.subscription().entitlementValidUntil()).isEqualTo(FEB_28);
         assertThat(syncGateway.actions).containsExactly("enabled:reservation_queue:2026-02-28T23:59:59Z");
         assertThat(events.events).containsExactly("renew:renew-001");
+    }
+
+    @Test
+    void purchaseWithDurationDefaultsAmountFromProductLinePriceAndCalculatesPeriodOnBackend() {
+        ProductSubscriptionCommand command = durationCommand("purchase-duration", "monthly", 3, null, null);
+
+        ProductSubscriptionMutationResult result = service.purchase(TENANT_ID, command, OPERATOR);
+
+        assertThat(result.subscription().currentPeriodStart()).isEqualTo(JAN_1);
+        assertThat(result.subscription().currentPeriodEnd()).isEqualTo(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        assertThat(result.subscription().amount()).isEqualByComparingTo("384.00");
+        assertThat(result.quote().durationCount()).isEqualTo(3);
+        assertThat(result.quote().unitAmount()).isEqualByComparingTo("128.00");
+        assertThat(result.quote().defaultAmount()).isEqualByComparingTo("384.00");
+        assertThat(events.payloads).singleElement().satisfies(payload -> assertThat(payload)
+            .contains("\"durationCount\": 3")
+            .contains("\"priceSource\": \"platform_product_line_prices\""));
+    }
+
+    @Test
+    void renewWithDurationExtendsFromFutureCurrentEndAndAllowsManualAmountOverride() {
+        ProductSubscription existing = subscriptions.add(existingSubscription("monthly", "active", JAN_1, JAN_31, 0));
+
+        ProductSubscriptionMutationResult result = service.renew(
+            TENANT_ID,
+            existing.id(),
+            durationCommand("renew-duration", "monthly", 2, new BigDecimal("200.00"), 0),
+            OPERATOR
+        );
+
+        assertThat(result.subscription().currentPeriodStart()).isEqualTo(JAN_31);
+        assertThat(result.subscription().currentPeriodEnd()).isEqualTo(OffsetDateTime.parse("2026-03-31T23:59:59Z"));
+        assertThat(result.subscription().amount()).isEqualByComparingTo("200.00");
+        assertThat(result.quote().defaultAmount()).isEqualByComparingTo("256.00");
+        assertThat(result.quote().finalAmount()).isEqualByComparingTo("200.00");
     }
 
     @Test
@@ -158,6 +207,27 @@ class ProductSubscriptionServiceTest {
         OffsetDateTime periodEnd
     ) {
         return command(idempotencyKey, billingCycle, periodStart, periodEnd, null);
+    }
+
+    private static ProductSubscriptionCommand durationCommand(
+        String idempotencyKey,
+        String billingCycle,
+        int durationCount,
+        BigDecimal amount,
+        Integer version
+    ) {
+        return new ProductSubscriptionCommand(
+            idempotencyKey,
+            APP_KEY,
+            billingCycle,
+            null,
+            null,
+            amount,
+            "SGD",
+            "manual payment",
+            durationCount,
+            version
+        );
     }
 
     private static ProductSubscriptionCommand command(
@@ -301,6 +371,7 @@ class ProductSubscriptionServiceTest {
     private static final class FakeProductSubscriptionEventRepository implements ProductSubscriptionEventRepository {
         private final Map<String, UUID> idempotency = new LinkedHashMap<>();
         private final List<String> events = new ArrayList<>();
+        private final List<String> payloads = new ArrayList<>();
 
         @Override
         public Optional<UUID> findSubscriptionIdByIdempotencyKey(UUID tenantId, String appKey, String eventType, String idempotencyKey) {
@@ -310,7 +381,30 @@ class ProductSubscriptionServiceTest {
         @Override
         public void append(ProductSubscriptionEventDraft draft) {
             events.add(draft.eventType() + ":" + draft.idempotencyKey());
+            payloads.add(draft.eventPayloadJson());
             idempotency.put(draft.eventType() + ":" + draft.idempotencyKey(), draft.subscriptionId());
+        }
+    }
+
+    private static final class FakeProductLinePriceRepository implements PlatformProductLinePriceRepository {
+        @Override
+        public List<PlatformProductLinePrice> findByAppKeys(Collection<String> appKeys) {
+            return List.of(
+                new PlatformProductLinePrice(APP_KEY, "monthly", new BigDecimal("128.00"), "SGD", "active", 0),
+                new PlatformProductLinePrice(APP_KEY, "yearly", new BigDecimal("1200.00"), "SGD", "active", 0)
+            );
+        }
+
+        @Override
+        public List<PlatformProductLinePrice> replacePrices(String appKey, List<PlatformProductLinePriceUpdate> prices) {
+            return findByAppKeys(List.of(appKey));
+        }
+
+        @Override
+        public Optional<PlatformProductLinePrice> findActivePrice(String appKey, String billingCycle) {
+            return findByAppKeys(List.of(appKey)).stream()
+                .filter(price -> price.billingCycle().equals(billingCycle))
+                .findFirst();
         }
     }
 

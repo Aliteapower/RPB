@@ -132,6 +132,7 @@ public class PlatformTenantProductSubscriptionController {
             request.amount(),
             request.currency(),
             request.paymentNote(),
+            request.durationCount(),
             request.version()
         );
     }

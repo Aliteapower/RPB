@@ -12,6 +12,7 @@ record ProductSubscriptionMutationRequest(
     BigDecimal amount,
     String currency,
     String paymentNote,
+    Integer durationCount,
     Integer version
 ) {
 }

@@ -2,6 +2,7 @@ import type {
   PlatformBillingApiErrorResponse,
   PlatformProductLineListResponse,
   PlatformProductLineMutation,
+  PlatformProductLinePriceMutation,
   PlatformProductLineResponse,
   ProductSubscriptionMutation,
   ProductSubscriptionStatusMutation,
@@ -42,6 +43,18 @@ export async function updateProductLine(
   fetcher?: PlatformBillingFetcher
 ): Promise<PlatformProductLineResponse> {
   return requestJson(`/api/v1/platform/product-lines/${encodeURIComponent(appKey)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function updateProductLinePrices(
+  appKey: string,
+  request: PlatformProductLinePriceMutation,
+  fetcher?: PlatformBillingFetcher
+): Promise<PlatformProductLineResponse> {
+  return requestJson(`/api/v1/platform/product-lines/${encodeURIComponent(appKey)}/prices`, {
     method: 'PATCH',
     body: request,
     fetcher

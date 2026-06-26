@@ -4,24 +4,36 @@ import { onMounted, reactive, ref } from 'vue'
 import {
   PlatformBillingApiError,
   listProductLines,
-  updateProductLine
+  updateProductLine,
+  updateProductLinePrices
 } from '../api/platformProductLineBillingApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
-import type { PlatformProductLine, ProductLineStatus } from '../types/platformProductLineBilling'
+import type { PlatformProductLine, ProductLinePriceStatus, ProductLineStatus } from '../types/platformProductLineBilling'
 import { useAuthSessionStore } from '../stores/authSession'
 
 const auth = useAuthSessionStore()
 const productLines = ref<PlatformProductLine[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const priceSaving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const form = reactive({
   appKey: 'reservation_queue',
   displayName: '预约排队叫号产线',
   status: 'active' as ProductLineStatus,
+  defaultEntryRoute: '/stores/:storeId/staff',
   description: '预约、排队、叫号一体化产线',
   sortOrder: 10
+})
+const priceForm = reactive({
+  monthlyAmount: 0,
+  yearlyAmount: 0,
+  currency: 'SGD',
+  monthlyStatus: 'active' as ProductLinePriceStatus,
+  yearlyStatus: 'active' as ProductLinePriceStatus,
+  monthlyVersion: 0,
+  yearlyVersion: 0
 })
 
 onMounted(() => {
@@ -49,8 +61,18 @@ function selectProductLine(productLine?: PlatformProductLine): void {
   form.appKey = productLine.appKey
   form.displayName = productLine.displayName
   form.status = productLine.status
+  form.defaultEntryRoute = productLine.defaultEntryRoute
   form.description = productLine.description ?? ''
   form.sortOrder = productLine.sortOrder
+  const monthly = productLine.prices.find(price => price.billingCycle === 'monthly')
+  const yearly = productLine.prices.find(price => price.billingCycle === 'yearly')
+  priceForm.monthlyAmount = monthly?.amount ?? 0
+  priceForm.yearlyAmount = yearly?.amount ?? 0
+  priceForm.currency = monthly?.currency ?? yearly?.currency ?? 'SGD'
+  priceForm.monthlyStatus = monthly?.status ?? 'active'
+  priceForm.yearlyStatus = yearly?.status ?? 'active'
+  priceForm.monthlyVersion = monthly?.version ?? 0
+  priceForm.yearlyVersion = yearly?.version ?? 0
 }
 
 async function saveProductLine(): Promise<void> {
@@ -76,6 +98,46 @@ async function saveProductLine(): Promise<void> {
     errorText.value = apiErrorText(error)
   } finally {
     saving.value = false
+  }
+}
+
+async function saveProductLinePrices(): Promise<void> {
+  if (priceSaving.value) {
+    return
+  }
+  priceSaving.value = true
+  errorText.value = ''
+  savedText.value = ''
+  try {
+    const currency = priceForm.currency.trim().toUpperCase() || 'SGD'
+    const response = await updateProductLinePrices(form.appKey, {
+      prices: [
+        {
+          billingCycle: 'monthly',
+          amount: Number(priceForm.monthlyAmount) || 0,
+          currency,
+          status: priceForm.monthlyStatus,
+          version: priceForm.monthlyVersion
+        },
+        {
+          billingCycle: 'yearly',
+          amount: Number(priceForm.yearlyAmount) || 0,
+          currency,
+          status: priceForm.yearlyStatus,
+          version: priceForm.yearlyVersion
+        }
+      ]
+    })
+    const index = productLines.value.findIndex(item => item.appKey === response.productLine.appKey)
+    if (index >= 0) {
+      productLines.value[index] = response.productLine
+    }
+    selectProductLine(response.productLine)
+    savedText.value = '定价已保存'
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    priceSaving.value = false
   }
 }
 
@@ -120,15 +182,17 @@ function apiErrorText(error: unknown): string {
                 <th>产品线</th>
                 <th>App Key</th>
                 <th>状态</th>
+                <th>默认入口</th>
                 <th>排序</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="4" class="table-empty">加载中</td>
+                <td colspan="6" class="table-empty">加载中</td>
               </tr>
               <tr v-else-if="productLines.length === 0">
-                <td colspan="4" class="table-empty">暂无产品线</td>
+                <td colspan="6" class="table-empty">暂无产品线</td>
               </tr>
               <tr
                 v-for="productLine in productLines"
@@ -140,42 +204,87 @@ function apiErrorText(error: unknown): string {
                 <td>{{ productLine.displayName }}</td>
                 <td>{{ productLine.appKey }}</td>
                 <td>{{ productLine.status === 'active' ? '启用' : '停用' }}</td>
+                <td>{{ productLine.defaultEntryRoute }}</td>
                 <td>{{ productLine.sortOrder }}</td>
+                <td>
+                  <button class="text-action" type="button" @click.stop="selectProductLine(productLine)">编辑</button>
+                </td>
               </tr>
             </tbody>
           </table>
         </section>
 
-        <form class="edit-panel" @submit.prevent="saveProductLine">
-          <h2>产品线设置</h2>
-          <label>
-            <span>App Key</span>
-            <input v-model="form.appKey" disabled>
-          </label>
-          <label>
-            <span>展示名称</span>
-            <input v-model.trim="form.displayName" required>
-          </label>
-          <label>
-            <span>状态</span>
-            <select v-model="form.status">
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
-            </select>
-          </label>
-          <label>
-            <span>排序</span>
-            <input v-model.number="form.sortOrder" type="number" min="0">
-          </label>
-          <label>
-            <span>说明</span>
-            <textarea v-model.trim="form.description" rows="4" />
-          </label>
-          <p class="form-note">停用产品线会影响所有已购买该产品线的租户</p>
-          <button class="primary-button" type="submit" :disabled="saving || loading">
-            {{ saving ? '保存中' : '保存' }}
-          </button>
-        </form>
+        <div class="side-panels">
+          <form class="edit-panel" @submit.prevent="saveProductLine">
+            <h2>产品线设置</h2>
+            <label>
+              <span>App Key</span>
+              <input v-model="form.appKey" disabled>
+            </label>
+            <label>
+              <span>展示名称</span>
+              <input v-model.trim="form.displayName" required>
+            </label>
+            <label>
+              <span>状态</span>
+              <select v-model="form.status">
+                <option value="active">启用</option>
+                <option value="disabled">停用</option>
+              </select>
+            </label>
+            <label>
+              <span>默认入口</span>
+              <input v-model="form.defaultEntryRoute" disabled>
+            </label>
+            <label>
+              <span>排序</span>
+              <input v-model.number="form.sortOrder" type="number" min="0">
+            </label>
+            <label>
+              <span>说明</span>
+              <textarea v-model.trim="form.description" rows="4" />
+            </label>
+            <p class="form-note">停用产品线会影响所有已购买该产品线的租户</p>
+            <button class="primary-button" type="submit" :disabled="saving || loading">
+              {{ saving ? '保存中' : '保存产品线' }}
+            </button>
+          </form>
+
+          <form class="edit-panel" @submit.prevent="saveProductLinePrices">
+            <h2>定价</h2>
+            <label>
+              <span>月付价格</span>
+              <input v-model.number="priceForm.monthlyAmount" type="number" min="0" step="0.01">
+            </label>
+            <label>
+              <span>年付价格</span>
+              <input v-model.number="priceForm.yearlyAmount" type="number" min="0" step="0.01">
+            </label>
+            <label>
+              <span>币种</span>
+              <input v-model.trim="priceForm.currency" maxlength="3">
+            </label>
+            <div class="price-status-grid">
+              <label>
+                <span>月付状态</span>
+                <select v-model="priceForm.monthlyStatus">
+                  <option value="active">启用</option>
+                  <option value="disabled">停用</option>
+                </select>
+              </label>
+              <label>
+                <span>年付状态</span>
+                <select v-model="priceForm.yearlyStatus">
+                  <option value="active">启用</option>
+                  <option value="disabled">停用</option>
+                </select>
+              </label>
+            </div>
+            <button class="primary-button" type="submit" :disabled="priceSaving || loading">
+              {{ priceSaving ? '保存中' : '保存定价' }}
+            </button>
+          </form>
+        </div>
       </div>
     </section>
   </main>
@@ -196,7 +305,8 @@ function apiErrorText(error: unknown): string {
 }
 
 .page-heading,
-.workspace-grid {
+.workspace-grid,
+.side-panels {
   display: grid;
   gap: 16px;
 }
@@ -279,9 +389,19 @@ function apiErrorText(error: unknown): string {
   padding: 16px;
 }
 
+.side-panels {
+  align-items: start;
+}
+
 .edit-panel label {
   display: grid;
   gap: 6px;
+}
+
+.price-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .edit-panel input,
@@ -299,7 +419,8 @@ function apiErrorText(error: unknown): string {
 }
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.text-action {
   min-height: 36px;
   border-radius: 6px;
   padding: 0 14px;
@@ -318,6 +439,12 @@ function apiErrorText(error: unknown): string {
   border: 1px solid #cbd5e1;
   color: #334155;
   background: #ffffff;
+}
+
+.text-action {
+  border: 0;
+  color: #0f766e;
+  background: transparent;
 }
 
 .primary-button:disabled,

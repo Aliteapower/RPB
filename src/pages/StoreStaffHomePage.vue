@@ -15,6 +15,10 @@ import type {
   StaffHomeOverviewApiErrorResponse,
   StaffHomeOverviewResponse
 } from '../types/staffHomeOverview'
+import {
+  formatAppGateErrorMessage,
+  formatAppGateErrorTitle
+} from '../utils/appGateErrorMessages'
 
 interface KpiItem {
   key: string
@@ -260,7 +264,8 @@ const overviewHint = computed(() => {
 
   return '当前没有排队压力'
 })
-const errorText = computed(() => apiError.value?.error.messageKey ?? 'staff_home.overview.unknown_error')
+const errorTitle = computed(() => formatAppGateErrorTitle(apiError.value?.error, '今日概览暂不可用'))
+const errorText = computed(() => formatAppGateErrorMessage(apiError.value?.error, '暂时无法读取今日概览，请稍后重试。'))
 
 watch(
   [storeId, currentBusinessDate],
@@ -358,7 +363,7 @@ function hasPermission(permission: string): boolean {
       </section>
 
       <section v-if="apiError" class="overview-error" aria-label="今日概览加载失败">
-        <strong>今日概览暂不可用</strong>
+        <strong>{{ errorTitle }}</strong>
         <span>{{ errorText }}</span>
       </section>
 

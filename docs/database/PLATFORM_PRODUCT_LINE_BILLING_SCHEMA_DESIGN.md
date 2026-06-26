@@ -1,12 +1,16 @@
 # Platform Product Line Billing Schema Design
 
-Status: Phase 1 implemented
+Status: Phase 1 implemented, Phase 1.1 pricing implemented
 
 ## Migration
 
 Phase 1 schema is owned by:
 
 - `src/main/resources/db/migration/V008__platform_product_line_billing.sql`
+
+Phase 1.1 pricing schema is owned by:
+
+- `src/main/resources/db/migration/V010__platform_product_line_prices.sql`
 
 ## Tables
 
@@ -22,6 +26,15 @@ Phase 1 schema is owned by:
 - Append-only event history for manual billing actions.
 - Supports `purchase`, `renew`, `suspend`, `cancel`, `convert_from_legacy`, `manual_adjust`.
 - Enforces idempotency by `(tenant_id, app_key, event_type, idempotency_key)`.
+- Stores quote snapshots in `event_payload` for duration-based purchase, renew, and legacy conversion.
+
+`platform_product_line_prices`
+
+- One monthly price and one yearly price per `platform_apps.app_key`.
+- Supports `billing_cycle`: `monthly`, `yearly`.
+- Stores default amount, currency, status, timestamps, and optimistic `version`.
+- Enforces unique `(app_key, billing_cycle)`.
+- Seeds `reservation_queue` monthly and yearly rows with `0.00 SGD` for platform-admin configuration.
 
 ## Product Line Source
 
@@ -61,3 +74,16 @@ Billing writes commercial state to its own tables, records events, then syncs Ap
 - legacy grant: keeps `valid_until = null`
 
 No reservation, queue, queue display, cleaning, or walk-in business table is changed by billing.
+
+## Phase 1.1 Duration And Quote Boundary
+
+Normal purchase, renew, and legacy conversion commands use `durationCount` instead of user-selected dates.
+
+The backend calculates:
+
+- `current_period_start`
+- `current_period_end`
+- default amount from product-line price times duration
+- App Gate `valid_from` and `valid_until`
+
+The frontend may preview values, but the backend result is authoritative.

@@ -2,8 +2,10 @@ package com.rpb.reservation.platformbilling.api;
 
 import com.rpb.reservation.platformbilling.application.PlatformBillingServiceException;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineMutationCommand;
+import com.rpb.reservation.platformbilling.application.PlatformProductLinePriceUpdate;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineService;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
+import java.util.List;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -47,6 +49,17 @@ public class PlatformProductLineController {
         ));
     }
 
+    @PatchMapping("/{appKey}/prices")
+    public ResponseEntity<PlatformProductLineResponse> updateProductLinePrices(
+        @PathVariable String appKey,
+        @RequestBody(required = false) PlatformProductLinePriceRequests.UpdatePricesRequest request
+    ) {
+        PlatformBillingSecurity.requirePlatformAdmin(currentActorProvider, PRODUCT_LINE_MANAGE);
+        return ResponseEntity.ok(PlatformProductLineResponse.from(
+            productLineService.updateProductLinePrices(appKey, toPriceUpdates(request))
+        ));
+    }
+
     @ExceptionHandler(PlatformBillingApiException.class)
     public ResponseEntity<PlatformBillingApiErrorResponse> handleApiException(PlatformBillingApiException exception) {
         return apiError(exception.code());
@@ -72,6 +85,21 @@ public class PlatformProductLineController {
             request.description(),
             request.sortOrder()
         );
+    }
+
+    private static List<PlatformProductLinePriceUpdate> toPriceUpdates(PlatformProductLinePriceRequests.UpdatePricesRequest request) {
+        if (request == null || request.prices() == null) {
+            return List.of();
+        }
+        return request.prices().stream()
+            .map(item -> new PlatformProductLinePriceUpdate(
+                item.billingCycle(),
+                item.amount(),
+                item.currency(),
+                item.status(),
+                item.version()
+            ))
+            .toList();
     }
 
     private static ResponseEntity<PlatformBillingApiErrorResponse> apiError(PlatformBillingApiErrorCode code) {

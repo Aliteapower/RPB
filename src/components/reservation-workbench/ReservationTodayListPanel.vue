@@ -22,6 +22,10 @@ import type {
   ReservationTodayViewItem,
   ReservationTodayViewStatusFilter
 } from '../../types/reservationTodayView'
+import {
+  formatAppGateErrorMessage,
+  formatAppGateErrorTitle
+} from '../../utils/appGateErrorMessages'
 import ReservationTodayListItem from './ReservationTodayListItem.vue'
 
 const props = defineProps<{
@@ -272,21 +276,18 @@ function createLocalStatusActionError(
     </section>
 
     <section v-if="apiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
-      <h3>加载失败</h3>
-      <p>错误代码：{{ apiError.error.code }}</p>
-      <p>消息键：{{ apiError.error.messageKey }}</p>
+      <h3>{{ formatAppGateErrorTitle(apiError.error, '加载失败') }}</h3>
+      <p>{{ formatAppGateErrorMessage(apiError.error, '暂时无法读取当日预约，请稍后重试。') }}</p>
     </section>
 
     <section v-if="cancelApiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
-      <h3>取消失败</h3>
-      <p>错误代码：{{ cancelApiError.error.code }}</p>
-      <p>消息键：{{ cancelApiError.error.messageKey }}</p>
+      <h3>{{ formatAppGateErrorTitle(cancelApiError.error, '取消失败') }}</h3>
+      <p>{{ formatAppGateErrorMessage(cancelApiError.error, '暂时无法取消预约，请稍后重试。') }}</p>
     </section>
 
     <section v-if="statusActionApiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
-      <h3>状态操作失败</h3>
-      <p>错误代码：{{ statusActionApiError.error.code }}</p>
-      <p>消息键：{{ statusActionApiError.error.messageKey }}</p>
+      <h3>{{ formatAppGateErrorTitle(statusActionApiError.error, '状态操作失败') }}</h3>
+      <p>{{ formatAppGateErrorMessage(statusActionApiError.error, '暂时无法更新预约状态，请稍后重试。') }}</p>
     </section>
 
     <section v-if="showEmptyState" class="reservation-today-list__state" aria-live="polite">

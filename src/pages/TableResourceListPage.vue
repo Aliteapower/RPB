@@ -35,6 +35,7 @@ import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwit
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
+import { formatAppGateErrorMessage, formatAppGateErrorTitle } from '../utils/appGateErrorMessages'
 import type {
   TableResourceApiErrorResponse,
   TableResourceItem,
@@ -1132,13 +1133,13 @@ function formatStoreLabel(value: string | undefined): string {
     </section>
 
     <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
-      <strong>{{ apiError.error.code }}</strong>
-      <span>{{ apiError.error.messageKey }}</span>
+      <strong>{{ formatAppGateErrorTitle(apiError.error, '桌台加载失败') }}</strong>
+      <span>{{ formatAppGateErrorMessage(apiError.error, '暂时无法读取桌台，请稍后重试。') }}</span>
     </section>
 
     <section v-if="actionError" class="state-panel error-panel" aria-live="assertive">
-      <strong>{{ actionError.error.code }}</strong>
-      <span>{{ actionError.error.messageKey }}</span>
+      <strong>{{ formatAppGateErrorTitle(actionError.error, '桌台操作失败') }}</strong>
+      <span>{{ formatAppGateErrorMessage(actionError.error, '暂时无法完成桌台操作，请稍后重试。') }}</span>
     </section>
 
     <section v-if="showNoConfiguredResources" class="state-panel" aria-live="polite">

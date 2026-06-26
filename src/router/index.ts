@@ -53,6 +53,12 @@ export const router = createRouter({
       meta: { requiresPlatformAdmin: true }
     },
     {
+      path: '/platform/billing/subscriptions',
+      name: 'platform-billing-subscriptions',
+      component: PlatformTenantsPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
       path: '/platform/tenants/new',
       name: 'platform-tenant-create',
       component: PlatformTenantFormPage,

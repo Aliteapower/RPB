@@ -34,13 +34,16 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("PlatformProductLinesPage")
             .contains("PlatformTenantBillingPage")
             .contains("path: '/platform/settings/product-lines'")
+            .contains("path: '/platform/billing/subscriptions'")
             .contains("path: '/platform/tenants/:tenantId/billing'")
             .contains("meta: { requiresPlatformAdmin: true }");
 
         assertThat(nav)
             .contains("/platform/settings/product-lines")
-            .contains("产品线");
-        assertThat(tenantTable).contains("计费").contains("billing");
+            .contains("/platform/billing/subscriptions")
+            .contains("产品线")
+            .contains("租户计费");
+        assertThat(tenantTable).contains("计费").contains("订阅/计费").contains("billingOnly").contains("billing");
 
         assertThat(api)
             .contains("listProductLines")
@@ -68,6 +71,11 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("产品线")
             .contains("预约排队叫号产线")
             .contains("reservation_queue")
+            .contains("defaultEntryRoute")
+            .contains("月付价格")
+            .contains("年付价格")
+            .contains("保存定价")
+            .contains("updateProductLinePrices")
             .contains("loading")
             .contains("errorText")
             .contains("saving")
@@ -76,14 +84,34 @@ class PlatformProductLineBillingUiImplementationValidationTest {
         assertThat(tenantBillingPage)
             .contains("订阅 / 计费")
             .contains("历史赠送 / 永久有效")
+            .contains("有效期开始")
+            .contains("金额")
+            .contains("币种")
+            .contains("购买数量")
+            .contains("个月")
+            .contains("标准单价")
+            .contains("本次金额")
+            .contains("calculatedAmount")
+            .contains("amount: calculatedAmount.value")
             .contains("purchaseProductSubscription")
             .contains("renewProductSubscription")
             .contains("suspendProductSubscription")
             .contains("cancelProductSubscription")
             .contains("convertLegacyProductSubscription")
             .contains("newIdempotencyKey")
+            .contains("selectedSubscription")
+            .contains("submitSelectedProductMutation")
+            .contains("primaryActionLabel")
+            .contains("toggleProductLine")
+            .contains("isProductLineChecked")
+            .contains("@change=\"toggleProductLine(row, $event)\"")
+            .contains("canRenew")
             .contains("loading")
             .contains("errorText")
-            .contains("saving");
+            .contains("saving")
+            .doesNotContain("@submit.prevent=\"purchaseSelectedProduct\"")
+            .doesNotContain(":checked=\"row.subscription?.status === 'active'\" disabled")
+            .doesNotContain("v-model.number=\"form.amount\"")
+            .doesNotContain("type=\"datetime-local\"");
     }
 }

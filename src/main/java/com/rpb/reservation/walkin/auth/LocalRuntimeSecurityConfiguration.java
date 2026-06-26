@@ -78,6 +78,7 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/restore").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/platform/product-lines").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/product-lines/*").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/product-lines/*/prices").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/platform/tenants/*/product-subscriptions").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/purchase").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/renew").permitAll()

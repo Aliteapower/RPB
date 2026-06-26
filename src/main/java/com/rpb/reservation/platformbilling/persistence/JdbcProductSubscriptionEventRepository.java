@@ -48,7 +48,7 @@ public class JdbcProductSubscriptionEventRepository implements ProductSubscripti
                 amount, currency, payment_note, idempotency_key,
                 operator_user_id, event_payload
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}'::jsonb)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
             """,
             draft.subscriptionId(),
             draft.tenantId(),
@@ -62,7 +62,8 @@ public class JdbcProductSubscriptionEventRepository implements ProductSubscripti
             draft.currency(),
             draft.paymentNote(),
             draft.idempotencyKey(),
-            draft.operatorUserId()
+            draft.operatorUserId(),
+            draft.eventPayloadJson() == null || draft.eventPayloadJson().isBlank() ? "{}" : draft.eventPayloadJson()
         );
     }
 }

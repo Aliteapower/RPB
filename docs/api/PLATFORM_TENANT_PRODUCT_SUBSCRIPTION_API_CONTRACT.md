@@ -1,6 +1,6 @@
 # Platform Tenant Product Subscription API Contract
 
-Status: Phase 1 implemented
+Status: Phase 1 implemented, Phase 1.1 duration billing implemented
 
 ## Scope
 
@@ -43,19 +43,30 @@ Converts a `legacy_grant` subscription into a manual paid cycle and records a `c
 
 ## Mutation Request
 
+Normal platform-admin purchase, renew, and convert-from-legacy commands use `durationCount`.
+
+The backend calculates `currentPeriodStart` and `currentPeriodEnd`.
+
 ```json
 {
   "idempotencyKey": "manual-20260626-001",
   "appKey": "reservation_queue",
   "billingCycle": "monthly",
-  "currentPeriodStart": "2026-07-01T00:00:00Z",
-  "currentPeriodEnd": "2026-07-31T23:59:59Z",
-  "amount": 128.00,
+  "durationCount": 3,
+  "amount": 384.00,
   "currency": "SGD",
   "paymentNote": "manual transfer",
   "version": 0
 }
 ```
+
+If `amount` is omitted, the backend defaults it from the product-line price:
+
+```text
+unit price * durationCount
+```
+
+If `amount` is present, it is stored as the final manual amount. The subscription event payload records unit price, default amount, final amount, duration, currency, and price source.
 
 `version` is required for optimistic protection on renew, suspend, cancel, and convert.
 
@@ -85,12 +96,20 @@ Converts a `legacy_grant` subscription into a manual paid cycle and records a `c
     "effectiveStatus": "active",
     "currentPeriodStart": "2026-07-01T00:00:00Z",
     "currentPeriodEnd": "2026-07-31T23:59:59Z",
-    "amount": 128.00,
+    "amount": 384.00,
     "currency": "SGD",
     "paymentNote": "manual transfer",
     "entitlementStatus": "enabled",
     "entitlementValidUntil": "2026-07-31T23:59:59Z",
     "version": 0
+  },
+  "quote": {
+    "durationCount": 3,
+    "durationUnit": "month",
+    "unitAmount": 128.00,
+    "defaultAmount": 384.00,
+    "finalAmount": 384.00,
+    "currency": "SGD"
   }
 }
 ```

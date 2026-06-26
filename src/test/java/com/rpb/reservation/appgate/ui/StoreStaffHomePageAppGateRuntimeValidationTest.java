@@ -67,6 +67,67 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
     }
 
     @Test
+    void staffPagesShowFriendlyAppGateSubscriptionMessages() throws Exception {
+        String staffHomeSource = Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
+        String todayListSource = Files.readString(Path.of(
+            "src",
+            "components",
+            "reservation-workbench",
+            "ReservationTodayListPanel.vue"
+        ));
+        String queueTicketListSource = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String tableResourceListSource = Files.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
+        Path appGateMessagesPath = Path.of("src", "utils", "appGateErrorMessages.ts");
+
+        assertThat(appGateMessagesPath).exists();
+        String appGateMessagesSource = Files.readString(appGateMessagesPath);
+
+        assertThat(staffHomeSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("apiError.value?.error.messageKey");
+
+        assertThat(todayListSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("错误代码：{{ apiError.error.code }}")
+            .doesNotContain("消息键：{{ apiError.error.messageKey }}");
+
+        assertThat(queueTicketListSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("错误代码：{{ apiError.error.code }}")
+            .doesNotContain("消息键：{{ apiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ callApiError.error.code }}")
+            .doesNotContain("消息键：{{ callApiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ skipApiError.error.code }}")
+            .doesNotContain("消息键：{{ skipApiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ rejoinApiError.error.code }}")
+            .doesNotContain("消息键：{{ rejoinApiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ cancelApiError.error.code }}")
+            .doesNotContain("消息键：{{ cancelApiError.error.messageKey }}");
+
+        assertThat(tableResourceListSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("<strong>{{ apiError.error.code }}</strong>")
+            .doesNotContain("<span>{{ apiError.error.messageKey }}</span>")
+            .doesNotContain("<strong>{{ actionError.error.code }}</strong>")
+            .doesNotContain("<span>{{ actionError.error.messageKey }}</span>");
+
+        assertThat(appGateMessagesSource)
+            .contains("TENANT_APP_NOT_ENABLED")
+            .contains("预约排队叫号系统未开通")
+            .contains("请联系平台管理员在租户计费中勾选产品线后再使用")
+            .contains("TENANT_APP_EXPIRED")
+            .contains("产品线订阅已到期")
+            .contains("PERMISSION_DENIED")
+            .contains("当前账号没有此功能权限")
+            .doesNotContain("错误代码")
+            .doesNotContain("消息键");
+    }
+
+    @Test
     void staffHomeNewUiDoesNotIntroducePrototypeOrWorkbenchArtifacts() throws Exception {
         String source = readStaffHomeSources();
 

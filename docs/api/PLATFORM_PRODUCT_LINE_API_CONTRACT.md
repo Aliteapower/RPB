@@ -1,6 +1,6 @@
 # Platform Product Line API Contract
 
-Status: Phase 1 implemented
+Status: Phase 1 implemented, Phase 1.1 pricing implemented
 
 ## Scope
 
@@ -38,7 +38,23 @@ Response:
       "description": "预约、排队、叫号一体化产线",
       "sortOrder": 10,
       "createdAt": "2026-06-26T00:00:00Z",
-      "updatedAt": "2026-06-26T00:00:00Z"
+      "updatedAt": "2026-06-26T00:00:00Z",
+      "prices": [
+        {
+          "billingCycle": "monthly",
+          "amount": 128.00,
+          "currency": "SGD",
+          "status": "active",
+          "version": 0
+        },
+        {
+          "billingCycle": "yearly",
+          "amount": 1200.00,
+          "currency": "SGD",
+          "status": "active",
+          "version": 0
+        }
+      ]
     }
   ]
 }
@@ -71,6 +87,35 @@ Response:
   }
 }
 ```
+
+### `PATCH /api/v1/platform/product-lines/{appKey}/prices`
+
+Updates monthly and yearly platform default prices for a product line.
+
+Request:
+
+```json
+{
+  "prices": [
+    {
+      "billingCycle": "monthly",
+      "amount": 128.00,
+      "currency": "SGD",
+      "status": "active",
+      "version": 0
+    },
+    {
+      "billingCycle": "yearly",
+      "amount": 1200.00,
+      "currency": "SGD",
+      "status": "active",
+      "version": 0
+    }
+  ]
+}
+```
+
+The price is a default quote for future purchase and renewal operations. Existing tenant subscription amounts are not rewritten when product-line prices change.
 
 ## Error Codes
 

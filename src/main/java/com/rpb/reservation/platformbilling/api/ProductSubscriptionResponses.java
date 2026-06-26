@@ -2,6 +2,7 @@ package com.rpb.reservation.platformbilling.api;
 
 import com.rpb.reservation.platformbilling.application.ProductSubscription;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionMutationResult;
+import com.rpb.reservation.platformbilling.application.SubscriptionQuote;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -22,13 +23,38 @@ record ProductSubscriptionListResponse(
 record ProductSubscriptionResponse(
     boolean success,
     boolean replayed,
-    ProductSubscriptionItemResponse subscription
+    ProductSubscriptionItemResponse subscription,
+    ProductSubscriptionQuoteResponse quote
 ) {
     static ProductSubscriptionResponse from(ProductSubscriptionMutationResult result) {
         return new ProductSubscriptionResponse(
             true,
             result.replayed(),
-            ProductSubscriptionItemResponse.from(result.subscription())
+            ProductSubscriptionItemResponse.from(result.subscription()),
+            ProductSubscriptionQuoteResponse.from(result.quote())
+        );
+    }
+}
+
+record ProductSubscriptionQuoteResponse(
+    Integer durationCount,
+    String durationUnit,
+    BigDecimal unitAmount,
+    BigDecimal defaultAmount,
+    BigDecimal finalAmount,
+    String currency
+) {
+    static ProductSubscriptionQuoteResponse from(SubscriptionQuote quote) {
+        if (quote == null) {
+            return null;
+        }
+        return new ProductSubscriptionQuoteResponse(
+            quote.durationCount(),
+            quote.durationUnit(),
+            quote.unitAmount(),
+            quote.defaultAmount(),
+            quote.finalAmount(),
+            quote.currency()
         );
     }
 }

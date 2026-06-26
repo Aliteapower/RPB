@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import {
   PlatformApiError,
@@ -19,6 +19,7 @@ import type { TenantStatusOption } from '../components/platform/platformTenantUi
 import { useAuthSessionStore } from '../stores/authSession'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthSessionStore()
 const tenants = ref<PlatformTenant[]>([])
 const loading = ref(false)
@@ -43,6 +44,7 @@ const statusOptions: TenantStatusOption[] = [
 
 const activeCount = computed(() => tenants.value.filter(tenant => !tenant.deleted).length)
 const deletedCount = computed(() => tenants.value.filter(tenant => tenant.deleted).length)
+const billingIndexMode = computed(() => route.name === 'platform-billing-subscriptions')
 const hasDirtyQuery = computed(() => keyword.value.trim() !== '' || filter.value !== 'all')
 const safePage = computed<PlatformPage>(() => page.value ?? {
   limit: limit.value,
@@ -158,8 +160,8 @@ function apiErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>平台</span>
-          <h1>租户管理</h1>
+          <span>{{ billingIndexMode ? '计费' : '平台' }}</span>
+          <h1>{{ billingIndexMode ? '租户计费' : '租户管理' }}</h1>
         </div>
       </header>
 
@@ -186,7 +188,7 @@ function apiErrorText(error: unknown): string {
           </div>
         </template>
         <template #actions>
-          <button class="primary-button" type="button" @click="openCreatePage">
+          <button v-if="!billingIndexMode" class="primary-button" type="button" @click="openCreatePage">
             新增租户
           </button>
         </template>
@@ -199,6 +201,7 @@ function apiErrorText(error: unknown): string {
         :loading="loading"
         :saving="saving"
         :status-options="statusOptions"
+        :billing-only="billingIndexMode"
         @edit="openEditPage"
         @billing="openBillingPage"
         @delete="deleteSelectedTenant"

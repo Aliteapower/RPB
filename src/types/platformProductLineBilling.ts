@@ -1,6 +1,15 @@
 export type ProductLineStatus = 'active' | 'disabled'
 export type ProductBillingCycle = 'monthly' | 'yearly' | 'legacy_grant' | 'manual'
 export type ProductSubscriptionStatus = 'active' | 'suspended' | 'cancelled' | 'expired'
+export type ProductLinePriceStatus = 'active' | 'disabled'
+
+export interface PlatformProductLinePrice {
+  billingCycle: 'monthly' | 'yearly'
+  amount: number
+  currency: string
+  status: ProductLinePriceStatus
+  version: number
+}
 
 export interface PlatformProductLine {
   appKey: string
@@ -11,6 +20,7 @@ export interface PlatformProductLine {
   sortOrder: number
   createdAt: string
   updatedAt: string
+  prices: PlatformProductLinePrice[]
 }
 
 export interface PlatformProductLineMutation {
@@ -46,6 +56,7 @@ export interface ProductSubscriptionMutation {
   billingCycle: ProductBillingCycle
   currentPeriodStart?: string | null
   currentPeriodEnd?: string | null
+  durationCount?: number | null
   amount?: number
   currency?: string
   paymentNote?: string | null
@@ -68,6 +79,16 @@ export interface PlatformProductLineResponse {
   productLine: PlatformProductLine
 }
 
+export interface PlatformProductLinePriceMutation {
+  prices: Array<{
+    billingCycle: 'monthly' | 'yearly'
+    amount: number
+    currency: string
+    status: ProductLinePriceStatus
+    version?: number
+  }>
+}
+
 export interface TenantProductSubscriptionListResponse {
   success: true
   subscriptions: TenantProductSubscription[]
@@ -77,6 +98,16 @@ export interface TenantProductSubscriptionResponse {
   success: true
   replayed: boolean
   subscription: TenantProductSubscription
+  quote: ProductSubscriptionQuote | null
+}
+
+export interface ProductSubscriptionQuote {
+  durationCount: number
+  durationUnit: string
+  unitAmount: number
+  defaultAmount: number
+  finalAmount: number
+  currency: string
 }
 
 export interface PlatformBillingApiErrorResponse {

@@ -17,6 +17,39 @@ public record ProductSubscriptionEventDraft(
     String currency,
     String paymentNote,
     String idempotencyKey,
-    UUID operatorUserId
+    UUID operatorUserId,
+    String eventPayloadJson
 ) {
+    public ProductSubscriptionEventDraft(
+        UUID subscriptionId,
+        UUID tenantId,
+        String appKey,
+        String eventType,
+        String billingCycle,
+        String status,
+        OffsetDateTime periodStart,
+        OffsetDateTime periodEnd,
+        BigDecimal amount,
+        String currency,
+        String paymentNote,
+        String idempotencyKey,
+        UUID operatorUserId
+    ) {
+        this(
+            subscriptionId,
+            tenantId,
+            appKey,
+            eventType,
+            billingCycle,
+            status,
+            periodStart,
+            periodEnd,
+            amount,
+            currency,
+            paymentNote,
+            idempotencyKey,
+            operatorUserId,
+            "{}"
+        );
+    }
 }

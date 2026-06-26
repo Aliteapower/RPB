@@ -1,6 +1,6 @@
 # Platform Product Line Billing UI Contract
 
-Status: Phase 1 implemented
+Status: Phase 1 implemented, Phase 1.1 pricing and duration flow implemented
 
 ## Pages
 
@@ -19,10 +19,26 @@ Responsibilities:
 - list product lines
 - show `reservation_queue`
 - show display name `预约排队叫号产线`
+- show the read-only App Gate default entry route
 - edit display name, status, description, sort order
+- edit monthly and yearly product-line prices
 - show loading, error, and saving states
 
 ### Tenant Billing
+
+Index route:
+
+- `/platform/billing/subscriptions`
+
+Index page:
+
+- reuses `src/pages/PlatformTenantsPage.vue` in billing mode
+
+Responsibilities:
+
+- list tenants
+- provide a clear `订阅/计费` row action
+- route into tenant-specific billing management
 
 Route:
 
@@ -34,22 +50,29 @@ Page:
 
 Responsibilities:
 
-- list tenant product subscriptions
+- list product lines with tenant subscription state
 - show `历史赠送 / 永久有效` for `legacy_grant`
+- show period start, period end, amount, currency, and entitlement status
+- show unopened product lines as `未开通`
+- use `购买数量` in months or years instead of visible date inputs
+- default `本次金额` from product-line price times duration count
 - manually purchase, renew, suspend, cancel, and convert legacy grant
 - generate idempotency keys client-side for manual operations
 - show loading, error, and saving states
+
+Normal purchase and renewal UI must not render `datetime-local` inputs. The backend calculates effective dates and returns the authoritative period.
 
 ## Navigation
 
 `PlatformAdminNav.vue` includes:
 
 - `租户管理`
+- `租户计费`
 - `产品线`
 - `叫号模板`
 
-`PlatformTenantTable.vue` includes a `计费` row action leading to tenant billing.
+`PlatformTenantTable.vue` includes a `计费` row action in tenant management and a clearer `订阅/计费` action in billing mode.
 
 ## Excluded Phase 1 UI
 
-The UI does not include payment gateway configuration, tenant payment checkout, invoices, webhooks, auto-renewal schedules, or price template management.
+The UI does not include payment gateway configuration, tenant payment checkout, invoices, webhooks, auto-renewal schedules, discounts, tax calculation, or exact-date manual adjustment.

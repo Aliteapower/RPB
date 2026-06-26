@@ -12,6 +12,7 @@ import com.rpb.reservation.appgate.application.AppGateDenialAuditService;
 import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.platformbilling.application.PlatformProductLine;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineMutationCommand;
+import com.rpb.reservation.platformbilling.application.PlatformProductLinePriceUpdate;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineService;
 import com.rpb.reservation.walkin.auth.LocalAuthProperties;
 import com.rpb.reservation.walkin.auth.LocalRuntimeCurrentActorProvider;
@@ -91,6 +92,26 @@ class PlatformProductLineControllerTest {
         mockMvc.perform(get("/api/v1/platform/product-lines")
                 .header("X-Test-Permissions", "platform.tenant.manage"))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void updatesProductLinePrices() throws Exception {
+        when(productLineService.updateProductLinePrices(any(), any()))
+            .thenReturn(productLine());
+
+        mockMvc.perform(patch("/api/v1/platform/product-lines/reservation_queue/prices")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "prices": [
+                        {"billingCycle":"monthly","amount":128.00,"currency":"SGD","status":"active","version":0},
+                        {"billingCycle":"yearly","amount":1200.00,"currency":"SGD","status":"active","version":0}
+                      ]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.productLine.appKey").value("reservation_queue"));
     }
 
     @Test

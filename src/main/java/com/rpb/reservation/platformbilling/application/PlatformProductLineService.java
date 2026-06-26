@@ -1,8 +1,13 @@
 package com.rpb.reservation.platformbilling.application;
 
 import com.rpb.reservation.platformbilling.persistence.PlatformProductLineRepository;
+import com.rpb.reservation.platformbilling.persistence.PlatformProductLinePriceRepository;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PlatformProductLineService {
@@ -10,13 +15,15 @@ public class PlatformProductLineService {
     private static final String DISABLED = "disabled";
 
     private final PlatformProductLineRepository repository;
+    private final PlatformProductLinePriceRepository prices;
 
-    public PlatformProductLineService(PlatformProductLineRepository repository) {
+    public PlatformProductLineService(PlatformProductLineRepository repository, PlatformProductLinePriceRepository prices) {
         this.repository = repository;
+        this.prices = prices;
     }
 
     public List<PlatformProductLine> listProductLines() {
-        return repository.findAll();
+        return attachPrices(repository.findAll());
     }
 
     public PlatformProductLine updateProductLine(String appKey, PlatformProductLineMutationCommand command) {
@@ -26,7 +33,36 @@ public class PlatformProductLineService {
         validate(command);
         repository.findByAppKey(appKey.trim())
             .orElseThrow(() -> new PlatformBillingServiceException(PlatformBillingServiceErrorCode.PRODUCT_LINE_NOT_FOUND));
-        return repository.update(appKey.trim(), normalized(command));
+        return attachPrices(repository.update(appKey.trim(), normalized(command)));
+    }
+
+    @Transactional
+    public PlatformProductLine updateProductLinePrices(String appKey, List<PlatformProductLinePriceUpdate> priceUpdates) {
+        if (appKey == null || appKey.isBlank() || priceUpdates == null || priceUpdates.isEmpty()) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
+        }
+        String normalizedAppKey = appKey.trim();
+        repository.findByAppKey(normalizedAppKey)
+            .orElseThrow(() -> new PlatformBillingServiceException(PlatformBillingServiceErrorCode.PRODUCT_LINE_NOT_FOUND));
+        prices.replacePrices(normalizedAppKey, priceUpdates);
+        return attachPrices(repository.findByAppKey(normalizedAppKey).orElseThrow());
+    }
+
+    private PlatformProductLine attachPrices(PlatformProductLine productLine) {
+        return attachPrices(List.of(productLine)).getFirst();
+    }
+
+    private List<PlatformProductLine> attachPrices(List<PlatformProductLine> productLines) {
+        Map<String, List<PlatformProductLinePrice>> pricesByAppKey = prices.findByAppKeys(
+            productLines.stream().map(PlatformProductLine::appKey).toList()
+        ).stream().collect(Collectors.groupingBy(PlatformProductLinePrice::appKey));
+        return productLines.stream()
+            .map(productLine -> productLine.withPrices(pricesByAppKey
+                .getOrDefault(productLine.appKey(), List.of())
+                .stream()
+                .sorted(Comparator.comparing(PlatformProductLinePrice::billingCycle))
+                .toList()))
+            .toList();
     }
 
     private static void validate(PlatformProductLineMutationCommand command) {
