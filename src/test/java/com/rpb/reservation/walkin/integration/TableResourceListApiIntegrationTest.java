@@ -17,8 +17,10 @@ import com.rpb.reservation.reservation.application.port.out.ReservationResourceA
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import com.rpb.reservation.tenant.value.TenantId;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -609,6 +611,12 @@ class TableResourceListApiIntegrationTest {
 
     @TestConfiguration
     static class TestCurrentActorConfiguration {
+        @Bean
+        @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2026-06-25T02:00:00Z"), ZoneOffset.UTC);
+        }
+
         @Bean
         @Primary
         TestCurrentActorProvider testCurrentActorProvider() {
