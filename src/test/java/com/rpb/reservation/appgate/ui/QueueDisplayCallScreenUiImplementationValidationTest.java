@@ -87,16 +87,19 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
         Path typesPath = Path.of("src", "types", "callScreenAdmin.ts");
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue");
+        Path modeSwitchPath = Path.of("src", "components", "call-screen", "CallScreenAdModeSwitch.vue");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
+        assertThat(modeSwitchPath).exists();
 
         String page = Files.readString(pagePath);
         String apiClient = Files.readString(apiPath);
         String types = Files.readString(typesPath);
         String router = Files.readString(routerPath);
         String nav = Files.readString(navPath);
+        String modeSwitch = Files.readString(modeSwitchPath);
 
         assertThat(router)
             .contains("TenantAdminCallScreenPage")
@@ -134,6 +137,7 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
 
         assertThat(page)
             .contains("叫号屏配置")
+            .contains("CallScreenAdModeSwitch")
             .contains("文案轮播")
             .contains("图片/视频轮播")
             .contains("type=\"file\"")
@@ -165,8 +169,18 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("preview-fullscreen")
             .contains("大屏预览")
             .contains("关闭预览")
+            .doesNotContain(".mode-control")
+            .doesNotContain(".mode-option")
             .doesNotContain("creatingAdSet")
             .doesNotContain("tenantId");
+
+        assertThat(modeSwitch)
+            .contains("defineProps")
+            .contains("modelValue")
+            .contains("update:modelValue")
+            .contains("文案轮播")
+            .contains("图片/视频轮播")
+            .contains("call-screen-ad-mode-switch");
     }
 
     @Test
@@ -175,10 +189,12 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
         Path apiPath = Path.of("src", "api", "platformCallScreenSeedApi.ts");
         Path typesPath = Path.of("src", "types", "platformCallScreenSeed.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
+        Path modeSwitchPath = Path.of("src", "components", "call-screen", "CallScreenAdModeSwitch.vue");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
+        assertThat(modeSwitchPath).exists();
 
         String page = Files.readString(pagePath);
         String apiClient = Files.readString(apiPath);
@@ -204,6 +220,8 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("'image' | 'video'");
 
         assertThat(page)
+            .contains("CallScreenAdModeSwitch")
+            .contains("selectedSeedMode")
             .contains("文案模板")
             .contains("图片/视频模板")
             .contains("type=\"file\"")
@@ -214,6 +232,8 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("<video")
             .contains("<img")
             .contains("大屏预览")
+            .doesNotContain(".mode-control")
+            .doesNotContain(".mode-option")
             .doesNotContain("图片模板（Phase 2）")
             .doesNotContain("图片模板需要先");
     }

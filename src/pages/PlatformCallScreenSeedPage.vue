@@ -9,6 +9,7 @@ import {
   updatePlatformCallScreenTextSeed,
   uploadPlatformCallScreenMedia
 } from '../api/platformCallScreenSeedApi'
+import CallScreenAdModeSwitch from '../components/call-screen/CallScreenAdModeSwitch.vue'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
@@ -20,10 +21,14 @@ import type {
   PlatformCallScreenSeedStatus
 } from '../types/platformCallScreenSeed'
 
+type PlatformSeedMode = 'text' | 'media'
+type PlatformPreviewSlide = PlatformCallScreenSeedSlide | PlatformCallScreenMediaSeedSlide
+
 const auth = useAuthSessionStore()
 
 const seedSet = ref<PlatformCallScreenSeedSet | null>(null)
 const mediaSeedSet = ref<PlatformCallScreenMediaSeedSet | null>(null)
+const selectedSeedMode = ref<PlatformSeedMode>('text')
 const loading = ref(false)
 const saving = ref(false)
 const savingMedia = ref(false)
@@ -35,9 +40,21 @@ const previewFullscreenOpen = ref(false)
 let previewCarouselTimer: number | undefined
 
 const sortedSlides = computed(() => sortSlides(seedSet.value?.slides ?? []))
-const previewSlides = computed(() => {
-  const activeSlides = sortedSlides.value.filter(slide => slide.status === 'active')
-  return activeSlides.length > 0 ? activeSlides : sortedSlides.value
+const sortedMediaPreviewSlides = computed(() => sortMediaSlides(mediaSeedSet.value?.mediaSlides ?? []))
+const selectedSeedSetDisplayName = computed(() =>
+  selectedSeedMode.value === 'media'
+    ? mediaSeedSet.value?.displayName ?? '图片/视频模板'
+    : seedSet.value?.displayName ?? '文案种子模板'
+)
+const selectedSeedSetStatus = computed(() =>
+  selectedSeedMode.value === 'media'
+    ? mediaSeedSet.value?.status ?? 'disabled'
+    : seedSet.value?.status ?? 'disabled'
+)
+const previewSlides = computed<PlatformPreviewSlide[]>(() => {
+  const sourceSlides = selectedSeedMode.value === 'media' ? sortedMediaPreviewSlides.value : sortedSlides.value
+  const activeSlides = sourceSlides.filter(slide => slide.status === 'active')
+  return activeSlides.length > 0 ? activeSlides : sourceSlides
 })
 const previewSlide = computed(() => previewSlides.value[previewSlideIndex.value] ?? previewSlides.value[0])
 
@@ -309,6 +326,10 @@ function nextMediaSortOrder(): number {
   return Math.max(0, ...(mediaSeedSet.value?.mediaSlides ?? []).map(slide => Number(slide.sortOrder) || 0)) + 1
 }
 
+function isMediaSlide(slide: PlatformPreviewSlide | undefined): slide is PlatformCallScreenMediaSeedSlide {
+  return !!slide && 'mediaKind' in slide
+}
+
 function statusLabel(status: PlatformCallScreenSeedStatus): string {
   return status === 'active' ? '启用' : '停用'
 }
@@ -364,25 +385,26 @@ function apiErrorText(error: unknown): string {
           <div class="panel-heading">
             <div>
               <span>模板设置</span>
-              <h2 id="platform-seed-settings-title">文案种子模板</h2>
+              <h2 id="platform-seed-settings-title">
+                {{ selectedSeedMode === 'media' ? '图片/视频种子模板' : '文案种子模板' }}
+              </h2>
             </div>
-            <small>{{ seedSet.seedKey }} · 版本 {{ seedSet.version }}</small>
+            <small>
+              {{ selectedSeedMode === 'media' ? mediaSeedSet.seedKey : seedSet.seedKey }}
+              · 版本 {{ selectedSeedMode === 'media' ? mediaSeedSet.version : seedSet.version }}
+            </small>
           </div>
 
-          <div class="mode-control" aria-label="模板类型">
-            <div class="mode-option">
-              <span class="mode-marker" aria-hidden="true"></span>
-              <span>文案模板</span>
-            </div>
-            <div class="mode-option">
-              <span class="mode-marker" aria-hidden="true"></span>
-              <span>图片/视频模板</span>
-            </div>
-          </div>
+          <CallScreenAdModeSwitch
+            v-model="selectedSeedMode"
+            aria-label="模板类型"
+            text-label="文案模板"
+            media-label="图片/视频模板"
+          />
 
           <p class="phase-note">平台维护文案种子模板和图片/视频种子模板；租户启用时仍使用自己的隔离副本。</p>
 
-          <div class="settings-grid">
+          <div v-if="selectedSeedMode === 'text'" class="settings-grid">
             <label>
               <span>模板名称</span>
               <input v-model.trim="seedSet.displayName" maxlength="40" required />
@@ -399,9 +421,26 @@ function apiErrorText(error: unknown): string {
               <input :value="seedSet.adType" disabled />
             </label>
           </div>
+          <div v-else class="settings-grid">
+            <label>
+              <span>模板名称</span>
+              <input v-model.trim="mediaSeedSet.displayName" maxlength="40" required />
+            </label>
+            <label>
+              <span>状态</span>
+              <select v-model="mediaSeedSet.status" required>
+                <option value="active">启用</option>
+                <option value="disabled">停用</option>
+              </select>
+            </label>
+            <label>
+              <span>类型</span>
+              <input value="media" disabled />
+            </label>
+          </div>
         </section>
 
-        <section class="config-panel" aria-labelledby="platform-seed-slides-title">
+        <section v-if="selectedSeedMode === 'text'" class="config-panel" aria-labelledby="platform-seed-slides-title">
           <div class="panel-heading">
             <div>
               <span>平台文案库</span>
@@ -457,7 +496,7 @@ function apiErrorText(error: unknown): string {
           </div>
         </section>
 
-        <section class="config-panel media-seed-panel" aria-labelledby="platform-media-seed-title">
+        <section v-else class="config-panel media-seed-panel" aria-labelledby="platform-media-seed-title">
           <div class="panel-heading">
             <div>
               <span>平台媒体库</span>
@@ -475,24 +514,6 @@ function apiErrorText(error: unknown): string {
               </label>
               <small>{{ mediaSeedSet.seedKey }} · 版本 {{ mediaSeedSet.version }}</small>
             </div>
-          </div>
-
-          <div class="settings-grid">
-            <label>
-              <span>模板名称</span>
-              <input v-model.trim="mediaSeedSet.displayName" maxlength="40" required />
-            </label>
-            <label>
-              <span>状态</span>
-              <select v-model="mediaSeedSet.status" required>
-                <option value="active">启用</option>
-                <option value="disabled">停用</option>
-              </select>
-            </label>
-            <label>
-              <span>类型</span>
-              <input value="media" disabled />
-            </label>
           </div>
 
           <div class="slide-editor media-slide-editor">
@@ -574,7 +595,7 @@ function apiErrorText(error: unknown): string {
           <div class="preview-header">
             <div class="preview-title">
               <span>终端预览</span>
-              <strong>{{ seedSet.displayName }} · {{ statusLabel(seedSet.status) }}</strong>
+              <strong>{{ selectedSeedSetDisplayName }} · {{ statusLabel(selectedSeedSetStatus) }}</strong>
             </div>
             <button
               class="preview-expand-button"
@@ -587,10 +608,29 @@ function apiErrorText(error: unknown): string {
             </button>
           </div>
           <div class="preview-screen">
-            <span class="preview-mark">食</span>
-            <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
-            <p class="preview-subtitle">{{ previewSlide?.subtitle || '请维护文案模板' }}</p>
-            <p class="preview-tagline">{{ previewSlide?.tagline || '新租户默认副本将使用平台种子文案' }}</p>
+            <template v-if="isMediaSlide(previewSlide)">
+              <img
+                v-if="previewSlide.mediaKind === 'image'"
+                class="preview-media"
+                :src="previewSlide.mediaUrl"
+                :alt="previewSlide.altText || previewSlide.title || '媒体预览'"
+              />
+              <video
+                v-else
+                class="preview-media"
+                :src="previewSlide.mediaUrl"
+                muted
+                playsinline
+                autoplay
+              />
+              <h3 class="preview-media-title">{{ previewSlide.title || '媒体广告' }}</h3>
+            </template>
+            <template v-else>
+              <span class="preview-mark">食</span>
+              <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
+              <p class="preview-subtitle">{{ previewSlide?.subtitle || '请维护文案模板' }}</p>
+              <p class="preview-tagline">{{ previewSlide?.tagline || '新租户默认副本将使用平台种子文案' }}</p>
+            </template>
           </div>
           <div class="preview-dots" aria-label="预览文案轮播">
             <button
@@ -616,10 +656,30 @@ function apiErrorText(error: unknown): string {
             关闭预览
           </button>
           <section class="preview-fullscreen-stage" aria-label="平台叫号文案大屏预览">
-            <span class="preview-mark preview-mark-large">食</span>
-            <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
-            <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请维护文案模板' }}</p>
-            <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '新租户默认副本将使用平台种子文案' }}</p>
+            <template v-if="isMediaSlide(previewSlide)">
+              <img
+                v-if="previewSlide.mediaKind === 'image'"
+                class="preview-fullscreen-media"
+                :src="previewSlide.mediaUrl"
+                :alt="previewSlide.altText || previewSlide.title || '媒体大屏预览'"
+              />
+              <video
+                v-else
+                class="preview-fullscreen-media"
+                :src="previewSlide.mediaUrl"
+                muted
+                playsinline
+                autoplay
+                controls
+              />
+              <h2 v-if="previewSlide.title">{{ previewSlide.title }}</h2>
+            </template>
+            <template v-else>
+              <span class="preview-mark preview-mark-large">食</span>
+              <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
+              <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请维护文案模板' }}</p>
+              <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '新租户默认副本将使用平台种子文案' }}</p>
+            </template>
             <div class="preview-dots preview-dots-large" aria-label="大屏预览文案轮播">
               <button
                 v-for="(slide, index) in previewSlides"
@@ -750,41 +810,9 @@ function apiErrorText(error: unknown): string {
   gap: 10px;
 }
 
-.mode-control,
 .settings-grid {
   display: grid;
   gap: 12px;
-}
-
-.mode-control {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.mode-option {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 12px;
-  border: 1px solid #99f6e4;
-  border-radius: 6px;
-  color: #115e59;
-  background: #f0fdfa;
-  font-weight: 800;
-}
-
-.mode-option.disabled {
-  border-color: #e2e8f0;
-  color: #94a3b8;
-  background: #f8fafc;
-}
-
-.mode-marker {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #0f766e;
-  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14);
 }
 
 .phase-note {
@@ -1073,6 +1101,7 @@ tr:last-child td {
 }
 
 .preview-screen {
+  position: relative;
   min-height: 280px;
   display: grid;
   align-content: center;
@@ -1104,6 +1133,22 @@ tr:last-child td {
   color: #ffffff;
   font-size: 32px;
   letter-spacing: 0;
+}
+
+.preview-media {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.preview-media-title {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.62);
 }
 
 .preview-subtitle,
@@ -1205,6 +1250,28 @@ tr:last-child td {
   letter-spacing: 0;
 }
 
+.preview-fullscreen-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.preview-fullscreen-stage:has(.preview-fullscreen-media) {
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-fullscreen-stage:has(.preview-fullscreen-media) h2 {
+  position: absolute;
+  left: 48px;
+  right: 48px;
+  bottom: 48px;
+  text-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+}
+
 .preview-fullscreen-subtitle,
 .preview-fullscreen-tagline {
   margin: 0;
@@ -1250,7 +1317,6 @@ tr:last-child td {
 
 @media (max-width: 980px) {
   .platform-shell,
-  .mode-control,
   .settings-grid {
     grid-template-columns: 1fr;
   }

@@ -11,6 +11,7 @@ import {
   updateCallScreenSettings,
   uploadCallScreenMedia
 } from '../api/callScreenAdminApi'
+import CallScreenAdModeSwitch from '../components/call-screen/CallScreenAdModeSwitch.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
@@ -469,16 +470,7 @@ function apiErrorText(error: unknown): string {
             <small>版本 {{ settings.version }}</small>
           </div>
 
-          <div class="mode-control" aria-label="轮播类型">
-            <label class="mode-option">
-              <input v-model="settings.adMode" type="radio" value="text" />
-              <span>文案轮播</span>
-            </label>
-            <label class="mode-option">
-              <input v-model="settings.adMode" type="radio" value="media" />
-              <span>图片/视频轮播</span>
-            </label>
-          </div>
+          <CallScreenAdModeSwitch v-model="settings.adMode" aria-label="轮播类型" />
 
           <p class="phase-note">媒体轮播支持 JPG、PNG、WebP、MP4、WebM，租户只可使用自己上传的资源。</p>
 
@@ -876,34 +868,10 @@ function apiErrorText(error: unknown): string {
   gap: 10px;
 }
 
-.mode-control,
 .settings-grid,
 .ad-set-fields {
   display: grid;
   gap: 12px;
-}
-
-.mode-control {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.mode-option {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 12px;
-  border: 1px solid #99f6e4;
-  border-radius: 6px;
-  color: #115e59;
-  background: #f0fdfa;
-  font-weight: 800;
-}
-
-.mode-option.disabled {
-  border-color: #e2e8f0;
-  color: #94a3b8;
-  background: #f8fafc;
 }
 
 .phase-note {
@@ -1373,7 +1341,6 @@ tr:last-child td {
 
 @media (max-width: 980px) {
   .tenant-shell,
-  .mode-control,
   .settings-grid,
   .ad-set-fields {
     grid-template-columns: 1fr;

@@ -14,16 +14,19 @@ class PlatformCallScreenSeedUiImplementationValidationTest {
         Path typesPath = Path.of("src", "types", "platformCallScreenSeed.ts");
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
+        Path modeSwitchPath = Path.of("src", "components", "call-screen", "CallScreenAdModeSwitch.vue");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
+        assertThat(modeSwitchPath).exists();
 
         String page = Files.readString(pagePath);
         String apiClient = Files.readString(apiPath);
         String types = Files.readString(typesPath);
         String router = Files.readString(routerPath);
         String nav = Files.readString(navPath);
+        String modeSwitch = Files.readString(modeSwitchPath);
 
         assertThat(router)
             .contains("PlatformCallScreenSeedPage")
@@ -63,6 +66,8 @@ class PlatformCallScreenSeedUiImplementationValidationTest {
 
         assertThat(page)
             .contains("平台叫号模板")
+            .contains("CallScreenAdModeSwitch")
+            .contains("selectedSeedMode")
             .contains("文案种子模板")
             .contains("图片/视频模板")
             .contains("type=\"file\"")
@@ -93,7 +98,16 @@ class PlatformCallScreenSeedUiImplementationValidationTest {
             .contains("preview-fullscreen")
             .contains("大屏预览")
             .contains("关闭预览")
+            .doesNotContain(".mode-control")
+            .doesNotContain(".mode-option")
             .doesNotContain("tenantId")
             .doesNotContain("storeId");
+
+        assertThat(modeSwitch)
+            .contains("modelValue")
+            .contains("update:modelValue")
+            .contains("textLabel")
+            .contains("mediaLabel")
+            .contains("call-screen-ad-mode-switch");
     }
 }
