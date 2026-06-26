@@ -1,7 +1,9 @@
 package com.rpb.reservation.platformbilling.api;
 
 import com.rpb.reservation.platformbilling.application.PlatformBillingServiceException;
+import com.rpb.reservation.platformbilling.application.PlatformProductLineCreateCommand;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineMutationCommand;
+import com.rpb.reservation.platformbilling.application.PlatformProductLineQuery;
 import com.rpb.reservation.platformbilling.application.PlatformProductLinePriceUpdate;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineService;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
@@ -12,8 +14,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,9 +37,26 @@ public class PlatformProductLineController {
     }
 
     @GetMapping
-    public ResponseEntity<PlatformProductLineListResponse> listProductLines() {
+    public ResponseEntity<PlatformProductLineListResponse> listProductLines(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) String status,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
         PlatformBillingSecurity.requirePlatformAdmin(currentActorProvider, PRODUCT_LINE_MANAGE);
-        return ResponseEntity.ok(PlatformProductLineListResponse.from(productLineService.listProductLines()));
+        return ResponseEntity.ok(PlatformProductLineListResponse.from(
+            productLineService.searchProductLines(new PlatformProductLineQuery(keyword, status, page, size))
+        ));
+    }
+
+    @PostMapping
+    public ResponseEntity<PlatformProductLineResponse> createProductLine(
+        @RequestBody(required = false) PlatformProductLineCreateRequest request
+    ) {
+        PlatformBillingSecurity.requirePlatformAdmin(currentActorProvider, PRODUCT_LINE_MANAGE);
+        return ResponseEntity.ok(PlatformProductLineResponse.from(
+            productLineService.createProductLine(toCommand(request))
+        ));
     }
 
     @PatchMapping("/{appKey}")
@@ -82,6 +103,21 @@ public class PlatformProductLineController {
         return new PlatformProductLineMutationCommand(
             request.displayName(),
             request.status(),
+            request.defaultEntryRoute(),
+            request.description(),
+            request.sortOrder()
+        );
+    }
+
+    private static PlatformProductLineCreateCommand toCommand(PlatformProductLineCreateRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new PlatformProductLineCreateCommand(
+            request.appKey(),
+            request.displayName(),
+            request.status(),
+            request.defaultEntryRoute(),
             request.description(),
             request.sortOrder()
         );

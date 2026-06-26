@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 import {
   PlatformBillingApiError,
+  createProductLine,
   listProductLines,
   updateProductLine,
   updateProductLinePrices
 } from '../api/platformProductLineBillingApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
-import type { PlatformProductLine, ProductLinePriceStatus, ProductLineStatus } from '../types/platformProductLineBilling'
+import PlatformProductLineDrawer from '../components/platform/product-line/PlatformProductLineDrawer.vue'
+import PlatformProductLineList from '../components/platform/product-line/PlatformProductLineList.vue'
+import {
+  defaultEntryRouteOptions,
+  isProductLineAppKeyValid,
+  normalizeProductLineAppKey
+} from '../components/platform/product-line/productLineCatalog'
 import { useAuthSessionStore } from '../stores/authSession'
+import type { PlatformProductLine, ProductLinePriceStatus, ProductLineStatus } from '../types/platformProductLineBilling'
+
+type ProductLineEditorMode = 'create' | 'edit'
 
 const auth = useAuthSessionStore()
 const productLines = ref<PlatformProductLine[]>([])
@@ -18,8 +28,18 @@ const saving = ref(false)
 const priceSaving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
+const editDrawerOpen = ref(false)
+const drawerMode = ref<ProductLineEditorMode>('edit')
+const total = ref(0)
+const page = ref(0)
+const size = ref(10)
+const filters = reactive({
+  keyword: '',
+  status: '' as ProductLineStatus | ''
+})
 const form = reactive({
   appKey: 'reservation_queue',
+  productCode: 'reservation_queue',
   displayName: '预约排队叫号产线',
   status: 'active' as ProductLineStatus,
   defaultEntryRoute: '/stores/:storeId/staff',
@@ -36,17 +56,35 @@ const priceForm = reactive({
   yearlyVersion: 0
 })
 
+const computedAppKey = computed(() => normalizeProductLineAppKey(form.productCode))
+const appKeyValid = computed(() => drawerMode.value === 'edit' || isProductLineAppKeyValid(computedAppKey.value))
+
 onMounted(() => {
   void loadProductLines()
 })
 
-async function loadProductLines(): Promise<void> {
+async function loadProductLines(nextPage = page.value): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const response = await listProductLines()
-    productLines.value = response.productLines
-    selectProductLine(response.productLines.find(item => item.appKey === 'reservation_queue') ?? response.productLines[0])
+    const response = await listProductLines({
+      keyword: filters.keyword,
+      status: filters.status,
+      page: nextPage,
+      size: size.value
+    })
+    const items = response.items ?? response.productLines
+    productLines.value = items
+    total.value = response.total ?? items.length
+    page.value = response.page ?? nextPage
+    size.value = response.size ?? size.value
+
+    const selected = items.find(item => item.appKey === form.appKey)
+      ?? items.find(item => item.appKey === 'reservation_queue')
+      ?? items[0]
+    if (selected && drawerMode.value === 'edit') {
+      selectProductLine(selected)
+    }
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -59,6 +97,7 @@ function selectProductLine(productLine?: PlatformProductLine): void {
     return
   }
   form.appKey = productLine.appKey
+  form.productCode = productLine.appKey
   form.displayName = productLine.displayName
   form.status = productLine.status
   form.defaultEntryRoute = productLine.defaultEntryRoute
@@ -75,6 +114,29 @@ function selectProductLine(productLine?: PlatformProductLine): void {
   priceForm.yearlyVersion = yearly?.version ?? 0
 }
 
+function openProductLineDrawer(productLine: PlatformProductLine): void {
+  drawerMode.value = 'edit'
+  selectProductLine(productLine)
+  editDrawerOpen.value = true
+}
+
+function openCreateProductLineDrawer(): void {
+  drawerMode.value = 'create'
+  form.appKey = ''
+  form.productCode = ''
+  form.displayName = ''
+  form.status = 'disabled'
+  form.defaultEntryRoute = ''
+  form.description = ''
+  form.sortOrder = nextSortOrder()
+  resetPriceForm()
+  editDrawerOpen.value = true
+}
+
+function closeProductLineDrawer(): void {
+  editDrawerOpen.value = false
+}
+
 async function saveProductLine(): Promise<void> {
   if (saving.value) {
     return
@@ -83,17 +145,27 @@ async function saveProductLine(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   try {
-    const response = await updateProductLine(form.appKey, {
-      displayName: form.displayName,
-      status: form.status,
-      description: form.description,
-      sortOrder: form.sortOrder
-    })
-    const index = productLines.value.findIndex(item => item.appKey === response.productLine.appKey)
-    if (index >= 0) {
-      productLines.value[index] = response.productLine
-    }
-    savedText.value = '已保存'
+    const wasCreate = drawerMode.value === 'create'
+    const response = wasCreate
+      ? await createProductLine({
+        appKey: computedAppKey.value,
+        displayName: form.displayName,
+        status: form.status,
+        defaultEntryRoute: form.defaultEntryRoute,
+        description: form.description,
+        sortOrder: form.sortOrder
+      })
+      : await updateProductLine(form.appKey, {
+        displayName: form.displayName,
+        status: form.status,
+        defaultEntryRoute: form.defaultEntryRoute,
+        description: form.description,
+        sortOrder: form.sortOrder
+      })
+    upsertProductLine(response.productLine)
+    selectProductLine(response.productLine)
+    drawerMode.value = 'edit'
+    savedText.value = wasCreate ? '产品线已创建' : '已保存'
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -128,10 +200,7 @@ async function saveProductLinePrices(): Promise<void> {
         }
       ]
     })
-    const index = productLines.value.findIndex(item => item.appKey === response.productLine.appKey)
-    if (index >= 0) {
-      productLines.value[index] = response.productLine
-    }
+    upsertProductLine(response.productLine)
     selectProductLine(response.productLine)
     savedText.value = '定价已保存'
   } catch (error) {
@@ -141,18 +210,61 @@ async function saveProductLinePrices(): Promise<void> {
   }
 }
 
+function searchProductLines(query: { keyword: string; status: ProductLineStatus | '' }): void {
+  filters.keyword = query.keyword
+  filters.status = query.status
+  void loadProductLines(0)
+}
+
+function resetProductLineFilters(): void {
+  filters.keyword = ''
+  filters.status = ''
+  void loadProductLines(0)
+}
+
+function upsertProductLine(productLine: PlatformProductLine): void {
+  const index = productLines.value.findIndex(item => item.appKey === productLine.appKey)
+  if (index >= 0) {
+    productLines.value[index] = productLine
+    return
+  }
+  productLines.value = [productLine, ...productLines.value]
+  total.value += 1
+}
+
+function resetPriceForm(): void {
+  priceForm.monthlyAmount = 0
+  priceForm.yearlyAmount = 0
+  priceForm.currency = 'SGD'
+  priceForm.monthlyStatus = 'active'
+  priceForm.yearlyStatus = 'active'
+  priceForm.monthlyVersion = 0
+  priceForm.yearlyVersion = 0
+}
+
+function nextSortOrder(): number {
+  const maxSortOrder = productLines.value.reduce((max, productLine) => Math.max(max, productLine.sortOrder), 0)
+  return maxSortOrder + 10
+}
+
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformBillingApiError)) {
-    return '操作失败'
+    return '操作失败，请稍后重试'
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return '登录已失效，请重新登录'
   }
   if (error.response.error.code === 'FORBIDDEN') {
     return '没有产品线管理权限'
   }
-  return '操作失败'
+  if (error.response.error.code === 'PRODUCT_LINE_CONFLICT') {
+    return '产品线 App Key 已存在，请换一个产品线代码'
+  }
+  if (error.response.error.code === 'REQUEST_INVALID') {
+    return '产品线信息不完整，请检查名称、代码、状态和默认入口'
+  }
+  return '操作失败，请稍后重试'
 }
 </script>
 
@@ -166,7 +278,7 @@ function apiErrorText(error: unknown): string {
           <span>基础设置</span>
           <h1>产品线</h1>
         </div>
-        <button class="secondary-button" type="button" :disabled="loading" @click="loadProductLines">
+        <button class="secondary-button" type="button" :disabled="loading" @click="loadProductLines()">
           刷新
         </button>
       </header>
@@ -174,118 +286,37 @@ function apiErrorText(error: unknown): string {
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner">{{ savedText }}</p>
 
-      <div class="workspace-grid">
-        <section class="table-panel">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>产品线</th>
-                <th>App Key</th>
-                <th>状态</th>
-                <th>默认入口</th>
-                <th>排序</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="loading">
-                <td colspan="6" class="table-empty">加载中</td>
-              </tr>
-              <tr v-else-if="productLines.length === 0">
-                <td colspan="6" class="table-empty">暂无产品线</td>
-              </tr>
-              <tr
-                v-for="productLine in productLines"
-                v-else
-                :key="productLine.appKey"
-                :class="{ selected: productLine.appKey === form.appKey }"
-                @click="selectProductLine(productLine)"
-              >
-                <td>{{ productLine.displayName }}</td>
-                <td>{{ productLine.appKey }}</td>
-                <td>{{ productLine.status === 'active' ? '启用' : '停用' }}</td>
-                <td>{{ productLine.defaultEntryRoute }}</td>
-                <td>{{ productLine.sortOrder }}</td>
-                <td>
-                  <button class="text-action" type="button" @click.stop="selectProductLine(productLine)">编辑</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+      <PlatformProductLineList
+        :keyword="filters.keyword"
+        :loading="loading"
+        :page="page"
+        :product-lines="productLines"
+        :selected-app-key="form.appKey"
+        :size="size"
+        :status="filters.status"
+        :total="total"
+        @create="openCreateProductLineDrawer"
+        @edit="openProductLineDrawer"
+        @page="loadProductLines"
+        @reset="resetProductLineFilters"
+        @search="searchProductLines"
+      />
 
-        <div class="side-panels">
-          <form class="edit-panel" @submit.prevent="saveProductLine">
-            <h2>产品线设置</h2>
-            <label>
-              <span>App Key</span>
-              <input v-model="form.appKey" disabled>
-            </label>
-            <label>
-              <span>展示名称</span>
-              <input v-model.trim="form.displayName" required>
-            </label>
-            <label>
-              <span>状态</span>
-              <select v-model="form.status">
-                <option value="active">启用</option>
-                <option value="disabled">停用</option>
-              </select>
-            </label>
-            <label>
-              <span>默认入口</span>
-              <input v-model="form.defaultEntryRoute" disabled>
-            </label>
-            <label>
-              <span>排序</span>
-              <input v-model.number="form.sortOrder" type="number" min="0">
-            </label>
-            <label>
-              <span>说明</span>
-              <textarea v-model.trim="form.description" rows="4" />
-            </label>
-            <p class="form-note">停用产品线会影响所有已购买该产品线的租户</p>
-            <button class="primary-button" type="submit" :disabled="saving || loading">
-              {{ saving ? '保存中' : '保存产品线' }}
-            </button>
-          </form>
-
-          <form class="edit-panel" @submit.prevent="saveProductLinePrices">
-            <h2>定价</h2>
-            <label>
-              <span>月付价格</span>
-              <input v-model.number="priceForm.monthlyAmount" type="number" min="0" step="0.01">
-            </label>
-            <label>
-              <span>年付价格</span>
-              <input v-model.number="priceForm.yearlyAmount" type="number" min="0" step="0.01">
-            </label>
-            <label>
-              <span>币种</span>
-              <input v-model.trim="priceForm.currency" maxlength="3">
-            </label>
-            <div class="price-status-grid">
-              <label>
-                <span>月付状态</span>
-                <select v-model="priceForm.monthlyStatus">
-                  <option value="active">启用</option>
-                  <option value="disabled">停用</option>
-                </select>
-              </label>
-              <label>
-                <span>年付状态</span>
-                <select v-model="priceForm.yearlyStatus">
-                  <option value="active">启用</option>
-                  <option value="disabled">停用</option>
-                </select>
-              </label>
-            </div>
-            <button class="primary-button" type="submit" :disabled="priceSaving || loading">
-              {{ priceSaving ? '保存中' : '保存定价' }}
-            </button>
-          </form>
-        </div>
-      </div>
+      <PlatformProductLineDrawer
+        :app-key-valid="appKeyValid"
+        :computed-app-key="computedAppKey"
+        :entry-route-options="defaultEntryRouteOptions"
+        :form="form"
+        :loading="loading"
+        :mode="drawerMode"
+        :open="editDrawerOpen"
+        :price-form="priceForm"
+        :price-saving="priceSaving"
+        :saving="saving"
+        @close="closeProductLineDrawer"
+        @save="saveProductLine"
+        @save-prices="saveProductLinePrices"
+      />
     </section>
   </main>
 </template>
@@ -304,150 +335,38 @@ function apiErrorText(error: unknown): string {
   padding: 22px;
 }
 
-.page-heading,
-.workspace-grid,
-.side-panels {
+.page-heading {
   display: grid;
   gap: 16px;
-}
-
-.page-heading {
   grid-template-columns: 1fr auto;
   align-items: center;
   margin-bottom: 16px;
 }
 
-.page-heading span,
-.edit-panel label span,
-.form-note {
+.page-heading span {
   color: #64748b;
   font-size: 13px;
   font-weight: 700;
 }
 
-.page-heading h1,
-.edit-panel h2 {
+.page-heading h1 {
   margin: 0;
   color: #0f172a;
-}
-
-.page-heading h1 {
   font-size: 24px;
 }
 
-.edit-panel h2 {
-  font-size: 18px;
-}
-
-.workspace-grid {
-  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.8fr);
-  align-items: start;
-}
-
-.table-panel,
-.edit-panel {
-  border: 1px solid #dbe3ea;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.table-panel {
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid #edf2f7;
-  text-align: left;
-}
-
-.data-table th {
-  color: #64748b;
-  background: #f8fafc;
-  font-size: 13px;
-}
-
-.data-table tr.selected {
-  background: #ecfdf5;
-}
-
-.table-empty {
-  color: #64748b;
-  text-align: center;
-}
-
-.edit-panel {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-}
-
-.side-panels {
-  align-items: start;
-}
-
-.edit-panel label {
-  display: grid;
-  gap: 6px;
-}
-
-.price-status-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.edit-panel input,
-.edit-panel select,
-.edit-panel textarea {
-  min-height: 38px;
+.secondary-button {
+  min-height: 36px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  padding: 8px 10px;
-  font: inherit;
-}
-
-.form-note {
-  margin: 0;
-}
-
-.primary-button,
-.secondary-button,
-.text-action {
-  min-height: 36px;
-  border-radius: 6px;
+  color: #334155;
+  background: #ffffff;
   padding: 0 14px;
   font: inherit;
   font-weight: 800;
   cursor: pointer;
 }
 
-.primary-button {
-  border: 0;
-  color: #ffffff;
-  background: #0f766e;
-}
-
-.secondary-button {
-  border: 1px solid #cbd5e1;
-  color: #334155;
-  background: #ffffff;
-}
-
-.text-action {
-  border: 0;
-  color: #0f766e;
-  background: transparent;
-}
-
-.primary-button:disabled,
 .secondary-button:disabled {
   opacity: 0.55;
   cursor: default;
@@ -473,8 +392,7 @@ function apiErrorText(error: unknown): string {
 }
 
 @media (max-width: 980px) {
-  .platform-shell,
-  .workspace-grid {
+  .platform-shell {
     grid-template-columns: 1fr;
   }
 }

@@ -1,6 +1,8 @@
 import type {
   PlatformBillingApiErrorResponse,
+  PlatformProductLineCreateMutation,
   PlatformProductLineListResponse,
+  PlatformProductLineListQuery,
   PlatformProductLineMutation,
   PlatformProductLinePriceMutation,
   PlatformProductLineResponse,
@@ -30,9 +32,23 @@ interface TextResponse {
   text(): Promise<string>
 }
 
-export async function listProductLines(fetcher?: PlatformBillingFetcher): Promise<PlatformProductLineListResponse> {
-  return requestJson('/api/v1/platform/product-lines', {
+export async function listProductLines(
+  query?: PlatformProductLineListQuery,
+  fetcher?: PlatformBillingFetcher
+): Promise<PlatformProductLineListResponse> {
+  return requestJson(`/api/v1/platform/product-lines${toQueryString(query)}`, {
     method: 'GET',
+    fetcher
+  })
+}
+
+export async function createProductLine(
+  request: PlatformProductLineCreateMutation,
+  fetcher?: PlatformBillingFetcher
+): Promise<PlatformProductLineResponse> {
+  return requestJson('/api/v1/platform/product-lines', {
+    method: 'POST',
+    body: request,
     fetcher
   })
 }
@@ -208,6 +224,27 @@ async function sendRequest(
 function resolveFetch(): PlatformBillingFetcher | undefined {
   const candidate = globalThis.fetch
   return typeof candidate === 'function' ? candidate.bind(globalThis) : undefined
+}
+
+function toQueryString(query?: PlatformProductLineListQuery): string {
+  if (!query) {
+    return ''
+  }
+  const parameters = new URLSearchParams()
+  if (query.keyword) {
+    parameters.set('keyword', query.keyword)
+  }
+  if (query.status) {
+    parameters.set('status', query.status)
+  }
+  if (query.page !== undefined) {
+    parameters.set('page', String(query.page))
+  }
+  if (query.size !== undefined) {
+    parameters.set('size', String(query.size))
+  }
+  const queryString = parameters.toString()
+  return queryString ? `?${queryString}` : ''
 }
 
 function xhrRequest(

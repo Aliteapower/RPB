@@ -41,12 +41,91 @@ class PlatformProductLineServiceTest {
     }
 
     @Test
+    void searchesProductLinesWithPaginationAndPrices() {
+        PlatformProductLine reservationQueue = productLine("reservation_queue", "预约排队叫号产线", "active");
+        PlatformProductLinePage page = new PlatformProductLinePage(List.of(reservationQueue), 3, 1, 2);
+        PlatformProductLineQuery query = new PlatformProductLineQuery("queue", "active", 1, 2);
+        when(repository.search(query)).thenReturn(page);
+        when(prices.findByAppKeys(List.of("reservation_queue"))).thenReturn(priceList());
+
+        PlatformProductLinePage result = service.searchProductLines(query);
+
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().getFirst().prices()).hasSize(2);
+        assertThat(result.total()).isEqualTo(3);
+        assertThat(result.page()).isEqualTo(1);
+        assertThat(result.size()).isEqualTo(2);
+    }
+
+    @Test
+    void createsDisabledProductLineWithControlledAppKeyAndEntryRoute() {
+        PlatformProductLine created = productLine("crm_suite", "CRM 系统", "disabled", "");
+        PlatformProductLineCreateCommand command = new PlatformProductLineCreateCommand(
+            "crm_suite",
+            "CRM 系统",
+            "disabled",
+            "",
+            "先登记，后续开发",
+            20
+        );
+        when(repository.findByAppKey("crm_suite")).thenReturn(Optional.empty());
+        when(repository.create(command)).thenReturn(created);
+        when(prices.findByAppKeys(List.of("crm_suite"))).thenReturn(List.of());
+
+        PlatformProductLine result = service.createProductLine(command);
+
+        assertThat(result.appKey()).isEqualTo("crm_suite");
+        assertThat(result.status()).isEqualTo("disabled");
+        assertThat(result.defaultEntryRoute()).isEmpty();
+        verify(repository).create(command);
+    }
+
+    @Test
+    void rejectsInvalidAppKeyDuplicateAndUncontrolledEntryRoute() {
+        when(repository.findByAppKey("reservation_queue")).thenReturn(Optional.of(productLine("reservation_queue", "预约排队叫号产线", "active")));
+
+        assertThatThrownBy(() -> service.createProductLine(new PlatformProductLineCreateCommand(
+            "Bad Key",
+            "Bad",
+            "disabled",
+            "",
+            null,
+            1
+        )))
+            .isInstanceOf(PlatformBillingServiceException.class)
+            .hasMessageContaining(PlatformBillingServiceErrorCode.REQUEST_INVALID.name());
+
+        assertThatThrownBy(() -> service.createProductLine(new PlatformProductLineCreateCommand(
+            "reservation_queue",
+            "重复",
+            "disabled",
+            "",
+            null,
+            1
+        )))
+            .isInstanceOf(PlatformBillingServiceException.class)
+            .hasMessageContaining(PlatformBillingServiceErrorCode.PRODUCT_LINE_CONFLICT.name());
+
+        assertThatThrownBy(() -> service.createProductLine(new PlatformProductLineCreateCommand(
+            "crm_suite",
+            "CRM 系统",
+            "disabled",
+            "/random/free-text",
+            null,
+            1
+        )))
+            .isInstanceOf(PlatformBillingServiceException.class)
+            .hasMessageContaining(PlatformBillingServiceErrorCode.REQUEST_INVALID.name());
+    }
+
+    @Test
     void updatesProductLineWithoutChangingAppKey() {
         PlatformProductLine updated = productLine("reservation_queue", "预约排队叫号产线", "active");
         when(repository.findByAppKey("reservation_queue")).thenReturn(Optional.of(productLine("reservation_queue", "旧名称", "active")));
         when(repository.update("reservation_queue", new PlatformProductLineMutationCommand(
             "预约排队叫号产线",
             "active",
+            "/stores/:storeId/staff",
             "预约、排队、叫号一体化产线",
             10
         ))).thenReturn(updated);
@@ -63,6 +142,7 @@ class PlatformProductLineServiceTest {
         verify(repository).update("reservation_queue", new PlatformProductLineMutationCommand(
             "预约排队叫号产线",
             "active",
+            "/stores/:storeId/staff",
             "预约、排队、叫号一体化产线",
             10
         ));
@@ -106,11 +186,15 @@ class PlatformProductLineServiceTest {
     }
 
     private static PlatformProductLine productLine(String appKey, String displayName, String status) {
+        return productLine(appKey, displayName, status, "/stores/:storeId/staff");
+    }
+
+    private static PlatformProductLine productLine(String appKey, String displayName, String status, String defaultEntryRoute) {
         return new PlatformProductLine(
             appKey,
             displayName,
             status,
-            "/stores/:storeId/staff",
+            defaultEntryRoute,
             "预约、排队、叫号一体化产线",
             10,
             OffsetDateTime.parse("2026-06-26T00:00:00Z"),

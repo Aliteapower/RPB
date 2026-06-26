@@ -1,6 +1,7 @@
 package com.rpb.reservation.platformbilling.api;
 
 import com.rpb.reservation.platformbilling.application.PlatformProductLine;
+import com.rpb.reservation.platformbilling.application.PlatformProductLinePage;
 import com.rpb.reservation.platformbilling.application.PlatformProductLinePrice;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -8,12 +9,33 @@ import java.util.List;
 
 record PlatformProductLineListResponse(
     boolean success,
-    List<PlatformProductLineItemResponse> productLines
+    List<PlatformProductLineItemResponse> productLines,
+    List<PlatformProductLineItemResponse> items,
+    long total,
+    int page,
+    int size
 ) {
     static PlatformProductLineListResponse from(List<PlatformProductLine> productLines) {
+        List<PlatformProductLineItemResponse> items = productLines.stream().map(PlatformProductLineItemResponse::from).toList();
         return new PlatformProductLineListResponse(
             true,
-            productLines.stream().map(PlatformProductLineItemResponse::from).toList()
+            items,
+            items,
+            items.size(),
+            0,
+            items.size()
+        );
+    }
+
+    static PlatformProductLineListResponse from(PlatformProductLinePage page) {
+        List<PlatformProductLineItemResponse> items = page.items().stream().map(PlatformProductLineItemResponse::from).toList();
+        return new PlatformProductLineListResponse(
+            true,
+            items,
+            items,
+            page.total(),
+            page.page(),
+            page.size()
         );
     }
 }

@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,7 +12,10 @@ import com.rpb.reservation.appgate.api.AppGateApiErrorMapper;
 import com.rpb.reservation.appgate.application.AppGateDenialAuditService;
 import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.platformbilling.application.PlatformProductLine;
+import com.rpb.reservation.platformbilling.application.PlatformProductLineCreateCommand;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineMutationCommand;
+import com.rpb.reservation.platformbilling.application.PlatformProductLinePage;
+import com.rpb.reservation.platformbilling.application.PlatformProductLineQuery;
 import com.rpb.reservation.platformbilling.application.PlatformProductLinePriceUpdate;
 import com.rpb.reservation.platformbilling.application.PlatformProductLineService;
 import com.rpb.reservation.walkin.auth.LocalAuthProperties;
@@ -61,19 +65,68 @@ class PlatformProductLineControllerTest {
 
     @Test
     void listsReservationQueueProductLine() throws Exception {
-        when(productLineService.listProductLines()).thenReturn(List.of(productLine()));
+        when(productLineService.searchProductLines(any(PlatformProductLineQuery.class)))
+            .thenReturn(new PlatformProductLinePage(List.of(productLine()), 1, 0, 20));
 
         mockMvc.perform(get("/api/v1/platform/product-lines"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.productLines[0].appKey").value("reservation_queue"))
-            .andExpect(jsonPath("$.productLines[0].displayName").value("预约排队叫号产线"));
+            .andExpect(jsonPath("$.productLines[0].displayName").value("预约排队叫号产线"))
+            .andExpect(jsonPath("$.items[0].appKey").value("reservation_queue"))
+            .andExpect(jsonPath("$.total").value(1))
+            .andExpect(jsonPath("$.page").value(0))
+            .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
+    void listsProductLinesWithPaginationFilters() throws Exception {
+        when(productLineService.searchProductLines(any(PlatformProductLineQuery.class)))
+            .thenReturn(new PlatformProductLinePage(List.of(productLine()), 12, 1, 5));
+
+        mockMvc.perform(get("/api/v1/platform/product-lines")
+                .param("keyword", "reservation")
+                .param("status", "active")
+                .param("page", "1")
+                .param("size", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.total").value(12))
+            .andExpect(jsonPath("$.page").value(1))
+            .andExpect(jsonPath("$.size").value(5));
+    }
+
+    @Test
+    void createsDisabledProductLineWithControlledRoute() throws Exception {
+        when(productLineService.createProductLine(any(PlatformProductLineCreateCommand.class)))
+            .thenReturn(productLine("crm_suite", "CRM 系统", "disabled", ""));
+
+        mockMvc.perform(post("/api/v1/platform/product-lines")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "appKey":"crm_suite",
+                      "displayName":"CRM 系统",
+                      "status":"disabled",
+                      "defaultEntryRoute":"",
+                      "description":"后续开发 CRM 产品线前登记",
+                      "sortOrder":20
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.productLine.appKey").value("crm_suite"))
+            .andExpect(jsonPath("$.productLine.status").value("disabled"))
+            .andExpect(jsonPath("$.productLine.defaultEntryRoute").value(""));
     }
 
     @Test
     void updatesProductLineWhenDedicatedOrTenantManagePermissionIsPresent() throws Exception {
         when(productLineService.updateProductLine(any(), any(PlatformProductLineMutationCommand.class)))
             .thenReturn(productLine());
+        when(productLineService.searchProductLines(any(PlatformProductLineQuery.class)))
+            .thenReturn(new PlatformProductLinePage(List.of(productLine()), 1, 0, 20));
 
         mockMvc.perform(patch("/api/v1/platform/product-lines/reservation_queue")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -124,11 +177,15 @@ class PlatformProductLineControllerTest {
     }
 
     private static PlatformProductLine productLine() {
+        return productLine("reservation_queue", "预约排队叫号产线", "active", "/stores/:storeId/staff");
+    }
+
+    private static PlatformProductLine productLine(String appKey, String displayName, String status, String defaultEntryRoute) {
         return new PlatformProductLine(
-            "reservation_queue",
-            "预约排队叫号产线",
-            "active",
-            "/stores/:storeId/staff",
+            appKey,
+            displayName,
+            status,
+            defaultEntryRoute,
             "预约、排队、叫号一体化产线",
             10,
             OffsetDateTime.parse("2026-06-26T00:00:00Z"),

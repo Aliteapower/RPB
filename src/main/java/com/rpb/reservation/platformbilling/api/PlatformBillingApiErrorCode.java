@@ -8,6 +8,7 @@ public enum PlatformBillingApiErrorCode {
     REQUEST_INVALID(HttpStatus.BAD_REQUEST, "platform.billing.request_invalid"),
     TENANT_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.billing.tenant_not_found"),
     PRODUCT_LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.billing.product_line_not_found"),
+    PRODUCT_LINE_CONFLICT(HttpStatus.CONFLICT, "platform.billing.product_line_conflict"),
     SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.billing.subscription_not_found"),
     SUBSCRIPTION_CONFLICT(HttpStatus.CONFLICT, "platform.billing.subscription_conflict"),
     VERSION_CONFLICT(HttpStatus.CONFLICT, "platform.billing.version_conflict"),

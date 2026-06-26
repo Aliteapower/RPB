@@ -26,8 +26,25 @@ export interface PlatformProductLine {
 export interface PlatformProductLineMutation {
   displayName: string
   status: ProductLineStatus
+  defaultEntryRoute?: string
   description?: string | null
   sortOrder?: number
+}
+
+export interface PlatformProductLineCreateMutation {
+  appKey: string
+  displayName: string
+  status: ProductLineStatus
+  defaultEntryRoute: string
+  description?: string | null
+  sortOrder?: number
+}
+
+export interface PlatformProductLineListQuery {
+  keyword?: string
+  status?: ProductLineStatus | ''
+  page?: number
+  size?: number
 }
 
 export interface TenantProductSubscription {
@@ -72,6 +89,10 @@ export interface ProductSubscriptionStatusMutation {
 export interface PlatformProductLineListResponse {
   success: true
   productLines: PlatformProductLine[]
+  items?: PlatformProductLine[]
+  total?: number
+  page?: number
+  size?: number
 }
 
 export interface PlatformProductLineResponse {
