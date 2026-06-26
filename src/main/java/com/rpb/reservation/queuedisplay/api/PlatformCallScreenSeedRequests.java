@@ -26,4 +26,23 @@ public final class PlatformCallScreenSeedRequests {
     ) {
     }
 
+    public record MediaSeedRequest(
+        String displayName,
+        String status,
+        List<MediaSeedSlideRequest> mediaSlides,
+        Integer version
+    ) {
+    }
+
+    public record MediaSeedSlideRequest(
+        UUID id,
+        UUID mediaAssetId,
+        String mediaKind,
+        String title,
+        String altText,
+        Integer sortOrder,
+        String status,
+        Integer version
+    ) {
+    }
 }

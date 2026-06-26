@@ -2,13 +2,13 @@
 
 Date: 2026-06-26
 
-Status: Phase 1 text-only design
+Status: Phase 1 text display plus restored media ads
 
 ## 1. Goal
 
-Phase 1 adds a tenant-isolated call screen for the reservation queue product line. The screen shows the current called ticket when one exists. When no ticket is being called, it rotates text advertising copy.
+The queue display slice adds a tenant-isolated call screen for the reservation queue product line. The screen shows the current called ticket when one exists. When no ticket is being called, it rotates the active text or image/video advertising carousel.
 
-The first release is deliberately small:
+The text release introduced:
 
 - Queue display terminal state.
 - Text advertising carousel.
@@ -18,15 +18,20 @@ The first release is deliberately small:
 - Platform admin entry for seed text maintenance.
 - App Gate permission `queue.display.view`.
 
+The restored media release adds:
+
+- Tenant-owned image/video media uploads.
+- Media ad sets and media slide ordering.
+- Platform-owned media seed template.
+- Terminal playback for API-provided image/video slides.
+
 ## 2. Explicit Non-Goals
 
-Phase 1 does not include binary asset handling, image/video templates, first-party asset storage, external asset URLs, rich creative editors, payment, analytics, websocket streaming, or device registration.
-
-Phase 2 not implemented: image/video carousel groups and asset management remain a later design gate. They must not appear in Phase 1 APIs, database tables, Vue forms, repository methods, or validation tests as implemented functionality.
+This slice does not include rich creative editors, payment, analytics, websocket streaming, device registration, public terminal tokens, CDN/object storage integration, transcoding, media security scanning, or media lifecycle cleanup automation.
 
 ## 3. Product Behavior
 
-The terminal is a staff-facing full-screen page opened from the queue management page. It polls the state API. If `currentCall` is present, it renders the called number, customer display name, party size, and waiting preview. If `currentCall` is null, it renders text slides from the active tenant call screen configuration.
+The terminal is a staff-facing full-screen page opened from the queue management page. It polls the state API. If `currentCall` is present, it renders the called number, customer display name, party size, and waiting preview. If `currentCall` is null, it renders text slides or media slides from the active tenant call screen configuration.
 
 The default tenant experience is bootstrapped from the platform seed:
 
@@ -35,17 +40,17 @@ The default tenant experience is bootstrapped from the platform seed:
 3. 特惠活动
 4. 会员专享
 
-Tenant admins can edit their own copy. Editing tenant copy never mutates the platform seed.
+Tenant admins can edit their own copy. Editing tenant copy never mutates the platform seed. Tenant admins can also upload tenant-owned image/video assets and build a media carousel. Platform admins can maintain a platform-owned media seed template, but platform media assets are not tenant-owned files.
 
 ## 4. OOD / Module Boundaries
 
 The feature is a focused `queuedisplay` slice:
 
 - API layer owns HTTP mapping, actor permission checks, and stable error response codes.
-- Application layer owns use cases, text-only normalization, version checks, and tenant-scope rules.
-- Persistence layer owns SQL projections and V007 schema access.
+- Application layer owns use cases, text/media normalization, version checks, and tenant-scope rules.
+- Persistence layer owns SQL projections and V007/V009 schema access.
 - Frontend API clients own wire format validation.
-- Vue pages own presentation, loading/error/saving states, and text-only editing.
+- Vue pages own presentation, loading/error/saving/uploading states, and text/media editing.
 
 No reservation, queue call, skip, seating, or cleaning use case should contain advertising rules. Business APIs keep relying on App Gate; the queue display screen only consumes an already-authorized read projection.
 
@@ -66,17 +71,24 @@ Tenant admin:
 - `POST /api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets`
 - `GET /api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets/{adSetId}`
 - `PATCH /api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets/{adSetId}`
+- `POST /api/v1/stores/{storeId}/tenant-admin/call-screen/media`
+- `GET /api/v1/stores/{storeId}/tenant-admin/call-screen/media/{assetId}`
+- `GET /api/v1/stores/{storeId}/queue-display/media/{assetId}`
 
 Platform seed:
 
 - `GET /api/v1/platform/call-screen/text-seed`
 - `PATCH /api/v1/platform/call-screen/text-seed`
+- `GET /api/v1/platform/call-screen/media-seed`
+- `PATCH /api/v1/platform/call-screen/media-seed`
+- `POST /api/v1/platform/call-screen/media`
+- `GET /api/v1/platform/call-screen/media/{assetId}`
 
-All ad set payloads are text-only. `adType` and `adMode` are `text`.
+Ad set payloads support `adType`/`adMode` of `text` and `media`. The legacy reserved `image` value is normalized to `media`.
 
 ## 6. Database Boundary
 
-Phase 1 owns one migration:
+The text slice owns:
 
 - `V007__queue_display_ad_config.sql`
 
@@ -88,11 +100,21 @@ Allowed tables:
 - `tenant_call_screen_text_slides`
 - `store_call_screen_settings`
 
+The restored media slice owns:
+
+- `V009__call_screen_media_carousel.sql`
+
+Media tables:
+
+- `call_screen_media_assets`
+- `platform_call_screen_media_seed_slides`
+- `tenant_call_screen_media_slides`
+
 Important constraints:
 
-- Platform seed `ad_type = 'text'`
-- Tenant ad set `ad_type = 'text'`
-- Store setting `ad_mode = 'text'`
+- Platform seed `ad_type` supports `text` and `media`
+- Tenant ad set `ad_type` supports `text` and `media`
+- Store setting `ad_mode` supports `text` and `media`
 - Tenant slide scope is `(tenant_id, ad_set_id)`
 - Store setting active set is scoped by `(active_ad_set_id, tenant_id)`
 - Active text slides have unique sort order per tenant ad set
@@ -117,7 +139,7 @@ Frontend types:
 - `callScreenAdmin.ts`
 - `platformCallScreenSeed.ts`
 
-The UI must include loading, error, saving, empty, and preview states. It must not expose binary asset controls or non-text ad mode controls in Phase 1.
+The UI must include loading, error, saving, uploading, empty, and preview states. Media controls must use the real upload APIs and must not expose raw storage keys.
 
 ## 8. Permission Model
 
@@ -132,15 +154,15 @@ Tenant call screen configuration uses existing tenant admin management permissio
 Required tests:
 
 - V007 table, index, constraint, seed, and permission migration behavior.
-- Text-only schema boundary.
+- V009 media asset, platform seed, tenant slide, and tenant isolation constraints.
 - Queue display API permission and store-scope rejection.
-- Queue display fallback to default text slides.
+- Queue display fallback to default text slides and active media slide projection.
 - Tenant seed clone and editable copy behavior.
-- Tenant text ad set create/update/settings activation.
-- Platform text seed get/update/version validation.
+- Tenant text/media ad set create/update/settings activation.
+- Platform text/media seed get/update/version validation.
 - UI implementation validation for terminal, tenant admin page, and platform seed page.
 - App Gate required permission coverage for `queue.display.view`.
 
-## 10. Phase 2 Boundary
+## 10. Remaining Later Boundary
 
-Phase 2 not implemented. A later spec must define asset ownership, validation, storage, lifecycle, security scanning, tenant isolation, API contracts, and terminal playback behavior before any image/video carousel work enters code.
+Later work should define production storage, security scanning, lifecycle cleanup, CDN delivery, device activation tokens, analytics, and richer creative management. These are not part of the restored local media carousel slice.

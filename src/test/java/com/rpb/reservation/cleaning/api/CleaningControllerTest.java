@@ -344,6 +344,7 @@ class CleaningControllerTest {
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
                 "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/CallScreenAdminController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenMediaSeedController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenSeedController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/QueueDisplayController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",

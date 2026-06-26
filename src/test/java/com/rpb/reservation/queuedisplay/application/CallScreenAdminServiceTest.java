@@ -30,45 +30,58 @@ class CallScreenAdminServiceTest {
     }
 
     @Test
-    void clonesPlatformSeedIntoTenantEditableTextSetWhenMissing() {
+    void clonesPlatformSeedIntoTenantEditableSetWhenMissing() {
         CallScreenSetting setting = service.getSettings(scope(TENANT_ID, STORE_ID));
 
         assertThat(setting.activeAdSetId()).isNotNull();
-        assertThat(setting.adMode()).isEqualTo("text");
         CallScreenAdSet adSet = service.getAdSet(scope(TENANT_ID, STORE_ID), setting.activeAdSetId());
-        assertThat(adSet.adType()).isEqualTo("text");
         assertThat(adSet.slides()).extracting(CallScreenTextSlide::title)
             .containsExactly("欢迎光临", "今日推荐", "特惠活动", "会员专享");
         assertThat(repository.platformSeedTitles).containsExactly("欢迎光临", "今日推荐", "特惠活动", "会员专享");
     }
 
     @Test
-    void createsUpdatesAndActivatesTenantTextAdSetWithoutChangingPlatformSeed() {
-        CallScreenAdSet created = service.createAdSet(scope(TENANT_ID, STORE_ID), new CallScreenAdSetCommand(
+    void updatesTenantTextSlideWithoutChangingPlatformSeed() {
+        CallScreenSetting setting = service.getSettings(scope(TENANT_ID, STORE_ID));
+
+        CallScreenAdSet updated = service.updateAdSet(scope(TENANT_ID, STORE_ID), setting.activeAdSetId(), new CallScreenAdSetCommand(
             "门店文案",
             "text",
             "active",
             List.of(new CallScreenTextSlideCommand(null, "晚市推荐", "牛排", "今日供应", 1, "active", null)),
+            0
+        ));
+
+        assertThat(updated.name()).isEqualTo("门店文案");
+        assertThat(updated.slides()).extracting(CallScreenTextSlide::title).containsExactly("晚市推荐");
+        assertThat(repository.platformSeedTitles).containsExactly("欢迎光临", "今日推荐", "特惠活动", "会员专享");
+    }
+
+    @Test
+    void createsMediaAdSetWithImageAndVideoSlidesAndCanActivateIt() {
+        UUID imageAssetId = UUID.fromString("8a000000-0000-0000-0000-000000000001");
+        UUID videoAssetId = UUID.fromString("8a000000-0000-0000-0000-000000000002");
+
+        CallScreenAdSet created = service.createAdSet(scope(TENANT_ID, STORE_ID), new CallScreenAdSetCommand(
+            "大厅媒体轮播",
+            "media",
+            "active",
+            List.of(),
+            List.of(
+                new CallScreenMediaSlideCommand(null, imageAssetId, "image", "新品推荐", "牛排海报", 1, "active", null),
+                new CallScreenMediaSlideCommand(null, videoAssetId, "video", "午市短片", "餐厅环境视频", 2, "active", null)
+            ),
             null
         ));
 
-        assertThat(created.adType()).isEqualTo("text");
-        assertThat(created.slides()).extracting(CallScreenTextSlide::title).containsExactly("晚市推荐");
-
-        CallScreenAdSet updated = service.updateAdSet(scope(TENANT_ID, STORE_ID), created.id(), new CallScreenAdSetCommand(
-            "门店文案更新",
-            "text",
-            "active",
-            List.of(new CallScreenTextSlideCommand(null, "会员专享", "储值满赠", "今日有效", 1, "active", null)),
-            0
-        ));
-        assertThat(updated.version()).isEqualTo(1);
-        assertThat(updated.slides()).extracting(CallScreenTextSlide::title).containsExactly("会员专享");
+        assertThat(created.adType()).isEqualTo("media");
+        assertThat(created.mediaSlides()).extracting(CallScreenMediaSlide::mediaKind)
+            .containsExactly("image", "video");
 
         CallScreenSetting setting = service.getSettings(scope(TENANT_ID, STORE_ID));
-        CallScreenSetting activated = service.updateSettings(scope(TENANT_ID, STORE_ID), new CallScreenSettingsCommand(
+        CallScreenSetting updated = service.updateSettings(scope(TENANT_ID, STORE_ID), new CallScreenSettingsCommand(
             created.id(),
-            "text",
+            "media",
             "active",
             8,
             4,
@@ -76,38 +89,34 @@ class CallScreenAdminServiceTest {
             setting.version()
         ));
 
-        assertThat(activated.activeAdSetId()).isEqualTo(created.id());
-        assertThat(activated.adMode()).isEqualTo("text");
-        assertThat(repository.platformSeedTitles).containsExactly("欢迎光临", "今日推荐", "特惠活动", "会员专享");
+        assertThat(updated.adMode()).isEqualTo("media");
+        assertThat(updated.activeAdSetId()).isEqualTo(created.id());
     }
 
     @Test
-    void rejectsNonTextAdTypesInPhaseOne() {
-        assertThatThrownBy(() -> service.createAdSet(scope(TENANT_ID, STORE_ID), new CallScreenAdSetCommand(
-            "图片轮播",
-            "media",
-            "active",
-            List.of(new CallScreenTextSlideCommand(null, "标题", "副标题", "标语", 1, "active", null)),
-            null
-        ))).isInstanceOf(CallScreenAdminServiceException.class)
-            .extracting("code")
-            .isEqualTo(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
-    }
-
-    @Test
-    void rejectsDisabledTextAdSetAsActiveSettingsTarget() {
+    void rejectsDisabledAdSetAsActiveSettingsTarget() {
         CallScreenAdSet disabled = service.createAdSet(scope(TENANT_ID, STORE_ID), new CallScreenAdSetCommand(
-            "停用文案",
-            "text",
+            "停用媒体轮播",
+            "media",
             "disabled",
-            List.of(new CallScreenTextSlideCommand(null, "停用", "不可展示", "停用", 1, "active", null)),
+            List.of(),
+            List.of(new CallScreenMediaSlideCommand(
+                null,
+                UUID.fromString("8a000000-0000-0000-0000-000000000011"),
+                "image",
+                "停用海报",
+                "停用",
+                1,
+                "active",
+                null
+            )),
             null
         ));
         CallScreenSetting setting = service.getSettings(scope(TENANT_ID, STORE_ID));
 
         assertThatThrownBy(() -> service.updateSettings(scope(TENANT_ID, STORE_ID), new CallScreenSettingsCommand(
             disabled.id(),
-            "text",
+            "media",
             "active",
             8,
             4,
@@ -229,9 +238,25 @@ class CallScreenAdminServiceTest {
         }
 
         @Override
+        public CallScreenAdSet createMediaAdSet(UUID tenantId, String name, String status, List<CallScreenMediaSlideCommand> slides) {
+            UUID id = UUID.randomUUID();
+            CallScreenAdSet adSet = new CallScreenAdSet(id, name, "media", status, List.of(), toMediaSlides(slides), 0);
+            adSets.computeIfAbsent(tenantId, ignored -> new LinkedHashMap<>()).put(id, adSet);
+            return adSet;
+        }
+
+        @Override
         public CallScreenAdSet updateTextAdSet(UUID tenantId, UUID adSetId, String name, String status, List<CallScreenTextSlideCommand> slides) {
             CallScreenAdSet current = adSets.get(tenantId).get(adSetId);
             CallScreenAdSet updated = new CallScreenAdSet(adSetId, name, "text", status, toSlides(slides), current.version() + 1);
+            adSets.get(tenantId).put(adSetId, updated);
+            return updated;
+        }
+
+        @Override
+        public CallScreenAdSet updateMediaAdSet(UUID tenantId, UUID adSetId, String name, String status, List<CallScreenMediaSlideCommand> slides) {
+            CallScreenAdSet current = adSets.get(tenantId).get(adSetId);
+            CallScreenAdSet updated = new CallScreenAdSet(adSetId, name, "media", status, List.of(), toMediaSlides(slides), current.version() + 1);
             adSets.get(tenantId).put(adSetId, updated);
             return updated;
         }
@@ -243,6 +268,22 @@ class CallScreenAdminServiceTest {
                     command.title(),
                     command.subtitle(),
                     command.tagline(),
+                    command.sortOrder(),
+                    command.status(),
+                    0
+                ))
+                .toList();
+        }
+
+        private static List<CallScreenMediaSlide> toMediaSlides(List<CallScreenMediaSlideCommand> commands) {
+            return commands.stream()
+                .map(command -> new CallScreenMediaSlide(
+                    UUID.randomUUID(),
+                    command.mediaAssetId(),
+                    command.mediaKind(),
+                    "/api/v1/stores/20000000-0000-0000-0000-000000000977/queue-display/media/" + command.mediaAssetId(),
+                    command.title(),
+                    command.altText(),
                     command.sortOrder(),
                     command.status(),
                     0

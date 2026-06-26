@@ -6,6 +6,7 @@ import { QueueDisplayApiError, fetchQueueDisplayState } from '../api/queueDispla
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
   QueueDisplayAdSlide,
+  QueueDisplayImageAdSlide,
   QueueDisplayStateResponse,
   QueueDisplayTextAdSlide
 } from '../types/queueDisplay'
@@ -40,14 +41,31 @@ const clientClockBase = ref<number | null>(null)
 
 const storeId = computed(() => String(route.params.storeId || ''))
 const hasCurrentCall = computed(() => !!state.value?.currentCall)
-const textSlides = computed<QueueDisplayTextAdSlide[]>(() => state.value?.ads.slides.filter(isTextAdSlide) ?? [])
-const activeAdSlideCount = computed(() => textSlides.value.length)
+const isMediaMode = computed(() => state.value?.ads.mode === 'media' || state.value?.ads.mode === 'image')
+const textSlides = computed<QueueDisplayTextAdSlide[]>(() =>
+  state.value?.ads.mode === 'text' ? state.value.ads.slides.filter(isTextAdSlide) : []
+)
+const mediaSlides = computed<QueueDisplayImageAdSlide[]>(() =>
+  isMediaMode.value ? state.value?.ads.slides.filter(isMediaAdSlide) ?? [] : []
+)
+const mediaSlide = computed(() => mediaSlides.value[activeSlideIndex.value] ?? mediaSlides.value[0])
+const activeAdSlideCount = computed(() => (isMediaMode.value ? mediaSlides.value.length : textSlides.value.length))
 const currentSlide = computed<QueueDisplayTextAdSlide>(() => {
   const slides = textSlides.value
-  return slides.length ? slides[activeSlideIndex.value % slides.length] : fallbackSlide
+  if (!slides.length) {
+    return fallbackSlide
+  }
+
+  return slides[activeSlideIndex.value % slides.length]
 })
-const slideDurationMs = computed(() => Math.max(3, state.value?.ads.slideDurationSeconds ?? SLIDE_DURATION_SECONDS) * 1000)
-const pollIntervalMs = computed(() => Math.max(2, state.value?.ads.statePollSeconds ?? POLL_INTERVAL_SECONDS) * 1000)
+const slideDurationMs = computed(() => {
+  const seconds = state.value?.ads.slideDurationSeconds ?? SLIDE_DURATION_SECONDS
+  return Math.max(3, seconds) * 1000
+})
+const pollIntervalMs = computed(() => {
+  const seconds = state.value?.ads.statePollSeconds ?? POLL_INTERVAL_SECONDS
+  return Math.max(2, seconds) * 1000
+})
 const waitingPreview = computed(() => state.value?.waiting.preview.slice(0, 4) ?? [])
 const waitingCount = computed(() => state.value?.waiting.count ?? 0)
 const storeDisplayName = computed(() => {
@@ -83,9 +101,11 @@ const screenMode = computed<'loading' | 'calling' | 'advertising' | 'error'>(() 
   if (isInitialLoading.value && !state.value) {
     return 'loading'
   }
+
   if (showErrorScreen.value) {
     return 'error'
   }
+
   return hasCurrentCall.value ? 'calling' : 'advertising'
 })
 
@@ -125,12 +145,22 @@ function constrainSlideIndex(): void {
   }
 }
 
-function isTextAdSlide(slide: QueueDisplayAdSlide): slide is QueueDisplayTextAdSlide {
+function isMediaAdSlide(slide: QueueDisplayAdSlide): slide is QueueDisplayImageAdSlide {
+  const candidate = slide as unknown as Record<string, unknown>
   return (
-    typeof slide.slideId === 'string' &&
-    typeof slide.title === 'string' &&
-    typeof slide.subtitle === 'string' &&
-    typeof slide.tagline === 'string'
+    typeof candidate.slideId === 'string' &&
+    (candidate.mediaKind === 'image' || candidate.mediaKind === 'video') &&
+    typeof candidate.mediaUrl === 'string'
+  )
+}
+
+function isTextAdSlide(slide: QueueDisplayAdSlide): slide is QueueDisplayTextAdSlide {
+  const candidate = slide as unknown as Record<string, unknown>
+  return (
+    typeof candidate.slideId === 'string' &&
+    typeof candidate.title === 'string' &&
+    typeof candidate.subtitle === 'string' &&
+    typeof candidate.tagline === 'string'
   )
 }
 
@@ -150,13 +180,44 @@ function stopPolling(): void {
 
 function startAdRotation(): void {
   stopAdRotation()
+
   if (hasCurrentCall.value || activeAdSlideCount.value <= 1) {
     return
   }
+
+  if (isMediaMode.value && mediaSlide.value?.mediaKind === 'video') {
+    return
+  }
+
   adTimer.value = window.setTimeout(() => {
-    activeSlideIndex.value = (activeSlideIndex.value + 1) % activeAdSlideCount.value
-    startAdRotation()
+    showNextAdSlide()
   }, slideDurationMs.value)
+}
+
+function showNextAdSlide(): void {
+  const slideCount = activeAdSlideCount.value
+  if (slideCount <= 1) {
+    return
+  }
+  activeSlideIndex.value = (activeSlideIndex.value + 1) % slideCount
+  startAdRotation()
+}
+
+function handleVideoEnded(event: Event): void {
+  if (activeAdSlideCount.value <= 1) {
+    const video = event.currentTarget as HTMLVideoElement | null
+    if (video) {
+      video.currentTime = 0
+      void video.play().catch(() => undefined)
+    }
+    return
+  }
+
+  showNextAdSlide()
+}
+
+function handleMediaPlaybackError(): void {
+  showNextAdSlide()
 }
 
 function stopAdRotation(): void {
@@ -217,9 +278,11 @@ watch(
   }
 )
 
-watch(pollIntervalMs, startPolling)
+watch(pollIntervalMs, () => {
+  startPolling()
+})
 
-watch([hasCurrentCall, () => activeAdSlideCount.value, slideDurationMs], () => {
+watch([hasCurrentCall, isMediaMode, () => activeAdSlideCount.value, slideDurationMs], () => {
   constrainSlideIndex()
   startAdRotation()
 })
@@ -298,18 +361,57 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else class="screen-ad" aria-live="polite">
-      <div class="ad-icon" aria-hidden="true">食</div>
-      <p class="ad-kicker">欢迎等候</p>
-      <h1>{{ currentSlide.title }}</h1>
-      <p class="ad-subtitle">{{ currentSlide.subtitle }}</p>
-      <p class="ad-tagline">{{ currentSlide.tagline }}</p>
-      <div v-if="textSlides.length > 1" class="ad-dots" aria-hidden="true">
-        <span
-          v-for="(slide, index) in textSlides"
-          :key="slide.slideId"
-          :class="{ 'ad-dot--active': index === activeSlideIndex % textSlides.length }"
-        ></span>
+      <div v-if="isMediaMode" class="media-ad-stage">
+        <template v-if="mediaSlide">
+          <img
+            v-if="mediaSlide.mediaKind === 'image'"
+            class="media-ad-asset"
+            :src="mediaSlide.mediaUrl"
+            :alt="mediaSlide.altText || mediaSlide.title || '叫号屏广告图片'"
+          />
+          <video
+            v-else
+            class="media-ad-asset"
+            :src="mediaSlide.mediaUrl"
+            :aria-label="mediaSlide.altText || mediaSlide.title || '叫号屏广告视频'"
+            autoplay
+            muted
+            playsinline
+            @ended="handleVideoEnded"
+            @error="handleMediaPlaybackError"
+          />
+          <div v-if="mediaSlide.title" class="media-ad-caption">
+            <h1>{{ mediaSlide.title }}</h1>
+          </div>
+          <div v-if="mediaSlides.length > 1" class="ad-dots media-ad-dots" aria-hidden="true">
+            <span
+              v-for="(slide, index) in mediaSlides"
+              :key="slide.slideId"
+              :class="{ 'ad-dot--active': index === activeSlideIndex % mediaSlides.length }"
+            ></span>
+          </div>
+        </template>
+        <template v-else>
+          <div class="ad-icon" aria-hidden="true">食</div>
+          <p class="ad-kicker">媒体广告待配置</p>
+          <h1>请上传图片或视频</h1>
+        </template>
       </div>
+
+      <template v-else>
+        <div class="ad-icon" aria-hidden="true">食</div>
+        <p class="ad-kicker">欢迎等候</p>
+        <h1>{{ currentSlide.title }}</h1>
+        <p class="ad-subtitle">{{ currentSlide.subtitle }}</p>
+        <p class="ad-tagline">{{ currentSlide.tagline }}</p>
+        <div v-if="textSlides.length > 1" class="ad-dots" aria-hidden="true">
+          <span
+            v-for="(slide, index) in textSlides"
+            :key="slide.slideId"
+            :class="{ 'ad-dot--active': index === activeSlideIndex % textSlides.length }"
+          ></span>
+        </div>
+      </template>
     </section>
   </main>
 </template>
@@ -318,21 +420,31 @@ onBeforeUnmount(() => {
 .queue-display-terminal {
   --queue-display-bg: #0b0e1a;
   --queue-display-panel: rgba(255, 255, 255, 0.08);
+  --queue-display-panel-strong: rgba(255, 255, 255, 0.14);
   --queue-display-accent: #f97316;
   --queue-display-accent-strong: #fb923c;
   --queue-display-cyan: #38bdf8;
   --queue-display-text: #f8fafc;
   --queue-display-muted: #a7b0c2;
 
+  position: relative;
   min-height: 100vh;
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(135deg, #090b14 0%, var(--queue-display-bg) 56%, #111827 100%);
-  background-size: 4rem 4rem, 4rem 4rem, auto;
+  background-size:
+    4rem 4rem,
+    4rem 4rem,
+    auto;
   color: var(--queue-display-text);
-  font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  font-family:
+    Inter,
+    "Microsoft YaHei",
+    "PingFang SC",
+    system-ui,
+    sans-serif;
 }
 
 .terminal-header {
@@ -342,6 +454,14 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
   padding: 1.5rem 2.25rem;
   min-height: 6rem;
+}
+
+.terminal-brand,
+.terminal-time,
+.terminal-manage,
+.terminal-manage-placeholder {
+  position: relative;
+  z-index: 2;
 }
 
 .terminal-brand {
@@ -354,6 +474,7 @@ onBeforeUnmount(() => {
 .brand-dot {
   width: 0.875rem;
   height: 0.875rem;
+  flex: 0 0 auto;
   border-radius: 999px;
   background: var(--queue-display-accent);
   box-shadow: 0 0 1.75rem rgba(249, 115, 22, 0.72);
@@ -372,8 +493,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.terminal-brand span,
-.terminal-time span {
+.terminal-brand span {
+  margin-top: 0.125rem;
   color: var(--queue-display-muted);
   font-size: 0.875rem;
 }
@@ -390,6 +511,13 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 
+.terminal-time span {
+  display: block;
+  margin-top: 0.375rem;
+  color: var(--queue-display-muted);
+  font-size: 0.875rem;
+}
+
 .terminal-manage {
   justify-self: end;
   min-width: 7.5rem;
@@ -401,6 +529,16 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font: inherit;
   font-weight: 700;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.terminal-manage:hover {
+  border-color: rgba(249, 115, 22, 0.72);
+  background: rgba(249, 115, 22, 0.16);
+  transform: translateY(-1px);
 }
 
 .terminal-manage-placeholder {
@@ -450,6 +588,10 @@ onBeforeUnmount(() => {
   animation: queue-display-spin 900ms linear infinite;
 }
 
+.screen-error {
+  align-content: center;
+}
+
 .state-kicker,
 .ad-kicker,
 .calling-label {
@@ -465,6 +607,12 @@ onBeforeUnmount(() => {
   line-height: 1.1;
 }
 
+.screen-error p:last-child {
+  margin: 1rem 0 0;
+  color: var(--queue-display-muted);
+  font-size: 1.25rem;
+}
+
 .screen-calling {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
@@ -476,6 +624,10 @@ onBeforeUnmount(() => {
 .calling-main {
   min-width: 0;
   text-align: center;
+}
+
+.calling-label {
+  font-size: 1.75rem;
 }
 
 .calling-number {
@@ -496,7 +648,9 @@ onBeforeUnmount(() => {
 .calling-meta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 1rem;
+  max-width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 0.5rem;
   padding: 0.875rem 1.25rem;
@@ -510,11 +664,14 @@ onBeforeUnmount(() => {
 }
 
 .calling-group {
+  min-width: 4.25rem;
   border-radius: 999px;
   padding: 0.45rem 0.85rem;
   background: rgba(249, 115, 22, 0.22);
   color: #fed7aa;
+  font-size: 1.125rem;
   font-weight: 800;
+  text-align: center;
 }
 
 .waiting-panel {
@@ -524,10 +681,12 @@ onBeforeUnmount(() => {
   border-radius: 0.5rem;
   padding: 1.5rem;
   background: var(--queue-display-panel);
+  box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.32);
 }
 
 .waiting-count {
   margin: 0 0 1.25rem;
+  color: var(--queue-display-text);
   font-size: 1.5rem;
   font-weight: 800;
 }
@@ -558,6 +717,7 @@ onBeforeUnmount(() => {
 
 .waiting-list span {
   overflow: hidden;
+  color: var(--queue-display-text);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -607,6 +767,7 @@ onBeforeUnmount(() => {
   color: #fed7aa;
   font-size: 3.25rem;
   font-weight: 900;
+  box-shadow: 0 1rem 5rem rgba(249, 115, 22, 0.2);
 }
 
 .ad-subtitle {
@@ -643,9 +804,71 @@ onBeforeUnmount(() => {
   background: var(--queue-display-accent);
 }
 
+.media-ad-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.media-ad-asset {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-ad-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4rem 3rem 5rem;
+  background: linear-gradient(180deg, transparent, rgba(4, 9, 18, 0.78));
+  text-align: center;
+}
+
+.media-ad-caption h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 4.5rem;
+  font-weight: 900;
+  text-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.56);
+}
+
+.media-ad-dots {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 @keyframes queue-display-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 1600px) {
+  .terminal-header {
+    padding: 2rem 3rem;
+    min-height: 7rem;
+  }
+
+  .screen-state,
+  .screen-ad,
+  .screen-calling {
+    min-height: calc(100vh - 7rem);
+  }
+
+  .calling-number {
+    font-size: 12rem;
+  }
+
+  .screen-ad h1 {
+    font-size: 6rem;
   }
 }
 
@@ -655,9 +878,30 @@ onBeforeUnmount(() => {
     padding: 1.25rem 1.5rem;
   }
 
+  .terminal-time {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .terminal-manage {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .terminal-manage-placeholder {
+    display: none;
+  }
+
   .screen-calling {
     grid-template-columns: 1fr;
+    align-content: center;
     padding: 1.5rem;
+  }
+
+  .waiting-panel {
+    align-self: auto;
   }
 
   .calling-number {
@@ -667,16 +911,28 @@ onBeforeUnmount(() => {
   .screen-ad h1 {
     font-size: 4rem;
   }
+
+  .ad-subtitle {
+    font-size: 1.875rem;
+  }
+
+  .terminal-offline-badge {
+    top: 6.25rem;
+    right: 1.5rem;
+  }
 }
 
 @media (max-width: 760px) {
   .terminal-header {
     grid-template-columns: 1fr;
     gap: 0.875rem;
+    min-height: auto;
   }
 
   .terminal-time,
   .terminal-manage {
+    grid-column: auto;
+    grid-row: auto;
     justify-self: start;
   }
 
@@ -684,8 +940,19 @@ onBeforeUnmount(() => {
     width: 100%;
   }
 
+  .screen-state,
+  .screen-ad,
+  .screen-calling {
+    min-height: auto;
+  }
+
   .calling-number {
     font-size: 5rem;
+  }
+
+  .calling-meta {
+    display: grid;
+    justify-items: center;
   }
 
   .waiting-list li {
@@ -698,6 +965,12 @@ onBeforeUnmount(() => {
 
   .screen-ad h1 {
     font-size: 3rem;
+  }
+
+  .ad-icon {
+    width: 5.5rem;
+    height: 5.5rem;
+    font-size: 2.5rem;
   }
 }
 </style>

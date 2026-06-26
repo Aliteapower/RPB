@@ -89,14 +89,20 @@ public record QueueDisplayResponse(
         String slideId,
         String title,
         String subtitle,
-        String tagline
+        String tagline,
+        String mediaKind,
+        String mediaUrl,
+        String altText
     ) {
         private static AdSlideResponse from(QueueDisplayAdSlide slide) {
             return new AdSlideResponse(
                 slide.slideId(),
                 slide.title(),
                 slide.subtitle(),
-                slide.tagline()
+                slide.tagline(),
+                slide.mediaKind(),
+                slide.mediaUrl(),
+                slide.altText()
             );
         }
     }

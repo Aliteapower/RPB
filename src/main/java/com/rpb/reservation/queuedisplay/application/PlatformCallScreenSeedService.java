@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PlatformCallScreenSeedService {
     private static final String DEFAULT_TEXT_SEED_KEY = "restaurant_default";
+    private static final String DEFAULT_MEDIA_SEED_KEY = "restaurant_media_default";
 
     private final PlatformCallScreenSeedRepository repository;
 
@@ -24,6 +25,13 @@ public class PlatformCallScreenSeedService {
             .orElseThrow(() -> new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.SEED_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
+    public PlatformCallScreenMediaSeedSet getMediaSeed() {
+        return repository.findMediaBySeedKey(DEFAULT_MEDIA_SEED_KEY)
+            .filter(seed -> "media".equals(seed.adType()) || "image".equals(seed.adType()))
+            .orElseThrow(() -> new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.SEED_NOT_FOUND));
+    }
+
     @Transactional
     public PlatformCallScreenSeedSet updateTextSeed(PlatformCallScreenSeedCommand command) {
         PlatformCallScreenSeedSet current = getTextSeed();
@@ -32,6 +40,16 @@ public class PlatformCallScreenSeedService {
             throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.VERSION_CONFLICT);
         }
         return repository.updateTextSeed(current.id(), input.displayName(), input.status(), input.slides());
+    }
+
+    @Transactional
+    public PlatformCallScreenMediaSeedSet updateMediaSeed(PlatformCallScreenMediaSeedCommand command) {
+        PlatformCallScreenMediaSeedSet current = getMediaSeed();
+        NormalizedMediaSeed input = normalizeMedia(command);
+        if (input.version() != null && input.version() != current.version()) {
+            throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.VERSION_CONFLICT);
+        }
+        return repository.updateMediaSeed(current.id(), input.displayName(), input.status(), input.mediaSlides());
     }
 
     private static NormalizedTextSeed normalize(PlatformCallScreenSeedCommand command) {
@@ -43,6 +61,25 @@ public class PlatformCallScreenSeedService {
             .toList();
         ensureUniqueSortOrders(slides);
         return new NormalizedTextSeed(
+            requiredText(command.displayName()),
+            normalizeStatus(command.status()),
+            slides,
+            command.version()
+        );
+    }
+
+    private static NormalizedMediaSeed normalizeMedia(PlatformCallScreenMediaSeedCommand command) {
+        if (command == null || command.mediaSlides() == null) {
+            throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
+        }
+        List<PlatformCallScreenMediaSeedSlideCommand> slides = command.mediaSlides().stream()
+            .map(PlatformCallScreenSeedService::normalizeMediaSlide)
+            .toList();
+        if ("active".equals(command.status()) && slides.isEmpty()) {
+            throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
+        }
+        ensureUniqueMediaSortOrders(slides);
+        return new NormalizedMediaSeed(
             requiredText(command.displayName()),
             normalizeStatus(command.status()),
             slides,
@@ -65,9 +102,34 @@ public class PlatformCallScreenSeedService {
         );
     }
 
+    private static PlatformCallScreenMediaSeedSlideCommand normalizeMediaSlide(PlatformCallScreenMediaSeedSlideCommand slide) {
+        if (slide == null || slide.mediaAssetId() == null || slide.sortOrder() == null || slide.sortOrder() <= 0) {
+            throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
+        }
+        return new PlatformCallScreenMediaSeedSlideCommand(
+            slide.id(),
+            slide.mediaAssetId(),
+            normalizeMediaKind(slide.mediaKind()),
+            optionalText(slide.title()),
+            optionalText(slide.altText()),
+            slide.sortOrder(),
+            normalizeStatus(slide.status()),
+            slide.version()
+        );
+    }
+
     private static void ensureUniqueSortOrders(List<PlatformCallScreenSeedSlideCommand> slides) {
         Set<Integer> seen = new HashSet<>();
         for (PlatformCallScreenSeedSlideCommand slide : slides) {
+            if (!seen.add(slide.sortOrder())) {
+                throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
+            }
+        }
+    }
+
+    private static void ensureUniqueMediaSortOrders(List<PlatformCallScreenMediaSeedSlideCommand> slides) {
+        Set<Integer> seen = new HashSet<>();
+        for (PlatformCallScreenMediaSeedSlideCommand slide : slides) {
             if (!seen.add(slide.sortOrder())) {
                 throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
             }
@@ -81,9 +143,23 @@ public class PlatformCallScreenSeedService {
         return value;
     }
 
+    private static String normalizeMediaKind(String value) {
+        if (!"image".equals(value) && !"video".equals(value)) {
+            throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
+        }
+        return value;
+    }
+
     private static String requiredText(String value) {
         if (value == null || value.isBlank()) {
             throw new PlatformCallScreenSeedServiceException(PlatformCallScreenSeedServiceErrorCode.REQUEST_INVALID);
+        }
+        return value.trim();
+    }
+
+    private static String optionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
         return value.trim();
     }
@@ -96,4 +172,11 @@ public class PlatformCallScreenSeedService {
     ) {
     }
 
+    private record NormalizedMediaSeed(
+        String displayName,
+        String status,
+        List<PlatformCallScreenMediaSeedSlideCommand> mediaSlides,
+        Integer version
+    ) {
+    }
 }

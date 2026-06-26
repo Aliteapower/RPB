@@ -3,6 +3,7 @@ import type {
   QueueDisplayAds,
   QueueDisplayApiErrorResponse,
   QueueDisplayCurrentCall,
+  QueueDisplayImageAdSlide,
   QueueDisplayStateResponse,
   QueueDisplayStoreTime,
   QueueDisplayTextAdSlide,
@@ -178,15 +179,31 @@ function isAds(value: unknown): value is QueueDisplayAds {
 
   const candidate = value as Partial<QueueDisplayAds>
   const slides = candidate.slides
+  const isMediaMode = candidate.mode === 'media' || candidate.mode === 'image'
   const slideShapeIsValid =
     Array.isArray(slides) &&
-    slides.every(isTextAdSlide)
+    (isMediaMode ? slides.every(isMediaAdSlide) : slides.every(isTextAdSlide))
 
   return (
-    candidate.mode === 'text' &&
+    typeof candidate.mode === 'string' &&
     typeof candidate.slideDurationSeconds === 'number' &&
     (candidate.statePollSeconds === undefined || typeof candidate.statePollSeconds === 'number') &&
     slideShapeIsValid
+  )
+}
+
+function isMediaAdSlide(value: unknown): value is QueueDisplayImageAdSlide {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.slideId === 'string' &&
+    (candidate.mediaKind === 'image' || candidate.mediaKind === 'video') &&
+    typeof candidate.mediaUrl === 'string' &&
+    (candidate.title === undefined || candidate.title === null || typeof candidate.title === 'string') &&
+    (candidate.altText === undefined || candidate.altText === null || typeof candidate.altText === 'string')
   )
 }
 

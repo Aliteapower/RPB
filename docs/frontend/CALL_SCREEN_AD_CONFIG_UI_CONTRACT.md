@@ -1,53 +1,38 @@
 # Call Screen Ad Config UI Contract
 
-Status: Phase 1 text-only
+## Route
 
-## Page
+Tenant admin UI is expected to manage:
 
-`src/pages/TenantAdminCallScreenPage.vue`
+```http
+/api/v1/stores/{storeId}/tenant-admin/call-screen/settings
+/api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets
+```
 
-Route:
+The backend requires `tenant_admin` plus `tenant.admin.manage`.
 
-- `/stores/:storeId/admin/call-screen`
+## Required Controls
 
-Navigation:
+`active ad type selector`: lets the tenant choose between text mode and image/video media mode.
 
-- Tenant admin nav shows `叫号屏配置`
+`active ad set selector`: chooses the tenant-owned ad set to activate for the current store.
 
-## Behavior
+`text slide editor`: edits title, subtitle, tagline, status, and versioned text slide fields.
 
-The page loads call screen settings and tenant text ad sets. It supports:
+`sort order field`: numeric field for slide ordering. Values must be greater than 0.
 
-- Loading state.
-- Error state.
-- Saving state.
-- Text ad set selection.
-- Text slide title, subtitle, tagline, sort order, and status editing.
-- Text preview.
-- Save settings.
-- Save text ad set.
+`enable/disable status`: controls whether an ad set or slide is active.
 
-## API Client
+`media upload`: accepts supported image/video files, adds uploaded assets to the current media carousel, and shows saving/uploading/error states.
 
-`src/api/callScreenAdminApi.ts`
+`preview panel`: renders the selected text set or media carousel in a dark call-screen preview.
 
-Allowed calls:
+## Tenant And Store Isolation
 
-- `getCallScreenSettings`
-- `updateCallScreenSettings`
-- `listCallScreenAdSets`
-- `createCallScreenAdSet`
-- `getCallScreenAdSet`
-- `updateCallScreenAdSet`
+The UI must not ask the user for a tenant id. Tenant scope comes from the authenticated session. Store scope comes from the route `{storeId}`. Tenant ad sets are reusable tenant-level data, while `store_call_screen_settings` selects one active set per store.
 
-## Types
+## Media Scope
 
-`src/types/callScreenAdmin.ts`
+The tenant page may render file input, upload action, image/video preview, media carousel ordering, and media slide status controls. Uploaded tenant assets remain tenant-scoped and can only be served when referenced by the store's active media ad set.
 
-Allowed ad mode/type:
-
-- `text`
-
-## Phase 2 Not Implemented
-
-Image/video carousel editing and binary asset controls must not render in Phase 1.
+Platform-owned seed template maintenance is a separate platform backend page at `/platform/call-screen/text-seed`. This tenant page edits tenant-owned copies only.

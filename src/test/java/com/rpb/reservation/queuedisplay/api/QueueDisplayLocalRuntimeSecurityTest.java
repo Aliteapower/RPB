@@ -11,6 +11,7 @@ import com.rpb.reservation.appgate.api.AppGateApiErrorMapper;
 import com.rpb.reservation.appgate.application.AppGateDenialAuditService;
 import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.appgate.domain.AppGateDecision;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import com.rpb.reservation.queuedisplay.application.QueueDisplayAds;
 import com.rpb.reservation.queuedisplay.application.QueueDisplayApplicationService;
 import com.rpb.reservation.queuedisplay.application.QueueDisplayResult;
@@ -58,6 +59,9 @@ class QueueDisplayLocalRuntimeSecurityTest {
 
     @MockBean
     private QueueDisplayApplicationService service;
+
+    @MockBean
+    private CallScreenMediaService mediaService;
 
     @MockBean
     private AppGateService appGateService;

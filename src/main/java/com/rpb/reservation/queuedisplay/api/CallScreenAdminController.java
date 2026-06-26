@@ -5,6 +5,11 @@ import com.rpb.reservation.queuedisplay.application.CallScreenAdSetCommand;
 import com.rpb.reservation.queuedisplay.application.CallScreenAdminService;
 import com.rpb.reservation.queuedisplay.application.CallScreenAdminServiceErrorCode;
 import com.rpb.reservation.queuedisplay.application.CallScreenAdminServiceException;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaSlideCommand;
 import com.rpb.reservation.queuedisplay.application.CallScreenSettingsCommand;
 import com.rpb.reservation.queuedisplay.application.CallScreenTextSlideCommand;
 import com.rpb.reservation.store.value.StoreId;
@@ -14,6 +19,9 @@ import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +30,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/tenant-admin/call-screen")
@@ -31,19 +41,41 @@ public class CallScreenAdminController {
     private static final String TENANT_ADMIN_MANAGE = "tenant.admin.manage";
 
     private final CallScreenAdminService service;
+    private final CallScreenMediaService mediaService;
     private final CurrentActorProvider currentActorProvider;
 
     public CallScreenAdminController(
         CallScreenAdminService service,
+        CallScreenMediaService mediaService,
         CurrentActorProvider currentActorProvider
     ) {
         this.service = service;
+        this.mediaService = mediaService;
         this.currentActorProvider = currentActorProvider;
     }
 
     @GetMapping("/settings")
     public ResponseEntity<CallScreenAdminResponses.SettingsResponse> getSettings(@PathVariable UUID storeId) {
         return ResponseEntity.ok(CallScreenAdminResponses.SettingsResponse.from(service.getSettings(requireTenantAdminScope(storeId))));
+    }
+
+    @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CallScreenAdminResponses.MediaAssetResponse> uploadMedia(
+        @PathVariable UUID storeId,
+        @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.status(201).body(CallScreenAdminResponses.MediaAssetResponse.from(
+            mediaService.uploadTenantMedia(requireTenantAdminScope(storeId), file)
+        ));
+    }
+
+    @GetMapping("/media/{assetId}")
+    public ResponseEntity<Resource> readMedia(
+        @PathVariable UUID storeId,
+        @PathVariable UUID assetId
+    ) {
+        CallScreenMediaContent content = mediaService.readTenantMedia(requireTenantAdminScope(storeId), assetId);
+        return mediaResponse(content);
     }
 
     @PatchMapping("/settings")
@@ -100,6 +132,11 @@ public class CallScreenAdminController {
         return apiError(toApiError(exception.code()));
     }
 
+    @ExceptionHandler(CallScreenMediaServiceException.class)
+    public ResponseEntity<CallScreenAdminApiErrorResponse> handleMediaServiceException(CallScreenMediaServiceException exception) {
+        return apiError(toApiError(exception.code()));
+    }
+
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<CallScreenAdminApiErrorResponse> handleDataAccessException(DataAccessException exception) {
         return apiError(CallScreenAdminApiErrorCode.PERSISTENCE_ERROR);
@@ -121,11 +158,27 @@ public class CallScreenAdminController {
         return ResponseEntity.status(code.httpStatus()).body(CallScreenAdminApiErrorResponse.of(code));
     }
 
+    private static ResponseEntity<Resource> mediaResponse(CallScreenMediaContent content) {
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(content.contentType()))
+            .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+            .header("X-Content-Type-Options", "nosniff")
+            .body(content.resource());
+    }
+
     private static CallScreenAdminApiErrorCode toApiError(CallScreenAdminServiceErrorCode code) {
         return switch (code) {
             case REQUEST_INVALID -> CallScreenAdminApiErrorCode.REQUEST_INVALID;
             case AD_SET_NOT_FOUND -> CallScreenAdminApiErrorCode.AD_SET_NOT_FOUND;
             case VERSION_CONFLICT -> CallScreenAdminApiErrorCode.VERSION_CONFLICT;
+            case PERSISTENCE_ERROR -> CallScreenAdminApiErrorCode.PERSISTENCE_ERROR;
+        };
+    }
+
+    private static CallScreenAdminApiErrorCode toApiError(CallScreenMediaServiceErrorCode code) {
+        return switch (code) {
+            case REQUEST_INVALID -> CallScreenAdminApiErrorCode.REQUEST_INVALID;
+            case MEDIA_NOT_FOUND -> CallScreenAdminApiErrorCode.MEDIA_NOT_FOUND;
             case PERSISTENCE_ERROR -> CallScreenAdminApiErrorCode.PERSISTENCE_ERROR;
         };
     }
@@ -152,7 +205,10 @@ public class CallScreenAdminController {
         List<CallScreenTextSlideCommand> slides = request.slides() == null ? List.of() : request.slides().stream()
             .map(CallScreenAdminController::toCommand)
             .toList();
-        return new CallScreenAdSetCommand(request.name(), request.adType(), request.status(), slides, request.version());
+        List<CallScreenMediaSlideCommand> mediaSlides = request.mediaSlides() == null ? List.of() : request.mediaSlides().stream()
+            .map(CallScreenAdminController::toCommand)
+            .toList();
+        return new CallScreenAdSetCommand(request.name(), request.adType(), request.status(), slides, mediaSlides, request.version());
     }
 
     private static CallScreenTextSlideCommand toCommand(CallScreenAdminRequests.TextSlideRequest request) {
@@ -167,4 +223,16 @@ public class CallScreenAdminController {
         );
     }
 
+    private static CallScreenMediaSlideCommand toCommand(CallScreenAdminRequests.MediaSlideRequest request) {
+        return new CallScreenMediaSlideCommand(
+            request.id(),
+            request.mediaAssetId(),
+            request.mediaKind(),
+            request.title(),
+            request.altText(),
+            request.sortOrder(),
+            request.status(),
+            request.version()
+        );
+    }
 }

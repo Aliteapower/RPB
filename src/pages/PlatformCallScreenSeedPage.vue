@@ -3,13 +3,19 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import {
   PlatformCallScreenSeedApiError,
+  getPlatformCallScreenMediaSeed,
   getPlatformCallScreenTextSeed,
-  updatePlatformCallScreenTextSeed
+  updatePlatformCallScreenMediaSeed,
+  updatePlatformCallScreenTextSeed,
+  uploadPlatformCallScreenMedia
 } from '../api/platformCallScreenSeedApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
   PlatformCallScreenSeedSet,
+  PlatformCallScreenMediaSeedSet,
+  PlatformCallScreenMediaSeedSlide,
+  PlatformCallScreenMediaSeedSlideMutation,
   PlatformCallScreenSeedSlide,
   PlatformCallScreenSeedStatus
 } from '../types/platformCallScreenSeed'
@@ -17,8 +23,11 @@ import type {
 const auth = useAuthSessionStore()
 
 const seedSet = ref<PlatformCallScreenSeedSet | null>(null)
+const mediaSeedSet = ref<PlatformCallScreenMediaSeedSet | null>(null)
 const loading = ref(false)
 const saving = ref(false)
+const savingMedia = ref(false)
+const uploadingMedia = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const previewSlideIndex = ref(0)
@@ -37,7 +46,9 @@ onMounted(() => {
   startPreviewCarousel()
 })
 
-onUnmounted(stopPreviewCarousel)
+onUnmounted(() => {
+  stopPreviewCarousel()
+})
 
 watch(previewSlides, slides => {
   if (previewSlideIndex.value >= slides.length) {
@@ -51,11 +62,72 @@ async function loadSeedSet(): Promise<void> {
   savedText.value = ''
   try {
     const response = await getPlatformCallScreenTextSeed()
+    const mediaResponse = await getPlatformCallScreenMediaSeed()
     seedSet.value = cloneSeedSet(response.seedSet)
+    mediaSeedSet.value = cloneMediaSeedSet(mediaResponse.seedSet)
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     loading.value = false
+  }
+}
+
+async function saveMediaSeedSet(): Promise<void> {
+  if (!mediaSeedSet.value || savingMedia.value) {
+    return
+  }
+  const validationError = validateMediaSeedSet(mediaSeedSet.value)
+  if (validationError) {
+    errorText.value = validationError
+    return
+  }
+
+  savingMedia.value = true
+  errorText.value = ''
+  savedText.value = ''
+  try {
+    const response = await updatePlatformCallScreenMediaSeed({
+      displayName: mediaSeedSet.value.displayName.trim(),
+      status: mediaSeedSet.value.status,
+      mediaSlides: sortMediaSlides(mediaSeedSet.value.mediaSlides).map(toMediaSlideMutation),
+      version: mediaSeedSet.value.version
+    })
+    mediaSeedSet.value = cloneMediaSeedSet(response.seedSet)
+    savedText.value = '图片/视频种子模板已保存'
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    savingMedia.value = false
+  }
+}
+
+async function uploadMediaSlide(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || !mediaSeedSet.value || uploadingMedia.value) {
+    return
+  }
+  uploadingMedia.value = true
+  errorText.value = ''
+  savedText.value = ''
+  try {
+    const response = await uploadPlatformCallScreenMedia(file)
+    mediaSeedSet.value.mediaSlides.push({
+      id: null,
+      mediaAssetId: response.media.id,
+      mediaKind: response.media.mediaKind,
+      mediaUrl: response.media.mediaUrl,
+      title: response.media.originalFilename,
+      altText: response.media.originalFilename,
+      sortOrder: nextMediaSortOrder(),
+      status: 'active',
+      version: 0
+    })
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    uploadingMedia.value = false
   }
 }
 
@@ -157,8 +229,33 @@ function cloneSeedSet(nextSeedSet: PlatformCallScreenSeedSet): PlatformCallScree
   }
 }
 
+function cloneMediaSeedSet(nextSeedSet: PlatformCallScreenMediaSeedSet): PlatformCallScreenMediaSeedSet {
+  return {
+    ...nextSeedSet,
+    adType: 'media',
+    mediaSlides: nextSeedSet.mediaSlides.map(slide => ({ ...slide }))
+  }
+}
+
 function sortSlides(slides: PlatformCallScreenSeedSlide[]): PlatformCallScreenSeedSlide[] {
   return [...slides].sort((left, right) => left.sortOrder - right.sortOrder || left.title.localeCompare(right.title))
+}
+
+function sortMediaSlides(slides: PlatformCallScreenMediaSeedSlide[]): PlatformCallScreenMediaSeedSlide[] {
+  return [...slides].sort((left, right) => left.sortOrder - right.sortOrder || (left.title ?? '').localeCompare(right.title ?? ''))
+}
+
+function toMediaSlideMutation(slide: PlatformCallScreenMediaSeedSlide): PlatformCallScreenMediaSeedSlideMutation {
+  return {
+    id: slide.id,
+    mediaAssetId: slide.mediaAssetId,
+    mediaKind: slide.mediaKind,
+    title: slide.title?.trim() || null,
+    altText: slide.altText?.trim() || null,
+    sortOrder: Number(slide.sortOrder),
+    status: slide.status,
+    version: slide.version
+  }
 }
 
 function validateSeedSet(nextSeedSet: PlatformCallScreenSeedSet): string {
@@ -187,6 +284,31 @@ function validateSeedSet(nextSeedSet: PlatformCallScreenSeedSet): string {
   return ''
 }
 
+function validateMediaSeedSet(nextSeedSet: PlatformCallScreenMediaSeedSet): string {
+  if (!nextSeedSet.displayName.trim()) {
+    return '请填写图片/视频模板名称'
+  }
+  if (nextSeedSet.status === 'active' && nextSeedSet.mediaSlides.length === 0) {
+    return '启用图片/视频模板前至少需要一个媒体'
+  }
+  const sortOrders = new Set<number>()
+  for (const slide of nextSeedSet.mediaSlides) {
+    const sortOrder = Number(slide.sortOrder)
+    if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
+      return '排序必须是大于 0 的整数'
+    }
+    if (sortOrders.has(sortOrder)) {
+      return '排序号不能重复'
+    }
+    sortOrders.add(sortOrder)
+  }
+  return ''
+}
+
+function nextMediaSortOrder(): number {
+  return Math.max(0, ...(mediaSeedSet.value?.mediaSlides ?? []).map(slide => Number(slide.sortOrder) || 0)) + 1
+}
+
 function statusLabel(status: PlatformCallScreenSeedStatus): string {
   return status === 'active' ? '启用' : '停用'
 }
@@ -207,6 +329,9 @@ function apiErrorText(error: unknown): string {
   }
   if (error.response.error.code === 'SEED_NOT_FOUND') {
     return '默认种子模板不存在'
+  }
+  if (error.response.error.code === 'MEDIA_NOT_FOUND') {
+    return '媒体资源不存在或已被删除'
   }
   if (error.response.error.code === 'VERSION_CONFLICT') {
     return '模板已被其他操作更新，请重新加载后再保存'
@@ -234,7 +359,7 @@ function apiErrorText(error: unknown): string {
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
       <p v-if="loading" class="loading-line">加载中</p>
 
-      <div v-else-if="seedSet" class="workspace-grid">
+      <div v-else-if="seedSet && mediaSeedSet" class="workspace-grid">
         <section class="config-panel" aria-labelledby="platform-seed-settings-title">
           <div class="panel-heading">
             <div>
@@ -243,6 +368,19 @@ function apiErrorText(error: unknown): string {
             </div>
             <small>{{ seedSet.seedKey }} · 版本 {{ seedSet.version }}</small>
           </div>
+
+          <div class="mode-control" aria-label="模板类型">
+            <div class="mode-option">
+              <span class="mode-marker" aria-hidden="true"></span>
+              <span>文案模板</span>
+            </div>
+            <div class="mode-option">
+              <span class="mode-marker" aria-hidden="true"></span>
+              <span>图片/视频模板</span>
+            </div>
+          </div>
+
+          <p class="phase-note">平台维护文案种子模板和图片/视频种子模板；租户启用时仍使用自己的隔离副本。</p>
 
           <div class="settings-grid">
             <label>
@@ -319,6 +457,119 @@ function apiErrorText(error: unknown): string {
           </div>
         </section>
 
+        <section class="config-panel media-seed-panel" aria-labelledby="platform-media-seed-title">
+          <div class="panel-heading">
+            <div>
+              <span>平台媒体库</span>
+              <h2 id="platform-media-seed-title">图片/视频模板</h2>
+            </div>
+            <div class="panel-heading-actions">
+              <label class="upload-button">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                  :disabled="uploadingMedia"
+                  @change="uploadMediaSlide"
+                />
+                {{ uploadingMedia ? '上传中' : '上传媒体' }}
+              </label>
+              <small>{{ mediaSeedSet.seedKey }} · 版本 {{ mediaSeedSet.version }}</small>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <label>
+              <span>模板名称</span>
+              <input v-model.trim="mediaSeedSet.displayName" maxlength="40" required />
+            </label>
+            <label>
+              <span>状态</span>
+              <select v-model="mediaSeedSet.status" required>
+                <option value="active">启用</option>
+                <option value="disabled">停用</option>
+              </select>
+            </label>
+            <label>
+              <span>类型</span>
+              <input value="media" disabled />
+            </label>
+          </div>
+
+          <div class="slide-editor media-slide-editor">
+            <table>
+              <thead>
+                <tr>
+                  <th>排序</th>
+                  <th>状态</th>
+                  <th>类型</th>
+                  <th>预览</th>
+                  <th>标题</th>
+                  <th>替代文本</th>
+                  <th>版本</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="slide in mediaSeedSet.mediaSlides" :key="slide.id || slide.mediaAssetId">
+                  <td>
+                    <input v-model.number="slide.sortOrder" class="sort-input" type="number" min="1" required />
+                  </td>
+                  <td>
+                    <select v-model="slide.status" class="status-select" required>
+                      <option value="active">启用</option>
+                      <option value="disabled">停用</option>
+                    </select>
+                  </td>
+                  <td class="version-cell">{{ slide.mediaKind === 'video' ? '视频' : '图片' }}</td>
+                  <td>
+                    <img
+                      v-if="slide.mediaKind === 'image'"
+                      class="media-thumb"
+                      :src="slide.mediaUrl"
+                      :alt="slide.altText || slide.title || '媒体预览'"
+                    />
+                    <video
+                      v-else
+                      class="media-thumb"
+                      :src="slide.mediaUrl"
+                      muted
+                      playsinline
+                      controls
+                    />
+                  </td>
+                  <td>
+                    <input v-model.trim="slide.title" maxlength="32" />
+                  </td>
+                  <td>
+                    <input v-model.trim="slide.altText" maxlength="48" />
+                  </td>
+                  <td class="version-cell">{{ slide.version }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="media-preview-strip" aria-label="图片/视频模板预览">
+            <template v-if="mediaSeedSet.mediaSlides.length">
+              <div v-for="slide in sortMediaSlides(mediaSeedSet.mediaSlides).slice(0, 2)" :key="`preview-${slide.mediaAssetId}`" class="media-preview-card">
+                <img
+                  v-if="slide.mediaKind === 'image'"
+                  :src="slide.mediaUrl"
+                  :alt="slide.altText || slide.title || '媒体预览'"
+                />
+                <video v-else :src="slide.mediaUrl" muted playsinline autoplay loop />
+                <strong>{{ slide.title || (slide.mediaKind === 'video' ? '视频广告' : '图片广告') }}</strong>
+              </div>
+            </template>
+            <p v-else class="empty-media-line">上传图片或视频后可轮播预览。</p>
+          </div>
+
+          <div class="panel-actions">
+            <button class="primary-button" type="button" :disabled="savingMedia" @click="saveMediaSeedSet">
+              {{ savingMedia ? '保存中' : '保存图片/视频种子模板' }}
+            </button>
+          </div>
+        </section>
+
         <aside class="preview-panel" aria-label="平台叫号文案预览">
           <div class="preview-header">
             <div class="preview-title">
@@ -331,6 +582,7 @@ function apiErrorText(error: unknown): string {
               :disabled="previewSlides.length === 0"
               @click="openPreviewFullscreen"
             >
+              <span class="preview-expand-icon" aria-hidden="true" />
               大屏预览
             </button>
           </div>
@@ -399,17 +651,11 @@ function apiErrorText(error: unknown): string {
   padding: 22px;
 }
 
-.page-heading,
-.panel-heading,
-.panel-actions,
-.preview-header {
+.page-heading {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-}
-
-.page-heading {
   margin-bottom: 16px;
 }
 
@@ -421,18 +667,10 @@ function apiErrorText(error: unknown): string {
   font-weight: 700;
 }
 
-.page-heading h1,
-.panel-heading h2 {
+.page-heading h1 {
   margin: 0;
   color: #0f172a;
-}
-
-.page-heading h1 {
   font-size: 24px;
-}
-
-.panel-heading h2 {
-  font-size: 18px;
 }
 
 .error-banner,
@@ -468,8 +706,7 @@ function apiErrorText(error: unknown): string {
   align-items: start;
 }
 
-.config-panel,
-.preview-panel {
+.config-panel {
   min-width: 0;
   display: grid;
   gap: 16px;
@@ -483,17 +720,86 @@ function apiErrorText(error: unknown): string {
   grid-column: 1;
 }
 
-.preview-panel {
-  position: sticky;
-  top: 22px;
-  grid-column: 2;
-  grid-row: 1 / span 2;
+.media-seed-panel {
+  grid-column: 1 / -1;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.panel-heading h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.panel-heading small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panel-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mode-control,
+.settings-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.mode-control {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mode-option {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 1px solid #99f6e4;
+  border-radius: 6px;
+  color: #115e59;
+  background: #f0fdfa;
+  font-weight: 800;
+}
+
+.mode-option.disabled {
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.mode-marker {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #0f766e;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14);
+}
+
+.phase-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .settings-grid {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) 150px 130px;
-  gap: 12px;
 }
 
 label {
@@ -515,6 +821,11 @@ select {
   color: #0f172a;
   background: #ffffff;
   font: inherit;
+}
+
+input[type='radio'] {
+  width: auto;
+  min-height: auto;
 }
 
 input:disabled {
@@ -567,9 +878,71 @@ tr:last-child td {
   text-align: center;
 }
 
+.media-slide-editor table {
+  min-width: 1080px;
+}
+
+.media-thumb {
+  width: 96px;
+  height: 54px;
+  display: block;
+  border-radius: 6px;
+  background: #0f172a;
+  object-fit: cover;
+}
+
+.media-preview-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.media-preview-card {
+  position: relative;
+  min-height: 180px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.media-preview-card img,
+.media-preview-card video {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  display: block;
+  object-fit: cover;
+}
+
+.media-preview-card strong {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  color: #ffffff;
+  font-size: 18px;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+}
+
+.empty-media-line {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #64748b;
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .primary-button,
-.secondary-button,
-.preview-expand-button {
+.secondary-button {
   min-height: 38px;
   border-radius: 6px;
   padding: 0 14px;
@@ -584,8 +957,7 @@ tr:last-child td {
   background: #0f766e;
 }
 
-.secondary-button,
-.preview-expand-button {
+.secondary-button {
   border: 1px solid #cbd5e1;
   color: #334155;
   background: #ffffff;
@@ -597,9 +969,54 @@ tr:last-child td {
   font-size: 13px;
 }
 
-button:disabled {
+.upload-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #c2410c;
+  background: #fff7ed;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.preview-panel {
+  position: sticky;
+  top: 22px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 4px;
 }
 
 .preview-title {
@@ -613,23 +1030,61 @@ button:disabled {
   font-size: 16px;
 }
 
-.preview-screen,
-.preview-fullscreen-stage {
+.preview-expand-button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #c2410c;
+  background: #fff7ed;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.preview-expand-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.preview-expand-icon {
+  position: relative;
+  width: 15px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.preview-expand-icon::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  bottom: -4px;
+  width: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.preview-screen {
+  min-height: 280px;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 12px;
+  padding: 24px;
+  border-radius: 8px;
   color: #f8fafc;
   background:
     radial-gradient(circle at 24% 18%, rgba(249, 115, 22, 0.22), transparent 30%),
     linear-gradient(135deg, #101827 0%, #172033 52%, #0b1120 100%);
   text-align: center;
-}
-
-.preview-screen {
-  min-height: 280px;
-  padding: 24px;
-  border-radius: 8px;
 }
 
 .preview-mark {
@@ -648,24 +1103,23 @@ button:disabled {
   margin: 0;
   color: #ffffff;
   font-size: 32px;
+  letter-spacing: 0;
 }
 
 .preview-subtitle,
-.preview-tagline,
-.preview-fullscreen-subtitle,
-.preview-fullscreen-tagline {
+.preview-tagline {
   margin: 0;
 }
 
-.preview-subtitle,
-.preview-fullscreen-subtitle {
+.preview-subtitle {
   color: #fdba74;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 800;
 }
 
-.preview-tagline,
-.preview-fullscreen-tagline {
+.preview-tagline {
   color: #cbd5e1;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -688,6 +1142,11 @@ button:disabled {
 .preview-dots button.active {
   width: 18px;
   background: #f97316;
+}
+
+.preview-dots button:focus-visible {
+  outline: 2px solid #fb923c;
+  outline-offset: 3px;
 }
 
 .preview-fullscreen {
@@ -718,9 +1177,18 @@ button:disabled {
 .preview-fullscreen-stage {
   width: min(1120px, calc(100vw - 96px));
   min-height: min(680px, calc(100dvh - 96px));
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
   padding: 56px;
   border: 1px solid rgba(251, 146, 60, 0.22);
   border-radius: 8px;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 24% 18%, rgba(249, 115, 22, 0.24), transparent 30%),
+    linear-gradient(135deg, #101827 0%, #172033 52%, #0b1120 100%);
+  text-align: center;
 }
 
 .preview-mark-large {
@@ -734,15 +1202,34 @@ button:disabled {
   color: #ffffff;
   font-size: 84px;
   line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.preview-fullscreen-subtitle,
+.preview-fullscreen-tagline {
+  margin: 0;
 }
 
 .preview-fullscreen-subtitle {
+  color: #fdba74;
   font-size: 34px;
+  font-weight: 900;
 }
 
 .preview-fullscreen-tagline {
   max-width: 760px;
+  color: #cbd5e1;
   font-size: 22px;
+  line-height: 1.6;
+}
+
+.preview-dots-large button {
+  width: 10px;
+  height: 10px;
+}
+
+.preview-dots-large button.active {
+  width: 30px;
 }
 
 @media (max-width: 1180px) {
@@ -763,6 +1250,7 @@ button:disabled {
 
 @media (max-width: 980px) {
   .platform-shell,
+  .mode-control,
   .settings-grid {
     grid-template-columns: 1fr;
   }
@@ -799,6 +1287,14 @@ button:disabled {
 
   .preview-fullscreen-stage h2 {
     font-size: 46px;
+  }
+
+  .preview-fullscreen-subtitle {
+    font-size: 24px;
+  }
+
+  .preview-fullscreen-tagline {
+    font-size: 16px;
   }
 }
 </style>

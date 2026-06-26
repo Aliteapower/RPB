@@ -1,34 +1,37 @@
 # Queue Display Terminal UI Contract
 
-Status: Phase 1 text-only
+## Route
 
-## Page
+```text
+/stores/:storeId/queue-display
+```
 
-`src/pages/QueueDisplayPage.vue`
+The terminal calls:
 
-Route:
+```http
+GET /api/v1/stores/{storeId}/queue-display/state
+```
 
-- `/stores/:storeId/queue-display`
+The API requires `queue.display.view`.
 
-Entry:
+## States
 
-- Queue ticket list opens the terminal in a new tab.
+`loading`: show a stable full-screen loading surface while the first state request is pending.
 
-## Behavior
+`calling`: show the current called ticket when `currentCall` is present.
 
-The terminal:
+`advertising`: rotate returned text or media slides when `currentCall` is null.
 
-- Loads `GET /api/v1/stores/{storeId}/queue-display/state`.
-- Polls by `ads.statePollSeconds`.
-- Shows loading state.
-- Shows current call state.
-- Shows text advertising state when `currentCall` is null.
-- Shows error/retry state.
-- Rotates text slides by `ads.slideDurationSeconds`.
-- Displays waiting count and waiting preview when configured.
+`error`: keep layout stable and show a restrained failure state when the state API cannot be loaded.
 
-The page must not hardcode platform seed slide copy. It renders only API-provided text slides.
+## Display Contract
 
-## Phase 2 Not Implemented
+Calling state must emphasize `displayNumber`, `customerDisplayName`, `partySizeGroup`, and waiting count. It must not expose raw phone numbers or internal IDs.
 
-Image/video carousel playback is deferred.
+Advertising state must render text slides with `title`, `subtitle`, and `tagline`, or media slides with image/video playback and safe fallback text. It uses `slideDurationSeconds` from the state response.
+
+Polling uses `statePollSeconds` from configuration when provided by the API response contract. Default expected value is 3 seconds.
+
+## Media Scope
+
+The terminal supports API-provided image/video media slides. It serves media through queue-display scoped URLs and must not expose raw storage keys or cross-tenant asset access.

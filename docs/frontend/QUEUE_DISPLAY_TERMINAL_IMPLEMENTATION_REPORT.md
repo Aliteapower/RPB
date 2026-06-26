@@ -1,21 +1,43 @@
 # Queue Display Terminal Implementation Report
 
-Status: Phase 1 text-only
+## Scope
 
-## Implemented
+Implemented queue display terminal at `/stores/:storeId/queue-display`.
 
-- Added `QueueDisplayPage.vue`.
-- Added queue display state API client.
-- Added queue display TypeScript types.
-- Added route `/stores/:storeId/queue-display`.
-- Added queue ticket list entry that opens the terminal in a new tab.
-- Added loading, calling, advertising, error, and retry states.
-- Added text slide rotation driven by API timing.
+## Changed Files
 
-## Boundary
+- `src/types/queueDisplay.ts`
+- `src/api/queueDisplayApi.ts`
+- `src/pages/QueueDisplayPage.vue`
+- `src/router/index.ts`
+- `src/test/java/com/rpb/reservation/appgate/ui/QueueDisplayCallScreenUiImplementationValidationTest.java`
+- Existing queue UI boundary validation tests updated to allow the approved Queue Display page and API client.
 
-The terminal consumes the state API only. It does not perform queue call, skip, rejoin, seating, or admin write actions.
+## API Endpoints
 
-## Phase 2 Not Implemented
+- `GET /api/v1/stores/{storeId}/queue-display/state`
+- `GET /api/v1/stores/{storeId}/queue-display/media/{assetId}`
 
-Image/video carousel playback and asset handling are not part of this implementation.
+The frontend reads the backend projection only. It does not call, skip, seat, cancel, or otherwise mutate queue state.
+
+## Permission
+
+- App Gate app key: `reservation_queue`
+- Permission: `queue.display.view`
+
+## Runtime Behavior
+
+- Loading state: stable dark terminal screen while connecting.
+- Calling state: shows current call number, safe customer display name, party-size group, waiting count, and waiting preview.
+- Advertising state: rotates API-provided text or image/video media slides using `slideDurationSeconds`.
+- Error state: keeps last good payload for a short grace window, then shows a restrained offline state.
+
+## Validation
+
+- `npm run build`: PASS
+- `mvn "-Dtest=QueueDisplayCallScreenUiImplementationValidationTest,QueueCallUiImplementationValidationTest,QueueSkipUiImplementationValidationTest,QueueRejoinUiImplementationValidationTest,ReservationArrivedToQueueUiImplementationValidationTest,SeatingFromCalledQueueUiImplementationValidationTest" test`: PASS
+
+## Known Limitations
+
+- The terminal requires the normal authenticated browser session in Phase 1.
+- Dedicated unattended device activation tokens remain a later design item.

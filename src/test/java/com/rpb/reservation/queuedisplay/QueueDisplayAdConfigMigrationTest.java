@@ -33,7 +33,7 @@ class QueueDisplayAdConfigMigrationTest {
     }
 
     @Test
-    void createsTextOnlyCallScreenAdConfigTablesSeedsDefaultSlidesAndDisplayPermission() {
+    void createsCallScreenAdConfigTablesSeedsDefaultSlidesAndDisplayPermission() {
         DATABASE.applyMigration("src/main/resources/db/migration/V001__reservation_platform_bootstrap.sql");
         insertTenantAndStore(VALIDATION_TENANT_ID, VALIDATION_STORE_ID, "20000000", "1000");
         insertTenantAndStore(OTHER_TENANT_ID, OTHER_STORE_ID, "tenant-other", "store-other");
@@ -49,11 +49,14 @@ class QueueDisplayAdConfigMigrationTest {
         assertThat(tableExists("platform_call_screen_ad_seed_slides")).isTrue();
         assertThat(tableExists("tenant_call_screen_ad_sets")).isTrue();
         assertThat(tableExists("tenant_call_screen_text_slides")).isTrue();
-        assertThat(tableExists("store_call_screen_settings")).isTrue();
         assertThat(tableExists("tenant_call_screen_image_slides")).isFalse();
-        assertThat(tableExists("call_screen_media_assets")).isFalse();
-        assertThat(tableExists("platform_call_screen_media_seed_slides")).isFalse();
-        assertThat(tableExists("tenant_call_screen_media_slides")).isFalse();
+        assertThat(tableExists("store_call_screen_settings")).isTrue();
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V009__call_screen_media_carousel.sql");
+
+        assertThat(tableExists("call_screen_media_assets")).isTrue();
+        assertThat(tableExists("platform_call_screen_media_seed_slides")).isTrue();
+        assertThat(tableExists("tenant_call_screen_media_slides")).isTrue();
 
         assertThat(countWhere("""
             select count(*)
@@ -63,6 +66,14 @@ class QueueDisplayAdConfigMigrationTest {
               and ad_type = 'text'
               and deleted_at is null
             """)).isGreaterThanOrEqualTo(1);
+
+        assertThat(countWhere("""
+            select count(*)
+            from platform_call_screen_ad_seed_slides slide
+            join platform_call_screen_ad_seed_sets seed on seed.id = slide.seed_set_id
+            where seed.seed_key = 'restaurant_default'
+              and slide.deleted_at is null
+            """)).isEqualTo(4);
 
         assertThat(strings("""
             select slide.title
@@ -85,6 +96,13 @@ class QueueDisplayAdConfigMigrationTest {
 
         assertThat(countWhere("""
             select count(*)
+            from auth_account_permissions
+            where permission_code = 'queue.display.view'
+              and deleted_at is null
+            """)).isEqualTo(3);
+
+        assertThat(countWhere("""
+            select count(*)
             from auth_account_permissions permission
             join auth_accounts account on account.id = permission.account_id
             where account.username = 'sysadmin'
@@ -97,7 +115,12 @@ class QueueDisplayAdConfigMigrationTest {
         assertThat(constraintExists("fk_store_call_screen_settings_active_ad_set_scope")).isTrue();
 
         UUID textAdSetId = insertAdSet(VALIDATION_TENANT_ID, "Validation Text", "text");
+        UUID imageAdSetId = insertAdSet(VALIDATION_TENANT_ID, "Validation Image", "image");
+        UUID mediaAdSetId = insertAdSet(VALIDATION_TENANT_ID, "Validation Media", "media");
+        UUID disabledMediaAdSetId = insertAdSet(VALIDATION_TENANT_ID, "Disabled Media", "media", "disabled");
         UUID otherTenantTextAdSetId = insertAdSet(OTHER_TENANT_ID, "Other Text", "text");
+        UUID imageAssetId = insertMediaAsset(VALIDATION_TENANT_ID, "image", "image/jpeg", "tenant/validation/image.jpg");
+        UUID videoAssetId = insertMediaAsset(VALIDATION_TENANT_ID, "video", "video/mp4", "tenant/validation/video.mp4");
 
         JDBC.update(
             """
@@ -131,17 +154,80 @@ class QueueDisplayAdConfigMigrationTest {
             textAdSetId
         )).hasMessageContaining("ux_tenant_call_screen_text_slides_active_sort");
 
-        assertThatThrownBy(() -> insertAdSet(VALIDATION_TENANT_ID, "Rejected Image", "image"))
-            .hasMessageContaining("ck_tenant_call_screen_ad_sets_type");
-        assertThatThrownBy(() -> insertAdSet(VALIDATION_TENANT_ID, "Rejected Media", "media"))
-            .hasMessageContaining("ck_tenant_call_screen_ad_sets_type");
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_call_screen_text_slides
+            where tenant_id = ?
+              and ad_set_id = ?
+              and sort_order = 1
+              and deleted_at is null
+            """, VALIDATION_TENANT_ID, textAdSetId)).isEqualTo(2);
 
         assertThatThrownBy(() -> JDBC.update(
             """
-            insert into platform_call_screen_ad_seed_sets (seed_key, display_name, status, ad_type)
-            values ('image_template', '图片模板', 'active', 'image')
+            insert into tenant_call_screen_text_slides (
+                tenant_id, ad_set_id, title, subtitle, tagline, sort_order, status
+            )
+            values (?, ?, '文字', '不能', '挂图片组', 2, 'active')
+            """,
+            VALIDATION_TENANT_ID,
+            imageAdSetId
+        )).hasMessageContaining("text slide ad_set_id must reference a text ad set");
+
+        JDBC.update(
             """
-        )).hasMessageContaining("ck_platform_call_screen_ad_seed_sets_type");
+            insert into tenant_call_screen_media_slides (
+                tenant_id, ad_set_id, media_asset_id, media_kind, title, alt_text, sort_order, status
+            )
+            values (?, ?, ?, 'image', '新品海报', '新品推荐图', 1, 'active')
+            """,
+            VALIDATION_TENANT_ID,
+            mediaAdSetId,
+            imageAssetId
+        );
+        JDBC.update(
+            """
+            insert into tenant_call_screen_media_slides (
+                tenant_id, ad_set_id, media_asset_id, media_kind, title, alt_text, sort_order, status
+            )
+            values (?, ?, ?, 'video', '餐厅短片', '餐厅环境视频', 2, 'active')
+            """,
+            VALIDATION_TENANT_ID,
+            mediaAdSetId,
+            videoAssetId
+        );
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_call_screen_media_slides
+            where tenant_id = ?
+              and ad_set_id = ?
+              and status = 'active'
+              and deleted_at is null
+            """, VALIDATION_TENANT_ID, mediaAdSetId)).isEqualTo(2);
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            insert into tenant_call_screen_media_slides (
+                tenant_id, ad_set_id, media_asset_id, media_kind, title, alt_text, sort_order, status
+            )
+            values (?, ?, ?, 'image', '不能', '绑定文字组', 3, 'active')
+            """,
+            VALIDATION_TENANT_ID,
+            textAdSetId,
+            imageAssetId
+        )).hasMessageContaining("media slide ad_set_id must reference a media ad set");
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            update tenant_call_screen_ad_sets
+            set ad_type = 'image'
+            where id = ?
+              and tenant_id = ?
+            """,
+            textAdSetId,
+            VALIDATION_TENANT_ID
+        )).hasMessageContaining("tenant call screen ad_type is immutable after creation");
 
         assertThatThrownBy(() -> JDBC.update(
             """
@@ -160,11 +246,36 @@ class QueueDisplayAdConfigMigrationTest {
             insert into store_call_screen_settings (
                 tenant_id, store_id, active_ad_set_id, ad_mode
             )
-            values (?, ?, null, 'media')
+            values (?, ?, ?, 'image')
             """,
             VALIDATION_TENANT_ID,
-            VALIDATION_STORE_ID
-        )).hasMessageContaining("ck_store_call_screen_settings_mode");
+            VALIDATION_STORE_ID,
+            textAdSetId
+        )).hasMessageContaining("store call screen ad_mode must match active ad set ad_type");
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            insert into store_call_screen_settings (
+                tenant_id, store_id, active_ad_set_id, ad_mode
+            )
+            values (?, ?, ?, 'text')
+            """,
+            VALIDATION_TENANT_ID,
+            VALIDATION_STORE_ID,
+            mediaAdSetId
+        )).hasMessageContaining("store call screen ad_mode must match active ad set ad_type");
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            insert into store_call_screen_settings (
+                tenant_id, store_id, active_ad_set_id, ad_mode
+            )
+            values (?, ?, ?, 'media')
+            """,
+            VALIDATION_TENANT_ID,
+            VALIDATION_STORE_ID,
+            disabledMediaAdSetId
+        )).hasMessageContaining("store call screen active_ad_set_id must reference an active ad set");
 
         int seedSlideCountBeforeReplay = countWhere("""
             select count(*)
@@ -187,6 +298,7 @@ class QueueDisplayAdConfigMigrationTest {
             """);
 
         DATABASE.applyMigration("src/main/resources/db/migration/V007__queue_display_ad_config.sql");
+        DATABASE.applyMigration("src/main/resources/db/migration/V009__call_screen_media_carousel.sql");
 
         assertThat(countWhere("""
             select count(*)
@@ -291,6 +403,23 @@ class QueueDisplayAdConfigMigrationTest {
             name,
             adType,
             status
+        );
+    }
+
+    private static UUID insertMediaAsset(UUID tenantId, String mediaKind, String contentType, String storageKey) {
+        return JDBC.queryForObject(
+            """
+            insert into call_screen_media_assets (
+                owner_scope, tenant_id, media_kind, content_type, byte_size, original_filename, storage_key, status
+            )
+            values ('tenant', ?, ?, ?, 1024, 'seed-media', ?, 'active')
+            returning id
+            """,
+            UUID.class,
+            tenantId,
+            mediaKind,
+            contentType,
+            storageKey
         );
     }
 

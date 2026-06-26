@@ -93,6 +93,27 @@ class QueueDisplayApplicationServiceTest {
     }
 
     @Test
+    void returnsConfiguredMediaSlidesWithoutFallingBackToTextSeeds() {
+        repository.currentCall = Optional.empty();
+        repository.ads = new QueueDisplayAds("media", 9, 5, List.of(
+            QueueDisplayAdSlide.media("media-1", "image", "/api/v1/stores/" + STORE_ID + "/queue-display/media/asset-image", "新品海报", "新品推荐"),
+            QueueDisplayAdSlide.media("media-2", "video", "/api/v1/stores/" + STORE_ID + "/queue-display/media/asset-video", "餐厅短片", "环境展示")
+        ));
+
+        QueueDisplayResult result = service.getState(query(STORE_ID));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.ads().mode()).isEqualTo("media");
+        assertThat(result.ads().slides()).extracting(QueueDisplayAdSlide::mediaKind)
+            .containsExactly("image", "video");
+        assertThat(result.ads().slides()).extracting(QueueDisplayAdSlide::mediaUrl)
+            .containsExactly(
+                "/api/v1/stores/" + STORE_ID + "/queue-display/media/asset-image",
+                "/api/v1/stores/" + STORE_ID + "/queue-display/media/asset-video"
+            );
+    }
+
+    @Test
     void storeNotFoundScopeMismatchAndPersistenceErrorReturnStableErrors() {
         storeRepository.store = Optional.empty();
         assertThat(service.getState(query(STORE_ID)).error()).isEqualTo(QueueDisplayError.STORE_NOT_FOUND);

@@ -2,6 +2,8 @@ package com.rpb.reservation.queuedisplay.persistence;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.queuedisplay.application.CallScreenAdSet;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaSlide;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaSlideCommand;
 import com.rpb.reservation.queuedisplay.application.CallScreenSetting;
 import com.rpb.reservation.queuedisplay.application.CallScreenTextSlide;
 import com.rpb.reservation.queuedisplay.application.CallScreenTextSlideCommand;
@@ -39,6 +41,10 @@ public interface CallScreenAdminRepository {
     CallScreenAdSet createTextAdSet(UUID tenantId, String name, String status, List<CallScreenTextSlideCommand> slides);
 
     CallScreenAdSet updateTextAdSet(UUID tenantId, UUID adSetId, String name, String status, List<CallScreenTextSlideCommand> slides);
+
+    CallScreenAdSet createMediaAdSet(UUID tenantId, String name, String status, List<CallScreenMediaSlideCommand> slides);
+
+    CallScreenAdSet updateMediaAdSet(UUID tenantId, UUID adSetId, String name, String status, List<CallScreenMediaSlideCommand> slides);
 }
 
 @Repository
@@ -152,7 +158,6 @@ class JdbcCallScreenAdminRepository implements CallScreenAdminRepository {
             from tenant_call_screen_ad_sets
             where tenant_id = ?
               and id = ?
-              and ad_type = 'text'
               and deleted_at is null
             """,
             (rs, rowNum) -> adSet(rs, tenantId),
@@ -169,7 +174,6 @@ class JdbcCallScreenAdminRepository implements CallScreenAdminRepository {
             from tenant_call_screen_ad_sets
             where tenant_id = ?
               and deleted_at is null
-              and ad_type = 'text'
             order by created_at asc, name asc
             """,
             (rs, rowNum) -> adSet(rs, tenantId),
@@ -260,6 +264,46 @@ class JdbcCallScreenAdminRepository implements CallScreenAdminRepository {
         return findAdSet(tenantId, adSetId).orElseThrow();
     }
 
+    @Override
+    public CallScreenAdSet createMediaAdSet(UUID tenantId, String name, String status, List<CallScreenMediaSlideCommand> slides) {
+        UUID adSetId = jdbc.queryForObject(
+            """
+            insert into tenant_call_screen_ad_sets (tenant_id, name, ad_type, status)
+            values (?, ?, 'media', ?)
+            returning id
+            """,
+            UUID.class,
+            tenantId,
+            name,
+            status
+        );
+        replaceMediaSlides(tenantId, adSetId, slides);
+        return findAdSet(tenantId, adSetId).orElseThrow();
+    }
+
+    @Override
+    public CallScreenAdSet updateMediaAdSet(UUID tenantId, UUID adSetId, String name, String status, List<CallScreenMediaSlideCommand> slides) {
+        jdbc.update(
+            """
+            update tenant_call_screen_ad_sets
+            set name = ?,
+                status = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and id = ?
+              and ad_type in ('image', 'media')
+              and deleted_at is null
+            """,
+            name,
+            status,
+            tenantId,
+            adSetId
+        );
+        replaceMediaSlides(tenantId, adSetId, slides);
+        return findAdSet(tenantId, adSetId).orElseThrow();
+    }
+
     private void replaceSlides(UUID tenantId, UUID adSetId, List<CallScreenTextSlideCommand> slides) {
         jdbc.update(
             """
@@ -293,6 +337,40 @@ class JdbcCallScreenAdminRepository implements CallScreenAdminRepository {
         }
     }
 
+    private void replaceMediaSlides(UUID tenantId, UUID adSetId, List<CallScreenMediaSlideCommand> slides) {
+        jdbc.update(
+            """
+            update tenant_call_screen_media_slides
+            set deleted_at = now(),
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and ad_set_id = ?
+              and deleted_at is null
+            """,
+            tenantId,
+            adSetId
+        );
+        for (CallScreenMediaSlideCommand slide : slides) {
+            jdbc.update(
+                """
+                insert into tenant_call_screen_media_slides (
+                    tenant_id, ad_set_id, media_asset_id, media_kind, title, alt_text, sort_order, status
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                tenantId,
+                adSetId,
+                slide.mediaAssetId(),
+                slide.mediaKind(),
+                slide.title(),
+                slide.altText(),
+                slide.sortOrder(),
+                slide.status()
+            );
+        }
+    }
+
     private CallScreenAdSet adSet(ResultSet rs, UUID tenantId) throws SQLException {
         UUID adSetId = rs.getObject("id", UUID.class);
         return new CallScreenAdSet(
@@ -301,6 +379,7 @@ class JdbcCallScreenAdminRepository implements CallScreenAdminRepository {
             rs.getString("ad_type"),
             rs.getString("status"),
             textSlides(tenantId, adSetId),
+            mediaSlides(tenantId, adSetId),
             rs.getInt("version")
         );
     }
@@ -320,6 +399,39 @@ class JdbcCallScreenAdminRepository implements CallScreenAdminRepository {
                 rs.getString("title"),
                 rs.getString("subtitle"),
                 rs.getString("tagline"),
+                rs.getInt("sort_order"),
+                rs.getString("status"),
+                rs.getInt("version")
+            ),
+            tenantId,
+            adSetId
+        );
+    }
+
+    private List<CallScreenMediaSlide> mediaSlides(UUID tenantId, UUID adSetId) {
+        return jdbc.query(
+            """
+            select slide.id,
+                   slide.media_asset_id,
+                   slide.media_kind,
+                   slide.title,
+                   slide.alt_text,
+                   slide.sort_order,
+                   slide.status,
+                   slide.version
+            from tenant_call_screen_media_slides slide
+            where slide.tenant_id = ?
+              and slide.ad_set_id = ?
+              and slide.deleted_at is null
+            order by slide.sort_order asc, slide.created_at asc
+            """,
+            (rs, rowNum) -> new CallScreenMediaSlide(
+                rs.getObject("id", UUID.class),
+                rs.getObject("media_asset_id", UUID.class),
+                rs.getString("media_kind"),
+                null,
+                rs.getString("title"),
+                rs.getString("alt_text"),
                 rs.getInt("sort_order"),
                 rs.getString("status"),
                 rs.getInt("version")

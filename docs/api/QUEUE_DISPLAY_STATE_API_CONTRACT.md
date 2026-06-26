@@ -1,52 +1,50 @@
 # Queue Display State API Contract
 
-Status: Phase 1 text-only
-
 ## Endpoint
 
-`GET /api/v1/stores/{storeId}/queue-display/state`
+```http
+GET /api/v1/stores/{storeId}/queue-display/state
+```
 
-## Authorization
+This endpoint returns the read-only terminal projection for a store queue display. It must not call, skip, seat, cancel, or otherwise mutate queue state.
 
-Required App Gate:
+## Permission
 
-- `appKey = reservation_queue`
-- `permission = queue.display.view`
+```text
+app_key = reservation_queue
+permission = queue.display.view
+```
 
-Allowed roles:
+The authenticated actor must be tenant/store scoped to `{storeId}`. Phase 1 does not provide public unauthenticated terminal tokens.
 
-- `tenant_admin`
-- `store_manager`
-- `store_staff`
-
-The authenticated actor must include `{storeId}` in store scope.
-
-## Response
+## Success Response
 
 ```json
 {
   "success": true,
-  "serverNow": "2030-06-20T02:30:00Z",
+  "serverNow": "2026-06-26T03:03:00Z",
   "storeTime": {
     "timezone": "Asia/Singapore",
-    "timeText": "10:30",
-    "businessDate": "2030-06-20"
+    "timeText": "03:03",
+    "businessDate": "2026-06-26"
   },
   "currentCall": {
-    "queueTicketId": "91000000-0000-0000-0000-000000000001",
-    "displayNumber": "A7",
-    "customerDisplayName": "赵先生",
+    "queueTicketId": "91000000-0000-0000-0000-000000000002",
+    "displayNumber": "A002",
+    "customerDisplayName": "孙女士",
     "partySize": 2,
-    "calledAt": "2030-06-20T02:29:00Z",
-    "expiresAt": "2030-06-20T02:33:00Z"
+    "partySizeGroup": "1-2",
+    "calledAt": "2026-06-26T03:01:00Z",
+    "holdUntilAt": "2026-06-26T03:04:00Z"
   },
   "waiting": {
-    "count": 3,
+    "count": 1,
     "preview": [
       {
-        "displayNumber": "A8",
-        "customerDisplayName": "钱女士",
-        "partySize": 2
+        "displayNumber": "A001",
+        "customerDisplayName": "赵先生",
+        "partySize": 3,
+        "partySizeGroup": "3-4"
       }
     ]
   },
@@ -56,7 +54,7 @@ The authenticated actor must include `{storeId}` in store scope.
     "statePollSeconds": 3,
     "slides": [
       {
-        "slideId": "83000000-0000-0000-0000-000000000001",
+        "slideId": "text-1",
         "title": "欢迎光临",
         "subtitle": "食刻 · 餐厅",
         "tagline": "新鲜食材 · 匠心烹饪 · 极致服务"
@@ -66,15 +64,34 @@ The authenticated actor must include `{storeId}` in store scope.
 }
 ```
 
-`currentCall` is null when no valid called ticket exists. In that state the terminal rotates the text slides from `ads.slides`.
+`currentCall` is nullable. When it is null, the terminal enters advertising state and uses the returned text slides.
 
-## Error Codes
+## Media Addendum
 
-- `FORBIDDEN`
-- `STORE_SCOPE_MISMATCH`
-- `STORE_NOT_FOUND`
-- `PERSISTENCE_ERROR`
+When the store activates a media ad set, `ads.mode` is `media` and slides use authenticated media URLs:
 
-## Phase 2 Not Implemented
+```json
+{
+  "mode": "media",
+  "slideDurationSeconds": 8,
+  "statePollSeconds": 4,
+  "slides": [
+    {
+      "slideId": "media-slide-1",
+      "title": "新品海报",
+      "mediaKind": "image",
+      "mediaUrl": "/api/v1/stores/20000000-0000-0000-0000-000000000983/queue-display/media/8a000000-0000-0000-0000-000000000001",
+      "altText": "新品推荐图"
+    },
+    {
+      "slideId": "media-slide-2",
+      "title": "环境短片",
+      "mediaKind": "video",
+      "mediaUrl": "/api/v1/stores/20000000-0000-0000-0000-000000000983/queue-display/media/8a000000-0000-0000-0000-000000000002",
+      "altText": "餐厅环境视频"
+    }
+  ]
+}
+```
 
-Image/video carousel groups and asset playback are outside Phase 1. The state response carries text slides only.
+The state endpoint remains read-only. Media bytes are served by `GET /api/v1/stores/{storeId}/queue-display/media/{assetId}` after `queue.display.view` and active ad-set membership checks.

@@ -1,41 +1,41 @@
 # Platform Call Screen Seed UI Contract
 
-Status: Phase 1 text-only
+## Route
 
-## Page
+```text
+/platform/call-screen/text-seed
+```
 
-`src/pages/PlatformCallScreenSeedPage.vue`
+Route name:
 
-Route:
+```text
+platform-call-screen-text-seed
+```
 
-- `/platform/call-screen/text-seed`
+The route requires platform-admin navigation guard access.
 
-Navigation:
+## Required Controls
 
-- Platform admin nav shows `叫号模板`
+`text seed editor`: edits the platform default text seed template name, status, title, subtitle, tagline, sort order, and slide status.
 
-## Behavior
+`add text slide`: adds a new text slide row to the submitted text seed payload.
 
-The page loads and edits the platform text seed:
+`version display`: shows seed and slide versions so stale-write conflicts are understandable.
 
-- Loading state.
-- Error state.
-- Saving state.
-- Text slide editor.
-- Text preview.
-- Optimistic version save.
+`preview panel`: renders the first active slide in the dark terminal visual style.
 
-Editing platform seed text does not alter existing tenant copies.
+`media seed editor`: edits the platform-owned image/video seed template, including upload, media slide ordering, status, title, and alt text.
 
-## API Client
+## Scope Rules
 
-`src/api/platformCallScreenSeedApi.ts`
+The page must not ask for tenant id or store id. Platform seed templates are platform-owned. Tenant admins edit tenant-owned copies from the tenant admin call-screen page.
 
-Allowed calls:
+Saving the platform seed affects the platform template only. Existing tenant copies remain unchanged.
 
-- `getPlatformCallScreenTextSeed`
-- `updatePlatformCallScreenTextSeed`
+## Empty / Loading / Error States
 
-## Phase 2 Not Implemented
+The page must provide stable loading, success, and error banners. `FORBIDDEN`, `REQUEST_INVALID`, `SEED_NOT_FOUND`, and `VERSION_CONFLICT` should map to clear Chinese copy.
 
-Image/video seed templates and asset management are deferred.
+## Media Scope
+
+The page exposes platform media upload and image/video seed editing through the real platform media seed APIs. Platform assets remain platform-owned and are not shared as tenant-owned files.

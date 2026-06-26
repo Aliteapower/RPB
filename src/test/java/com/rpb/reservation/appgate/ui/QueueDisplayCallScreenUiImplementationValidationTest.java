@@ -62,6 +62,9 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("state.value?.ads")
             .contains("fetchQueueDisplayState")
             .contains("返回管理")
+            .contains("mediaSlides")
+            .contains("<video")
+            .contains("<img")
             .doesNotContain("今日推荐")
             .doesNotContain("特惠活动")
             .doesNotContain("会员专享")
@@ -78,7 +81,7 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
     }
 
     @Test
-    void tenantAdminCallScreenPageUsesTenantTextAdminApi() throws Exception {
+    void tenantAdminCallScreenPageUsesTenantAdminApiAndSupportsMediaGroups() throws Exception {
         Path pagePath = Path.of("src", "pages", "TenantAdminCallScreenPage.vue");
         Path apiPath = Path.of("src", "api", "callScreenAdminApi.ts");
         Path typesPath = Path.of("src", "types", "callScreenAdmin.ts");
@@ -113,6 +116,8 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("/tenant-admin/call-screen")
             .contains("/settings")
             .contains("/ad-sets")
+            .contains("uploadCallScreenMedia")
+            .contains("/media")
             .doesNotContain("tenantId")
             .doesNotContain("mock");
 
@@ -120,19 +125,29 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("interface CallScreenSettings")
             .contains("interface CallScreenAdSet")
             .contains("interface CallScreenTextSlide")
+            .contains("interface CallScreenMediaSlide")
+            .contains("mediaKind")
+            .contains("mediaUrl")
             .contains("interface CallScreenAdSetMutation")
-            .doesNotContain("tenantId");
+            .doesNotContain("tenantId")
+            .contains("mediaAssetId");
 
         assertThat(page)
             .contains("叫号屏配置")
             .contains("文案轮播")
+            .contains("图片/视频轮播")
+            .contains("type=\"file\"")
+            .contains("accept=\"image/jpeg,image/png,image/webp,video/mp4,video/webm\"")
             .contains("文案编辑")
+            .contains("媒体编辑")
+            .contains("mediaSlides")
             .contains("sortOrder")
             .contains("title")
             .contains("subtitle")
             .contains("tagline")
             .contains("updateCallScreenSettings")
             .contains("updateCallScreenAdSet")
+            .contains("uploadCallScreenMedia")
             .contains("addSlide")
             .contains("editableAdSet.value.slides.push")
             .contains("nextSortOrder")
@@ -144,13 +159,18 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("selectPreviewSlide")
             .contains("window.setInterval")
             .contains("切换预览文案")
+            .contains("previewFullscreenOpen")
+            .contains("openPreviewFullscreen")
+            .contains("closePreviewFullscreen")
+            .contains("preview-fullscreen")
             .contains("大屏预览")
+            .contains("关闭预览")
             .doesNotContain("creatingAdSet")
             .doesNotContain("tenantId");
     }
 
     @Test
-    void platformCallScreenSeedPageUsesTextSeedTemplateApi() throws Exception {
+    void platformCallScreenSeedPageSupportsTextAndMediaSeedTemplates() throws Exception {
         Path pagePath = Path.of("src", "pages", "PlatformCallScreenSeedPage.vue");
         Path apiPath = Path.of("src", "api", "platformCallScreenSeedApi.ts");
         Path typesPath = Path.of("src", "types", "platformCallScreenSeed.ts");
@@ -165,27 +185,36 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
         String types = Files.readString(typesPath);
         String nav = Files.readString(navPath);
 
-        assertThat(nav).contains("叫号模板");
+        assertThat(nav)
+            .contains("叫号模板");
 
         assertThat(apiClient)
             .contains("getPlatformCallScreenTextSeed")
-            .contains("updatePlatformCallScreenTextSeed")
-            .contains("/api/v1/platform/call-screen/text-seed");
+            .contains("getPlatformCallScreenMediaSeed")
+            .contains("updatePlatformCallScreenMediaSeed")
+            .contains("uploadPlatformCallScreenMedia")
+            .contains("/api/v1/platform/call-screen/media-seed")
+            .contains("/api/v1/platform/call-screen/media");
 
         assertThat(types)
-            .contains("interface PlatformCallScreenSeedSet")
-            .contains("interface PlatformCallScreenSeedSlide")
-            .contains("interface PlatformCallScreenSeedMutation");
+            .contains("interface PlatformCallScreenMediaSeedSlide")
+            .contains("mediaKind")
+            .contains("mediaUrl")
+            .contains("mediaAssetId")
+            .contains("'image' | 'video'");
 
         assertThat(page)
             .contains("文案模板")
-            .contains("seedSet")
-            .contains("slides")
-            .contains("sortOrder")
-            .contains("title")
-            .contains("subtitle")
-            .contains("tagline")
-            .contains("updatePlatformCallScreenTextSeed")
-            .contains("大屏预览");
+            .contains("图片/视频模板")
+            .contains("type=\"file\"")
+            .contains("accept=\"image/jpeg,image/png,image/webp,video/mp4,video/webm\"")
+            .contains("uploadPlatformCallScreenMedia")
+            .contains("getPlatformCallScreenMediaSeed")
+            .contains("updatePlatformCallScreenMediaSeed")
+            .contains("<video")
+            .contains("<img")
+            .contains("大屏预览")
+            .doesNotContain("图片模板（Phase 2）")
+            .doesNotContain("图片模板需要先");
     }
 }

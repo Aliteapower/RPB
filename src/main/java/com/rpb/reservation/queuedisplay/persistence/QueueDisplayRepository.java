@@ -140,13 +140,14 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
     public QueueDisplayAds findActiveAds(StoreScope scope) {
         List<QueueDisplayAds> configured = jdbc.query(
             """
-            select setting.slide_duration_seconds,
+            select setting.ad_mode,
+                   setting.slide_duration_seconds,
                    setting.state_poll_seconds,
-                   ad_set.id as ad_set_id
+                   ad_set.id as ad_set_id,
+                   ad_set.ad_type
             from store_call_screen_settings setting
             join tenant_call_screen_ad_sets ad_set on ad_set.id = setting.active_ad_set_id
              and ad_set.tenant_id = setting.tenant_id
-             and ad_set.ad_type = 'text'
              and ad_set.status = 'active'
              and ad_set.deleted_at is null
             where setting.tenant_id = ?
@@ -157,11 +158,15 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
             """,
             (rs, rowNum) -> {
                 UUID adSetId = rs.getObject("ad_set_id", UUID.class);
+                String adType = normalizeAdType(rs.getString("ad_type"));
+                List<QueueDisplayAdSlide> slides = "media".equals(adType)
+                    ? findTenantMediaSlides(scope, adSetId)
+                    : findTenantTextSlides(scope, adSetId);
                 return new QueueDisplayAds(
-                    "text",
+                    adType,
                     rs.getInt("slide_duration_seconds"),
                     rs.getInt("state_poll_seconds"),
-                    findTenantTextSlides(scope, adSetId)
+                    slides
                 );
             },
             scope.tenantId().value(),
@@ -190,6 +195,39 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
         );
     }
 
+    private List<QueueDisplayAdSlide> findTenantMediaSlides(StoreScope scope, UUID adSetId) {
+        return jdbc.query(
+            """
+            select slide.id,
+                   slide.media_asset_id,
+                   slide.media_kind,
+                   slide.title,
+                   slide.alt_text
+            from tenant_call_screen_media_slides slide
+            join call_screen_media_assets asset on asset.id = slide.media_asset_id
+             and asset.owner_scope = 'tenant'
+             and asset.tenant_id = slide.tenant_id
+             and asset.media_kind = slide.media_kind
+             and asset.status = 'active'
+             and asset.deleted_at is null
+            where slide.tenant_id = ?
+              and slide.ad_set_id = ?
+              and slide.status = 'active'
+              and slide.deleted_at is null
+            order by slide.sort_order asc
+            """,
+            (rs, rowNum) -> QueueDisplayAdSlide.media(
+                rs.getString("id"),
+                rs.getString("media_kind"),
+                "/api/v1/stores/" + scope.storeId().value() + "/queue-display/media/" + rs.getString("media_asset_id"),
+                rs.getString("alt_text"),
+                rs.getString("title")
+            ),
+            scope.tenantId().value(),
+            adSetId
+        );
+    }
+
     private List<QueueDisplayAdSlide> findPlatformSeedSlides() {
         return jdbc.query(
             """
@@ -206,6 +244,13 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
             """,
             (rs, rowNum) -> new QueueDisplayAdSlide(rs.getString("id"), rs.getString("title"), rs.getString("subtitle"), rs.getString("tagline"))
         );
+    }
+
+    private static String normalizeAdType(String adType) {
+        if ("image".equals(adType) || "media".equals(adType)) {
+            return "media";
+        }
+        return "text";
     }
 
     private static QueueDisplayCurrentCall currentCall(ResultSet rs) throws SQLException {

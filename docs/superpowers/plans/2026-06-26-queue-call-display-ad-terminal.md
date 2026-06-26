@@ -1,12 +1,12 @@
-# Queue Display / Call Screen Phase 1 Implementation Plan
+# Queue Display / Call Screen Implementation Plan
 
 Date: 2026-06-26
 
-Status: Phase 1 text-only plan
+Status: Phase 1 text display plus restored media ads
 
 ## Scope
 
-Implement a text-only queue display and call screen ad configuration slice:
+Implement queue display and call screen ad configuration:
 
 - Full-screen call terminal.
 - Text ad rotation when no ticket is being called.
@@ -15,17 +15,18 @@ Implement a text-only queue display and call screen ad configuration slice:
 - Tenant admin configuration page.
 - Platform admin seed page.
 - `queue.display.view` App Gate permission.
-
-Phase 2 not implemented: image/video carousel groups and asset management stay outside this plan.
+- Image/video media ad groups restored from the earlier media implementation.
+- Platform media seed template.
+- Tenant media upload and editable media carousel.
 
 ## Architecture
 
 Create a `queuedisplay` backend slice with explicit layers:
 
 - API controllers map HTTP requests and stable error codes.
-- Application services enforce text-only rules, optimistic version checks, and tenant/store scope.
+- Application services enforce text/media rules, optimistic version checks, and tenant/store scope.
 - Repositories hide SQL and table names from controllers and services.
-- Migration V007 owns all text ad schema.
+- Migration V007 owns text ad schema; V009 owns media asset and media slide schema.
 - Vue pages use typed API clients and never inspect tenant IDs directly.
 
 This preserves OOD boundaries: terminal display, tenant admin text configuration, and platform seed maintenance are separate use cases with shared text slide value objects where useful.
@@ -36,16 +37,17 @@ This preserves OOD boundaries: terminal display, tenant admin text configuration
 2. Add `QueueDisplayController` with `GET /api/v1/stores/{storeId}/queue-display/state`.
 3. Add `CallScreenAdminController` for store-scoped tenant text settings and text ad set management.
 4. Add `PlatformCallScreenSeedController` for platform text seed get/update.
-5. Add V007 migration with only text seed, tenant text slides, tenant text ad sets, and store settings.
-6. Seed four platform text slides and `queue.display.view` where validation accounts exist.
-7. Add frontend typed API clients and response validation.
-8. Add `QueueDisplayPage.vue`, `TenantAdminCallScreenPage.vue`, and `PlatformCallScreenSeedPage.vue`.
-9. Add router/nav entries for terminal, tenant admin call screen, and platform seed maintenance.
-10. Add migration, application, API, App Gate, and UI validation tests.
+5. Add V007 migration with text seed, tenant text slides, tenant text ad sets, and store settings.
+6. Add V009 migration with media assets, platform media seed slides, tenant media slides, and tenant-scope triggers.
+7. Seed four platform text slides and `queue.display.view` where validation accounts exist.
+8. Add frontend typed API clients and response validation.
+9. Add `QueueDisplayPage.vue`, `TenantAdminCallScreenPage.vue`, and `PlatformCallScreenSeedPage.vue`.
+10. Add router/nav entries for terminal, tenant admin call screen, and platform seed maintenance.
+11. Add migration, application, API, App Gate, and UI validation tests.
 
 ## Database Plan
 
-Only V007 is part of Phase 1.
+V007 covers the text slice.
 
 Tables:
 
@@ -64,7 +66,11 @@ Constraints:
 - Store settings active ad set foreign key includes tenant scope.
 - Active text slide sort order is unique per tenant ad set.
 
-No Phase 2 asset tables are included.
+V009 covers restored media ads:
+
+- `call_screen_media_assets`
+- `platform_call_screen_media_seed_slides`
+- `tenant_call_screen_media_slides`
 
 ## API Plan
 
@@ -80,13 +86,20 @@ Tenant admin:
 - `POST /api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets`
 - `GET /api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets/{adSetId}`
 - `PATCH /api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets/{adSetId}`
+- `POST /api/v1/stores/{storeId}/tenant-admin/call-screen/media`
+- `GET /api/v1/stores/{storeId}/tenant-admin/call-screen/media/{assetId}`
+- `GET /api/v1/stores/{storeId}/queue-display/media/{assetId}`
 
 Platform:
 
 - `GET /api/v1/platform/call-screen/text-seed`
 - `PATCH /api/v1/platform/call-screen/text-seed`
+- `GET /api/v1/platform/call-screen/media-seed`
+- `PATCH /api/v1/platform/call-screen/media-seed`
+- `POST /api/v1/platform/call-screen/media`
+- `GET /api/v1/platform/call-screen/media/{assetId}`
 
-All payloads use text slides with `title`, `subtitle`, `tagline`, `sortOrder`, `status`, and optional `version`.
+Text payloads use `title`, `subtitle`, `tagline`, `sortOrder`, `status`, and optional `version`. Media payloads use `mediaAssetId`, `mediaKind`, `mediaUrl`, `title`, `altText`, `sortOrder`, `status`, and optional `version`.
 
 ## Frontend Plan
 
@@ -95,39 +108,40 @@ Terminal page:
 - Load state on mount.
 - Poll using `statePollSeconds`.
 - Render loading, calling, advertising, and error states.
-- Rotate text slides using `slideDurationSeconds`.
+- Rotate text or media slides using `slideDurationSeconds`.
 - Avoid built-in hardcoded slide content.
 
 Tenant admin page:
 
 - Load settings and ad sets.
-- Create and edit text ad sets.
+- Create and edit text/media ad sets.
 - Edit title, subtitle, tagline, sort order, and status.
 - Save settings and ad sets with clear saving/error states.
-- Show a text-only preview.
+- Upload image/video assets and show text/media previews.
 
 Platform seed page:
 
 - Load platform text seed.
 - Edit four or more text slides.
 - Save with optimistic version.
-- Show text-only preview.
+- Maintain platform text and media seed previews.
 
 ## Test Plan
 
 Migration:
 
-- V007 creates only Phase 1 tables.
+- V007 creates text tables.
+- V009 creates media asset and slide tables.
 - V007 seeds four text slides.
 - V007 grants `queue.display.view` to validation accounts.
-- V007 enforces text-only `ad_type` and `ad_mode`.
+- V007/V009 enforce compatible `ad_type` and `ad_mode`.
 - V007 remains replay-safe.
 
 Backend:
 
-- Queue display state returns current call or text ads.
+- Queue display state returns current call, text ads, or media ads.
 - Store scope and permission failures return stable errors.
-- Tenant text set clone, create, update, and settings activation work.
+- Tenant text/media set clone, create, update, upload, and settings activation work.
 - Platform text seed update validates sort order and version.
 
 Frontend:
@@ -136,6 +150,6 @@ Frontend:
 - Pages are route/nav reachable.
 - Loading, error, saving, and preview code paths exist.
 
-## Phase 2 Not Implemented
+## Remaining Later Boundary
 
-A separate Phase 2 spec is required before adding image/video carousel groups, asset storage, asset validation, platform asset templates, tenant asset ownership, or terminal playback of binary assets.
+Later work should cover production-grade object storage, security scanning, media lifecycle cleanup, CDN delivery, device activation tokens, analytics, and richer creative management.

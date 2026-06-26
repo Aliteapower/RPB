@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import com.rpb.reservation.queuedisplay.application.QueueDisplayAdSlide;
 import com.rpb.reservation.queuedisplay.application.QueueDisplayAds;
 import com.rpb.reservation.queuedisplay.application.QueueDisplayApplicationService;
@@ -35,6 +38,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class QueueDisplayControllerTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/queue-display/state";
+    private static final String MEDIA_ENDPOINT = "/api/v1/stores/{storeId}/queue-display/media/{assetId}";
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000973");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000973");
     private static final UUID OTHER_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000974");
@@ -42,15 +46,18 @@ class QueueDisplayControllerTest {
     private static final UUID TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000973");
 
     private QueueDisplayApplicationService service;
+    private CallScreenMediaService mediaService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         service = mock(QueueDisplayApplicationService.class);
+        mediaService = mock(CallScreenMediaService.class);
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("queue.display.view"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders.standaloneSetup(new QueueDisplayController(
             service,
+            mediaService,
             actorProvider,
             new QueueDisplayApiErrorMapper()
         )).build();
@@ -93,6 +100,17 @@ class QueueDisplayControllerTest {
             .andExpect(jsonPath("$.error.code").value("STORE_SCOPE_MISMATCH"));
 
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void mapsMissingDisplayMediaToNotFound() throws Exception {
+        UUID assetId = UUID.fromString("8a000000-0000-0000-0000-000000000073");
+        when(mediaService.readQueueDisplayMedia(any(), any()))
+            .thenThrow(new CallScreenMediaServiceException(CallScreenMediaServiceErrorCode.MEDIA_NOT_FOUND));
+
+        mockMvc.perform(get(MEDIA_ENDPOINT, STORE_ID, assetId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error.code").value("MEDIA_NOT_FOUND"));
     }
 
     @Test

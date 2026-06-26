@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rpb.reservation.queuedisplay.application.CallScreenAdSet;
 import com.rpb.reservation.queuedisplay.application.CallScreenAdminService;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import com.rpb.reservation.queuedisplay.application.CallScreenSetting;
 import com.rpb.reservation.queuedisplay.application.CallScreenTextSlide;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -39,14 +40,16 @@ class CallScreenAdminControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CallScreenAdminService service;
+    private CallScreenMediaService mediaService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         service = mock(CallScreenAdminService.class);
+        mediaService = mock(CallScreenMediaService.class);
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("tenant_admin"), Set.of("tenant.admin.manage"), Set.of(STORE_ID)));
-        mockMvc = MockMvcBuilders.standaloneSetup(new CallScreenAdminController(service, actorProvider)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new CallScreenAdminController(service, mediaService, actorProvider)).build();
     }
 
     @Test

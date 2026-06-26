@@ -1,4 +1,6 @@
-export type QueueDisplayAdMode = 'text'
+export type QueueDisplayAdMode = 'text' | 'media' | 'image' | (string & {})
+
+export type QueueDisplayMediaKind = 'image' | 'video'
 
 export interface QueueDisplayStoreTime {
   timezone: string
@@ -35,7 +37,16 @@ export interface QueueDisplayTextAdSlide {
   tagline: string
 }
 
-export type QueueDisplayAdSlide = QueueDisplayTextAdSlide
+export interface QueueDisplayImageAdSlide {
+  slideId: string
+  mediaKind: QueueDisplayMediaKind
+  mediaUrl: string
+  imageUrl?: string | null
+  altText?: string | null
+  title?: string | null
+}
+
+export type QueueDisplayAdSlide = QueueDisplayTextAdSlide | QueueDisplayImageAdSlide
 
 export interface QueueDisplayAds {
   mode: QueueDisplayAdMode

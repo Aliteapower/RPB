@@ -4,21 +4,27 @@ import { useRoute } from 'vue-router'
 
 import {
   CallScreenAdminApiError,
+  createCallScreenAdSet,
   getCallScreenSettings,
   listCallScreenAdSets,
   updateCallScreenAdSet,
-  updateCallScreenSettings
+  updateCallScreenSettings,
+  uploadCallScreenMedia
 } from '../api/callScreenAdminApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
+  CallScreenAdMode,
   CallScreenAdSet,
-  CallScreenAdSetMutation,
+  CallScreenMediaSlide,
+  CallScreenMediaSlideMutation,
   CallScreenSettings,
   CallScreenStatus,
   CallScreenTextSlide,
   CallScreenTextSlideMutation
 } from '../types/callScreenAdmin'
+
+type PreviewSlide = CallScreenTextSlide | CallScreenMediaSlide
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -30,6 +36,7 @@ const editableAdSet = ref<CallScreenAdSet | null>(null)
 const loading = ref(false)
 const savingSettings = ref(false)
 const savingAdSet = ref(false)
+const uploadingMedia = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const previewSlideIndex = ref(0)
@@ -37,27 +44,47 @@ const previewFullscreenOpen = ref(false)
 let previewCarouselTimer: number | undefined
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const adMode = computed<CallScreenAdMode>(() => normalizeAdMode(settings.value?.adMode))
 const textAdSets = computed(() => adSets.value.filter(adSet => adSet.adType === 'text'))
-const sortedPreviewSlides = computed(() => sortTextSlides(editableAdSet.value?.slides ?? []))
+const mediaAdSets = computed(() => adSets.value.filter(adSet => normalizeAdMode(adSet.adType) === 'media'))
+const selectableAdSets = computed(() => (adMode.value === 'media' ? mediaAdSets.value : textAdSets.value))
+const sortedPreviewSlides = computed<PreviewSlide[]>(() => {
+  if (!editableAdSet.value) {
+    return []
+  }
+  return editableAdSet.value.adType === 'text'
+    ? sortTextSlides(editableAdSet.value.slides)
+    : sortMediaSlides(editableAdSet.value.mediaSlides)
+})
 const previewSlides = computed(() => {
   const activeSlides = sortedPreviewSlides.value.filter(slide => slide.status === 'active')
   return activeSlides.length > 0 ? activeSlides : sortedPreviewSlides.value
 })
 const previewSlide = computed(() => previewSlides.value[previewSlideIndex.value] ?? previewSlides.value[0])
-const hasSelectableSets = computed(() => textAdSets.value.length > 0)
+const hasSelectableSets = computed(() => selectableAdSets.value.length > 0)
 
 onMounted(() => {
   void loadCallScreenConfig()
   startPreviewCarousel()
 })
 
-onUnmounted(stopPreviewCarousel)
+onUnmounted(() => {
+  stopPreviewCarousel()
+})
 
 watch(selectedAdSetId, value => {
   if (settings.value) {
     settings.value.activeAdSetId = value || null
   }
   syncEditableAdSet(value)
+})
+
+watch(adMode, mode => {
+  const current = adSets.value.find(adSet => adSet.id === selectedAdSetId.value)
+  if (current && normalizeAdMode(current.adType) === mode) {
+    return
+  }
+  selectedAdSetId.value = selectableAdSets.value[0]?.id ?? ''
 })
 
 watch(previewSlides, slides => {
@@ -75,10 +102,13 @@ async function loadCallScreenConfig(): Promise<void> {
       getCallScreenSettings(storeId.value),
       listCallScreenAdSets(storeId.value)
     ])
-    settings.value = { ...settingsResult.settings, adMode: 'text' }
+    settings.value = { ...settingsResult.settings, adMode: normalizeAdMode(settingsResult.settings.adMode) }
     adSets.value = setsResult.adSets.map(cloneAdSet)
     const active = adSets.value.find(adSet => adSet.id === settingsResult.settings.activeAdSetId)
-    selectedAdSetId.value = active?.id ?? textAdSets.value[0]?.id ?? ''
+    selectedAdSetId.value =
+      active && normalizeAdMode(active.adType) === adMode.value
+        ? active.id
+        : selectableAdSets.value[0]?.id ?? ''
     syncEditableAdSet(selectedAdSetId.value)
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -93,7 +123,7 @@ async function saveSettings(): Promise<void> {
   }
   const activeAdSetId = selectedAdSetId.value || null
   if (!activeAdSetId) {
-    errorText.value = '请选择要启用的文案组'
+    errorText.value = adMode.value === 'media' ? '请先上传图片或视频并选择媒体组' : '请选择要启用的文案组'
     return
   }
 
@@ -103,14 +133,14 @@ async function saveSettings(): Promise<void> {
   try {
     const response = await updateCallScreenSettings(storeId.value, {
       activeAdSetId,
-      adMode: 'text',
+      adMode: adMode.value,
       status: settings.value.status,
       slideDurationSeconds: Number(settings.value.slideDurationSeconds),
       statePollSeconds: Number(settings.value.statePollSeconds),
       showWaitingPreview: Boolean(settings.value.showWaitingPreview),
       version: settings.value.version
     })
-    settings.value = { ...response.settings, adMode: 'text' }
+    settings.value = { ...response.settings, adMode: normalizeAdMode(response.settings.adMode) }
     selectedAdSetId.value = response.settings.activeAdSetId ?? activeAdSetId
     savedText.value = '门店叫号屏设置已保存'
   } catch (error) {
@@ -138,11 +168,57 @@ async function saveAdSet(): Promise<void> {
     replaceAdSet(response.adSet)
     selectedAdSetId.value = response.adSet.id
     editableAdSet.value = cloneAdSet(response.adSet)
-    savedText.value = '文案组已保存'
+    savedText.value = editableAdSet.value.adType === 'media' ? '媒体组已保存' : '文案组已保存'
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     savingAdSet.value = false
+  }
+}
+
+async function uploadMediaSlide(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || uploadingMedia.value) {
+    return
+  }
+  uploadingMedia.value = true
+  errorText.value = ''
+  savedText.value = ''
+  try {
+    const upload = await uploadCallScreenMedia(storeId.value, file)
+    const nextSlide: CallScreenMediaSlide = {
+      id: `draft-${Date.now()}`,
+      mediaAssetId: upload.media.id,
+      mediaKind: upload.media.mediaKind,
+      mediaUrl: upload.media.mediaUrl,
+      title: upload.media.originalFilename,
+      altText: upload.media.originalFilename,
+      sortOrder: nextMediaSortOrder(),
+      status: 'active',
+      version: 0
+    }
+    if (editableAdSet.value && normalizeAdMode(editableAdSet.value.adType) === 'media') {
+      editableAdSet.value.mediaSlides.push(nextSlide)
+      previewSlideIndex.value = Math.max(0, previewSlides.value.length - 1)
+      return
+    }
+    const response = await createCallScreenAdSet(storeId.value, {
+      name: '默认图片/视频轮播',
+      adType: 'media',
+      status: 'active',
+      slides: [],
+      mediaSlides: [toMediaSlideMutation(nextSlide)]
+    })
+    replaceAdSet(response.adSet)
+    settings.value = settings.value ? { ...settings.value, adMode: 'media' } : settings.value
+    selectedAdSetId.value = response.adSet.id
+    editableAdSet.value = cloneAdSet(response.adSet)
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    uploadingMedia.value = false
   }
 }
 
@@ -190,7 +266,7 @@ function closePreviewFullscreen(): void {
 }
 
 function addSlide(): void {
-  if (!editableAdSet.value) {
+  if (!editableAdSet.value || editableAdSet.value.adType !== 'text') {
     return
   }
   const nextSortOrder = Math.max(0, ...editableAdSet.value.slides.map(slide => Number(slide.sortOrder) || 0)) + 1
@@ -218,23 +294,29 @@ function replaceAdSet(nextAdSet: CallScreenAdSet): void {
 function cloneAdSet(adSet: CallScreenAdSet): CallScreenAdSet {
   return {
     ...adSet,
-    adType: 'text',
-    slides: (adSet.slides ?? []).map(slide => ({ ...slide }))
+    adType: normalizeAdMode(adSet.adType),
+    slides: (adSet.slides ?? []).map(slide => ({ ...slide })),
+    mediaSlides: (adSet.mediaSlides ?? []).map(slide => ({ ...slide }))
   }
 }
 
-function toAdSetMutation(adSet: CallScreenAdSet): CallScreenAdSetMutation {
+function toAdSetMutation(adSet: CallScreenAdSet) {
   return {
     name: adSet.name.trim(),
-    adType: 'text',
+    adType: normalizeAdMode(adSet.adType),
     status: adSet.status,
-    slides: toSlideMutations(adSet.slides),
+    slides: adSet.adType === 'text' ? toSlideMutations(adSet.slides) : [],
+    mediaSlides: normalizeAdMode(adSet.adType) === 'media' ? toMediaSlideMutations(adSet.mediaSlides) : [],
     version: adSet.version
   }
 }
 
 function sortTextSlides(slides: CallScreenTextSlide[]): CallScreenTextSlide[] {
   return [...slides].sort((left, right) => left.sortOrder - right.sortOrder || left.title.localeCompare(right.title))
+}
+
+function sortMediaSlides(slides: CallScreenMediaSlide[]): CallScreenMediaSlide[] {
+  return [...slides].sort((left, right) => left.sortOrder - right.sortOrder || (left.title ?? '').localeCompare(right.title ?? ''))
 }
 
 function toSlideMutations(slides: CallScreenTextSlide[]): CallScreenTextSlideMutation[] {
@@ -247,10 +329,29 @@ function toSlideMutations(slides: CallScreenTextSlide[]): CallScreenTextSlideMut
   }))
 }
 
+function toMediaSlideMutations(slides: CallScreenMediaSlide[]): CallScreenMediaSlideMutation[] {
+  return sortMediaSlides(slides).map(toMediaSlideMutation)
+}
+
+function toMediaSlideMutation(slide: CallScreenMediaSlide): CallScreenMediaSlideMutation {
+  return {
+    mediaAssetId: slide.mediaAssetId,
+    mediaKind: slide.mediaKind,
+    title: slide.title?.trim() || null,
+    altText: slide.altText?.trim() || null,
+    sortOrder: Number(slide.sortOrder),
+    status: slide.status
+  }
+}
+
 function validateAdSet(adSet: CallScreenAdSet): string {
   if (!adSet.name.trim()) {
     return '请填写广告组名称'
   }
+  return normalizeAdMode(adSet.adType) === 'media' ? validateMediaAdSet(adSet) : validateTextAdSet(adSet)
+}
+
+function validateTextAdSet(adSet: CallScreenAdSet): string {
   if (adSet.slides.length === 0) {
     return '文案组至少需要一条文案'
   }
@@ -259,16 +360,53 @@ function validateAdSet(adSet: CallScreenAdSet): string {
     if (!slide.title.trim() || !slide.subtitle.trim() || !slide.tagline.trim()) {
       return '请填写完整的标题、副标题和标语'
     }
-    const sortOrder = Number(slide.sortOrder)
-    if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
-      return '排序必须是大于 0 的整数'
+    const error = validateSortOrder(slide.sortOrder, sortOrders)
+    if (error) {
+      return error
     }
-    if (sortOrders.has(sortOrder)) {
-      return '排序号不能重复'
-    }
-    sortOrders.add(sortOrder)
   }
   return ''
+}
+
+function validateMediaAdSet(adSet: CallScreenAdSet): string {
+  if (adSet.mediaSlides.length === 0) {
+    return '媒体组至少需要一张图片或一个视频'
+  }
+  const sortOrders = new Set<number>()
+  for (const slide of adSet.mediaSlides) {
+    if (!slide.mediaAssetId || !slide.mediaKind) {
+      return '请先上传图片或视频'
+    }
+    const error = validateSortOrder(slide.sortOrder, sortOrders)
+    if (error) {
+      return error
+    }
+  }
+  return ''
+}
+
+function validateSortOrder(value: number, sortOrders: Set<number>): string {
+  const sortOrder = Number(value)
+  if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
+    return '排序必须是大于 0 的整数'
+  }
+  if (sortOrders.has(sortOrder)) {
+    return '排序号不能重复'
+  }
+  sortOrders.add(sortOrder)
+  return ''
+}
+
+function nextMediaSortOrder(): number {
+  return Math.max(0, ...(editableAdSet.value?.mediaSlides ?? []).map(slide => Number(slide.sortOrder) || 0)) + 1
+}
+
+function isMediaSlide(slide: PreviewSlide | undefined): slide is CallScreenMediaSlide {
+  return !!slide && 'mediaKind' in slide
+}
+
+function normalizeAdMode(value: string | null | undefined): CallScreenAdMode {
+  return value === 'media' || value === 'image' ? 'media' : 'text'
 }
 
 function statusLabel(status: CallScreenStatus): string {
@@ -290,10 +428,10 @@ function apiErrorText(error: unknown): string {
     return '没有该店面的后台权限'
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查文案组、排序和轮播时间'
+    return '请检查广告组、排序和轮播时间'
   }
-  if (error.response.error.code === 'AD_SET_NOT_FOUND') {
-    return '文案组不存在或已被删除'
+  if (error.response.error.code === 'AD_SET_NOT_FOUND' || error.response.error.code === 'MEDIA_NOT_FOUND') {
+    return '广告资源不存在或已被删除'
   }
   if (error.response.error.code === 'VERSION_CONFLICT') {
     return '配置已被其他操作更新，请重新加载后再保存'
@@ -326,16 +464,29 @@ function apiErrorText(error: unknown): string {
           <div class="panel-heading">
             <div>
               <span>门店设置</span>
-              <h2 id="call-screen-settings-title">文本轮播参数</h2>
+              <h2 id="call-screen-settings-title">播放参数</h2>
             </div>
             <small>版本 {{ settings.version }}</small>
           </div>
 
+          <div class="mode-control" aria-label="轮播类型">
+            <label class="mode-option">
+              <input v-model="settings.adMode" type="radio" value="text" />
+              <span>文案轮播</span>
+            </label>
+            <label class="mode-option">
+              <input v-model="settings.adMode" type="radio" value="media" />
+              <span>图片/视频轮播</span>
+            </label>
+          </div>
+
+          <p class="phase-note">媒体轮播支持 JPG、PNG、WebP、MP4、WebM，租户只可使用自己上传的资源。</p>
+
           <div class="settings-grid">
             <label>
-              <span>启用文案组</span>
+              <span>{{ adMode === 'media' ? '启用媒体组' : '启用文案组' }}</span>
               <select v-model="selectedAdSetId" :disabled="!hasSelectableSets" required>
-                <option v-for="adSet in textAdSets" :key="adSet.id" :value="adSet.id">
+                <option v-for="adSet in selectableAdSets" :key="adSet.id" :value="adSet.id">
                   {{ adSet.name }} · {{ statusLabel(adSet.status) }}
                 </option>
               </select>
@@ -365,17 +516,34 @@ function apiErrorText(error: unknown): string {
           <div class="panel-heading">
             <div>
               <span>文案组</span>
-              <h2 id="call-screen-copy-title">文案编辑</h2>
+              <h2 id="call-screen-copy-title">{{ editableAdSet?.adType === 'media' ? '媒体编辑' : '文案编辑' }}</h2>
             </div>
             <div class="panel-heading-actions">
-              <button class="secondary-button compact" type="button" :disabled="!editableAdSet" @click="addSlide">
+              <label v-if="editableAdSet?.adType === 'media' || adMode === 'media'" class="upload-button">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                  :disabled="uploadingMedia"
+                  @change="uploadMediaSlide"
+                />
+                {{ uploadingMedia ? '上传中' : '上传媒体' }}
+              </label>
+              <button
+                v-if="editableAdSet?.adType !== 'media'"
+                class="secondary-button compact"
+                type="button"
+                :disabled="!editableAdSet"
+                @click="addSlide"
+              >
                 新增一组
               </button>
               <small v-if="editableAdSet">版本 {{ editableAdSet.version }}</small>
             </div>
           </div>
 
-          <p v-if="!editableAdSet" class="empty-line">暂无可编辑文案组</p>
+          <p v-if="!editableAdSet" class="empty-line">
+            {{ adMode === 'media' ? '暂无媒体组，请先上传图片或视频' : '暂无可编辑文案组' }}
+          </p>
 
           <template v-else>
             <div class="ad-set-fields">
@@ -392,7 +560,7 @@ function apiErrorText(error: unknown): string {
               </label>
             </div>
 
-            <div class="slide-editor">
+            <div v-if="editableAdSet.adType === 'text'" class="slide-editor">
               <table>
                 <thead>
                   <tr>
@@ -430,9 +598,62 @@ function apiErrorText(error: unknown): string {
               </table>
             </div>
 
+            <div v-else class="slide-editor media-slide-editor">
+              <table>
+                <thead>
+                  <tr>
+                    <th>排序</th>
+                    <th>状态</th>
+                    <th>类型</th>
+                    <th>预览</th>
+                    <th>标题</th>
+                    <th>替代文本</th>
+                    <th>版本</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="slide in editableAdSet.mediaSlides" :key="slide.id">
+                    <td>
+                      <input v-model.number="slide.sortOrder" class="sort-input" type="number" min="1" required />
+                    </td>
+                    <td>
+                      <select v-model="slide.status" class="status-select" required>
+                        <option value="active">启用</option>
+                        <option value="disabled">停用</option>
+                      </select>
+                    </td>
+                    <td class="version-cell">{{ slide.mediaKind === 'video' ? '视频' : '图片' }}</td>
+                    <td>
+                      <img
+                        v-if="slide.mediaKind === 'image'"
+                        class="media-thumb"
+                        :src="slide.mediaUrl"
+                        :alt="slide.altText || slide.title || '媒体预览'"
+                      />
+                      <video
+                        v-else
+                        class="media-thumb"
+                        :src="slide.mediaUrl"
+                        muted
+                        playsinline
+                        controls
+                      />
+                    </td>
+                    <td>
+                      <input v-model.trim="slide.title" maxlength="32" />
+                    </td>
+                    <td>
+                      <input v-model.trim="slide.altText" maxlength="48" />
+                    </td>
+                    <td class="version-cell">{{ slide.version }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <div class="panel-actions">
               <button class="primary-button" type="button" :disabled="savingAdSet" @click="saveAdSet">
-                {{ savingAdSet ? '保存中' : '保存文案组' }}
+                {{ savingAdSet ? '保存中' : editableAdSet.adType === 'media' ? '保存媒体组' : '保存文案组' }}
               </button>
             </div>
           </template>
@@ -450,14 +671,34 @@ function apiErrorText(error: unknown): string {
               :disabled="previewSlides.length === 0"
               @click="openPreviewFullscreen"
             >
+              <span class="preview-expand-icon" aria-hidden="true" />
               大屏预览
             </button>
           </div>
           <div class="preview-screen">
-            <span class="preview-mark">食</span>
-            <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
-            <p class="preview-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
-            <p class="preview-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
+            <template v-if="isMediaSlide(previewSlide)">
+              <img
+                v-if="previewSlide.mediaKind === 'image'"
+                class="preview-media"
+                :src="previewSlide.mediaUrl"
+                :alt="previewSlide.altText || previewSlide.title || '媒体预览'"
+              />
+              <video
+                v-else
+                class="preview-media"
+                :src="previewSlide.mediaUrl"
+                muted
+                playsinline
+                autoplay
+              />
+              <h3 class="preview-media-title">{{ previewSlide.title || '媒体广告' }}</h3>
+            </template>
+            <template v-else>
+              <span class="preview-mark">食</span>
+              <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
+              <p class="preview-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
+              <p class="preview-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
+            </template>
           </div>
           <div class="preview-dots" aria-label="预览文案轮播">
             <button
@@ -483,10 +724,30 @@ function apiErrorText(error: unknown): string {
             关闭预览
           </button>
           <section class="preview-fullscreen-stage" aria-label="叫号屏文案大屏预览">
-            <span class="preview-mark preview-mark-large">食</span>
-            <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
-            <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
-            <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
+            <template v-if="isMediaSlide(previewSlide)">
+              <img
+                v-if="previewSlide.mediaKind === 'image'"
+                class="preview-fullscreen-media"
+                :src="previewSlide.mediaUrl"
+                :alt="previewSlide.altText || previewSlide.title || '媒体大屏预览'"
+              />
+              <video
+                v-else
+                class="preview-fullscreen-media"
+                :src="previewSlide.mediaUrl"
+                muted
+                playsinline
+                autoplay
+                controls
+              />
+              <h2 v-if="previewSlide.title">{{ previewSlide.title }}</h2>
+            </template>
+            <template v-else>
+              <span class="preview-mark preview-mark-large">食</span>
+              <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
+              <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
+              <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
+            </template>
             <div class="preview-dots preview-dots-large" aria-label="大屏预览文案轮播">
               <button
                 v-for="(slide, index) in previewSlides"
@@ -518,18 +779,11 @@ function apiErrorText(error: unknown): string {
   padding: 22px;
 }
 
-.page-heading,
-.panel-heading,
-.panel-heading-actions,
-.panel-actions,
-.preview-header {
+.page-heading {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-}
-
-.page-heading {
   margin-bottom: 16px;
 }
 
@@ -541,18 +795,10 @@ function apiErrorText(error: unknown): string {
   font-weight: 700;
 }
 
-.page-heading h1,
-.panel-heading h2 {
+.page-heading h1 {
   margin: 0;
   color: #0f172a;
-}
-
-.page-heading h1 {
   font-size: 24px;
-}
-
-.panel-heading h2 {
-  font-size: 18px;
 }
 
 .error-banner,
@@ -590,8 +836,7 @@ function apiErrorText(error: unknown): string {
   align-items: start;
 }
 
-.config-panel,
-.preview-panel {
+.config-panel {
   min-width: 0;
   display: grid;
   gap: 16px;
@@ -605,17 +850,71 @@ function apiErrorText(error: unknown): string {
   grid-column: 1;
 }
 
-.preview-panel {
-  position: sticky;
-  top: 22px;
-  grid-column: 2;
-  grid-row: 1 / span 2;
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
 }
 
+.panel-heading h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.panel-heading small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panel-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mode-control,
 .settings-grid,
 .ad-set-fields {
   display: grid;
   gap: 12px;
+}
+
+.mode-control {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mode-option {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 1px solid #99f6e4;
+  border-radius: 6px;
+  color: #115e59;
+  background: #f0fdfa;
+  font-weight: 800;
+}
+
+.mode-option.disabled {
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.phase-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .settings-grid {
@@ -647,6 +946,7 @@ select {
   font: inherit;
 }
 
+input[type='radio'],
 input[type='checkbox'] {
   width: auto;
   min-height: auto;
@@ -706,9 +1006,27 @@ tr:last-child td {
   text-align: center;
 }
 
+.media-slide-editor table {
+  min-width: 1080px;
+}
+
+.media-thumb {
+  width: 96px;
+  height: 54px;
+  display: block;
+  border-radius: 6px;
+  background: #0f172a;
+  object-fit: cover;
+}
+
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .primary-button,
-.secondary-button,
-.preview-expand-button {
+.secondary-button {
   min-height: 38px;
   border-radius: 6px;
   padding: 0 14px;
@@ -723,8 +1041,7 @@ tr:last-child td {
   background: #0f766e;
 }
 
-.secondary-button,
-.preview-expand-button {
+.secondary-button {
   border: 1px solid #cbd5e1;
   color: #334155;
   background: #ffffff;
@@ -736,9 +1053,54 @@ tr:last-child td {
   font-size: 13px;
 }
 
-button:disabled {
+.upload-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #c2410c;
+  background: #fff7ed;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.preview-panel {
+  position: sticky;
+  top: 22px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 4px;
 }
 
 .preview-title {
@@ -752,23 +1114,62 @@ button:disabled {
   font-size: 16px;
 }
 
-.preview-screen,
-.preview-fullscreen-stage {
+.preview-expand-button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #c2410c;
+  background: #fff7ed;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.preview-expand-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.preview-expand-icon {
+  position: relative;
+  width: 15px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.preview-expand-icon::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  bottom: -4px;
+  width: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.preview-screen {
+  position: relative;
+  min-height: 280px;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 12px;
+  padding: 24px;
+  border-radius: 8px;
   color: #f8fafc;
   background:
     radial-gradient(circle at 25% 20%, rgba(249, 115, 22, 0.22), transparent 30%),
     linear-gradient(135deg, #101827 0%, #172033 50%, #0b1120 100%);
   text-align: center;
-}
-
-.preview-screen {
-  min-height: 280px;
-  padding: 24px;
-  border-radius: 8px;
 }
 
 .preview-mark {
@@ -787,24 +1188,39 @@ button:disabled {
   margin: 0;
   color: #ffffff;
   font-size: 32px;
+  letter-spacing: 0;
+}
+
+.preview-media {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.preview-media-title {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.62);
 }
 
 .preview-subtitle,
-.preview-tagline,
-.preview-fullscreen-subtitle,
-.preview-fullscreen-tagline {
+.preview-tagline {
   margin: 0;
 }
 
-.preview-subtitle,
-.preview-fullscreen-subtitle {
+.preview-subtitle {
   color: #fdba74;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 800;
 }
 
-.preview-tagline,
-.preview-fullscreen-tagline {
+.preview-tagline {
   color: #cbd5e1;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -827,6 +1243,11 @@ button:disabled {
 .preview-dots button.active {
   width: 18px;
   background: #f97316;
+}
+
+.preview-dots button:focus-visible {
+  outline: 2px solid #fb923c;
+  outline-offset: 3px;
 }
 
 .preview-fullscreen {
@@ -857,9 +1278,18 @@ button:disabled {
 .preview-fullscreen-stage {
   width: min(1120px, calc(100vw - 96px));
   min-height: min(680px, calc(100dvh - 96px));
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
   padding: 56px;
   border: 1px solid rgba(251, 146, 60, 0.22);
   border-radius: 8px;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(249, 115, 22, 0.24), transparent 30%),
+    linear-gradient(135deg, #101827 0%, #172033 50%, #0b1120 100%);
+  text-align: center;
 }
 
 .preview-mark-large {
@@ -873,15 +1303,56 @@ button:disabled {
   color: #ffffff;
   font-size: 84px;
   line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.preview-fullscreen-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.preview-fullscreen-stage:has(.preview-fullscreen-media) {
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-fullscreen-stage:has(.preview-fullscreen-media) h2 {
+  position: absolute;
+  left: 48px;
+  right: 48px;
+  bottom: 48px;
+  text-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+}
+
+.preview-fullscreen-subtitle,
+.preview-fullscreen-tagline {
+  margin: 0;
 }
 
 .preview-fullscreen-subtitle {
+  color: #fdba74;
   font-size: 34px;
+  font-weight: 900;
 }
 
 .preview-fullscreen-tagline {
   max-width: 760px;
+  color: #cbd5e1;
   font-size: 22px;
+  line-height: 1.6;
+}
+
+.preview-dots-large button {
+  width: 10px;
+  height: 10px;
+}
+
+.preview-dots-large button.active {
+  width: 30px;
 }
 
 @media (max-width: 1180px) {
@@ -902,6 +1373,7 @@ button:disabled {
 
 @media (max-width: 980px) {
   .tenant-shell,
+  .mode-control,
   .settings-grid,
   .ad-set-fields {
     grid-template-columns: 1fr;
@@ -940,6 +1412,14 @@ button:disabled {
 
   .preview-fullscreen-stage h2 {
     font-size: 46px;
+  }
+
+  .preview-fullscreen-subtitle {
+    font-size: 24px;
+  }
+
+  .preview-fullscreen-tagline {
+    font-size: 16px;
   }
 }
 </style>

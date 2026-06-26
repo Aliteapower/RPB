@@ -3,6 +3,7 @@ import type {
   CallScreenAdSetListResponse,
   CallScreenAdSetMutation,
   CallScreenAdSetResponse,
+  CallScreenMediaAssetResponse,
   CallScreenSettingsMutation,
   CallScreenSettingsResponse
 } from '../types/callScreenAdmin'
@@ -86,6 +87,16 @@ export async function updateCallScreenAdSet(
   })
 }
 
+export async function uploadCallScreenMedia(
+  storeId: string,
+  file: File,
+  fetcher?: CallScreenAdminFetcher
+): Promise<CallScreenMediaAssetResponse> {
+  const form = new FormData()
+  form.append('file', file)
+  return requestForm(`${baseEndpoint(storeId)}/media`, form, fetcher)
+}
+
 function baseEndpoint(storeId: string): string {
   return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/call-screen`
 }
@@ -102,6 +113,39 @@ async function requestJson<T>(
 
   try {
     response = await sendRequest(endpoint, options)
+  } catch {
+    throw new CallScreenAdminApiError(0, unknownError())
+  }
+
+  const payload = await readJson(response)
+  if (!response.ok || isCallScreenAdminApiErrorResponse(payload)) {
+    throw new CallScreenAdminApiError(
+      response.status,
+      isCallScreenAdminApiErrorResponse(payload) ? payload : unknownError(response.status)
+    )
+  }
+
+  return payload as T
+}
+
+async function requestForm<T>(
+  endpoint: string,
+  form: FormData,
+  fetcher?: CallScreenAdminFetcher
+): Promise<T> {
+  let response: TextResponse
+  try {
+    const activeFetcher = fetcher ?? resolveFetch()
+    if (activeFetcher) {
+      response = await activeFetcher(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+        body: form
+      })
+    } else {
+      response = await xhrFormRequest(endpoint, form)
+    }
   } catch {
     throw new CallScreenAdminApiError(0, unknownError())
   }
@@ -180,6 +224,25 @@ function xhrRequest(
     xhr.onerror = () => reject(new TypeError('Network request failed'))
     xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
     xhr.send(options.body)
+  })
+}
+
+function xhrFormRequest(endpoint: string, form: FormData): Promise<TextResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', endpoint, true)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: async () => xhr.responseText
+      })
+    }
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
+    xhr.send(form)
   })
 }
 

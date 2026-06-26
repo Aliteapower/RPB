@@ -55,19 +55,24 @@ public class CallScreenAdminService {
     @Transactional
     public List<CallScreenAdSet> listAdSets(StoreScope scope) {
         ensureTenantDefaultTextSet(scope);
-        return repository.listAdSets(scope.tenantId().value());
+        return repository.listAdSets(scope.tenantId().value()).stream()
+            .map(adSet -> withTenantMediaUrls(scope, adSet))
+            .toList();
     }
 
     @Transactional
     public CallScreenAdSet createAdSet(StoreScope scope, CallScreenAdSetCommand command) {
         NormalizedAdSet input = normalizeAdSet(command, true);
-        return repository.createTextAdSet(scope.tenantId().value(), input.name(), input.status(), input.textSlides());
+        if ("media".equals(input.adType())) {
+            return withTenantMediaUrls(scope, repository.createMediaAdSet(scope.tenantId().value(), input.name(), input.status(), input.mediaSlides()));
+        }
+        return withTenantMediaUrls(scope, repository.createTextAdSet(scope.tenantId().value(), input.name(), input.status(), input.textSlides()));
     }
 
     @Transactional(readOnly = true)
     public CallScreenAdSet getAdSet(StoreScope scope, UUID adSetId) {
-        return repository.findAdSet(scope.tenantId().value(), adSetId)
-            .orElseThrow(() -> new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.AD_SET_NOT_FOUND));
+        return withTenantMediaUrls(scope, repository.findAdSet(scope.tenantId().value(), adSetId)
+            .orElseThrow(() -> new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.AD_SET_NOT_FOUND)));
     }
 
     @Transactional
@@ -81,12 +86,43 @@ public class CallScreenAdminService {
         if (input.version() != null && input.version() != current.version()) {
             throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.VERSION_CONFLICT);
         }
-        return repository.updateTextAdSet(scope.tenantId().value(), adSetId, input.name(), input.status(), input.textSlides());
+        if ("media".equals(input.adType())) {
+            return withTenantMediaUrls(scope, repository.updateMediaAdSet(scope.tenantId().value(), adSetId, input.name(), input.status(), input.mediaSlides()));
+        }
+        return withTenantMediaUrls(scope, repository.updateTextAdSet(scope.tenantId().value(), adSetId, input.name(), input.status(), input.textSlides()));
     }
 
     private CallScreenAdSet ensureTenantDefaultTextSet(StoreScope scope) {
         return repository.findDefaultTextSet(scope.tenantId().value(), DEFAULT_SEED_KEY)
             .orElseGet(() -> repository.cloneSeedTextSet(scope.tenantId().value(), DEFAULT_SEED_KEY));
+    }
+
+    private static CallScreenAdSet withTenantMediaUrls(StoreScope scope, CallScreenAdSet adSet) {
+        if (adSet.mediaSlides().isEmpty()) {
+            return adSet;
+        }
+        List<CallScreenMediaSlide> mediaSlides = adSet.mediaSlides().stream()
+            .map(slide -> new CallScreenMediaSlide(
+                slide.id(),
+                slide.mediaAssetId(),
+                slide.mediaKind(),
+                CallScreenMediaService.tenantAdminMediaUrl(scope, slide.mediaAssetId()),
+                slide.title(),
+                slide.altText(),
+                slide.sortOrder(),
+                slide.status(),
+                slide.version()
+            ))
+            .toList();
+        return new CallScreenAdSet(
+            adSet.id(),
+            adSet.name(),
+            "image".equals(adSet.adType()) ? "media" : adSet.adType(),
+            adSet.status(),
+            adSet.slides(),
+            mediaSlides,
+            adSet.version()
+        );
     }
 
     private static NormalizedSettings normalizeSettings(CallScreenSettingsCommand command) {
@@ -117,11 +153,18 @@ public class CallScreenAdminService {
         List<CallScreenTextSlideCommand> textSlides = command.slides().stream()
             .map(CallScreenAdminService::normalizeTextSlide)
             .toList();
-        if (textSlides.isEmpty()) {
+        List<CallScreenMediaSlideCommand> mediaSlides = command.mediaSlides().stream()
+            .map(CallScreenAdminService::normalizeMediaSlide)
+            .toList();
+        if ("text".equals(adType) && textSlides.isEmpty()) {
             throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
         }
-        ensureUniqueSortOrders(textSlides.stream().map(CallScreenTextSlideCommand::sortOrder).toList());
-        return new NormalizedAdSet(adType, name, status, textSlides, create ? null : command.version());
+        if ("media".equals(adType) && mediaSlides.isEmpty()) {
+            throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        ensureUniqueSortOrders("text".equals(adType) ? textSlides.stream().map(CallScreenTextSlideCommand::sortOrder).toList()
+            : mediaSlides.stream().map(CallScreenMediaSlideCommand::sortOrder).toList());
+        return new NormalizedAdSet(adType, name, status, textSlides, mediaSlides, create ? null : command.version());
     }
 
     private static CallScreenTextSlideCommand normalizeTextSlide(CallScreenTextSlideCommand slide) {
@@ -133,6 +176,23 @@ public class CallScreenAdminService {
             requiredText(slide.title()),
             requiredText(slide.subtitle()),
             requiredText(slide.tagline()),
+            slide.sortOrder(),
+            normalizeStatus(slide.status()),
+            slide.version()
+        );
+    }
+
+    private static CallScreenMediaSlideCommand normalizeMediaSlide(CallScreenMediaSlideCommand slide) {
+        if (slide == null || slide.mediaAssetId() == null || slide.sortOrder() == null || slide.sortOrder() <= 0) {
+            throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        String mediaKind = normalizeMediaKind(slide.mediaKind());
+        return new CallScreenMediaSlideCommand(
+            slide.id(),
+            slide.mediaAssetId(),
+            mediaKind,
+            optionalText(slide.title()),
+            optionalText(slide.altText()),
             slide.sortOrder(),
             normalizeStatus(slide.status()),
             slide.version()
@@ -166,7 +226,17 @@ public class CallScreenAdminService {
         if ("text".equals(value)) {
             return "text";
         }
+        if ("media".equals(value) || "image".equals(value)) {
+            return "media";
+        }
         throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
+    }
+
+    private static String normalizeMediaKind(String value) {
+        if (!"image".equals(value) && !"video".equals(value)) {
+            throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return value;
     }
 
     private static boolean adModeMatches(String adType, String adMode) {
@@ -179,6 +249,13 @@ public class CallScreenAdminService {
     private static String requiredText(String value) {
         if (value == null || value.isBlank()) {
             throw new CallScreenAdminServiceException(CallScreenAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return value.trim();
+    }
+
+    private static String optionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
         return value.trim();
     }
@@ -199,6 +276,7 @@ public class CallScreenAdminService {
         String name,
         String status,
         List<CallScreenTextSlideCommand> textSlides,
+        List<CallScreenMediaSlideCommand> mediaSlides,
         Integer version
     ) {
     }

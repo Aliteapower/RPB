@@ -7,6 +7,7 @@ public enum PlatformCallScreenSeedApiErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "platform.call_screen_seed.forbidden"),
     REQUEST_INVALID(HttpStatus.BAD_REQUEST, "platform.call_screen_seed.request_invalid"),
     SEED_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.call_screen_seed.not_found"),
+    MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.call_screen_seed.media_not_found"),
     VERSION_CONFLICT(HttpStatus.CONFLICT, "platform.call_screen_seed.version_conflict"),
     PERSISTENCE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "platform.call_screen_seed.persistence_error");
 

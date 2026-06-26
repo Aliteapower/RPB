@@ -23,8 +23,18 @@ public final class CallScreenAdminRequests {
         String adType,
         String status,
         List<TextSlideRequest> slides,
+        List<MediaSlideRequest> mediaSlides,
         Integer version
     ) {
+        public AdSetRequest(
+            String name,
+            String adType,
+            String status,
+            List<TextSlideRequest> slides,
+            Integer version
+        ) {
+            this(name, adType, status, slides, List.of(), version);
+        }
     }
 
     public record TextSlideRequest(
@@ -38,4 +48,15 @@ public final class CallScreenAdminRequests {
     ) {
     }
 
+    public record MediaSlideRequest(
+        UUID id,
+        UUID mediaAssetId,
+        String mediaKind,
+        String title,
+        String altText,
+        Integer sortOrder,
+        String status,
+        Integer version
+    ) {
+    }
 }

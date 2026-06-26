@@ -1,4 +1,6 @@
-export type CallScreenAdMode = 'text'
+export type CallScreenAdMode = 'text' | 'media'
+
+export type CallScreenMediaKind = 'image' | 'video'
 
 export type CallScreenStatus = 'active' | 'disabled'
 
@@ -22,12 +24,35 @@ export interface CallScreenTextSlide {
   version: number
 }
 
+export interface CallScreenMediaSlide {
+  id: string
+  mediaAssetId: string
+  mediaKind: CallScreenMediaKind
+  mediaUrl: string
+  title: string | null
+  altText: string | null
+  sortOrder: number
+  status: CallScreenStatus
+  version: number
+}
+
 export interface CallScreenAdSet {
   id: string
   name: string
   adType: CallScreenAdMode
   status: CallScreenStatus
   slides: CallScreenTextSlide[]
+  mediaSlides: CallScreenMediaSlide[]
+  version: number
+}
+
+export interface CallScreenMediaAsset {
+  id: string
+  mediaKind: CallScreenMediaKind
+  contentType: string
+  byteSize: number
+  originalFilename: string
+  mediaUrl: string
   version: number
 }
 
@@ -39,6 +64,11 @@ export interface CallScreenSettingsResponse {
 export interface CallScreenAdSetResponse {
   success: true
   adSet: CallScreenAdSet
+}
+
+export interface CallScreenMediaAssetResponse {
+  success: true
+  media: CallScreenMediaAsset
 }
 
 export interface CallScreenAdSetListResponse {
@@ -66,11 +96,23 @@ export interface CallScreenTextSlideMutation {
   version?: number
 }
 
+export interface CallScreenMediaSlideMutation {
+  id?: string
+  mediaAssetId: string
+  mediaKind: CallScreenMediaKind
+  title?: string | null
+  altText?: string | null
+  sortOrder: number
+  status: CallScreenStatus
+  version?: number
+}
+
 export interface CallScreenAdSetMutation {
   name: string
   adType: CallScreenAdMode
   status: CallScreenStatus
   slides: CallScreenTextSlideMutation[]
+  mediaSlides?: CallScreenMediaSlideMutation[]
   version?: number
 }
 
