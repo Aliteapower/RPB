@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -106,6 +107,13 @@ public class PlatformCallScreenMediaSeedController {
         CallScreenMediaServiceException exception
     ) {
         return apiError(toApiError(exception.code()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<PlatformCallScreenSeedApiErrorResponse> handleMaxUploadSizeExceededException(
+        MaxUploadSizeExceededException exception
+    ) {
+        return apiError(PlatformCallScreenSeedApiErrorCode.REQUEST_INVALID);
     }
 
     @ExceptionHandler(DataAccessException.class)

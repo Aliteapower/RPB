@@ -3,6 +3,7 @@ package com.rpb.reservation.auth.integration;
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_STORE_ID;
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -188,6 +189,82 @@ class TenantAdminApiIntegrationTest {
               and policy.effective_to_at is null
               and policy.deleted_at is null
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminMaintainsOwnTenantProfileAndLogo() throws Exception {
+        Cookie session = login("20000000");
+
+        mockMvc.perform(get(basePath() + "/profile").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.profile.tenantCode").value("20000000"))
+            .andExpect(jsonPath("$.profile.status").value("active"));
+
+        mockMvc.perform(patch(basePath() + "/profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"食刻租户",
+                      "defaultLocale":"zh-CN",
+                      "contactPhone":"021-393930",
+                      "address":"上海市徐汇区示例路 1 号",
+                      "principalName":"张店长"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profile.displayName").value("食刻租户"))
+            .andExpect(jsonPath("$.profile.contactPhone").value("021-393930"))
+            .andExpect(jsonPath("$.profile.address").value("上海市徐汇区示例路 1 号"))
+            .andExpect(jsonPath("$.profile.principalName").value("张店长"));
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenants
+            where id = ?
+              and tenant_code = '20000000'
+              and status = 'active'
+              and display_name = '食刻租户'
+              and default_locale = 'zh-CN'
+              and contact_phone = '021-393930'
+              and address = '上海市徐汇区示例路 1 号'
+              and principal_name = '张店长'
+            """, VALIDATION_TENANT_ID)).isEqualTo(1);
+
+        MockMultipartFile logo = new MockMultipartFile(
+            "file",
+            "tenant-logo.png",
+            "image/png",
+            pngHeader()
+        );
+        mockMvc.perform(multipart(basePath() + "/profile/logo")
+                .file(logo)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profile.logoMediaUrl").isNotEmpty());
+
+        UUID logoAssetId = jdbc.queryForObject(
+            "select logo_media_asset_id from tenants where id = ?",
+            UUID.class,
+            VALIDATION_TENANT_ID
+        );
+        assertThat(logoAssetId).isNotNull();
+
+        mockMvc.perform(get(basePath() + "/profile/logo/media/{assetId}", logoAssetId).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(result -> assertThat(result.getResponse().getContentType()).isEqualTo("image/png"));
+
+        mockMvc.perform(delete(basePath() + "/profile/logo").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profile.logoMediaUrl").doesNotExist());
+
+        UUID clearedLogoAssetId = jdbc.queryForObject(
+            "select logo_media_asset_id from tenants where id = ?",
+            UUID.class,
+            VALIDATION_TENANT_ID
+        );
+        assertThat(clearedLogoAssetId).isNull();
     }
 
     @Test
@@ -579,6 +656,13 @@ class TenantAdminApiIntegrationTest {
             workbook.write(output);
             return output.toByteArray();
         }
+    }
+
+    private static byte[] pngHeader() {
+        return new byte[] {
+            (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            0x00, 0x00, 0x00, 0x0d
+        };
     }
 
     private Cookie login(String username) throws Exception {

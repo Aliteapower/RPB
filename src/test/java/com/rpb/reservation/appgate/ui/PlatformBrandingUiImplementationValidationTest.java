@@ -97,7 +97,11 @@ class PlatformBrandingUiImplementationValidationTest {
             .contains("平台 LOGO")
             .contains("社交媒体")
             .contains("社媒 LOGO")
+            .contains("新增社媒 LOGO")
+            .contains("handleNewSocialLogoChange")
+            .contains("newSocialLink.logoFile")
             .contains("uploadPlatformSocialLinkLogo")
+            .contains("createdLink.id")
             .contains("createPlatformSocialLink")
             .contains("updatePlatformSocialLink")
             .contains("deletePlatformSocialLink");

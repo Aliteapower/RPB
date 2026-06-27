@@ -1,8 +1,13 @@
 package com.rpb.reservation.tenantadmin.api;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.tenant.value.TenantId;
+import com.rpb.reservation.tenantadmin.application.TenantAdminProfileCommand;
+import com.rpb.reservation.tenantadmin.application.TenantAdminProfileService;
 import com.rpb.reservation.tenantadmin.application.TenantAdminSearchCommand;
 import com.rpb.reservation.tenantadmin.application.TenantAdminServiceErrorCode;
 import com.rpb.reservation.tenantadmin.application.TenantAdminServiceException;
@@ -16,9 +21,11 @@ import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -41,18 +48,60 @@ public class TenantAdminController {
     private final TenantAdminStaffService staffService;
     private final TenantAdminTableService tableService;
     private final TenantAdminSettingsService settingsService;
+    private final TenantAdminProfileService profileService;
     private final CurrentActorProvider currentActorProvider;
 
     public TenantAdminController(
         TenantAdminStaffService staffService,
         TenantAdminTableService tableService,
         TenantAdminSettingsService settingsService,
+        TenantAdminProfileService profileService,
         CurrentActorProvider currentActorProvider
     ) {
         this.staffService = staffService;
         this.tableService = tableService;
         this.settingsService = settingsService;
+        this.profileService = profileService;
         this.currentActorProvider = currentActorProvider;
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<TenantAdminProfileResponse> getProfile(@PathVariable UUID storeId) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminProfileResponse.from(scope, profileService.getProfile(scope)));
+    }
+
+    @PatchMapping("/profile")
+    public ResponseEntity<TenantAdminProfileResponse> updateProfile(
+        @PathVariable UUID storeId,
+        @RequestBody(required = false) TenantAdminProfileRequest request
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminProfileResponse.from(scope, profileService.updateProfile(scope, toCommand(request))));
+    }
+
+    @PostMapping(value = "/profile/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TenantAdminProfileResponse> uploadProfileLogo(
+        @PathVariable UUID storeId,
+        @RequestParam("file") MultipartFile file
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminProfileResponse.from(scope, profileService.uploadLogo(scope, file)));
+    }
+
+    @DeleteMapping("/profile/logo")
+    public ResponseEntity<TenantAdminProfileResponse> clearProfileLogo(@PathVariable UUID storeId) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminProfileResponse.from(scope, profileService.clearLogo(scope)));
+    }
+
+    @GetMapping("/profile/logo/media/{assetId}")
+    public ResponseEntity<Resource> readProfileLogo(
+        @PathVariable UUID storeId,
+        @PathVariable UUID assetId
+    ) {
+        CallScreenMediaContent content = profileService.readLogoMedia(requireTenantAdminScope(storeId), assetId);
+        return mediaResponse(content);
     }
 
     @GetMapping("/staff")
@@ -194,6 +243,13 @@ public class TenantAdminController {
         return apiError(TenantAdminApiErrorCode.valueOf(exception.code().name()));
     }
 
+    @ExceptionHandler(CallScreenMediaServiceException.class)
+    public ResponseEntity<TenantAdminApiErrorResponse> handleMediaServiceException(
+        CallScreenMediaServiceException exception
+    ) {
+        return apiError(toApiError(exception.code()));
+    }
+
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<TenantAdminApiErrorResponse> handleDataAccessException(DataAccessException exception) {
         return apiError(TenantAdminApiErrorCode.PERSISTENCE_ERROR);
@@ -213,6 +269,35 @@ public class TenantAdminController {
 
     private static ResponseEntity<TenantAdminApiErrorResponse> apiError(TenantAdminApiErrorCode code) {
         return ResponseEntity.status(code.httpStatus()).body(TenantAdminApiErrorResponse.of(code));
+    }
+
+    private static ResponseEntity<Resource> mediaResponse(CallScreenMediaContent content) {
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(content.contentType()))
+            .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+            .header("X-Content-Type-Options", "nosniff")
+            .body(content.resource());
+    }
+
+    private static TenantAdminApiErrorCode toApiError(CallScreenMediaServiceErrorCode code) {
+        return switch (code) {
+            case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
+            case MEDIA_NOT_FOUND -> TenantAdminApiErrorCode.MEDIA_NOT_FOUND;
+            case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
+        };
+    }
+
+    private static TenantAdminProfileCommand toCommand(TenantAdminProfileRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new TenantAdminProfileCommand(
+            request.displayName(),
+            request.defaultLocale(),
+            request.contactPhone(),
+            request.address(),
+            request.principalName()
+        );
     }
 
     private static TenantAdminStaffMutationCommand toCommand(TenantAdminStaffMutationRequest request) {

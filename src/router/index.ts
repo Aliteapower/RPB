@@ -19,6 +19,7 @@ import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
 import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
 import TableResourceListPage from '../pages/TableResourceListPage.vue'
 import TenantAdminCallScreenPage from '../pages/TenantAdminCallScreenPage.vue'
+import TenantAdminProfilePage from '../pages/TenantAdminProfilePage.vue'
 import TenantAdminSettingsPage from '../pages/TenantAdminSettingsPage.vue'
 import TenantAdminStaffFormPage from '../pages/TenantAdminStaffFormPage.vue'
 import TenantAdminStaffPage from '../pages/TenantAdminStaffPage.vue'
@@ -103,9 +104,15 @@ export const router = createRouter({
     {
       path: '/stores/:storeId/admin',
       redirect: to => ({
-        name: 'tenant-admin-staff',
+        name: 'tenant-admin-profile',
         params: { storeId: to.params.storeId }
       })
+    },
+    {
+      path: '/stores/:storeId/admin/profile',
+      name: 'tenant-admin-profile',
+      component: TenantAdminProfilePage,
+      meta: { requiresTenantAdmin: true }
     },
     {
       path: '/stores/:storeId/admin/staff',

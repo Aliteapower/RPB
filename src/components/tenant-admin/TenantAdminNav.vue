@@ -35,6 +35,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
         <small>门店 {{ auth.user?.username || '20000000' }}</small>
       </div>
       <nav class="nav-list">
+        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/profile`">租户资料</RouterLink>
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/staff`">员工管理</RouterLink>
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/tables`">桌号管理</RouterLink>
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/settings`">基础设置</RouterLink>

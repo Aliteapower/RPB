@@ -184,6 +184,7 @@ class AuthLoginUiValidationTest {
         Path storePath = Path.of("src", "stores", "authSession.ts");
         Path loginPagePath = Path.of("src", "pages", "LoginPage.vue");
         Path tenantApiPath = Path.of("src", "api", "tenantAdminApi.ts");
+        Path profilePagePath = Path.of("src", "pages", "TenantAdminProfilePage.vue");
         Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
         Path staffFormPath = Path.of("src", "pages", "TenantAdminStaffFormPage.vue");
         Path tablesPagePath = Path.of("src", "pages", "TenantAdminTablesPage.vue");
@@ -192,6 +193,7 @@ class AuthLoginUiValidationTest {
         Path navPath = Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue");
 
         assertThat(tenantApiPath).exists();
+        assertThat(profilePagePath).exists();
         assertThat(staffPagePath).exists();
         assertThat(staffFormPath).exists();
         assertThat(tablesPagePath).exists();
@@ -203,6 +205,7 @@ class AuthLoginUiValidationTest {
             + Files.readString(storePath)
             + Files.readString(loginPagePath)
             + Files.readString(tenantApiPath)
+            + Files.readString(profilePagePath)
             + Files.readString(staffPagePath)
             + Files.readString(staffFormPath)
             + Files.readString(tablesPagePath)
@@ -213,6 +216,7 @@ class AuthLoginUiValidationTest {
         assertThat(source)
             .contains("tenantAdminHomeRoute")
             .contains("requiresTenantAdmin: true")
+            .contains("path: '/stores/:storeId/admin/profile'")
             .contains("path: '/stores/:storeId/admin/staff'")
             .contains("path: '/stores/:storeId/admin/staff/new'")
             .contains("path: '/stores/:storeId/admin/staff/:staffId/edit'")
@@ -221,18 +225,26 @@ class AuthLoginUiValidationTest {
             .contains("path: '/stores/:storeId/admin/tables/:tableId/edit'")
             .contains("path: '/stores/:storeId/admin/settings'")
             .contains("/api/v1/stores/")
+            .contains("`${baseEndpoint(storeId)}/profile`")
             .contains("/tenant-admin/staff")
             .contains("/tenant-admin/tables")
             .contains("/tenant-admin/settings")
+            .contains("getTenantProfile")
+            .contains("updateTenantProfile")
+            .contains("uploadTenantProfileLogo")
+            .contains("clearTenantProfileLogo")
             .contains("ErpPagination")
             .contains("ErpQueryToolbar")
             .contains("resetFilters")
+            .contains("租户资料")
             .contains("员工管理")
             .contains("桌号管理")
             .contains("基础设置")
             .contains("employeeNo")
             .contains("areaName")
             .contains("tableCode")
+            .contains("logoMediaUrl")
+            .contains("principalName")
             .contains("reservationHoldMinutes")
             .contains("退出登录")
             .contains("auth.defaultHomeRoute")

@@ -1,8 +1,12 @@
 package com.rpb.reservation.platform.api;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,6 +17,7 @@ import com.rpb.reservation.platform.application.PlatformTenantListResult;
 import com.rpb.reservation.platform.application.PlatformTenantPage;
 import com.rpb.reservation.platform.application.PlatformTenant;
 import com.rpb.reservation.platform.application.PlatformTenantService;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.walkin.auth.LocalAuthProperties;
 import com.rpb.reservation.walkin.auth.LocalRuntimeCurrentActorProvider;
 import com.rpb.reservation.walkin.auth.LocalRuntimeSecurityConfiguration;
@@ -25,9 +30,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
 @WebMvcTest(PlatformTenantController.class)
 @Import({
@@ -47,6 +55,7 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 class PlatformTenantLocalRuntimeSecurityTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000983");
+    private static final UUID LOGO_MEDIA_ASSET_ID = UUID.fromString("91000000-0000-0000-0000-000000000983");
 
     @Autowired
     private MockMvc mockMvc;
@@ -62,25 +71,56 @@ class PlatformTenantLocalRuntimeSecurityTest {
 
     @Test
     void localRuntimeAllowsPlatformTenantApiWhenConfiguredActorIsPlatformAdmin() throws Exception {
-        when(tenantService.listTenants(any())).thenReturn(new PlatformTenantListResult(List.of(new PlatformTenant(
-            TENANT_ID,
-            "20000000",
-            "食刻租户",
-            "active",
-            "zh-CN",
-            "021-393930",
-            "上海市徐汇区示例路 1 号",
-            "张店长",
-            null,
-            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
-            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
-            null
-        )), new PlatformTenantPage(20, 0, 1)));
+        when(tenantService.listTenants(any())).thenReturn(new PlatformTenantListResult(
+            List.of(tenant(null)),
+            new PlatformTenantPage(20, 0, 1)
+        ));
 
         mockMvc.perform(get("/api/v1/platform/tenants").param("includeDeleted", "true"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.tenants[0].tenantCode").value("20000000"));
+    }
+
+    @Test
+    void localRuntimeAllowsTenantLogoUploadWhenConfiguredActorIsPlatformAdmin() throws Exception {
+        when(tenantService.uploadTenantLogo(eq(TENANT_ID), any(MultipartFile.class), any()))
+            .thenReturn(tenant(LOGO_MEDIA_ASSET_ID));
+
+        mockMvc.perform(multipart("/api/v1/platform/tenants/{tenantId}/logo", TENANT_ID)
+                .file("file", new byte[] {
+                    (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                    0x00, 0x00, 0x00, 0x0d
+                }))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tenant.logoMediaUrl").value(
+                "/api/v1/platform/tenants/" + TENANT_ID + "/logo/media/" + LOGO_MEDIA_ASSET_ID
+            ));
+    }
+
+    @Test
+    void localRuntimeAllowsTenantLogoClearWhenConfiguredActorIsPlatformAdmin() throws Exception {
+        when(tenantService.clearTenantLogo(eq(TENANT_ID), any())).thenReturn(tenant(null));
+
+        mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/logo", TENANT_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tenant.logoMediaUrl").doesNotExist());
+    }
+
+    @Test
+    void localRuntimeAllowsTenantLogoMediaReadWhenConfiguredActorIsPlatformAdmin() throws Exception {
+        when(tenantService.readTenantLogoMedia(TENANT_ID, LOGO_MEDIA_ASSET_ID))
+            .thenReturn(new CallScreenMediaContent(new ByteArrayResource(new byte[] {1, 2, 3}), "image/png", 3));
+
+        mockMvc.perform(get(
+                "/api/v1/platform/tenants/{tenantId}/logo/media/{assetId}",
+                TENANT_ID,
+                LOGO_MEDIA_ASSET_ID
+            ))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_PNG));
     }
 
     @Test
@@ -104,5 +144,22 @@ class PlatformTenantLocalRuntimeSecurityTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    private static PlatformTenant tenant(UUID logoMediaAssetId) {
+        return new PlatformTenant(
+            TENANT_ID,
+            "20000000",
+            "食刻租户",
+            "active",
+            "zh-CN",
+            "021-393930",
+            "上海市徐汇区示例路 1 号",
+            "张店长",
+            logoMediaAssetId,
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            null
+        );
     }
 }

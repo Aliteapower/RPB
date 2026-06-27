@@ -12,10 +12,18 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 80MB
+      max-request-size: 90MB
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+
+server:
+  tomcat:
+    max-swallow-size: 100MB
 
 security:
   jwt:

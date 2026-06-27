@@ -1079,6 +1079,9 @@ onBeforeUnmount(() => {
 .tenant-logo-image {
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
   object-fit: contain;
   padding: 0.7rem;
 }

@@ -49,7 +49,8 @@ const newSocialLink = reactive({
   displayName: '',
   url: '',
   sortOrder: 1,
-  status: 'active' as 'active' | 'disabled'
+  status: 'active' as 'active' | 'disabled',
+  logoFile: null as File | null
 })
 
 onMounted(() => {
@@ -133,19 +134,27 @@ async function addSocialLink(): Promise<void> {
   saving.value = true
   errorText.value = ''
   try {
+    const existingIds = new Set(socialLinks.value.map((link) => link.id))
     const response = await createPlatformSocialLink({
       displayName: newSocialLink.displayName.trim(),
       url: newSocialLink.url.trim(),
       sortOrder: newSocialLink.sortOrder,
       status: newSocialLink.status
     })
+    let nextProfile = response.profile
+    const createdLink = nextProfile.socialLinks.find((link) => !existingIds.has(link.id))
+    if (newSocialLink.logoFile && createdLink) {
+      const uploadResponse = await uploadPlatformSocialLinkLogo(createdLink.id, newSocialLink.logoFile)
+      nextProfile = uploadResponse.profile
+    }
     Object.assign(newSocialLink, {
       displayName: '',
       url: '',
-      sortOrder: response.profile.socialLinks.length + 1,
-      status: 'active'
+      sortOrder: nextProfile.socialLinks.length + 1,
+      status: 'active',
+      logoFile: null
     })
-    applyProfile(response.profile)
+    applyProfile(nextProfile)
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -230,6 +239,11 @@ function handleProfileLogoChange(event: Event): void {
 function handleSocialLogoChange(row: EditableSocialLink, event: Event): void {
   const input = event.target as HTMLInputElement | null
   row.logoFile = input?.files?.[0] ?? null
+}
+
+function handleNewSocialLogoChange(event: Event): void {
+  const input = event.target as HTMLInputElement | null
+  newSocialLink.logoFile = input?.files?.[0] ?? null
 }
 
 function applyProfile(profile: PlatformProfile): void {
@@ -354,6 +368,9 @@ function apiErrorText(error: unknown): string {
           </div>
 
           <div class="social-create">
+            <div class="social-logo empty">
+              <span>社媒 LOGO</span>
+            </div>
             <input v-model.trim="newSocialLink.displayName" maxlength="80" placeholder="名称" />
             <input v-model.trim="newSocialLink.url" maxlength="240" placeholder="URL" />
             <input v-model.number="newSocialLink.sortOrder" type="number" min="1" aria-label="排序" />
@@ -361,10 +378,23 @@ function apiErrorText(error: unknown): string {
               <option value="active">启用</option>
               <option value="disabled">停用</option>
             </select>
+            <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="新增社媒 LOGO" @change="handleNewSocialLogoChange" />
             <button class="primary-button" type="button" :disabled="saving" @click="addSocialLink">新增</button>
           </div>
 
           <div class="social-list">
+            <div v-if="socialLinks.length" class="social-header" aria-hidden="true">
+              <span>LOGO</span>
+              <span>名称</span>
+              <span>URL</span>
+              <span>排序</span>
+              <span>状态</span>
+              <span>选择 LOGO</span>
+              <span>保存</span>
+              <span>上传</span>
+              <span>清空</span>
+              <span>删除</span>
+            </div>
             <article v-for="row in socialLinks" :key="row.id" class="social-row">
               <div class="social-logo" :class="{ empty: !row.logoMediaUrl }">
                 <img v-if="row.logoMediaUrl" :src="row.logoMediaUrl" :alt="`${row.displayName} 社媒 LOGO`" />
@@ -521,9 +551,23 @@ select {
 .social-create,
 .social-row {
   display: grid;
-  grid-template-columns: minmax(120px, 0.8fr) minmax(180px, 1.3fr) 84px 92px auto;
   gap: 8px;
   align-items: center;
+}
+
+.social-create {
+  grid-template-columns: auto minmax(120px, 0.8fr) minmax(180px, 1.3fr) 84px 92px minmax(150px, 0.9fr) auto;
+}
+
+.social-header {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 0.8fr) minmax(180px, 1.2fr) 76px 86px minmax(160px, 1fr) auto auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .social-row {

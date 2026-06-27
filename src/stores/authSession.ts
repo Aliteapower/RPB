@@ -20,7 +20,7 @@ export const useAuthSessionStore = defineStore('authSession', {
       state.user?.permissions.includes('tenant.admin.manage') === true,
     tenantAdminHomeRoute: state => {
       const storeId = state.user?.defaultStoreId || state.user?.storeIds[0] || localValidationStoreId
-      return `/stores/${storeId}/admin/staff`
+      return `/stores/${storeId}/admin/profile`
     },
     defaultStoreRoute: state => {
       const storeId = state.user?.defaultStoreId || state.user?.storeIds[0] || localValidationStoreId

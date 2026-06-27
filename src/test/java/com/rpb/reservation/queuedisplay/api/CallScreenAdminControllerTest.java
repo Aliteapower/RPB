@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,12 +28,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 class CallScreenAdminControllerTest {
     private static final String SETTINGS_ENDPOINT = "/api/v1/stores/{storeId}/tenant-admin/call-screen/settings";
     private static final String AD_SET_ENDPOINT = "/api/v1/stores/{storeId}/tenant-admin/call-screen/ad-sets/{adSetId}";
+    private static final String MEDIA_ENDPOINT = "/api/v1/stores/{storeId}/tenant-admin/call-screen/media";
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000975");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000975");
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000975");
@@ -139,6 +143,21 @@ class CallScreenAdminControllerTest {
         mockMvc.perform(get(SETTINGS_ENDPOINT, STORE_ID))
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.error.code").value("PERSISTENCE_ERROR"));
+    }
+
+    @Test
+    void mapsOversizedTenantMediaUploadToStableInvalidRequest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "intro.mp4",
+            "video/mp4",
+            new byte[] {0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70}
+        );
+        when(mediaService.uploadTenantMedia(any(), any())).thenThrow(new MaxUploadSizeExceededException(80L * 1024L * 1024L));
+
+        mockMvc.perform(multipart(MEDIA_ENDPOINT, STORE_ID).file(file))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
     }
 
     private static CallScreenSetting setting() {

@@ -2,6 +2,7 @@ package com.rpb.reservation.tenantadmin.application;
 
 public enum TenantAdminServiceErrorCode {
     REQUEST_INVALID,
+    TENANT_PROFILE_NOT_FOUND,
     STAFF_NOT_FOUND,
     TABLE_NOT_FOUND,
     STAFF_CODE_CONFLICT,

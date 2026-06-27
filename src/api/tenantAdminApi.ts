@@ -59,6 +59,28 @@ export interface TenantAdminSettings {
   expectedDiningMinutes: number
 }
 
+export interface TenantAdminProfile {
+  tenantId: string
+  tenantCode: string
+  displayName: string
+  status: string
+  defaultLocale: string | null
+  contactPhone: string | null
+  address: string | null
+  principalName: string | null
+  logoMediaUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TenantAdminProfileMutation {
+  displayName: string
+  defaultLocale?: string | null
+  contactPhone?: string | null
+  address?: string | null
+  principalName?: string | null
+}
+
 export interface TenantAdminListQuery {
   keyword?: string
   limit?: number
@@ -99,6 +121,11 @@ export interface TenantAdminTableImportResponse {
 export interface TenantAdminSettingsResponse {
   success: true
   settings: TenantAdminSettings
+}
+
+export interface TenantAdminProfileResponse {
+  success: true
+  profile: TenantAdminProfile
 }
 
 export interface TenantAdminApiErrorResponse {
@@ -244,6 +271,42 @@ export async function updateSettings(
   })
 }
 
+export async function getTenantProfile(
+  storeId: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminProfileResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/profile`, { method: 'GET', fetcher })
+}
+
+export async function updateTenantProfile(
+  storeId: string,
+  request: TenantAdminProfileMutation,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminProfileResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/profile`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function uploadTenantProfileLogo(
+  storeId: string,
+  file: File,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminProfileResponse> {
+  const form = new FormData()
+  form.append('file', file)
+  return requestForm(`${baseEndpoint(storeId)}/profile/logo`, form, fetcher)
+}
+
+export async function clearTenantProfileLogo(
+  storeId: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminProfileResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/profile/logo`, { method: 'DELETE', fetcher })
+}
+
 function baseEndpoint(storeId: string): string {
   return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin`
 }
@@ -269,7 +332,7 @@ function setNumberParam(params: URLSearchParams, key: string, value: number | un
 async function requestJson<T>(
   endpoint: string,
   options: {
-    method: 'GET' | 'POST' | 'PATCH'
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
     body?: unknown
     fetcher?: TenantAdminFetcher
   }
@@ -359,7 +422,7 @@ async function requestBlob(endpoint: string, fetcher?: TenantAdminFetcher): Prom
 async function sendRequest(
   endpoint: string,
   options: {
-    method: 'GET' | 'POST' | 'PATCH'
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
     body?: unknown
     fetcher?: TenantAdminFetcher
   }
@@ -395,7 +458,7 @@ function resolveFetch(): TenantAdminFetcher | undefined {
 function xhrRequest(
   endpoint: string,
   options: {
-    method: 'GET' | 'POST' | 'PATCH'
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
     headers: Record<string, string>
     body?: string
   }

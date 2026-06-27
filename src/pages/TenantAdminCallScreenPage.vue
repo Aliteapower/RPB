@@ -11,6 +11,7 @@ import {
   updateCallScreenSettings,
   uploadCallScreenMedia
 } from '../api/callScreenAdminApi'
+import { getTenantProfile } from '../api/tenantAdminApi'
 import CallScreenAdModeSwitch from '../components/call-screen/CallScreenAdModeSwitch.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
@@ -42,7 +43,15 @@ const errorText = ref('')
 const savedText = ref('')
 const previewSlideIndex = ref(0)
 const previewFullscreenOpen = ref(false)
+const previewLogoUrl = ref('')
+const previewLogoFailed = ref(false)
 let previewCarouselTimer: number | undefined
+
+const MAX_CALL_SCREEN_IMAGE_BYTES = 10 * 1024 * 1024
+const MAX_CALL_SCREEN_VIDEO_BYTES = 80 * 1024 * 1024
+const CALL_SCREEN_MEDIA_UPLOAD_HINT = '支持 JPG、PNG、WebP、MP4、WebM；图片不超过 10MB，视频不超过 80MB。'
+const CALL_SCREEN_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const CALL_SCREEN_VIDEO_TYPES = new Set(['video/mp4', 'video/webm'])
 
 const storeId = computed(() => String(route.params.storeId || ''))
 const adMode = computed<CallScreenAdMode>(() => normalizeAdMode(settings.value?.adMode))
@@ -63,6 +72,7 @@ const previewSlides = computed(() => {
 })
 const previewSlide = computed(() => previewSlides.value[previewSlideIndex.value] ?? previewSlides.value[0])
 const hasSelectableSets = computed(() => selectableAdSets.value.length > 0)
+const showPreviewLogoImage = computed(() => !!previewLogoUrl.value && !previewLogoFailed.value)
 
 onMounted(() => {
   void loadCallScreenConfig()
@@ -98,6 +108,7 @@ async function loadCallScreenConfig(): Promise<void> {
   loading.value = true
   errorText.value = ''
   savedText.value = ''
+  void loadPreviewLogo()
   try {
     const [settingsResult, setsResult] = await Promise.all([
       getCallScreenSettings(storeId.value),
@@ -115,6 +126,17 @@ async function loadCallScreenConfig(): Promise<void> {
     errorText.value = apiErrorText(error)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadPreviewLogo(): Promise<void> {
+  try {
+    const response = await getTenantProfile(storeId.value)
+    previewLogoUrl.value = response.profile.logoMediaUrl || ''
+    previewLogoFailed.value = false
+  } catch {
+    previewLogoUrl.value = ''
+    previewLogoFailed.value = true
   }
 }
 
@@ -184,6 +206,12 @@ async function uploadMediaSlide(event: Event): Promise<void> {
   if (!file || uploadingMedia.value) {
     return
   }
+  const validationError = validateMediaUploadFile(file)
+  if (validationError) {
+    errorText.value = validationError
+    savedText.value = ''
+    return
+  }
   uploadingMedia.value = true
   errorText.value = ''
   savedText.value = ''
@@ -217,7 +245,7 @@ async function uploadMediaSlide(event: Event): Promise<void> {
     selectedAdSetId.value = response.adSet.id
     editableAdSet.value = cloneAdSet(response.adSet)
   } catch (error) {
-    errorText.value = apiErrorText(error)
+    errorText.value = mediaUploadErrorText(error)
   } finally {
     uploadingMedia.value = false
   }
@@ -253,6 +281,10 @@ function showNextPreviewSlide(): void {
 function selectPreviewSlide(index: number): void {
   previewSlideIndex.value = index
   startPreviewCarousel()
+}
+
+function handlePreviewLogoError(): void {
+  previewLogoFailed.value = true
 }
 
 function openPreviewFullscreen(): void {
@@ -406,6 +438,16 @@ function isMediaSlide(slide: PreviewSlide | undefined): slide is CallScreenMedia
   return !!slide && 'mediaKind' in slide
 }
 
+function validateMediaUploadFile(file: File): string {
+  if (CALL_SCREEN_IMAGE_TYPES.has(file.type)) {
+    return file.size > MAX_CALL_SCREEN_IMAGE_BYTES ? '图片不能超过 10MB' : ''
+  }
+  if (CALL_SCREEN_VIDEO_TYPES.has(file.type)) {
+    return file.size > MAX_CALL_SCREEN_VIDEO_BYTES ? '视频不能超过 80MB' : ''
+  }
+  return '仅支持 JPG、PNG、WebP、MP4、WebM'
+}
+
 function normalizeAdMode(value: string | null | undefined): CallScreenAdMode {
   return value === 'media' || value === 'image' ? 'media' : 'text'
 }
@@ -438,6 +480,13 @@ function apiErrorText(error: unknown): string {
     return '配置已被其他操作更新，请重新加载后再保存'
   }
   return '操作失败'
+}
+
+function mediaUploadErrorText(error: unknown): string {
+  if (error instanceof CallScreenAdminApiError && error.response.error.code === 'REQUEST_INVALID') {
+    return '请检查媒体文件格式或大小，图片不超过 10MB，视频不超过 80MB'
+  }
+  return apiErrorText(error)
 }
 </script>
 
@@ -538,6 +587,9 @@ function apiErrorText(error: unknown): string {
           </p>
 
           <template v-else>
+            <p v-if="editableAdSet.adType === 'media'" class="media-upload-hint">
+              {{ CALL_SCREEN_MEDIA_UPLOAD_HINT }}
+            </p>
             <div class="ad-set-fields">
               <label>
                 <span>名称</span>
@@ -686,7 +738,16 @@ function apiErrorText(error: unknown): string {
               <h3 class="preview-media-title">{{ previewSlide.title || '媒体广告' }}</h3>
             </template>
             <template v-else>
-              <span class="preview-mark">食</span>
+              <span class="preview-mark">
+                <img
+                  v-if="showPreviewLogoImage"
+                  class="preview-logo-image"
+                  :src="previewLogoUrl"
+                  alt=""
+                  @error="handlePreviewLogoError"
+                />
+                <span v-else>食</span>
+              </span>
               <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
               <p class="preview-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
               <p class="preview-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
@@ -735,7 +796,16 @@ function apiErrorText(error: unknown): string {
               <h2 v-if="previewSlide.title">{{ previewSlide.title }}</h2>
             </template>
             <template v-else>
-              <span class="preview-mark preview-mark-large">食</span>
+              <span class="preview-mark preview-mark-large">
+                <img
+                  v-if="showPreviewLogoImage"
+                  class="preview-logo-image"
+                  :src="previewLogoUrl"
+                  alt=""
+                  @error="handlePreviewLogoError"
+                />
+                <span v-else>食</span>
+              </span>
               <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
               <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
               <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
@@ -882,6 +952,13 @@ function apiErrorText(error: unknown): string {
   color: #475569;
   background: #f8fafc;
   font-size: 13px;
+  font-weight: 700;
+}
+
+.media-upload-hint {
+  margin: -6px 0 0;
+  color: #64748b;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1145,11 +1222,27 @@ tr:last-child td {
   height: 48px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border: 1px solid rgba(251, 146, 60, 0.6);
   border-radius: 50%;
+  background: rgba(249, 115, 22, 0.14);
   color: #fed7aa;
   font-size: 20px;
   font-weight: 900;
+}
+
+.preview-logo-image {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 999px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.92);
+  object-fit: contain;
+}
+
+.preview-mark-large .preview-logo-image {
+  padding: 10px;
 }
 
 .preview-screen h3 {
