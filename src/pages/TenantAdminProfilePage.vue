@@ -11,8 +11,16 @@ import {
   type TenantAdminProfile,
   type TenantAdminProfileMutation
 } from '../api/tenantAdminApi'
+import {
+  getTenantAdminShareProfile,
+  updateTenantAdminShareProfile
+} from '../api/tenantAdminShareProfileApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import type {
+  TenantAdminShareProfile,
+  TenantAdminShareProfileMutation
+} from '../types/tenantAdminShareProfile'
 
 interface TenantProfileForm {
   tenantCode: string
@@ -23,6 +31,17 @@ interface TenantProfileForm {
   address: string
   principalName: string
   logoMediaUrl: string
+}
+
+interface TenantShareProfileForm {
+  storeDisplayName: string
+  shareDisplayName: string
+  shareAddress: string
+  googleMapUrl: string
+  shareContactPhone: string
+  reservationShareNote: string
+  reservationShareTemplate: string
+  usesDefaultReservationShareTemplate: boolean
 }
 
 const route = useRoute()
@@ -50,6 +69,17 @@ const form = reactive<TenantProfileForm>({
   logoMediaUrl: ''
 })
 
+const shareForm = reactive<TenantShareProfileForm>({
+  storeDisplayName: '',
+  shareDisplayName: '',
+  shareAddress: '',
+  googleMapUrl: '',
+  shareContactPhone: '',
+  reservationShareNote: '',
+  reservationShareTemplate: '',
+  usesDefaultReservationShareTemplate: true
+})
+
 onMounted(() => {
   void loadProfile()
 })
@@ -63,8 +93,12 @@ async function loadProfile(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   try {
-    const response = await getTenantProfile(storeId.value)
-    applyProfile(response.profile)
+    const [profileResponse, shareProfileResponse] = await Promise.all([
+      getTenantProfile(storeId.value),
+      getTenantAdminShareProfile(storeId.value)
+    ])
+    applyProfile(profileResponse.profile)
+    applyShareProfile(shareProfileResponse.shareProfile)
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -81,8 +115,12 @@ async function submitProfile(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   try {
-    const response = await updateTenantProfile(storeId.value, toPayload())
-    applyProfile(response.profile)
+    const [profileResponse, shareProfileResponse] = await Promise.all([
+      updateTenantProfile(storeId.value, toPayload()),
+      updateTenantAdminShareProfile(storeId.value, toSharePayload())
+    ])
+    applyProfile(profileResponse.profile)
+    applyShareProfile(shareProfileResponse.shareProfile)
     savedText.value = '已保存'
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -169,6 +207,19 @@ function applyProfile(profile: TenantAdminProfile): void {
   } satisfies TenantProfileForm)
 }
 
+function applyShareProfile(profile: TenantAdminShareProfile): void {
+  Object.assign(shareForm, {
+    storeDisplayName: profile.storeDisplayName,
+    shareDisplayName: profile.shareDisplayName,
+    shareAddress: profile.shareAddress,
+    googleMapUrl: profile.googleMapUrl,
+    shareContactPhone: profile.shareContactPhone,
+    reservationShareNote: profile.reservationShareNote,
+    reservationShareTemplate: profile.reservationShareTemplate,
+    usesDefaultReservationShareTemplate: profile.usesDefaultReservationShareTemplate
+  } satisfies TenantShareProfileForm)
+}
+
 function toPayload(): TenantAdminProfileMutation {
   return {
     displayName: form.displayName.trim(),
@@ -176,6 +227,19 @@ function toPayload(): TenantAdminProfileMutation {
     contactPhone: optionalValue(String(form.contactPhone || '')),
     address: optionalValue(String(form.address || '')),
     principalName: optionalValue(String(form.principalName || ''))
+  }
+}
+
+function toSharePayload(): TenantAdminShareProfileMutation {
+  return {
+    shareDisplayName: optionalValue(shareForm.shareDisplayName),
+    shareAddress: optionalValue(shareForm.shareAddress),
+    googleMapUrl: optionalValue(shareForm.googleMapUrl),
+    shareContactPhone: optionalValue(shareForm.shareContactPhone),
+    reservationShareNote: optionalValue(shareForm.reservationShareNote),
+    reservationShareTemplate: shareForm.usesDefaultReservationShareTemplate
+      ? null
+      : optionalValue(shareForm.reservationShareTemplate)
   }
 }
 
@@ -266,8 +330,41 @@ function apiErrorText(error: unknown): string {
               <input v-model.trim="form.contactPhone" />
             </label>
             <label class="wide-field">
-              <span>地址</span>
+              <span>租户地址</span>
               <input v-model.trim="form.address" />
+            </label>
+          </div>
+        </section>
+
+        <section class="section-panel">
+          <div class="section-heading">
+            <h2>门店分享资料</h2>
+          </div>
+
+          <div class="field-grid">
+            <label>
+              <span>后台店名</span>
+              <input v-model.trim="shareForm.storeDisplayName" readonly />
+            </label>
+            <label>
+              <span>分享显示名称</span>
+              <input v-model.trim="shareForm.shareDisplayName" />
+            </label>
+            <label>
+              <span>联系电话</span>
+              <input v-model.trim="shareForm.shareContactPhone" />
+            </label>
+            <label>
+              <span>Google Map 链接</span>
+              <input v-model.trim="shareForm.googleMapUrl" />
+            </label>
+            <label class="wide-field">
+              <span>分享地址</span>
+              <input v-model.trim="shareForm.shareAddress" />
+            </label>
+            <label class="wide-field">
+              <span>到店提示</span>
+              <input v-model.trim="shareForm.reservationShareNote" />
             </label>
           </div>
         </section>

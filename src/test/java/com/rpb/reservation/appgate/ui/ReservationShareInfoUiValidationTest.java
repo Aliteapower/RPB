@@ -12,6 +12,7 @@ class ReservationShareInfoUiValidationTest {
     void tenantAdminRouteAndWorkbenchUseBackendGeneratedManualCopyShareText() throws Exception {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue");
+        Path profilePagePath = Path.of("src", "pages", "TenantAdminProfilePage.vue");
         Path adminPagePath = Path.of("src", "pages", "TenantAdminReservationSharePage.vue");
         Path createDialogPath = Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue");
         Path todayItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
@@ -24,6 +25,7 @@ class ReservationShareInfoUiValidationTest {
 
         String routerSource = Files.readString(routerPath);
         String navSource = Files.readString(navPath);
+        String profilePageSource = Files.readString(profilePagePath);
         String adminPageSource = Files.readString(adminPagePath);
         String createDialogSource = Files.readString(createDialogPath);
         String todayItemSource = Files.readString(todayItemPath);
@@ -37,6 +39,15 @@ class ReservationShareInfoUiValidationTest {
         assertThat(navSource)
             .contains("/stores/${storeId}/admin/share-template")
             .contains("订位分享");
+        assertThat(profilePageSource)
+            .contains("getTenantAdminShareProfile")
+            .contains("updateTenantAdminShareProfile")
+            .contains("门店分享资料")
+            .contains("分享地址")
+            .contains("Google Map 链接")
+            .contains("shareAddress")
+            .contains("googleMapUrl")
+            .contains("usesDefaultReservationShareTemplate");
         assertThat(adminPageSource)
             .contains("getTenantAdminShareProfile")
             .contains("updateTenantAdminShareProfile")
