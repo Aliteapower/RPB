@@ -361,10 +361,13 @@ class CleaningControllerTest {
                 "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
                 "src/main/java/com/rpb/reservation/auth/api/AuthController.java",
                 "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java",
+                "src/main/java/com/rpb/reservation/platform/api/PlatformProfileController.java",
                 "src/main/java/com/rpb/reservation/platform/api/PlatformTenantController.java",
                 "src/main/java/com/rpb/reservation/platformbilling/api/PlatformProductLineController.java",
                 "src/main/java/com/rpb/reservation/platformbilling/api/PlatformTenantProductSubscriptionController.java",
-                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminController.java"
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationShareInfoController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminShareProfileController.java"
             );
         assertThat(sourceFiles)
             .noneMatch(CleaningControllerTest::isForbiddenQueueApiFile);
@@ -381,16 +384,21 @@ class CleaningControllerTest {
         assertThat(vueFiles)
             .containsExactlyInAnyOrder(
                 "src/App.vue",
+                "src/components/call-screen/CallScreenAdModeSwitch.vue",
                 "src/components/DateTimeWheelPicker.vue",
                 "src/components/erp/ErpPagination.vue",
                 "src/components/erp/ErpQueryToolbar.vue",
                 "src/components/platform/PlatformAdminNav.vue",
                 "src/components/platform/PlatformTenantForm.vue",
                 "src/components/platform/PlatformTenantTable.vue",
+                "src/components/platform/product-line/PlatformProductLineDrawer.vue",
+                "src/components/platform/product-line/PlatformProductLineList.vue",
+                "src/components/platform/product-line/PlatformProductLinePriceForm.vue",
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
                 "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
                 "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
@@ -408,6 +416,7 @@ class CleaningControllerTest {
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/LoginPage.vue",
                 "src/pages/PlatformCallScreenSeedPage.vue",
+                "src/pages/PlatformProfilePage.vue",
                 "src/pages/PlatformProductLinesPage.vue",
                 "src/pages/PlatformTenantBillingPage.vue",
                 "src/pages/PlatformTenantFormPage.vue",
@@ -423,6 +432,8 @@ class CleaningControllerTest {
                 "src/pages/StoreStaffHomePage.vue",
                 "src/pages/TableResourceListPage.vue",
                 "src/pages/TenantAdminCallScreenPage.vue",
+                "src/pages/TenantAdminProfilePage.vue",
+                "src/pages/TenantAdminReservationSharePage.vue",
                 "src/pages/TenantAdminSettingsPage.vue",
                 "src/pages/TenantAdminStaffFormPage.vue",
                 "src/pages/TenantAdminStaffPage.vue",
@@ -446,10 +457,12 @@ class CleaningControllerTest {
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
                 "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
                 "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
                 "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
-                "src/pages/SeatingFromCalledQueuePage.vue"
+                "src/pages/SeatingFromCalledQueuePage.vue",
+                "src/pages/TenantAdminReservationSharePage.vue"
             ).contains(path))
             .noneMatch(CleaningControllerTest::isForbiddenUiFile);
     }

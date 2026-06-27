@@ -11,6 +11,7 @@ public enum TenantAdminApiErrorCode {
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.staff_not_found"),
     TABLE_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.table_not_found"),
     MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.media_not_found"),
+    TEMPLATE_UNKNOWN_VARIABLE(HttpStatus.BAD_REQUEST, "tenant.admin.template_unknown_variable"),
     STAFF_CODE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.staff_code_conflict"),
     TABLE_CODE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.table_code_conflict"),
     TABLE_IN_USE(HttpStatus.CONFLICT, "tenant.admin.table_in_use"),

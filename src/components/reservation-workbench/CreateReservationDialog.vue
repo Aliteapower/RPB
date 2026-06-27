@@ -2,16 +2,22 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 import { createReservation, ReservationCreateApiError } from '../../api/reservationCreateApi'
+import {
+  getReservationShareInfo,
+  ReservationShareInfoApiError
+} from '../../api/reservationShareInfoApi'
 import { fetchTableResources, TableResourceApiError } from '../../api/tableResourceApi'
 import {
   saveTemporaryTableGroup,
   TemporaryTableGroupApiError
 } from '../../api/temporaryTableGroupApi'
+import { copyPlainText } from '../../utils/plainTextClipboard'
 import { formatReservationCreateErrorMessage } from '../../utils/reservationCreateMessages'
 import StaffGuestContactLookup from '../staff/StaffGuestContactLookup.vue'
 import StaffTimeWheelPicker from '../staff/StaffTimeWheelPicker.vue'
 import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../staff/staffGuestContact'
 import TableResourcePicker from '../staff-table/TableResourcePicker.vue'
+import ReservationShareCopyPanel from './ReservationShareCopyPanel.vue'
 import {
   defaultFutureReservationDateTime,
   isReservationStartInPast
@@ -21,6 +27,7 @@ import type {
   CreateReservationResponse,
   ReservationApiErrorResponse
 } from '../../types/reservation'
+import type { ReservationShareInfo } from '../../types/reservationShareInfo'
 import type {
   TableResourceApiErrorResponse,
   TableResourceItem
@@ -68,6 +75,12 @@ const isLoadingTableResources = ref(false)
 const tableResourceApiError = ref<TableResourceApiErrorResponse | null>(null)
 const isTablePickerOpen = ref(false)
 const tablePickerSelectionMode = ref<TablePickerSelectionMode>('single')
+const createdReservation = ref<CreateReservationResponse | null>(null)
+const createdShareInfo = ref<ReservationShareInfo | null>(null)
+const isLoadingCreatedShare = ref(false)
+const createdShareErrorText = ref('')
+const createdShareCopied = ref(false)
+const createdShareFallbackText = ref('')
 let tableResourceLoadSequence = 0
 
 const canSubmit = computed(
@@ -75,6 +88,7 @@ const canSubmit = computed(
     props.open &&
     !!props.storeId &&
     !isSubmitting.value &&
+    !createdReservation.value &&
     !!form.businessDate &&
     !!form.time &&
     !isBeforeMinDate(form.businessDate) &&
@@ -133,11 +147,13 @@ watch(
   open => {
     if (open) {
       apiError.value = null
+      clearCreatedReservationShareState()
       applyDefaultFutureDateTime(props.selectedDate)
     } else {
       isTablePickerOpen.value = false
       clearTemporaryGroupDraft()
       tablePickerSelectionMode.value = 'single'
+      clearCreatedReservationShareState()
     }
   },
   { immediate: true }
@@ -187,8 +203,9 @@ async function submit(): Promise<void> {
   try {
     const result = await createReservation(props.storeId, toRequest(), createIdempotencyKey())
     emit('created', result)
-    emit('update:open', false)
+    createdReservation.value = result
     resetAfterSuccess()
+    await loadCreatedShareInfo(result.reservationId)
   } catch (error) {
     apiError.value =
       error instanceof ReservationCreateApiError
@@ -200,9 +217,15 @@ async function submit(): Promise<void> {
 }
 
 function close(): void {
-  if (!isSubmitting.value) {
+  if (!isSubmitting.value && !isLoadingCreatedShare.value) {
     emit('update:open', false)
+    clearCreatedReservationShareState()
   }
+}
+
+function finishCreatedReservationFlow(): void {
+  emit('update:open', false)
+  clearCreatedReservationShareState()
 }
 
 function validateForm(): ReservationApiErrorResponse | null {
@@ -487,6 +510,63 @@ function createTemporaryGroupLocalError(
   }
 }
 
+async function loadCreatedShareInfo(reservationId: string): Promise<void> {
+  if (!props.storeId || !reservationId) {
+    return
+  }
+
+  isLoadingCreatedShare.value = true
+  createdShareErrorText.value = ''
+  createdShareCopied.value = false
+  createdShareFallbackText.value = ''
+
+  try {
+    const response = await getReservationShareInfo(props.storeId, reservationId)
+    createdShareInfo.value = response.shareInfo
+  } catch (error) {
+    createdShareInfo.value = null
+    createdShareErrorText.value =
+      error instanceof ReservationShareInfoApiError
+        ? '订位信息读取失败'
+        : '订位信息读取失败'
+  } finally {
+    isLoadingCreatedShare.value = false
+  }
+}
+
+async function copyCreatedShareText(): Promise<void> {
+  if (!createdShareInfo.value && createdReservation.value) {
+    await loadCreatedShareInfo(createdReservation.value.reservationId)
+  }
+
+  const text = createdShareInfo.value?.shareText ?? ''
+  if (!text) {
+    createdShareErrorText.value = '暂无可复制内容'
+    return
+  }
+
+  createdShareErrorText.value = ''
+  createdShareCopied.value = false
+  createdShareFallbackText.value = ''
+
+  if (await copyPlainText(text)) {
+    createdShareCopied.value = true
+    return
+  }
+
+  createdShareFallbackText.value = text
+  createdShareErrorText.value = '当前浏览器限制自动复制，请手动复制下方文本'
+}
+
+function clearCreatedReservationShareState(): void {
+  createdReservation.value = null
+  createdShareInfo.value = null
+  isLoadingCreatedShare.value = false
+  createdShareErrorText.value = ''
+  createdShareCopied.value = false
+  createdShareFallbackText.value = ''
+}
+
 function resetAfterSuccess(): void {
   form.customerId = ''
   form.customerName = ''
@@ -524,11 +604,40 @@ function isBeforeMinDate(value: string): boolean {
       <form class="reservation-create-dialog__panel" @submit.prevent="submit">
         <header>
           <h2>新增预约</h2>
-          <button type="button" aria-label="关闭新增预约" :disabled="isSubmitting" @click="close">
+          <button
+            type="button"
+            aria-label="关闭新增预约"
+            :disabled="isSubmitting || isLoadingCreatedShare"
+            @click="close"
+          >
             ×
           </button>
         </header>
 
+        <section v-if="createdReservation" class="reservation-create-dialog__success" aria-live="polite">
+          <div>
+            <strong>预约已创建</strong>
+            <span>{{ createdReservation.reservationCode }} · {{ createdReservation.partySize }}人</span>
+          </div>
+
+          <ReservationShareCopyPanel
+            :share-info="createdShareInfo"
+            :loading="isLoadingCreatedShare"
+            :copied="createdShareCopied"
+            :error-text="createdShareErrorText"
+            :fallback-text="createdShareFallbackText"
+            button-text="复制订位信息"
+            @copy-requested="copyCreatedShareText"
+          />
+
+          <footer>
+            <button class="reservation-create-dialog__save" type="button" @click="finishCreatedReservationFlow">
+              完成
+            </button>
+          </footer>
+        </section>
+
+        <template v-else>
         <StaffGuestContactLookup
           :store-id="storeId"
           v-model:customer-id="form.customerId"
@@ -681,6 +790,7 @@ function isBeforeMinDate(value: string): boolean {
             取消
           </button>
         </footer>
+        </template>
       </form>
     </section>
   </Teleport>
@@ -785,6 +895,32 @@ function isBeforeMinDate(value: string): boolean {
   font-size: 0.82rem;
   font-weight: 800;
   padding: 9px 11px;
+}
+
+.reservation-create-dialog__success {
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.reservation-create-dialog__success > div {
+  display: grid;
+  gap: 4px;
+}
+
+.reservation-create-dialog__success strong {
+  color: #166534;
+  font-size: 0.96rem;
+  font-weight: 950;
+}
+
+.reservation-create-dialog__success span {
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
 }
 
 .reservation-create-dialog__hint {

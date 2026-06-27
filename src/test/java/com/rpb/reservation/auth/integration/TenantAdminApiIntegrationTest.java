@@ -192,6 +192,89 @@ class TenantAdminApiIntegrationTest {
     }
 
     @Test
+    void tenantAdminMaintainsReservationShareProfileAndRejectsUnknownTemplateVariable() throws Exception {
+        Cookie session = login("20000000");
+
+        mockMvc.perform(get(basePath() + "/share-profile").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.shareProfile.storeDisplayName").isNotEmpty())
+            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{storeName}}")))
+            .andExpect(jsonPath("$.shareProfile.defaultReservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{reservationNo}}")))
+            .andExpect(jsonPath("$.shareProfile.availableVariables[0]").exists());
+
+        mockMvc.perform(patch(basePath() + "/share-profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shareDisplayName":"食刻订位中心",
+                      "shareAddress":"上海市徐汇区示例路 1 号",
+                      "googleMapUrl":"https://maps.app.goo.gl/rpb",
+                      "shareContactPhone":"021-393930",
+                      "reservationShareNote":"请提前 10 分钟到店",
+                      "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.shareProfile.shareDisplayName").value("食刻订位中心"))
+            .andExpect(jsonPath("$.shareProfile.shareAddress").value("上海市徐汇区示例路 1 号"))
+            .andExpect(jsonPath("$.shareProfile.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
+            .andExpect(jsonPath("$.shareProfile.shareContactPhone").value("021-393930"))
+            .andExpect(jsonPath("$.shareProfile.reservationShareNote").value("请提前 10 分钟到店"))
+            .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(false));
+
+        mockMvc.perform(post(basePath() + "/share-profile/preview")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shareDisplayName":"食刻订位中心",
+                      "shareAddress":"上海市徐汇区示例路 1 号",
+                      "googleMapUrl":"https://maps.app.goo.gl/rpb",
+                      "shareContactPhone":"021-393930",
+                      "reservationShareNote":"请提前 10 分钟到店",
+                      "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("门店：食刻订位中心")))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("地图：https://maps.app.goo.gl/rpb")));
+
+        mockMvc.perform(patch(basePath() + "/share-profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reservationShareTemplate":"{{unsupportedVariable}}"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("TEMPLATE_UNKNOWN_VARIABLE"));
+
+        mockMvc.perform(post(basePath() + "/share-profile/default-template").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(true))
+            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{storeName}}")));
+
+        assertThat(countWhere("""
+            select count(*)
+            from stores
+            where id = ?
+              and tenant_id = ?
+              and share_display_name = '食刻订位中心'
+              and share_address = '上海市徐汇区示例路 1 号'
+              and google_map_url = 'https://maps.app.goo.gl/rpb'
+              and share_contact_phone = '021-393930'
+              and reservation_share_note = '请提前 10 分钟到店'
+              and reservation_share_template is null
+            """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
     void tenantAdminMaintainsOwnTenantProfileAndLogo() throws Exception {
         Cookie session = login("20000000");
 

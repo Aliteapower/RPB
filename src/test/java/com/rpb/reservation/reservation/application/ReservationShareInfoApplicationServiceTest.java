@@ -1,0 +1,212 @@
+package com.rpb.reservation.reservation.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoReadPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoRow;
+import com.rpb.reservation.reservation.application.query.ReservationShareInfoQuery;
+import com.rpb.reservation.reservation.application.service.PhoneMaskingPolicy;
+import com.rpb.reservation.reservation.application.service.ReservationShareInfoApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateRenderer;
+import com.rpb.reservation.reservation.application.service.StoreShareDateTimeFormatter;
+import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
+import com.rpb.reservation.store.domain.Store;
+import com.rpb.reservation.store.domain.StorePolicy;
+import com.rpb.reservation.store.value.StoreId;
+import com.rpb.reservation.tenant.value.TenantId;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+class ReservationShareInfoApplicationServiceTest {
+    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000001101");
+    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000001101");
+    private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000001101");
+    private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000001101");
+
+    @Test
+    void rendersCustomShareInfoUsingStoreProfileReservationCustomerAndMaskedPhone() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = row("""
+            门店：{{storeName}}
+            编号：{{reservationNo}}
+            时间：{{reservationDate}} {{reservationTime}}
+            人数：{{partySize}}
+            联系人：{{contactName}}
+            电话：{{maskedPhone}}
+            地址：{{storeAddress}}
+            地图：{{googleMapUrl}}
+            提示：{{arrivalNote}}
+            门店电话：{{storePhone}}
+            """);
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query());
+
+        assertThat(result.success()).isTrue();
+        ReservationShareInfo shareInfo = result.shareInfo();
+        assertThat(shareInfo.reservationId()).isEqualTo(RESERVATION_ID);
+        assertThat(shareInfo.reservationNo()).isEqualTo("R-20300620-0007");
+        assertThat(shareInfo.channel()).isEqualTo("manual_copy");
+        assertThat(shareInfo.customerMaskedPhone()).isEqualTo("****4567");
+        assertThat(shareInfo.customerPhoneAvailable()).isTrue();
+        assertThat(shareInfo.canOpenWhatsAppLink()).isFalse();
+        assertThat(shareInfo.whatsappLink()).isNull();
+        assertThat(shareInfo.shareText())
+            .contains("门店：食刻订位中心")
+            .contains("编号：R-20300620-0007")
+            .contains("时间：20-06-2030 11:30")
+            .contains("人数：4")
+            .contains("联系人：Ada Guest")
+            .contains("电话：****4567")
+            .contains("地址：1 Example Road")
+            .contains("地图：https://maps.app.goo.gl/rpb")
+            .contains("提示：请提前 10 分钟到店")
+            .contains("门店电话：6333 1234");
+    }
+
+    @Test
+    void fallsBackToDefaultTemplateWhenStoredTemplateContainsUnknownVariable() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = row("门店：{{storeName}}\n未知：{{unsupportedVariable}}");
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.shareInfo().shareText())
+            .contains("【订位确认】")
+            .contains("预约编号：R-20300620-0007")
+            .doesNotContain("unsupportedVariable");
+    }
+
+    @Test
+    void emptyCustomerPhoneReturnsEmptyMaskedPhoneAndUnavailableFlag() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = rowWithoutPhone();
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.shareInfo().customerMaskedPhone()).isEmpty();
+        assertThat(result.shareInfo().customerPhoneAvailable()).isFalse();
+        assertThat(result.shareInfo().shareText()).doesNotContain("null");
+    }
+
+    @Test
+    void returnsReservationNotFoundInsideRequestedTenantStoreScope() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = null;
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationShareInfoError.RESERVATION_NOT_FOUND);
+    }
+
+    private static ReservationShareInfoQuery query() {
+        return new ReservationShareInfoQuery(TENANT_ID, STORE_ID, RESERVATION_ID, ACTOR_ID, "staff");
+    }
+
+    private static ReservationShareInfoRow row(String template) {
+        return new ReservationShareInfoRow(
+            RESERVATION_ID,
+            "R-20300620-0007",
+            4,
+            Instant.parse("2030-06-20T03:30:00Z"),
+            "Ada Guest",
+            "VIP",
+            "+6591234567",
+            "Reservation Integration Store",
+            "Asia/Singapore",
+            "食刻订位中心",
+            "1 Example Road",
+            "https://maps.app.goo.gl/rpb",
+            "6333 1234",
+            "请提前 10 分钟到店",
+            template
+        );
+    }
+
+    private static ReservationShareInfoRow rowWithoutPhone() {
+        return new ReservationShareInfoRow(
+            RESERVATION_ID,
+            "R-20300620-0007",
+            2,
+            Instant.parse("2030-06-20T03:30:00Z"),
+            "No Phone Guest",
+            null,
+            null,
+            "Reservation Integration Store",
+            "Asia/Singapore",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
+    private static final class Scenario {
+        private final StoreScope scope = new StoreScope(new TenantId(TENANT_ID), new StoreId(STORE_ID));
+        private final FakeStoreRepository storeRepository = new FakeStoreRepository(scope);
+        private final FakeReservationShareInfoReadPort readPort = new FakeReservationShareInfoReadPort();
+        private final ReservationShareInfoApplicationService service = new ReservationShareInfoApplicationService(
+            storeRepository,
+            readPort,
+            new ReservationShareTemplateRenderer(),
+            new PhoneMaskingPolicy(),
+            new StoreShareDateTimeFormatter()
+        );
+
+        private static Scenario ready() {
+            Scenario scenario = new Scenario();
+            scenario.readPort.row = row(null);
+            return scenario;
+        }
+    }
+
+    private static final class FakeStoreRepository implements StoreRepositoryPort {
+        private final StoreScope scope;
+        private final Store store;
+
+        private FakeStoreRepository(StoreScope scope) {
+            this.scope = scope;
+            this.store = new Store(scope.storeId(), scope.tenantId(), "STORE-1", "Asia/Singapore", "en-SG", "active");
+        }
+
+        @Override
+        public Optional<Store> findById(StoreScope requestedScope) {
+            return scope.equals(requestedScope) ? Optional.of(store) : Optional.empty();
+        }
+
+        @Override
+        public Optional<StorePolicy> findCurrentPolicy(StoreScope scope, OffsetDateTime at) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Store save(StoreScope scope, Store store) {
+            return store;
+        }
+
+        @Override
+        public StorePolicy savePolicy(StoreScope scope, StorePolicy policy) {
+            return policy;
+        }
+    }
+
+    private static final class FakeReservationShareInfoReadPort implements ReservationShareInfoReadPort {
+        private ReservationShareInfoRow row;
+
+        @Override
+        public Optional<ReservationShareInfoRow> findByReservationId(StoreScope scope, UUID reservationId) {
+            if (!scope.storeId().value().equals(STORE_ID) || !reservationId.equals(RESERVATION_ID)) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(row);
+        }
+    }
+}

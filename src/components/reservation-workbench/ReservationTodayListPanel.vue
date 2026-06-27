@@ -312,6 +312,7 @@ function createLocalStatusActionError(
         :is-no-showing="noShowingReservationId === item.reservationId"
         :is-seating="seatingReservationId === item.reservationId"
         :item="item"
+        :store-id="storeId"
         :store-timezone="storeTimezone"
         @cancel-requested="handleCancelRequested"
         @check-in-requested="handleCheckInRequested"

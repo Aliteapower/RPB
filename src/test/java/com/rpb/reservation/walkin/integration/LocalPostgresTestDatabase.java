@@ -180,10 +180,24 @@ final class LocalPostgresTestDatabase implements AutoCloseable {
     }
 
     private static void deleteOne(Path path) {
+        IOException lastException = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                Files.deleteIfExists(path);
+                return;
+            } catch (IOException exception) {
+                lastException = exception;
+                sleepBeforeDeleteRetry();
+            }
+        }
+        throw new IllegalStateException("delete_path_failed: " + path, lastException);
+    }
+
+    private static void sleepBeforeDeleteRetry() {
         try {
-            Files.deleteIfExists(path);
-        } catch (IOException exception) {
-            throw new IllegalStateException("delete_path_failed: " + path, exception);
+            Thread.sleep(100L);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
         }
     }
 }

@@ -4,8 +4,6 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
-import com.rpb.reservation.store.value.StoreId;
-import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.tenantadmin.application.TenantAdminProfileCommand;
 import com.rpb.reservation.tenantadmin.application.TenantAdminProfileService;
 import com.rpb.reservation.tenantadmin.application.TenantAdminSearchCommand;
@@ -17,8 +15,6 @@ import com.rpb.reservation.tenantadmin.application.TenantAdminStaffMutationComma
 import com.rpb.reservation.tenantadmin.application.TenantAdminStaffService;
 import com.rpb.reservation.tenantadmin.application.TenantAdminTableMutationCommand;
 import com.rpb.reservation.tenantadmin.application.TenantAdminTableService;
-import com.rpb.reservation.walkin.api.CurrentActor;
-import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.core.io.Resource;
@@ -41,28 +37,26 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/tenant-admin")
 public class TenantAdminController {
-    private static final String TENANT_ADMIN = "tenant_admin";
-    private static final String TENANT_ADMIN_MANAGE = "tenant.admin.manage";
     private static final String EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final TenantAdminStaffService staffService;
     private final TenantAdminTableService tableService;
     private final TenantAdminSettingsService settingsService;
     private final TenantAdminProfileService profileService;
-    private final CurrentActorProvider currentActorProvider;
+    private final TenantAdminScopeResolver scopeResolver;
 
     public TenantAdminController(
         TenantAdminStaffService staffService,
         TenantAdminTableService tableService,
         TenantAdminSettingsService settingsService,
         TenantAdminProfileService profileService,
-        CurrentActorProvider currentActorProvider
+        TenantAdminScopeResolver scopeResolver
     ) {
         this.staffService = staffService;
         this.tableService = tableService;
         this.settingsService = settingsService;
         this.profileService = profileService;
-        this.currentActorProvider = currentActorProvider;
+        this.scopeResolver = scopeResolver;
     }
 
     @GetMapping("/profile")
@@ -256,15 +250,7 @@ public class TenantAdminController {
     }
 
     private StoreScope requireTenantAdminScope(UUID storeId) {
-        CurrentActor actor = currentActorProvider.currentActor()
-            .orElseThrow(() -> new TenantAdminApiException(TenantAdminApiErrorCode.UNAUTHENTICATED));
-        if (!actor.roles().contains(TENANT_ADMIN) || !actor.hasPermission(TENANT_ADMIN_MANAGE)) {
-            throw new TenantAdminApiException(TenantAdminApiErrorCode.FORBIDDEN);
-        }
-        if (actor.tenantId() == null || !actor.storeIds().contains(storeId)) {
-            throw new TenantAdminApiException(TenantAdminApiErrorCode.STORE_SCOPE_MISMATCH);
-        }
-        return new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
+        return scopeResolver.requireTenantAdminScope(storeId);
     }
 
     private static ResponseEntity<TenantAdminApiErrorResponse> apiError(TenantAdminApiErrorCode code) {

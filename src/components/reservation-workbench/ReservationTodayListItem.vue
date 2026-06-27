@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
+import {
+  getReservationShareInfo,
+  ReservationShareInfoApiError
+} from '../../api/reservationShareInfoApi'
+import { copyPlainText } from '../../utils/plainTextClipboard'
 import type { ReservationTodayViewItem } from '../../types/reservationTodayView'
+import type { ReservationShareInfo } from '../../types/reservationShareInfo'
+import ReservationShareCopyPanel from './ReservationShareCopyPanel.vue'
 
 const cancellableStatuses = new Set(['draft', 'confirmed'])
 const noShowableStatuses = new Set(['confirmed'])
@@ -35,6 +42,7 @@ const props = defineProps<{
   isCheckingIn?: boolean
   isNoShowing?: boolean
   isSeating?: boolean
+  storeId: string
   storeTimezone: string
 }>()
 
@@ -105,6 +113,11 @@ const queueAssignmentText = computed(() => {
 
   return `${numberText} · ${statusText}`
 })
+const shareInfo = ref<ReservationShareInfo | null>(null)
+const isLoadingShareInfo = ref(false)
+const shareInfoErrorText = ref('')
+const shareInfoCopied = ref(false)
+const shareInfoFallbackText = ref('')
 
 function requestCancel(): void {
   emit('cancel-requested', props.item)
@@ -132,6 +145,54 @@ function requestSeat(): void {
   }
 
   emit('seat-requested', props.item)
+}
+
+async function copyReservationShareInfo(): Promise<void> {
+  if (!shareInfo.value) {
+    await loadReservationShareInfo()
+  }
+
+  const text = shareInfo.value?.shareText ?? ''
+  if (!text) {
+    shareInfoErrorText.value = '暂无可复制内容'
+    return
+  }
+
+  shareInfoErrorText.value = ''
+  shareInfoCopied.value = false
+  shareInfoFallbackText.value = ''
+
+  if (await copyPlainText(text)) {
+    shareInfoCopied.value = true
+    return
+  }
+
+  shareInfoFallbackText.value = text
+  shareInfoErrorText.value = '当前浏览器限制自动复制，请手动复制下方文本'
+}
+
+async function loadReservationShareInfo(): Promise<void> {
+  if (!props.storeId || isLoadingShareInfo.value) {
+    return
+  }
+
+  isLoadingShareInfo.value = true
+  shareInfoErrorText.value = ''
+  shareInfoCopied.value = false
+  shareInfoFallbackText.value = ''
+
+  try {
+    const response = await getReservationShareInfo(props.storeId, props.item.reservationId)
+    shareInfo.value = response.shareInfo
+  } catch (error) {
+    shareInfo.value = null
+    shareInfoErrorText.value =
+      error instanceof ReservationShareInfoApiError
+        ? '订位信息读取失败'
+        : '订位信息读取失败'
+  } finally {
+    isLoadingShareInfo.value = false
+  }
 }
 
 function formatStoreTime(value: string): string {
@@ -193,6 +254,16 @@ function resourceLabel(type: string | null | undefined): string {
       <span class="reservation-today-list-item__status" :class="statusClass">
         {{ statusText }}
       </span>
+
+      <ReservationShareCopyPanel
+        :share-info="shareInfo"
+        :loading="isLoadingShareInfo"
+        :copied="shareInfoCopied"
+        :error-text="shareInfoErrorText"
+        :fallback-text="shareInfoFallbackText"
+        button-text="复制订位信息"
+        @copy-requested="copyReservationShareInfo"
+      />
 
       <button
         v-if="showCheckIn"
@@ -299,6 +370,14 @@ function resourceLabel(type: string | null | undefined): string {
   gap: 6px;
   justify-content: flex-end;
   max-width: 214px;
+}
+
+.reservation-today-list-item__actions :deep(.reservation-share-copy) {
+  max-width: 190px;
+}
+
+.reservation-today-list-item__actions :deep(.reservation-share-copy__fallback) {
+  width: 190px;
 }
 
 .reservation-today-list-item__status,

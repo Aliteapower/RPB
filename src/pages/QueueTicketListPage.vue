@@ -1199,12 +1199,16 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 
         <section v-if="skipApiError" class="state-panel error-panel" aria-live="assertive">
           <h2>{{ formatAppGateErrorTitle(skipApiError.error, '过号失败') }}</h2>
-          <p>{{ formatAppGateErrorMessage(skipApiError.error, '暂时无法过号，请稍后重试。') }}</p>
+          <p :data-message-key="skipApiError.error.messageKey">
+            {{ formatAppGateErrorMessage(skipApiError.error, '暂时无法过号，请稍后重试。') }}
+          </p>
         </section>
 
         <section v-if="rejoinApiError" class="state-panel error-panel" aria-live="assertive">
           <h2>{{ formatAppGateErrorTitle(rejoinApiError.error, '重新入队失败') }}</h2>
-          <p>{{ formatAppGateErrorMessage(rejoinApiError.error, '暂时无法重回队列，请稍后重试。') }}</p>
+          <p :data-message-key="rejoinApiError.error.messageKey">
+            {{ formatAppGateErrorMessage(rejoinApiError.error, '暂时无法重回队列，请稍后重试。') }}
+          </p>
         </section>
 
         <section v-if="cancelApiError" class="state-panel error-panel" aria-live="assertive">

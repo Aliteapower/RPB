@@ -39,6 +39,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/staff`">员工管理</RouterLink>
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/tables`">桌号管理</RouterLink>
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/settings`">基础设置</RouterLink>
+        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/share-template`">订位分享</RouterLink>
         <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/call-screen`">叫号屏配置</RouterLink>
       </nav>
     </div>

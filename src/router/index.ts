@@ -20,6 +20,7 @@ import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
 import TableResourceListPage from '../pages/TableResourceListPage.vue'
 import TenantAdminCallScreenPage from '../pages/TenantAdminCallScreenPage.vue'
 import TenantAdminProfilePage from '../pages/TenantAdminProfilePage.vue'
+import TenantAdminReservationSharePage from '../pages/TenantAdminReservationSharePage.vue'
 import TenantAdminSettingsPage from '../pages/TenantAdminSettingsPage.vue'
 import TenantAdminStaffFormPage from '../pages/TenantAdminStaffFormPage.vue'
 import TenantAdminStaffPage from '../pages/TenantAdminStaffPage.vue'
@@ -154,6 +155,12 @@ export const router = createRouter({
       path: '/stores/:storeId/admin/settings',
       name: 'tenant-admin-settings',
       component: TenantAdminSettingsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/share-template',
+      name: 'tenant-admin-reservation-share',
+      component: TenantAdminReservationSharePage,
       meta: { requiresTenantAdmin: true }
     },
     {
