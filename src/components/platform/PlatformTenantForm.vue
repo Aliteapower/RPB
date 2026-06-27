@@ -12,6 +12,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   submit: [form: PlatformTenantFormModel]
+  uploadLogo: [file: File]
+  clearLogo: []
 }>()
 
 const localForm = reactive<PlatformTenantFormModel>({
@@ -23,6 +25,8 @@ const localForm = reactive<PlatformTenantFormModel>({
   contactPhone: '',
   address: '',
   principalName: '',
+  logoMediaUrl: '',
+  logoFile: null,
   initialPassword: '',
   password: ''
 })
@@ -40,6 +44,22 @@ watch(
 
 function submitForm(): void {
   emit('submit', { ...localForm })
+}
+
+function handleLogoFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement | null
+  localForm.logoFile = input?.files?.[0] ?? null
+}
+
+function submitLogo(): void {
+  if (localForm.logoFile) {
+    emit('uploadLogo', localForm.logoFile)
+  }
+}
+
+function clearLogo(): void {
+  localForm.logoFile = null
+  emit('clearLogo')
 }
 </script>
 
@@ -118,6 +138,28 @@ function submitForm(): void {
       </label>
     </section>
 
+    <section v-if="mode === 'edit'" class="form-section form-section--logo" aria-label="租户 LOGO">
+      <div class="logo-preview" :class="{ empty: !localForm.logoMediaUrl }">
+        <img v-if="localForm.logoMediaUrl" :src="localForm.logoMediaUrl" alt="租户 LOGO" />
+        <span v-else>LOGO</span>
+      </div>
+
+      <div class="logo-fields">
+        <label>
+          <span>租户 LOGO</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="选择图片" @change="handleLogoFileChange" />
+        </label>
+        <div class="logo-actions">
+          <button class="secondary-button" type="button" :disabled="!localForm.logoFile || saving" @click="submitLogo">
+            上传 LOGO
+          </button>
+          <button class="secondary-button" type="button" :disabled="!localForm.logoMediaUrl || saving" @click="clearLogo">
+            清空 LOGO
+          </button>
+        </div>
+      </div>
+    </section>
+
     <div class="form-actions">
       <button class="primary-button" type="submit" :disabled="saving">
         {{ saving ? '保存中' : '保存' }}
@@ -154,6 +196,45 @@ label {
   grid-column: span 2;
 }
 
+.form-section--logo {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.logo-preview {
+  width: 78px;
+  height: 78px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-preview span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.logo-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 input,
 select {
   min-height: 40px;
@@ -188,7 +269,21 @@ input.readonly {
   cursor: pointer;
 }
 
-.primary-button:disabled {
+.secondary-button {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #1e3a5f;
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -200,6 +295,10 @@ input.readonly {
 
   .span-2 {
     grid-column: auto;
+  }
+
+  .form-section--logo {
+    grid-template-columns: 1fr;
   }
 }
 </style>

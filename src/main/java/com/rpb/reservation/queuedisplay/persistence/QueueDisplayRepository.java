@@ -24,6 +24,8 @@ public interface QueueDisplayRepository {
     int countWaiting(StoreScope scope, LocalDate businessDate);
 
     QueueDisplayAds findActiveAds(StoreScope scope);
+
+    Optional<UUID> findTenantLogoMediaAssetId(StoreScope scope);
 }
 
 @Repository
@@ -176,6 +178,30 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
             return configured.get(0);
         }
         return new QueueDisplayAds("text", 5, 3, findPlatformSeedSlides());
+    }
+
+    @Override
+    public Optional<UUID> findTenantLogoMediaAssetId(StoreScope scope) {
+        return jdbc.query(
+            """
+            select asset.id
+            from stores store
+            join tenants tenant on tenant.id = store.tenant_id
+             and tenant.deleted_at is null
+            join call_screen_media_assets asset on asset.id = tenant.logo_media_asset_id
+             and asset.owner_scope = 'tenant'
+             and asset.tenant_id = tenant.id
+             and asset.media_kind = 'image'
+             and asset.status = 'active'
+             and asset.deleted_at is null
+            where store.tenant_id = ?
+              and store.id = ?
+              and store.deleted_at is null
+            """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).stream().findFirst();
     }
 
     private List<QueueDisplayAdSlide> findTenantTextSlides(StoreScope scope, UUID adSetId) {

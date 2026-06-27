@@ -114,6 +114,18 @@ class QueueDisplayApplicationServiceTest {
     }
 
     @Test
+    void returnsTenantLogoQueueDisplayMediaUrlWhenTenantHasLogoAsset() {
+        UUID logoAssetId = UUID.fromString("8a000000-0000-0000-0000-000000000971");
+        repository.tenantLogoMediaAssetId = Optional.of(logoAssetId);
+
+        QueueDisplayResult result = service.getState(query(STORE_ID));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.tenantLogoUrl())
+            .isEqualTo("/api/v1/stores/" + STORE_ID + "/queue-display/media/" + logoAssetId);
+    }
+
+    @Test
     void storeNotFoundScopeMismatchAndPersistenceErrorReturnStableErrors() {
         storeRepository.store = Optional.empty();
         assertThat(service.getState(query(STORE_ID)).error()).isEqualTo(QueueDisplayError.STORE_NOT_FOUND);
@@ -169,6 +181,7 @@ class QueueDisplayApplicationServiceTest {
         private Optional<QueueDisplayCurrentCall> currentCall = Optional.empty();
         private List<QueueDisplayWaitingPreviewItem> waitingPreview = List.of();
         private QueueDisplayAds ads = new QueueDisplayAds("text", 5, 3, List.of());
+        private Optional<UUID> tenantLogoMediaAssetId = Optional.empty();
         private LocalDate lastBusinessDate;
         private Instant lastNow;
         private boolean throwPersistence;
@@ -196,6 +209,11 @@ class QueueDisplayApplicationServiceTest {
         @Override
         public QueueDisplayAds findActiveAds(StoreScope scope) {
             return ads;
+        }
+
+        @Override
+        public Optional<UUID> findTenantLogoMediaAssetId(StoreScope scope) {
+            return tenantLogoMediaAssetId;
         }
     }
 }

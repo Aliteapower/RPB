@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   PlatformApiError,
+  clearTenantLogo,
   createTenant,
   getTenant,
+  uploadTenantLogo,
   updateTenant,
   type PlatformTenantMutation
 } from '../api/platformApi'
@@ -42,6 +44,8 @@ const form = reactive<PlatformTenantFormModel>({
   contactPhone: '',
   address: '',
   principalName: '',
+  logoMediaUrl: '',
+  logoFile: null,
   initialPassword: '',
   password: ''
 })
@@ -66,6 +70,8 @@ async function loadTenant(): Promise<void> {
       contactPhone: response.tenant.contactPhone || '',
       address: response.tenant.address || '',
       principalName: response.tenant.principalName || '',
+      logoMediaUrl: response.tenant.logoMediaUrl || '',
+      logoFile: null,
       initialPassword: '',
       password: ''
     } satisfies PlatformTenantFormModel)
@@ -91,6 +97,42 @@ async function submitTenantForm(submittedForm: PlatformTenantFormModel): Promise
       await updateTenant(submittedForm.id, payload)
     }
     await router.push({ name: 'platform-tenants' })
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submitTenantLogo(file: File): Promise<void> {
+  if (saving.value || mode.value !== 'edit') {
+    return
+  }
+
+  saving.value = true
+  errorText.value = ''
+  try {
+    const response = await uploadTenantLogo(tenantId.value, file)
+    form.logoMediaUrl = response.tenant.logoMediaUrl || ''
+    form.logoFile = null
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function removeTenantLogo(): Promise<void> {
+  if (saving.value || mode.value !== 'edit') {
+    return
+  }
+
+  saving.value = true
+  errorText.value = ''
+  try {
+    const response = await clearTenantLogo(tenantId.value)
+    form.logoMediaUrl = response.tenant.logoMediaUrl || ''
+    form.logoFile = null
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -166,6 +208,8 @@ function apiErrorText(error: unknown): string {
         :status-options="statusOptions"
         :saving="saving"
         @submit="submitTenantForm"
+        @upload-logo="submitTenantLogo"
+        @clear-logo="removeTenantLogo"
       />
     </section>
   </main>

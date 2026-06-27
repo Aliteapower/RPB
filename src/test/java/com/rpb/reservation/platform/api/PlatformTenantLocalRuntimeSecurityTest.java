@@ -71,6 +71,7 @@ class PlatformTenantLocalRuntimeSecurityTest {
             "021-393930",
             "上海市徐汇区示例路 1 号",
             "张店长",
+            null,
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             null

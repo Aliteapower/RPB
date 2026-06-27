@@ -48,6 +48,7 @@ const areFullscreenControlsVisible = ref(true)
 const fullscreenErrorMessage = ref<string | null>(null)
 const fullscreenMessageTimer = ref<number | null>(null)
 const fullscreenControlsTimer = ref<number | null>(null)
+const tenantLogoFailed = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || ''))
 const hasCurrentCall = computed(() => !!state.value?.currentCall)
@@ -82,6 +83,8 @@ const storeDisplayName = computed(() => {
   const payload = state.value
   return payload?.storeDisplayName?.trim() || payload?.storeName?.trim() || '门店'
 })
+const tenantLogoUrl = computed(() => state.value?.tenantLogoUrl?.trim() || '')
+const showTenantLogoImage = computed(() => !!tenantLogoUrl.value && !tenantLogoFailed.value)
 const displayTime = computed(() => {
   const timezone = state.value?.storeTime.timezone
   if (!timezone) {
@@ -228,6 +231,10 @@ function handleVideoEnded(event: Event): void {
 
 function handleMediaPlaybackError(): void {
   showNextAdSlide()
+}
+
+function handleTenantLogoError(): void {
+  tenantLogoFailed.value = true
 }
 
 function stopAdRotation(): void {
@@ -452,6 +459,13 @@ function returnToManagement(): void {
 }
 
 watch(
+  () => state.value?.tenantLogoUrl,
+  () => {
+    tenantLogoFailed.value = false
+  }
+)
+
+watch(
   () => storeId.value,
   () => {
     state.value = null
@@ -618,14 +632,32 @@ onBeforeUnmount(() => {
           </div>
         </template>
         <template v-else>
-          <div class="ad-icon" aria-hidden="true">食</div>
+          <div class="ad-icon" aria-hidden="true">
+            <img
+              v-if="showTenantLogoImage"
+              class="tenant-logo-image"
+              :src="tenantLogoUrl"
+              alt=""
+              @error="handleTenantLogoError"
+            />
+            <span v-else>食</span>
+          </div>
           <p class="ad-kicker">媒体广告待配置</p>
           <h1>请上传图片或视频</h1>
         </template>
       </div>
 
       <template v-else>
-        <div class="ad-icon" aria-hidden="true">食</div>
+        <div class="ad-icon" aria-hidden="true">
+          <img
+            v-if="showTenantLogoImage"
+            class="tenant-logo-image"
+            :src="tenantLogoUrl"
+            alt=""
+            @error="handleTenantLogoError"
+          />
+          <span v-else>食</span>
+        </div>
         <p class="ad-kicker">欢迎等候</p>
         <h1>{{ currentSlide.title }}</h1>
         <p class="ad-subtitle">{{ currentSlide.subtitle }}</p>
@@ -1031,6 +1063,7 @@ onBeforeUnmount(() => {
 .ad-icon {
   display: grid;
   place-items: center;
+  overflow: hidden;
   width: 7rem;
   height: 7rem;
   margin: 0 auto 1.5rem;
@@ -1041,6 +1074,13 @@ onBeforeUnmount(() => {
   font-size: 3.25rem;
   font-weight: 900;
   box-shadow: 0 1rem 5rem rgba(249, 115, 22, 0.2);
+}
+
+.tenant-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.7rem;
 }
 
 .ad-subtitle {

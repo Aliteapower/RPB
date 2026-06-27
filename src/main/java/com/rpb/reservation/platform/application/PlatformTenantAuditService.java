@@ -109,6 +109,7 @@ public class PlatformTenantAuditService {
         metadata.put("contactPhone", tenant.contactPhone());
         metadata.put("address", tenant.address());
         metadata.put("principalName", tenant.principalName());
+        metadata.put("logoMediaAssetId", tenant.logoMediaAssetId());
         metadata.put("deleted", tenant.deleted());
         return metadata;
     }
@@ -121,6 +122,7 @@ public class PlatformTenantAuditService {
         addIfChanged(fields, "contactPhone", before.contactPhone(), after.contactPhone());
         addIfChanged(fields, "address", before.address(), after.address());
         addIfChanged(fields, "principalName", before.principalName(), after.principalName());
+        addIfChanged(fields, "logoMediaAssetId", before.logoMediaAssetId(), after.logoMediaAssetId());
         if (passwordChanged) {
             fields.add("password");
         }

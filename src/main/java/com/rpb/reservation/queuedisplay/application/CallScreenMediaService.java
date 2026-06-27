@@ -35,7 +35,7 @@ public class CallScreenMediaService {
 
     @Transactional
     public CallScreenMediaAsset uploadTenantMedia(StoreScope scope, MultipartFile file) {
-        StoredUpload upload = storeUpload("tenant/" + scope.tenantId().value(), file);
+        StoredUpload upload = storeUpload("tenant/" + scope.tenantId().value(), file, false);
         CallScreenMediaAsset asset = repository.createAsset(
             "tenant",
             scope.tenantId().value(),
@@ -50,7 +50,37 @@ public class CallScreenMediaService {
 
     @Transactional
     public CallScreenMediaAsset uploadPlatformMedia(MultipartFile file) {
-        StoredUpload upload = storeUpload("platform", file);
+        StoredUpload upload = storeUpload("platform", file, false);
+        CallScreenMediaAsset asset = repository.createAsset(
+            "platform",
+            null,
+            upload.mediaKind(),
+            upload.contentType(),
+            upload.byteSize(),
+            upload.originalFilename(),
+            upload.storageKey()
+        );
+        return withMediaUrl(asset, platformMediaUrl(asset.id()));
+    }
+
+    @Transactional
+    public CallScreenMediaAsset uploadTenantLogoMedia(UUID tenantId, MultipartFile file) {
+        StoredUpload upload = storeUpload("tenant/" + tenantId + "/logo", file, true);
+        CallScreenMediaAsset asset = repository.createAsset(
+            "tenant",
+            tenantId,
+            upload.mediaKind(),
+            upload.contentType(),
+            upload.byteSize(),
+            upload.originalFilename(),
+            upload.storageKey()
+        );
+        return withMediaUrl(asset, tenantLogoMediaUrl(tenantId, asset.id()));
+    }
+
+    @Transactional
+    public CallScreenMediaAsset uploadPlatformLogoMedia(MultipartFile file) {
+        StoredUpload upload = storeUpload("platform/logo", file, true);
         CallScreenMediaAsset asset = repository.createAsset(
             "platform",
             null,
@@ -70,6 +100,12 @@ public class CallScreenMediaService {
     }
 
     @Transactional(readOnly = true)
+    public CallScreenMediaContent readTenantLogoMedia(UUID tenantId, UUID assetId) {
+        return content(repository.findTenantLogoAsset(tenantId, assetId)
+            .orElseThrow(() -> new CallScreenMediaServiceException(CallScreenMediaServiceErrorCode.MEDIA_NOT_FOUND)));
+    }
+
+    @Transactional(readOnly = true)
     public CallScreenMediaContent readPlatformMedia(UUID assetId) {
         return content(repository.findPlatformAsset(assetId)
             .orElseThrow(() -> new CallScreenMediaServiceException(CallScreenMediaServiceErrorCode.MEDIA_NOT_FOUND)));
@@ -81,8 +117,11 @@ public class CallScreenMediaService {
             .orElseThrow(() -> new CallScreenMediaServiceException(CallScreenMediaServiceErrorCode.MEDIA_NOT_FOUND)));
     }
 
-    private StoredUpload storeUpload(String keyPrefix, MultipartFile file) {
+    private StoredUpload storeUpload(String keyPrefix, MultipartFile file, boolean imageOnly) {
         MediaTypeSpec spec = validate(file);
+        if (imageOnly && !"image".equals(spec.mediaKind())) {
+            throw new CallScreenMediaServiceException(CallScreenMediaServiceErrorCode.REQUEST_INVALID);
+        }
         String storageKey = keyPrefix + "/" + UUID.randomUUID() + spec.extension();
         try (InputStream input = file.getInputStream()) {
             storage.store(storageKey, input);
@@ -171,6 +210,10 @@ public class CallScreenMediaService {
 
     public static String platformMediaUrl(UUID assetId) {
         return "/api/v1/platform/call-screen/media/" + assetId;
+    }
+
+    public static String tenantLogoMediaUrl(UUID tenantId, UUID assetId) {
+        return "/api/v1/platform/tenants/" + tenantId + "/logo/media/" + assetId;
     }
 
     private static CallScreenMediaAsset withMediaUrl(CallScreenMediaAsset asset, String mediaUrl) {

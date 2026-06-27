@@ -16,6 +16,8 @@ export interface PlatformTenantFormModel {
   contactPhone: string
   address: string
   principalName: string
+  logoMediaUrl: string
+  logoFile: File | null
   initialPassword: string
   password: string
 }

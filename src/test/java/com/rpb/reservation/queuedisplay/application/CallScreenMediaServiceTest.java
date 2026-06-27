@@ -73,6 +73,41 @@ class CallScreenMediaServiceTest {
     }
 
     @Test
+    void acceptsTenantLogoImageWithTenantScopedPreviewUrl() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "brand.webp",
+            "image/webp",
+            new byte[] {0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50}
+        );
+
+        CallScreenMediaAsset asset = service.uploadTenantLogoMedia(TENANT_ID, file);
+
+        assertThat(asset.ownerScope()).isEqualTo("tenant");
+        assertThat(asset.tenantId()).isEqualTo(TENANT_ID);
+        assertThat(asset.mediaKind()).isEqualTo("image");
+        assertThat(asset.storageKey()).startsWith("tenant/" + TENANT_ID + "/logo/");
+        assertThat(asset.mediaUrl()).isEqualTo("/api/v1/platform/tenants/" + TENANT_ID + "/logo/media/" + asset.id());
+    }
+
+    @Test
+    void rejectsVideoForLogoUploads() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "intro.mp4",
+            "video/mp4",
+            new byte[] {0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D, 0, 0, 0, 0}
+        );
+
+        assertThatThrownBy(() -> service.uploadPlatformLogoMedia(file))
+            .isInstanceOf(CallScreenMediaServiceException.class)
+            .extracting("code")
+            .isEqualTo(CallScreenMediaServiceErrorCode.REQUEST_INVALID);
+        assertThat(storage.bytes).isEmpty();
+        assertThat(repository.assets).isEmpty();
+    }
+
+    @Test
     void rejectsForgedContentTypeBeforeStoringBytes() {
         MockMultipartFile file = new MockMultipartFile(
             "file",
@@ -127,6 +162,12 @@ class CallScreenMediaServiceTest {
         public Optional<CallScreenMediaAsset> findTenantAsset(UUID tenantId, UUID assetId) {
             return Optional.ofNullable(assets.get(assetId))
                 .filter(asset -> "tenant".equals(asset.ownerScope()) && tenantId.equals(asset.tenantId()));
+        }
+
+        @Override
+        public Optional<CallScreenMediaAsset> findTenantLogoAsset(UUID tenantId, UUID assetId) {
+            return findTenantAsset(tenantId, assetId)
+                .filter(asset -> "image".equals(asset.mediaKind()));
         }
 
         @Override

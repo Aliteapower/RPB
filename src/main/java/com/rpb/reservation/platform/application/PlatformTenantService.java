@@ -2,6 +2,9 @@ package com.rpb.reservation.platform.application;
 
 import com.rpb.reservation.platform.persistence.PlatformTenantAdminAccountRepository;
 import com.rpb.reservation.platform.persistence.PlatformTenantRepository;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaAsset;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -23,17 +26,20 @@ public class PlatformTenantService {
     private final PlatformTenantAdminAccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final PlatformTenantAuditService auditService;
+    private final CallScreenMediaService mediaService;
 
     public PlatformTenantService(
         PlatformTenantRepository repository,
         PlatformTenantAdminAccountRepository accountRepository,
         PasswordEncoder passwordEncoder,
-        PlatformTenantAuditService auditService
+        PlatformTenantAuditService auditService,
+        CallScreenMediaService mediaService
     ) {
         this.repository = repository;
         this.accountRepository = accountRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.mediaService = mediaService;
     }
 
     @Transactional(readOnly = true)
@@ -126,6 +132,34 @@ public class PlatformTenantService {
         } catch (DataIntegrityViolationException exception) {
             throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_CODE_CONFLICT);
         }
+    }
+
+    @Transactional
+    public PlatformTenant uploadTenantLogo(UUID tenantId, org.springframework.web.multipart.MultipartFile file, PlatformOperator operator) {
+        PlatformTenant existing = repository.findById(tenantId, false)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        CallScreenMediaAsset asset = mediaService.uploadTenantLogoMedia(tenantId, file);
+        PlatformTenant tenant = repository.updateLogoMediaAsset(tenantId, asset.id())
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        auditService.recordUpdated(existing, tenant, operator, false);
+        return tenant;
+    }
+
+    @Transactional
+    public PlatformTenant clearTenantLogo(UUID tenantId, PlatformOperator operator) {
+        PlatformTenant existing = repository.findById(tenantId, false)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        PlatformTenant tenant = repository.updateLogoMediaAsset(tenantId, null)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        auditService.recordUpdated(existing, tenant, operator, false);
+        return tenant;
+    }
+
+    @Transactional(readOnly = true)
+    public CallScreenMediaContent readTenantLogoMedia(UUID tenantId, UUID assetId) {
+        repository.findById(tenantId, false)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        return mediaService.readTenantLogoMedia(tenantId, assetId);
     }
 
     private static NormalizedTenantInput normalizeCreate(PlatformTenantMutationCommand request) {

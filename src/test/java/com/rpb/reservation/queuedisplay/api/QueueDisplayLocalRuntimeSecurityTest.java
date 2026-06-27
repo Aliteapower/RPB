@@ -85,7 +85,8 @@ class QueueDisplayLocalRuntimeSecurityTest {
             null,
             0,
             List.of(),
-            new QueueDisplayAds("text", 5, 3, List.of())
+            new QueueDisplayAds("text", 5, 3, List.of()),
+            null
         ));
 
         mockMvc.perform(get("/api/v1/stores/{storeId}/queue-display/state", STORE_ID))

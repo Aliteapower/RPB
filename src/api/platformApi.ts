@@ -7,6 +7,7 @@ export interface PlatformTenant {
   contactPhone: string | null
   address: string | null
   principalName: string | null
+  logoMediaUrl: string | null
   deleted: boolean
   createdAt: string
   updatedAt: string
@@ -145,6 +146,30 @@ export async function restoreTenant(
   })
 }
 
+export async function uploadTenantLogo(
+  tenantId: string,
+  file: File,
+  fetcher?: PlatformFetcher
+): Promise<PlatformTenantResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return requestForm(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/logo`, {
+    method: 'POST',
+    body: formData,
+    fetcher
+  })
+}
+
+export async function clearTenantLogo(
+  tenantId: string,
+  fetcher?: PlatformFetcher
+): Promise<PlatformTenantResponse> {
+  return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/logo`, {
+    method: 'DELETE',
+    fetcher
+  })
+}
+
 function buildListEndpoint(query: PlatformTenantListQuery): string {
   const params = new URLSearchParams()
   const keyword = query.keyword?.trim()
@@ -194,6 +219,33 @@ async function requestJson<T>(
   return payload as T
 }
 
+async function requestForm<T>(
+  endpoint: string,
+  options: {
+    method: 'POST' | 'PATCH'
+    body: FormData
+    fetcher?: PlatformFetcher
+  }
+): Promise<T> {
+  let response: TextResponse
+
+  try {
+    response = await sendFormRequest(endpoint, options)
+  } catch {
+    throw new PlatformApiError(0, unknownError())
+  }
+
+  const payload = await readJson(response)
+  if (!response.ok || isPlatformApiErrorResponse(payload)) {
+    throw new PlatformApiError(
+      response.status,
+      isPlatformApiErrorResponse(payload) ? payload : unknownError(response.status)
+    )
+  }
+
+  return payload as T
+}
+
 async function sendRequest(
   endpoint: string,
   options: {
@@ -225,6 +277,36 @@ async function sendRequest(
   })
 }
 
+async function sendFormRequest(
+  endpoint: string,
+  options: {
+    method: 'POST' | 'PATCH'
+    body: FormData
+    fetcher?: PlatformFetcher
+  }
+): Promise<TextResponse> {
+  const fetcher = options.fetcher ?? resolveFetch()
+
+  if (fetcher) {
+    return fetcher(endpoint, {
+      method: options.method,
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json'
+      },
+      body: options.body
+    })
+  }
+
+  return xhrRequest(endpoint, {
+    method: options.method,
+    headers: {
+      Accept: 'application/json'
+    },
+    body: options.body
+  })
+}
+
 function resolveFetch(): PlatformFetcher | undefined {
   const candidate = globalThis.fetch
   return typeof candidate === 'function' ? candidate.bind(globalThis) : undefined
@@ -235,7 +317,7 @@ function xhrRequest(
   options: {
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
     headers: Record<string, string>
-    body?: string
+    body?: string | FormData
   }
 ): Promise<TextResponse> {
   return new Promise((resolve, reject) => {

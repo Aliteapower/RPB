@@ -72,6 +72,7 @@ class QueueDisplayControllerTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.storeTime.timezone").value("Asia/Singapore"))
             .andExpect(jsonPath("$.storeTime.timeText").value("10:30"))
+            .andExpect(jsonPath("$.tenantLogoUrl").value("/api/v1/stores/" + STORE_ID + "/queue-display/media/8a000000-0000-0000-0000-000000000973"))
             .andExpect(jsonPath("$.currentCall.queueTicketId").value(TICKET_ID.toString()))
             .andExpect(jsonPath("$.currentCall.displayNumber").value("A7"))
             .andExpect(jsonPath("$.waiting.count").value(1))
@@ -140,7 +141,8 @@ class QueueDisplayControllerTest {
             ).withDisplayValues("A7", "赵先生"),
             1,
             List.of(new QueueDisplayWaitingPreviewItem(8, "1-2", "钱女士", 2).withDisplayValues("A8", "钱女士")),
-            new QueueDisplayAds("text", 5, 3, List.of(new QueueDisplayAdSlide("slide-1", "欢迎光临", "食刻", "标语")))
+            new QueueDisplayAds("text", 5, 3, List.of(new QueueDisplayAdSlide("slide-1", "欢迎光临", "食刻", "标语"))),
+            "/api/v1/stores/" + STORE_ID + "/queue-display/media/8a000000-0000-0000-0000-000000000973"
         );
     }
 

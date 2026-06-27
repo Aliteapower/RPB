@@ -61,6 +61,9 @@ public class QueueDisplayApplicationService {
                 .toList();
             int waitingCount = repository.countWaiting(scope, businessDate);
             QueueDisplayAds ads = normalizeAds(repository.findActiveAds(scope));
+            String tenantLogoUrl = repository.findTenantLogoMediaAssetId(scope)
+                .map(assetId -> CallScreenMediaService.queueDisplayMediaUrl(scope, assetId))
+                .orElse(null);
             return QueueDisplayResult.success(
                 now,
                 zone.getId(),
@@ -69,7 +72,8 @@ public class QueueDisplayApplicationService {
                 currentCall,
                 waitingCount,
                 preview,
-                ads
+                ads,
+                tenantLogoUrl
             );
         } catch (RuntimeException exception) {
             LOGGER.warn("queue_display_state_read_failed: {}", exception.toString());

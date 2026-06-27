@@ -29,6 +29,7 @@ public class PlatformTenantRepository {
             """
             select id, tenant_code, display_name, status, default_locale,
                    contact_phone, address, principal_name,
+                   logo_media_asset_id,
                    created_at, updated_at, deleted_at
             from tenants
             %s
@@ -55,6 +56,7 @@ public class PlatformTenantRepository {
             """
             select id, tenant_code, display_name, status, default_locale,
                    contact_phone, address, principal_name,
+                   logo_media_asset_id,
                    created_at, updated_at, deleted_at
             from tenants
             where id = ?
@@ -85,6 +87,7 @@ public class PlatformTenantRepository {
             values (?, ?, ?, ?, ?, ?, ?, ?)
             returning id, tenant_code, display_name, status, default_locale,
                       contact_phone, address, principal_name,
+                      logo_media_asset_id,
                       created_at, updated_at, deleted_at
             """,
             (rs, rowNum) -> tenant(rs),
@@ -124,6 +127,7 @@ public class PlatformTenantRepository {
             where id = ?
             returning id, tenant_code, display_name, status, default_locale,
                       contact_phone, address, principal_name,
+                      logo_media_asset_id,
                       created_at, updated_at, deleted_at
             """,
             (rs, rowNum) -> tenant(rs),
@@ -148,6 +152,7 @@ public class PlatformTenantRepository {
             where id = ?
             returning id, tenant_code, display_name, status, default_locale,
                       contact_phone, address, principal_name,
+                      logo_media_asset_id,
                       created_at, updated_at, deleted_at
             """,
             (rs, rowNum) -> tenant(rs),
@@ -165,9 +170,30 @@ public class PlatformTenantRepository {
             where id = ?
             returning id, tenant_code, display_name, status, default_locale,
                       contact_phone, address, principal_name,
+                      logo_media_asset_id,
                       created_at, updated_at, deleted_at
             """,
             (rs, rowNum) -> tenant(rs),
+            tenantId
+        ).stream().findFirst();
+    }
+
+    public Optional<PlatformTenant> updateLogoMediaAsset(UUID tenantId, UUID logoMediaAssetId) {
+        return jdbc.query(
+            """
+            update tenants
+            set logo_media_asset_id = ?,
+                updated_at = now(),
+                version = version + 1
+            where id = ?
+              and deleted_at is null
+            returning id, tenant_code, display_name, status, default_locale,
+                      contact_phone, address, principal_name,
+                      logo_media_asset_id,
+                      created_at, updated_at, deleted_at
+            """,
+            (rs, rowNum) -> tenant(rs),
+            logoMediaAssetId,
             tenantId
         ).stream().findFirst();
     }
@@ -182,6 +208,7 @@ public class PlatformTenantRepository {
             rs.getString("contact_phone"),
             rs.getString("address"),
             rs.getString("principal_name"),
+            rs.getObject("logo_media_asset_id", UUID.class),
             rs.getObject("created_at", OffsetDateTime.class),
             rs.getObject("updated_at", OffsetDateTime.class),
             rs.getObject("deleted_at", OffsetDateTime.class)

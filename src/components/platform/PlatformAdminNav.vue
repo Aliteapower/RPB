@@ -33,6 +33,7 @@ async function logoutFromPlatform(): Promise<void> {
       <nav class="nav-list">
         <RouterLink class="nav-item" to="/platform/tenants">租户管理</RouterLink>
         <RouterLink class="nav-item" to="/platform/billing/subscriptions">租户计费</RouterLink>
+        <RouterLink class="nav-item" to="/platform/settings/profile">平台资料</RouterLink>
         <RouterLink class="nav-item" to="/platform/settings/product-lines">产品线</RouterLink>
         <RouterLink class="nav-item" to="/platform/call-screen/text-seed">叫号模板</RouterLink>
       </nav>

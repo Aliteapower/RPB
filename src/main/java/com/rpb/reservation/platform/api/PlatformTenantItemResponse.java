@@ -1,6 +1,7 @@
 package com.rpb.reservation.platform.api;
 
 import com.rpb.reservation.platform.application.PlatformTenant;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ public record PlatformTenantItemResponse(
     String contactPhone,
     String address,
     String principalName,
+    String logoMediaUrl,
     boolean deleted,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
@@ -28,10 +30,17 @@ public record PlatformTenantItemResponse(
             tenant.contactPhone(),
             tenant.address(),
             tenant.principalName(),
+            tenantLogoMediaUrl(tenant),
             tenant.deleted(),
             tenant.createdAt(),
             tenant.updatedAt(),
             tenant.deletedAt()
         );
+    }
+
+    private static String tenantLogoMediaUrl(PlatformTenant tenant) {
+        return tenant.logoMediaAssetId() == null
+            ? null
+            : CallScreenMediaService.tenantLogoMediaUrl(tenant.id(), tenant.logoMediaAssetId());
     }
 }

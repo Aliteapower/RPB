@@ -60,6 +60,7 @@ export interface QueueDisplayStateResponse {
   serverNow: string
   storeDisplayName?: string | null
   storeName?: string | null
+  tenantLogoUrl?: string | null
   storeTime: QueueDisplayStoreTime
   currentCall: QueueDisplayCurrentCall | null
   waiting: QueueDisplayWaiting

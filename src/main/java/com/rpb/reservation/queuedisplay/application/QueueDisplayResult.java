@@ -14,7 +14,8 @@ public record QueueDisplayResult(
     QueueDisplayCurrentCall currentCall,
     int waitingCount,
     List<QueueDisplayWaitingPreviewItem> waitingPreview,
-    QueueDisplayAds ads
+    QueueDisplayAds ads,
+    String tenantLogoUrl
 ) {
     public QueueDisplayResult {
         waitingPreview = waitingPreview == null ? List.of() : List.copyOf(waitingPreview);
@@ -28,12 +29,13 @@ public record QueueDisplayResult(
         QueueDisplayCurrentCall currentCall,
         int waitingCount,
         List<QueueDisplayWaitingPreviewItem> waitingPreview,
-        QueueDisplayAds ads
+        QueueDisplayAds ads,
+        String tenantLogoUrl
     ) {
-        return new QueueDisplayResult(true, null, serverNow, storeTimezone, storeTimeText, businessDate, currentCall, waitingCount, waitingPreview, ads);
+        return new QueueDisplayResult(true, null, serverNow, storeTimezone, storeTimeText, businessDate, currentCall, waitingCount, waitingPreview, ads, tenantLogoUrl);
     }
 
     public static QueueDisplayResult failure(QueueDisplayError error) {
-        return new QueueDisplayResult(false, error, null, null, null, null, null, 0, List.of(), null);
+        return new QueueDisplayResult(false, error, null, null, null, null, null, 0, List.of(), null, null);
     }
 }

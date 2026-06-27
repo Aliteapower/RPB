@@ -22,6 +22,8 @@ public interface CallScreenMediaRepository {
 
     Optional<CallScreenMediaAsset> findTenantAsset(UUID tenantId, UUID assetId);
 
+    Optional<CallScreenMediaAsset> findTenantLogoAsset(UUID tenantId, UUID assetId);
+
     Optional<CallScreenMediaAsset> findPlatformAsset(UUID assetId);
 
     Optional<CallScreenMediaAsset> findQueueDisplayAsset(StoreScope scope, UUID assetId);
@@ -85,6 +87,36 @@ class JdbcCallScreenMediaRepository implements CallScreenMediaRepository {
     }
 
     @Override
+    public Optional<CallScreenMediaAsset> findTenantLogoAsset(UUID tenantId, UUID assetId) {
+        return jdbc.query(
+            """
+            select asset.id,
+                   asset.owner_scope,
+                   asset.tenant_id,
+                   asset.media_kind,
+                   asset.content_type,
+                   asset.byte_size,
+                   asset.original_filename,
+                   asset.storage_key,
+                   asset.version
+            from tenants tenant
+            join call_screen_media_assets asset on asset.id = tenant.logo_media_asset_id
+             and asset.owner_scope = 'tenant'
+             and asset.tenant_id = tenant.id
+             and asset.media_kind = 'image'
+             and asset.status = 'active'
+             and asset.deleted_at is null
+            where tenant.id = ?
+              and tenant.deleted_at is null
+              and asset.id = ?
+            """,
+            (rs, rowNum) -> asset(rs),
+            tenantId,
+            assetId
+        ).stream().findFirst();
+    }
+
+    @Override
     public Optional<CallScreenMediaAsset> findPlatformAsset(UUID assetId) {
         return jdbc.query(
             """
@@ -106,37 +138,70 @@ class JdbcCallScreenMediaRepository implements CallScreenMediaRepository {
     public Optional<CallScreenMediaAsset> findQueueDisplayAsset(StoreScope scope, UUID assetId) {
         return jdbc.query(
             """
-            select distinct asset.id,
-                   asset.owner_scope,
-                   asset.tenant_id,
-                   asset.media_kind,
-                   asset.content_type,
-                   asset.byte_size,
-                   asset.original_filename,
-                   asset.storage_key,
-                   asset.version
-            from store_call_screen_settings setting
-            join tenant_call_screen_ad_sets ad_set on ad_set.id = setting.active_ad_set_id
-             and ad_set.tenant_id = setting.tenant_id
-             and ad_set.status = 'active'
-             and ad_set.ad_type in ('image', 'media')
-             and ad_set.deleted_at is null
-            join tenant_call_screen_media_slides slide on slide.ad_set_id = ad_set.id
-             and slide.tenant_id = ad_set.tenant_id
-             and slide.status = 'active'
-             and slide.deleted_at is null
-            join call_screen_media_assets asset on asset.id = slide.media_asset_id
-             and asset.owner_scope = 'tenant'
-             and asset.tenant_id = slide.tenant_id
-             and asset.status = 'active'
-             and asset.deleted_at is null
-            where setting.tenant_id = ?
-              and setting.store_id = ?
-              and setting.status = 'active'
-              and setting.deleted_at is null
-              and asset.id = ?
+            with allowed_assets as (
+                select asset.id,
+                       asset.owner_scope,
+                       asset.tenant_id,
+                       asset.media_kind,
+                       asset.content_type,
+                       asset.byte_size,
+                       asset.original_filename,
+                       asset.storage_key,
+                       asset.version
+                from store_call_screen_settings setting
+                join tenant_call_screen_ad_sets ad_set on ad_set.id = setting.active_ad_set_id
+                 and ad_set.tenant_id = setting.tenant_id
+                 and ad_set.status = 'active'
+                 and ad_set.ad_type in ('image', 'media')
+                 and ad_set.deleted_at is null
+                join tenant_call_screen_media_slides slide on slide.ad_set_id = ad_set.id
+                 and slide.tenant_id = ad_set.tenant_id
+                 and slide.status = 'active'
+                 and slide.deleted_at is null
+                join call_screen_media_assets asset on asset.id = slide.media_asset_id
+                 and asset.owner_scope = 'tenant'
+                 and asset.tenant_id = slide.tenant_id
+                 and asset.status = 'active'
+                 and asset.deleted_at is null
+                where setting.tenant_id = ?
+                  and setting.store_id = ?
+                  and setting.status = 'active'
+                  and setting.deleted_at is null
+                  and asset.id = ?
+
+                union all
+
+                select asset.id,
+                       asset.owner_scope,
+                       asset.tenant_id,
+                       asset.media_kind,
+                       asset.content_type,
+                       asset.byte_size,
+                       asset.original_filename,
+                       asset.storage_key,
+                       asset.version
+                from stores store
+                join tenants tenant on tenant.id = store.tenant_id
+                 and tenant.deleted_at is null
+                join call_screen_media_assets asset on asset.id = tenant.logo_media_asset_id
+                 and asset.owner_scope = 'tenant'
+                 and asset.tenant_id = tenant.id
+                 and asset.media_kind = 'image'
+                 and asset.status = 'active'
+                 and asset.deleted_at is null
+                where store.tenant_id = ?
+                  and store.id = ?
+                  and store.deleted_at is null
+                  and asset.id = ?
+            )
+            select distinct id, owner_scope, tenant_id, media_kind, content_type, byte_size,
+                   original_filename, storage_key, version
+            from allowed_assets
             """,
             (rs, rowNum) -> asset(rs),
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            assetId,
             scope.tenantId().value(),
             scope.storeId().value(),
             assetId

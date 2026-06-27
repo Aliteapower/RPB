@@ -108,6 +108,7 @@ function isQueueDisplayStateResponse(payload: unknown): payload is QueueDisplayS
     typeof candidate.serverNow === 'string' &&
     isOptionalString(candidate.storeDisplayName) &&
     isOptionalString(candidate.storeName) &&
+    isOptionalString(candidate.tenantLogoUrl) &&
     isStoreTime(candidate.storeTime) &&
     (candidate.currentCall === null || isCurrentCall(candidate.currentCall)) &&
     isWaiting(candidate.waiting) &&

@@ -12,6 +12,7 @@ public record PlatformTenant(
     String contactPhone,
     String address,
     String principalName,
+    UUID logoMediaAssetId,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
     OffsetDateTime deletedAt

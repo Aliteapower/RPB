@@ -14,6 +14,7 @@ public record QueueDisplayResponse(
     boolean success,
     Instant serverNow,
     StoreTimeResponse storeTime,
+    String tenantLogoUrl,
     CurrentCallResponse currentCall,
     WaitingResponse waiting,
     AdsResponse ads
@@ -23,6 +24,7 @@ public record QueueDisplayResponse(
             true,
             result.serverNow(),
             new StoreTimeResponse(result.storeTimezone(), result.storeTimeText(), result.businessDate()),
+            result.tenantLogoUrl(),
             CurrentCallResponse.from(result.currentCall()),
             new WaitingResponse(
                 result.waitingCount(),
