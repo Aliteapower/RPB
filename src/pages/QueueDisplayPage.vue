@@ -14,6 +14,8 @@ import type {
 const POLL_INTERVAL_SECONDS = 3
 const SLIDE_DURATION_SECONDS = 5
 const ERROR_GRACE_MS = 15_000
+const QUEUE_DISPLAY_FULLSCREEN_PREFERENCE_KEY = 'rpb.queue-display.fullscreen-preferred'
+const FULLSCREEN_CONTROLS_HIDE_MS = 5000
 
 const fallbackSlide: QueueDisplayTextAdSlide = {
   slideId: 'empty-placeholder',
@@ -38,6 +40,14 @@ const clockTimer = ref<number | null>(null)
 const clockNow = ref(new Date())
 const serverClockBase = ref<number | null>(null)
 const clientClockBase = ref<number | null>(null)
+const queueDisplayTerminalRef = ref<HTMLElement | null>(null)
+const terminalActionsRef = ref<HTMLElement | null>(null)
+const isQueueDisplayFullscreen = ref(false)
+const isFullscreenPreferred = ref(false)
+const areFullscreenControlsVisible = ref(true)
+const fullscreenErrorMessage = ref<string | null>(null)
+const fullscreenMessageTimer = ref<number | null>(null)
+const fullscreenControlsTimer = ref<number | null>(null)
 
 const storeId = computed(() => String(route.params.storeId || ''))
 const hasCurrentCall = computed(() => !!state.value?.currentCall)
@@ -261,6 +271,182 @@ function stopClock(): void {
   }
 }
 
+function readFullscreenPreference(): boolean {
+  try {
+    return window.localStorage.getItem(QUEUE_DISPLAY_FULLSCREEN_PREFERENCE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function persistFullscreenPreference(value: boolean): void {
+  isFullscreenPreferred.value = value
+
+  try {
+    window.localStorage.setItem(QUEUE_DISPLAY_FULLSCREEN_PREFERENCE_KEY, value ? 'true' : 'false')
+  } catch {
+    // localStorage can be blocked in private or embedded browser contexts.
+  }
+}
+
+function showFullscreenMessage(message: string): void {
+  fullscreenErrorMessage.value = message
+  clearFullscreenMessageTimer()
+  fullscreenMessageTimer.value = window.setTimeout(() => {
+    fullscreenErrorMessage.value = null
+    fullscreenMessageTimer.value = null
+  }, 4200)
+}
+
+function clearFullscreenMessageTimer(): void {
+  if (fullscreenMessageTimer.value !== null) {
+    window.clearTimeout(fullscreenMessageTimer.value)
+    fullscreenMessageTimer.value = null
+  }
+}
+
+function clearFullscreenControlsTimer(): void {
+  if (fullscreenControlsTimer.value !== null) {
+    window.clearTimeout(fullscreenControlsTimer.value)
+    fullscreenControlsTimer.value = null
+  }
+}
+
+function isFullscreenControlFocused(): boolean {
+  const activeElement = document.activeElement
+  return !!activeElement && !!terminalActionsRef.value?.contains(activeElement)
+}
+
+function blurFullscreenControlFocus(): void {
+  const activeElement = document.activeElement
+
+  if (activeElement instanceof HTMLElement && terminalActionsRef.value?.contains(activeElement)) {
+    activeElement.blur()
+  }
+}
+
+function hideFullscreenControlsIfIdle(): void {
+  fullscreenControlsTimer.value = null
+
+  if (isFullscreenControlFocused()) {
+    return
+  }
+
+  areFullscreenControlsVisible.value = false
+}
+
+function scheduleFullscreenControlsHide(delayMs = FULLSCREEN_CONTROLS_HIDE_MS): void {
+  clearFullscreenControlsTimer()
+
+  if (!isQueueDisplayFullscreen.value) {
+    areFullscreenControlsVisible.value = true
+    return
+  }
+
+  fullscreenControlsTimer.value = window.setTimeout(hideFullscreenControlsIfIdle, delayMs)
+}
+
+function showFullscreenControlsTemporarily(delayMs = FULLSCREEN_CONTROLS_HIDE_MS): void {
+  areFullscreenControlsVisible.value = true
+  scheduleFullscreenControlsHide(delayMs)
+}
+
+function handleFullscreenPointerActivity(): void {
+  if (!isQueueDisplayFullscreen.value) {
+    return
+  }
+
+  showFullscreenControlsTemporarily()
+}
+
+function keepFullscreenControlsVisible(): void {
+  if (!isQueueDisplayFullscreen.value) {
+    return
+  }
+
+  areFullscreenControlsVisible.value = true
+  clearFullscreenControlsTimer()
+}
+
+function handleFullscreenControlsPointerEnter(): void {
+  showFullscreenControlsTemporarily()
+}
+
+function handleFullscreenControlsPointerLeave(): void {
+  scheduleFullscreenControlsHide()
+}
+
+function syncQueueDisplayFullscreenState(): void {
+  const wasFullscreen = isQueueDisplayFullscreen.value
+  isQueueDisplayFullscreen.value = document.fullscreenElement === queueDisplayTerminalRef.value
+
+  if (isQueueDisplayFullscreen.value) {
+    blurFullscreenControlFocus()
+    showFullscreenControlsTemporarily()
+  } else {
+    areFullscreenControlsVisible.value = true
+    clearFullscreenControlsTimer()
+  }
+
+  if (wasFullscreen && !isQueueDisplayFullscreen.value) {
+    persistFullscreenPreference(false)
+  }
+}
+
+async function requestQueueDisplayFullscreen(): Promise<void> {
+  const terminalElement = queueDisplayTerminalRef.value
+  fullscreenErrorMessage.value = null
+  clearFullscreenMessageTimer()
+
+  if (!terminalElement || typeof terminalElement.requestFullscreen !== 'function') {
+    showFullscreenMessage('无法自动进入全屏，可按 F11 使用浏览器全屏。')
+    return
+  }
+
+  try {
+    await terminalElement.requestFullscreen()
+    isQueueDisplayFullscreen.value = true
+    persistFullscreenPreference(true)
+    blurFullscreenControlFocus()
+    showFullscreenControlsTemporarily()
+  } catch {
+    showFullscreenMessage('无法自动进入全屏，可按 F11 使用浏览器全屏。')
+  }
+}
+
+async function exitQueueDisplayFullscreen(): Promise<void> {
+  fullscreenErrorMessage.value = null
+  clearFullscreenMessageTimer()
+
+  if (!document.fullscreenElement) {
+    persistFullscreenPreference(false)
+    syncQueueDisplayFullscreenState()
+    return
+  }
+
+  if (typeof document.exitFullscreen !== 'function') {
+    showFullscreenMessage('无法退出全屏，可按 Esc 或 F11 退出。')
+    return
+  }
+
+  try {
+    await document.exitFullscreen()
+    persistFullscreenPreference(false)
+    syncQueueDisplayFullscreenState()
+  } catch {
+    showFullscreenMessage('无法退出全屏，可按 Esc 或 F11 退出。')
+  }
+}
+
+function toggleQueueDisplayFullscreen(): void {
+  if (isQueueDisplayFullscreen.value) {
+    void exitQueueDisplayFullscreen()
+    return
+  }
+
+  void requestQueueDisplayFullscreen()
+}
+
 function returnToManagement(): void {
   void router.push(auth.defaultHomeRoute)
 }
@@ -288,20 +474,39 @@ watch([hasCurrentCall, isMediaMode, () => activeAdSlideCount.value, slideDuratio
 })
 
 onMounted(() => {
+  isFullscreenPreferred.value = readFullscreenPreference()
+  syncQueueDisplayFullscreenState()
+  document.addEventListener('fullscreenchange', syncQueueDisplayFullscreenState)
   startClock()
   void loadState().then(startPolling)
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', syncQueueDisplayFullscreenState)
   stopPolling()
   stopAdRotation()
   stopClock()
   clearErrorGraceTimer()
+  clearFullscreenMessageTimer()
+  clearFullscreenControlsTimer()
 })
 </script>
 
 <template>
-  <main class="queue-display-terminal" :class="`queue-display-terminal--${screenMode}`">
+  <main
+    ref="queueDisplayTerminalRef"
+    class="queue-display-terminal"
+    :class="[
+      `queue-display-terminal--${screenMode}`,
+      {
+        'queue-display-terminal--fullscreen': isQueueDisplayFullscreen,
+        'queue-display-terminal--fullscreen-preferred': isFullscreenPreferred && !isQueueDisplayFullscreen,
+        'queue-display-terminal--controls-visible': areFullscreenControlsVisible
+      }
+    ]"
+    @pointermove="handleFullscreenPointerActivity"
+    @pointerdown="handleFullscreenPointerActivity"
+  >
     <header class="terminal-header">
       <div class="terminal-brand" aria-label="门店叫号屏">
         <span class="brand-dot"></span>
@@ -316,14 +521,35 @@ onBeforeUnmount(() => {
         <span>{{ businessDate }}</span>
       </div>
 
-      <button v-if="showManageButton" class="terminal-manage" type="button" @click="returnToManagement">
-        返回管理
-      </button>
-      <div v-else class="terminal-manage-placeholder" aria-hidden="true"></div>
+      <div
+        ref="terminalActionsRef"
+        class="terminal-actions"
+        @focusin="keepFullscreenControlsVisible"
+        @focusout="scheduleFullscreenControlsHide()"
+        @pointerenter="handleFullscreenControlsPointerEnter"
+        @pointerleave="handleFullscreenControlsPointerLeave"
+      >
+        <button
+          class="terminal-fullscreen"
+          type="button"
+          :aria-pressed="isQueueDisplayFullscreen"
+          @click="toggleQueueDisplayFullscreen"
+        >
+          {{ isQueueDisplayFullscreen ? '退出全屏' : '全屏展示' }}
+        </button>
+        <button v-if="showManageButton" class="terminal-manage" type="button" @click="returnToManagement">
+          返回管理
+        </button>
+      </div>
     </header>
 
-    <div v-if="apiError && !showErrorScreen" class="terminal-offline-badge" role="status">
-      连接恢复中
+    <div v-if="(apiError && !showErrorScreen) || fullscreenErrorMessage" class="terminal-status-stack">
+      <div v-if="apiError && !showErrorScreen" class="terminal-offline-badge" role="status">
+        连接恢复中
+      </div>
+      <div v-if="fullscreenErrorMessage" class="terminal-fullscreen-hint" role="status">
+        {{ fullscreenErrorMessage }}
+      </div>
     </div>
 
     <section v-if="screenMode === 'loading'" class="screen-state screen-loading" aria-live="polite">
@@ -458,8 +684,7 @@ onBeforeUnmount(() => {
 
 .terminal-brand,
 .terminal-time,
-.terminal-manage,
-.terminal-manage-placeholder {
+.terminal-actions {
   position: relative;
   z-index: 2;
 }
@@ -518,8 +743,19 @@ onBeforeUnmount(() => {
   font-size: 0.875rem;
 }
 
-.terminal-manage {
+.terminal-actions {
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 180ms ease;
+}
+
+.terminal-fullscreen,
+.terminal-manage {
   min-width: 7.5rem;
   min-height: 2.75rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -535,27 +771,64 @@ onBeforeUnmount(() => {
     transform 160ms ease;
 }
 
+.terminal-fullscreen {
+  border-color: rgba(249, 115, 22, 0.56);
+  background: rgba(249, 115, 22, 0.18);
+  color: #fed7aa;
+}
+
+.terminal-fullscreen[aria-pressed='true'] {
+  border-color: rgba(56, 189, 248, 0.54);
+  background: rgba(56, 189, 248, 0.14);
+  color: #bae6fd;
+}
+
+.terminal-fullscreen:hover,
 .terminal-manage:hover {
   border-color: rgba(249, 115, 22, 0.72);
   background: rgba(249, 115, 22, 0.16);
   transform: translateY(-1px);
 }
 
-.terminal-manage-placeholder {
-  min-height: 2.75rem;
-}
-
-.terminal-offline-badge {
+.terminal-status-stack {
   position: absolute;
   top: 6.125rem;
   right: 2.25rem;
   z-index: 3;
+  display: grid;
+  justify-items: end;
+  gap: 0.625rem;
+}
+
+.terminal-offline-badge,
+.terminal-fullscreen-hint {
   border: 1px solid rgba(251, 146, 60, 0.48);
   border-radius: 999px;
   padding: 0.45rem 0.85rem;
   background: rgba(249, 115, 22, 0.14);
   color: #fed7aa;
   font-weight: 700;
+}
+
+.terminal-fullscreen-hint {
+  max-width: min(26rem, calc(100vw - 3rem));
+  border-color: rgba(148, 163, 184, 0.34);
+  background: rgba(15, 23, 42, 0.78);
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+.queue-display-terminal--fullscreen {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+}
+
+.queue-display-terminal--fullscreen:not(.queue-display-terminal--controls-visible) .terminal-actions {
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-0.625rem);
 }
 
 .screen-state,
@@ -885,13 +1158,9 @@ onBeforeUnmount(() => {
     text-align: left;
   }
 
-  .terminal-manage {
+  .terminal-actions {
     grid-column: 2;
     grid-row: 1;
-  }
-
-  .terminal-manage-placeholder {
-    display: none;
   }
 
   .screen-calling {
@@ -916,7 +1185,7 @@ onBeforeUnmount(() => {
     font-size: 1.875rem;
   }
 
-  .terminal-offline-badge {
+  .terminal-status-stack {
     top: 6.25rem;
     right: 1.5rem;
   }
@@ -930,14 +1199,20 @@ onBeforeUnmount(() => {
   }
 
   .terminal-time,
-  .terminal-manage {
+  .terminal-actions {
     grid-column: auto;
     grid-row: auto;
     justify-self: start;
   }
 
-  .terminal-manage {
+  .terminal-actions {
     width: 100%;
+  }
+
+  .terminal-fullscreen,
+  .terminal-manage {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .screen-state,

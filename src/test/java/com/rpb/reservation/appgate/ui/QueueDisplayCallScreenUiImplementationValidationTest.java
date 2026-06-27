@@ -81,6 +81,38 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
     }
 
     @Test
+    void queueDisplayTerminalSupportsPersistentFullscreenPresentation() throws Exception {
+        Path pagePath = Path.of("src", "pages", "QueueDisplayPage.vue");
+
+        String page = Files.readString(pagePath);
+
+        assertThat(page)
+            .contains("QUEUE_DISPLAY_FULLSCREEN_PREFERENCE_KEY")
+            .contains("isQueueDisplayFullscreen")
+            .contains("isFullscreenPreferred")
+            .contains("fullscreenErrorMessage")
+            .contains("requestQueueDisplayFullscreen")
+            .contains("exitQueueDisplayFullscreen")
+            .contains("toggleQueueDisplayFullscreen")
+            .contains("document.fullscreenElement")
+            .contains("requestFullscreen")
+            .contains("exitFullscreen")
+            .contains("fullscreenchange")
+            .contains("localStorage")
+            .contains("const FULLSCREEN_CONTROLS_HIDE_MS = 5000")
+            .contains("areFullscreenControlsVisible")
+            .contains("handleFullscreenPointerActivity")
+            .contains("blurFullscreenControlFocus")
+            .contains("queue-display-terminal--controls-visible")
+            .contains(".queue-display-terminal--fullscreen:not(.queue-display-terminal--controls-visible) .terminal-actions")
+            .contains("全屏展示")
+            .contains("退出全屏")
+            .contains("无法自动进入全屏")
+            .contains("queue-display-terminal--fullscreen")
+            .doesNotContain("isFullscreenControlHovered");
+    }
+
+    @Test
     void tenantAdminCallScreenPageUsesTenantAdminApiAndSupportsMediaGroups() throws Exception {
         Path pagePath = Path.of("src", "pages", "TenantAdminCallScreenPage.vue");
         Path apiPath = Path.of("src", "api", "callScreenAdminApi.ts");

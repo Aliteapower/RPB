@@ -1130,7 +1130,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
                   :key="option.value"
                   :aria-pressed="selectedTableArea === option.value"
                   :class="{ selected: selectedTableArea === option.value }"
-                  class="filter-chip"
+                  class="filter-chip area-filter-chip"
                   type="button"
                   @click="selectTableArea(option.value)"
                 >
@@ -1361,7 +1361,9 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
   align-items: center;
   display: flex;
   flex: 0 0 auto;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .section-kicker,
@@ -1402,7 +1404,7 @@ h2 {
 .seat-link,
 .cancel-button {
   align-items: center;
-  border-radius: 10px;
+  border-radius: 8px;
   display: inline-flex;
   font-weight: 900;
   justify-content: center;
@@ -1416,15 +1418,18 @@ h2 {
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   color: #315f91;
-  padding: 0 14px;
+  font-size: 0.82rem;
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .queue-display-link {
   background: #f97316;
   border: 1px solid #f97316;
   color: #ffffff;
-  min-height: 42px;
-  padding: 0 13px;
+  font-size: 0.82rem;
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .queue-display-icon {
@@ -1432,19 +1437,19 @@ h2 {
   border-radius: 3px;
   box-sizing: border-box;
   display: inline-block;
-  height: 12px;
-  margin-right: 6px;
+  height: 10px;
+  margin-right: 5px;
   position: relative;
-  width: 15px;
+  width: 13px;
 }
 
 .queue-display-icon::after {
   background: currentColor;
   border-radius: 999px;
-  bottom: -5px;
+  bottom: -4px;
   content: '';
   height: 2px;
-  left: 4px;
+  left: 3px;
   position: absolute;
   width: 5px;
 }
@@ -1463,34 +1468,71 @@ h2 {
 .status-options,
 .filter-chip-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  scrollbar-width: none;
 }
 
-.status-options button,
+.status-options::-webkit-scrollbar,
+.filter-chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.status-options {
+  background: #eef2f7;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  gap: 4px;
+  padding: 4px;
+}
+
 .filter-chip {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border: 1px solid #d1dae7;
   color: #315f91;
   flex: 0 0 auto;
-  padding: 0 13px;
+  min-height: 38px;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
-.status-options button.selected,
-.filter-chip.selected {
+.status-options button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #315f91;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.status-options button.selected {
   background: #f97316;
   border-color: #f97316;
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.2);
   color: #ffffff;
+}
+
+.status-options button:not(.selected):hover {
+  background: #ffffff;
+  border-color: #d1dae7;
+}
+
+.filter-chip.selected {
+  background: #fff7ed;
+  border-color: #fb923c;
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.28);
+  color: #c2410c;
 }
 
 .queue-list-filters {
   background: #f8fafc;
   border: 1px solid #dbe3ee;
-  border-radius: 10px;
+  border-radius: 8px;
   display: grid;
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .compact-filter-heading {
@@ -1515,7 +1557,7 @@ h2 {
 }
 
 .filter-chip.selected span {
-  color: #ffffff;
+  color: #c2410c;
 }
 
 .table-area-filter,
@@ -1525,9 +1567,21 @@ h2 {
   min-width: 0;
 }
 
+.table-area-filter {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 10px;
+}
+
+.area-filter-chip {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  min-width: 58px;
+  padding: 0 10px;
+}
+
 .queue-filter-controls {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .queue-phone-filter {
@@ -1538,28 +1592,46 @@ h2 {
 
 .queue-phone-filter input {
   background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 999px;
+  border: 1px solid #d1dae7;
+  border-radius: 8px;
   color: #0f172a;
-  font-weight: 800;
-  min-height: 38px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  min-height: 30px;
   outline: none;
-  padding: 0 14px;
+  padding: 0 10px;
   width: 100%;
 }
 
 .queue-group-chip {
   align-items: flex-start;
+  background: #ffffff;
   display: inline-flex;
   flex-direction: column;
   gap: 2px;
-  min-height: 46px;
-  padding: 6px 13px;
+  min-height: 38px;
+  min-width: 84px;
+  padding: 5px 10px;
+}
+
+.queue-group-chip.selected {
+  background: #f97316;
+  border-color: #f97316;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
+  color: #ffffff;
+}
+
+.queue-group-chip.selected span {
+  color: #fff7ed;
 }
 
 .queue-group-chip strong {
-  font-size: 0.88rem;
+  font-size: 0.72rem;
   line-height: 1.1;
+}
+
+.queue-group-chip span {
+  font-size: 0.68rem;
 }
 
 .queue-phone-filter input:focus {
@@ -1583,11 +1655,12 @@ h2 {
 }
 
 .reset-filter-button {
-  background: #eef2f7;
-  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border: 1px solid #d1dae7;
   color: #315f91;
-  min-height: 38px;
-  padding: 0 13px;
+  font-size: 0.72rem;
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .queue-message-stack {

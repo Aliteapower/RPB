@@ -367,28 +367,44 @@ function createLocalStatusActionError(
 }
 
 .reservation-today-list__status-filter {
+  background: #eef2f7;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin: 0 -14px;
   overflow-x: auto;
-  padding: 0 14px 2px;
+  padding: 4px;
+  scrollbar-width: none;
+}
+
+.reservation-today-list__status-filter::-webkit-scrollbar {
+  display: none;
 }
 
 .reservation-today-list__status-filter button {
-  background: #f8fafc;
-  border: 1px solid #c8d3e2;
-  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
   color: #315f91;
   flex: 0 0 auto;
+  font-size: 0.72rem;
   font-weight: 900;
-  min-height: 38px;
-  padding: 0 13px;
+  min-height: 32px;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 
 .reservation-today-list__status-filter button.selected {
   background: #f97316;
   border-color: #f97316;
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.18);
   color: #ffffff;
+}
+
+.reservation-today-list__status-filter button:not(.selected):hover {
+  background: #ffffff;
+  border-color: #d1dae7;
 }
 
 .reservation-today-list__filters {

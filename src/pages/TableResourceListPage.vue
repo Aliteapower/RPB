@@ -1583,7 +1583,7 @@ h3 {
 .temporary-group-panel__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .temporary-group-panel__name {
@@ -1606,28 +1606,28 @@ h3 {
 .temporary-group-panel__actions button,
 .temporary-group-panel__seat {
   align-items: center;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  color: #1d4ed8;
+  background: #ffffff;
+  border: 1px solid #d1dae7;
+  border-radius: 8px;
+  color: #315f91;
   display: inline-flex;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 950;
   justify-content: center;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 10px;
   text-decoration: none;
 }
 
 .temporary-group-panel__seat {
-  background: #ecfdf5;
-  border-color: #bbf7d0;
+  background: #f0fdf4;
+  border-color: #86efac;
   color: #047857;
 }
 
 .temporary-group-panel__save {
   background: #fff7ed;
-  border-color: #fdba74;
+  border-color: #fb923c;
   color: #c2410c;
 }
 
@@ -1646,37 +1646,50 @@ h3 {
 .table-page__area-filter button {
   align-items: center;
   background: #ffffff;
+  border: 1px solid #d1dae7;
+  border-radius: 8px;
   color: #315f91;
   display: inline-flex;
-  gap: 6px;
+  font-size: 0.72rem;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .table-page__area-filter button strong {
-  font-size: 0.78rem;
+  font-size: 0.68rem;
 }
 
 .table-page__area-filter button.selected {
-  background: #f97316;
-  border-color: #f97316;
-  color: #ffffff;
+  background: #fff7ed;
+  border-color: #fb923c;
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.24);
+  color: #c2410c;
 }
 
 .table-area-party-filter {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: 6px;
+}
+
+.table-area-party-filter span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
 }
 
 .table-area-party-filter select {
   appearance: none;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border: 1px solid #d1dae7;
   border-radius: 8px;
   color: #0f172a;
+  font-size: 0.72rem;
   font-weight: 850;
-  min-height: 38px;
-  padding: 0 30px 0 12px;
-  width: 102px;
+  min-height: 30px;
+  padding: 0 22px 0 10px;
+  width: 76px;
 }
 
 .state-panel {
@@ -1724,12 +1737,7 @@ h3 {
 .table-page__area-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-}
-
-.table-page__area-filter button {
-  min-height: 34px;
-  padding: 0 12px;
+  gap: 6px;
 }
 
 .table-page__resource-grid {

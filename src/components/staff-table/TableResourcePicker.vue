@@ -555,7 +555,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
 .table-picker__mode {
   background: #f8fafc;
   border: 1px solid #d8e0eb;
-  border-radius: 999px;
+  border-radius: 8px;
   display: inline-flex;
   gap: 2px;
   padding: 2px;
@@ -565,20 +565,20 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
 .table-picker__refresh {
   background: #fff7ed;
   border: 1px solid #fed7aa;
-  border-radius: 999px;
+  border-radius: 8px;
   color: #f97316;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 900;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 9px;
 }
 
 .table-picker__mode button {
   background: transparent;
   border-color: transparent;
   color: #64748b;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 26px;
+  padding: 0 8px;
 }
 
 .table-picker__mode button.selected {
