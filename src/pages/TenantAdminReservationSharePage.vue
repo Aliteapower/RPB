@@ -174,14 +174,19 @@ function apiErrorText(error: unknown): string {
 
       <form v-else class="form-panel" @submit.prevent="submitShareProfile">
         <section class="template-tools form-panel__wide" aria-label="模板变量">
-          <button
-            v-for="variable in availableVariables"
-            :key="variable"
-            type="button"
-            @click="insertVariable(variable)"
-          >
-            {{ variable }}
-          </button>
+          <p class="template-tools__hint">
+            点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到分享模板中；调整模板后请保存，保存后的模板会在新的订位分享中生效。
+          </p>
+          <div class="template-tools__buttons">
+            <button
+              v-for="variable in availableVariables"
+              :key="variable"
+              type="button"
+              @click="insertVariable(variable)"
+            >
+              {{ variable }}
+            </button>
+          </div>
         </section>
 
         <label class="form-panel__wide">
@@ -316,12 +321,25 @@ input:disabled {
 }
 
 .template-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.template-tools__hint {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.template-tools__buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.template-tools button,
+.template-tools__buttons button,
 .form-actions button {
   background: #ffffff;
   border: 1px solid #cbd5e1;

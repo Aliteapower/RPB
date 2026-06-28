@@ -197,14 +197,19 @@ function platformMapUrl(profile: PlatformProfile): string | null {
         </div>
 
         <section class="template-tools" aria-label="模板变量">
-          <button
-            v-for="variable in availableVariables"
-            :key="variable"
-            type="button"
-            @click="insertVariable(variable)"
-          >
-            {{ variable }}
-          </button>
+          <p class="template-tools__hint">
+            点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到模板内容中；调整模板后请保存，保存后的平台种子模板会用于租户默认订位分享模板。
+          </p>
+          <div class="template-tools__buttons">
+            <button
+              v-for="variable in availableVariables"
+              :key="variable"
+              type="button"
+              @click="insertVariable(variable)"
+            >
+              {{ variable }}
+            </button>
+          </div>
         </section>
 
         <section class="template-layout">
@@ -321,12 +326,25 @@ textarea {
 }
 
 .template-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.template-tools__hint {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.template-tools__buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.template-tools button {
+.template-tools__buttons button {
   min-height: 36px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;

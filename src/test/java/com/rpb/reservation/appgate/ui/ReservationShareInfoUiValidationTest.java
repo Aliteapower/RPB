@@ -75,6 +75,14 @@ class ReservationShareInfoUiValidationTest {
             .contains("resetTenantAdminShareProfileTemplate")
             .contains("reservationShareTemplate")
             .contains("availableVariables")
+            .contains("点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到分享模板中")
+            .contains("保存后的模板会在新的订位分享中生效")
+            .doesNotContain("ReservationPublicSharePage")
+            .doesNotContain("getReservationPublicShare")
+            .doesNotContain("/reservation-share/")
+            .doesNotContain("/api/v1/public/reservation-shares")
+            .doesNotContain("食刻")
+            .doesNotContain("上海市")
             .doesNotContain("googleMapUrl")
             .doesNotContain("shareAddress")
             .doesNotContain("shareContactPhone")
@@ -143,7 +151,8 @@ class ReservationShareInfoUiValidationTest {
             .contains("/tenant-admin/share-profile")
             .contains("/template")
             .contains("/preview")
-            .contains("/default-template");
+            .contains("/default-template")
+            .doesNotContain("/reservation-share");
     }
 
     @Test
