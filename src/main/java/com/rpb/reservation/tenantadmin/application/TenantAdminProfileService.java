@@ -28,7 +28,7 @@ public class TenantAdminProfileService {
     @Transactional
     public TenantAdminProfile updateProfile(StoreScope scope, TenantAdminProfileCommand command) {
         NormalizedProfileInput input = normalize(command);
-        return repository.update(
+        TenantAdminProfile profile = repository.update(
                 scope,
                 input.displayName(),
                 input.defaultLocale(),
@@ -37,6 +37,10 @@ public class TenantAdminProfileService {
                 input.principalName()
             )
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.TENANT_PROFILE_NOT_FOUND));
+        if (!repository.syncStoreShareContact(scope, input.contactPhone(), input.address())) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return profile;
     }
 
     @Transactional

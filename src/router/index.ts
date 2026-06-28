@@ -5,6 +5,7 @@ import LoginPage from '../pages/LoginPage.vue'
 import PlatformCallScreenSeedPage from '../pages/PlatformCallScreenSeedPage.vue'
 import PlatformProductLinesPage from '../pages/PlatformProductLinesPage.vue'
 import PlatformProfilePage from '../pages/PlatformProfilePage.vue'
+import PlatformReservationShareTemplateSeedPage from '../pages/PlatformReservationShareTemplateSeedPage.vue'
 import PlatformTenantBillingPage from '../pages/PlatformTenantBillingPage.vue'
 import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
 import PlatformTenantsPage from '../pages/PlatformTenantsPage.vue'
@@ -95,6 +96,12 @@ export const router = createRouter({
       path: '/platform/call-screen/text-seed',
       name: 'platform-call-screen-text-seed',
       component: PlatformCallScreenSeedPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/reservation/share-template-seed',
+      name: 'platform-reservation-share-template-seed',
+      component: PlatformReservationShareTemplateSeedPage,
       meta: { requiresPlatformAdmin: true }
     },
     {

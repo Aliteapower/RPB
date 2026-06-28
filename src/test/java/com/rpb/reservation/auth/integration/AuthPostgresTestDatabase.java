@@ -49,6 +49,9 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
             database.applyMigration("src/main/resources/db/migration/V011__tenant_table_sort_order.sql");
             database.applyMigration("src/main/resources/db/migration/V012__platform_branding_profile.sql");
             database.applyMigration("src/main/resources/db/migration/V013__store_reservation_share_profile.sql");
+            database.applyMigration("src/main/resources/db/migration/V014__platform_reservation_share_template_seed.sql");
+            database.applyMigration("src/main/resources/db/migration/V015__platform_reservation_share_template_permission.sql");
+            database.applyMigration("src/main/resources/db/migration/V016__normalize_store_date_format.sql");
             Runtime.getRuntime().addShutdownHook(new Thread(database::closeQuietly));
             return database;
         } catch (IOException exception) {
@@ -134,7 +137,7 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
                 'active',
                 'Asia/Singapore',
                 'zh-CN',
-                'yyyy-MM-dd',
+                'DD-MM-YYYY',
                 'HH:mm',
                 'SGD'
             );

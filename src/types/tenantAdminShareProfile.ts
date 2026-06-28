@@ -13,10 +13,12 @@ export interface TenantAdminShareProfile {
 
 export interface TenantAdminShareProfileMutation {
   shareDisplayName?: string | null
-  shareAddress?: string | null
   googleMapUrl?: string | null
-  shareContactPhone?: string | null
   reservationShareNote?: string | null
+  reservationShareTemplate?: string | null
+}
+
+export interface TenantAdminShareTemplateMutation {
   reservationShareTemplate?: string | null
 }
 

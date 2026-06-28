@@ -203,7 +203,7 @@ class PlatformBillingMigrationTest {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, ?, '食刻门店', 'active',
-                'Asia/Singapore', 'zh-CN', 'yyyy-MM-dd', 'HH:mm', ?)
+                'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', ?)
             """,
             storeId,
             tenantId,

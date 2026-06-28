@@ -441,6 +441,7 @@ class ReservationControllerTest {
                 "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenMediaSeedController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenSeedController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/QueueDisplayController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationShareTemplateSeedController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
@@ -518,6 +519,7 @@ class ReservationControllerTest {
                 "src/pages/PlatformCallScreenSeedPage.vue",
                 "src/pages/PlatformProfilePage.vue",
                 "src/pages/PlatformProductLinesPage.vue",
+                "src/pages/PlatformReservationShareTemplateSeedPage.vue",
                 "src/pages/PlatformTenantBillingPage.vue",
                 "src/pages/PlatformTenantFormPage.vue",
                 "src/pages/PlatformTenantsPage.vue",
@@ -557,6 +559,7 @@ class ReservationControllerTest {
                 "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+                "src/pages/PlatformReservationShareTemplateSeedPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/TenantAdminReservationSharePage.vue"
             ).contains(path))

@@ -68,6 +68,24 @@ public class TenantAdminProfileRepository {
         ).stream().findFirst();
     }
 
+    public boolean syncStoreShareContact(StoreScope scope, String contactPhone, String address) {
+        int updated = jdbc.update(
+            """
+            update stores
+            set share_contact_phone = ?,
+                share_address = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and deleted_at is null
+            """,
+            contactPhone,
+            address,
+            scope.tenantId().value()
+        );
+        return updated > 0;
+    }
+
     public Optional<TenantAdminProfile> updateLogoMediaAsset(StoreScope scope, UUID logoMediaAssetId) {
         return jdbc.query(
             """

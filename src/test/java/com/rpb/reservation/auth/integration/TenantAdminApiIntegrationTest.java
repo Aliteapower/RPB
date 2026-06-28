@@ -39,6 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class TenantAdminApiIntegrationTest {
     private static final AuthPostgresTestDatabase DATABASE = AuthPostgresTestDatabase.startWithValidationStore();
     private static final String PASSWORD_393930_HASH = "$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy";
+    private static final UUID SECONDARY_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000984");
 
     @Autowired
     private MockMvc mockMvc;
@@ -87,6 +88,11 @@ class TenantAdminApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.staff[0].employeeNo").value("1000"));
+
+        mockMvc.perform(get(basePath() + "/settings").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.settings.dateFormat").value("DD-MM-YYYY"));
 
         UUID staffId = createStaff(session, "codex-1001", "Codex 员工");
 
@@ -171,6 +177,7 @@ class TenantAdminApiIntegrationTest {
                 .cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.settings.storeName").value("食刻门店"))
+            .andExpect(jsonPath("$.settings.dateFormat").value("DD-MM-YYYY"))
             .andExpect(jsonPath("$.settings.reservationHoldMinutes").value(18))
             .andExpect(jsonPath("$.settings.queueCallHoldMinutes").value(4))
             .andExpect(jsonPath("$.settings.expectedDiningMinutes").value(88));
@@ -182,6 +189,7 @@ class TenantAdminApiIntegrationTest {
             where store.id = ?
               and store.tenant_id = ?
               and store.display_name = '食刻门店'
+              and store.date_format = 'DD-MM-YYYY'
               and store.currency = 'CNY'
               and policy.reservation_hold_minutes = 18
               and policy.queue_call_hold_minutes = 4
@@ -199,18 +207,31 @@ class TenantAdminApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.shareProfile.storeDisplayName").isNotEmpty())
-            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{storeName}}")))
+            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("尊敬的 {{contactName}} {{guestSalutation}}")))
             .andExpect(jsonPath("$.shareProfile.defaultReservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{reservationNo}}")))
+            .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(true))
             .andExpect(jsonPath("$.shareProfile.availableVariables[0]").exists());
+
+        mockMvc.perform(patch(basePath() + "/profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"食刻租户",
+                      "defaultLocale":"zh-CN",
+                      "contactPhone":"021-393930",
+                      "address":"上海市徐汇区示例路 1 号",
+                      "principalName":"张店长"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk());
 
         mockMvc.perform(patch(basePath() + "/share-profile")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
                       "shareDisplayName":"食刻订位中心",
-                      "shareAddress":"上海市徐汇区示例路 1 号",
                       "googleMapUrl":"https://maps.app.goo.gl/rpb",
-                      "shareContactPhone":"021-393930",
                       "reservationShareNote":"请提前 10 分钟到店",
                       "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
                     }
@@ -229,9 +250,7 @@ class TenantAdminApiIntegrationTest {
                 .content("""
                     {
                       "shareDisplayName":"食刻订位中心",
-                      "shareAddress":"上海市徐汇区示例路 1 号",
                       "googleMapUrl":"https://maps.app.goo.gl/rpb",
-                      "shareContactPhone":"021-393930",
                       "reservationShareNote":"请提前 10 分钟到店",
                       "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
                     }
@@ -241,6 +260,40 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("门店：食刻订位中心")))
             .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("地图：https://maps.app.goo.gl/rpb")));
+
+        mockMvc.perform(patch(basePath() + "/share-profile/template")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reservationShareTemplate":"桌位：{{tableCode}}\\n保留：{{holdMinutes}}分钟\\n电话：{{storePhone}}"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.shareProfile.shareDisplayName").value("食刻订位中心"))
+            .andExpect(jsonPath("$.shareProfile.shareAddress").value("上海市徐汇区示例路 1 号"))
+            .andExpect(jsonPath("$.shareProfile.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
+            .andExpect(jsonPath("$.shareProfile.shareContactPhone").value("021-393930"))
+            .andExpect(jsonPath("$.shareProfile.reservationShareNote").value("请提前 10 分钟到店"))
+            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{tableCode}}")))
+            .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(false));
+
+        mockMvc.perform(post(basePath() + "/share-profile/preview")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reservationShareTemplate":"地址：{{storeAddress}}\\n地图：{{googleMapUrl}}\\n电话：{{storePhone}}\\n提示：{{arrivalNote}}\\n桌位：{{tableCode}}\\n保留：{{holdMinutes}}分钟"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("地址：上海市徐汇区示例路 1 号")))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("地图：https://maps.app.goo.gl/rpb")))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("电话：021-393930")))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("提示：请提前 10 分钟到店")))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("桌位：A01")))
+            .andExpect(jsonPath("$.preview.shareText").value(org.hamcrest.Matchers.containsString("保留：15分钟")));
 
         mockMvc.perform(patch(basePath() + "/share-profile")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -258,7 +311,7 @@ class TenantAdminApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(true))
-            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{storeName}}")));
+            .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("尊敬的 {{contactName}} {{guestSalutation}}")));
 
         assertThat(countWhere("""
             select count(*)
@@ -270,13 +323,15 @@ class TenantAdminApiIntegrationTest {
               and google_map_url = 'https://maps.app.goo.gl/rpb'
               and share_contact_phone = '021-393930'
               and reservation_share_note = '请提前 10 分钟到店'
-              and reservation_share_template is null
+              and reservation_share_template like '%尊敬的 {{contactName}} {{guestSalutation}}%'
+              and reservation_share_template like '%{{reservationNo}}%'
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
     }
 
     @Test
     void tenantAdminMaintainsOwnTenantProfileAndLogo() throws Exception {
         Cookie session = login("20000000");
+        upsertSecondaryStoreForProfileSync();
 
         mockMvc.perform(get(basePath() + "/profile").cookie(session))
             .andExpect(status().isOk())
@@ -314,6 +369,15 @@ class TenantAdminApiIntegrationTest {
               and address = '上海市徐汇区示例路 1 号'
               and principal_name = '张店长'
             """, VALIDATION_TENANT_ID)).isEqualTo(1);
+
+        assertThat(countWhere("""
+            select count(*)
+            from stores
+            where tenant_id = ?
+              and id in (?, ?)
+              and share_address = '上海市徐汇区示例路 1 号'
+              and share_contact_phone = '021-393930'
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID, SECONDARY_STORE_ID)).isEqualTo(2);
 
         MockMultipartFile logo = new MockMultipartFile(
             "file",
@@ -683,6 +747,29 @@ class TenantAdminApiIntegrationTest {
             VALIDATION_STORE_ID
         );
         return maxSortOrder == null ? 0 : maxSortOrder;
+    }
+
+    private void upsertSecondaryStoreForProfileSync() {
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency,
+                share_address, share_contact_phone
+            )
+            values (?, ?, 'profile-sync-store', '同步验证门店', 'active',
+                    'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD',
+                    '旧地址', '旧电话')
+            on conflict (id) do update
+            set share_address = '旧地址',
+                share_contact_phone = '旧电话',
+                deleted_at = null,
+                updated_at = now(),
+                version = stores.version + 1
+            """,
+            SECONDARY_STORE_ID,
+            VALIDATION_TENANT_ID
+        );
     }
 
     private byte[] tableImportWorkbook() throws Exception {

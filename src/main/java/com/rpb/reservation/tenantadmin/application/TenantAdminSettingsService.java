@@ -48,7 +48,7 @@ public class TenantAdminSettingsService {
             requiredText(command.storeName()),
             requiredText(command.timezone()),
             requiredText(command.locale()),
-            requiredText(command.dateFormat()),
+            normalizedDateFormat(command.dateFormat()),
             requiredText(command.timeFormat()),
             requiredText(command.currency()),
             positive(command.reservationHoldMinutes()),
@@ -69,6 +69,14 @@ public class TenantAdminSettingsService {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
         return value.trim();
+    }
+
+    private static String normalizedDateFormat(String value) {
+        String dateFormat = requiredText(value);
+        if ("yyyy-MM-dd".equals(dateFormat) || "dd-MM-yyyy".equals(dateFormat)) {
+            return "DD-MM-YYYY";
+        }
+        return dateFormat;
     }
 
     private record NormalizedSettingsInput(

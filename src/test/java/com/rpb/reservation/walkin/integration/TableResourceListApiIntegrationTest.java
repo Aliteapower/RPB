@@ -375,7 +375,7 @@ class TableResourceListApiIntegrationTest {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-table-resource-it', 'Table Resource Store', 'active',
-                'Asia/Singapore', 'zh-CN', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             STORE_ID,
             TENANT_ID

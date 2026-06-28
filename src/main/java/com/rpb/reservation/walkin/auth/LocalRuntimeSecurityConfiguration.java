@@ -101,6 +101,8 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/convert-from-legacy").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/platform/call-screen/text-seed").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/call-screen/text-seed").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/platform/reservation/share-template-seed").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/reservation/share-template-seed").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/platform/call-screen/media-seed").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/call-screen/media-seed").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/call-screen/media").permitAll()

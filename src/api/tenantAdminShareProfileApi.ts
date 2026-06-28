@@ -5,6 +5,7 @@ import {
 import type {
   TenantAdminShareProfileMutation,
   TenantAdminShareProfileResponse,
+  TenantAdminShareTemplateMutation,
   TenantAdminSharePreviewResponse
 } from '../types/tenantAdminShareProfile'
 
@@ -23,6 +24,14 @@ export async function updateTenantAdminShareProfile(
   fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminShareProfileResponse> {
   return requestJson(shareProfileEndpoint(storeId), { method: 'PATCH', body: request, fetcher })
+}
+
+export async function updateTenantAdminShareProfileTemplate(
+  storeId: string,
+  request: TenantAdminShareTemplateMutation,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse> {
+  return requestJson(`${shareProfileEndpoint(storeId)}/template`, { method: 'PATCH', body: request, fetcher })
 }
 
 export async function previewTenantAdminShareProfile(

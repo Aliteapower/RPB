@@ -54,6 +54,16 @@ public class TenantAdminShareProfileController {
         return ResponseEntity.ok(TenantAdminSharePreviewResponse.from(service.preview(scope, toCommand(request))));
     }
 
+    @PatchMapping("/template")
+    public ResponseEntity<TenantAdminShareProfileResponse> updateShareTemplate(
+        @PathVariable UUID storeId,
+        @RequestBody(required = false) TenantAdminShareTemplateRequest request
+    ) {
+        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        String template = request == null ? null : request.reservationShareTemplate();
+        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.updateTemplate(scope, template)));
+    }
+
     @PostMapping("/default-template")
     public ResponseEntity<TenantAdminShareProfileResponse> restoreDefaultTemplate(@PathVariable UUID storeId) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
@@ -81,9 +91,7 @@ public class TenantAdminShareProfileController {
         }
         return new TenantAdminShareProfileCommand(
             request.shareDisplayName(),
-            request.shareAddress(),
             request.googleMapUrl(),
-            request.shareContactPhone(),
             request.reservationShareNote(),
             request.reservationShareTemplate()
         );

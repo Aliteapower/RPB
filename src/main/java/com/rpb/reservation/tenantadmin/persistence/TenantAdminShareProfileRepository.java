@@ -42,9 +42,7 @@ public class TenantAdminShareProfileRepository {
             """
             update stores
             set share_display_name = ?,
-                share_address = ?,
                 google_map_url = ?,
-                share_contact_phone = ?,
                 reservation_share_note = ?,
                 reservation_share_template = ?,
                 updated_at = now(),
@@ -54,9 +52,7 @@ public class TenantAdminShareProfileRepository {
               and deleted_at is null
             """,
             input.shareDisplayName(),
-            input.shareAddress(),
             input.googleMapUrl(),
-            input.shareContactPhone(),
             input.reservationShareNote(),
             input.reservationShareTemplate(),
             scope.tenantId().value(),
@@ -65,17 +61,18 @@ public class TenantAdminShareProfileRepository {
         return updated > 0;
     }
 
-    public boolean clearTemplate(StoreScope scope) {
+    public boolean updateTemplate(StoreScope scope, String reservationShareTemplate) {
         int updated = jdbc.update(
             """
             update stores
-            set reservation_share_template = null,
+            set reservation_share_template = ?,
                 updated_at = now(),
                 version = version + 1
             where tenant_id = ?
               and id = ?
               and deleted_at is null
             """,
+            reservationShareTemplate,
             scope.tenantId().value(),
             scope.storeId().value()
         );

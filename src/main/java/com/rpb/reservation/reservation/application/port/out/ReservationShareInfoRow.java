@@ -8,6 +8,8 @@ public record ReservationShareInfoRow(
     String reservationNo,
     int partySize,
     Instant reservedStartAt,
+    Instant holdUntilAt,
+    String tableCode,
     String customerName,
     String customerNickname,
     String customerPhoneE164,

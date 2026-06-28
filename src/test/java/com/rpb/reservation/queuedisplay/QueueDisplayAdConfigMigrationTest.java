@@ -337,7 +337,7 @@ class QueueDisplayAdConfigMigrationTest {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, ?, '食刻门店', 'active',
-                'Asia/Singapore', 'zh-CN', 'yyyy-MM-dd', 'HH:mm', 'CNY')
+                'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'CNY')
             """,
             storeId,
             tenantId,

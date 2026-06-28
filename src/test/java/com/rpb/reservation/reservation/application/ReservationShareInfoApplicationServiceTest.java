@@ -5,10 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoReadPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoRow;
+import com.rpb.reservation.reservation.application.port.out.ReservationShareTemplateSeedPort;
 import com.rpb.reservation.reservation.application.query.ReservationShareInfoQuery;
 import com.rpb.reservation.reservation.application.service.PhoneMaskingPolicy;
 import com.rpb.reservation.reservation.application.service.ReservationShareInfoApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateCatalog;
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateRenderer;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateSeedService;
 import com.rpb.reservation.reservation.application.service.StoreShareDateTimeFormatter;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
@@ -35,6 +38,8 @@ class ReservationShareInfoApplicationServiceTest {
             编号：{{reservationNo}}
             时间：{{reservationDate}} {{reservationTime}}
             人数：{{partySize}}
+            桌位：{{tableCode}}
+            保留：{{holdMinutes}} 分钟
             联系人：{{contactName}}
             电话：{{maskedPhone}}
             地址：{{storeAddress}}
@@ -59,6 +64,8 @@ class ReservationShareInfoApplicationServiceTest {
             .contains("编号：R-20300620-0007")
             .contains("时间：20-06-2030 11:30")
             .contains("人数：4")
+            .contains("桌位：A01")
+            .contains("保留：15 分钟")
             .contains("联系人：Ada Guest")
             .contains("电话：****4567")
             .contains("地址：1 Example Road")
@@ -76,8 +83,19 @@ class ReservationShareInfoApplicationServiceTest {
 
         assertThat(result.success()).isTrue();
         assertThat(result.shareInfo().shareText())
-            .contains("【订位确认】")
-            .contains("预约编号：R-20300620-0007")
+            .contains("尊敬的 Ada Guest 先生/女士")
+            .contains("感谢您选择 食刻订位中心")
+            .contains("预订编号：R-20300620-0007")
+            .contains("日期：20-06-2030")
+            .contains("时间：11:30")
+            .contains("人数：4位成人")
+            .contains("桌位：A01 (已预留)")
+            .contains("预留时间：为保证所有宾客的用餐体验，我们将为您保留座位 15分钟")
+            .contains("https://maps.app.goo.gl/rpb")
+            .contains("请提前 10 分钟到店")
+            .contains("如需修改或取消，请至少提前 2 小时致电 6333 1234 联系我们")
+            .contains("食刻订位中心 预订部")
+            .contains("6333 1234 | 1 Example Road")
             .doesNotContain("unsupportedVariable");
     }
 
@@ -115,6 +133,8 @@ class ReservationShareInfoApplicationServiceTest {
             "R-20300620-0007",
             4,
             Instant.parse("2030-06-20T03:30:00Z"),
+            Instant.parse("2030-06-20T03:45:00Z"),
+            "A01",
             "Ada Guest",
             "VIP",
             "+6591234567",
@@ -135,6 +155,8 @@ class ReservationShareInfoApplicationServiceTest {
             "R-20300620-0007",
             2,
             Instant.parse("2030-06-20T03:30:00Z"),
+            Instant.parse("2030-06-20T03:45:00Z"),
+            null,
             "No Phone Guest",
             null,
             null,
@@ -157,6 +179,7 @@ class ReservationShareInfoApplicationServiceTest {
             storeRepository,
             readPort,
             new ReservationShareTemplateRenderer(),
+            new ReservationShareTemplateSeedService(new FakeReservationShareTemplateSeedPort()),
             new PhoneMaskingPolicy(),
             new StoreShareDateTimeFormatter()
         );
@@ -207,6 +230,13 @@ class ReservationShareInfoApplicationServiceTest {
                 return Optional.empty();
             }
             return Optional.ofNullable(row);
+        }
+    }
+
+    private static final class FakeReservationShareTemplateSeedPort implements ReservationShareTemplateSeedPort {
+        @Override
+        public Optional<ReservationShareTemplateSeed> findActiveBySeedKey(String seedKey) {
+            return Optional.of(new ReservationShareTemplateSeed(seedKey, ReservationShareTemplateCatalog.defaultTemplate()));
         }
     }
 }

@@ -45,7 +45,7 @@ final class WalkInDirectSeatingIntegrationFixture {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-it', 'Integration Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             STORE_ID,
             TENANT_ID
@@ -57,7 +57,7 @@ final class WalkInDirectSeatingIntegrationFixture {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-it-other', 'Integration Other Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             OTHER_STORE_ID,
             TENANT_ID

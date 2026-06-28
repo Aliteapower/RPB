@@ -7,13 +7,13 @@ import {
   getTenantAdminShareProfile,
   previewTenantAdminShareProfile,
   resetTenantAdminShareProfileTemplate,
-  updateTenantAdminShareProfile
+  updateTenantAdminShareProfileTemplate
 } from '../api/tenantAdminShareProfileApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
   TenantAdminShareProfile,
-  TenantAdminShareProfileMutation
+  TenantAdminShareTemplateMutation
 } from '../types/tenantAdminShareProfile'
 
 const route = useRoute()
@@ -30,12 +30,6 @@ const availableVariables = ref<string[]>([])
 const storeId = computed(() => String(route.params.storeId || ''))
 
 const form = reactive({
-  storeDisplayName: '',
-  shareDisplayName: '',
-  shareAddress: '',
-  googleMapUrl: '',
-  shareContactPhone: '',
-  reservationShareNote: '',
   reservationShareTemplate: ''
 })
 
@@ -69,7 +63,7 @@ async function submitShareProfile(): Promise<void> {
   savedText.value = ''
 
   try {
-    const response = await updateTenantAdminShareProfile(storeId.value, toMutation())
+    const response = await updateTenantAdminShareProfileTemplate(storeId.value, toTemplateMutation())
     applyShareProfile(response.shareProfile)
     savedText.value = '已保存'
   } catch (error) {
@@ -89,7 +83,7 @@ async function previewShareProfile(): Promise<void> {
   previewText.value = ''
 
   try {
-    const response = await previewTenantAdminShareProfile(storeId.value, toMutation())
+    const response = await previewTenantAdminShareProfile(storeId.value, toTemplateMutation())
     previewText.value = response.preview.shareText
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -119,23 +113,12 @@ async function restoreDefaultTemplate(): Promise<void> {
 }
 
 function applyShareProfile(profile: TenantAdminShareProfile): void {
-  form.storeDisplayName = profile.storeDisplayName
-  form.shareDisplayName = profile.shareDisplayName
-  form.shareAddress = profile.shareAddress
-  form.googleMapUrl = profile.googleMapUrl
-  form.shareContactPhone = profile.shareContactPhone
-  form.reservationShareNote = profile.reservationShareNote
   form.reservationShareTemplate = profile.reservationShareTemplate
   availableVariables.value = profile.availableVariables
 }
 
-function toMutation(): TenantAdminShareProfileMutation {
+function toTemplateMutation(): TenantAdminShareTemplateMutation {
   return {
-    shareDisplayName: nullableText(form.shareDisplayName),
-    shareAddress: nullableText(form.shareAddress),
-    googleMapUrl: nullableText(form.googleMapUrl),
-    shareContactPhone: nullableText(form.shareContactPhone),
-    reservationShareNote: nullableText(form.reservationShareNote),
     reservationShareTemplate: nullableText(form.reservationShareTemplate)
   }
 }
@@ -181,7 +164,7 @@ function apiErrorText(error: unknown): string {
       <header class="page-heading">
         <div>
           <span>租户</span>
-          <h1>订位分享</h1>
+          <h1>订位分享模板</h1>
         </div>
       </header>
 
@@ -190,31 +173,6 @@ function apiErrorText(error: unknown): string {
       <p v-if="loading" class="loading-line">加载中</p>
 
       <form v-else class="form-panel" @submit.prevent="submitShareProfile">
-        <label>
-          <span>后台店名</span>
-          <input v-model.trim="form.storeDisplayName" disabled />
-        </label>
-        <label>
-          <span>分享显示名称</span>
-          <input v-model.trim="form.shareDisplayName" />
-        </label>
-        <label>
-          <span>联系电话</span>
-          <input v-model.trim="form.shareContactPhone" />
-        </label>
-        <label class="form-panel__wide">
-          <span>分享地址</span>
-          <input v-model.trim="form.shareAddress" />
-        </label>
-        <label class="form-panel__wide">
-          <span>Google Map 链接</span>
-          <input v-model.trim="form.googleMapUrl" />
-        </label>
-        <label class="form-panel__wide">
-          <span>到店提示</span>
-          <input v-model.trim="form.reservationShareNote" />
-        </label>
-
         <section class="template-tools form-panel__wide" aria-label="模板变量">
           <button
             v-for="variable in availableVariables"

@@ -33,7 +33,7 @@ public class DefaultStoreMapper implements StoreMapper {
             domain.status(),
             domain.timezone(),
             domain.locale(),
-            "yyyy-MM-dd",
+            "DD-MM-YYYY",
             "HH:mm",
             "USD",
             now,

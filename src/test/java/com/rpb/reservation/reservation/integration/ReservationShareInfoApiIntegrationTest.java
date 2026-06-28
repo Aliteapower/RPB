@@ -40,6 +40,9 @@ class ReservationShareInfoApiIntegrationTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000001201");
     private static final UUID CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000001201");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000001201");
+    private static final UUID AREA_ID = UUID.fromString("60000000-0000-0000-0000-000000001201");
+    private static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000001201");
+    private static final UUID PREASSIGNMENT_ID = UUID.fromString("80000000-0000-0000-0000-000000001201");
     private static final LocalDate BUSINESS_DATE = LocalDate.parse("2030-06-20");
     private static final Instant RESERVED_START_AT = Instant.parse("2030-06-20T03:30:00Z");
 
@@ -90,6 +93,8 @@ class ReservationShareInfoApiIntegrationTest {
             .andExpect(jsonPath("$.shareInfo.whatsappLink").doesNotExist())
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("门店：食刻订位中心")))
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("时间：20-06-2030 11:30")))
+            .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("桌位：A01")))
+            .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("保留：15分钟")))
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("地图：https://maps.app.goo.gl/rpb")));
 
         assertReadOnlyBoundary();
@@ -160,10 +165,10 @@ class ReservationShareInfoApiIntegrationTest {
                 share_contact_phone, reservation_share_note, reservation_share_template
             )
             values (?, ?, 'store-share-it', 'Reservation Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD',
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD',
                 '食刻订位中心', '1 Example Road', 'https://maps.app.goo.gl/rpb',
                 '6333 1234', '请提前 10 分钟到店',
-                '门店：{{storeName}}\n编号：{{reservationNo}}\n时间：{{reservationDate}} {{reservationTime}}\n人数：{{partySize}}\n联系人：{{contactName}}\n电话：{{maskedPhone}}\n地址：{{storeAddress}}\n地图：{{googleMapUrl}}\n提示：{{arrivalNote}}\n门店电话：{{storePhone}}')
+                '门店：{{storeName}}\n编号：{{reservationNo}}\n时间：{{reservationDate}} {{reservationTime}}\n人数：{{partySize}}\n桌位：{{tableCode}}\n保留：{{holdMinutes}}分钟\n联系人：{{contactName}}\n电话：{{maskedPhone}}\n地址：{{storeAddress}}\n地图：{{googleMapUrl}}\n提示：{{arrivalNote}}\n门店电话：{{storePhone}}')
             """,
             STORE_ID,
             TENANT_ID
@@ -175,7 +180,7 @@ class ReservationShareInfoApiIntegrationTest {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-share-other', 'Other Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             OTHER_STORE_ID,
             TENANT_ID
@@ -208,6 +213,44 @@ class ReservationShareInfoApiIntegrationTest {
             utc(RESERVED_START_AT),
             utc(RESERVED_START_AT.plusSeconds(90 * 60L)),
             utc(RESERVED_START_AT.plusSeconds(15 * 60L))
+        );
+        jdbc.update(
+            """
+            insert into store_areas (
+                id, tenant_id, store_id, area_code, display_name, status, sort_order
+            )
+            values (?, ?, ?, 'A', 'A区', 'active', 1)
+            """,
+            AREA_ID,
+            TENANT_ID,
+            STORE_ID
+        );
+        jdbc.update(
+            """
+            insert into dining_tables (
+                id, tenant_id, store_id, area_id, table_code, display_name,
+                capacity_min, capacity_max, status, is_combinable
+            )
+            values (?, ?, ?, ?, 'A01', 'A01', 2, 4, 'available', true)
+            """,
+            TABLE_ID,
+            TENANT_ID,
+            STORE_ID,
+            AREA_ID
+        );
+        jdbc.update(
+            """
+            insert into reservation_preassignments (
+                id, tenant_id, store_id, reservation_id, resource_type, table_id,
+                status, preassigned_at
+            )
+            values (?, ?, ?, ?, 'dining_table', ?, 'active', now())
+            """,
+            PREASSIGNMENT_ID,
+            TENANT_ID,
+            STORE_ID,
+            RESERVATION_ID,
+            TABLE_ID
         );
         enableReservationQueueApp(STORE_ID);
         enableReservationQueueApp(OTHER_STORE_ID);

@@ -36,9 +36,7 @@ interface TenantProfileForm {
 interface TenantShareProfileForm {
   storeDisplayName: string
   shareDisplayName: string
-  shareAddress: string
   googleMapUrl: string
-  shareContactPhone: string
   reservationShareNote: string
   reservationShareTemplate: string
   usesDefaultReservationShareTemplate: boolean
@@ -72,9 +70,7 @@ const form = reactive<TenantProfileForm>({
 const shareForm = reactive<TenantShareProfileForm>({
   storeDisplayName: '',
   shareDisplayName: '',
-  shareAddress: '',
   googleMapUrl: '',
-  shareContactPhone: '',
   reservationShareNote: '',
   reservationShareTemplate: '',
   usesDefaultReservationShareTemplate: true
@@ -211,9 +207,7 @@ function applyShareProfile(profile: TenantAdminShareProfile): void {
   Object.assign(shareForm, {
     storeDisplayName: profile.storeDisplayName,
     shareDisplayName: profile.shareDisplayName,
-    shareAddress: profile.shareAddress,
     googleMapUrl: profile.googleMapUrl,
-    shareContactPhone: profile.shareContactPhone,
     reservationShareNote: profile.reservationShareNote,
     reservationShareTemplate: profile.reservationShareTemplate,
     usesDefaultReservationShareTemplate: profile.usesDefaultReservationShareTemplate
@@ -233,9 +227,7 @@ function toPayload(): TenantAdminProfileMutation {
 function toSharePayload(): TenantAdminShareProfileMutation {
   return {
     shareDisplayName: optionalValue(shareForm.shareDisplayName),
-    shareAddress: optionalValue(shareForm.shareAddress),
     googleMapUrl: optionalValue(shareForm.googleMapUrl),
-    shareContactPhone: optionalValue(shareForm.shareContactPhone),
     reservationShareNote: optionalValue(shareForm.reservationShareNote),
     reservationShareTemplate: shareForm.usesDefaultReservationShareTemplate
       ? null
@@ -351,16 +343,8 @@ function apiErrorText(error: unknown): string {
               <input v-model.trim="shareForm.shareDisplayName" />
             </label>
             <label>
-              <span>联系电话</span>
-              <input v-model.trim="shareForm.shareContactPhone" />
-            </label>
-            <label>
               <span>Google Map 链接</span>
               <input v-model.trim="shareForm.googleMapUrl" />
-            </label>
-            <label class="wide-field">
-              <span>分享地址</span>
-              <input v-model.trim="shareForm.shareAddress" />
             </label>
             <label class="wide-field">
               <span>到店提示</span>

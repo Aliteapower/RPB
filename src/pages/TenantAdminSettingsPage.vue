@@ -24,7 +24,7 @@ const form = reactive<TenantAdminSettings>({
   storeName: '',
   timezone: 'Asia/Shanghai',
   locale: 'zh-CN',
-  dateFormat: 'yyyy-MM-dd',
+  dateFormat: 'DD-MM-YYYY',
   timeFormat: 'HH:mm',
   currency: 'CNY',
   reservationHoldMinutes: 15,
@@ -135,7 +135,7 @@ function apiErrorText(error: unknown): string {
         </label>
         <label>
           <span>日期格式</span>
-          <input v-model.trim="form.dateFormat" required />
+          <input v-model.trim="form.dateFormat" placeholder="DD-MM-YYYY" required />
         </label>
         <label>
           <span>时间格式</span>

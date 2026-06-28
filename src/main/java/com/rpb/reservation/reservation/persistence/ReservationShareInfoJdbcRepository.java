@@ -28,6 +28,28 @@ public class ReservationShareInfoJdbcRepository implements ReservationShareInfoR
                    reservation.reservation_code as reservation_no,
                    reservation.party_size,
                    reservation.reserved_start_at,
+                   reservation.hold_until_at,
+                   (
+                       select coalesce(assigned_table.table_code, assigned_group.group_code)
+                       from reservation_preassignments preassignment
+                       left join dining_tables assigned_table
+                         on assigned_table.id = preassignment.table_id
+                        and assigned_table.tenant_id = preassignment.tenant_id
+                        and assigned_table.store_id = preassignment.store_id
+                        and assigned_table.deleted_at is null
+                       left join table_groups assigned_group
+                         on assigned_group.id = preassignment.table_group_id
+                        and assigned_group.tenant_id = preassignment.tenant_id
+                        and assigned_group.store_id = preassignment.store_id
+                        and assigned_group.deleted_at is null
+                       where preassignment.tenant_id = reservation.tenant_id
+                         and preassignment.store_id = reservation.store_id
+                         and preassignment.reservation_id = reservation.id
+                         and preassignment.status = 'active'
+                         and preassignment.deleted_at is null
+                       order by preassignment.preassigned_at asc, preassignment.created_at asc
+                       limit 1
+                   ) as table_code,
                    customer.display_name as customer_name,
                    customer.nickname as customer_nickname,
                    customer.phone_e164 as customer_phone_e164,
@@ -64,6 +86,8 @@ public class ReservationShareInfoJdbcRepository implements ReservationShareInfoR
             rs.getString("reservation_no"),
             rs.getInt("party_size"),
             toInstant(rs.getObject("reserved_start_at", OffsetDateTime.class)),
+            toInstant(rs.getObject("hold_until_at", OffsetDateTime.class)),
+            rs.getString("table_code"),
             rs.getString("customer_name"),
             rs.getString("customer_nickname"),
             rs.getString("customer_phone_e164"),
