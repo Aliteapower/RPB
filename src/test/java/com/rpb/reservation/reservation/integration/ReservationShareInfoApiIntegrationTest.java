@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 class ReservationShareInfoApiIntegrationTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/share-info";
+    private static final String PUBLIC_ENDPOINT = "/api/v1/public/reservation-shares/{token}";
     private static final LocalPostgresTestDatabase DATABASE = LocalPostgresTestDatabase.start();
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000001201");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000001201");
@@ -91,6 +92,10 @@ class ReservationShareInfoApiIntegrationTest {
             .andExpect(jsonPath("$.shareInfo.customerPhoneAvailable").value(true))
             .andExpect(jsonPath("$.shareInfo.canOpenWhatsAppLink").value(false))
             .andExpect(jsonPath("$.shareInfo.whatsappLink").doesNotExist())
+            .andExpect(jsonPath("$.shareInfo.shareToken").isNotEmpty())
+            .andExpect(jsonPath("$.shareInfo.sharePath").value(org.hamcrest.Matchers.startsWith("/reservation-share/")))
+            .andExpect(jsonPath("$.shareInfo.shareTitle").value("食刻订位中心 订位确认"))
+            .andExpect(jsonPath("$.shareInfo.shareSummary").value("20-06-2030 11:30 · 4人"))
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("门店：食刻订位中心")))
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("时间：20-06-2030 11:30")))
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("桌位：A01")))
@@ -98,6 +103,67 @@ class ReservationShareInfoApiIntegrationTest {
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("地图：https://maps.app.goo.gl/rpb")));
 
         assertReadOnlyBoundary();
+    }
+
+    @Test
+    void publicTokenEndpointReturnsCustomerSafeShareViewWithoutActor() throws Exception {
+        mockMvc.perform(get(ENDPOINT, STORE_ID, RESERVATION_ID))
+            .andExpect(status().isOk());
+        String token = stringValue("""
+            select token
+            from reservation_public_share_tokens
+            where tenant_id = ?
+              and store_id = ?
+              and reservation_id = ?
+              and status = 'active'
+            """, TENANT_ID, STORE_ID, RESERVATION_ID);
+        int tokenCountBefore = count("reservation_public_share_tokens");
+
+        actorProvider.clear();
+
+        mockMvc.perform(get(PUBLIC_ENDPOINT, token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.share.reservationNo").value("R-SHARE-0007"))
+            .andExpect(jsonPath("$.share.storeName").value("食刻订位中心"))
+            .andExpect(jsonPath("$.share.reservationDate").value("20-06-2030"))
+            .andExpect(jsonPath("$.share.reservationTime").value("11:30"))
+            .andExpect(jsonPath("$.share.partySize").value(4))
+            .andExpect(jsonPath("$.share.tableCode").value("A01"))
+            .andExpect(jsonPath("$.share.tablePending").value(false))
+            .andExpect(jsonPath("$.share.arrivalNote").value("请提前 10 分钟到店"))
+            .andExpect(jsonPath("$.share.storePhone").value("6333 1234"))
+            .andExpect(jsonPath("$.share.storeAddress").value("1 Example Road"))
+            .andExpect(jsonPath("$.share.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
+            .andExpect(jsonPath("$.share.shareTitle").value("食刻订位中心 订位确认"))
+            .andExpect(jsonPath("$.share.shareSummary").value("20-06-2030 11:30 · 4人"))
+            .andExpect(jsonPath("$.share.tenantId").doesNotExist())
+            .andExpect(jsonPath("$.share.storeId").doesNotExist())
+            .andExpect(jsonPath("$.share.reservationId").doesNotExist())
+            .andExpect(jsonPath("$.share.customerPhone").doesNotExist());
+
+        assertThat(count("reservation_public_share_tokens")).isEqualTo(tokenCountBefore);
+        assertReadOnlyBoundary();
+    }
+
+    @Test
+    void publicTokenEndpointReturnsStableErrorsForMissingRevokedAndExpiredTokens() throws Exception {
+        mockMvc.perform(get(PUBLIC_ENDPOINT, "missing-token"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("TOKEN_NOT_FOUND"));
+
+        insertToken("revoked-token", "revoked", null);
+        mockMvc.perform(get(PUBLIC_ENDPOINT, "revoked-token"))
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("TOKEN_REVOKED"));
+
+        insertToken("expired-token", "active", Instant.parse("2020-01-01T00:00:00Z"));
+        mockMvc.perform(get(PUBLIC_ENDPOINT, "expired-token"))
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("TOKEN_EXPIRED"));
     }
 
     @Test
@@ -290,6 +356,27 @@ class ReservationShareInfoApiIntegrationTest {
 
     private int countWhere(String sql, Object... args) {
         return jdbc.queryForObject(sql, Integer.class, args);
+    }
+
+    private String stringValue(String sql, Object... args) {
+        return jdbc.queryForObject(sql, String.class, args);
+    }
+
+    private void insertToken(String token, String status, Instant expiresAt) {
+        jdbc.update(
+            """
+            insert into reservation_public_share_tokens (
+                tenant_id, store_id, reservation_id, token, status, expires_at
+            )
+            values (?, ?, ?, ?, ?, ?)
+            """,
+            TENANT_ID,
+            STORE_ID,
+            RESERVATION_ID,
+            token,
+            status,
+            expiresAt == null ? null : utc(expiresAt)
+        );
     }
 
     private static CurrentActor actor(Set<String> roles, Set<String> permissions, Set<UUID> storeIds) {

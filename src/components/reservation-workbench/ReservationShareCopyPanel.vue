@@ -5,7 +5,7 @@ const props = withDefaults(
   defineProps<{
     shareInfo: ReservationShareInfo | null
     loading?: boolean
-    copied?: boolean
+    shared?: boolean
     errorText?: string
     fallbackText?: string
     buttonText?: string
@@ -13,37 +13,37 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
-    copied: false,
+    shared: false,
     errorText: '',
     fallbackText: '',
-    buttonText: '复制订位信息',
+    buttonText: '转发订位链接',
     disabled: false
   }
 )
 
 const emit = defineEmits<{
-  'copy-requested': []
+  'share-requested': []
 }>()
 
-function requestCopy(): void {
+function requestShare(): void {
   if (!props.loading && !props.disabled) {
-    emit('copy-requested')
+    emit('share-requested')
   }
 }
 </script>
 
 <template>
-  <section class="reservation-share-copy" aria-label="订位分享复制">
+  <section class="reservation-share-copy" aria-label="订位链接转发">
     <button
       class="reservation-share-copy__button"
       type="button"
       :disabled="loading || disabled"
-      @click="requestCopy"
+      @click="requestShare"
     >
       {{ loading ? '读取中' : buttonText }}
     </button>
 
-    <p v-if="copied" class="reservation-share-copy__status" role="status">已复制</p>
+    <p v-if="shared" class="reservation-share-copy__status" role="status">已准备链接</p>
     <p v-else-if="errorText" class="reservation-share-copy__error" role="alert">{{ errorText }}</p>
 
     <textarea
@@ -51,7 +51,7 @@ function requestCopy(): void {
       class="reservation-share-copy__fallback"
       readonly
       :value="fallbackText"
-      aria-label="订位分享文本"
+      aria-label="订位分享链接"
     ></textarea>
   </section>
 </template>

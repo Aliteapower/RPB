@@ -7,6 +7,10 @@ export interface ReservationShareInfo {
   customerPhoneAvailable: boolean
   canOpenWhatsAppLink: boolean
   whatsappLink?: string | null
+  shareToken: string
+  sharePath: string
+  shareTitle: string
+  shareSummary: string
 }
 
 export interface ReservationShareInfoResponse {

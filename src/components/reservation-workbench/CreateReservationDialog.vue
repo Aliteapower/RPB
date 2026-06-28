@@ -79,7 +79,7 @@ const createdReservation = ref<CreateReservationResponse | null>(null)
 const createdShareInfo = ref<ReservationShareInfo | null>(null)
 const isLoadingCreatedShare = ref(false)
 const createdShareErrorText = ref('')
-const createdShareCopied = ref(false)
+const createdShareShared = ref(false)
 const createdShareFallbackText = ref('')
 let tableResourceLoadSequence = 0
 
@@ -517,7 +517,7 @@ async function loadCreatedShareInfo(reservationId: string): Promise<void> {
 
   isLoadingCreatedShare.value = true
   createdShareErrorText.value = ''
-  createdShareCopied.value = false
+  createdShareShared.value = false
   createdShareFallbackText.value = ''
 
   try {
@@ -534,28 +534,45 @@ async function loadCreatedShareInfo(reservationId: string): Promise<void> {
   }
 }
 
-async function copyCreatedShareText(): Promise<void> {
+async function shareCreatedReservationLink(): Promise<void> {
   if (!createdShareInfo.value && createdReservation.value) {
     await loadCreatedShareInfo(createdReservation.value.reservationId)
   }
 
-  const text = createdShareInfo.value?.shareText ?? ''
-  if (!text) {
-    createdShareErrorText.value = '暂无可复制内容'
+  const info = createdShareInfo.value
+  const url = info ? reservationShareUrl(info) : ''
+  if (!info || !url) {
+    createdShareErrorText.value = '暂无可转发链接'
     return
   }
 
   createdShareErrorText.value = ''
-  createdShareCopied.value = false
+  createdShareShared.value = false
   createdShareFallbackText.value = ''
 
-  if (await copyPlainText(text)) {
-    createdShareCopied.value = true
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: info.shareTitle,
+        text: info.shareSummary || info.shareText,
+        url
+      })
+      createdShareShared.value = true
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
+    }
+  }
+
+  if (await copyPlainText(url)) {
+    createdShareShared.value = true
     return
   }
 
-  createdShareFallbackText.value = text
-  createdShareErrorText.value = '当前浏览器限制自动复制，请手动复制下方文本'
+  createdShareFallbackText.value = url
+  createdShareErrorText.value = '当前浏览器限制转发，请手动复制下方链接'
 }
 
 function clearCreatedReservationShareState(): void {
@@ -563,7 +580,7 @@ function clearCreatedReservationShareState(): void {
   createdShareInfo.value = null
   isLoadingCreatedShare.value = false
   createdShareErrorText.value = ''
-  createdShareCopied.value = false
+  createdShareShared.value = false
   createdShareFallbackText.value = ''
 }
 
@@ -587,6 +604,11 @@ function applyDefaultFutureDateTime(selectedDate: string): void {
 
 function isBeforeMinDate(value: string): boolean {
   return !!props.minDate && !!value && value < props.minDate
+}
+
+function reservationShareUrl(info: ReservationShareInfo): string {
+  const path = info.sharePath?.trim() || (info.shareToken ? `/reservation-share/${info.shareToken}` : '')
+  return path ? new URL(path, window.location.origin).toString() : ''
 }
 </script>
 
@@ -623,11 +645,11 @@ function isBeforeMinDate(value: string): boolean {
           <ReservationShareCopyPanel
             :share-info="createdShareInfo"
             :loading="isLoadingCreatedShare"
-            :copied="createdShareCopied"
+            :shared="createdShareShared"
             :error-text="createdShareErrorText"
             :fallback-text="createdShareFallbackText"
-            button-text="复制订位信息"
-            @copy-requested="copyCreatedShareText"
+            button-text="转发订位链接"
+            @share-requested="shareCreatedReservationLink"
           />
 
           <footer>

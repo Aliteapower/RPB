@@ -116,7 +116,7 @@ const queueAssignmentText = computed(() => {
 const shareInfo = ref<ReservationShareInfo | null>(null)
 const isLoadingShareInfo = ref(false)
 const shareInfoErrorText = ref('')
-const shareInfoCopied = ref(false)
+const shareInfoShared = ref(false)
 const shareInfoFallbackText = ref('')
 
 function requestCancel(): void {
@@ -147,28 +147,45 @@ function requestSeat(): void {
   emit('seat-requested', props.item)
 }
 
-async function copyReservationShareInfo(): Promise<void> {
+async function shareReservationLink(): Promise<void> {
   if (!shareInfo.value) {
     await loadReservationShareInfo()
   }
 
-  const text = shareInfo.value?.shareText ?? ''
-  if (!text) {
-    shareInfoErrorText.value = '暂无可复制内容'
+  const info = shareInfo.value
+  const url = info ? reservationShareUrl(info) : ''
+  if (!info || !url) {
+    shareInfoErrorText.value = '暂无可转发链接'
     return
   }
 
   shareInfoErrorText.value = ''
-  shareInfoCopied.value = false
+  shareInfoShared.value = false
   shareInfoFallbackText.value = ''
 
-  if (await copyPlainText(text)) {
-    shareInfoCopied.value = true
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: info.shareTitle,
+        text: info.shareSummary || info.shareText,
+        url
+      })
+      shareInfoShared.value = true
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
+    }
+  }
+
+  if (await copyPlainText(url)) {
+    shareInfoShared.value = true
     return
   }
 
-  shareInfoFallbackText.value = text
-  shareInfoErrorText.value = '当前浏览器限制自动复制，请手动复制下方文本'
+  shareInfoFallbackText.value = url
+  shareInfoErrorText.value = '当前浏览器限制转发，请手动复制下方链接'
 }
 
 async function loadReservationShareInfo(): Promise<void> {
@@ -178,7 +195,7 @@ async function loadReservationShareInfo(): Promise<void> {
 
   isLoadingShareInfo.value = true
   shareInfoErrorText.value = ''
-  shareInfoCopied.value = false
+  shareInfoShared.value = false
   shareInfoFallbackText.value = ''
 
   try {
@@ -225,6 +242,11 @@ function queueTicketDisplayText(item: ReservationTodayViewItem): string {
   return displayNumber ? `#${displayNumber}` : '排队票'
 }
 
+function reservationShareUrl(info: ReservationShareInfo): string {
+  const path = info.sharePath?.trim() || (info.shareToken ? `/reservation-share/${info.shareToken}` : '')
+  return path ? new URL(path, window.location.origin).toString() : ''
+}
+
 function resourceLabel(type: string | null | undefined): string {
   if (type === 'table_group') {
     return '桌组'
@@ -258,11 +280,11 @@ function resourceLabel(type: string | null | undefined): string {
       <ReservationShareCopyPanel
         :share-info="shareInfo"
         :loading="isLoadingShareInfo"
-        :copied="shareInfoCopied"
+        :shared="shareInfoShared"
         :error-text="shareInfoErrorText"
         :fallback-text="shareInfoFallbackText"
-        button-text="复制订位信息"
-        @copy-requested="copyReservationShareInfo"
+        button-text="转发订位链接"
+        @share-requested="shareReservationLink"
       />
 
       <button

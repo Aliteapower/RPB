@@ -15,6 +15,7 @@ import QueueTicketListPage from '../pages/QueueTicketListPage.vue'
 import ReservationArrivedDirectSeatingPage from '../pages/ReservationArrivedDirectSeatingPage.vue'
 import ReservationArrivedToQueuePage from '../pages/ReservationArrivedToQueuePage.vue'
 import ReservationCheckInPage from '../pages/ReservationCheckInPage.vue'
+import ReservationPublicSharePage from '../pages/ReservationPublicSharePage.vue'
 import ReservationTodayViewPage from '../pages/ReservationTodayViewPage.vue'
 import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
 import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
@@ -41,6 +42,12 @@ export const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginPage,
+      meta: { public: true }
+    },
+    {
+      path: '/reservation-share/:token',
+      name: 'reservation-public-share',
+      component: ReservationPublicSharePage,
       meta: { public: true }
     },
     {

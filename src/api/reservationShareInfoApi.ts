@@ -90,7 +90,11 @@ function isReservationShareInfoResponse(payload: unknown): payload is Reservatio
     typeof candidate.shareInfo.reservationId === 'string' &&
     typeof candidate.shareInfo.reservationNo === 'string' &&
     typeof candidate.shareInfo.channel === 'string' &&
-    typeof candidate.shareInfo.shareText === 'string'
+    typeof candidate.shareInfo.shareText === 'string' &&
+    typeof candidate.shareInfo.shareToken === 'string' &&
+    typeof candidate.shareInfo.sharePath === 'string' &&
+    typeof candidate.shareInfo.shareTitle === 'string' &&
+    typeof candidate.shareInfo.shareSummary === 'string'
   )
 }
 

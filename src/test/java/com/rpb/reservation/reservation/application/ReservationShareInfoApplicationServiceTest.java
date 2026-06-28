@@ -6,6 +6,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoReadPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoRow;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareTemplateSeedPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareTokenPort;
 import com.rpb.reservation.reservation.application.query.ReservationShareInfoQuery;
 import com.rpb.reservation.reservation.application.service.PhoneMaskingPolicy;
 import com.rpb.reservation.reservation.application.service.ReservationShareInfoApplicationService;
@@ -59,6 +60,10 @@ class ReservationShareInfoApplicationServiceTest {
         assertThat(shareInfo.customerPhoneAvailable()).isTrue();
         assertThat(shareInfo.canOpenWhatsAppLink()).isFalse();
         assertThat(shareInfo.whatsappLink()).isNull();
+        assertThat(shareInfo.shareToken()).isEqualTo("share-token-1");
+        assertThat(shareInfo.sharePath()).isEqualTo("/reservation-share/share-token-1");
+        assertThat(shareInfo.shareTitle()).isEqualTo("食刻订位中心 订位确认");
+        assertThat(shareInfo.shareSummary()).isEqualTo("20-06-2030 11:30 · 4人");
         assertThat(shareInfo.shareText())
             .contains("门店：食刻订位中心")
             .contains("编号：R-20300620-0007")
@@ -109,7 +114,21 @@ class ReservationShareInfoApplicationServiceTest {
         assertThat(result.success()).isTrue();
         assertThat(result.shareInfo().customerMaskedPhone()).isEmpty();
         assertThat(result.shareInfo().customerPhoneAvailable()).isFalse();
+        assertThat(result.shareInfo().sharePath()).isEqualTo("/reservation-share/share-token-1");
         assertThat(result.shareInfo().shareText()).doesNotContain("null");
+    }
+
+    @Test
+    void reusesExistingActivePublicShareTokenForReservation() {
+        Scenario scenario = Scenario.ready();
+        scenario.publicShareTokenPort.token = "existing-token";
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.shareInfo().shareToken()).isEqualTo("existing-token");
+        assertThat(result.shareInfo().sharePath()).isEqualTo("/reservation-share/existing-token");
+        assertThat(scenario.publicShareTokenPort.ensureCalls).isEqualTo(1);
     }
 
     @Test
@@ -175,13 +194,16 @@ class ReservationShareInfoApplicationServiceTest {
         private final StoreScope scope = new StoreScope(new TenantId(TENANT_ID), new StoreId(STORE_ID));
         private final FakeStoreRepository storeRepository = new FakeStoreRepository(scope);
         private final FakeReservationShareInfoReadPort readPort = new FakeReservationShareInfoReadPort();
+        private final FakeReservationPublicShareTokenPort publicShareTokenPort = new FakeReservationPublicShareTokenPort();
         private final ReservationShareInfoApplicationService service = new ReservationShareInfoApplicationService(
             storeRepository,
             readPort,
+            publicShareTokenPort,
             new ReservationShareTemplateRenderer(),
             new ReservationShareTemplateSeedService(new FakeReservationShareTemplateSeedPort()),
             new PhoneMaskingPolicy(),
-            new StoreShareDateTimeFormatter()
+            new StoreShareDateTimeFormatter(),
+            () -> "generated-token"
         );
 
         private static Scenario ready() {
@@ -230,6 +252,21 @@ class ReservationShareInfoApplicationServiceTest {
                 return Optional.empty();
             }
             return Optional.ofNullable(row);
+        }
+    }
+
+    private static final class FakeReservationPublicShareTokenPort implements ReservationPublicShareTokenPort {
+        private String token = "share-token-1";
+        private int ensureCalls;
+
+        @Override
+        public String ensureActiveToken(StoreScope scope, UUID reservationId, String tokenCandidate) {
+            ensureCalls++;
+            assertThat(scope.tenantId().value()).isEqualTo(TENANT_ID);
+            assertThat(scope.storeId().value()).isEqualTo(STORE_ID);
+            assertThat(reservationId).isEqualTo(RESERVATION_ID);
+            assertThat(tokenCandidate).isEqualTo("generated-token");
+            return token;
         }
     }
 

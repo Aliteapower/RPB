@@ -16,7 +16,11 @@ public record ReservationShareInfoResponse(
         String customerMaskedPhone,
         boolean customerPhoneAvailable,
         boolean canOpenWhatsAppLink,
-        String whatsappLink
+        String whatsappLink,
+        String shareToken,
+        String sharePath,
+        String shareTitle,
+        String shareSummary
     ) {
     }
 }

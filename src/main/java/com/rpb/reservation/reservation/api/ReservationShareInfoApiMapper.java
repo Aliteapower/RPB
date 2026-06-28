@@ -19,7 +19,11 @@ public class ReservationShareInfoApiMapper {
                 shareInfo.customerMaskedPhone(),
                 shareInfo.customerPhoneAvailable(),
                 shareInfo.canOpenWhatsAppLink(),
-                shareInfo.whatsappLink()
+                shareInfo.whatsappLink(),
+                shareInfo.shareToken(),
+                shareInfo.sharePath(),
+                shareInfo.shareTitle(),
+                shareInfo.shareSummary()
             )
         );
     }
