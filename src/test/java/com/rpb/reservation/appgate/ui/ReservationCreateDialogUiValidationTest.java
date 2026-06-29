@@ -18,10 +18,10 @@ class ReservationCreateDialogUiValidationTest {
         assertThat(timePath).exists();
         assertThat(messagePath).exists();
 
-        String dialogSource = Files.readString(dialogPath);
-        String pickerSource = Files.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
-        String timeSource = Files.readString(timePath);
-        String messageSource = Files.readString(messagePath);
+        String dialogSource = readSource(dialogPath);
+        String pickerSource = readSource(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+        String timeSource = readSource(timePath);
+        String messageSource = readSource(messagePath);
 
         assertThat(dialogSource)
             .contains("fetchTableResources")
@@ -117,8 +117,8 @@ class ReservationCreateDialogUiValidationTest {
         assertThat(routerPath).exists();
         assertThat(todayPagePath).exists();
 
-        String routerSource = Files.readString(routerPath);
-        String todayPageSource = Files.readString(todayPagePath);
+        String routerSource = readSource(routerPath);
+        String todayPageSource = readSource(todayPagePath);
 
         assertThat(routerSource)
             .contains("path: '/stores/:storeId/reservations/create'")
@@ -142,5 +142,11 @@ class ReservationCreateDialogUiValidationTest {
                 .isGreaterThanOrEqualTo(0);
             cursor = index + fragment.length();
         }
+    }
+
+    private static String readSource(Path path) throws Exception {
+        return Files.readString(path)
+            .replace("\r\n", "\n")
+            .replace('\r', '\n');
     }
 }

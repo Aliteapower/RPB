@@ -30,5 +30,8 @@ security:
     secret: ${JWT_SECRET:}
 
 rpb:
+  customer-auth:
+    cookie-secure: ${CUSTOMER_AUTH_COOKIE_SECURE:false}
+    expose-dev-code: false
   local-auth:
     enabled: false

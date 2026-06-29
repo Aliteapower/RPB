@@ -18,9 +18,9 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(itemsPath)).isTrue();
         assertThat(Files.exists(componentPath)).isTrue();
 
-        String itemsSource = Files.readString(itemsPath);
-        String componentSource = Files.readString(componentPath);
-        String routerSource = Files.readString(routerPath);
+        String itemsSource = readSource(itemsPath);
+        String componentSource = readSource(componentPath);
+        String routerSource = readSource(routerPath);
 
         assertAppearsInOrder(
             itemsSource,
@@ -61,16 +61,16 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(seatingApiPath)).isTrue();
         assertThat(Files.exists(typePath)).isTrue();
 
-        String tablePageSource = Files.readString(tablePagePath);
-        String dateSwitcherSource = Files.readString(dateSwitcherPath);
-        String createDialogSource = Files.readString(createDialogPath);
+        String tablePageSource = readSource(tablePagePath);
+        String dateSwitcherSource = readSource(dateSwitcherPath);
+        String createDialogSource = readSource(createDialogPath);
         String source = tablePageSource
             + dateSwitcherSource
-            + Files.readString(pickerPath)
+            + readSource(pickerPath)
             + createDialogSource
-            + Files.readString(apiPath)
-            + Files.readString(seatingApiPath)
-            + Files.readString(typePath);
+            + readSource(apiPath)
+            + readSource(seatingApiPath)
+            + readSource(typePath);
 
         assertThat(source)
             .contains("fetchTableResources")
@@ -238,7 +238,7 @@ class StaffUiV12TableSelectionValidationTest {
 
     @Test
     void tablePageSupportsVisibleRangeBulkCleaningActions() throws Exception {
-        String tablePageSource = Files.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
+        String tablePageSource = readSource(Path.of("src", "pages", "TableResourceListPage.vue"));
 
         assertThat(tablePageSource)
             .contains("bulkStartCleaningResources")
@@ -273,10 +273,10 @@ class StaffUiV12TableSelectionValidationTest {
             queueSeatingPath,
             reservationSeatDialogPath
         ));
-        String walkInDirectSource = Files.readString(walkInDirectPath);
-        String reservationDirectSource = Files.readString(reservationDirectPath);
-        String queueSeatingSource = Files.readString(queueSeatingPath);
-        String reservationSeatDialogSource = Files.readString(reservationSeatDialogPath);
+        String walkInDirectSource = readSource(walkInDirectPath);
+        String reservationDirectSource = readSource(reservationDirectPath);
+        String queueSeatingSource = readSource(queueSeatingPath);
+        String reservationSeatDialogSource = readSource(reservationSeatDialogPath);
 
         assertThat(source)
             .contains("TableResourcePicker")
@@ -301,7 +301,7 @@ class StaffUiV12TableSelectionValidationTest {
 
     @Test
     void tableResourcePickerShowsSavedTemporaryGroupsInTemporaryMode() throws Exception {
-        String picker = Files.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+        String picker = readSource(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
 
         assertThat(picker)
             .contains("temporaryGroupResources")
@@ -316,7 +316,7 @@ class StaffUiV12TableSelectionValidationTest {
 
     @Test
     void walkInDirectSeatingPageUsesOneTapPickerFlowWithoutLegacyManualFields() throws Exception {
-        String page = Files.readString(Path.of("src", "pages", "WalkInDirectSeatingPage.vue"));
+        String page = readSource(Path.of("src", "pages", "WalkInDirectSeatingPage.vue"));
 
         assertThat(page)
             .contains("StaffHomeTopBar")
@@ -360,7 +360,7 @@ class StaffUiV12TableSelectionValidationTest {
 
     @Test
     void staffHomeTopBarKeepsDatePropCompatibilityButDoesNotRenderBusinessDateChip() throws Exception {
-        String topBar = Files.readString(Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"));
+        String topBar = readSource(Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"));
 
         assertThat(topBar)
             .contains("businessDate?: string | null")
@@ -371,34 +371,34 @@ class StaffUiV12TableSelectionValidationTest {
             .doesNotContain("topbar-business-date")
             .doesNotContain("<span>营业日期</span>");
 
-        assertThat(Files.readString(Path.of("src", "components", "staff-home", "useCurrentClock.ts")))
+        assertThat(readSource(Path.of("src", "components", "staff-home", "useCurrentClock.ts")))
             .contains("currentBusinessDate")
             .contains("formatBusinessDate")
             .contains("timeZone = 'Asia/Singapore'");
 
-        assertThat(Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "StoreStaffHomePage.vue")))
             .contains(":business-date=\"displayedBusinessDate\"")
             .contains("getStaffHomeOverview")
             .contains("return '首页'");
-        assertThat(Files.readString(Path.of("src", "pages", "WalkInQueuePage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "WalkInQueuePage.vue")))
             .contains(":business-date=\"currentBusinessDate\"");
-        assertThat(Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "QueueTicketListPage.vue")))
             .contains(":business-date=\"currentBusinessDate\"")
             .contains("营业日期 {{ currentBusinessDate }}")
             .contains("reservationQueueEntry.value ? '排队' : '暂无应用'");
-        assertThat(Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue")))
             .contains(":business-date=\"currentBusinessDate\"");
-        assertThat(Files.readString(Path.of("src", "pages", "WalkInDirectSeatingPage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "WalkInDirectSeatingPage.vue")))
             .contains(":business-date=\"businessDate\"")
             .doesNotContain("business-date-badge");
-        assertThat(Files.readString(Path.of("src", "pages", "ReservationArrivedToQueuePage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "ReservationArrivedToQueuePage.vue")))
             .contains(":business-date=\"displayedBusinessDate\"")
             .doesNotContain("business-date-badge");
-        assertThat(Files.readString(Path.of("src", "pages", "ReservationTodayViewPage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "ReservationTodayViewPage.vue")))
             .contains("StaffHomeTopBar")
             .contains(":business-date=\"displayedBusinessDate\"")
             .doesNotContain("reservation-workbench__header");
-        assertThat(Files.readString(Path.of("src", "pages", "TableResourceListPage.vue")))
+        assertThat(readSource(Path.of("src", "pages", "TableResourceListPage.vue")))
             .contains("StaffHomeTopBar")
             .contains(":business-date=\"selectedBusinessDate\"")
             .doesNotContain("class=\"top-bar\"");
@@ -410,8 +410,8 @@ class StaffUiV12TableSelectionValidationTest {
 
         assertThat(staffWorkbenchStylePath).exists();
 
-        String mainSource = Files.readString(Path.of("src", "main.ts"));
-        String staffWorkbenchStyle = Files.readString(staffWorkbenchStylePath);
+        String mainSource = readSource(Path.of("src", "main.ts"));
+        String staffWorkbenchStyle = readSource(staffWorkbenchStylePath);
 
         assertThat(mainSource)
             .contains("import './styles/staffWorkbench.css'");
@@ -435,7 +435,7 @@ class StaffUiV12TableSelectionValidationTest {
         );
 
         for (Path path : paths) {
-            String source = Files.readString(path);
+            String source = readSource(path);
 
             assertThat(source)
                 .as("%s should render staff bottom navigation", path)
@@ -461,7 +461,6 @@ class StaffUiV12TableSelectionValidationTest {
         Path seatDialogPath = Path.of("src", "components", "reservation-workbench", "ReservationSeatDialog.vue");
         Path todayListPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListPanel.vue");
         Path todayListItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
-        Path timePickerPath = Path.of("src", "components", "staff", "StaffTimeWheelPicker.vue");
         Path cancelApiPath = Path.of("src", "api", "reservationCancelApi.ts");
         Path calendarSummaryApiPath = Path.of("src", "api", "reservationCalendarSummaryApi.ts");
         Path calendarSummaryTypePath = Path.of("src", "types", "reservationCalendarSummary.ts");
@@ -473,26 +472,24 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(seatDialogPath)).isTrue();
         assertThat(Files.exists(todayListPath)).isTrue();
         assertThat(Files.exists(todayListItemPath)).isTrue();
-        assertThat(Files.exists(timePickerPath)).isTrue();
         assertThat(Files.exists(cancelApiPath)).isTrue();
         assertThat(Files.exists(calendarSummaryApiPath)).isTrue();
         assertThat(Files.exists(calendarSummaryTypePath)).isTrue();
 
-        String pageSource = Files.readString(pagePath);
-        String actionPanelSource = Files.readString(actionsPath);
-        String dateSwitcherSource = Files.readString(dateSwitcherPath);
+        String pageSource = readSource(pagePath);
+        String actionPanelSource = readSource(actionsPath);
+        String dateSwitcherSource = readSource(dateSwitcherPath);
         String source = pageSource
             + actionPanelSource
             + dateSwitcherSource
-            + Files.readString(calendarPath)
-            + Files.readString(createDialogPath)
-            + Files.readString(seatDialogPath)
-            + Files.readString(todayListPath)
-            + Files.readString(todayListItemPath)
-            + Files.readString(timePickerPath)
-            + Files.readString(cancelApiPath)
-            + Files.readString(calendarSummaryApiPath)
-            + Files.readString(calendarSummaryTypePath);
+            + readSource(calendarPath)
+            + readSource(createDialogPath)
+            + readSource(seatDialogPath)
+            + readSource(todayListPath)
+            + readSource(todayListItemPath)
+            + readSource(cancelApiPath)
+            + readSource(calendarSummaryApiPath)
+            + readSource(calendarSummaryTypePath);
 
         assertThat(source)
             .contains("ReservationQuickActionPanel")
@@ -522,14 +519,16 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("checkInReservation")
             .contains("check-in-requested")
             .contains("seat-requested")
-            .contains("StaffTimeWheelPicker")
-            .contains("v-model=\"form.time\"")
-            .contains("name=\"reservationTime\"")
-            .contains("24小时制时间选择")
-            .contains("HOUR_OPTIONS = Array.from({ length: 24 }")
-            .contains("MINUTE_OPTIONS = Array.from({ length: 60 }")
-            .contains("time-wheel-picker__frame")
-            .contains("time-wheel-picker__column")
+            .contains("fetchReservationTimeSlots")
+            .contains("timeSlots")
+            .contains("mealPeriodFilterOptions")
+            .contains("filteredTimeSlots")
+            .contains("selectedMealPeriodKey")
+            .contains("selectMealPeriod")
+            .contains("selectedTimeSlot")
+            .contains("reservation-create-meal-period-filter")
+            .contains("reservation-create-time-slots")
+            .contains("v-for=\"slot in filteredTimeSlots\"")
             .contains("桌号（可选）")
             .contains("今日预约")
             .contains("当日预约")
@@ -633,7 +632,7 @@ class StaffUiV12TableSelectionValidationTest {
 
         assertThat(todayListItemPath).exists();
 
-        String todayListItem = Files.readString(todayListItemPath);
+        String todayListItem = readSource(todayListItemPath);
 
         assertThat(todayListItem)
             .contains("function formatStoreTime")
@@ -665,14 +664,14 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(switchTypePath).exists();
         assertThat(tableResourceTypePath).exists();
 
-        String tablePage = Files.readString(tablePagePath);
-        String todayList = Files.readString(todayListPath) + Files.readString(todayListItemPath);
+        String tablePage = readSource(tablePagePath);
+        String todayList = readSource(todayListPath) + readSource(todayListItemPath);
         String source = tablePage
-            + Files.readString(pickerPath)
-            + Files.readString(switchDialogPath)
-            + Files.readString(switchApiPath)
-            + Files.readString(switchTypePath)
-            + Files.readString(tableResourceTypePath);
+            + readSource(pickerPath)
+            + readSource(switchDialogPath)
+            + readSource(switchApiPath)
+            + readSource(switchTypePath)
+            + readSource(tableResourceTypePath);
 
         assertThat(source)
             .contains("ReservationTableSwitchDialog")
@@ -748,10 +747,16 @@ class StaffUiV12TableSelectionValidationTest {
 
         for (Path path : paths) {
             if (Files.exists(path)) {
-                source.append(Files.readString(path)).append('\n');
+                source.append(readSource(path)).append('\n');
             }
         }
 
         return source.toString();
+    }
+
+    private static String readSource(Path path) throws Exception {
+        return Files.readString(path)
+            .replace("\r\n", "\n")
+            .replace('\r', '\n');
     }
 }

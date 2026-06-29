@@ -49,6 +49,8 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/seatings/*/table-switch").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/cleanings/*/complete").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations").permitAll()
+                .requestMatchers("/api/v1/public/customer-auth/**").permitAll()
+                .requestMatchers("/api/v1/public/stores/*/booking/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/reservations/today").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/reservations/calendar-summary").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/reservations/time-slots").permitAll()
