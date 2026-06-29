@@ -52,6 +52,7 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
                    reservation.reservation_code as reservation_no,
                    reservation.party_size,
                    reservation.reserved_start_at,
+                   reservation.hold_until_at,
                    (
                        select coalesce(assigned_table.table_code, assigned_group.group_code)
                        from reservation_preassignments preassignment
@@ -73,13 +74,17 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
                        order by preassignment.preassigned_at asc, preassignment.created_at asc
                        limit 1
                    ) as table_code,
+                   customer.display_name as customer_name,
+                   customer.nickname as customer_nickname,
+                   customer.phone_e164 as customer_phone_e164,
                    store.display_name as store_display_name,
                    store.timezone as store_timezone,
                    store.share_display_name,
                    store.share_address,
                    store.google_map_url,
                    store.share_contact_phone,
-                   store.reservation_share_note
+                   store.reservation_share_note,
+                   store.reservation_share_template
             from reservation_public_share_tokens share
             join stores store on store.id = share.store_id
              and store.tenant_id = share.tenant_id
@@ -88,6 +93,9 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
              and reservation.tenant_id = share.tenant_id
              and reservation.store_id = share.store_id
              and reservation.deleted_at is null
+            left join customers customer on customer.tenant_id = reservation.tenant_id
+             and customer.id = reservation.customer_id
+             and customer.deleted_at is null
             where share.token = ?
             """,
             (rs, rowNum) -> row(rs),
@@ -104,14 +112,19 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
             rs.getString("reservation_no"),
             rs.getInt("party_size"),
             toInstant(rs.getObject("reserved_start_at", OffsetDateTime.class)),
+            toInstant(rs.getObject("hold_until_at", OffsetDateTime.class)),
             rs.getString("table_code"),
+            rs.getString("customer_name"),
+            rs.getString("customer_nickname"),
+            rs.getString("customer_phone_e164"),
             rs.getString("store_display_name"),
             rs.getString("store_timezone"),
             rs.getString("share_display_name"),
             rs.getString("share_address"),
             rs.getString("google_map_url"),
             rs.getString("share_contact_phone"),
-            rs.getString("reservation_share_note")
+            rs.getString("reservation_share_note"),
+            rs.getString("reservation_share_template")
         );
     }
 

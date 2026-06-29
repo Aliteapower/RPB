@@ -11,7 +11,7 @@ import {
   saveTemporaryTableGroup,
   TemporaryTableGroupApiError
 } from '../../api/temporaryTableGroupApi'
-import { copyPlainText } from '../../utils/plainTextClipboard'
+import { shareLinkOrCopy } from '../../utils/reservationShareLauncher'
 import { formatReservationCreateErrorMessage } from '../../utils/reservationCreateMessages'
 import StaffGuestContactLookup from '../staff/StaffGuestContactLookup.vue'
 import StaffTimeWheelPicker from '../staff/StaffTimeWheelPicker.vue'
@@ -80,6 +80,7 @@ const createdShareInfo = ref<ReservationShareInfo | null>(null)
 const isLoadingCreatedShare = ref(false)
 const createdShareErrorText = ref('')
 const createdShareShared = ref(false)
+const createdShareStatusText = ref('')
 const createdShareFallbackText = ref('')
 let tableResourceLoadSequence = 0
 
@@ -518,6 +519,7 @@ async function loadCreatedShareInfo(reservationId: string): Promise<void> {
   isLoadingCreatedShare.value = true
   createdShareErrorText.value = ''
   createdShareShared.value = false
+  createdShareStatusText.value = ''
   createdShareFallbackText.value = ''
 
   try {
@@ -548,26 +550,22 @@ async function shareCreatedReservationLink(): Promise<void> {
 
   createdShareErrorText.value = ''
   createdShareShared.value = false
+  createdShareStatusText.value = ''
   createdShareFallbackText.value = ''
 
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: info.shareTitle,
-        text: info.shareSummary || info.shareText,
-        url
-      })
-      createdShareShared.value = true
-      return
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return
-      }
-    }
+  const result = await shareLinkOrCopy({
+    title: info.shareTitle,
+    text: info.shareSummary || info.shareText,
+    url
+  })
+
+  if (result === 'cancelled') {
+    return
   }
 
-  if (await copyPlainText(url)) {
+  if (result === 'copied' || result === 'native-share') {
     createdShareShared.value = true
+    createdShareStatusText.value = result === 'copied' ? '链接已复制' : '已打开转发'
     return
   }
 
@@ -581,6 +579,7 @@ function clearCreatedReservationShareState(): void {
   isLoadingCreatedShare.value = false
   createdShareErrorText.value = ''
   createdShareShared.value = false
+  createdShareStatusText.value = ''
   createdShareFallbackText.value = ''
 }
 
@@ -646,6 +645,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
             :share-info="createdShareInfo"
             :loading="isLoadingCreatedShare"
             :shared="createdShareShared"
+            :status-text="createdShareStatusText"
             :error-text="createdShareErrorText"
             :fallback-text="createdShareFallbackText"
             button-text="转发订位链接"

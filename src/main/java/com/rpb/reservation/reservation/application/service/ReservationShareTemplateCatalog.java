@@ -41,21 +41,20 @@ public final class ReservationShareTemplateCatalog {
 
         桌位：{{tableCode}} (已预留)
 
-        温馨提示：
-        {{arrivalNote}}
-
         预留时间：为保证所有宾客的用餐体验，我们将为您保留座位 {{holdMinutes}}分钟。若超过保留时间，座位可能被取消，敬请谅解。
 
-        Google Map：
-        {{googleMapUrl}}
+        到店提示：{{arrivalNote}}
 
-        如需修改或取消，请至少提前 2 小时致电 {{storePhone}} 联系我们。
+        门店地址：{{storeAddress}}
+
+        联系电话：{{storePhone}}
+
+        如需修改或取消，请至少提前 2 小时联系门店。
 
         期待为您奉上一场味蕾盛宴！
 
         顺颂时祺，
         {{storeName}} 预订部
-        {{storePhone}} | {{storeAddress}}
         """;
 
     private ReservationShareTemplateCatalog() {

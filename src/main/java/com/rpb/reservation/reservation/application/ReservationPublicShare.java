@@ -13,6 +13,7 @@ public record ReservationPublicShare(
     String storeAddress,
     String googleMapUrl,
     String shareTitle,
-    String shareSummary
+    String shareSummary,
+    String shareText
 ) {
 }

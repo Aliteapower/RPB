@@ -17,6 +17,7 @@ class ReservationShareInfoUiValidationTest {
         Path createDialogPath = Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue");
         Path todayItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
         Path copyPanelPath = Path.of("src", "components", "reservation-workbench", "ReservationShareCopyPanel.vue");
+        Path shareLauncherPath = Path.of("src", "utils", "reservationShareLauncher.ts");
         Path shareApiPath = Path.of("src", "api", "reservationShareInfoApi.ts");
         Path adminApiPath = Path.of("src", "api", "tenantAdminShareProfileApi.ts");
         Path publicShareApiPath = Path.of("src", "api", "reservationPublicShareApi.ts");
@@ -30,6 +31,7 @@ class ReservationShareInfoUiValidationTest {
         assertThat(publicShareApiPath).exists();
         assertThat(publicShareTypePath).exists();
         assertThat(publicSharePagePath).exists();
+        assertThat(shareLauncherPath).exists();
 
         String routerSource = Files.readString(routerPath);
         String navSource = Files.readString(navPath);
@@ -38,6 +40,7 @@ class ReservationShareInfoUiValidationTest {
         String createDialogSource = Files.readString(createDialogPath);
         String todayItemSource = Files.readString(todayItemPath);
         String copyPanelSource = Files.readString(copyPanelPath);
+        String shareLauncherSource = Files.readString(shareLauncherPath);
         String shareApiSource = Files.readString(shareApiPath);
         String adminApiSource = Files.readString(adminApiPath);
         String publicShareApiSource = Files.readString(publicShareApiPath);
@@ -101,21 +104,32 @@ class ReservationShareInfoUiValidationTest {
             .contains("getReservationShareInfo")
             .contains("ReservationShareCopyPanel")
             .contains("shareCreatedReservationLink")
-            .contains("navigator.share")
+            .contains("shareLinkOrCopy")
             .contains("sharePath")
-            .contains("转发订位链接");
+            .contains("转发订位链接")
+            .doesNotContain("navigator.share");
         assertThat(todayItemSource)
             .contains("getReservationShareInfo")
             .contains("ReservationShareCopyPanel")
             .contains("shareReservationLink")
-            .contains("navigator.share")
+            .contains("shareLinkOrCopy")
             .contains("sharePath")
-            .contains("转发订位链接");
+            .contains("转发订位链接")
+            .doesNotContain("navigator.share");
         assertThat(copyPanelSource)
             .contains("share-requested")
             .contains("buttonText: '转发订位链接'")
+            .contains("statusText: '已准备链接'")
             .contains("已准备链接")
             .doesNotContain("copy-requested");
+        assertThat(shareLauncherSource)
+            .contains("shareLinkOrCopy")
+            .contains("canUseNativeShare")
+            .contains("navigator.share")
+            .contains("navigator.canShare")
+            .contains("maxTouchPoints")
+            .contains("matchMedia('(pointer: coarse)')")
+            .contains("copyPlainText(payload.url)");
         assertThat(shareApiSource)
             .contains("/share-info")
             .contains("shareText")
@@ -132,6 +146,7 @@ class ReservationShareInfoUiValidationTest {
         assertThat(publicShareTypeSource)
             .contains("ReservationPublicShare")
             .contains("tablePending")
+            .contains("shareText")
             .contains("shareTitle")
             .contains("shareSummary")
             .doesNotContain("tenantId")
@@ -140,11 +155,43 @@ class ReservationShareInfoUiValidationTest {
             .contains("getReservationPublicShare")
             .contains("route.params.token")
             .contains("预约信息")
-            .contains("桌位待确认")
             .contains("链接已失效")
-            .contains("navigator.share")
+            .contains("reservation-public-share__intro")
+            .contains("customerIntroText")
+            .contains("reservation-public-share__focus")
+            .contains("reservation-public-share__datetime")
+            .contains("reservation-public-share__table")
+            .contains("customerVisibleShareText")
+            .contains("tableLabel")
+            .contains("share.reservationDate")
+            .contains("share.reservationTime")
+            .contains("share.partySize")
+            .contains("日期")
+            .contains("时间")
+            .contains("桌位")
+            .contains("reservation-public-share__template")
+            .contains("reservation-public-share__contact-actions")
+            .contains("share.googleMapUrl")
+            .contains("打开地图")
+            .contains("share.storePhone")
+            .contains(":href=\"`tel:${share.storePhone}`\"")
+            .contains("拨打电话")
+            .contains("shareLinkOrCopy")
+            .contains("reservation-public-share__actions")
+            .doesNotContain("reservation-public-share__details")
+            .doesNotContain("reservation-public-share__store")
+            .doesNotContain("{{ share.shareText }}")
+            .doesNotContain("share.reservationNo")
+            .doesNotContain("预订编号")
+            .doesNotContain("aria-label=\"订位摘要\"")
+            .doesNotContain("aria-label=\"门店信息\"")
+            .doesNotContain("navigator.share")
             .doesNotContain("StaffBottomNav")
             .doesNotContain("TenantAdminNav");
+        assertThat(publicSharePageSource.indexOf("reservation-public-share__intro"))
+            .isLessThan(publicSharePageSource.indexOf("reservation-public-share__focus"));
+        assertThat(publicSharePageSource.indexOf("reservation-public-share__focus"))
+            .isLessThan(publicSharePageSource.indexOf("reservation-public-share__template"));
         assertThat(localSecuritySource)
             .contains(".requestMatchers(HttpMethod.GET, \"/api/v1/public/reservation-shares/*\").permitAll()");
         assertThat(adminApiSource)

@@ -4,7 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareReadPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareRow;
+import com.rpb.reservation.reservation.application.port.out.ReservationShareTemplateSeedPort;
+import com.rpb.reservation.reservation.application.service.PhoneMaskingPolicy;
 import com.rpb.reservation.reservation.application.service.ReservationPublicShareApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateRenderer;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateSeedService;
 import com.rpb.reservation.reservation.application.service.StoreShareDateTimeFormatter;
 import java.time.Instant;
 import java.util.Optional;
@@ -36,6 +40,12 @@ class ReservationPublicShareApplicationServiceTest {
         assertThat(share.googleMapUrl()).isEqualTo("https://maps.app.goo.gl/rpb");
         assertThat(share.shareTitle()).isEqualTo("食刻订位中心 订位确认");
         assertThat(share.shareSummary()).isEqualTo("20-06-2030 11:30 · 4人");
+        assertThat(share.shareText())
+            .contains("【食刻订位中心】")
+            .contains("订位 R-PUBLIC-0007")
+            .contains("20-06-2030 11:30")
+            .contains("桌位 A01")
+            .contains("请提前 10 分钟到店");
     }
 
     @Test
@@ -92,14 +102,19 @@ class ReservationPublicShareApplicationServiceTest {
             "R-PUBLIC-0007",
             4,
             Instant.parse("2030-06-20T03:30:00Z"),
+            Instant.parse("2030-06-20T03:45:00Z"),
             tableCode,
+            "Ada Guest",
+            "VIP",
+            "+6591234567",
             "Reservation Store",
             "Asia/Singapore",
             "食刻订位中心",
             "1 Example Road",
             "https://maps.app.goo.gl/rpb",
             "6333 1234",
-            "请提前 10 分钟到店"
+            "请提前 10 分钟到店",
+            "【{{storeName}}】\n订位 {{reservationNo}}\n{{reservationDate}} {{reservationTime}} · {{partySize}}人\n桌位 {{tableCode}}\n{{arrivalNote}}"
         );
     }
 
@@ -107,6 +122,9 @@ class ReservationPublicShareApplicationServiceTest {
         private final FakeReservationPublicShareReadPort readPort = new FakeReservationPublicShareReadPort();
         private final ReservationPublicShareApplicationService service = new ReservationPublicShareApplicationService(
             readPort,
+            new ReservationShareTemplateRenderer(),
+            new ReservationShareTemplateSeedService(new FakeReservationShareTemplateSeedPort()),
+            new PhoneMaskingPolicy(),
             new StoreShareDateTimeFormatter(),
             () -> NOW
         );
@@ -124,6 +142,16 @@ class ReservationPublicShareApplicationServiceTest {
         @Override
         public Optional<ReservationPublicShareRow> findByToken(String token) {
             return Optional.ofNullable(row);
+        }
+    }
+
+    private static final class FakeReservationShareTemplateSeedPort implements ReservationShareTemplateSeedPort {
+        @Override
+        public Optional<ReservationShareTemplateSeed> findActiveBySeedKey(String seedKey) {
+            return Optional.of(new ReservationShareTemplateSeed(
+                seedKey,
+                "默认 {{storeName}} {{reservationNo}} {{reservationDate}} {{reservationTime}} {{partySize}} {{tableCode}} {{arrivalNote}}"
+            ));
         }
     }
 }

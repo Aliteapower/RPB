@@ -96,11 +96,12 @@ class ReservationShareInfoApplicationServiceTest {
             .contains("人数：4位成人")
             .contains("桌位：A01 (已预留)")
             .contains("预留时间：为保证所有宾客的用餐体验，我们将为您保留座位 15分钟")
-            .contains("https://maps.app.goo.gl/rpb")
-            .contains("请提前 10 分钟到店")
-            .contains("如需修改或取消，请至少提前 2 小时致电 6333 1234 联系我们")
+            .contains("到店提示：请提前 10 分钟到店")
+            .contains("门店地址：1 Example Road")
+            .contains("联系电话：6333 1234")
+            .contains("如需修改或取消，请至少提前 2 小时联系门店。")
             .contains("食刻订位中心 预订部")
-            .contains("6333 1234 | 1 Example Road")
+            .doesNotContain("https://maps.app.goo.gl/rpb")
             .doesNotContain("unsupportedVariable");
     }
 

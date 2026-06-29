@@ -7,7 +7,7 @@ import {
   reservationPublicShareErrorMessage,
   ReservationPublicShareApiError
 } from '../api/reservationPublicShareApi'
-import { copyPlainText } from '../utils/plainTextClipboard'
+import { shareLinkOrCopy } from '../utils/reservationShareLauncher'
 import type { ReservationPublicShare } from '../types/reservationPublicShare'
 
 const route = useRoute()
@@ -17,14 +17,34 @@ const errorText = ref('')
 const shareStatusText = ref('')
 const fallbackUrl = ref('')
 
+const hiddenShareTextLabels = [
+  '\u9884\u8ba2\u7f16\u53f7',
+  '\u9884\u7ea6\u7f16\u53f7',
+  '\u8ba2\u4f4d\u7f16\u53f7',
+  '日期',
+  '时间',
+  '人数',
+  '桌位'
+]
+
 const token = computed(() => String(route.params.token || '').trim())
-const tableDisplay = computed(() => {
+const tableLabel = computed(() => {
   if (!share.value || share.value.tablePending || !share.value.tableCode.trim()) {
-    return '桌位待确认'
+    return '待确认'
   }
 
-  return share.value.tableCode
+  return share.value.tableCode.trim()
 })
+const tableStatus = computed(() => (share.value?.tablePending ? '到店后确认' : '已预留'))
+const customerShareText = computed(() => {
+  if (!share.value) {
+    return { intro: '', details: '' }
+  }
+
+  return splitShareText(share.value.shareText)
+})
+const customerIntroText = computed(() => customerShareText.value.intro)
+const customerVisibleShareText = computed(() => customerShareText.value.details)
 const pageUrl = computed(() => {
   if (typeof window === 'undefined') {
     return ''
@@ -75,6 +95,61 @@ function publicSharePageErrorText(error: ReservationPublicShareApiError): string
   return reservationPublicShareErrorMessage(error.response.error.code)
 }
 
+function splitShareText(text: string): { intro: string; details: string } {
+  const lines = text.split(/\r?\n/)
+  const firstDetailsIndex = lines.findIndex((line) => isHiddenShareTextLine(line.trim()))
+
+  if (firstDetailsIndex < 0) {
+    return {
+      intro: '',
+      details: compactShareTextLines(lines)
+    }
+  }
+
+  return {
+    intro: collapseBlankLines(lines.slice(0, firstDetailsIndex)).join('\n').trim(),
+    details: compactShareTextLines(lines.slice(firstDetailsIndex))
+  }
+}
+
+function compactShareTextLines(lines: string[]): string {
+  const filteredLines = lines.filter((line) => {
+    const trimmedLine = line.trim()
+    if (!trimmedLine) {
+      return true
+    }
+
+    return !isHiddenShareTextLine(trimmedLine)
+  })
+
+  return collapseBlankLines(filteredLines).join('\n').trim()
+}
+
+function isHiddenShareTextLine(line: string): boolean {
+  return hiddenShareTextLabels.some((label) => startsWithLabel(line, label))
+}
+
+function startsWithLabel(line: string, label: string): boolean {
+  return line.startsWith(`${label}：`) || line.startsWith(`${label}:`)
+}
+
+function collapseBlankLines(lines: string[]): string[] {
+  const result: string[] = []
+  let previousLineWasBlank = false
+
+  for (const line of lines) {
+    const isBlank = !line.trim()
+    if (isBlank && previousLineWasBlank) {
+      continue
+    }
+
+    result.push(line)
+    previousLineWasBlank = isBlank
+  }
+
+  return result
+}
+
 async function shareCurrentPage(): Promise<void> {
   if (!share.value || !pageUrl.value) {
     return
@@ -83,24 +158,18 @@ async function shareCurrentPage(): Promise<void> {
   shareStatusText.value = ''
   fallbackUrl.value = ''
 
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: share.value.shareTitle,
-        text: share.value.shareSummary,
-        url: pageUrl.value
-      })
-      shareStatusText.value = '已打开转发'
-      return
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return
-      }
-    }
+  const result = await shareLinkOrCopy({
+    title: share.value.shareTitle,
+    text: share.value.shareSummary,
+    url: pageUrl.value
+  })
+
+  if (result === 'cancelled') {
+    return
   }
 
-  if (await copyPlainText(pageUrl.value)) {
-    shareStatusText.value = '链接已复制'
+  if (result === 'copied' || result === 'native-share') {
+    shareStatusText.value = result === 'copied' ? '链接已复制' : '已打开转发'
     return
   }
 
@@ -112,12 +181,6 @@ async function shareCurrentPage(): Promise<void> {
 <template>
   <main class="reservation-public-share">
     <section class="reservation-public-share__shell" aria-label="预约信息">
-      <header class="reservation-public-share__header">
-        <span>预约信息</span>
-        <h1>{{ share?.storeName || '订位确认' }}</h1>
-        <p v-if="share">{{ share.shareSummary }}</p>
-      </header>
-
       <section v-if="isLoading" class="reservation-public-share__state" aria-live="polite">
         正在读取预约信息
       </section>
@@ -128,47 +191,65 @@ async function shareCurrentPage(): Promise<void> {
       </section>
 
       <template v-else-if="share">
-        <dl class="reservation-public-share__details">
-          <div>
-            <dt>预约编号</dt>
-            <dd>{{ share.reservationNo }}</dd>
-          </div>
-          <div>
-            <dt>日期</dt>
-            <dd>{{ share.reservationDate }}</dd>
-          </div>
-          <div>
-            <dt>时间</dt>
-            <dd>{{ share.reservationTime }}</dd>
-          </div>
-          <div>
-            <dt>人数</dt>
-            <dd>{{ share.partySize }}人</dd>
-          </div>
-          <div>
-            <dt>桌位</dt>
-            <dd>{{ tableDisplay }}</dd>
-          </div>
-        </dl>
+        <section
+          v-if="customerIntroText"
+          class="reservation-public-share__intro"
+          aria-label="顾客确认文案"
+        >
+          {{ customerIntroText }}
+        </section>
 
-        <section class="reservation-public-share__store" aria-label="门店信息">
-          <div v-if="share.arrivalNote">
-            <span>到店提示</span>
-            <p>{{ share.arrivalNote }}</p>
+        <section class="reservation-public-share__focus" aria-label="订位重点信息">
+          <p class="reservation-public-share__focus-label">订位确认</p>
+          <h1>{{ share.storeName }}</h1>
+
+          <div class="reservation-public-share__datetime">
+            <div>
+              <span>日期</span>
+              <strong>{{ share.reservationDate }}</strong>
+            </div>
+            <div>
+              <span>时间</span>
+              <strong>{{ share.reservationTime }}</strong>
+            </div>
           </div>
-          <div v-if="share.storeAddress">
-            <span>地址</span>
-            <p>{{ share.storeAddress }}</p>
+
+          <div class="reservation-public-share__table">
+            <span>桌位</span>
+            <strong>{{ tableLabel }}</strong>
+            <small>{{ tableStatus }}</small>
           </div>
-          <a v-if="share.googleMapUrl" :href="share.googleMapUrl" target="_blank" rel="noreferrer">
-            打开地图
-          </a>
-          <a v-if="share.storePhone" :href="`tel:${share.storePhone}`">
-            联系门店
-          </a>
+
+          <div class="reservation-public-share__party">
+            <span>人数</span>
+            <strong>{{ share.partySize }}位成人</strong>
+          </div>
+        </section>
+
+        <section
+          v-if="customerVisibleShareText"
+          class="reservation-public-share__template"
+          aria-label="订位确认内容"
+        >
+          {{ customerVisibleShareText }}
         </section>
 
         <footer class="reservation-public-share__actions">
+          <nav
+            v-if="share.googleMapUrl || share.storePhone"
+            class="reservation-public-share__contact-actions"
+            aria-label="地图与电话"
+          >
+            <a
+              v-if="share.googleMapUrl"
+              :href="share.googleMapUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              打开地图
+            </a>
+            <a v-if="share.storePhone" :href="`tel:${share.storePhone}`">拨打电话</a>
+          </nav>
           <button type="button" @click="shareCurrentPage">转发订位链接</button>
           <p v-if="shareStatusText" role="status">{{ shareStatusText }}</p>
           <textarea
@@ -200,35 +281,7 @@ async function shareCurrentPage(): Promise<void> {
   max-width: 520px;
 }
 
-.reservation-public-share__header {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  display: grid;
-  gap: 6px;
-  padding: 20px;
-}
-
-.reservation-public-share__header span,
-.reservation-public-share__store span,
-.reservation-public-share__details dt {
-  color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 850;
-}
-
-.reservation-public-share__header h1 {
-  color: #0f172a;
-  font-size: 1.55rem;
-  letter-spacing: 0;
-  line-height: 1.22;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.reservation-public-share__header p,
 .reservation-public-share__state span,
-.reservation-public-share__store p,
 .reservation-public-share__actions p {
   color: #334155;
   font-size: 0.9rem;
@@ -238,8 +291,9 @@ async function shareCurrentPage(): Promise<void> {
 }
 
 .reservation-public-share__state,
-.reservation-public-share__details,
-.reservation-public-share__store,
+.reservation-public-share__intro,
+.reservation-public-share__focus,
+.reservation-public-share__template,
 .reservation-public-share__actions {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -252,45 +306,117 @@ async function shareCurrentPage(): Promise<void> {
   gap: 6px;
 }
 
+.reservation-public-share__intro {
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1.72;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.reservation-public-share__focus {
+  display: grid;
+  gap: 14px;
+}
+
+.reservation-public-share__focus-label,
+.reservation-public-share__datetime span,
+.reservation-public-share__table span,
+.reservation-public-share__party span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.reservation-public-share__focus h1 {
+  color: #0f172a;
+  font-size: 1.28rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.24;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reservation-public-share__datetime {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reservation-public-share__datetime div,
+.reservation-public-share__party {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.reservation-public-share__datetime strong,
+.reservation-public-share__party strong {
+  color: #0f172a;
+  font-size: 1.3rem;
+  font-weight: 950;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.reservation-public-share__table {
+  background: #ecfdf5;
+  border: 1px solid #5eead4;
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+}
+
+.reservation-public-share__table strong {
+  color: #0f766e;
+  font-size: 2.15rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.reservation-public-share__table small {
+  color: #0f766e;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.reservation-public-share__template {
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.72;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
 .reservation-public-share__state strong {
   color: #b42318;
   font-size: 1rem;
   font-weight: 950;
 }
 
-.reservation-public-share__details {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
-}
-
-.reservation-public-share__details div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.reservation-public-share__details dd {
-  color: #0f172a;
-  font-size: 1rem;
-  font-weight: 950;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.reservation-public-share__store,
 .reservation-public-share__actions {
   display: grid;
   gap: 10px;
 }
 
-.reservation-public-share__store div {
+.reservation-public-share__contact-actions {
   display: grid;
-  gap: 4px;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.reservation-public-share__store a,
+.reservation-public-share__contact-actions a,
 .reservation-public-share__actions button {
   align-items: center;
   border-radius: 8px;
@@ -302,9 +428,9 @@ async function shareCurrentPage(): Promise<void> {
   text-decoration: none;
 }
 
-.reservation-public-share__store a {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+.reservation-public-share__contact-actions a {
+  background: #ffffff;
+  border: 1px solid #99f6e4;
   color: #0f766e;
 }
 
@@ -336,8 +462,17 @@ async function shareCurrentPage(): Promise<void> {
     padding: 12px;
   }
 
-  .reservation-public-share__details {
-    grid-template-columns: minmax(0, 1fr);
+  .reservation-public-share__datetime strong,
+  .reservation-public-share__party strong {
+    font-size: 1.18rem;
+  }
+
+  .reservation-public-share__table strong {
+    font-size: 1.9rem;
+  }
+
+  .reservation-public-share__contact-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>

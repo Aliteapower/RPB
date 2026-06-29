@@ -9,6 +9,7 @@ const props = withDefaults(
     errorText?: string
     fallbackText?: string
     buttonText?: string
+    statusText?: string
     disabled?: boolean
   }>(),
   {
@@ -17,6 +18,7 @@ const props = withDefaults(
     errorText: '',
     fallbackText: '',
     buttonText: '转发订位链接',
+    statusText: '已准备链接',
     disabled: false
   }
 )
@@ -43,7 +45,7 @@ function requestShare(): void {
       {{ loading ? '读取中' : buttonText }}
     </button>
 
-    <p v-if="shared" class="reservation-share-copy__status" role="status">已准备链接</p>
+    <p v-if="shared" class="reservation-share-copy__status" role="status">{{ statusText }}</p>
     <p v-else-if="errorText" class="reservation-share-copy__error" role="alert">{{ errorText }}</p>
 
     <textarea

@@ -12,6 +12,7 @@ export interface ReservationPublicShare {
   googleMapUrl: string
   shareTitle: string
   shareSummary: string
+  shareText: string
 }
 
 export interface ReservationPublicShareResponse {

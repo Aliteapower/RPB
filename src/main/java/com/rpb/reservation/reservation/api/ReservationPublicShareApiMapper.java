@@ -26,7 +26,8 @@ public class ReservationPublicShareApiMapper {
                 share.storeAddress(),
                 share.googleMapUrl(),
                 share.shareTitle(),
-                share.shareSummary()
+                share.shareSummary(),
+                share.shareText()
             )
         );
     }

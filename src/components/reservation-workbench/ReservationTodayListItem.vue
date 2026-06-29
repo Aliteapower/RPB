@@ -5,7 +5,7 @@ import {
   getReservationShareInfo,
   ReservationShareInfoApiError
 } from '../../api/reservationShareInfoApi'
-import { copyPlainText } from '../../utils/plainTextClipboard'
+import { shareLinkOrCopy } from '../../utils/reservationShareLauncher'
 import type { ReservationTodayViewItem } from '../../types/reservationTodayView'
 import type { ReservationShareInfo } from '../../types/reservationShareInfo'
 import ReservationShareCopyPanel from './ReservationShareCopyPanel.vue'
@@ -117,6 +117,7 @@ const shareInfo = ref<ReservationShareInfo | null>(null)
 const isLoadingShareInfo = ref(false)
 const shareInfoErrorText = ref('')
 const shareInfoShared = ref(false)
+const shareInfoStatusText = ref('')
 const shareInfoFallbackText = ref('')
 
 function requestCancel(): void {
@@ -161,26 +162,22 @@ async function shareReservationLink(): Promise<void> {
 
   shareInfoErrorText.value = ''
   shareInfoShared.value = false
+  shareInfoStatusText.value = ''
   shareInfoFallbackText.value = ''
 
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: info.shareTitle,
-        text: info.shareSummary || info.shareText,
-        url
-      })
-      shareInfoShared.value = true
-      return
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return
-      }
-    }
+  const result = await shareLinkOrCopy({
+    title: info.shareTitle,
+    text: info.shareSummary || info.shareText,
+    url
+  })
+
+  if (result === 'cancelled') {
+    return
   }
 
-  if (await copyPlainText(url)) {
+  if (result === 'copied' || result === 'native-share') {
     shareInfoShared.value = true
+    shareInfoStatusText.value = result === 'copied' ? '链接已复制' : '已打开转发'
     return
   }
 
@@ -196,6 +193,7 @@ async function loadReservationShareInfo(): Promise<void> {
   isLoadingShareInfo.value = true
   shareInfoErrorText.value = ''
   shareInfoShared.value = false
+  shareInfoStatusText.value = ''
   shareInfoFallbackText.value = ''
 
   try {
@@ -281,6 +279,7 @@ function resourceLabel(type: string | null | undefined): string {
         :share-info="shareInfo"
         :loading="isLoadingShareInfo"
         :shared="shareInfoShared"
+        :status-text="shareInfoStatusText"
         :error-text="shareInfoErrorText"
         :fallback-text="shareInfoFallbackText"
         button-text="转发订位链接"

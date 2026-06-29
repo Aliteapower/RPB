@@ -108,10 +108,13 @@ Response:
     "storeAddress": "1 Example Road",
     "googleMapUrl": "https://maps.app.goo.gl/rpb",
     "shareTitle": "食刻订位中心 订位确认",
-    "shareSummary": "20-06-2030 11:30 · 4人"
+    "shareSummary": "20-06-2030 11:30 · 4人",
+    "shareText": "门店：食刻订位中心\n编号：R-SHARE-0007\n时间：20-06-2030 11:30"
   }
 }
 ```
+
+`shareText` is the backend-rendered reservation share template for the store. The public H5 page uses it as the main confirmation content so tenant-configured wording and line breaks are preserved. Unsupported store template variables fall back to the active platform default template, matching the staff share-info behavior.
 
 Public errors:
 
@@ -145,7 +148,7 @@ Add a public route:
 The page is mobile-first and independent from the staff shell. It should show:
 
 - Store name as the first viewport signal.
-- Reservation confirmation heading.
+- Reservation confirmation heading and backend-rendered tenant template text.
 - Date, time, party size, and table assignment or "待确认".
 - Arrival note.
 - Store address and phone.
