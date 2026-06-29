@@ -59,6 +59,7 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/stores/*/tables/temporary-groups/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/check-in").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/seating/direct").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/seating/check-in-direct").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/queue").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/cancel").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/reservations/*/no-show").permitAll()

@@ -50,6 +50,7 @@ class StaffUiV12TableSelectionValidationTest {
         Path pickerPath = Path.of("src", "components", "staff-table", "TableResourcePicker.vue");
         Path createDialogPath = Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue");
         Path apiPath = Path.of("src", "api", "tableResourceApi.ts");
+        Path seatingApiPath = Path.of("src", "api", "reservationArrivedDirectSeatingApi.ts");
         Path typePath = Path.of("src", "types", "tableResource.ts");
 
         assertThat(Files.exists(tablePagePath)).isTrue();
@@ -57,6 +58,7 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(pickerPath)).isTrue();
         assertThat(Files.exists(createDialogPath)).isTrue();
         assertThat(Files.exists(apiPath)).isTrue();
+        assertThat(Files.exists(seatingApiPath)).isTrue();
         assertThat(Files.exists(typePath)).isTrue();
 
         String tablePageSource = Files.readString(tablePagePath);
@@ -67,11 +69,13 @@ class StaffUiV12TableSelectionValidationTest {
             + Files.readString(pickerPath)
             + createDialogSource
             + Files.readString(apiPath)
+            + Files.readString(seatingApiPath)
             + Files.readString(typePath);
 
         assertThat(source)
             .contains("fetchTableResources")
             .contains("/api/v1/stores/${storeId}/tables")
+            .contains("/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/seating/check-in-direct")
             .contains("resourceType: 'dining_table' | 'table_group'")
             .contains("areaName")
             .contains("memberTableCodes")
@@ -93,6 +97,7 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("completeCleaning")
             .contains("completeReservation")
             .contains("seatArrivedReservation")
+            .contains("checkInAndSeatConfirmedReservation")
             .contains("seatCalledQueueTicket")
             .contains("canSeatWalkInResource")
             .contains("getReservationCalendarSummary")
@@ -127,6 +132,9 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("preassignedQueueTicketStatus")
             .contains("预约指定")
             .contains("预约入桌")
+            .contains("到店入桌")
+            .contains("seatAssignedReservationActionText")
+            .contains("resource.preassignedReservationStatus === 'confirmed'")
             .contains("叫号入桌")
             .contains("桌台分区")
             .contains("全部分区")
@@ -226,6 +234,31 @@ class StaffUiV12TableSelectionValidationTest {
             .contains(":business-date=\"form.businessDate\"")
             .doesNotContain("temporaryTableIds: form.temporaryTableIds")
             .doesNotContain("reservation-create-table-picker__grid");
+    }
+
+    @Test
+    void tablePageSupportsVisibleRangeBulkCleaningActions() throws Exception {
+        String tablePageSource = Files.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
+
+        assertThat(tablePageSource)
+            .contains("bulkStartCleaningResources")
+            .contains("bulkCompleteCleaningResources")
+            .contains("bulkCleaningMode")
+            .contains("bulkCleaningProgressText")
+            .contains("startVisibleResourcesCleaning")
+            .contains("completeVisibleResourcesCleaning")
+            .contains("runBulkCleaningAction")
+            .contains("startCleaningForResource(currentStoreId, resource)")
+            .contains("completeCleaningForResource(currentStoreId, resource)")
+            .contains("createBulkCleaningLocalError")
+            .contains("cleaning.bulk_partial_failed")
+            .contains("批量清台")
+            .contains("批量完成")
+            .contains("当前筛选")
+            .contains("table-page__bulk-actions")
+            .contains("table-page__bulk-action")
+            .contains(":disabled=\"!canRunBulkStartCleaning\"")
+            .contains(":disabled=\"!canRunBulkCompleteCleaning\"");
     }
 
     @Test

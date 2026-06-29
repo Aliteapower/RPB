@@ -52,3 +52,51 @@ Staff Reception Queue Closed Loop / 2026-06-24
 - To roll back queue cancellation, remove the Queue List cancel action, `queueCancelApi.ts`, `queueCancel.ts`, and the queue cancel backend controller/service/DTO classes.
 - Remove `walkin.queue.create` and `queue.cancel` from `AppGateRequiredPermission` only if the corresponding endpoints and UI actions are also rolled back.
 - Restore the deleted legacy reservation create page only if the old route behavior is intentionally reintroduced.
+
+---
+
+# Release Notes
+
+## Version / Date
+
+Assigned Reservation Table Check-In Seating / 2026-06-29
+
+## New
+
+- Added an atomic reservation seating action for assigned-table reservations: `POST /api/v1/stores/{storeId}/reservations/{reservationId}/seating/check-in-direct`.
+- The new action persists the `confirmed -> arrived -> seated` flow in one transaction, including reservation arrived/seated business events, state transition logs, audit logs, seating, seating resource, table occupancy, and idempotency evidence.
+- Added a table-page "到店入桌" action for today's assigned reservations that are still `confirmed`.
+
+## Changed
+
+- Table page assigned reservations now show the main action for both `confirmed` and `arrived` reservations.
+- `arrived` assigned reservations continue to use the existing `/seating/direct` endpoint and "预约入桌" copy.
+- `confirmed` assigned reservations use the new `/seating/check-in-direct` endpoint and "到店入桌" copy.
+
+## Fixed
+
+- Staff no longer need to switch from the table page to the reservation page just to mark an assigned reservation arrived before seating it.
+- Avoided the partial frontend sequence where check-in could succeed while seating failed in a separate request.
+
+## Migration
+
+- No database migration is required.
+- Existing reservation, seating, dining table, audit, business event, state transition, and idempotency tables are reused.
+
+## Permission
+
+- No new App Gate permission is required.
+- The new endpoint uses the existing `reservation.seat` permission under `reservation_queue`.
+- Local runtime allowlist now includes `POST /api/v1/stores/{storeId}/reservations/{reservationId}/seating/check-in-direct`.
+
+## Risk
+
+- The new API is additive; the existing `/seating/direct` contract remains unchanged and still rejects non-arrived reservations.
+- The atomic action writes both arrival and seating evidence, so reporting that counts reservation arrival events should expect an arrival event when staff use "到店入桌".
+
+## Rollback Notes
+
+- Remove the table-page confirmed-reservation branch and "到店入桌" copy, keeping `arrived` reservations on `seatArrivedReservation`.
+- Remove `checkInAndSeatConfirmedReservation` from `reservationArrivedDirectSeatingApi.ts`.
+- Remove the controller endpoint and the `checkInAndSeatConfirmedReservation` service path.
+- Remove the local runtime allowlist entry for `/seating/check-in-direct`.

@@ -12,6 +12,7 @@ import {
   ReservationStatusActionApiError
 } from '../api/reservationStatusActionApi'
 import {
+  checkInAndSeatConfirmedReservation,
   ReservationArrivedDirectSeatingApiError,
   seatArrivedReservation
 } from '../api/reservationArrivedDirectSeatingApi'
@@ -69,6 +70,15 @@ type TableActionErrorResponse =
   | ReservationStatusActionApiErrorResponse
   | SeatingFromCalledQueueApiErrorResponse
   | TemporaryTableGroupApiErrorResponse
+type BulkCleaningMode = 'start' | 'complete'
+
+const APP_GATE_BLOCKING_ERROR_CODES = new Set([
+  'APP_DISABLED',
+  'PERMISSION_DENIED',
+  'STORE_APP_NOT_ENABLED',
+  'TENANT_APP_EXPIRED',
+  'TENANT_APP_NOT_ENABLED'
+])
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -129,6 +139,9 @@ const savingTemporaryGroup = ref(false)
 const dissolvingTemporaryGroupId = ref<string | null>(null)
 const startingCleaningResourceId = ref<string | null>(null)
 const completingCleaningResourceId = ref<string | null>(null)
+const bulkCleaningMode = ref<BulkCleaningMode | null>(null)
+const bulkCleaningCompletedCount = ref(0)
+const bulkCleaningTotalCount = ref(0)
 const seatingResourceId = ref<string | null>(null)
 const showTableSwitchDialog = ref(false)
 const selectedSwitchResource = ref<TableResourceItem | null>(null)
@@ -212,6 +225,8 @@ const summaryItems = computed<SummaryItem[]>(() =>
 )
 const displayedResourceCount = computed(() => tableResources.value.length + displayedGroupResources.value.length)
 const isSelectedBusinessDateToday = computed(() => selectedBusinessDate.value === todayDateInput())
+const bulkStartCleaningResources = computed(() => tableResources.value.filter(canStartCleaning))
+const bulkCompleteCleaningResources = computed(() => tableResources.value.filter(canCompleteCleaning))
 const tableSwitchDialogItem = computed(() => {
   const resource = selectedSwitchResource.value
 
@@ -237,14 +252,36 @@ const partySizeValue = computed({
   }
 })
 const selectedTemporaryTableIdSet = computed(() => new Set(selectedTemporaryTableIds.value))
+const isBulkCleaning = computed(() => bulkCleaningMode.value !== null)
 const activeTableActionInProgress = computed(
   () =>
     savingTemporaryGroup.value ||
     !!dissolvingTemporaryGroupId.value ||
     !!startingCleaningResourceId.value ||
     !!completingCleaningResourceId.value ||
+    isBulkCleaning.value ||
     !!seatingResourceId.value
 )
+const canRunBulkStartCleaning = computed(
+  () =>
+    isSelectedBusinessDateToday.value &&
+    bulkStartCleaningResources.value.length > 0 &&
+    !activeTableActionInProgress.value
+)
+const canRunBulkCompleteCleaning = computed(
+  () =>
+    isSelectedBusinessDateToday.value &&
+    bulkCompleteCleaningResources.value.length > 0 &&
+    !activeTableActionInProgress.value
+)
+const bulkCleaningProgressText = computed(() => {
+  if (bulkCleaningMode.value) {
+    const action = bulkCleaningMode.value === 'start' ? '批量清台' : '批量完成'
+    return `${action} ${bulkCleaningCompletedCount.value}/${bulkCleaningTotalCount.value}`
+  }
+
+  return `当前筛选：可清 ${bulkStartCleaningResources.value.length} · 清台中 ${bulkCompleteCleaningResources.value.length}`
+})
 const selectedTemporaryTableResources = computed(() =>
   allTableResources.value.filter(resource => selectedTemporaryTableIdSet.value.has(resource.resourceId))
 )
@@ -516,25 +553,32 @@ async function startResourceCleaning(resource: TableResourceItem): Promise<void>
   startingCleaningResourceId.value = resource.resourceId
 
   try {
-    await completeReservationForResourceIfNeeded(currentStoreId, resource)
-    await startCleaning(
-      currentStoreId,
-      seatingId,
-      {
-        reasonCode: 'staff_table_page_clear',
-        note: `table_resource:${resource.resourceType}:${resource.code}`
-      },
-      createTableActionIdempotencyKey('cleaning-start', resource.resourceId)
-    )
+    await startCleaningForResource(currentStoreId, resource)
     await loadResources()
   } catch (error) {
-    actionError.value =
-      error instanceof CleaningApiError || error instanceof ReservationStatusActionApiError
-        ? error.response
-        : createCleaningLocalError('REQUEST_FAILED', 'cleaning.request_failed')
+    actionError.value = tableCleaningActionError(error, 'cleaning.request_failed')
   } finally {
     startingCleaningResourceId.value = null
   }
+}
+
+async function startCleaningForResource(currentStoreId: string, resource: TableResourceItem): Promise<void> {
+  const seatingId = resource.currentSeatingId
+
+  if (!seatingId) {
+    throw createCleaningLocalError('SEATING_NOT_FOUND', 'cleaning.seating_not_found')
+  }
+
+  await completeReservationForResourceIfNeeded(currentStoreId, resource)
+  await startCleaning(
+    currentStoreId,
+    seatingId,
+    {
+      reasonCode: 'staff_table_page_clear',
+      note: `table_resource:${resource.resourceType}:${resource.code}`
+    },
+    createTableActionIdempotencyKey('cleaning-start', resource.resourceId)
+  )
 }
 
 async function completeReservationForResourceIfNeeded(
@@ -573,22 +617,116 @@ async function completeResourceCleaning(resource: TableResourceItem): Promise<vo
   completingCleaningResourceId.value = resource.resourceId
 
   try {
-    await completeCleaning(
-      currentStoreId,
-      cleaningId,
-      {
-        reasonCode: 'staff_table_page_complete_clear',
-        note: `table_resource:${resource.resourceType}:${resource.code}`
-      },
-      createTableActionIdempotencyKey('cleaning-complete', resource.resourceId)
-    )
+    await completeCleaningForResource(currentStoreId, resource)
     await loadResources()
   } catch (error) {
-    actionError.value =
-      error instanceof CleaningApiError
-        ? error.response
-        : createCleaningLocalError('REQUEST_FAILED', 'cleaning.request_failed')
+    actionError.value = tableCleaningActionError(error, 'cleaning.request_failed')
   } finally {
+    completingCleaningResourceId.value = null
+  }
+}
+
+async function completeCleaningForResource(currentStoreId: string, resource: TableResourceItem): Promise<void> {
+  const cleaningId = resource.currentCleaningId
+
+  if (!cleaningId) {
+    throw createCleaningLocalError('CLEANING_NOT_FOUND', 'cleaning.not_found')
+  }
+
+  await completeCleaning(
+    currentStoreId,
+    cleaningId,
+    {
+      reasonCode: 'staff_table_page_complete_clear',
+      note: `table_resource:${resource.resourceType}:${resource.code}`
+    },
+    createTableActionIdempotencyKey('cleaning-complete', resource.resourceId)
+  )
+}
+
+async function startVisibleResourcesCleaning(): Promise<void> {
+  const currentStoreId = storeId.value
+  const targets = [...bulkStartCleaningResources.value]
+
+  if (!currentStoreId || !targets.length || activeTableActionInProgress.value) {
+    actionError.value = createCleaningLocalError('NO_CLEARABLE_TABLES', 'cleaning.no_clearable_tables')
+    return
+  }
+
+  await runBulkCleaningAction('start', targets, async resource => {
+    startingCleaningResourceId.value = resource.resourceId
+    await startCleaningForResource(currentStoreId, resource)
+  })
+}
+
+async function completeVisibleResourcesCleaning(): Promise<void> {
+  const currentStoreId = storeId.value
+  const targets = [...bulkCompleteCleaningResources.value]
+
+  if (!currentStoreId || !targets.length || activeTableActionInProgress.value) {
+    actionError.value = createCleaningLocalError('NO_CLEANING_TABLES', 'cleaning.no_cleaning_tables')
+    return
+  }
+
+  await runBulkCleaningAction('complete', targets, async resource => {
+    completingCleaningResourceId.value = resource.resourceId
+    await completeCleaningForResource(currentStoreId, resource)
+  })
+}
+
+async function runBulkCleaningAction(
+  mode: BulkCleaningMode,
+  targets: TableResourceItem[],
+  action: (resource: TableResourceItem) => Promise<void>
+): Promise<void> {
+  actionError.value = null
+  bulkCleaningMode.value = mode
+  bulkCleaningCompletedCount.value = 0
+  bulkCleaningTotalCount.value = targets.length
+
+  let failedCount = 0
+  let firstError: TableActionErrorResponse | null = null
+  let blockedByAppGate = false
+
+  try {
+    for (const resource of targets) {
+      try {
+        await action(resource)
+        bulkCleaningCompletedCount.value += 1
+      } catch (error) {
+        failedCount += 1
+        const currentError = tableCleaningActionError(error, 'cleaning.request_failed')
+        firstError ??= currentError
+
+        if (isBlockingAppGateError(currentError)) {
+          firstError = currentError
+          blockedByAppGate = true
+          break
+        }
+      } finally {
+        startingCleaningResourceId.value = null
+        completingCleaningResourceId.value = null
+      }
+    }
+
+    if (failedCount > 0) {
+      actionError.value =
+        (blockedByAppGate || failedCount === targets.length) && firstError
+          ? firstError
+          : createBulkCleaningLocalError(
+              bulkCleaningCompletedCount.value,
+              failedCount,
+              targets.length,
+              mode
+            )
+    }
+
+    await loadResources()
+  } finally {
+    bulkCleaningMode.value = null
+    bulkCleaningCompletedCount.value = 0
+    bulkCleaningTotalCount.value = 0
+    startingCleaningResourceId.value = null
     completingCleaningResourceId.value = null
   }
 }
@@ -606,16 +744,24 @@ async function seatAssignedReservation(resource: TableResourceItem): Promise<voi
   seatingResourceId.value = resource.resourceId
 
   try {
-    await seatArrivedReservation(
+    const isConfirmedReservation = resource.preassignedReservationStatus === 'confirmed'
+    const seatReservation = isConfirmedReservation ? checkInAndSeatConfirmedReservation : seatArrivedReservation
+
+    await seatReservation(
       currentStoreId,
       reservationId,
       {
         ...resourceSeatRequest(resource),
         overrideReasonCode: null,
         overrideNote: null,
-        note: 'staff_table_resource_preassigned_seating'
+        note: isConfirmedReservation
+          ? 'staff_table_resource_preassigned_check_in_seating'
+          : 'staff_table_resource_preassigned_seating'
       },
-      createTableActionIdempotencyKey('reservation-seat', resource.resourceId)
+      createTableActionIdempotencyKey(
+        isConfirmedReservation ? 'reservation-check-in-seat' : 'reservation-seat',
+        resource.resourceId
+      )
     )
     await loadResources()
   } catch (error) {
@@ -851,7 +997,8 @@ function canSeatAssignedReservation(resource: TableResourceItem): boolean {
   return (
     isSelectedBusinessDateToday.value &&
     resource.status === 'reserved' &&
-    resource.preassignedReservationStatus === 'arrived' &&
+    (resource.preassignedReservationStatus === 'arrived' ||
+      resource.preassignedReservationStatus === 'confirmed') &&
     !resource.preassignedQueueTicketId &&
     !!resource.preassignedReservationId
   )
@@ -901,6 +1048,14 @@ function temporaryGroupCapacityText(): string {
 
 function isSeatingResource(resource: TableResourceItem): boolean {
   return seatingResourceId.value === resource.resourceId
+}
+
+function seatAssignedReservationActionText(resource: TableResourceItem): string {
+  if (isSeatingResource(resource)) {
+    return '入桌中'
+  }
+
+  return resource.preassignedReservationStatus === 'confirmed' ? '到店入桌' : '预约入桌'
 }
 
 function preassignedPendingActionText(resource: TableResourceItem): string {
@@ -969,6 +1124,61 @@ function createCleaningLocalError(code: string, messageKey: string): CleaningApi
       status: 'failed'
     }
   }
+}
+
+function createBulkCleaningLocalError(
+  completedCount: number,
+  failedCount: number,
+  totalCount: number,
+  mode: BulkCleaningMode
+): CleaningApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code: 'BULK_CLEANING_PARTIAL_FAILED',
+      messageKey: 'cleaning.bulk_partial_failed',
+      details: {
+        completedCount,
+        failedCount,
+        mode,
+        totalCount
+      }
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
+function tableCleaningActionError(error: unknown, fallbackMessageKey: string): TableActionErrorResponse {
+  if (
+    error instanceof CleaningApiError ||
+    error instanceof ReservationStatusActionApiError
+  ) {
+    return error.response
+  }
+
+  if (isTableActionErrorResponse(error)) {
+    return error
+  }
+
+  return createCleaningLocalError('REQUEST_FAILED', fallbackMessageKey)
+}
+
+function isTableActionErrorResponse(value: unknown): value is TableActionErrorResponse {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as { success?: unknown }).success === false &&
+    typeof (value as { error?: { code?: unknown } }).error?.code === 'string'
+  )
+}
+
+function isBlockingAppGateError(response: TableActionErrorResponse): boolean {
+  return (
+    APP_GATE_BLOCKING_ERROR_CODES.has(response.error.code) ||
+    response.error.messageKey.startsWith('appgate.')
+  )
 }
 
 function createTemporaryGroupLocalError(code: string, messageKey: string): TemporaryTableGroupApiErrorResponse {
@@ -1164,6 +1374,25 @@ function formatStoreLabel(value: string | undefined): string {
             </select>
           </label>
           <span>共 {{ tableResources.length }} 个</span>
+          <div class="table-page__bulk-actions" aria-label="批量清台操作">
+            <span>{{ bulkCleaningProgressText }}</span>
+            <button
+              class="table-page__bulk-action table-page__bulk-action--danger"
+              :disabled="!canRunBulkStartCleaning"
+              type="button"
+              @click="startVisibleResourcesCleaning"
+            >
+              {{ bulkCleaningMode === 'start' ? '批量清台中' : `批量清台 ${bulkStartCleaningResources.length}` }}
+            </button>
+            <button
+              class="table-page__bulk-action table-page__bulk-action--primary"
+              :disabled="!canRunBulkCompleteCleaning"
+              type="button"
+              @click="completeVisibleResourcesCleaning"
+            >
+              {{ bulkCleaningMode === 'complete' ? '批量完成中' : `批量完成 ${bulkCompleteCleaningResources.length}` }}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1243,7 +1472,7 @@ function formatStoreLabel(value: string | undefined): string {
                 type="button"
                 @click="seatAssignedReservation(resource)"
               >
-                {{ isSeatingResource(resource) ? '入桌中' : '预约入桌' }}
+                {{ seatAssignedReservationActionText(resource) }}
               </button>
               <button
                 v-else-if="resource.status === 'reserved'"
@@ -1352,7 +1581,7 @@ function formatStoreLabel(value: string | undefined): string {
               type="button"
               @click="seatAssignedReservation(resource)"
             >
-              {{ isSeatingResource(resource) ? '入桌中' : '预约入桌' }}
+              {{ seatAssignedReservationActionText(resource) }}
             </button>
             <button
               v-else-if="resource.status === 'reserved'"
@@ -1729,6 +1958,55 @@ h3 {
   justify-content: flex-end;
 }
 
+.table-page__bulk-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.table-page__bulk-actions > span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.table-page__bulk-action {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d1dae7;
+  border-radius: 8px;
+  color: #315f91;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.table-page__bulk-action--primary {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #047857;
+}
+
+.table-page__bulk-action--danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.table-page__bulk-action:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .table-page__area-section {
   display: grid;
   gap: 10px;
@@ -1996,6 +2274,11 @@ select:focus-visible {
 
   .table-page__resource-grid--groups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .table-page__area-tools,
+  .table-page__bulk-actions {
+    justify-content: flex-start;
   }
 }
 </style>

@@ -77,20 +77,25 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class ReservationArrivedDirectSeatingApplicationService {
 
-    private static final String ACTION = "seat_arrived_reservation";
+    private static final String ACTION_SEAT_ARRIVED = "seat_arrived_reservation";
+    private static final String ACTION_CHECK_IN_AND_SEAT = "check_in_and_seat_reservation";
     private static final String RESERVATION_SOURCE = "reservation";
     private static final String RESOURCE_TABLE = "dining_table";
     private static final String RESOURCE_GROUP = "table_group";
+    private static final String EVENT_RESERVATION_ARRIVED = "reservation.arrived";
     private static final String EVENT_RESERVATION_SEATED = "reservation.seated";
     private static final String EVENT_SEATING_CREATED = "seating.created";
     private static final String EVENT_TABLE_OCCUPIED = "table.occupied";
+    private static final String OPERATION_CHECK_IN = "reservation.check_in";
     private static final String OPERATION_SEAT = "reservation.seat";
     private static final String OPERATION_SEAT_FAILED = "reservation.seat.failed";
+    private static final String OPERATION_CHECK_IN_AND_SEAT_FAILED = "reservation.check_in_and_seat.failed";
 
     private final StoreRepositoryPort storeRepository;
     private final ReservationRepositoryPort reservationRepository;
@@ -104,6 +109,7 @@ public class ReservationArrivedDirectSeatingApplicationService {
     private final AuditLogRepositoryPort auditLogRepository;
     private final IdempotencyRepositoryPort idempotencyRepository;
     private final Clock clock;
+    private final PlatformTransactionManager transactionManager;
     private final TemporaryTableGroupApplicationService temporaryTableGroupService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
@@ -144,7 +150,39 @@ public class ReservationArrivedDirectSeatingApplicationService {
             stateTransitionLogRepository,
             auditLogRepository,
             idempotencyRepository,
-            clock
+            clock,
+            null
+        );
+    }
+
+    public ReservationArrivedDirectSeatingApplicationService(
+        StoreRepositoryPort storeRepository,
+        ReservationRepositoryPort reservationRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
+        TableLockRepositoryPort tableLockRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        SeatingRepositoryPort seatingRepository,
+        BusinessEventRepositoryPort businessEventRepository,
+        StateTransitionLogRepositoryPort stateTransitionLogRepository,
+        AuditLogRepositoryPort auditLogRepository,
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock
+    ) {
+        this(
+            storeRepository,
+            reservationRepository,
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            preassignmentRepository,
+            seatingRepository,
+            businessEventRepository,
+            stateTransitionLogRepository,
+            auditLogRepository,
+            idempotencyRepository,
+            clock,
+            null
         );
     }
 
@@ -161,7 +199,8 @@ public class ReservationArrivedDirectSeatingApplicationService {
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
         IdempotencyRepositoryPort idempotencyRepository,
-        Clock clock
+        Clock clock,
+        PlatformTransactionManager transactionManager
     ) {
         this.storeRepository = storeRepository;
         this.reservationRepository = reservationRepository;
@@ -175,6 +214,7 @@ public class ReservationArrivedDirectSeatingApplicationService {
         this.auditLogRepository = auditLogRepository;
         this.idempotencyRepository = idempotencyRepository;
         this.clock = clock;
+        this.transactionManager = transactionManager;
         this.temporaryTableGroupService = new TemporaryTableGroupApplicationService(
             diningTableRepository,
             tableGroupRepository,
@@ -185,8 +225,19 @@ public class ReservationArrivedDirectSeatingApplicationService {
         );
     }
 
-    @Transactional
     public ReservationArrivedDirectSeatingResult seatArrivedReservation(SeatArrivedReservationCommand command) {
+        return seatReservation(command, ACTION_SEAT_ARRIVED, false);
+    }
+
+    public ReservationArrivedDirectSeatingResult checkInAndSeatConfirmedReservation(SeatArrivedReservationCommand command) {
+        return seatReservation(command, ACTION_CHECK_IN_AND_SEAT, true);
+    }
+
+    private ReservationArrivedDirectSeatingResult seatReservation(
+        SeatArrivedReservationCommand command,
+        String action,
+        boolean checkInFirst
+    ) {
         ReservationArrivedDirectSeatingError preValidationError = validateCommand(command);
         if (preValidationError != null) {
             return ReservationArrivedDirectSeatingResult.failure(preValidationError);
@@ -197,31 +248,51 @@ public class ReservationArrivedDirectSeatingApplicationService {
         String requestHash = requestHash(command);
         String source = source(command);
 
-        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, source, ACTION, idempotencyKey);
+        Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(scope, source, action, idempotencyKey);
         if (existing.isPresent()) {
             return resolveExistingIdempotency(existing.get(), requestHash);
         }
 
         IdempotencyRecord started;
         try {
-            started = idempotencyRepository.start(scope, source, ACTION, idempotencyKey, requestHash, OffsetDateTime.now(clock).plusMinutes(30));
+            started = idempotencyRepository.start(scope, source, action, idempotencyKey, requestHash, OffsetDateTime.now(clock).plusMinutes(30));
         } catch (RuntimeException exception) {
             return ReservationArrivedDirectSeatingResult.failure(ReservationArrivedDirectSeatingError.REPOSITORY_SAVE_FAILED);
         }
 
         try {
-            return execute(command, scope, started);
+            return executeInTransaction(() -> execute(command, scope, started, checkInFirst));
         } catch (ApplicationFailure failure) {
             markFailed(scope, started, failure.error());
-            appendFailureAudit(scope, command, started.idempotencyKey(), failure.error());
+            appendFailureAudit(
+                scope,
+                command,
+                started.idempotencyKey(),
+                failure.error(),
+                checkInFirst ? OPERATION_CHECK_IN_AND_SEAT_FAILED : OPERATION_SEAT_FAILED
+            );
             return failure.retryLater()
                 ? ReservationArrivedDirectSeatingResult.retryLater(failure.error())
                 : ReservationArrivedDirectSeatingResult.failure(failure.error());
         } catch (RuntimeException exception) {
             markFailed(scope, started, ReservationArrivedDirectSeatingError.REPOSITORY_SAVE_FAILED);
-            appendFailureAudit(scope, command, started.idempotencyKey(), ReservationArrivedDirectSeatingError.REPOSITORY_SAVE_FAILED);
+            appendFailureAudit(
+                scope,
+                command,
+                started.idempotencyKey(),
+                ReservationArrivedDirectSeatingError.REPOSITORY_SAVE_FAILED,
+                checkInFirst ? OPERATION_CHECK_IN_AND_SEAT_FAILED : OPERATION_SEAT_FAILED
+            );
             return ReservationArrivedDirectSeatingResult.failure(ReservationArrivedDirectSeatingError.REPOSITORY_SAVE_FAILED);
         }
+    }
+
+    private ReservationArrivedDirectSeatingResult executeInTransaction(TransactionalAction action) {
+        if (transactionManager == null) {
+            return action.execute();
+        }
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        return transactionTemplate.execute(status -> action.execute());
     }
 
     public static String requestHash(SeatArrivedReservationCommand command) {
@@ -242,7 +313,12 @@ public class ReservationArrivedDirectSeatingApplicationService {
         return sha256(normalized);
     }
 
-    private ReservationArrivedDirectSeatingResult execute(SeatArrivedReservationCommand command, StoreScope scope, IdempotencyRecord started) {
+    private ReservationArrivedDirectSeatingResult execute(
+        SeatArrivedReservationCommand command,
+        StoreScope scope,
+        IdempotencyRecord started,
+        boolean checkInFirst
+    ) {
         Store store = storeRepository.findById(scope)
             .orElseThrow(() -> new ApplicationFailure(ReservationArrivedDirectSeatingError.STORE_NOT_FOUND));
         if (!scope.equals(store.scope())) {
@@ -261,9 +337,14 @@ public class ReservationArrivedDirectSeatingApplicationService {
             return alreadySeated(scope, command, started, reservation);
         }
 
-        ReservationArrivedDirectSeatingError statusError = reservationArrivedSeatingRule.validateFreshSeating(reservation.status());
+        ReservationArrivedDirectSeatingError statusError = checkInFirst
+            ? validateCheckInAndSeatStatus(reservation.status())
+            : reservationArrivedSeatingRule.validateFreshSeating(reservation.status());
         if (statusError != null) {
             throw new ApplicationFailure(statusError);
+        }
+        if (checkInFirst && !reservationStateMachine.canTransition(ReservationStatus.CONFIRMED, ReservationStatus.ARRIVED)) {
+            throw new ApplicationFailure(ReservationArrivedDirectSeatingError.ILLEGAL_STATE_TRANSITION);
         }
         if (!reservationStateMachine.canTransition(ReservationStatus.ARRIVED, ReservationStatus.SEATED)) {
             throw new ApplicationFailure(ReservationArrivedDirectSeatingError.ILLEGAL_STATE_TRANSITION);
@@ -274,17 +355,22 @@ public class ReservationArrivedDirectSeatingApplicationService {
         require(reservationArrivedSeatingRule.validateReservationSource(reservation.id().value()), ReservationArrivedDirectSeatingError.INVALID_SEATING_SOURCE);
         require(seatingResourceValidator.validate(selection.resourceType(), selection.resourceId()), ReservationArrivedDirectSeatingError.INVALID_SEATING_RESOURCE);
 
-        Seating seating = createSeating(scope, command, reservation);
+        Instant arrivedAt = Instant.now(clock);
+        Reservation reservationForSeating = checkInFirst ? arrivedReservation(reservation, arrivedAt) : reservation;
+        Seating seating = createSeating(scope, command, reservationForSeating);
         SeatingResource seatingResource = createSeatingResource(scope, seating, selection);
         List<DiningTable> occupiedTables = occupyTables(scope, selection);
-        Reservation savedReservation = saveSeated(scope, reservation);
+        Reservation savedReservation = saveSeated(scope, reservationForSeating);
         List<String> groupMemberStatuses = occupiedTables.stream().map(table -> table.status().code()).toList();
         String tableStatus = selection.isTable() ? occupiedTables.getFirst().status().code() : null;
         List<UUID> occupiedTableIds = occupiedTables.stream().map(table -> table.id().value()).toList();
 
-        List<UUID> eventIds = appendBusinessEvents(scope, command, savedReservation, seating, selection, started.idempotencyKey());
-        List<UUID> transitionIds = appendTransitionLogs(scope, command, savedReservation, seating, occupiedTables, started.idempotencyKey());
-        AuditLog auditLog = appendCompletedAudit(scope, command, savedReservation, seating, selection, occupiedTableIds, started.idempotencyKey());
+        List<UUID> eventIds = appendBusinessEvents(scope, command, savedReservation, seating, selection, started.idempotencyKey(), checkInFirst, arrivedAt);
+        List<UUID> transitionIds = appendTransitionLogs(scope, command, savedReservation, seating, occupiedTables, started.idempotencyKey(), checkInFirst, arrivedAt);
+        if (checkInFirst) {
+            appendCheckInAudit(scope, command, savedReservation, seating, selection, started.idempotencyKey(), arrivedAt);
+        }
+        AuditLog seatAuditLog = appendCompletedAudit(scope, command, savedReservation, seating, selection, occupiedTableIds, started.idempotencyKey());
 
         IdempotencyRecord completed = completeIdempotency(
             scope,
@@ -308,10 +394,12 @@ public class ReservationArrivedDirectSeatingApplicationService {
             selection.isTable() ? List.of() : groupMemberStatuses,
             occupiedTableIds,
             completed.status().code(),
-            List.of(EVENT_RESERVATION_SEATED, EVENT_SEATING_CREATED, EVENT_TABLE_OCCUPIED),
+            checkInFirst
+                ? List.of(EVENT_RESERVATION_ARRIVED, EVENT_RESERVATION_SEATED, EVENT_SEATING_CREATED, EVENT_TABLE_OCCUPIED)
+                : List.of(EVENT_RESERVATION_SEATED, EVENT_SEATING_CREATED, EVENT_TABLE_OCCUPIED),
             eventIds,
             transitionIds,
-            auditLog.id()
+            seatAuditLog.id()
         );
     }
 
@@ -320,6 +408,22 @@ public class ReservationArrivedDirectSeatingApplicationService {
         if (!reservation.businessDate().value().equals(storeToday)) {
             throw new ApplicationFailure(ReservationArrivedDirectSeatingError.RESERVATION_NOT_TODAY);
         }
+    }
+
+    private static ReservationArrivedDirectSeatingError validateCheckInAndSeatStatus(ReservationStatus status) {
+        if (status == ReservationStatus.CONFIRMED) {
+            return null;
+        }
+        if (status == ReservationStatus.CANCELLED) {
+            return ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_CANCELLED;
+        }
+        if (status == ReservationStatus.NO_SHOW) {
+            return ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_NO_SHOW;
+        }
+        if (status == ReservationStatus.COMPLETED) {
+            return ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_COMPLETED;
+        }
+        return ReservationArrivedDirectSeatingError.RESERVATION_STATUS_NOT_CONFIRMED;
     }
 
     private ReservationArrivedDirectSeatingResult alreadySeated(
@@ -563,6 +667,28 @@ public class ReservationArrivedDirectSeatingApplicationService {
         }
     }
 
+    private static Reservation arrivedReservation(Reservation reservation, Instant arrivedAt) {
+        return new Reservation(
+            reservation.id(),
+            reservation.scope(),
+            reservation.customerId(),
+            reservation.reservationCode(),
+            reservation.partySize(),
+            reservation.businessDate(),
+            reservation.reservedStartAt(),
+            reservation.reservedEndAt(),
+            reservation.holdUntilAt(),
+            ReservationStatus.ARRIVED,
+            reservation.sourceChannel(),
+            reservation.cancellationReasonCode(),
+            reservation.noShowReasonCode(),
+            reservation.note(),
+            reservation.createdAt(),
+            arrivedAt,
+            reservation.deletedAt()
+        );
+    }
+
     private Reservation saveSeated(StoreScope scope, Reservation reservation) {
         try {
             return reservationRepository.save(
@@ -598,13 +724,23 @@ public class ReservationArrivedDirectSeatingApplicationService {
         Reservation reservation,
         Seating seating,
         ResourceSelection selection,
-        IdempotencyKey idempotencyKey
+        IdempotencyKey idempotencyKey,
+        boolean includeArrival,
+        Instant arrivedAt
     ) {
-        List<BusinessEvent> events = List.of(
-            newBusinessEvent(EVENT_RESERVATION_SEATED, RESERVATION_SOURCE, reservation.id().value(), command, metadata(reservation, seating, selection, idempotencyKey, null)),
-            newBusinessEvent(EVENT_SEATING_CREATED, "seating", seating.id().value(), command, metadata(reservation, seating, selection, idempotencyKey, null)),
-            newBusinessEvent(EVENT_TABLE_OCCUPIED, selection.resourceType(), selection.resourceId(), command, metadata(reservation, seating, selection, idempotencyKey, null))
-        );
+        List<BusinessEvent> events = new ArrayList<>();
+        if (includeArrival) {
+            events.add(newBusinessEvent(
+                EVENT_RESERVATION_ARRIVED,
+                RESERVATION_SOURCE,
+                reservation.id().value(),
+                command,
+                metadata(reservation, seating, selection, idempotencyKey, "confirmed", "arrived", arrivalExtra(arrivedAt))
+            ));
+        }
+        events.add(newBusinessEvent(EVENT_RESERVATION_SEATED, RESERVATION_SOURCE, reservation.id().value(), command, metadata(reservation, seating, selection, idempotencyKey, null)));
+        events.add(newBusinessEvent(EVENT_SEATING_CREATED, "seating", seating.id().value(), command, metadata(reservation, seating, selection, idempotencyKey, null)));
+        events.add(newBusinessEvent(EVENT_TABLE_OCCUPIED, selection.resourceType(), selection.resourceId(), command, metadata(reservation, seating, selection, idempotencyKey, null)));
         List<UUID> ids = new ArrayList<>();
         for (BusinessEvent event : events) {
             require(
@@ -626,10 +762,23 @@ public class ReservationArrivedDirectSeatingApplicationService {
         Reservation reservation,
         Seating seating,
         List<DiningTable> occupiedTables,
-        IdempotencyKey idempotencyKey
+        IdempotencyKey idempotencyKey,
+        boolean includeArrival,
+        Instant arrivedAt
     ) {
         List<StateTransitionLog> logs = new ArrayList<>();
         String metadata = metadata(reservation, seating, null, idempotencyKey, null);
+        if (includeArrival) {
+            logs.add(newTransition(
+                RESERVATION_SOURCE,
+                reservation.id().value(),
+                "confirmed",
+                "arrived",
+                OPERATION_CHECK_IN,
+                command,
+                metadata(reservation, seating, null, idempotencyKey, "confirmed", "arrived", arrivalExtra(arrivedAt))
+            ));
+        }
         logs.add(newTransition(RESERVATION_SOURCE, reservation.id().value(), "arrived", "seated", OPERATION_SEAT, command, metadata));
         logs.add(newTransition("seating", seating.id().value(), "planned", "occupied", "seating.occupy", command, metadata));
         for (DiningTable table : occupiedTables) {
@@ -685,18 +834,46 @@ public class ReservationArrivedDirectSeatingApplicationService {
         }
     }
 
+    private AuditLog appendCheckInAudit(
+        StoreScope scope,
+        SeatArrivedReservationCommand command,
+        Reservation reservation,
+        Seating seating,
+        ResourceSelection selection,
+        IdempotencyKey idempotencyKey,
+        Instant arrivedAt
+    ) {
+        AuditLog auditLog = new AuditLog(
+            UUID.randomUUID(),
+            OPERATION_CHECK_IN,
+            RESERVATION_SOURCE,
+            reservation.id().value(),
+            source(command),
+            command.actorType(),
+            command.actorId(),
+            metadata(reservation, seating, selection, idempotencyKey, "confirmed", "arrived", arrivalExtra(arrivedAt))
+        );
+        require(auditRule.evaluate(auditLog.operationCode(), auditLog.targetType(), auditLog.targetId(), auditLog.actorType()), ReservationArrivedDirectSeatingError.AUDIT_WRITE_FAILED);
+        try {
+            return auditLogRepository.append(scope, auditLog);
+        } catch (RuntimeException exception) {
+            throw new ApplicationFailure(ReservationArrivedDirectSeatingError.AUDIT_WRITE_FAILED, exception);
+        }
+    }
+
     private void appendFailureAudit(
         StoreScope scope,
         SeatArrivedReservationCommand command,
         IdempotencyKey idempotencyKey,
-        ReservationArrivedDirectSeatingError error
+        ReservationArrivedDirectSeatingError error,
+        String operationCode
     ) {
         try {
             auditLogRepository.append(
                 scope,
                 new AuditLog(
                     UUID.randomUUID(),
-                    OPERATION_SEAT_FAILED,
+                    operationCode,
                     RESERVATION_SOURCE,
                     command.reservationId(),
                     source(command),
@@ -923,20 +1100,41 @@ public class ReservationArrivedDirectSeatingApplicationService {
         IdempotencyKey idempotencyKey,
         String extraJsonWithoutLeadingBrace
     ) {
+        return metadata(reservation, seating, selection, idempotencyKey, "arrived", "seated", extraJsonWithoutLeadingBrace);
+    }
+
+    private static String metadata(
+        Reservation reservation,
+        Seating seating,
+        ResourceSelection selection,
+        IdempotencyKey idempotencyKey,
+        String beforeReservationStatus,
+        String afterReservationStatus,
+        String extraJsonWithoutLeadingBrace
+    ) {
         String resourceType = selection == null ? null : selection.resourceType();
         UUID resourceId = selection == null ? null : selection.resourceId();
+        UUID seatingId = seating == null ? null : seating.id().value();
         String extra = hasText(extraJsonWithoutLeadingBrace) ? extraJsonWithoutLeadingBrace : "";
         return """
-            {"reservationId":"%s","reservationCode":"%s","seatingId":"%s","resourceType":%s,"resourceId":%s,"beforeReservationStatus":"arrived","afterReservationStatus":"seated","idempotencyKey":"%s"%s}
+            {"reservationId":"%s","reservationCode":"%s","seatingId":%s,"resourceType":%s,"resourceId":%s,"beforeReservationStatus":"%s","afterReservationStatus":"%s","idempotencyKey":"%s"%s}
             """.formatted(
             reservation.id().value(),
             reservation.reservationCode().value(),
-            seating.id().value(),
+            jsonNullable(seatingId),
             jsonNullable(resourceType),
             jsonNullable(resourceId),
+            escape(beforeReservationStatus),
+            escape(afterReservationStatus),
             escape(idempotencyKey.value()),
             extra
         ).trim();
+    }
+
+    private static String arrivalExtra(Instant arrivedAt) {
+        return """
+            ,"arrivedAt":"%s"
+            """.formatted(arrivedAt).trim();
     }
 
     private static String seatingNote(SeatArrivedReservationCommand command) {
@@ -1119,6 +1317,11 @@ public class ReservationArrivedDirectSeatingApplicationService {
         public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
             return preassignment;
         }
+    }
+
+    @FunctionalInterface
+    private interface TransactionalAction {
+        ReservationArrivedDirectSeatingResult execute();
     }
 
     private static final class ApplicationFailure extends RuntimeException {

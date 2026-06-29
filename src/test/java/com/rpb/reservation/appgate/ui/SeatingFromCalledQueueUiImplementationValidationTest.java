@@ -159,6 +159,65 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
     }
 
     @Test
+    void queueSeatingRoutesCarryReservationPreassignmentContext() throws Exception {
+        String queueListPage = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String todayViewPage = Files.readString(Path.of("src", "pages", "ReservationTodayViewPage.vue"));
+
+        assertThat(queueListPage)
+            .contains("queueSeatRoute(item: QueueTicketListItem)")
+            .contains("partySize: String(item.partySize)")
+            .contains("assignedResourceType: optionalQueryValue(item.assignedResourceType)")
+            .contains("assignedResourceId: optionalQueryValue(item.assignedResourceId)")
+            .contains("assignedResourceCode: optionalQueryValue(item.assignedResourceCode)")
+            .contains("assignedResourceLabel: optionalQueryValue(item.assignedResourceLabel)")
+            .contains("assignedResourceAreaName: optionalQueryValue(item.assignedResourceAreaName)");
+
+        assertThat(todayViewPage)
+            .contains("queueSeatingRouteQuery(item)")
+            .contains("partySize: String(item.partySize)")
+            .contains("assignedResourceType: optionalRouteQueryValue(item.assignedResourceType)")
+            .contains("assignedResourceId: optionalRouteQueryValue(item.assignedResourceId)")
+            .contains("assignedResourceCode: optionalRouteQueryValue(item.assignedResourceCode)");
+    }
+
+    @Test
+    void seatingFromCalledQueueUiAutoSelectsAndLocksReservationAssignedResource() throws Exception {
+        String page = Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+
+        assertThat(page)
+            .contains("route.query.assignedResourceType")
+            .contains("route.query.assignedResourceId")
+            .contains("route.query.assignedResourceCode")
+            .contains("queuePartySize")
+            .contains("hasAssignedResource")
+            .contains("assignedResourceSelectionSatisfied")
+            .contains("applyAssignedResourceSelection")
+            .contains("预约指定")
+            .contains("已自动选择")
+            .contains(":party-size=\"queuePartySize\"")
+            .contains(":required-resource-type=\"assignedResourceType\"")
+            .contains(":required-resource-id=\"assignedResourceId\"")
+            .contains(":temporary-selection-enabled=\"!hasAssignedResource\"")
+            .contains(":show-selection-mode-controls=\"!hasAssignedResource\"")
+            .contains("ASSIGNED_RESOURCE_REQUIRED")
+            .contains("queue.seat.assigned_resource_required");
+    }
+
+    @Test
+    void tableResourcePickerCanRestrictSelectionToRequiredResource() throws Exception {
+        String picker = Files.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+
+        assertThat(picker)
+            .contains("requiredResourceType?: string | null")
+            .contains("requiredResourceId?: string | null")
+            .contains("hasRequiredResource")
+            .contains("matchesRequiredResource")
+            .contains("if (hasRequiredResource.value && !matchesRequiredResource(resource))")
+            .contains("需使用预约指定桌台")
+            .contains("resource.selectable || matchesRequiredResource(resource)");
+    }
+
+    @Test
     void seatingFromCalledQueueUiDoesNotIntroduceForbiddenOperationPagesOrApiClients() throws Exception {
         List<String> vueFiles = Files.walk(Path.of("src", "pages"))
             .filter(Files::isRegularFile)

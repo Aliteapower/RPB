@@ -25,6 +25,27 @@ export async function seatArrivedReservation(
 ): Promise<SeatArrivedReservationResponse> {
   const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/seating/direct`
 
+  return submitReservationSeating(endpoint, request, idempotencyKey, fetcher)
+}
+
+export async function checkInAndSeatConfirmedReservation(
+  storeId: string,
+  reservationId: string,
+  request: SeatArrivedReservationRequest,
+  idempotencyKey: string,
+  fetcher: typeof fetch = fetch
+): Promise<SeatArrivedReservationResponse> {
+  const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/seating/check-in-direct`
+
+  return submitReservationSeating(endpoint, request, idempotencyKey, fetcher)
+}
+
+async function submitReservationSeating(
+  endpoint: string,
+  request: SeatArrivedReservationRequest,
+  idempotencyKey: string,
+  fetcher: typeof fetch
+): Promise<SeatArrivedReservationResponse> {
   let response: Response
 
   try {

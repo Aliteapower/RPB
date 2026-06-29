@@ -839,9 +839,20 @@ function queueSeatRoute(item: QueueTicketListItem): RouteLocationRaw {
       storeId: storeId.value
     },
     query: {
-      queueTicketId: item.queueTicketId
+      queueTicketId: item.queueTicketId,
+      partySize: String(item.partySize),
+      assignedResourceType: optionalQueryValue(item.assignedResourceType),
+      assignedResourceId: optionalQueryValue(item.assignedResourceId),
+      assignedResourceCode: optionalQueryValue(item.assignedResourceCode),
+      assignedResourceLabel: optionalQueryValue(item.assignedResourceLabel),
+      assignedResourceAreaName: optionalQueryValue(item.assignedResourceAreaName)
     }
   }
+}
+
+function optionalQueryValue(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed || undefined
 }
 
 function formatStoreDateTime(value: string | null | undefined): string {

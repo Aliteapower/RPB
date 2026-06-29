@@ -125,6 +125,45 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
     }
 
     @Test
+    void checksInConfirmedReservationAndSeatsItToAssignedTableAtomically() {
+        Scenario scenario = Scenario.ready(ReservationStatus.CONFIRMED);
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .checkInAndSeatConfirmedReservation(scenario.commandWithTableAndKey(scenario.table.id().value(), "idem-check-in-seat-table"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.reservationStatus()).isEqualTo("seated");
+        assertThat(result.resourceType()).isEqualTo("dining_table");
+        assertThat(result.resourceId()).isEqualTo(scenario.table.id().value());
+        assertThat(result.events()).containsExactly("reservation.arrived", "reservation.seated", "seating.created", "table.occupied");
+
+        assertThat(scenario.reservationRepository.saved).extracting(Reservation::status)
+            .containsExactly(ReservationStatus.SEATED);
+        assertThat(scenario.seatingRepository.saved).hasSize(1);
+        assertThat(scenario.seatingRepository.savedResources).hasSize(1);
+        assertThat(scenario.diningTableRepository.saved).extracting(DiningTable::status).contains(DiningTableStatus.OCCUPIED);
+        assertThat(scenario.businessEventRepository.events).extracting(BusinessEvent::eventType)
+            .containsExactly("reservation.arrived", "reservation.seated", "seating.created", "table.occupied");
+        assertThat(scenario.stateTransitionLogRepository.logs)
+            .anySatisfy(log -> {
+                assertThat(log.targetType()).isEqualTo("reservation");
+                assertThat(log.fromStatus()).isEqualTo("confirmed");
+                assertThat(log.toStatus()).isEqualTo("arrived");
+                assertThat(log.transitionCode()).isEqualTo("reservation.check_in");
+            })
+            .anySatisfy(log -> {
+                assertThat(log.targetType()).isEqualTo("reservation");
+                assertThat(log.fromStatus()).isEqualTo("arrived");
+                assertThat(log.toStatus()).isEqualTo("seated");
+                assertThat(log.transitionCode()).isEqualTo("reservation.seat");
+            });
+        assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::operationCode)
+            .containsExactly("reservation.check_in", "reservation.seat");
+        assertThat(scenario.idempotencyRepository.started.getFirst().action()).isEqualTo("check_in_and_seat_reservation");
+        assertThat(scenario.idempotencyRepository.completed).hasSize(1);
+    }
+
+    @Test
     void seatsArrivedReservationToTableGroupAndOccupiesEveryMemberTable() {
         Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
 

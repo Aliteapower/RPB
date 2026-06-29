@@ -11,6 +11,7 @@ public enum ReservationArrivedDirectSeatingError {
     STORE_SCOPE_MISMATCH("store_scope_mismatch"),
     STORE_ACCESS_DENIED("store_access_denied"),
     RESERVATION_NOT_FOUND("reservation_not_found"),
+    RESERVATION_STATUS_NOT_CONFIRMED("reservation_status_not_confirmed"),
     RESERVATION_STATUS_NOT_ARRIVED("reservation_status_not_arrived"),
     RESERVATION_NOT_TODAY("reservation_not_today"),
     RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING("reservation_seated_without_active_seating"),

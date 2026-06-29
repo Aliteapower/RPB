@@ -31,6 +31,12 @@ const form = reactive({
 
 const isSubmitting = ref(false)
 const apiError = ref<SeatingFromCalledQueueApiErrorResponse | null>(null)
+const queuePartySize = ref<number | null>(null)
+const assignedResourceType = ref('')
+const assignedResourceId = ref('')
+const assignedResourceCode = ref('')
+const assignedResourceLabel = ref('')
+const assignedResourceAreaName = ref('')
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
@@ -48,6 +54,22 @@ const hasTemporaryTables = computed(() => form.temporaryTableIds.length > 0)
 const selectedResourceCount = computed(
   () => Number(hasTableId.value) + Number(hasTableGroupId.value) + Number(hasTemporaryTables.value)
 )
+const hasAssignedResource = computed(() => !!assignedResourceType.value && !!assignedResourceId.value)
+const assignedResourceSelectionSatisfied = computed(() => {
+  if (!hasAssignedResource.value) {
+    return true
+  }
+
+  if (assignedResourceType.value === 'dining_table') {
+    return form.tableId === assignedResourceId.value && !hasTableGroupId.value && !hasTemporaryTables.value
+  }
+
+  if (assignedResourceType.value === 'table_group') {
+    return form.tableGroupId === assignedResourceId.value && !hasTableId.value && !hasTemporaryTables.value
+  }
+
+  return false
+})
 const hasValidTemporaryTables = computed(
   () => !hasTemporaryTables.value || form.temporaryTableIds.length >= 2
 )
@@ -71,9 +93,24 @@ const resourceSelectionError = computed(() => {
     ).error
   }
 
+  if (
+    hasAssignedResource.value &&
+    selectedResourceCount.value > 0 &&
+    !assignedResourceSelectionSatisfied.value
+  ) {
+    return createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+      .error
+  }
+
   return null
 })
 const resourceSelectionHint = computed(() => {
+  if (hasAssignedResource.value) {
+    return assignedResourceSelectionSatisfied.value
+      ? '已自动选择预约指定资源，请按该桌号入座'
+      : '请使用预约指定资源入座'
+  }
+
   if (!hasQueueTicketId.value || selectedResourceCount.value !== 0) {
     return ''
   }
@@ -85,20 +122,50 @@ const canSubmit = computed(
     !isSubmitting.value &&
     !!storeId.value &&
     hasQueueTicketId.value &&
-    hasExactlyOneResource.value
+    hasExactlyOneResource.value &&
+    assignedResourceSelectionSatisfied.value
 )
 const queueTicketContextText = computed(() =>
   hasQueueTicketId.value ? '已从排队列表带入' : '请从排队列表选择已叫号排队票'
 )
+const assignedResourceDisplayText = computed(() => {
+  const code = assignedResourceLabel.value || assignedResourceCode.value || assignedResourceId.value
+  const prefix = assignedResourceType.value === 'table_group' ? '预约指定桌组' : '预约指定桌号'
+  const area = assignedResourceAreaName.value ? ` · ${assignedResourceAreaName.value}` : ''
+
+  return `${prefix} ${code}${area}`
+})
 
 watch(
-  () => route.query.queueTicketId,
-  value => {
-    const queueTicketId = queryValue(value)
+  () => [
+    route.query.queueTicketId,
+    route.query.partySize,
+    route.query.assignedResourceType,
+    route.query.assignedResourceId,
+    route.query.assignedResourceCode,
+    route.query.assignedResourceLabel,
+    route.query.assignedResourceAreaName
+  ] as const,
+  () => {
+    const queueTicketId = queryValue(route.query.queueTicketId)
+
+    if (queueTicketId && queueTicketId !== form.queueTicketId) {
+      form.tableId = ''
+      form.tableGroupId = ''
+      form.temporaryTableIds = []
+    }
 
     if (queueTicketId) {
       form.queueTicketId = queueTicketId
     }
+
+    queuePartySize.value = parsePartySize(queryValue(route.query.partySize))
+    assignedResourceType.value = normalizeAssignedResourceType(queryValue(route.query.assignedResourceType))
+    assignedResourceId.value = queryValue(route.query.assignedResourceId)
+    assignedResourceCode.value = queryValue(route.query.assignedResourceCode)
+    assignedResourceLabel.value = queryValue(route.query.assignedResourceLabel)
+    assignedResourceAreaName.value = queryValue(route.query.assignedResourceAreaName)
+    applyAssignedResourceSelection()
   },
   { immediate: true }
 )
@@ -155,11 +222,21 @@ function validateForm(): SeatingFromCalledQueueApiErrorResponse | null {
     )
   }
 
+  if (hasAssignedResource.value && !assignedResourceSelectionSatisfied.value) {
+    return createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+  }
+
   return null
 }
 
 function selectTable(tableId: string): void {
   clearSubmissionError()
+  if (!isAssignedResourceSelectionAllowed('dining_table', tableId)) {
+    apiError.value = createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+    applyAssignedResourceSelection()
+    return
+  }
+
   form.tableId = tableId
   form.tableGroupId = ''
   form.temporaryTableIds = []
@@ -167,6 +244,12 @@ function selectTable(tableId: string): void {
 
 function selectTableGroup(tableGroupId: string): void {
   clearSubmissionError()
+  if (!isAssignedResourceSelectionAllowed('table_group', tableGroupId)) {
+    apiError.value = createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+    applyAssignedResourceSelection()
+    return
+  }
+
   form.tableGroupId = tableGroupId
   form.tableId = ''
   form.temporaryTableIds = []
@@ -174,9 +257,39 @@ function selectTableGroup(tableGroupId: string): void {
 
 function selectTemporaryTables(tableIds: string[]): void {
   clearSubmissionError()
+  if (hasAssignedResource.value) {
+    apiError.value = createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+    applyAssignedResourceSelection()
+    return
+  }
+
   form.temporaryTableIds = tableIds
   form.tableId = ''
   form.tableGroupId = ''
+}
+
+function applyAssignedResourceSelection(): void {
+  if (!hasAssignedResource.value) {
+    return
+  }
+
+  if (assignedResourceType.value === 'table_group') {
+    form.tableGroupId = assignedResourceId.value
+    form.tableId = ''
+    form.temporaryTableIds = []
+    return
+  }
+
+  form.tableId = assignedResourceId.value
+  form.tableGroupId = ''
+  form.temporaryTableIds = []
+}
+
+function isAssignedResourceSelectionAllowed(resourceType: string, resourceId: string): boolean {
+  return (
+    !hasAssignedResource.value ||
+    (assignedResourceType.value === resourceType && assignedResourceId.value === resourceId)
+  )
 }
 
 function clearSubmissionError(): void {
@@ -237,6 +350,15 @@ function queryValue(value: unknown): string {
 
   return typeof value === 'string' ? value : ''
 }
+
+function parsePartySize(value: string): number | null {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function normalizeAssignedResourceType(value: string): string {
+  return value === 'dining_table' || value === 'table_group' ? value : ''
+}
 </script>
 
 <template>
@@ -265,14 +387,25 @@ function queryValue(value: unknown): string {
           <strong>{{ hasQueueTicketId ? '排队列表已选中' : '缺少排队票' }}</strong>
         </section>
 
+        <section v-if="hasAssignedResource" class="assigned-resource-context" aria-label="预约指定资源">
+          <span>预约指定</span>
+          <strong>{{ assignedResourceDisplayText }}</strong>
+          <small>已自动选择，请按指定桌台入座</small>
+        </section>
+
         <section class="resource-panel" aria-label="桌台选择">
           <TableResourcePicker
             :store-id="storeId"
+            :party-size="queuePartySize"
+            :business-date="currentBusinessDate"
             :available-only="true"
             :selected-table-id="form.tableId"
             :selected-table-group-id="form.tableGroupId"
             :selected-temporary-table-ids="form.temporaryTableIds"
-            temporary-selection-enabled
+            :required-resource-type="assignedResourceType"
+            :required-resource-id="assignedResourceId"
+            :temporary-selection-enabled="!hasAssignedResource"
+            :show-selection-mode-controls="!hasAssignedResource"
             @select-table="selectTable"
             @select-table-group="selectTableGroup"
             @select-temporary-tables="selectTemporaryTables"
@@ -337,7 +470,8 @@ function queryValue(value: unknown): string {
 }
 
 .queue-seating-heading p,
-.queue-ticket-context span {
+.queue-ticket-context span,
+.assigned-resource-context span {
   color: #64748b;
   font-size: 0.78rem;
   font-weight: 800;
@@ -347,7 +481,8 @@ function queryValue(value: unknown): string {
 
 h1,
 h2,
-.queue-ticket-context strong {
+.queue-ticket-context strong,
+.assigned-resource-context strong {
   color: #0f172a;
   letter-spacing: 0;
   margin: 0;
@@ -389,6 +524,28 @@ h2 {
 
 .queue-ticket-context strong {
   font-size: 0.96rem;
+}
+
+.assigned-resource-context {
+  background: #ecfdf5;
+  border: 1px solid #5eead4;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.assigned-resource-context strong {
+  color: #0f766e;
+  font-size: 1.08rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.assigned-resource-context small {
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .resource-panel {

@@ -328,15 +328,28 @@ function openReservationSeatDialog(item: ReservationTodayViewItem): void {
       params: {
         storeId: storeId.value
       },
-      query: {
-        queueTicketId
-      }
+      query: queueSeatingRouteQuery(item)
     })
     return
   }
 
   selectedSeatReservation.value = item
   showSeatDialog.value = true
+}
+
+function queueSeatingRouteQuery(item: ReservationTodayViewItem): Record<string, string | undefined> {
+  return {
+    queueTicketId: item.queueTicketId?.trim() || undefined,
+    partySize: String(item.partySize),
+    assignedResourceType: optionalRouteQueryValue(item.assignedResourceType),
+    assignedResourceId: optionalRouteQueryValue(item.assignedResourceId),
+    assignedResourceCode: optionalRouteQueryValue(item.assignedResourceCode)
+  }
+}
+
+function optionalRouteQueryValue(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed || undefined
 }
 
 function handleReservationSeated(): void {

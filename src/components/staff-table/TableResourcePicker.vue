@@ -28,6 +28,8 @@ const props = defineProps<{
   temporarySelectionEnabled?: boolean
   selectionMode?: SelectionMode | null
   showSelectionModeControls?: boolean
+  requiredResourceType?: string | null
+  requiredResourceId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -60,8 +62,15 @@ const statusLabels: Record<string, string> = {
 const displayableResources = computed(() =>
   resources.value.filter(resource => !isTemporaryGroupMember(resource))
 )
+const normalizedRequiredResourceType = computed(() => props.requiredResourceType?.trim() ?? '')
+const normalizedRequiredResourceId = computed(() => props.requiredResourceId?.trim() ?? '')
+const hasRequiredResource = computed(
+  () => !!normalizedRequiredResourceType.value && !!normalizedRequiredResourceId.value
+)
 const displayedResources = computed(() =>
-  props.availableOnly ? displayableResources.value.filter(resource => resource.selectable) : displayableResources.value
+  props.availableOnly
+    ? displayableResources.value.filter(resource => resource.selectable || matchesRequiredResource(resource))
+    : displayableResources.value
 )
 const tableResources = computed(() =>
   displayedResources.value.filter(resource => resource.resourceType === 'dining_table')
@@ -292,7 +301,11 @@ function toggleTemporaryTable(tableId: string): void {
 }
 
 function canChooseResource(resource: TableResourceItem): boolean {
-  if (!resource.selectable) {
+  if (hasRequiredResource.value && !matchesRequiredResource(resource)) {
+    return false
+  }
+
+  if (!resource.selectable && !canUseRequiredPreassignedResource(resource)) {
     return false
   }
 
@@ -300,6 +313,21 @@ function canChooseResource(resource: TableResourceItem): boolean {
     selectionMode.value === 'single' ||
     resource.resourceType === 'dining_table' ||
     isTemporaryModeSavedGroup(resource)
+  )
+}
+
+function matchesRequiredResource(resource: TableResourceItem): boolean {
+  return (
+    hasRequiredResource.value &&
+    resource.resourceType === normalizedRequiredResourceType.value &&
+    resource.resourceId === normalizedRequiredResourceId.value
+  )
+}
+
+function canUseRequiredPreassignedResource(resource: TableResourceItem): boolean {
+  return (
+    matchesRequiredResource(resource) &&
+    resource.selectionDisabledReason?.trim() === 'reservation_preassigned'
   )
 }
 
@@ -326,6 +354,16 @@ function capacityText(resource: TableResourceItem): string {
 }
 
 function statusText(resource: TableResourceItem): string {
+  if (matchesRequiredResource(resource)) {
+    return resource.selectable || canUseRequiredPreassignedResource(resource)
+      ? '预约指定'
+      : resourceUnavailableReasonText(resource)
+  }
+
+  if (hasRequiredResource.value) {
+    return '需使用预约指定桌台'
+  }
+
   return resource.selectable ? statusLabel(resource.status) : resourceUnavailableReasonText(resource)
 }
 

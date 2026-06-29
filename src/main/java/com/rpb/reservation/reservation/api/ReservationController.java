@@ -246,6 +246,51 @@ public class ReservationController {
         return ResponseEntity.ok(seatingApiMapper.toResponse(result));
     }
 
+    @PostMapping("/reservations/{reservationId}/seating/check-in-direct")
+    @RequireAppGate(appKey = "reservation_queue", permission = SEAT_PERMISSION)
+    public ResponseEntity<?> checkInAndSeatConfirmedReservation(
+        @PathVariable UUID storeId,
+        @PathVariable UUID reservationId,
+        @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+        @RequestBody(required = false) SeatArrivedReservationRequest request
+    ) {
+        if (!hasText(idempotencyKey)) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.MISSING_IDEMPOTENCY_KEY);
+        }
+
+        SeatArrivedReservationRequest nonNullRequest = nonNull(request);
+        Optional<ReservationApiErrorCode> validationError = nonNullRequest.validateContract();
+        if (validationError.isPresent()) {
+            return seatingErrorMapper.toResponse(validationError.get());
+        }
+
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(SEAT_PERMISSION)) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        SeatArrivedReservationCommand command = seatingApiMapper.toCommand(
+            nonNullRequest,
+            storeId,
+            reservationId,
+            idempotencyKey,
+            actor
+        );
+        ReservationArrivedDirectSeatingResult result = seatingApplicationService.checkInAndSeatConfirmedReservation(command);
+        if (!result.success()) {
+            return seatingErrorMapper.toResponse(result);
+        }
+
+        return ResponseEntity.ok(seatingApiMapper.toResponse(result));
+    }
+
     @PostMapping("/reservations/{reservationId}/queue")
     @RequireAppGate(appKey = "reservation_queue", permission = QUEUE_PERMISSION)
     public ResponseEntity<?> queueArrivedReservation(
