@@ -10,6 +10,8 @@ export interface PublicBookingStore {
   shareAddress: string | null
   googleMapUrl: string | null
   shareContactPhone: string | null
+  shareEmail: string | null
+  whatsappBusinessPhoneE164: string | null
 }
 
 export interface PublicBookingSettings {

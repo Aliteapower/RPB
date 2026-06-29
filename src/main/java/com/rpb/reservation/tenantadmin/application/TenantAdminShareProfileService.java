@@ -15,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TenantAdminShareProfileService {
     private static final Pattern E164_PATTERN = Pattern.compile("^[+][1-9][0-9]{1,14}$");
+    private static final Pattern SINGAPORE_LOCAL_PHONE_PATTERN = Pattern.compile("^[0-9]{8}$");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final String SINGAPORE_PHONE_PREFIX = "+65";
 
     private final TenantAdminShareProfileRepository repository;
     private final ReservationShareTemplateRenderer templateRenderer;
@@ -97,6 +100,7 @@ public class TenantAdminShareProfileService {
             clean(row.shareAddress()),
             clean(row.googleMapUrl()),
             clean(row.shareContactPhone()),
+            clean(row.shareEmail()),
             clean(row.whatsappBusinessPhoneE164()),
             clean(row.reservationShareNote()),
             usesDefaultTemplate ? defaultTemplate : row.reservationShareTemplate().trim(),
@@ -113,6 +117,7 @@ public class TenantAdminShareProfileService {
         return new TenantAdminShareProfileUpdate(
             optionalText(command.shareDisplayName()),
             optionalText(command.googleMapUrl()),
+            optionalEmail(command.shareEmail()),
             optionalE164(command.whatsappBusinessPhoneE164()),
             optionalText(command.reservationShareNote()),
             optionalText(command.reservationShareTemplate())
@@ -172,7 +177,21 @@ public class TenantAdminShareProfileService {
         if (normalized == null) {
             return null;
         }
+        if (SINGAPORE_LOCAL_PHONE_PATTERN.matcher(normalized).matches()) {
+            return SINGAPORE_PHONE_PREFIX + normalized;
+        }
         if (!E164_PATTERN.matcher(normalized).matches()) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return normalized;
+    }
+
+    private static String optionalEmail(String value) {
+        String normalized = optionalText(value);
+        if (normalized == null) {
+            return null;
+        }
+        if (!EMAIL_PATTERN.matcher(normalized).matches()) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
         return normalized;

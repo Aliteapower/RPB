@@ -24,6 +24,7 @@ public class TenantAdminShareProfileRepository {
                    share_address,
                    google_map_url,
                    share_contact_phone,
+                   share_email,
                    whatsapp_business_phone_e164,
                    reservation_share_note,
                    reservation_share_template
@@ -44,6 +45,7 @@ public class TenantAdminShareProfileRepository {
             update stores
             set share_display_name = ?,
                 google_map_url = ?,
+                share_email = ?,
                 whatsapp_business_phone_e164 = ?,
                 reservation_share_note = ?,
                 reservation_share_template = ?,
@@ -55,6 +57,7 @@ public class TenantAdminShareProfileRepository {
             """,
             input.shareDisplayName(),
             input.googleMapUrl(),
+            input.shareEmail(),
             input.whatsappBusinessPhoneE164(),
             input.reservationShareNote(),
             input.reservationShareTemplate(),
@@ -89,6 +92,7 @@ public class TenantAdminShareProfileRepository {
             rs.getString("share_address"),
             rs.getString("google_map_url"),
             rs.getString("share_contact_phone"),
+            rs.getString("share_email"),
             rs.getString("whatsapp_business_phone_e164"),
             rs.getString("reservation_share_note"),
             rs.getString("reservation_share_template")
@@ -101,6 +105,7 @@ public class TenantAdminShareProfileRepository {
         String shareAddress,
         String googleMapUrl,
         String shareContactPhone,
+        String shareEmail,
         String whatsappBusinessPhoneE164,
         String reservationShareNote,
         String reservationShareTemplate

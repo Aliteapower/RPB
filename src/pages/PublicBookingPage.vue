@@ -79,6 +79,10 @@ const slotsByPeriod = computed(() => {
 const selectedSlot = computed(() => selectableSlots.value.find((slot) => slot.startAt === selectedStartAt.value) || null)
 const canSubmit = computed(() => !!customer.value && !!selectedSlot.value && !submitting.value)
 const enabledAuthProviders = computed(() => context.value?.authProviders || [])
+const whatsappContactUrl = computed(() => {
+  const digits = (context.value?.store.whatsappBusinessPhoneE164 || '').replace(/\D/g, '')
+  return digits ? `https://wa.me/${digits}` : ''
+})
 
 onMounted(() => {
   void loadCustomer()
@@ -343,6 +347,35 @@ function todayDate(): string {
         <span>Online Booking</span>
         <h1>{{ context?.store.storeName || '餐厅预约' }}</h1>
         <p v-if="context?.store.shareAddress">{{ context.store.shareAddress }}</p>
+        <nav
+          v-if="
+            context?.store.googleMapUrl ||
+            context?.store.shareContactPhone ||
+            context?.store.shareEmail ||
+            context?.store.whatsappBusinessPhoneE164
+          "
+          class="booking-contact-actions"
+          aria-label="门店联系方式"
+        >
+          <a
+            v-if="context.store.googleMapUrl"
+            :href="context.store.googleMapUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            打开地图
+          </a>
+          <a v-if="context.store.shareContactPhone" :href="`tel:${context.store.shareContactPhone}`">拨打电话</a>
+          <a v-if="context.store.shareEmail" :href="`mailto:${context.store.shareEmail}`">发送邮件</a>
+          <a
+            v-if="whatsappContactUrl"
+            :href="whatsappContactUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WhatsApp
+          </a>
+        </nav>
       </header>
 
       <p v-if="errorText" class="alert alert--error" role="alert">{{ errorText }}</p>
@@ -505,6 +538,27 @@ label span,
 .booking-heading p,
 .alert {
   margin: 0;
+}
+
+.booking-contact-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.booking-contact-actions a {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #99f6e4;
+  border-radius: 6px;
+  color: #0f766e;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 850;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 10px;
+  text-decoration: none;
 }
 
 .booking-panel,

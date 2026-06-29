@@ -95,7 +95,8 @@ public class PublicBookingPersistenceAdapter implements
     public Optional<PublicBookingStoreProfile> findActiveStoreProfileByStoreId(UUID storeId) {
         return jdbc.query(
             """
-            select id, tenant_id, display_name, timezone, share_address, google_map_url, share_contact_phone
+            select id, tenant_id, display_name, timezone, share_address, google_map_url,
+                   share_contact_phone, share_email, whatsapp_business_phone_e164
             from stores
             where id = ?
               and status = 'active'
@@ -110,7 +111,8 @@ public class PublicBookingPersistenceAdapter implements
     public Optional<PublicBookingStoreProfile> findActiveStoreProfile(StoreScope scope) {
         return jdbc.query(
             """
-            select id, tenant_id, display_name, timezone, share_address, google_map_url, share_contact_phone
+            select id, tenant_id, display_name, timezone, share_address, google_map_url,
+                   share_contact_phone, share_email, whatsapp_business_phone_e164
             from stores
             where id = ?
               and tenant_id = ?
@@ -245,7 +247,9 @@ public class PublicBookingPersistenceAdapter implements
             rs.getString("timezone"),
             rs.getString("share_address"),
             rs.getString("google_map_url"),
-            rs.getString("share_contact_phone")
+            rs.getString("share_contact_phone"),
+            rs.getString("share_email"),
+            rs.getString("whatsapp_business_phone_e164")
         );
     }
 

@@ -125,7 +125,9 @@ public class PublicBookingController {
         String timezone,
         String shareAddress,
         String googleMapUrl,
-        String shareContactPhone
+        String shareContactPhone,
+        String shareEmail,
+        String whatsappBusinessPhoneE164
     ) {
         static StoreResponse from(PublicBookingStoreProfile store) {
             return new StoreResponse(
@@ -134,7 +136,9 @@ public class PublicBookingController {
                 store.timezone(),
                 store.shareAddress(),
                 store.googleMapUrl(),
-                store.shareContactPhone()
+                store.shareContactPhone(),
+                store.shareEmail(),
+                store.whatsappBusinessPhoneE164()
             );
         }
     }

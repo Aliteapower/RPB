@@ -8,6 +8,8 @@ public record PublicBookingStoreProfile(
     String timezone,
     String shareAddress,
     String googleMapUrl,
-    String shareContactPhone
+    String shareContactPhone,
+    String shareEmail,
+    String whatsappBusinessPhoneE164
 ) {
 }
