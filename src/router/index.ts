@@ -5,6 +5,7 @@ import LoginPage from '../pages/LoginPage.vue'
 import PlatformCallScreenSeedPage from '../pages/PlatformCallScreenSeedPage.vue'
 import PlatformProductLinesPage from '../pages/PlatformProductLinesPage.vue'
 import PlatformProfilePage from '../pages/PlatformProfilePage.vue'
+import PlatformReservationMealPeriodSeedPage from '../pages/PlatformReservationMealPeriodSeedPage.vue'
 import PlatformReservationShareTemplateSeedPage from '../pages/PlatformReservationShareTemplateSeedPage.vue'
 import PlatformTenantBillingPage from '../pages/PlatformTenantBillingPage.vue'
 import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
@@ -109,6 +110,12 @@ export const router = createRouter({
       path: '/platform/reservation/share-template-seed',
       name: 'platform-reservation-share-template-seed',
       component: PlatformReservationShareTemplateSeedPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/reservation/meal-period-seed',
+      name: 'platform-reservation-meal-period-seed',
+      component: PlatformReservationMealPeriodSeedPage,
       meta: { requiresPlatformAdmin: true }
     },
     {

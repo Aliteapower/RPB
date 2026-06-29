@@ -2,8 +2,10 @@ package com.rpb.reservation.reservation.api;
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
 import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
+import com.rpb.reservation.reservation.application.ReservationTimeSlotListResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
 import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
+import com.rpb.reservation.reservation.application.query.ReservationTimeSlotQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.application.service.ReservationTodayViewApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/stores/{storeId}/reservations")
 public class ReservationTodayViewController {
     private static final String REQUIRED_PERMISSION = "reservation.today_view";
+    private static final String CREATE_PERMISSION = "reservation.create";
     private static final Set<String> ALLOWED_ROLES = Set.of("tenant_admin", "store_manager", "store_staff");
 
     private final ReservationTodayViewApplicationService applicationService;
@@ -103,6 +106,37 @@ public class ReservationTodayViewController {
             return errorMapper.toResponse(result);
         }
         return ResponseEntity.ok(apiMapper.toResponse(result));
+    }
+
+    @GetMapping("/time-slots")
+    @RequireAppGate(appKey = "reservation_queue", permission = CREATE_PERMISSION)
+    public ResponseEntity<?> timeSlots(
+        @PathVariable UUID storeId,
+        @RequestParam(value = "businessDate", required = false) String businessDate
+    ) {
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return errorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(CREATE_PERMISSION)) {
+            return errorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return errorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        ReservationTimeSlotListResult result = applicationService.getTimeSlots(new ReservationTimeSlotQuery(
+            actor.tenantId(),
+            storeId,
+            actor.actorId(),
+            actor.actorType(),
+            businessDate
+        ));
+        if (!result.success()) {
+            return errorMapper.toResponse(ReservationTodayViewResult.failure(result.error()));
+        }
+        return ResponseEntity.ok(ReservationTimeSlotListResponse.from(result));
     }
 
     private static boolean hasAllowedRole(CurrentActor actor) {

@@ -93,6 +93,7 @@ function toApiBody(request: CreateReservationRequest): CreateReservationRequest 
     partySize: request.partySize,
     reservedStartAt: request.reservedStartAt,
     reservedEndAt: request.reservedEndAt ?? null,
+    businessDate: request.businessDate ?? null,
     customerId: request.customerId ?? null,
     customerName: request.customerName ?? null,
     customerNickname: request.customerNickname ?? null,

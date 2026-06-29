@@ -23,6 +23,7 @@ public class ReservationApiMapper {
             request.partySize(),
             request.reservedStartAt(),
             request.reservedEndAt(),
+            request.businessDate(),
             request.customerId(),
             trimToNull(request.customerName()),
             trimToNull(request.customerNickname()),

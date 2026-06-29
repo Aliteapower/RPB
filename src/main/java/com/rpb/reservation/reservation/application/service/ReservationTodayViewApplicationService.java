@@ -6,13 +6,16 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.reservation.application.ReservationCalendarSummaryDay;
 import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
+import com.rpb.reservation.reservation.application.ReservationTimeSlotListResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewError;
 import com.rpb.reservation.reservation.application.ReservationTodayViewItem;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
 import com.rpb.reservation.reservation.application.port.out.ReservationCalendarSummaryRow;
+import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationTodayViewRow;
 import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
+import com.rpb.reservation.reservation.application.query.ReservationTimeSlotQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.queue.application.QueueTicketDisplayNumbers;
@@ -53,14 +56,23 @@ public class ReservationTodayViewApplicationService {
     private final StoreRepositoryPort storeRepository;
     private final ReservationRepositoryPort reservationRepository;
     private final Clock clock;
+    private final ReservationMealPeriodScheduleService mealPeriodScheduleService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
 
     @Autowired
     public ReservationTodayViewApplicationService(
         StoreRepositoryPort storeRepository,
+        ReservationRepositoryPort reservationRepository,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository
+    ) {
+        this(storeRepository, reservationRepository, mealPeriodRepository, Clock.systemUTC());
+    }
+
+    public ReservationTodayViewApplicationService(
+        StoreRepositoryPort storeRepository,
         ReservationRepositoryPort reservationRepository
     ) {
-        this(storeRepository, reservationRepository, Clock.systemUTC());
+        this(storeRepository, reservationRepository, ReservationMealPeriodRepositoryPort.platformDefault(), Clock.systemUTC());
     }
 
     public ReservationTodayViewApplicationService(
@@ -68,9 +80,19 @@ public class ReservationTodayViewApplicationService {
         ReservationRepositoryPort reservationRepository,
         Clock clock
     ) {
+        this(storeRepository, reservationRepository, ReservationMealPeriodRepositoryPort.platformDefault(), clock);
+    }
+
+    public ReservationTodayViewApplicationService(
+        StoreRepositoryPort storeRepository,
+        ReservationRepositoryPort reservationRepository,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository,
+        Clock clock
+    ) {
         this.storeRepository = storeRepository;
         this.reservationRepository = reservationRepository;
         this.clock = clock;
+        this.mealPeriodScheduleService = new ReservationMealPeriodScheduleService(mealPeriodRepository);
     }
 
     @Transactional(readOnly = true)
@@ -167,6 +189,45 @@ public class ReservationTodayViewApplicationService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public ReservationTimeSlotListResult getTimeSlots(ReservationTimeSlotQuery query) {
+        ReservationTodayViewError validationError = validate(query);
+        if (validationError != null) {
+            return ReservationTimeSlotListResult.failure(validationError);
+        }
+
+        StoreScope scope = new StoreScope(new TenantId(query.tenantId()), query.storeId());
+        Store store = storeRepository.findById(scope).orElse(null);
+        if (store == null) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.STORE_NOT_FOUND);
+        }
+        if (!scope.equals(store.scope())) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.STORE_SCOPE_MISMATCH);
+        }
+
+        RuleDecision storeAccess = storeAccessPolicy.decide(scope, query.actorId(), query.actorType());
+        if (!storeAccess.accepted()) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.STORE_ACCESS_DENIED);
+        }
+
+        ZoneId zoneId = zoneId(store.timezone());
+        LocalDate businessDate = resolveBusinessDate(query.businessDate(), zoneId);
+        if (businessDate == null) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.INVALID_BUSINESS_DATE);
+        }
+
+        try {
+            return ReservationTimeSlotListResult.success(
+                scope.storeId().value(),
+                businessDate,
+                zoneId.getId(),
+                mealPeriodScheduleService.listSlots(scope, zoneId.getId(), businessDate, java.time.Instant.now(clock))
+            );
+        } catch (RuntimeException exception) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.PERSISTENCE_ERROR);
+        }
+    }
+
     private static ReservationTodayViewError validate(ReservationTodayViewQuery query) {
         if (
             query == null
@@ -181,6 +242,19 @@ public class ReservationTodayViewApplicationService {
     }
 
     private static ReservationTodayViewError validate(ReservationCalendarSummaryQuery query) {
+        if (
+            query == null
+                || query.tenantId() == null
+                || query.storeId() == null
+                || query.actorId() == null
+                || !hasText(query.actorType())
+        ) {
+            return ReservationTodayViewError.INVALID_COMMAND;
+        }
+        return null;
+    }
+
+    private static ReservationTodayViewError validate(ReservationTimeSlotQuery query) {
         if (
             query == null
                 || query.tenantId() == null

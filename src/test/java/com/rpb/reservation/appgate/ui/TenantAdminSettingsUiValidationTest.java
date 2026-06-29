@@ -15,6 +15,11 @@ class TenantAdminSettingsUiValidationTest {
         assertThat(page)
             .contains("dateFormat: 'DD-MM-YYYY'")
             .contains("placeholder=\"DD-MM-YYYY\"")
+            .contains("getStoreReservationMealPeriods")
+            .contains("updateStoreReservationMealPeriods")
+            .contains("mealPeriodForm.usePlatformSeed")
+            .contains("copyPlatformSeed")
+            .contains("预约餐段")
             .doesNotContain("dateFormat: 'yyyy-MM-dd'");
     }
 }

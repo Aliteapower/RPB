@@ -4,6 +4,13 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
+import com.rpb.reservation.reservation.api.ReservationMealPeriodApiErrorCode;
+import com.rpb.reservation.reservation.api.ReservationMealPeriodApiException;
+import com.rpb.reservation.reservation.api.ReservationMealPeriodSettingsRequest;
+import com.rpb.reservation.reservation.api.ReservationMealPeriodSettingsResponse;
+import com.rpb.reservation.reservation.application.service.ReservationMealPeriodManagementService;
+import com.rpb.reservation.reservation.application.service.ReservationMealPeriodServiceErrorCode;
+import com.rpb.reservation.reservation.application.service.ReservationMealPeriodServiceException;
 import com.rpb.reservation.tenantadmin.application.TenantAdminProfileCommand;
 import com.rpb.reservation.tenantadmin.application.TenantAdminProfileService;
 import com.rpb.reservation.tenantadmin.application.TenantAdminSearchCommand;
@@ -43,6 +50,7 @@ public class TenantAdminController {
     private final TenantAdminTableService tableService;
     private final TenantAdminSettingsService settingsService;
     private final TenantAdminProfileService profileService;
+    private final ReservationMealPeriodManagementService mealPeriodService;
     private final TenantAdminScopeResolver scopeResolver;
 
     public TenantAdminController(
@@ -50,12 +58,14 @@ public class TenantAdminController {
         TenantAdminTableService tableService,
         TenantAdminSettingsService settingsService,
         TenantAdminProfileService profileService,
+        ReservationMealPeriodManagementService mealPeriodService,
         TenantAdminScopeResolver scopeResolver
     ) {
         this.staffService = staffService;
         this.tableService = tableService;
         this.settingsService = settingsService;
         this.profileService = profileService;
+        this.mealPeriodService = mealPeriodService;
         this.scopeResolver = scopeResolver;
     }
 
@@ -227,6 +237,29 @@ public class TenantAdminController {
         ));
     }
 
+    @GetMapping("/reservation-meal-periods")
+    public ResponseEntity<ReservationMealPeriodSettingsResponse> getReservationMealPeriods(@PathVariable UUID storeId) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(ReservationMealPeriodSettingsResponse.from(mealPeriodService.getStoreSettings(scope)));
+    }
+
+    @PatchMapping("/reservation-meal-periods")
+    public ResponseEntity<ReservationMealPeriodSettingsResponse> updateReservationMealPeriods(
+        @PathVariable UUID storeId,
+        @RequestBody(required = false) ReservationMealPeriodSettingsRequest request
+    ) {
+        if (request == null) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(ReservationMealPeriodSettingsResponse.from(mealPeriodService.updateStoreSettings(
+            scope,
+            request.usePlatformSeed(),
+            request.copyPlatformSeed(),
+            request.commands()
+        )));
+    }
+
     @ExceptionHandler(TenantAdminApiException.class)
     public ResponseEntity<TenantAdminApiErrorResponse> handleApiException(TenantAdminApiException exception) {
         return apiError(exception.code());
@@ -240,6 +273,20 @@ public class TenantAdminController {
     @ExceptionHandler(CallScreenMediaServiceException.class)
     public ResponseEntity<TenantAdminApiErrorResponse> handleMediaServiceException(
         CallScreenMediaServiceException exception
+    ) {
+        return apiError(toApiError(exception.code()));
+    }
+
+    @ExceptionHandler(ReservationMealPeriodServiceException.class)
+    public ResponseEntity<TenantAdminApiErrorResponse> handleMealPeriodServiceException(
+        ReservationMealPeriodServiceException exception
+    ) {
+        return apiError(toApiError(exception.code()));
+    }
+
+    @ExceptionHandler(ReservationMealPeriodApiException.class)
+    public ResponseEntity<TenantAdminApiErrorResponse> handleMealPeriodApiException(
+        ReservationMealPeriodApiException exception
     ) {
         return apiError(toApiError(exception.code()));
     }
@@ -270,6 +317,21 @@ public class TenantAdminController {
             case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
             case MEDIA_NOT_FOUND -> TenantAdminApiErrorCode.MEDIA_NOT_FOUND;
             case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
+        };
+    }
+
+    private static TenantAdminApiErrorCode toApiError(ReservationMealPeriodServiceErrorCode code) {
+        return switch (code) {
+            case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
+            case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
+        };
+    }
+
+    private static TenantAdminApiErrorCode toApiError(ReservationMealPeriodApiErrorCode code) {
+        return switch (code) {
+            case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
+            case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
+            case UNAUTHENTICATED, FORBIDDEN -> TenantAdminApiErrorCode.FORBIDDEN;
         };
     }
 

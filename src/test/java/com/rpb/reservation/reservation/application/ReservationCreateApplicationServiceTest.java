@@ -377,6 +377,20 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void arbitraryStartTimeOutsideEffectiveMealPeriodSlotsIsRejected() {
+        Scenario scenario = Scenario.ready();
+        Instant arbitraryStartAt = Instant.parse("2026-06-20T04:10:00Z");
+
+        ReservationCreateResult result = scenario.service().createReservation(
+            scenario.commandWithRange(arbitraryStartAt, arbitraryStartAt.plusSeconds(90 * 60L))
+        );
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCreateError.RESERVATION_TIME_SLOT_UNAVAILABLE);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+    }
+
+    @Test
     void customerNotFoundIsRejected() {
         Scenario scenario = Scenario.ready();
 

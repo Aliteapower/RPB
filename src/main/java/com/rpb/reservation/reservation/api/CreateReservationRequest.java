@@ -1,6 +1,7 @@
 package com.rpb.reservation.reservation.api;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -9,6 +10,7 @@ public record CreateReservationRequest(
     Integer partySize,
     Instant reservedStartAt,
     Instant reservedEndAt,
+    LocalDate businessDate,
     UUID customerId,
     String customerName,
     String customerNickname,
@@ -27,9 +29,36 @@ public record CreateReservationRequest(
         String customerName,
         String customerNickname,
         String phoneE164,
+        String note,
+        UUID tableId,
+        UUID tableGroupId
+    ) {
+        this(
+            partySize,
+            reservedStartAt,
+            reservedEndAt,
+            null,
+            customerId,
+            customerName,
+            customerNickname,
+            phoneE164,
+            note,
+            tableId,
+            tableGroupId
+        );
+    }
+
+    public CreateReservationRequest(
+        Integer partySize,
+        Instant reservedStartAt,
+        Instant reservedEndAt,
+        UUID customerId,
+        String customerName,
+        String customerNickname,
+        String phoneE164,
         String note
     ) {
-        this(partySize, reservedStartAt, reservedEndAt, customerId, customerName, customerNickname, phoneE164, note, null, null);
+        this(partySize, reservedStartAt, reservedEndAt, null, customerId, customerName, customerNickname, phoneE164, note, null, null);
     }
 
     public Optional<ReservationApiErrorCode> validateContract() {

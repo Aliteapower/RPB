@@ -58,6 +58,7 @@ public class ReservationApiErrorMapper {
             case CUSTOMER_NOT_FOUND -> ReservationApiErrorCode.CUSTOMER_NOT_FOUND;
             case RESERVATION_DUPLICATE_ACTIVE -> ReservationApiErrorCode.RESERVATION_DUPLICATE_ACTIVE;
             case RESERVATION_CAPACITY_INSUFFICIENT -> ReservationApiErrorCode.RESERVATION_CAPACITY_INSUFFICIENT;
+            case RESERVATION_TIME_SLOT_UNAVAILABLE -> ReservationApiErrorCode.RESERVATION_TIME_SLOT_UNAVAILABLE;
             case RESERVATION_CODE_CONFLICT -> ReservationApiErrorCode.RESERVATION_CODE_CONFLICT;
             case ILLEGAL_STATE_TRANSITION -> ReservationApiErrorCode.ILLEGAL_STATE_TRANSITION;
             case AUDIT_WRITE_FAILED -> ReservationApiErrorCode.AUDIT_WRITE_FAILED;

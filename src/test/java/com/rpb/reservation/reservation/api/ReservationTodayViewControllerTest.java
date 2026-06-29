@@ -7,9 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.rpb.reservation.appgate.guard.RequireAppGate;
 import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
+import com.rpb.reservation.reservation.application.ReservationTimeSlot;
+import com.rpb.reservation.reservation.application.ReservationTimeSlotListResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewItem;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
 import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
+import com.rpb.reservation.reservation.application.query.ReservationTimeSlotQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.application.service.ReservationTodayViewApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -82,6 +85,21 @@ class ReservationTodayViewControllerTest {
         assertThat(annotation).isNotNull();
         assertThat(annotation.appKey()).isEqualTo("reservation_queue");
         assertThat(annotation.permission()).isEqualTo("reservation.today_view");
+    }
+
+    @Test
+    void timeSlotsEndpointRequiresReservationCreateAppGatePermission() throws Exception {
+        Method method = ReservationTodayViewController.class.getMethod(
+            "timeSlots",
+            UUID.class,
+            String.class
+        );
+
+        RequireAppGate annotation = method.getAnnotation(RequireAppGate.class);
+
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.appKey()).isEqualTo("reservation_queue");
+        assertThat(annotation.permission()).isEqualTo("reservation.create");
     }
 
     @Test
@@ -165,6 +183,45 @@ class ReservationTodayViewControllerTest {
         assertThat(applicationService.todayQuery).isNull();
     }
 
+    @Test
+    void mapsTimeSlotsQueryAndResponse() throws Exception {
+        actorProvider.actor = actor(Set.of("store_staff"), Set.of("reservation.create"), Set.of(STORE_ID));
+        applicationService.timeSlotResult = ReservationTimeSlotListResult.success(
+            STORE_ID,
+            LocalDate.parse("2030-06-20"),
+            "Asia/Singapore",
+            List.of(new ReservationTimeSlot(
+                UUID.fromString("9d81f2ab-f8de-4b8a-bc77-58bb7b026001"),
+                "lunch",
+                "午餐",
+                LocalDate.parse("2030-06-20"),
+                java.time.LocalTime.parse("11:00"),
+                Instant.parse("2030-06-20T03:00:00Z"),
+                false,
+                true
+            ))
+        );
+
+        mockMvc.perform(get("/api/v1/stores/{storeId}/reservations/time-slots", STORE_ID)
+                .param("businessDate", "2030-06-20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.storeId").value(STORE_ID.toString()))
+            .andExpect(jsonPath("$.businessDate").value("2030-06-20"))
+            .andExpect(jsonPath("$.timezone").value("Asia/Singapore"))
+            .andExpect(jsonPath("$.slots[0].periodKey").value("lunch"))
+            .andExpect(jsonPath("$.slots[0].time").value("11:00"))
+            .andExpect(jsonPath("$.slots[0].startAt").value("2030-06-20T03:00:00Z"))
+            .andExpect(jsonPath("$.slots[0].selectable").value(true));
+
+        ReservationTimeSlotQuery query = applicationService.timeSlotQuery;
+        assertThat(query.tenantId()).isEqualTo(TENANT_ID);
+        assertThat(query.storeId()).isEqualTo(STORE_ID);
+        assertThat(query.actorId()).isEqualTo(ACTOR_ID);
+        assertThat(query.actorType()).isEqualTo("staff");
+        assertThat(query.businessDate()).isEqualTo("2030-06-20");
+    }
+
     private static CurrentActor actor(Set<String> roles, Set<String> permissions, Set<UUID> storeIds) {
         return CurrentActor.storeStaff(
             TENANT_ID,
@@ -192,7 +249,9 @@ class ReservationTodayViewControllerTest {
     private static final class CapturingReservationTodayViewService extends ReservationTodayViewApplicationService {
         private ReservationTodayViewQuery todayQuery;
         private ReservationCalendarSummaryQuery calendarSummaryQuery;
+        private ReservationTimeSlotQuery timeSlotQuery;
         private ReservationTodayViewResult todayResult;
+        private ReservationTimeSlotListResult timeSlotResult;
 
         private CapturingReservationTodayViewService() {
             super(null, null);
@@ -208,6 +267,12 @@ class ReservationTodayViewControllerTest {
         public ReservationCalendarSummaryResult getCalendarSummary(ReservationCalendarSummaryQuery query) {
             this.calendarSummaryQuery = query;
             throw new AssertionError("Calendar summary should not be invoked by this controller test");
+        }
+
+        @Override
+        public ReservationTimeSlotListResult getTimeSlots(ReservationTimeSlotQuery query) {
+            this.timeSlotQuery = query;
+            return timeSlotResult;
         }
     }
 }

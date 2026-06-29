@@ -22,6 +22,7 @@ public enum ReservationCreateError {
     TABLE_GROUP_CAPACITY_INSUFFICIENT("table_group_capacity_insufficient"),
     RESERVATION_DUPLICATE_ACTIVE("reservation_duplicate_active"),
     RESERVATION_CAPACITY_INSUFFICIENT("reservation_capacity_insufficient"),
+    RESERVATION_TIME_SLOT_UNAVAILABLE("reservation_time_slot_unavailable"),
     RESERVATION_CODE_CONFLICT("reservation_code_conflict"),
     IDEMPOTENCY_CONFLICT("idempotency_conflict"),
     COMMAND_IN_PROGRESS("command_in_progress"),

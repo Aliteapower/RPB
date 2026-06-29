@@ -120,6 +120,7 @@ class ReservationControllerTest {
                       "partySize": 4,
                       "reservedStartAt": "2030-06-20T11:00:00Z",
                       "reservedEndAt": null,
+                      "businessDate": "2030-06-20",
                       "customerId": null,
                       "customerName": " Guest ",
                       "customerNickname": " VIP friend ",
@@ -155,6 +156,7 @@ class ReservationControllerTest {
         assertThat(command.partySize()).isEqualTo(4);
         assertThat(command.reservedStartAt()).isEqualTo(RESERVED_START_AT);
         assertThat(command.reservedEndAt()).isNull();
+        assertThat(command.businessDate()).isEqualTo(LocalDate.parse("2030-06-20"));
         assertThat(command.customerId()).isNull();
         assertThat(command.customerName()).isEqualTo("Guest");
         assertThat(command.customerNickname()).isEqualTo("VIP friend");
@@ -338,6 +340,7 @@ class ReservationControllerTest {
                 "partySize",
                 "reservedStartAt",
                 "reservedEndAt",
+                "businessDate",
                 "customerId",
                 "customerName",
                 "customerNickname",
@@ -356,6 +359,7 @@ class ReservationControllerTest {
         assertApplicationError(ReservationCreateError.CUSTOMER_NOT_FOUND, 404, "CUSTOMER_NOT_FOUND");
         assertApplicationError(ReservationCreateError.RESERVATION_DUPLICATE_ACTIVE, 409, "RESERVATION_DUPLICATE_ACTIVE");
         assertApplicationError(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT, 409, "RESERVATION_CAPACITY_INSUFFICIENT");
+        assertApplicationError(ReservationCreateError.RESERVATION_TIME_SLOT_UNAVAILABLE, 409, "RESERVATION_TIME_SLOT_UNAVAILABLE");
         assertApplicationError(ReservationCreateError.RESERVATION_CODE_CONFLICT, 409, "RESERVATION_CODE_CONFLICT");
         assertApplicationError(ReservationCreateError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS");
         assertApplicationError(ReservationCreateError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY");
@@ -441,6 +445,7 @@ class ReservationControllerTest {
                 "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenMediaSeedController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenSeedController.java",
                 "src/main/java/com/rpb/reservation/queuedisplay/api/QueueDisplayController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationMealPeriodSeedController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationShareTemplateSeedController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
@@ -449,6 +454,7 @@ class ReservationControllerTest {
                 "src/main/java/com/rpb/reservation/queue/api/QueueTicketListController.java",
                 "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationPublicShareController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
                 "src/main/java/com/rpb/reservation/staffhome/api/StaffHomeOverviewController.java",
                 "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
@@ -519,6 +525,7 @@ class ReservationControllerTest {
                 "src/pages/PlatformCallScreenSeedPage.vue",
                 "src/pages/PlatformProfilePage.vue",
                 "src/pages/PlatformProductLinesPage.vue",
+                "src/pages/PlatformReservationMealPeriodSeedPage.vue",
                 "src/pages/PlatformReservationShareTemplateSeedPage.vue",
                 "src/pages/PlatformTenantBillingPage.vue",
                 "src/pages/PlatformTenantFormPage.vue",
@@ -529,6 +536,7 @@ class ReservationControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
+                "src/pages/ReservationPublicSharePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
@@ -550,6 +558,7 @@ class ReservationControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
+                "src/pages/ReservationPublicSharePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/components/reservation-workbench/CreateReservationDialog.vue",
                 "src/components/reservation-workbench/ReservationMonthCalendar.vue",
@@ -559,6 +568,7 @@ class ReservationControllerTest {
                 "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
                 "src/components/reservation-workbench/ReservationTodayListItem.vue",
                 "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+                "src/pages/PlatformReservationMealPeriodSeedPage.vue",
                 "src/pages/PlatformReservationShareTemplateSeedPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/TenantAdminReservationSharePage.vue"
@@ -667,6 +677,7 @@ class ReservationControllerTest {
               "partySize": 4,
               "reservedStartAt": "2030-06-20T11:00:00Z",
               "reservedEndAt": "2030-06-20T12:30:00Z",
+              "businessDate": "2030-06-20",
               "customerId": null,
               "customerName": "Guest",
               "customerNickname": null,
@@ -682,6 +693,7 @@ class ReservationControllerTest {
         return switch (apiCode) {
             case "RESERVATION_DUPLICATE_ACTIVE" -> "reservation.duplicate_active";
             case "RESERVATION_CAPACITY_INSUFFICIENT" -> "reservation.capacity_insufficient";
+            case "RESERVATION_TIME_SLOT_UNAVAILABLE" -> "reservation.time_slot_unavailable";
             case "RESERVATION_CODE_CONFLICT" -> "reservation.code_conflict";
             case "RESERVATION_START_IN_PAST" -> "reservation.start_in_past";
             case "EVENT_WRITE_FAILED" -> "reservation.event_write_failed";

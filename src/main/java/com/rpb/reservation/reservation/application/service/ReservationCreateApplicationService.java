@@ -29,6 +29,7 @@ import com.rpb.reservation.idempotency.status.IdempotencyStatus;
 import com.rpb.reservation.reservation.application.ReservationCreateError;
 import com.rpb.reservation.reservation.application.ReservationCreateResult;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
 import com.rpb.reservation.reservation.application.rule.ReservationAvailabilityRule;
@@ -96,6 +97,7 @@ public class ReservationCreateApplicationService {
     private final IdempotencyRepositoryPort idempotencyRepository;
     private final Clock clock;
     private final ReservationCodePolicy reservationCodePolicy;
+    private final ReservationMealPeriodScheduleService reservationMealPeriodScheduleService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultAuditRule auditRule = new DefaultAuditRule();
     private final DefaultBusinessEventRule businessEventRule = new DefaultBusinessEventRule();
@@ -120,7 +122,8 @@ public class ReservationCreateApplicationService {
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
         IdempotencyRepositoryPort idempotencyRepository,
-        Clock clock
+        Clock clock,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository
     ) {
         this(
             storeRepository,
@@ -135,7 +138,8 @@ public class ReservationCreateApplicationService {
             auditLogRepository,
             idempotencyRepository,
             clock,
-            new ReservationCodePolicy()
+            new ReservationCodePolicy(),
+            mealPeriodRepository
         );
     }
 
@@ -167,7 +171,8 @@ public class ReservationCreateApplicationService {
             auditLogRepository,
             idempotencyRepository,
             clock,
-            new ReservationCodePolicy(reservationCodeSequenceSupplier)
+            new ReservationCodePolicy(reservationCodeSequenceSupplier),
+            ReservationMealPeriodRepositoryPort.platformDefault()
         );
     }
 
@@ -184,7 +189,8 @@ public class ReservationCreateApplicationService {
         AuditLogRepositoryPort auditLogRepository,
         IdempotencyRepositoryPort idempotencyRepository,
         Clock clock,
-        ReservationCodePolicy reservationCodePolicy
+        ReservationCodePolicy reservationCodePolicy,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository
     ) {
         this.storeRepository = storeRepository;
         this.storePolicyRepository = storePolicyRepository;
@@ -199,6 +205,7 @@ public class ReservationCreateApplicationService {
         this.idempotencyRepository = idempotencyRepository;
         this.clock = clock;
         this.reservationCodePolicy = reservationCodePolicy;
+        this.reservationMealPeriodScheduleService = new ReservationMealPeriodScheduleService(mealPeriodRepository);
     }
 
     @Transactional
@@ -255,6 +262,7 @@ public class ReservationCreateApplicationService {
             value(command.partySize()),
             value(command.reservedStartAt()),
             value(command.reservedEndAt()),
+            value(command.businessDate()),
             value(command.customerId()),
             normalize(command.customerName()),
             normalize(command.customerNickname()),
@@ -290,7 +298,18 @@ public class ReservationCreateApplicationService {
         }
 
         PartySize partySize = new PartySize(command.partySize());
-        BusinessDate businessDate = businessDate(store, reservedStartAt);
+        BusinessDate businessDate = command.businessDate() == null
+            ? businessDate(store, reservedStartAt)
+            : new BusinessDate(command.businessDate());
+        if (!reservationMealPeriodScheduleService.isSelectableSlot(
+            scope,
+            store.timezone(),
+            businessDate.value(),
+            reservedStartAt,
+            now
+        )) {
+            throw new ApplicationFailure(ReservationCreateError.RESERVATION_TIME_SLOT_UNAVAILABLE);
+        }
         TimeRange timeRange = new TimeRange(reservedStartAt, reservedEndAt);
         Instant holdUntilAt = reservationHoldPolicy.holdUntilAt(reservedStartAt, policy);
         Customer customer = resolveCustomer(command, scope.tenantScope());

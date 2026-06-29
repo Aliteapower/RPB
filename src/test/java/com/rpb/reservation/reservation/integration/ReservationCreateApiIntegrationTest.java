@@ -632,6 +632,7 @@ class ReservationCreateApiIntegrationTest {
             "src/pages/ReservationCheckInPage.vue",
             "src/pages/ReservationArrivedDirectSeatingPage.vue",
             "src/pages/ReservationArrivedToQueuePage.vue",
+            "src/pages/ReservationPublicSharePage.vue",
             "src/pages/ReservationTodayViewPage.vue",
             "src/components/reservation-workbench/CreateReservationDialog.vue",
             "src/components/reservation-workbench/ReservationMonthCalendar.vue",
@@ -641,6 +642,8 @@ class ReservationCreateApiIntegrationTest {
             "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
             "src/components/reservation-workbench/ReservationTodayListItem.vue",
             "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+            "src/pages/PlatformReservationShareTemplateSeedPage.vue",
+            "src/pages/PlatformReservationMealPeriodSeedPage.vue",
             "src/pages/TenantAdminReservationSharePage.vue"
         ).contains(normalized);
     }

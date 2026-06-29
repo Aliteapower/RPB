@@ -8,20 +8,20 @@ import {
 } from '../../api/reservationShareInfoApi'
 import { fetchTableResources, TableResourceApiError } from '../../api/tableResourceApi'
 import {
+  fetchReservationTimeSlots,
+  ReservationMealPeriodApiError
+} from '../../api/reservationMealPeriodApi'
+import {
   saveTemporaryTableGroup,
   TemporaryTableGroupApiError
 } from '../../api/temporaryTableGroupApi'
 import { shareLinkOrCopy } from '../../utils/reservationShareLauncher'
 import { formatReservationCreateErrorMessage } from '../../utils/reservationCreateMessages'
 import StaffGuestContactLookup from '../staff/StaffGuestContactLookup.vue'
-import StaffTimeWheelPicker from '../staff/StaffTimeWheelPicker.vue'
 import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../staff/staffGuestContact'
 import TableResourcePicker from '../staff-table/TableResourcePicker.vue'
 import ReservationShareCopyPanel from './ReservationShareCopyPanel.vue'
-import {
-  defaultFutureReservationDateTime,
-  isReservationStartInPast
-} from './reservationCreateTime'
+import { defaultFutureReservationDateTime } from './reservationCreateTime'
 import type {
   CreateReservationRequest,
   CreateReservationResponse,
@@ -33,6 +33,10 @@ import type {
   TableResourceItem
 } from '../../types/tableResource'
 import type { TemporaryTableGroupApiErrorResponse } from '../../types/temporaryTableGroup'
+import type {
+  ReservationMealPeriodApiErrorResponse,
+  ReservationTimeSlot
+} from '../../types/reservationMealPeriod'
 
 const props = withDefaults(
   defineProps<{
@@ -52,6 +56,13 @@ const emit = defineEmits<{
 }>()
 
 type TablePickerSelectionMode = 'single' | 'temporary'
+type MealPeriodFilterOption = {
+  periodKey: string
+  displayName: string
+  count: number
+}
+
+const ALL_MEAL_PERIOD_KEY = 'all'
 
 const form = reactive({
   customerId: '',
@@ -59,7 +70,7 @@ const form = reactive({
   customerSalutation: '',
   phoneLocal: '',
   businessDate: props.selectedDate,
-  time: '',
+  selectedStartAt: '',
   partySize: 2,
   tablePreference: 'unassigned',
   temporaryTableIds: [] as string[]
@@ -73,6 +84,10 @@ const temporaryGroupApiError = ref<TemporaryTableGroupApiErrorResponse | null>(n
 const tableResourceOptions = ref<TableResourceItem[]>([])
 const isLoadingTableResources = ref(false)
 const tableResourceApiError = ref<TableResourceApiErrorResponse | null>(null)
+const timeSlots = ref<ReservationTimeSlot[]>([])
+const isLoadingTimeSlots = ref(false)
+const timeSlotApiError = ref<ReservationMealPeriodApiErrorResponse | null>(null)
+const selectedMealPeriodKey = ref(ALL_MEAL_PERIOD_KEY)
 const isTablePickerOpen = ref(false)
 const tablePickerSelectionMode = ref<TablePickerSelectionMode>('single')
 const createdReservation = ref<CreateReservationResponse | null>(null)
@@ -83,6 +98,7 @@ const createdShareShared = ref(false)
 const createdShareStatusText = ref('')
 const createdShareFallbackText = ref('')
 let tableResourceLoadSequence = 0
+let timeSlotLoadSequence = 0
 
 const canSubmit = computed(
   () =>
@@ -91,10 +107,44 @@ const canSubmit = computed(
     !isSubmitting.value &&
     !createdReservation.value &&
     !!form.businessDate &&
-    !!form.time &&
+    !!selectedTimeSlot.value?.selectable &&
     !isBeforeMinDate(form.businessDate) &&
     Number.isInteger(form.partySize) &&
     form.partySize > 0
+)
+const availableTimeSlots = computed(() => timeSlots.value.filter(slot => slot.selectable))
+const mealPeriodFilterOptions = computed<MealPeriodFilterOption[]>(() => {
+  const periodOptions = new Map<string, MealPeriodFilterOption>()
+
+  for (const slot of availableTimeSlots.value) {
+    const current = periodOptions.get(slot.periodKey)
+    if (current) {
+      current.count += 1
+      continue
+    }
+    periodOptions.set(slot.periodKey, {
+      periodKey: slot.periodKey,
+      displayName: slot.displayName,
+      count: 1
+    })
+  }
+
+  return [
+    {
+      periodKey: ALL_MEAL_PERIOD_KEY,
+      displayName: '全部',
+      count: availableTimeSlots.value.length
+    },
+    ...periodOptions.values()
+  ]
+})
+const filteredTimeSlots = computed(() =>
+  selectedMealPeriodKey.value === ALL_MEAL_PERIOD_KEY
+    ? availableTimeSlots.value
+    : availableTimeSlots.value.filter(slot => slot.periodKey === selectedMealPeriodKey.value)
+)
+const selectedTimeSlot = computed(() =>
+  availableTimeSlots.value.find(slot => slot.startAt === form.selectedStartAt) ?? null
 )
 const selectedResource = computed(() =>
   tableResourceOptions.value.find(
@@ -181,6 +231,7 @@ watch(
 watch(
   [() => props.open, () => props.storeId, () => form.businessDate],
   () => {
+    void loadTimeSlots()
     void loadTableResources()
   },
   { immediate: true }
@@ -234,7 +285,7 @@ function validateForm(): ReservationApiErrorResponse | null {
     return createLocalError('INVALID_PARTY_SIZE', 'reservation.invalid_party_size')
   }
 
-  if (!toIsoInstant()) {
+  if (!selectedTimeSlot.value) {
     return createLocalError('INVALID_TIME_RANGE', 'reservation.invalid_time_range')
   }
 
@@ -242,7 +293,7 @@ function validateForm(): ReservationApiErrorResponse | null {
     return createLocalError('RESERVATION_START_IN_PAST', 'reservation.start_in_past')
   }
 
-  if (isReservationStartInPast(form.businessDate, form.time)) {
+  if (!selectedTimeSlot.value.selectable) {
     return createLocalError('RESERVATION_START_IN_PAST', 'reservation.start_in_past')
   }
 
@@ -259,8 +310,9 @@ function toRequest(): CreateReservationRequest {
 
   return {
     partySize: form.partySize,
-    reservedStartAt: toIsoInstant() ?? '',
+    reservedStartAt: selectedTimeSlot.value?.startAt ?? '',
     reservedEndAt: null,
+    businessDate: form.businessDate,
     customerId: optionalValue(form.customerId),
     customerName: optionalValue(form.customerName),
     customerNickname: optionalValue(form.customerSalutation),
@@ -268,6 +320,76 @@ function toRequest(): CreateReservationRequest {
     tableId: resource && resource.resourceType === 'dining_table' ? resource.resourceId : null,
     tableGroupId: resource && resource.resourceType === 'table_group' ? resource.resourceId : null
   }
+}
+
+async function loadTimeSlots(): Promise<void> {
+  const sequence = ++timeSlotLoadSequence
+  timeSlotApiError.value = null
+
+  if (!props.open || !props.storeId || !form.businessDate) {
+    timeSlots.value = []
+    form.selectedStartAt = ''
+    selectedMealPeriodKey.value = ALL_MEAL_PERIOD_KEY
+    isLoadingTimeSlots.value = false
+    return
+  }
+
+  isLoadingTimeSlots.value = true
+
+  try {
+    const result = await fetchReservationTimeSlots(props.storeId, form.businessDate)
+
+    if (sequence === timeSlotLoadSequence) {
+      timeSlots.value = result.slots
+      ensureSelectedMealPeriodStillAvailable()
+      ensureSelectedTimeSlotStillAvailable()
+    }
+  } catch (error) {
+    if (sequence === timeSlotLoadSequence) {
+      timeSlots.value = []
+      form.selectedStartAt = ''
+      selectedMealPeriodKey.value = ALL_MEAL_PERIOD_KEY
+      timeSlotApiError.value =
+        error instanceof ReservationMealPeriodApiError
+          ? error.response
+          : createMealPeriodLocalError('REQUEST_FAILED', 'reservation.meal_period.request_failed')
+    }
+  } finally {
+    if (sequence === timeSlotLoadSequence) {
+      isLoadingTimeSlots.value = false
+    }
+  }
+}
+
+function selectTimeSlot(slot: ReservationTimeSlot): void {
+  if (slot.selectable && !isSubmitting.value) {
+    form.selectedStartAt = slot.startAt
+  }
+}
+
+function selectMealPeriod(periodKey: string): void {
+  if (isSubmitting.value) {
+    return
+  }
+  selectedMealPeriodKey.value = periodKey
+  ensureSelectedTimeSlotStillAvailable()
+}
+
+function ensureSelectedMealPeriodStillAvailable(): void {
+  if (selectedMealPeriodKey.value === ALL_MEAL_PERIOD_KEY) {
+    return
+  }
+  if (mealPeriodFilterOptions.value.some(option => option.periodKey === selectedMealPeriodKey.value)) {
+    return
+  }
+  selectedMealPeriodKey.value = ALL_MEAL_PERIOD_KEY
+}
+
+function ensureSelectedTimeSlotStillAvailable(): void {
+  if (filteredTimeSlots.value.some(slot => slot.startAt === form.selectedStartAt)) {
+    return
+  }
+  form.selectedStartAt = filteredTimeSlots.value[0]?.startAt ?? availableTimeSlots.value[0]?.startAt ?? ''
 }
 
 async function loadTableResources(): Promise<void> {
@@ -446,15 +568,6 @@ function statusDisabledText(resource: TableResourceItem): string {
   return reason ? reasonLabels[reason] ?? '不可选' : '不可选'
 }
 
-function toIsoInstant(): string | null {
-  if (!form.businessDate || !form.time) {
-    return null
-  }
-
-  const timestamp = new Date(`${form.businessDate}T${form.time}`).getTime()
-  return Number.isNaN(timestamp) ? null : new Date(timestamp).toISOString()
-}
-
 function optionalValue(value: string): string | null {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
@@ -487,6 +600,20 @@ function createTableResourceLocalError(
   code: string,
   messageKey: string
 ): TableResourceApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    }
+  }
+}
+
+function createMealPeriodLocalError(
+  code: string,
+  messageKey: string
+): ReservationMealPeriodApiErrorResponse {
   return {
     success: false,
     error: {
@@ -590,6 +717,8 @@ function resetAfterSuccess(): void {
   form.phoneLocal = ''
   form.partySize = 2
   form.tablePreference = 'unassigned'
+  form.selectedStartAt = ''
+  selectedMealPeriodKey.value = ALL_MEAL_PERIOD_KEY
   clearTemporaryGroupDraft()
 }
 
@@ -598,7 +727,8 @@ function applyDefaultFutureDateTime(selectedDate: string): void {
     props.minDate && selectedDate < props.minDate ? props.minDate : selectedDate
   const next = defaultFutureReservationDateTime(nextSelectedDate)
   form.businessDate = next.businessDate
-  form.time = next.time
+  form.selectedStartAt = ''
+  selectedMealPeriodKey.value = ALL_MEAL_PERIOD_KEY
 }
 
 function isBeforeMinDate(value: string): boolean {
@@ -674,7 +804,52 @@ function reservationShareUrl(info: ReservationShareInfo): string {
           <input v-model="form.businessDate" :min="minDate" name="businessDate" type="date" />
         </label>
 
-        <StaffTimeWheelPicker v-model="form.time" label="时间" name="reservationTime" />
+        <div class="reservation-create-dialog__field">
+          <span>时间</span>
+          <div
+            v-if="mealPeriodFilterOptions.length > 1"
+            class="reservation-create-meal-period-filter"
+            role="group"
+            aria-label="餐段筛选"
+          >
+            <button
+              v-for="option in mealPeriodFilterOptions"
+              :key="option.periodKey"
+              class="reservation-create-meal-period-filter__item"
+              :class="{ 'is-selected': option.periodKey === selectedMealPeriodKey }"
+              type="button"
+              :aria-pressed="option.periodKey === selectedMealPeriodKey"
+              :disabled="isSubmitting"
+              @click="selectMealPeriod(option.periodKey)"
+            >
+              <span>{{ option.displayName }}</span>
+              <small>{{ option.count }}</small>
+            </button>
+          </div>
+          <div class="reservation-create-time-slots" role="listbox" aria-label="预约可选时间">
+            <button
+              v-for="slot in filteredTimeSlots"
+              :key="slot.startAt"
+              class="reservation-create-time-slots__item"
+              :class="{ 'is-selected': slot.startAt === form.selectedStartAt }"
+              type="button"
+              :disabled="isSubmitting"
+              @click="selectTimeSlot(slot)"
+            >
+              <strong>{{ slot.time }}</strong>
+              <small>{{ slot.displayName }}{{ slot.nextDay ? ' · 次日' : '' }}</small>
+            </button>
+          </div>
+          <small v-if="isLoadingTimeSlots" class="reservation-create-dialog__hint">
+            正在读取时间
+          </small>
+          <small v-else-if="timeSlotApiError" class="reservation-create-dialog__hint">
+            时间列表读取失败
+          </small>
+          <small v-else-if="filteredTimeSlots.length === 0" class="reservation-create-dialog__hint">
+            暂无可选时间
+          </small>
+        </div>
 
         <label>
           <span>人数</span>
@@ -949,6 +1124,108 @@ function reservationShareUrl(info: ReservationShareInfo): string {
   color: #64748b;
   font-size: 0.74rem;
   font-weight: 800;
+}
+
+.reservation-create-meal-period-filter {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  padding: 4px;
+}
+
+.reservation-create-meal-period-filter__item {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #334155;
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.reservation-create-meal-period-filter__item span {
+  font-size: 0.78rem;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reservation-create-meal-period-filter__item small {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.reservation-create-meal-period-filter__item.is-selected {
+  background: #ffffff;
+  border-color: #fdba74;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  color: #c2410c;
+}
+
+.reservation-create-meal-period-filter__item.is-selected small {
+  color: #ea580c;
+}
+
+.reservation-create-time-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 178px;
+  overflow-y: auto;
+}
+
+.reservation-create-time-slots__item {
+  min-height: 48px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  text-align: left;
+  padding: 6px 10px;
+}
+
+.reservation-create-time-slots__item strong,
+.reservation-create-time-slots__item small {
+  overflow-wrap: anywhere;
+}
+
+.reservation-create-time-slots__item strong {
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.reservation-create-time-slots__item small {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.reservation-create-time-slots__item.is-selected {
+  border-color: #f97316;
+  background: #fff7ed;
+}
+
+.reservation-create-time-slots__item:disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: default;
+}
+
+.reservation-create-time-slots__item:disabled small {
+  color: #94a3b8;
 }
 
 .reservation-create-dialog__table-field {

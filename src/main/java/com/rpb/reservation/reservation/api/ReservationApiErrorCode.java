@@ -72,6 +72,7 @@ public enum ReservationApiErrorCode {
     INVALID_CUSTOMER_IDENTITY(HttpStatus.BAD_REQUEST, "reservation.invalid_customer_identity"),
     RESERVATION_DUPLICATE_ACTIVE(HttpStatus.CONFLICT, "reservation.duplicate_active"),
     RESERVATION_CAPACITY_INSUFFICIENT(HttpStatus.CONFLICT, "reservation.capacity_insufficient"),
+    RESERVATION_TIME_SLOT_UNAVAILABLE(HttpStatus.CONFLICT, "reservation.time_slot_unavailable"),
     RESERVATION_CODE_CONFLICT(HttpStatus.CONFLICT, "reservation.code_conflict"),
     RESERVATION_POLICY_NOT_FOUND(HttpStatus.CONFLICT, "reservation.policy_not_found"),
     INVALID_BUSINESS_DATE(HttpStatus.BAD_REQUEST, "reservation.today_view.invalid_business_date"),

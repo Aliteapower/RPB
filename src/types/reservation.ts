@@ -11,6 +11,7 @@ export interface CreateReservationRequest {
   partySize: number
   reservedStartAt: string
   reservedEndAt?: string | null
+  businessDate?: string | null
   customerId?: string | null
   customerName?: string | null
   customerNickname?: string | null
