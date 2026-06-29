@@ -72,6 +72,18 @@ class TenantAdminApiIntegrationTest {
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
         jdbc.update("delete from dining_tables where table_code like 'CX%'");
         jdbc.update("delete from store_areas where area_code like 'CX%' or display_name like 'Codex%'");
+        jdbc.update("""
+            update stores
+            set share_display_name = null,
+                share_address = null,
+                google_map_url = null,
+                share_contact_phone = null,
+                whatsapp_business_phone_e164 = null,
+                reservation_share_note = null,
+                reservation_share_template = null
+            where id = ?
+              and tenant_id = ?
+            """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID);
         jdbc.update(
             "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
             PASSWORD_393930_HASH
@@ -342,6 +354,32 @@ class TenantAdminApiIntegrationTest {
               and reservation_share_note = '请提前 10 分钟到店'
               and reservation_share_template like '%尊敬的 {{contactName}} {{guestSalutation}}%'
               and reservation_share_template like '%{{reservationNo}}%'
+            """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminNormalizesSingaporeLocalPhoneForReservationShareProfile() throws Exception {
+        Cookie session = login("20000000");
+
+        mockMvc.perform(patch(basePath() + "/share-profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shareDisplayName":"食刻订位中心",
+                      "whatsappBusinessPhoneE164":"68681234"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.shareProfile.whatsappBusinessPhoneE164").value("+6568681234"));
+
+        assertThat(countWhere("""
+            select count(*)
+            from stores
+            where id = ?
+              and tenant_id = ?
+              and whatsapp_business_phone_e164 = '+6568681234'
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
     }
 

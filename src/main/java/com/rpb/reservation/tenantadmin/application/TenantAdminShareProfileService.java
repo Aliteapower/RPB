@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TenantAdminShareProfileService {
     private static final Pattern E164_PATTERN = Pattern.compile("^[+][1-9][0-9]{1,14}$");
+    private static final Pattern SINGAPORE_LOCAL_PHONE_PATTERN = Pattern.compile("^[0-9]{8}$");
+    private static final String SINGAPORE_PHONE_PREFIX = "+65";
 
     private final TenantAdminShareProfileRepository repository;
     private final ReservationShareTemplateRenderer templateRenderer;
@@ -171,6 +173,9 @@ public class TenantAdminShareProfileService {
         String normalized = optionalText(value);
         if (normalized == null) {
             return null;
+        }
+        if (SINGAPORE_LOCAL_PHONE_PATTERN.matcher(normalized).matches()) {
+            return SINGAPORE_PHONE_PREFIX + normalized;
         }
         if (!E164_PATTERN.matcher(normalized).matches()) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
