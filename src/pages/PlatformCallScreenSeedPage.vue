@@ -230,6 +230,18 @@ function addSlide(): void {
   })
 }
 
+function removeMediaSlide(index: number): void {
+  if (!mediaSeedSet.value) {
+    return
+  }
+  mediaSeedSet.value.mediaSlides.splice(index, 1)
+  if (previewSlideIndex.value >= previewSlides.value.length) {
+    previewSlideIndex.value = Math.max(0, previewSlides.value.length - 1)
+  }
+  errorText.value = ''
+  savedText.value = ''
+}
+
 function startPreviewCarousel(): void {
   stopPreviewCarousel()
   previewCarouselTimer = window.setInterval(showNextPreviewSlide, 3500)
@@ -577,10 +589,11 @@ function mediaUploadErrorText(error: unknown): string {
                   <th>标题</th>
                   <th>替代文本</th>
                   <th>版本</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="slide in mediaSeedSet.mediaSlides" :key="slide.id || slide.mediaAssetId">
+                <tr v-for="(slide, index) in mediaSeedSet.mediaSlides" :key="slide.id || slide.mediaAssetId">
                   <td>
                     <input v-model.number="slide.sortOrder" class="sort-input" type="number" min="1" required />
                   </td>
@@ -614,6 +627,11 @@ function mediaUploadErrorText(error: unknown): string {
                     <input v-model.trim="slide.altText" maxlength="48" />
                   </td>
                   <td class="version-cell">{{ slide.version }}</td>
+                  <td>
+                    <button class="danger-button compact" type="button" @click="removeMediaSlide(index)">
+                      删除
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -1064,6 +1082,19 @@ tr:last-child td {
   border: 1px solid #cbd5e1;
   color: #334155;
   background: #ffffff;
+}
+
+.danger-button {
+  min-height: 34px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #b91c1c;
+  background: #fff1f2;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .secondary-button.compact {
