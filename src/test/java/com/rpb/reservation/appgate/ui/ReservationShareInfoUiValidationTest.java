@@ -18,7 +18,9 @@ class ReservationShareInfoUiValidationTest {
         Path todayItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
         Path copyPanelPath = Path.of("src", "components", "reservation-workbench", "ReservationShareCopyPanel.vue");
         Path shareLauncherPath = Path.of("src", "utils", "reservationShareLauncher.ts");
+        Path channelSharePayloadPath = Path.of("src", "utils", "reservationChannelSharePayload.ts");
         Path shareApiPath = Path.of("src", "api", "reservationShareInfoApi.ts");
+        Path shareInfoTypePath = Path.of("src", "types", "reservationShareInfo.ts");
         Path adminApiPath = Path.of("src", "api", "tenantAdminShareProfileApi.ts");
         Path publicShareApiPath = Path.of("src", "api", "reservationPublicShareApi.ts");
         Path publicShareTypePath = Path.of("src", "types", "reservationPublicShare.ts");
@@ -32,6 +34,7 @@ class ReservationShareInfoUiValidationTest {
         assertThat(publicShareTypePath).exists();
         assertThat(publicSharePagePath).exists();
         assertThat(shareLauncherPath).exists();
+        assertThat(channelSharePayloadPath).exists();
 
         String routerSource = Files.readString(routerPath);
         String navSource = Files.readString(navPath);
@@ -41,7 +44,9 @@ class ReservationShareInfoUiValidationTest {
         String todayItemSource = Files.readString(todayItemPath);
         String copyPanelSource = Files.readString(copyPanelPath);
         String shareLauncherSource = Files.readString(shareLauncherPath);
+        String channelSharePayloadSource = Files.readString(channelSharePayloadPath);
         String shareApiSource = Files.readString(shareApiPath);
+        String shareInfoTypeSource = Files.readString(shareInfoTypePath);
         String adminApiSource = Files.readString(adminApiPath);
         String publicShareApiSource = Files.readString(publicShareApiPath);
         String publicShareTypeSource = Files.readString(publicShareTypePath);
@@ -102,26 +107,39 @@ class ReservationShareInfoUiValidationTest {
             .doesNotContain("【订位确认】");
         assertThat(createDialogSource)
             .contains("getReservationShareInfo")
+            .contains("recordReservationShareIntent")
             .contains("ReservationShareCopyPanel")
             .contains("shareCreatedReservationLink")
             .contains("shareLinkOrCopy")
+            .contains("openWhatsApp")
+            .contains("openWechat")
+            .contains("reservationWechatShareText")
             .contains("sharePath")
-            .contains("转发订位链接")
+            .doesNotContain("const text = info?.wechatShareText?.trim()")
             .doesNotContain("navigator.share");
         assertThat(todayItemSource)
             .contains("getReservationShareInfo")
+            .contains("recordReservationShareIntent")
             .contains("ReservationShareCopyPanel")
             .contains("shareReservationLink")
             .contains("shareLinkOrCopy")
+            .contains("openWhatsApp")
+            .contains("openWechat")
+            .contains("reservationWechatShareText")
             .contains("sharePath")
-            .contains("转发订位链接")
+            .doesNotContain("const text = info?.wechatShareText?.trim()")
             .doesNotContain("navigator.share");
         assertThat(copyPanelSource)
-            .contains("share-requested")
-            .contains("buttonText: '转发订位链接'")
+            .contains("whatsapp-requested")
+            .contains("wechat-requested")
+            .contains("system-share-requested")
+            .contains("copy-requested")
+            .contains("WhatsApp发送")
+            .contains("微信发送")
+            .contains("系统转发")
+            .contains("复制链接")
             .contains("statusText: '已准备链接'")
-            .contains("已准备链接")
-            .doesNotContain("copy-requested");
+            .contains("已准备链接");
         assertThat(shareLauncherSource)
             .contains("shareLinkOrCopy")
             .contains("canUseNativeShare")
@@ -130,13 +148,23 @@ class ReservationShareInfoUiValidationTest {
             .contains("maxTouchPoints")
             .contains("matchMedia('(pointer: coarse)')")
             .contains("copyPlainText(payload.url)");
+        assertThat(channelSharePayloadSource)
+            .contains("reservationWechatShareText")
+            .contains("info.wechatShareText?.trim()")
+            .contains("info.shareText?.trim()")
+            .contains("shareUrl.trim()")
+            .contains("return text || url");
         assertThat(shareApiSource)
             .contains("/share-info")
             .contains("shareText")
             .contains("shareToken")
             .contains("sharePath")
+            .contains("recordReservationShareIntent")
+            .contains("}/intent`")
             .doesNotContain("send")
             .doesNotContain("webhook");
+        assertThat(shareInfoTypeSource)
+            .contains("wechatShareText?: string | null");
         assertThat(publicShareApiSource)
             .contains("/api/v1/public/reservation-shares")
             .contains("ReservationPublicShareApiError")

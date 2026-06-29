@@ -37,6 +37,7 @@ interface TenantShareProfileForm {
   storeDisplayName: string
   shareDisplayName: string
   googleMapUrl: string
+  whatsappBusinessPhoneE164: string
   reservationShareNote: string
   reservationShareTemplate: string
   usesDefaultReservationShareTemplate: boolean
@@ -71,6 +72,7 @@ const shareForm = reactive<TenantShareProfileForm>({
   storeDisplayName: '',
   shareDisplayName: '',
   googleMapUrl: '',
+  whatsappBusinessPhoneE164: '',
   reservationShareNote: '',
   reservationShareTemplate: '',
   usesDefaultReservationShareTemplate: true
@@ -208,6 +210,7 @@ function applyShareProfile(profile: TenantAdminShareProfile): void {
     storeDisplayName: profile.storeDisplayName,
     shareDisplayName: profile.shareDisplayName,
     googleMapUrl: profile.googleMapUrl,
+    whatsappBusinessPhoneE164: profile.whatsappBusinessPhoneE164,
     reservationShareNote: profile.reservationShareNote,
     reservationShareTemplate: profile.reservationShareTemplate,
     usesDefaultReservationShareTemplate: profile.usesDefaultReservationShareTemplate
@@ -228,6 +231,7 @@ function toSharePayload(): TenantAdminShareProfileMutation {
   return {
     shareDisplayName: optionalValue(shareForm.shareDisplayName),
     googleMapUrl: optionalValue(shareForm.googleMapUrl),
+    whatsappBusinessPhoneE164: optionalValue(shareForm.whatsappBusinessPhoneE164),
     reservationShareNote: optionalValue(shareForm.reservationShareNote),
     reservationShareTemplate: shareForm.usesDefaultReservationShareTemplate
       ? null
@@ -345,6 +349,10 @@ function apiErrorText(error: unknown): string {
             <label>
               <span>Google Map 链接</span>
               <input v-model.trim="shareForm.googleMapUrl" />
+            </label>
+            <label>
+              <span>WhatsApp 固定号码</span>
+              <input v-model.trim="shareForm.whatsappBusinessPhoneE164" placeholder="+6588880000" />
             </label>
             <label class="wide-field">
               <span>到店提示</span>

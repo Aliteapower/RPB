@@ -3,9 +3,13 @@ import { computed, ref } from 'vue'
 
 import {
   getReservationShareInfo,
+  recordReservationShareIntent,
   ReservationShareInfoApiError
 } from '../../api/reservationShareInfoApi'
+import { reservationWechatShareText } from '../../utils/reservationChannelSharePayload'
 import { shareLinkOrCopy } from '../../utils/reservationShareLauncher'
+import { copyPlainText } from '../../utils/plainTextClipboard'
+import type { ReservationShareIntentChannel } from '../../types/reservationShareInfo'
 import type { ReservationTodayViewItem } from '../../types/reservationTodayView'
 import type { ReservationShareInfo } from '../../types/reservationShareInfo'
 import ReservationShareCopyPanel from './ReservationShareCopyPanel.vue'
@@ -149,21 +153,18 @@ function requestSeat(): void {
 }
 
 async function shareReservationLink(): Promise<void> {
-  if (!shareInfo.value) {
-    await loadReservationShareInfo()
-  }
+  await systemShareReservationLink()
+}
 
-  const info = shareInfo.value
+async function systemShareReservationLink(): Promise<void> {
+  const info = await ensureShareInfo()
   const url = info ? reservationShareUrl(info) : ''
   if (!info || !url) {
     shareInfoErrorText.value = '暂无可转发链接'
     return
   }
 
-  shareInfoErrorText.value = ''
-  shareInfoShared.value = false
-  shareInfoStatusText.value = ''
-  shareInfoFallbackText.value = ''
+  resetShareFeedback()
 
   const result = await shareLinkOrCopy({
     title: info.shareTitle,
@@ -176,13 +177,94 @@ async function shareReservationLink(): Promise<void> {
   }
 
   if (result === 'copied' || result === 'native-share') {
+    await recordShareIntent(result === 'copied' ? 'copy_link' : 'system_share')
     shareInfoShared.value = true
-    shareInfoStatusText.value = result === 'copied' ? '链接已复制' : '已打开转发'
+    shareInfoStatusText.value = result === 'copied' ? '链接已复制' : '已打开系统转发'
     return
   }
 
   shareInfoFallbackText.value = url
   shareInfoErrorText.value = '当前浏览器限制转发，请手动复制下方链接'
+}
+
+async function openWhatsApp(): Promise<void> {
+  const info = await ensureShareInfo()
+  if (!info?.canOpenWhatsAppLink || !info.whatsappLink) {
+    shareInfoErrorText.value = info?.customerPhoneAvailable ? '顾客手机号暂不可用于 WhatsApp' : '顾客未填写可用手机号'
+    return
+  }
+
+  resetShareFeedback()
+  await recordShareIntent('whatsapp')
+  shareInfoShared.value = true
+  shareInfoStatusText.value = `将以 ${info.senderLabel || '门店'} 身份提示打开 WhatsApp`
+  window.location.href = info.whatsappLink
+}
+
+async function openWechat(): Promise<void> {
+  const info = await ensureShareInfo()
+  const url = info ? reservationShareUrl(info) : ''
+  const text = info ? reservationWechatShareText(info, url) : ''
+  if (!info || !text) {
+    shareInfoErrorText.value = '暂无可发送文案'
+    return
+  }
+
+  resetShareFeedback()
+  if (!(await copyPlainText(text))) {
+    shareInfoFallbackText.value = text
+    shareInfoErrorText.value = '当前浏览器限制复制，请手动复制文案后打开微信'
+    return
+  }
+  await recordShareIntent('wechat')
+  shareInfoShared.value = true
+  shareInfoStatusText.value = '文案已复制，正在打开微信'
+  if (info.wechatLink) {
+    window.location.href = info.wechatLink
+  }
+}
+
+async function copyReservationShareLink(): Promise<void> {
+  const info = await ensureShareInfo()
+  const url = info ? reservationShareUrl(info) : ''
+  if (!info || !url) {
+    shareInfoErrorText.value = '暂无可复制链接'
+    return
+  }
+
+  resetShareFeedback()
+  if (await copyPlainText(url)) {
+    await recordShareIntent('copy_link')
+    shareInfoShared.value = true
+    shareInfoStatusText.value = '链接已复制'
+    return
+  }
+
+  shareInfoFallbackText.value = url
+  shareInfoErrorText.value = '当前浏览器限制复制，请手动复制下方链接'
+}
+
+async function ensureShareInfo(): Promise<ReservationShareInfo | null> {
+  if (!shareInfo.value) {
+    await loadReservationShareInfo()
+  }
+
+  return shareInfo.value
+}
+
+async function recordShareIntent(channel: ReservationShareIntentChannel): Promise<void> {
+  try {
+    await recordReservationShareIntent(props.storeId, props.item.reservationId, channel)
+  } catch {
+    // Sending should remain possible even when audit recording is temporarily unavailable.
+  }
+}
+
+function resetShareFeedback(): void {
+  shareInfoErrorText.value = ''
+  shareInfoShared.value = false
+  shareInfoStatusText.value = ''
+  shareInfoFallbackText.value = ''
 }
 
 async function loadReservationShareInfo(): Promise<void> {
@@ -282,8 +364,10 @@ function resourceLabel(type: string | null | undefined): string {
         :status-text="shareInfoStatusText"
         :error-text="shareInfoErrorText"
         :fallback-text="shareInfoFallbackText"
-        button-text="转发订位链接"
-        @share-requested="shareReservationLink"
+        @whatsapp-requested="openWhatsApp"
+        @wechat-requested="openWechat"
+        @system-share-requested="shareReservationLink"
+        @copy-requested="copyReservationShareLink"
       />
 
       <button

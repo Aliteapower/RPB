@@ -7,6 +7,7 @@ public record ReservationShareInfoQuery(
     UUID storeId,
     UUID reservationId,
     UUID actorId,
-    String actorType
+    String actorType,
+    String publicShareBaseUrl
 ) {
 }

@@ -8,11 +8,14 @@ import com.rpb.reservation.reservation.application.service.ReservationShareTempl
 import com.rpb.reservation.tenantadmin.persistence.TenantAdminShareProfileRepository;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TenantAdminShareProfileService {
+    private static final Pattern E164_PATTERN = Pattern.compile("^[+][1-9][0-9]{1,14}$");
+
     private final TenantAdminShareProfileRepository repository;
     private final ReservationShareTemplateRenderer templateRenderer;
     private final ReservationShareTemplateSeedService templateSeedService;
@@ -94,6 +97,7 @@ public class TenantAdminShareProfileService {
             clean(row.shareAddress()),
             clean(row.googleMapUrl()),
             clean(row.shareContactPhone()),
+            clean(row.whatsappBusinessPhoneE164()),
             clean(row.reservationShareNote()),
             usesDefaultTemplate ? defaultTemplate : row.reservationShareTemplate().trim(),
             defaultTemplate,
@@ -109,6 +113,7 @@ public class TenantAdminShareProfileService {
         return new TenantAdminShareProfileUpdate(
             optionalText(command.shareDisplayName()),
             optionalText(command.googleMapUrl()),
+            optionalE164(command.whatsappBusinessPhoneE164()),
             optionalText(command.reservationShareNote()),
             optionalText(command.reservationShareTemplate())
         );
@@ -160,6 +165,17 @@ public class TenantAdminShareProfileService {
 
     private static String optionalText(String value) {
         return hasText(value) ? value.trim() : null;
+    }
+
+    private static String optionalE164(String value) {
+        String normalized = optionalText(value);
+        if (normalized == null) {
+            return null;
+        }
+        if (!E164_PATTERN.matcher(normalized).matches()) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return normalized;
     }
 
     private static String clean(String value) {

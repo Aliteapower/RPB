@@ -209,6 +209,7 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.shareProfile.storeDisplayName").isNotEmpty())
             .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("尊敬的 {{contactName}} {{guestSalutation}}")))
             .andExpect(jsonPath("$.shareProfile.defaultReservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{reservationNo}}")))
+            .andExpect(jsonPath("$.shareProfile.whatsappBusinessPhoneE164").value(""))
             .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(true))
             .andExpect(jsonPath("$.shareProfile.availableVariables[0]").exists());
 
@@ -232,6 +233,7 @@ class TenantAdminApiIntegrationTest {
                     {
                       "shareDisplayName":"食刻订位中心",
                       "googleMapUrl":"https://maps.app.goo.gl/rpb",
+                      "whatsappBusinessPhoneE164":"+6588880000",
                       "reservationShareNote":"请提前 10 分钟到店",
                       "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
                     }
@@ -241,6 +243,7 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.shareProfile.shareDisplayName").value("食刻订位中心"))
             .andExpect(jsonPath("$.shareProfile.shareAddress").value("上海市徐汇区示例路 1 号"))
             .andExpect(jsonPath("$.shareProfile.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
+            .andExpect(jsonPath("$.shareProfile.whatsappBusinessPhoneE164").value("+6588880000"))
             .andExpect(jsonPath("$.shareProfile.shareContactPhone").value("021-393930"))
             .andExpect(jsonPath("$.shareProfile.reservationShareNote").value("请提前 10 分钟到店"))
             .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(false));
@@ -251,6 +254,7 @@ class TenantAdminApiIntegrationTest {
                     {
                       "shareDisplayName":"食刻订位中心",
                       "googleMapUrl":"https://maps.app.goo.gl/rpb",
+                      "whatsappBusinessPhoneE164":"+6588880000",
                       "reservationShareNote":"请提前 10 分钟到店",
                       "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
                     }
@@ -299,6 +303,18 @@ class TenantAdminApiIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
+                      "whatsappBusinessPhoneE164":"6588880000"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
+
+        mockMvc.perform(patch(basePath() + "/share-profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
                       "reservationShareTemplate":"{{unsupportedVariable}}"
                     }
                     """)
@@ -322,6 +338,7 @@ class TenantAdminApiIntegrationTest {
               and share_address = '上海市徐汇区示例路 1 号'
               and google_map_url = 'https://maps.app.goo.gl/rpb'
               and share_contact_phone = '021-393930'
+              and whatsapp_business_phone_e164 = '+6588880000'
               and reservation_share_note = '请提前 10 分钟到店'
               and reservation_share_template like '%尊敬的 {{contactName}} {{guestSalutation}}%'
               and reservation_share_template like '%{{reservationNo}}%'

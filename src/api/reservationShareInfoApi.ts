@@ -1,5 +1,7 @@
 import type {
   ReservationShareInfoApiErrorResponse,
+  ReservationShareIntentChannel,
+  ReservationShareIntentResponse,
   ReservationShareInfoResponse
 } from '../types/reservationShareInfo'
 
@@ -20,7 +22,7 @@ export async function getReservationShareInfo(
   reservationId: string,
   fetcher: typeof fetch = fetch
 ): Promise<ReservationShareInfoResponse> {
-  const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/share-info`
+  const endpoint = shareInfoEndpoint(storeId, reservationId)
   let response: Response
 
   try {
@@ -52,6 +54,52 @@ export async function getReservationShareInfo(
   }
 
   return payload
+}
+
+export async function recordReservationShareIntent(
+  storeId: string,
+  reservationId: string,
+  channel: ReservationShareIntentChannel,
+  fetcher: typeof fetch = fetch
+): Promise<ReservationShareIntentResponse> {
+  const endpoint = `${shareInfoEndpoint(storeId, reservationId)}/intent`
+  let response: Response
+
+  try {
+    response = await fetcher(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ channel })
+    })
+  } catch {
+    throw new ReservationShareInfoApiError(0, localError('NETWORK_FAILURE', 'reservation.share_info.network_failure'))
+  }
+
+  const payload = await readJson(response)
+  if (!response.ok || isReservationShareInfoApiErrorResponse(payload)) {
+    throw new ReservationShareInfoApiError(
+      response.status,
+      isReservationShareInfoApiErrorResponse(payload)
+        ? payload
+        : localError('REQUEST_FAILED', 'reservation.share_info.request_failed')
+    )
+  }
+
+  if (!isReservationShareIntentResponse(payload)) {
+    throw new ReservationShareInfoApiError(
+      response.status,
+      localError('INVALID_API_RESPONSE', 'reservation.share_info.invalid_api_response')
+    )
+  }
+
+  return payload
+}
+
+function shareInfoEndpoint(storeId: string, reservationId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/share-info`
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -96,6 +144,15 @@ function isReservationShareInfoResponse(payload: unknown): payload is Reservatio
     typeof candidate.shareInfo.shareTitle === 'string' &&
     typeof candidate.shareInfo.shareSummary === 'string'
   )
+}
+
+function isReservationShareIntentResponse(payload: unknown): payload is ReservationShareIntentResponse {
+  if (!payload || typeof payload !== 'object') {
+    return false
+  }
+
+  const candidate = payload as Partial<ReservationShareIntentResponse>
+  return candidate.success === true && typeof candidate.channel === 'string'
 }
 
 function localError(code: string, messageKey: string): ReservationShareInfoApiErrorResponse {

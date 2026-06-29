@@ -36,6 +36,7 @@ public class ReservationShareInfoApplicationService {
     private final ReservationShareTemplateSeedService templateSeedService;
     private final PhoneMaskingPolicy phoneMaskingPolicy;
     private final StoreShareDateTimeFormatter dateTimeFormatter;
+    private final ReservationShareChannelLinkFactory channelLinkFactory = new ReservationShareChannelLinkFactory();
     private final Supplier<String> tokenSupplier;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
 
@@ -107,13 +108,13 @@ public class ReservationShareInfoApplicationService {
             if (row == null) {
                 return ReservationShareInfoResult.failure(ReservationShareInfoError.RESERVATION_NOT_FOUND);
             }
-            return ReservationShareInfoResult.success(toShareInfo(scope, row));
+            return ReservationShareInfoResult.success(toShareInfo(scope, row, query.publicShareBaseUrl()));
         } catch (RuntimeException exception) {
             return ReservationShareInfoResult.failure(ReservationShareInfoError.PERSISTENCE_ERROR);
         }
     }
 
-    private ReservationShareInfo toShareInfo(StoreScope scope, ReservationShareInfoRow row) {
+    private ReservationShareInfo toShareInfo(StoreScope scope, ReservationShareInfoRow row, String publicShareBaseUrl) {
         Map<String, String> variables = variables(row);
         String defaultTemplate = templateSeedService.defaultTemplate();
         String template = hasText(row.reservationShareTemplate())
@@ -127,10 +128,15 @@ public class ReservationShareInfoApplicationService {
         }
         String maskedPhone = variables.get("maskedPhone");
         String token = publicShareTokenPort.ensureActiveToken(scope, row.reservationId(), tokenSupplier.get());
+        String sharePath = sharePath(token);
+        String publicShareUrl = channelLinkFactory.publicShareUrl(publicShareBaseUrl, sharePath);
         String storeName = variables.get("storeName");
         String date = variables.get("reservationDate");
         String time = variables.get("reservationTime");
         String partySize = variables.get("partySize");
+        String shareMessage = channelLinkFactory.fullShareMessage(shareText, publicShareUrl);
+        String senderLabel = firstText(row.whatsappBusinessPhoneE164(), storeName);
+        boolean canOpenWhatsApp = channelLinkFactory.isE164(row.customerPhoneE164());
         return new ReservationShareInfo(
             row.reservationId(),
             clean(row.reservationNo()),
@@ -138,10 +144,14 @@ public class ReservationShareInfoApplicationService {
             shareText,
             maskedPhone,
             hasText(row.customerPhoneE164()),
-            false,
-            null,
+            senderLabel,
+            canOpenWhatsApp,
+            channelLinkFactory.whatsappLink(row.customerPhoneE164(), shareMessage),
+            true,
+            ReservationShareChannelLinkFactory.WECHAT_LINK,
+            shareMessage,
             token,
-            sharePath(token),
+            sharePath,
             shareTitle(storeName),
             shareSummary(date, time, partySize)
         );
@@ -185,6 +195,7 @@ public class ReservationShareInfoApplicationService {
                 || query.reservationId() == null
                 || query.actorId() == null
                 || !hasText(query.actorType())
+                || !hasText(query.publicShareBaseUrl())
         ) {
             return ReservationShareInfoError.INVALID_COMMAND;
         }

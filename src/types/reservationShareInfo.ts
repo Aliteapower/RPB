@@ -5,8 +5,12 @@ export interface ReservationShareInfo {
   shareText: string
   customerMaskedPhone: string
   customerPhoneAvailable: boolean
+  senderLabel: string
   canOpenWhatsAppLink: boolean
   whatsappLink?: string | null
+  canOpenWechatLink: boolean
+  wechatLink?: string | null
+  wechatShareText?: string | null
   shareToken: string
   sharePath: string
   shareTitle: string
@@ -16,6 +20,13 @@ export interface ReservationShareInfo {
 export interface ReservationShareInfoResponse {
   success: true
   shareInfo: ReservationShareInfo
+}
+
+export type ReservationShareIntentChannel = 'whatsapp' | 'wechat' | 'system_share' | 'copy_link'
+
+export interface ReservationShareIntentResponse {
+  success: true
+  channel: ReservationShareIntentChannel
 }
 
 export interface ReservationShareInfoApiErrorResponse {

@@ -92,6 +92,7 @@ public class TenantAdminShareProfileController {
         return new TenantAdminShareProfileCommand(
             request.shareDisplayName(),
             request.googleMapUrl(),
+            request.whatsappBusinessPhoneE164(),
             request.reservationShareNote(),
             request.reservationShareTemplate()
         );

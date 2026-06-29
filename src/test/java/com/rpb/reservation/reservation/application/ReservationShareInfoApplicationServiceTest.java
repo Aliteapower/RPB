@@ -58,8 +58,18 @@ class ReservationShareInfoApplicationServiceTest {
         assertThat(shareInfo.channel()).isEqualTo("manual_copy");
         assertThat(shareInfo.customerMaskedPhone()).isEqualTo("****4567");
         assertThat(shareInfo.customerPhoneAvailable()).isTrue();
-        assertThat(shareInfo.canOpenWhatsAppLink()).isFalse();
-        assertThat(shareInfo.whatsappLink()).isNull();
+        assertThat(shareInfo.senderLabel()).isEqualTo("+6588880000");
+        assertThat(shareInfo.canOpenWhatsAppLink()).isTrue();
+        assertThat(shareInfo.whatsappLink())
+            .startsWith("https://wa.me/6591234567?text=")
+            .contains("https%3A%2F%2Fstaff.rpb.test%2Freservation-share%2Fshare-token-1")
+            .doesNotContain("+6591234567");
+        assertThat(shareInfo.canOpenWechatLink()).isTrue();
+        assertThat(shareInfo.wechatLink()).isEqualTo("weixin://");
+        assertThat(shareInfo.wechatShareText())
+            .contains("门店：食刻订位中心")
+            .contains("https://staff.rpb.test/reservation-share/share-token-1")
+            .doesNotContain("+6591234567");
         assertThat(shareInfo.shareToken()).isEqualTo("share-token-1");
         assertThat(shareInfo.sharePath()).isEqualTo("/reservation-share/share-token-1");
         assertThat(shareInfo.shareTitle()).isEqualTo("食刻订位中心 订位确认");
@@ -115,6 +125,9 @@ class ReservationShareInfoApplicationServiceTest {
         assertThat(result.success()).isTrue();
         assertThat(result.shareInfo().customerMaskedPhone()).isEmpty();
         assertThat(result.shareInfo().customerPhoneAvailable()).isFalse();
+        assertThat(result.shareInfo().canOpenWhatsAppLink()).isFalse();
+        assertThat(result.shareInfo().whatsappLink()).isNull();
+        assertThat(result.shareInfo().canOpenWechatLink()).isTrue();
         assertThat(result.shareInfo().sharePath()).isEqualTo("/reservation-share/share-token-1");
         assertThat(result.shareInfo().shareText()).doesNotContain("null");
     }
@@ -144,7 +157,14 @@ class ReservationShareInfoApplicationServiceTest {
     }
 
     private static ReservationShareInfoQuery query() {
-        return new ReservationShareInfoQuery(TENANT_ID, STORE_ID, RESERVATION_ID, ACTOR_ID, "staff");
+        return new ReservationShareInfoQuery(
+            TENANT_ID,
+            STORE_ID,
+            RESERVATION_ID,
+            ACTOR_ID,
+            "staff",
+            "https://staff.rpb.test"
+        );
     }
 
     private static ReservationShareInfoRow row(String template) {
@@ -164,6 +184,7 @@ class ReservationShareInfoApplicationServiceTest {
             "1 Example Road",
             "https://maps.app.goo.gl/rpb",
             "6333 1234",
+            "+6588880000",
             "请提前 10 分钟到店",
             template
         );
@@ -182,6 +203,7 @@ class ReservationShareInfoApplicationServiceTest {
             null,
             "Reservation Integration Store",
             "Asia/Singapore",
+            null,
             null,
             null,
             null,

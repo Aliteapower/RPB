@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ReservationShareInfo } from '../../types/reservationShareInfo'
 
 const props = withDefaults(
@@ -8,7 +9,6 @@ const props = withDefaults(
     shared?: boolean
     errorText?: string
     fallbackText?: string
-    buttonText?: string
     statusText?: string
     disabled?: boolean
   }>(),
@@ -17,33 +17,79 @@ const props = withDefaults(
     shared: false,
     errorText: '',
     fallbackText: '',
-    buttonText: '转发订位链接',
     statusText: '已准备链接',
     disabled: false
   }
 )
 
 const emit = defineEmits<{
-  'share-requested': []
+  'whatsapp-requested': []
+  'wechat-requested': []
+  'system-share-requested': []
+  'copy-requested': []
 }>()
 
-function requestShare(): void {
-  if (!props.loading && !props.disabled) {
-    emit('share-requested')
+const whatsappUnavailable = computed(() => {
+  return !!props.shareInfo && (!props.shareInfo.canOpenWhatsAppLink || !props.shareInfo.whatsappLink)
+})
+
+function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-share-requested' | 'copy-requested'): void {
+  if (props.loading || props.disabled) {
+    return
   }
+
+  if (action === 'whatsapp-requested') {
+    emit('whatsapp-requested')
+    return
+  }
+  if (action === 'wechat-requested') {
+    emit('wechat-requested')
+    return
+  }
+  if (action === 'system-share-requested') {
+    emit('system-share-requested')
+    return
+  }
+  emit('copy-requested')
 }
 </script>
 
 <template>
   <section class="reservation-share-copy" aria-label="订位链接转发">
-    <button
-      class="reservation-share-copy__button"
-      type="button"
-      :disabled="loading || disabled"
-      @click="requestShare"
-    >
-      {{ loading ? '读取中' : buttonText }}
-    </button>
+    <div class="reservation-share-copy__actions">
+      <button
+        class="reservation-share-copy__button reservation-share-copy__button--whatsapp"
+        type="button"
+        :disabled="loading || disabled || whatsappUnavailable"
+        @click="request('whatsapp-requested')"
+      >
+        {{ loading ? '读取中' : 'WhatsApp发送' }}
+      </button>
+      <button
+        class="reservation-share-copy__button reservation-share-copy__button--wechat"
+        type="button"
+        :disabled="loading || disabled"
+        @click="request('wechat-requested')"
+      >
+        微信发送
+      </button>
+      <button
+        class="reservation-share-copy__button"
+        type="button"
+        :disabled="loading || disabled"
+        @click="request('system-share-requested')"
+      >
+        系统转发
+      </button>
+      <button
+        class="reservation-share-copy__button reservation-share-copy__button--secondary"
+        type="button"
+        :disabled="loading || disabled"
+        @click="request('copy-requested')"
+      >
+        复制链接
+      </button>
+    </div>
 
     <p v-if="shared" class="reservation-share-copy__status" role="status">{{ statusText }}</p>
     <p v-else-if="errorText" class="reservation-share-copy__error" role="alert">{{ errorText }}</p>
@@ -64,9 +110,15 @@ function requestShare(): void {
   gap: 8px;
 }
 
+.reservation-share-copy__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .reservation-share-copy__button {
-  background: #0f766e;
-  border: 1px solid #0f766e;
+  background: #315f91;
+  border: 1px solid #315f91;
   border-radius: 6px;
   color: #ffffff;
   font: inherit;
@@ -74,6 +126,22 @@ function requestShare(): void {
   font-weight: 900;
   min-height: 34px;
   padding: 0 12px;
+}
+
+.reservation-share-copy__button--whatsapp {
+  background: #137d4f;
+  border-color: #137d4f;
+}
+
+.reservation-share-copy__button--wechat {
+  background: #16803c;
+  border-color: #16803c;
+}
+
+.reservation-share-copy__button--secondary {
+  background: #ffffff;
+  border-color: #94a3b8;
+  color: #315f91;
 }
 
 .reservation-share-copy__button:disabled {

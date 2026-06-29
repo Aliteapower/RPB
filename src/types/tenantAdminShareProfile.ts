@@ -4,6 +4,7 @@ export interface TenantAdminShareProfile {
   shareAddress: string
   googleMapUrl: string
   shareContactPhone: string
+  whatsappBusinessPhoneE164: string
   reservationShareNote: string
   reservationShareTemplate: string
   defaultReservationShareTemplate: string
@@ -14,6 +15,7 @@ export interface TenantAdminShareProfile {
 export interface TenantAdminShareProfileMutation {
   shareDisplayName?: string | null
   googleMapUrl?: string | null
+  whatsappBusinessPhoneE164?: string | null
   reservationShareNote?: string | null
   reservationShareTemplate?: string | null
 }

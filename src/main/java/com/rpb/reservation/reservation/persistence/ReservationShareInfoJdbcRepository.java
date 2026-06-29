@@ -59,6 +59,7 @@ public class ReservationShareInfoJdbcRepository implements ReservationShareInfoR
                    store.share_address,
                    store.google_map_url,
                    store.share_contact_phone,
+                   store.whatsapp_business_phone_e164,
                    store.reservation_share_note,
                    store.reservation_share_template
             from reservations reservation
@@ -97,6 +98,7 @@ public class ReservationShareInfoJdbcRepository implements ReservationShareInfoR
             rs.getString("share_address"),
             rs.getString("google_map_url"),
             rs.getString("share_contact_phone"),
+            rs.getString("whatsapp_business_phone_e164"),
             rs.getString("reservation_share_note"),
             rs.getString("reservation_share_template")
         );

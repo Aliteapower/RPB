@@ -2,6 +2,7 @@ package com.rpb.reservation.reservation.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -81,7 +82,7 @@ class ReservationShareInfoApiIntegrationTest {
     }
 
     @Test
-    void returnsPlainTextShareInfoWithoutMutationOrExternalSendLink() throws Exception {
+    void returnsShareInfoWithWhatsAppWechatAndPublicShareLinksWithoutBusinessMutation() throws Exception {
         mockMvc.perform(get(ENDPOINT, STORE_ID, RESERVATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
@@ -90,8 +91,14 @@ class ReservationShareInfoApiIntegrationTest {
             .andExpect(jsonPath("$.shareInfo.channel").value("manual_copy"))
             .andExpect(jsonPath("$.shareInfo.customerMaskedPhone").value("****4567"))
             .andExpect(jsonPath("$.shareInfo.customerPhoneAvailable").value(true))
-            .andExpect(jsonPath("$.shareInfo.canOpenWhatsAppLink").value(false))
-            .andExpect(jsonPath("$.shareInfo.whatsappLink").doesNotExist())
+            .andExpect(jsonPath("$.shareInfo.senderLabel").value("+6588880000"))
+            .andExpect(jsonPath("$.shareInfo.canOpenWhatsAppLink").value(true))
+            .andExpect(jsonPath("$.shareInfo.whatsappLink").value(org.hamcrest.Matchers.startsWith("https://wa.me/6591234567?text=")))
+            .andExpect(jsonPath("$.shareInfo.whatsappLink").value(org.hamcrest.Matchers.containsString("%2Freservation-share%2F")))
+            .andExpect(jsonPath("$.shareInfo.canOpenWechatLink").value(true))
+            .andExpect(jsonPath("$.shareInfo.wechatLink").value("weixin://"))
+            .andExpect(jsonPath("$.shareInfo.wechatShareText").value(org.hamcrest.Matchers.containsString("门店：食刻订位中心")))
+            .andExpect(jsonPath("$.shareInfo.wechatShareText").value(org.hamcrest.Matchers.containsString("/reservation-share/")))
             .andExpect(jsonPath("$.shareInfo.shareToken").isNotEmpty())
             .andExpect(jsonPath("$.shareInfo.sharePath").value(org.hamcrest.Matchers.startsWith("/reservation-share/")))
             .andExpect(jsonPath("$.shareInfo.shareTitle").value("食刻订位中心 订位确认"))
@@ -103,6 +110,38 @@ class ReservationShareInfoApiIntegrationTest {
             .andExpect(jsonPath("$.shareInfo.shareText").value(org.hamcrest.Matchers.containsString("地图：https://maps.app.goo.gl/rpb")));
 
         assertReadOnlyBoundary();
+    }
+
+    @Test
+    void recordsShareIntentAuditWithoutMessageBodyOrRawCustomerPhone() throws Exception {
+        mockMvc.perform(post(ENDPOINT + "/intent", STORE_ID, RESERVATION_ID)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"channel\":\"whatsapp\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.channel").value("whatsapp"));
+
+        assertThat(countWhere("""
+            select count(*)
+            from audit_logs
+            where tenant_id = ?
+              and store_id = ?
+              and operation_code = 'reservation.share_intent'
+              and target_type = 'reservation'
+              and target_id = ?
+              and metadata ->> 'channel' = 'whatsapp'
+              and metadata ->> 'customerMaskedPhone' = '****4567'
+              and metadata ->> 'customerPhoneAvailable' = 'true'
+              and metadata ->> 'sharePath' like '/reservation-share/%'
+              and not jsonb_exists(metadata, 'messageText')
+              and metadata::text not like '%+6591234567%'
+            """, TENANT_ID, STORE_ID, RESERVATION_ID)).isEqualTo(1);
+        assertThat(count("business_events")).isEqualTo(0);
+        assertThat(count("state_transition_logs")).isEqualTo(0);
+        assertThat(count("queue_tickets")).isEqualTo(0);
+        assertThat(count("seatings")).isEqualTo(0);
+        assertThat(countWhere("select count(*) from reservations where id = ? and status = 'confirmed'", RESERVATION_ID))
+            .isEqualTo(1);
     }
 
     @Test
@@ -233,12 +272,13 @@ class ReservationShareInfoApiIntegrationTest {
                 id, tenant_id, store_code, display_name, status,
                 timezone, locale, date_format, time_format, currency,
                 share_display_name, share_address, google_map_url,
-                share_contact_phone, reservation_share_note, reservation_share_template
+                share_contact_phone, whatsapp_business_phone_e164,
+                reservation_share_note, reservation_share_template
             )
             values (?, ?, 'store-share-it', 'Reservation Store', 'active',
                 'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD',
                 '食刻订位中心', '1 Example Road', 'https://maps.app.goo.gl/rpb',
-                '6333 1234', '请提前 10 分钟到店',
+                '6333 1234', '+6588880000', '请提前 10 分钟到店',
                 '门店：{{storeName}}\n编号：{{reservationNo}}\n时间：{{reservationDate}} {{reservationTime}}\n人数：{{partySize}}\n桌位：{{tableCode}}\n保留：{{holdMinutes}}分钟\n联系人：{{contactName}}\n电话：{{maskedPhone}}\n地址：{{storeAddress}}\n地图：{{googleMapUrl}}\n提示：{{arrivalNote}}\n门店电话：{{storePhone}}')
             """,
             STORE_ID,

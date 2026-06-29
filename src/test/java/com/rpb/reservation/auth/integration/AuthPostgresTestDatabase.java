@@ -55,6 +55,7 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
             database.applyMigration("src/main/resources/db/migration/V017__reservation_public_share_tokens.sql");
             database.applyMigration("src/main/resources/db/migration/V018__dedupe_reservation_share_template.sql");
             database.applyMigration("src/main/resources/db/migration/V019__reservation_meal_period_schedule.sql");
+            database.applyMigration("src/main/resources/db/migration/V020__store_whatsapp_share_profile.sql");
             Runtime.getRuntime().addShutdownHook(new Thread(database::closeQuietly));
             return database;
         } catch (IOException exception) {
