@@ -2,6 +2,7 @@ package com.rpb.reservation.publicbooking.persistence;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
+import com.rpb.reservation.publicbooking.application.PublicBookingAvailabilityRule;
 import com.rpb.reservation.publicbooking.application.PublicBookingQuotaOverride;
 import com.rpb.reservation.publicbooking.application.PublicBookingSettings;
 import com.rpb.reservation.publicbooking.application.PublicBookingStoreProfile;
@@ -47,6 +48,24 @@ public class PublicBookingPersistenceAdapter implements
             scope.tenantId().value(),
             scope.storeId().value()
         ).stream().findFirst();
+    }
+
+    @Override
+    public List<PublicBookingAvailabilityRule> findAvailabilityRules(StoreScope scope) {
+        return jdbc.query(
+            """
+            select id, rule_type, business_date, day_of_week, period_key, quota_mode,
+                   quota_percent, table_count, guest_count
+            from store_public_booking_availability_rules
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            order by rule_type, business_date nulls last, day_of_week nulls last, coalesce(period_key, '')
+            """,
+            (rs, rowNum) -> availabilityRule(rs),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        );
     }
 
     @Override
@@ -212,7 +231,84 @@ public class PublicBookingPersistenceAdapter implements
                 override.guestCount()
             );
         }
+        saveAvailabilityRule(
+            scope,
+            new PublicBookingAvailabilityRule(
+                null,
+                PublicBookingAvailabilityRule.TYPE_DATE_EXCEPTION,
+                businessDate,
+                null,
+                override.periodKey(),
+                override.quotaMode(),
+                override.quotaPercent(),
+                override.tableCount(),
+                override.guestCount()
+            )
+        );
         return findQuotaOverride(scope, new BusinessDate(businessDate), override.periodKey()).orElse(override);
+    }
+
+    @Override
+    public PublicBookingAvailabilityRule saveAvailabilityRule(
+        StoreScope scope,
+        PublicBookingAvailabilityRule rule
+    ) {
+        int updated = jdbc.update(
+            """
+            update store_public_booking_availability_rules
+            set quota_mode = ?,
+                quota_percent = ?,
+                table_count = ?,
+                guest_count = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and rule_type = ?
+              and (
+                (rule_type = 'weekly' and day_of_week = ?)
+                    or
+                (rule_type = 'date_exception' and business_date = ?)
+              )
+              and coalesce(period_key, '') = coalesce(?, '')
+              and deleted_at is null
+            """,
+            rule.quotaMode(),
+            rule.quotaPercent(),
+            rule.tableCount(),
+            rule.guestCount(),
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            rule.ruleType(),
+            rule.dayOfWeek(),
+            sqlDate(rule.businessDate()),
+            rule.periodKey()
+        );
+        if (updated == 0) {
+            jdbc.update(
+                """
+                insert into store_public_booking_availability_rules (
+                    tenant_id, store_id, rule_type, business_date, day_of_week, period_key,
+                    quota_mode, quota_percent, table_count, guest_count
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                scope.tenantId().value(),
+                scope.storeId().value(),
+                rule.ruleType(),
+                sqlDate(rule.businessDate()),
+                rule.dayOfWeek(),
+                rule.periodKey(),
+                rule.quotaMode(),
+                rule.quotaPercent(),
+                rule.tableCount(),
+                rule.guestCount()
+            );
+        }
+        return findAvailabilityRules(scope).stream()
+            .filter(candidate -> sameRuleTarget(candidate, rule))
+            .findFirst()
+            .orElse(rule);
     }
 
     private static PublicBookingSettings settings(ResultSet rs) throws SQLException {
@@ -230,6 +326,21 @@ public class PublicBookingPersistenceAdapter implements
 
     private static PublicBookingQuotaOverride quotaOverride(ResultSet rs) throws SQLException {
         return new PublicBookingQuotaOverride(
+            rs.getString("period_key"),
+            rs.getString("quota_mode"),
+            nullableInteger(rs, "quota_percent"),
+            nullableInteger(rs, "table_count"),
+            nullableInteger(rs, "guest_count")
+        );
+    }
+
+    private static PublicBookingAvailabilityRule availabilityRule(ResultSet rs) throws SQLException {
+        Date businessDate = rs.getDate("business_date");
+        return new PublicBookingAvailabilityRule(
+            rs.getObject("id", UUID.class),
+            rs.getString("rule_type"),
+            businessDate == null ? null : businessDate.toLocalDate(),
+            nullableInteger(rs, "day_of_week"),
             rs.getString("period_key"),
             rs.getString("quota_mode"),
             nullableInteger(rs, "quota_percent"),
@@ -256,5 +367,23 @@ public class PublicBookingPersistenceAdapter implements
     private static Integer nullableInteger(ResultSet rs, String column) throws SQLException {
         int value = rs.getInt(column);
         return rs.wasNull() ? null : value;
+    }
+
+    private static Date sqlDate(java.time.LocalDate value) {
+        return value == null ? null : Date.valueOf(value);
+    }
+
+    private static boolean sameRuleTarget(
+        PublicBookingAvailabilityRule left,
+        PublicBookingAvailabilityRule right
+    ) {
+        return java.util.Objects.equals(left.ruleType(), right.ruleType())
+            && java.util.Objects.equals(left.businessDate(), right.businessDate())
+            && java.util.Objects.equals(left.dayOfWeek(), right.dayOfWeek())
+            && java.util.Objects.equals(nullToEmpty(left.periodKey()), nullToEmpty(right.periodKey()));
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 }

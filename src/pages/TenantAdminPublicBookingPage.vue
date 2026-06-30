@@ -5,18 +5,25 @@ import { useRoute } from 'vue-router'
 import {
   getTenantAdminCustomerEmailSettings,
   getTenantAdminCustomerOAuthProviderSettings,
+  getTenantAdminPublicBookingAvailabilityRules,
   getTenantAdminPublicBookingSettings,
   updateTenantAdminCustomerEmailSettings,
   updateTenantAdminCustomerOAuthProviderSettings,
-  updateTenantAdminPublicBookingQuotaOverride,
+  updateTenantAdminPublicBookingAvailabilityRule,
   updateTenantAdminPublicBookingSettings,
   PublicBookingApiError
 } from '../api/publicBookingApi'
+import {
+  getStoreReservationMealPeriods,
+  ReservationMealPeriodApiError
+} from '../api/reservationMealPeriodApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
+import type { ReservationMealPeriod } from '../types/reservationMealPeriod'
 import type {
   TenantAdminCustomerEmailSettingsMutation,
   TenantAdminCustomerOAuthProviderSettingsMutation,
-  TenantAdminPublicBookingQuotaOverrideMutation,
+  TenantAdminPublicBookingAvailabilityRule,
+  TenantAdminPublicBookingAvailabilityRuleMutation,
   TenantAdminPublicBookingSettingsMutation
 } from '../types/publicBooking'
 
@@ -26,14 +33,19 @@ const saving = ref(false)
 const savingEmail = ref(false)
 const savingGoogle = ref(false)
 const savingFacebook = ref(false)
-const savingOverride = ref(false)
+const savingRule = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const emailSecretConfigured = ref(false)
 const googleSecretConfigured = ref(false)
 const facebookSecretConfigured = ref(false)
+const mealPeriods = ref<ReservationMealPeriod[]>([])
+const availabilityRules = ref<TenantAdminPublicBookingAvailabilityRule[]>([])
+
+type PublicBookingPanel = 'settings' | 'email' | 'google' | 'facebook' | 'rules'
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const activePanel = ref<PublicBookingPanel>('settings')
 
 const form = reactive<TenantAdminPublicBookingSettingsMutation>({
   enabled: false,
@@ -46,14 +58,27 @@ const form = reactive<TenantAdminPublicBookingSettingsMutation>({
   maxAdvanceDays: 30
 })
 
-const overrideForm = reactive<TenantAdminPublicBookingQuotaOverrideMutation>({
-  businessDate: new Date().toISOString().slice(0, 10),
+const ruleForm = reactive<TenantAdminPublicBookingAvailabilityRuleMutation>({
+  ruleType: 'weekly',
+  businessDate: todayInputValue(),
+  dayOfWeek: null,
   periodKey: '',
-  quotaMode: 'table_count',
+  quotaMode: 'closed',
   quotaPercent: null,
   tableCount: 4,
   guestCount: null
 })
+const selectedWeekdays = ref<number[]>([1])
+
+const weekdayOptions = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 7, label: '周日' }
+]
 
 const emailForm = reactive<TenantAdminCustomerEmailSettingsMutation>({
   enabled: false,
@@ -79,21 +104,52 @@ const facebookForm = reactive<TenantAdminCustomerOAuthProviderSettingsMutation>(
 })
 
 const publicBookingUrl = computed(() => `${window.location.origin}/book/${storeId.value}`)
+const activeMealPeriods = computed(() => mealPeriods.value.filter(period => period.status === 'active'))
+const emailSmtpCredentialComplete = computed(() => (
+  !hasText(emailForm.smtpUsername) ||
+  emailSecretConfigured.value ||
+  hasText(emailForm.smtpPassword)
+))
+const emailSettingsComplete = computed(() => (
+  hasText(emailForm.fromEmail) &&
+  hasText(emailForm.smtpHost) &&
+  Number(emailForm.smtpPort) > 0 &&
+  emailSmtpCredentialComplete.value
+))
+const googleSettingsComplete = computed(() => hasText(googleForm.clientId))
+const facebookSettingsComplete = computed(() => (
+  hasText(facebookForm.clientId) &&
+  (facebookSecretConfigured.value || hasText(facebookForm.clientSecret))
+))
+const emailLoginReady = computed(() => emailForm.enabled && emailSettingsComplete.value)
+const googleLoginReady = computed(() => googleForm.enabled && googleSettingsComplete.value)
+const facebookLoginReady = computed(() => facebookForm.enabled && facebookSettingsComplete.value)
+const canSaveEmail = computed(() => !savingEmail.value && (!emailForm.enabled || emailSettingsComplete.value))
+const canSaveGoogle = computed(() => !savingGoogle.value && (!googleForm.enabled || googleSettingsComplete.value))
+const canSaveFacebook = computed(() => !savingFacebook.value && (!facebookForm.enabled || facebookSettingsComplete.value))
 
 onMounted(() => {
   void loadSettings()
 })
+
+function openPanel(panel: PublicBookingPanel): void {
+  activePanel.value = panel
+  errorText.value = ''
+  savedText.value = ''
+}
 
 async function loadSettings(): Promise<void> {
   loading.value = true
   errorText.value = ''
   savedText.value = ''
   try {
-    const [settings, email, google, facebook] = await Promise.all([
+    const [settings, email, google, facebook, mealPeriodResponse, rulesResponse] = await Promise.all([
       getTenantAdminPublicBookingSettings(storeId.value),
       getTenantAdminCustomerEmailSettings(storeId.value),
       getTenantAdminCustomerOAuthProviderSettings(storeId.value, 'google'),
-      getTenantAdminCustomerOAuthProviderSettings(storeId.value, 'facebook')
+      getTenantAdminCustomerOAuthProviderSettings(storeId.value, 'facebook'),
+      getStoreReservationMealPeriods(storeId.value),
+      getTenantAdminPublicBookingAvailabilityRules(storeId.value)
     ])
     Object.assign(form, {
       enabled: settings.enabled,
@@ -128,6 +184,8 @@ async function loadSettings(): Promise<void> {
       clientSecret: ''
     })
     facebookSecretConfigured.value = facebook.secretConfigured
+    mealPeriods.value = mealPeriodResponse.effectivePeriods
+    availabilityRules.value = [...rulesResponse.rules].sort(compareAvailabilityRules)
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -136,7 +194,7 @@ async function loadSettings(): Promise<void> {
 }
 
 async function saveEmailSettings(): Promise<void> {
-  if (savingEmail.value) {
+  if (!canSaveEmail.value) {
     return
   }
   savingEmail.value = true
@@ -146,7 +204,7 @@ async function saveEmailSettings(): Promise<void> {
     const response = await updateTenantAdminCustomerEmailSettings(storeId.value, normalizedEmailSettings())
     emailSecretConfigured.value = response.secretConfigured
     emailForm.smtpPassword = ''
-    savedText.value = '邮件服务已保存'
+    savedText.value = '邮箱登录服务已保存'
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -156,7 +214,8 @@ async function saveEmailSettings(): Promise<void> {
 
 async function saveOAuthSettings(provider: 'google' | 'facebook'): Promise<void> {
   const busy = provider === 'google' ? savingGoogle : savingFacebook
-  if (busy.value) {
+  const canSave = provider === 'google' ? canSaveGoogle : canSaveFacebook
+  if (!canSave.value) {
     return
   }
   busy.value = true
@@ -203,21 +262,35 @@ async function saveSettings(): Promise<void> {
   }
 }
 
-async function saveOverride(): Promise<void> {
-  if (savingOverride.value) {
+async function saveAvailabilityRule(): Promise<void> {
+  if (savingRule.value) {
     return
   }
-  savingOverride.value = true
+  if (ruleForm.ruleType === 'weekly' && selectedWeekdays.value.length === 0) {
+    errorText.value = '至少选择一个星期'
+    savedText.value = ''
+    return
+  }
+  savingRule.value = true
   errorText.value = ''
   savedText.value = ''
   try {
-    await updateTenantAdminPublicBookingQuotaOverride(storeId.value, normalizedOverride())
-    savedText.value = '日期覆盖已保存'
+    const responses = ruleForm.ruleType === 'weekly'
+      ? await saveWeeklyAvailabilityRules()
+      : [await updateTenantAdminPublicBookingAvailabilityRule(storeId.value, normalizedAvailabilityRule())]
+    availabilityRules.value = upsertAvailabilityRules(availabilityRules.value, responses)
+    savedText.value = responses.length > 1 ? `公网预约规则已保存（${responses.length} 个星期）` : '公网预约规则已保存'
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
-    savingOverride.value = false
+    savingRule.value = false
   }
+}
+
+async function saveWeeklyAvailabilityRules(): Promise<TenantAdminPublicBookingAvailabilityRule[]> {
+  return Promise.all(selectedWeekdays.value.map(dayOfWeek => (
+    updateTenantAdminPublicBookingAvailabilityRule(storeId.value, normalizedAvailabilityRule(dayOfWeek))
+  )))
 }
 
 async function copyPublicUrl(): Promise<void> {
@@ -236,14 +309,16 @@ function normalizedSettings(): TenantAdminPublicBookingSettingsMutation {
   }
 }
 
-function normalizedOverride(): TenantAdminPublicBookingQuotaOverrideMutation {
+function normalizedAvailabilityRule(dayOfWeek?: number): TenantAdminPublicBookingAvailabilityRuleMutation {
   return {
-    businessDate: overrideForm.businessDate,
-    periodKey: nullableText(overrideForm.periodKey || ''),
-    quotaMode: overrideForm.quotaMode,
-    quotaPercent: overrideForm.quotaMode === 'percentage' ? Number(overrideForm.quotaPercent ?? 20) : null,
-    tableCount: overrideForm.quotaMode === 'table_count' ? Number(overrideForm.tableCount ?? 0) : null,
-    guestCount: overrideForm.quotaMode === 'guest_count' ? Number(overrideForm.guestCount ?? 0) : null
+    ruleType: ruleForm.ruleType,
+    businessDate: ruleForm.ruleType === 'date_exception' ? ruleForm.businessDate || todayInputValue() : null,
+    dayOfWeek: ruleForm.ruleType === 'weekly' ? Number(dayOfWeek || selectedWeekdays.value[0] || 1) : null,
+    periodKey: nullableText(ruleForm.periodKey || ''),
+    quotaMode: ruleForm.quotaMode,
+    quotaPercent: ruleForm.quotaMode === 'percentage' ? Number(ruleForm.quotaPercent ?? 20) : null,
+    tableCount: ruleForm.quotaMode === 'table_count' ? Number(ruleForm.tableCount ?? 0) : null,
+    guestCount: ruleForm.quotaMode === 'guest_count' ? Number(ruleForm.guestCount ?? 0) : null
   }
 }
 
@@ -275,7 +350,102 @@ function nullableText(value: string): string | null {
   return trimmed ? trimmed : null
 }
 
+function hasText(value: string | null | undefined): boolean {
+  return !!value && !!value.trim()
+}
+
+function mealPeriodOptionLabel(period: ReservationMealPeriod): string {
+  const startTime = period.startLocalTime.slice(0, 5)
+  const endTime = period.endLocalTime.slice(0, 5)
+  const nextDay = period.crossesNextDay ? ' 次日' : ''
+  return `${period.displayName} (${period.periodKey}, ${startTime}-${endTime}${nextDay})`
+}
+
+function upsertAvailabilityRules(
+  rules: TenantAdminPublicBookingAvailabilityRule[],
+  updatedRules: TenantAdminPublicBookingAvailabilityRule[]
+): TenantAdminPublicBookingAvailabilityRule[] {
+  return updatedRules.reduce(
+    (nextRules, rule) => upsertAvailabilityRule(nextRules, rule),
+    rules
+  )
+}
+
+function upsertAvailabilityRule(
+  rules: TenantAdminPublicBookingAvailabilityRule[],
+  rule: TenantAdminPublicBookingAvailabilityRule
+): TenantAdminPublicBookingAvailabilityRule[] {
+  const nextRules = rules.filter(candidate => !sameAvailabilityRuleTarget(candidate, rule))
+  nextRules.push(rule)
+  return nextRules.sort(compareAvailabilityRules)
+}
+
+function sameAvailabilityRuleTarget(
+  left: TenantAdminPublicBookingAvailabilityRule,
+  right: TenantAdminPublicBookingAvailabilityRule
+): boolean {
+  return left.ruleType === right.ruleType &&
+    left.businessDate === right.businessDate &&
+    left.dayOfWeek === right.dayOfWeek &&
+    (left.periodKey || '') === (right.periodKey || '')
+}
+
+function compareAvailabilityRules(
+  left: TenantAdminPublicBookingAvailabilityRule,
+  right: TenantAdminPublicBookingAvailabilityRule
+): number {
+  return ruleTargetLabel(left).localeCompare(ruleTargetLabel(right), 'zh-Hans') ||
+    rulePeriodLabel(left).localeCompare(rulePeriodLabel(right), 'zh-Hans')
+}
+
+function ruleTargetLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
+  if (rule.ruleType === 'weekly') {
+    return `每周固定 ${weekdayLabel(rule.dayOfWeek)}`
+  }
+  return `指定日期例外 ${rule.businessDate || '未选择日期'}`
+}
+
+function rulePeriodLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
+  if (!rule.periodKey) {
+    return '全部餐段'
+  }
+  const period = activeMealPeriods.value.find(candidate => candidate.periodKey === rule.periodKey)
+  return period ? `${period.displayName} (${period.periodKey})` : rule.periodKey
+}
+
+function ruleModeLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
+  if (rule.quotaMode === 'closed') {
+    return '关闭预约'
+  }
+  if (rule.quotaMode === 'percentage') {
+    return `容量 ${rule.quotaPercent ?? 0}%`
+  }
+  if (rule.quotaMode === 'table_count') {
+    return `开放 ${rule.tableCount ?? 0} 桌`
+  }
+  return `开放 ${rule.guestCount ?? 0} 人`
+}
+
+function weekdayLabel(dayOfWeek: number | null): string {
+  return weekdayOptions.find(option => option.value === dayOfWeek)?.label || '周一'
+}
+
+function todayInputValue(): string {
+  const date = new Date()
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 10)
+}
+
 function apiErrorText(error: unknown): string {
+  if (error instanceof ReservationMealPeriodApiError) {
+    if (error.status === 401) {
+      return '登录已失效'
+    }
+    if (error.status === 403 || error.response.error.code === 'FORBIDDEN') {
+      return '没有租户后台权限'
+    }
+    return '预约餐段加载失败'
+  }
   if (!(error instanceof PublicBookingApiError)) {
     return '操作失败'
   }
@@ -307,7 +477,94 @@ function apiErrorText(error: unknown): string {
       <p v-if="loading" class="loading-line">加载中</p>
 
       <section v-else class="settings-layout">
-        <form class="form-panel" @submit.prevent="saveSettings">
+        <section class="settings-operation-list" aria-label="公网预约项目操作">
+          <h2 class="operation-list-title">项目操作</h2>
+
+          <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'settings' }">
+            <div>
+              <span>开放规则</span>
+              <small>默认配额 / 登录要求</small>
+            </div>
+            <strong class="status-chip" :class="{ 'status-chip--ready': form.enabled }">
+              {{ form.enabled ? '已开放' : '未开放' }}
+            </strong>
+            <button
+              type="button"
+              :aria-expanded="activePanel === 'settings'"
+              @click="openPanel('settings')"
+            >
+              配置
+            </button>
+          </article>
+
+          <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'email' }">
+            <div>
+              <span>邮箱注册 / 登录</span>
+              <small>验证码邮件服务</small>
+            </div>
+            <strong class="status-chip" :class="{ 'status-chip--ready': emailLoginReady }">
+              {{ emailLoginReady ? '可用' : '待配置' }}
+            </strong>
+            <button
+              type="button"
+              :aria-expanded="activePanel === 'email'"
+              @click="openPanel('email')"
+            >
+              配置
+            </button>
+          </article>
+
+          <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'google' }">
+            <div>
+              <span>Google 登录</span>
+              <small>OAuth Client ID</small>
+            </div>
+            <strong class="status-chip" :class="{ 'status-chip--ready': googleLoginReady }">
+              {{ googleLoginReady ? '可用' : '待配置' }}
+            </strong>
+            <button
+              type="button"
+              :aria-expanded="activePanel === 'google'"
+              @click="openPanel('google')"
+            >
+              配置
+            </button>
+          </article>
+
+          <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'facebook' }">
+            <div>
+              <span>Facebook 登录</span>
+              <small>App ID / App Secret</small>
+            </div>
+            <strong class="status-chip" :class="{ 'status-chip--ready': facebookLoginReady }">
+              {{ facebookLoginReady ? '可用' : '待配置' }}
+            </strong>
+            <button
+              type="button"
+              :aria-expanded="activePanel === 'facebook'"
+              @click="openPanel('facebook')"
+            >
+              配置
+            </button>
+          </article>
+
+          <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'rules' }">
+            <div>
+              <span>公网预约规则</span>
+              <small>每周固定 / 指定日期例外</small>
+            </div>
+            <strong class="status-chip status-chip--ready">可选</strong>
+            <button
+              type="button"
+              :aria-expanded="activePanel === 'rules'"
+              @click="openPanel('rules')"
+            >
+              配置
+            </button>
+          </article>
+        </section>
+
+        <form v-if="activePanel === 'settings'" class="form-panel" @submit.prevent="saveSettings">
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="form.enabled" type="checkbox" />
@@ -315,7 +572,7 @@ function apiErrorText(error: unknown): string {
             </label>
             <label>
               <input v-model="form.requireCustomerLogin" type="checkbox" />
-              <span>要求邮箱登录</span>
+              <span>要求顾客登录</span>
             </label>
           </section>
 
@@ -360,16 +617,25 @@ function apiErrorText(error: unknown): string {
           </div>
         </form>
 
-        <form class="form-panel" @submit.prevent="saveEmailSettings">
-          <h2 class="form-panel__wide">邮件验证码</h2>
+        <form v-else-if="activePanel === 'email'" class="form-panel" @submit.prevent="saveEmailSettings">
+          <div class="form-panel__wide panel-heading-row">
+            <h2>邮箱注册 / 登录邮件服务</h2>
+            <strong class="status-chip" :class="{ 'status-chip--ready': emailLoginReady }">
+              {{ emailLoginReady ? '可用' : '待配置' }}
+            </strong>
+          </div>
+          <p class="form-panel__wide panel-note">用于公网预约邮箱验证码，已注册邮箱登录，未注册邮箱注册</p>
 
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="emailForm.enabled" type="checkbox" />
-              <span>启用邮件服务</span>
+              <span>启用邮箱注册 / 登录</span>
             </label>
             <span class="secret-hint">{{ emailSecretConfigured ? 'SMTP 密钥已配置' : 'SMTP 密钥未配置' }}</span>
           </section>
+          <p v-if="emailForm.enabled && !emailSettingsComplete" class="form-panel__wide field-hint">
+            启用后需填写发件邮箱、SMTP Host、SMTP Port；填写 SMTP 用户名时需保存 SMTP 密钥
+          </p>
 
           <label>
             <span>发件邮箱</span>
@@ -409,14 +675,19 @@ function apiErrorText(error: unknown): string {
           </section>
 
           <div class="form-actions">
-            <button class="primary-button" type="submit" :disabled="savingEmail">
-              {{ savingEmail ? '保存中' : '保存邮件服务' }}
+            <button class="primary-button" type="submit" :disabled="!canSaveEmail">
+              {{ savingEmail ? '保存中' : '保存邮箱登录服务' }}
             </button>
           </div>
         </form>
 
-        <form class="form-panel" @submit.prevent="saveOAuthSettings('google')">
-          <h2 class="form-panel__wide">Google 登录</h2>
+        <form v-else-if="activePanel === 'google'" class="form-panel" @submit.prevent="saveOAuthSettings('google')">
+          <div class="form-panel__wide panel-heading-row">
+            <h2>Google 登录</h2>
+            <strong class="status-chip" :class="{ 'status-chip--ready': googleLoginReady }">
+              {{ googleLoginReady ? '可用' : '待配置' }}
+            </strong>
+          </div>
 
           <section class="form-panel__wide switch-row">
             <label>
@@ -424,6 +695,9 @@ function apiErrorText(error: unknown): string {
               <span>启用 Google</span>
             </label>
           </section>
+          <p v-if="googleForm.enabled && !googleSettingsComplete" class="form-panel__wide field-hint">
+            启用后需填写 Client ID
+          </p>
 
           <label>
             <span>Client ID</span>
@@ -431,14 +705,19 @@ function apiErrorText(error: unknown): string {
           </label>
 
           <div class="form-actions">
-            <button class="primary-button" type="submit" :disabled="savingGoogle">
+            <button class="primary-button" type="submit" :disabled="!canSaveGoogle">
               {{ savingGoogle ? '保存中' : '保存 Google' }}
             </button>
           </div>
         </form>
 
-        <form class="form-panel" @submit.prevent="saveOAuthSettings('facebook')">
-          <h2 class="form-panel__wide">Facebook 登录</h2>
+        <form v-else-if="activePanel === 'facebook'" class="form-panel" @submit.prevent="saveOAuthSettings('facebook')">
+          <div class="form-panel__wide panel-heading-row">
+            <h2>Facebook 登录</h2>
+            <strong class="status-chip" :class="{ 'status-chip--ready': facebookLoginReady }">
+              {{ facebookLoginReady ? '可用' : '待配置' }}
+            </strong>
+          </div>
 
           <section class="form-panel__wide switch-row">
             <label>
@@ -447,6 +726,9 @@ function apiErrorText(error: unknown): string {
             </label>
             <span class="secret-hint">{{ facebookSecretConfigured ? 'App Secret 已配置' : 'App Secret 未配置' }}</span>
           </section>
+          <p v-if="facebookForm.enabled && !facebookSettingsComplete" class="form-panel__wide field-hint">
+            启用后需填写 App ID，并保存 App Secret
+          </p>
 
           <label>
             <span>App ID</span>
@@ -459,28 +741,72 @@ function apiErrorText(error: unknown): string {
           </label>
 
           <div class="form-actions">
-            <button class="primary-button" type="submit" :disabled="savingFacebook">
+            <button class="primary-button" type="submit" :disabled="!canSaveFacebook">
               {{ savingFacebook ? '保存中' : '保存 Facebook' }}
             </button>
           </div>
         </form>
 
-        <form class="form-panel" @submit.prevent="saveOverride">
-          <h2 class="form-panel__wide">日期餐段覆盖</h2>
+        <form v-else-if="activePanel === 'rules'" class="form-panel" @submit.prevent="saveAvailabilityRule">
+          <h2 class="form-panel__wide">公网预约规则</h2>
+          <p class="form-panel__wide panel-note">
+            用于设置公网预约是否开放以及可预约配额；每周固定适合周一店休，指定日期例外适合节假日或临时调整
+          </p>
 
           <label>
+            <span>规则类型</span>
+            <select v-model="ruleForm.ruleType">
+              <option value="weekly">每周固定</option>
+              <option value="date_exception">指定日期例外</option>
+            </select>
+          </label>
+
+          <section v-if="ruleForm.ruleType === 'weekly'" class="weekday-field">
+            <span>星期</span>
+            <div class="weekday-checkbox-grid" role="group" aria-label="星期">
+              <label
+                v-for="weekday in weekdayOptions"
+                :key="weekday.value"
+                class="weekday-checkbox"
+              >
+                <input v-model="selectedWeekdays" type="checkbox" :value="weekday.value" />
+                <span>{{ weekday.label }}</span>
+              </label>
+            </div>
+          </section>
+          <p
+            v-if="ruleForm.ruleType === 'weekly' && selectedWeekdays.length === 0"
+            class="form-panel__wide field-hint"
+          >
+            至少选择一个星期
+          </p>
+
+          <label v-if="ruleForm.ruleType === 'date_exception'">
             <span>日期</span>
-            <input v-model="overrideForm.businessDate" type="date" />
+            <input v-model="ruleForm.businessDate" type="date" />
           </label>
 
           <label>
-            <span>餐段 Key</span>
-            <input v-model="overrideForm.periodKey" placeholder="dinner" />
+            <span>选择餐段</span>
+            <select v-model="ruleForm.periodKey">
+              <option value="">全部餐段</option>
+              <option
+                v-for="period in activeMealPeriods"
+                :key="period.id"
+                :value="period.periodKey"
+              >
+                {{ mealPeriodOptionLabel(period) }}
+              </option>
+            </select>
           </label>
+
+          <p v-if="activeMealPeriods.length === 0" class="form-panel__wide field-hint">
+            暂无可用预约餐段，请先在基础设置的预约餐段中启用餐段
+          </p>
 
           <label>
             <span>覆盖模式</span>
-            <select v-model="overrideForm.quotaMode">
+            <select v-model="ruleForm.quotaMode">
               <option value="percentage">百分比</option>
               <option value="table_count">桌数</option>
               <option value="guest_count">人数</option>
@@ -488,26 +814,39 @@ function apiErrorText(error: unknown): string {
             </select>
           </label>
 
-          <label v-if="overrideForm.quotaMode === 'percentage'">
+          <label v-if="ruleForm.quotaMode === 'percentage'">
             <span>百分比</span>
-            <input v-model.number="overrideForm.quotaPercent" min="0" max="100" type="number" />
+            <input v-model.number="ruleForm.quotaPercent" min="0" max="100" type="number" />
           </label>
 
-          <label v-if="overrideForm.quotaMode === 'table_count'">
+          <label v-if="ruleForm.quotaMode === 'table_count'">
             <span>桌数</span>
-            <input v-model.number="overrideForm.tableCount" min="0" type="number" />
+            <input v-model.number="ruleForm.tableCount" min="0" type="number" />
           </label>
 
-          <label v-if="overrideForm.quotaMode === 'guest_count'">
+          <label v-if="ruleForm.quotaMode === 'guest_count'">
             <span>人数</span>
-            <input v-model.number="overrideForm.guestCount" min="0" type="number" />
+            <input v-model.number="ruleForm.guestCount" min="0" type="number" />
           </label>
 
           <div class="form-actions">
-            <button class="primary-button" type="submit" :disabled="savingOverride">
-              {{ savingOverride ? '保存中' : '保存覆盖' }}
+            <button class="primary-button" type="submit" :disabled="savingRule">
+              {{ savingRule ? '保存中' : '保存规则' }}
             </button>
           </div>
+
+          <section class="form-panel__wide rule-list" aria-label="已保存规则">
+            <h3>已保存规则</h3>
+            <p v-if="availabilityRules.length === 0" class="rule-list__empty">还没有单独规则，当前使用开放规则里的默认配置</p>
+            <article
+              v-for="rule in availabilityRules"
+              :key="`${rule.ruleType}-${rule.businessDate || rule.dayOfWeek}-${rule.periodKey || 'all'}`"
+            >
+              <strong>{{ ruleTargetLabel(rule) }}</strong>
+              <span>{{ rulePeriodLabel(rule) }}</span>
+              <em>{{ ruleModeLabel(rule) }}</em>
+            </article>
+          </section>
         </form>
       </section>
     </section>
@@ -595,6 +934,77 @@ function apiErrorText(error: unknown): string {
   max-width: 980px;
 }
 
+.settings-operation-list {
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 14px;
+}
+
+.operation-list-title {
+  color: #0f172a;
+  font-size: 17px;
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+}
+
+.operation-card {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 64px;
+  padding: 12px;
+}
+
+.operation-card--active {
+  background: #f0fdfa;
+  border-color: #0f766e;
+  box-shadow: inset 3px 0 0 #0f766e;
+}
+
+.operation-card div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.operation-card span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.operation-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.operation-card button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.operation-card--active button {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+}
+
 .form-panel {
   background: #ffffff;
   border: 1px solid #dbe3ea;
@@ -609,10 +1019,115 @@ function apiErrorText(error: unknown): string {
   grid-column: 1 / -1;
 }
 
+.panel-heading-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
 .form-panel h2 {
   color: #0f172a;
   font-size: 18px;
   margin: 0;
+}
+
+.panel-note {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  margin: -8px 0 0;
+}
+
+.field-hint {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 850;
+  margin: -4px 0 0;
+  padding: 9px 10px;
+}
+
+.rule-list {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 14px;
+}
+
+.rule-list h3 {
+  color: #0f172a;
+  font-size: 15px;
+  margin: 0;
+}
+
+.rule-list article {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, auto) auto;
+  min-height: 48px;
+  padding: 10px 12px;
+}
+
+.rule-list strong,
+.rule-list span,
+.rule-list em,
+.rule-list__empty {
+  color: #334155;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.rule-list span {
+  color: #64748b;
+}
+
+.rule-list em {
+  color: #0f766e;
+  justify-self: end;
+}
+
+.rule-list__empty {
+  margin: 0;
+}
+
+.weekday-field {
+  color: #334155;
+  display: grid;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 7px;
+}
+
+.weekday-checkbox-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.weekday-checkbox {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.weekday-checkbox span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .switch-row {
@@ -646,6 +1161,26 @@ label {
   font-weight: 800;
   min-height: 30px;
   padding: 0 10px;
+}
+
+.status-chip {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #c2410c;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  min-height: 28px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.status-chip--ready {
+  background: #ecfdf5;
+  border-color: #99f6e4;
+  color: #0f766e;
 }
 
 input,
@@ -685,7 +1220,8 @@ button:disabled {
 
 @media (max-width: 980px) {
   .tenant-shell,
-  .form-panel {
+  .form-panel,
+  .settings-operation-list {
     grid-template-columns: 1fr;
   }
 }
@@ -699,6 +1235,18 @@ button:disabled {
   .form-actions {
     align-items: stretch;
     display: grid;
+  }
+
+  .operation-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rule-list article {
+    grid-template-columns: 1fr;
+  }
+
+  .weekday-checkbox-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

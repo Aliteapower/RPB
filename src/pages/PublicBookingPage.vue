@@ -38,15 +38,22 @@ declare global {
   }
 }
 
+type BookingStep = 1 | 2 | 3
+
 const route = useRoute()
 const loading = ref(false)
 const submitting = ref(false)
 const authBusy = ref(false)
 const errorText = ref('')
 const statusText = ref('')
+const currentStep = ref<BookingStep>(1)
 const context = ref<PublicBookingContextResponse | null>(null)
-const selectedDate = ref(todayDate())
+const minBookingDate = todayDate()
+const selectedDate = ref(minBookingDate)
+const displayDate = ref(formatDisplayDate(minBookingDate))
 const selectedStartAt = ref('')
+const selectedPeriodKey = ref('all')
+const dateInputErrorText = ref('')
 const customer = ref<CustomerAuthPrincipal | null>(null)
 
 const authForm = reactive({
@@ -62,6 +69,7 @@ const bookingForm = reactive({
   note: ''
 })
 
+const ALL_PERIOD_KEY = 'all'
 const storeId = computed(() => String(route.params.storeId || '').trim())
 const selectableSlots = computed(() => (context.value?.timeSlots || []).filter((slot) => slot.selectable))
 const slotsByPeriod = computed(() => {
@@ -76,9 +84,48 @@ const slotsByPeriod = computed(() => {
     slots
   }))
 })
+const periodFilterOptions = computed(() => [
+  {
+    periodKey: ALL_PERIOD_KEY,
+    displayName: '全部',
+    count: selectableSlots.value.length
+  },
+  ...slotsByPeriod.value.map((group) => ({
+    periodKey: group.periodKey,
+    displayName: group.displayName,
+    count: group.slots.length
+  }))
+])
+const filteredSlots = computed(() => {
+  if (selectedPeriodKey.value === ALL_PERIOD_KEY) {
+    return selectableSlots.value
+  }
+  return selectableSlots.value.filter((slot) => (slot.periodKey || 'default') === selectedPeriodKey.value)
+})
 const selectedSlot = computed(() => selectableSlots.value.find((slot) => slot.startAt === selectedStartAt.value) || null)
-const canSubmit = computed(() => !!customer.value && !!selectedSlot.value && !submitting.value)
+const hasValidPartySize = computed(() => {
+  const partySize = Number(bookingForm.partySize)
+  return Number.isInteger(partySize) && partySize >= 1 && partySize <= 20
+})
+const canProceedToAuth = computed(() => (
+  !!selectedSlot.value &&
+  hasValidPartySize.value &&
+  !loading.value &&
+  !dateInputErrorText.value
+))
+const canProceedToContact = computed(() => !!customer.value && !authBusy.value)
+const canSubmit = computed(() => (
+  currentStep.value === 3 &&
+  !!customer.value &&
+  !!selectedSlot.value &&
+  hasValidPartySize.value &&
+  !!bookingForm.phoneE164.trim() &&
+  !submitting.value &&
+  !dateInputErrorText.value
+))
 const enabledAuthProviders = computed(() => context.value?.authProviders || [])
+const emailAuthEnabled = computed(() => context.value?.emailAuthEnabled === true)
+const hasConfiguredLoginMethod = computed(() => emailAuthEnabled.value || enabledAuthProviders.value.length > 0)
 const whatsappContactUrl = computed(() => {
   const digits = (context.value?.store.whatsappBusinessPhoneE164 || '').replace(/\D/g, '')
   return digits ? `https://wa.me/${digits}` : ''
@@ -90,8 +137,25 @@ onMounted(() => {
 })
 
 watch(selectedDate, () => {
+  if (selectedDate.value && selectedDate.value < minBookingDate) {
+    selectedDate.value = minBookingDate
+    displayDate.value = formatDisplayDate(minBookingDate)
+    return
+  }
+  displayDate.value = formatDisplayDate(selectedDate.value)
   selectedStartAt.value = ''
+  selectedPeriodKey.value = ALL_PERIOD_KEY
   void loadContext()
+})
+
+watch(slotsByPeriod, () => {
+  if (selectedPeriodKey.value === ALL_PERIOD_KEY) {
+    return
+  }
+  if (!slotsByPeriod.value.some((group) => group.periodKey === selectedPeriodKey.value)) {
+    selectedPeriodKey.value = ALL_PERIOD_KEY
+    selectedStartAt.value = ''
+  }
 })
 
 async function loadCustomer(): Promise<void> {
@@ -125,7 +189,7 @@ async function loadContext(): Promise<void> {
 }
 
 async function sendEmailCode(): Promise<void> {
-  if (authBusy.value || !authForm.email.trim()) {
+  if (authBusy.value || !emailAuthEnabled.value || !authForm.email.trim()) {
     return
   }
   authBusy.value = true
@@ -144,7 +208,7 @@ async function sendEmailCode(): Promise<void> {
 }
 
 async function loginWithEmail(): Promise<void> {
-  if (authBusy.value || !authForm.email.trim() || !authForm.code.trim()) {
+  if (authBusy.value || !emailAuthEnabled.value || !authForm.email.trim() || !authForm.code.trim()) {
     return
   }
   authBusy.value = true
@@ -158,6 +222,7 @@ async function loginWithEmail(): Promise<void> {
     )
     customer.value = response.principal
     statusText.value = '已登录'
+    currentStep.value = 3
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
   } finally {
@@ -231,6 +296,7 @@ async function completeOAuthLogin(provider: 'google' | 'facebook', token: string
     const response = await loginCustomerWithOAuth(storeId.value, provider, token)
     customer.value = response.principal
     statusText.value = '已登录'
+    currentStep.value = 3
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
   } finally {
@@ -265,6 +331,56 @@ async function submitBooking(): Promise<void> {
   }
 }
 
+function selectPeriod(periodKey: string): void {
+  selectedPeriodKey.value = periodKey
+  if (periodKey === ALL_PERIOD_KEY || !selectedSlot.value) {
+    return
+  }
+  if ((selectedSlot.value.periodKey || 'default') !== periodKey) {
+    selectedStartAt.value = ''
+  }
+}
+
+function goToAuthStep(): void {
+  commitDisplayDate()
+  if (canProceedToAuth.value) {
+    currentStep.value = 2
+  }
+}
+
+function goToContactStep(): void {
+  if (canProceedToContact.value) {
+    currentStep.value = 3
+  }
+}
+
+function goBackToTimeStep(): void {
+  currentStep.value = 1
+}
+
+function goBackToAuthStep(): void {
+  currentStep.value = 2
+}
+
+function commitDisplayDate(): void {
+  const parsedDate = parseDisplayDate(displayDate.value)
+  if (!parsedDate) {
+    dateInputErrorText.value = '日期格式请使用 DD-MM-YYYY'
+    return
+  }
+  if (parsedDate < minBookingDate) {
+    dateInputErrorText.value = '日期不能早于今天'
+    selectedDate.value = minBookingDate
+    displayDate.value = formatDisplayDate(minBookingDate)
+    return
+  }
+  dateInputErrorText.value = ''
+  displayDate.value = formatDisplayDate(parsedDate)
+  if (parsedDate !== selectedDate.value) {
+    selectedDate.value = parsedDate
+  }
+}
+
 function publicBookingErrorText(error: unknown): string {
   if (!(error instanceof PublicBookingApiError)) {
     return '操作失败'
@@ -272,7 +388,7 @@ function publicBookingErrorText(error: unknown): string {
   switch (error.response.error) {
     case 'login_required':
     case 'unauthenticated':
-      return '请先邮箱登录'
+      return '请先登录'
     case 'booking_disabled':
       return '门店暂未开放公网预约'
     case 'invalid_booking_window':
@@ -336,7 +452,33 @@ function loadFacebookSdk(appId: string): Promise<void> {
 }
 
 function todayDate(): string {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDisplayDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-')
+  return year && month && day ? `${day}-${month}-${year}` : ''
+}
+
+function parseDisplayDate(value: string): string | null {
+  const match = value.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/)
+  if (!match) {
+    return null
+  }
+  const [, day, month, year] = match
+  const date = new Date(Number(year), Number(month) - 1, Number(day))
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() + 1 !== Number(month) ||
+    date.getDate() !== Number(day)
+  ) {
+    return null
+  }
+  return `${year}-${month}-${day}`
 }
 </script>
 
@@ -381,41 +523,84 @@ function todayDate(): string {
       <p v-if="errorText" class="alert alert--error" role="alert">{{ errorText }}</p>
       <p v-if="statusText" class="alert alert--success" role="status">{{ statusText }}</p>
 
-      <section class="booking-panel" aria-label="预约时间">
+      <section v-if="currentStep === 1" class="booking-panel" aria-label="预约时间">
         <div class="panel-title">
           <span>1</span>
-          <strong>选择日期与餐段</strong>
+          <strong>选择日期、餐段与人数</strong>
         </div>
 
         <label>
           <span>日期</span>
-          <input v-model="selectedDate" type="date" />
+          <input
+            v-model="displayDate"
+            autocomplete="off"
+            inputmode="numeric"
+            maxlength="10"
+            pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}"
+            placeholder="DD-MM-YYYY"
+            type="text"
+            @blur="commitDisplayDate"
+            @keyup.enter="commitDisplayDate"
+          />
+          <small v-if="dateInputErrorText" class="field-error">{{ dateInputErrorText }}</small>
         </label>
 
-        <div v-if="loading" class="quiet-line">加载中</div>
-        <div v-else class="slot-groups">
-          <section v-for="group in slotsByPeriod" :key="group.periodKey" class="slot-group">
-            <strong>{{ group.displayName }}</strong>
-            <div class="slot-grid">
+        <div class="booking-time-field">
+          <span>时间</span>
+          <div
+            v-if="periodFilterOptions.length > 1"
+            class="booking-period-tabs"
+            role="group"
+            aria-label="餐段筛选"
+          >
+            <button
+              v-for="option in periodFilterOptions"
+              :key="option.periodKey"
+              class="booking-period-tab"
+              :class="{ 'is-selected': selectedPeriodKey === option.periodKey }"
+              type="button"
+              :aria-pressed="selectedPeriodKey === option.periodKey"
+              @click="selectPeriod(option.periodKey)"
+            >
+              <span>{{ option.displayName }}</span>
+              <small>{{ option.count }}</small>
+            </button>
+          </div>
+
+          <div v-if="loading" class="quiet-line">加载中</div>
+          <template v-else>
+            <div class="booking-time-slots" role="listbox" aria-label="预约可选时间">
               <button
-                v-for="slot in group.slots"
+                v-for="slot in filteredSlots"
                 :key="slot.startAt"
                 type="button"
-                :class="{ active: selectedStartAt === slot.startAt }"
+                class="booking-time-card"
+                :class="{ 'is-selected': selectedStartAt === slot.startAt }"
+                :aria-selected="selectedStartAt === slot.startAt"
                 @click="selectedStartAt = slot.startAt"
               >
-                {{ slot.localTime.slice(0, 5) }}
+                <strong>{{ slot.localTime.slice(0, 5) }}</strong>
+                <small>{{ slot.displayName }}{{ slot.nextDay ? ' · 次日' : '' }}</small>
               </button>
             </div>
-          </section>
-          <p v-if="!selectableSlots.length" class="quiet-line">当天暂无可预约时段</p>
+            <p v-if="!filteredSlots.length" class="quiet-line">当天暂无可预约时段</p>
+          </template>
         </div>
+
+        <label>
+          <span>人数</span>
+          <input v-model.number="bookingForm.partySize" min="1" max="20" type="number" />
+        </label>
+
+        <button class="submit-button" type="button" :disabled="!canProceedToAuth" @click="goToAuthStep">
+          下一步：登录
+        </button>
       </section>
 
-      <section class="booking-panel" aria-label="登录">
+      <section v-else-if="currentStep === 2" class="booking-panel" aria-label="登录">
         <div class="panel-title">
           <span>2</span>
-          <strong>邮箱登录</strong>
+          <strong>顾客登录</strong>
         </div>
 
         <div v-if="customer" class="customer-chip">
@@ -424,25 +609,42 @@ function todayDate(): string {
         </div>
 
         <template v-else>
-          <div class="auth-grid">
+          <p v-if="!hasConfiguredLoginMethod" class="quiet-line">门店尚未配置顾客登录方式，请联系门店</p>
+
+          <section v-if="emailAuthEnabled" class="auth-method-panel" aria-label="邮箱注册 / 登录">
+            <strong>邮箱注册 / 登录</strong>
+            <p class="quiet-line">已注册邮箱通过验证码登录，未注册邮箱自动注册</p>
+            <div class="auth-grid">
+              <label>
+                <span>邮箱</span>
+                <input v-model="authForm.email" autocomplete="email" type="email" />
+              </label>
+              <label>
+                <span>姓名</span>
+                <input v-model="authForm.displayName" autocomplete="name" />
+              </label>
+            </div>
+            <button class="secondary-button" type="button" :disabled="authBusy" @click="sendEmailCode">
+              发送验证码
+            </button>
             <label>
-              <span>邮箱</span>
-              <input v-model="authForm.email" autocomplete="email" type="email" />
+              <span>验证码</span>
+              <input v-model="authForm.code" inputmode="numeric" />
             </label>
-            <label>
-              <span>姓名</span>
-              <input v-model="authForm.displayName" autocomplete="name" />
-            </label>
-          </div>
-          <div class="auth-actions">
-            <button type="button" :disabled="authBusy" @click="sendEmailCode">发送验证码</button>
+            <p v-if="authForm.devCode" class="quiet-line">验证码 {{ authForm.devCode }}</p>
+            <button class="primary-button" type="button" :disabled="authBusy" @click="loginWithEmail">
+              登录
+            </button>
+          </section>
+
+          <div v-if="enabledAuthProviders.length" class="auth-actions" aria-label="联合登录">
             <button
               v-if="providerClientId('google')"
               type="button"
               :disabled="authBusy"
               @click="startOAuthLogin('google')"
             >
-              Google
+              Google 登录
             </button>
             <button
               v-if="providerClientId('facebook')"
@@ -450,45 +652,41 @@ function todayDate(): string {
               :disabled="authBusy"
               @click="startOAuthLogin('facebook')"
             >
-              Facebook
+              Facebook 登录
             </button>
           </div>
-          <label>
-            <span>验证码</span>
-            <input v-model="authForm.code" inputmode="numeric" />
-          </label>
-          <p v-if="authForm.devCode" class="quiet-line">验证码 {{ authForm.devCode }}</p>
-          <button class="primary-button" type="button" :disabled="authBusy" @click="loginWithEmail">
-            登录
-          </button>
         </template>
+
+        <div class="step-actions">
+          <button class="secondary-button" type="button" @click="goBackToTimeStep">上一步</button>
+          <button class="submit-button" type="button" :disabled="!canProceedToContact" @click="goToContactStep">
+            下一步：填写手机号
+          </button>
+        </div>
       </section>
 
-      <form class="booking-panel" aria-label="提交预约" @submit.prevent="submitBooking">
+      <form v-else class="booking-panel" aria-label="提交预约" @submit.prevent="submitBooking">
         <div class="panel-title">
           <span>3</span>
-          <strong>填写资料</strong>
+          <strong>填写手机号并提交</strong>
         </div>
 
-        <div class="form-grid">
-          <label>
-            <span>人数</span>
-            <input v-model.number="bookingForm.partySize" min="1" max="20" type="number" />
-          </label>
-          <label>
-            <span>手机号</span>
-            <input v-model="bookingForm.phoneE164" inputmode="tel" placeholder="+6591234567" />
-          </label>
-        </div>
+        <label>
+          <span>手机号</span>
+          <input v-model="bookingForm.phoneE164" inputmode="tel" placeholder="+6591234567" />
+        </label>
 
         <label>
           <span>备注</span>
           <textarea v-model="bookingForm.note" rows="3"></textarea>
         </label>
 
-        <button class="submit-button" type="submit" :disabled="!canSubmit">
-          {{ submitting ? '提交中' : '提交预约' }}
-        </button>
+        <div class="step-actions">
+          <button class="secondary-button" type="button" @click="goBackToAuthStep">上一步</button>
+          <button class="submit-button" type="submit" :disabled="!canSubmit">
+            {{ submitting ? '提交中' : '提交预约' }}
+          </button>
+        </div>
       </form>
     </section>
   </main>
@@ -634,41 +832,128 @@ textarea {
   resize: vertical;
 }
 
-.slot-groups,
-.slot-group,
+.field-error {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.booking-time-field,
+.auth-method-panel,
 .customer-chip {
   display: grid;
   gap: 10px;
 }
 
-.slot-group strong {
-  color: #334155;
+.booking-time-field > span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.slot-grid {
+.booking-period-tabs {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  padding: 4px;
+}
+
+.booking-period-tab {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #334155;
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.booking-period-tab span {
+  font-size: 13px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-period-tab small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.booking-period-tab.is-selected {
+  background: #ffffff;
+  border-color: #fdba74;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  color: #c2410c;
+}
+
+.booking-period-tab.is-selected small {
+  color: #ea580c;
+}
+
+.booking-time-slots {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: 178px;
+  overflow-y: auto;
 }
 
-.slot-grid button,
+.booking-time-card {
+  align-content: center;
+  background: #ffffff;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  color: #0f172a;
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.booking-time-card strong,
+.booking-time-card small {
+  overflow-wrap: anywhere;
+}
+
+.booking-time-card strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.booking-time-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.booking-time-card.is-selected {
+  background: #fff7ed;
+  border-color: #f97316;
+}
+
+.booking-time-card.is-selected small {
+  color: #c2410c;
+}
+
 .auth-actions button,
 .primary-button,
+.secondary-button,
 .submit-button {
   border: 1px solid #cbd5e1;
   color: #334155;
   font-weight: 850;
   min-height: 40px;
-}
-
-.slot-grid button {
-  background: #ffffff;
-}
-
-.slot-grid button.active {
-  background: #0f766e;
-  border-color: #0f766e;
-  color: #ffffff;
 }
 
 .auth-grid,
@@ -681,12 +966,30 @@ textarea {
 .auth-actions {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.auth-method-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.auth-method-panel > strong {
+  color: #0f172a;
+  font-size: 15px;
 }
 
 .auth-actions button,
-.primary-button {
+.primary-button,
+.secondary-button {
   background: #ffffff;
+}
+
+.step-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(110px, 0.55fr) minmax(0, 1fr);
 }
 
 .customer-chip {
@@ -727,7 +1030,8 @@ button:not(:disabled) {
 
   .auth-grid,
   .form-grid,
-  .auth-actions {
+  .auth-actions,
+  .step-actions {
     grid-template-columns: 1fr;
   }
 }

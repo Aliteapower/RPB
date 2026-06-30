@@ -4,11 +4,14 @@ import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.customerauth.application.CustomerAuthApplicationService;
 import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
+import com.rpb.reservation.customerauth.application.CustomerEmailSettings;
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettings;
+import com.rpb.reservation.customerauth.application.port.out.CustomerEmailSettingsRepositoryPort;
 import com.rpb.reservation.customerauth.application.port.out.CustomerOAuthSettingsRepositoryPort;
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingSettingsRepositoryPort;
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingStoreRepositoryPort;
 import com.rpb.reservation.reservation.application.ReservationCreateResult;
+import com.rpb.reservation.reservation.application.ReservationTimeSlot;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
@@ -32,6 +35,7 @@ public class PublicBookingApplicationService {
     private final PublicBookingStoreRepositoryPort storeRepository;
     private final PublicBookingSettingsRepositoryPort settingsRepository;
     private final CustomerOAuthSettingsRepositoryPort oauthSettingsRepository;
+    private final CustomerEmailSettingsRepositoryPort emailSettingsRepository;
     private final CustomerAuthApplicationService customerAuthService;
     private final ReservationCreateApplicationService reservationCreateService;
     private final ReservationMealPeriodScheduleService mealPeriodScheduleService;
@@ -42,6 +46,7 @@ public class PublicBookingApplicationService {
         PublicBookingStoreRepositoryPort storeRepository,
         PublicBookingSettingsRepositoryPort settingsRepository,
         CustomerOAuthSettingsRepositoryPort oauthSettingsRepository,
+        CustomerEmailSettingsRepositoryPort emailSettingsRepository,
         CustomerAuthApplicationService customerAuthService,
         ReservationCreateApplicationService reservationCreateService,
         ReservationMealPeriodRepositoryPort mealPeriodRepository
@@ -50,6 +55,7 @@ public class PublicBookingApplicationService {
             storeRepository,
             settingsRepository,
             oauthSettingsRepository,
+            emailSettingsRepository,
             customerAuthService,
             reservationCreateService,
             mealPeriodRepository,
@@ -61,6 +67,7 @@ public class PublicBookingApplicationService {
         PublicBookingStoreRepositoryPort storeRepository,
         PublicBookingSettingsRepositoryPort settingsRepository,
         CustomerOAuthSettingsRepositoryPort oauthSettingsRepository,
+        CustomerEmailSettingsRepositoryPort emailSettingsRepository,
         CustomerAuthApplicationService customerAuthService,
         ReservationCreateApplicationService reservationCreateService,
         ReservationMealPeriodRepositoryPort mealPeriodRepository,
@@ -69,6 +76,7 @@ public class PublicBookingApplicationService {
         this.storeRepository = storeRepository;
         this.settingsRepository = settingsRepository;
         this.oauthSettingsRepository = oauthSettingsRepository;
+        this.emailSettingsRepository = emailSettingsRepository;
         this.customerAuthService = customerAuthService;
         this.reservationCreateService = reservationCreateService;
         this.mealPeriodScheduleService = new ReservationMealPeriodScheduleService(mealPeriodRepository);
@@ -87,13 +95,57 @@ public class PublicBookingApplicationService {
             return Optional.empty();
         }
         PublicBookingSettings settings = settingsRepository.findSettings(store.scope()).orElse(PublicBookingSettings.disabled());
+        List<PublicBookingAvailabilityRule> availabilityRules = settingsRepository.findAvailabilityRules(store.scope());
         return Optional.of(new PublicBookingContext(
             store,
             settings,
             businessDate,
-            mealPeriodScheduleService.listSlots(store.scope(), zoneId.getId(), businessDate, Instant.now(clock)),
+            applyAvailabilityRules(
+                mealPeriodScheduleService.listSlots(store.scope(), zoneId.getId(), businessDate, Instant.now(clock)),
+                availabilityRules
+            ),
+            emailAuthEnabled(store),
             publicAuthProviders(store)
         ));
+    }
+
+    private List<ReservationTimeSlot> applyAvailabilityRules(
+        List<ReservationTimeSlot> slots,
+        List<PublicBookingAvailabilityRule> availabilityRules
+    ) {
+        return slots.stream()
+            .map(slot -> applyAvailabilityRule(slot, availabilityRules))
+            .toList();
+    }
+
+    private ReservationTimeSlot applyAvailabilityRule(
+        ReservationTimeSlot slot,
+        List<PublicBookingAvailabilityRule> availabilityRules
+    ) {
+        if (!slot.selectable()) {
+            return slot;
+        }
+        return PublicBookingAvailabilityRules
+            .effectiveRule(availabilityRules, new BusinessDate(slot.businessDate()), slot.periodKey())
+            .filter(rule -> PublicBookingSettings.MODE_CLOSED.equals(rule.quotaMode()))
+            .map(rule -> new ReservationTimeSlot(
+                slot.periodId(),
+                slot.periodKey(),
+                slot.displayName(),
+                slot.businessDate(),
+                slot.time(),
+                slot.startAt(),
+                slot.nextDay(),
+                false
+            ))
+            .orElse(slot);
+    }
+
+    private boolean emailAuthEnabled(PublicBookingStoreProfile store) {
+        return emailSettingsRepository
+            .findEmailSettings(store.scope().tenantId().value(), store.scope().storeId().value())
+            .filter(CustomerEmailSettings::usableForLoginCode)
+            .isPresent();
     }
 
     private List<PublicBookingAuthProvider> publicAuthProviders(PublicBookingStoreProfile store) {
@@ -107,7 +159,7 @@ public class PublicBookingApplicationService {
     }
 
     private boolean isPublicAuthProvider(CustomerOAuthProviderSettings settings) {
-        return settings.enabled() && hasText(settings.clientId());
+        return settings.usableForPublicLogin();
     }
 
     @Transactional

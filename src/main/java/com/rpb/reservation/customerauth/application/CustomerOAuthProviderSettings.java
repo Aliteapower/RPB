@@ -19,4 +19,14 @@ public record CustomerOAuthProviderSettings(
     public static CustomerOAuthProviderSettings disabled(String provider) {
         return new CustomerOAuthProviderSettings(false, provider, null, null, false);
     }
+
+    public boolean usableForPublicLogin() {
+        return enabled
+            && hasText(clientId)
+            && (!"facebook".equals(provider) || secretConfigured);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
 }

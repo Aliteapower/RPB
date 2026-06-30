@@ -36,7 +36,6 @@ public class CustomerAuthApplicationService {
     private static final Duration SESSION_TTL = Duration.ofDays(30);
     private static final String ACCOUNT_STATUS_ACTIVE = "active";
     private static final String PROVIDER_EMAIL = "email";
-    private static final String PROVIDER_SMTP = "smtp";
     private static final String PROVIDER_GOOGLE = "google";
     private static final String PROVIDER_FACEBOOK = "facebook";
 
@@ -265,19 +264,14 @@ public class CustomerAuthApplicationService {
     }
 
     private static boolean isUsableEmailSettings(CustomerEmailSettings settings) {
-        return settings != null
-            && settings.enabled()
-            && PROVIDER_SMTP.equals(settings.provider())
-            && hasText(settings.fromEmail())
-            && hasText(settings.smtpHost())
-            && settings.smtpPort() > 0;
+        return settings != null && settings.usableForLoginCode();
     }
 
     private static boolean isUsableOAuthSettings(String provider, CustomerOAuthProviderSettings settings) {
-        if (settings == null || !settings.enabled() || !provider.equals(settings.provider()) || !hasText(settings.clientId())) {
+        if (settings == null || !provider.equals(settings.provider())) {
             return false;
         }
-        return !PROVIDER_FACEBOOK.equals(provider) || settings.secretConfigured();
+        return settings.usableForPublicLogin();
     }
 
     private static String normalizeProvider(String provider) {

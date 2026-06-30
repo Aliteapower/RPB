@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingSettingsManagementPort;
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingSettingsRepositoryPort;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +60,34 @@ public class PublicBookingAdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<PublicBookingAvailabilityRule> listAvailabilityRules(StoreScope scope) {
+        return settingsRepository.findAvailabilityRules(scope);
+    }
+
+    @Transactional
+    public PublicBookingAvailabilityRule saveAvailabilityRule(
+        StoreScope scope,
+        PublicBookingAvailabilityRuleCommand command
+    ) {
+        if (command == null) {
+            throw new IllegalArgumentException("availability_rule_required");
+        }
+        String ruleType = normalizeRuleType(command.ruleType());
+        PublicBookingAvailabilityRule rule = new PublicBookingAvailabilityRule(
+            null,
+            ruleType,
+            PublicBookingAvailabilityRule.TYPE_DATE_EXCEPTION.equals(ruleType) ? requiredDate(command.businessDate()) : null,
+            PublicBookingAvailabilityRule.TYPE_WEEKLY.equals(ruleType) ? requiredDayOfWeek(command.dayOfWeek()) : null,
+            trimToNull(command.periodKey()),
+            normalizeOverrideMode(command.quotaMode()),
+            boundedNullable(command.quotaPercent(), 0, 100),
+            nonNegative(command.tableCount(), null),
+            nonNegative(command.guestCount(), null)
+        );
+        return managementPort.saveAvailabilityRule(scope, rule);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<PublicBookingQuotaOverride> findQuotaOverride(
         StoreScope scope,
         BusinessDate businessDate,
@@ -94,6 +123,31 @@ public class PublicBookingAdminService {
             return normalized;
         }
         throw new IllegalArgumentException("quota_mode_invalid");
+    }
+
+    private static String normalizeRuleType(String candidate) {
+        String normalized = trimToNull(candidate);
+        if (
+            PublicBookingAvailabilityRule.TYPE_WEEKLY.equals(normalized)
+                || PublicBookingAvailabilityRule.TYPE_DATE_EXCEPTION.equals(normalized)
+        ) {
+            return normalized;
+        }
+        throw new IllegalArgumentException("availability_rule_type_invalid");
+    }
+
+    private static java.time.LocalDate requiredDate(java.time.LocalDate value) {
+        if (value == null) {
+            throw new IllegalArgumentException("business_date_required");
+        }
+        return value;
+    }
+
+    private static int requiredDayOfWeek(Integer value) {
+        if (value == null || value < 1 || value > 7) {
+            throw new IllegalArgumentException("day_of_week_invalid");
+        }
+        return value;
     }
 
     private static Integer bounded(Integer candidate, Integer fallback, int min, int max) {

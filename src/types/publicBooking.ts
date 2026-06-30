@@ -46,6 +46,7 @@ export interface PublicBookingContextResponse {
   settings: PublicBookingSettings
   businessDate: string
   timeSlots: PublicBookingTimeSlot[]
+  emailAuthEnabled: boolean
   authProviders: PublicBookingAuthProvider[]
 }
 
@@ -145,6 +146,41 @@ export interface TenantAdminCustomerOAuthProviderSettingsMutation {
   enabled: boolean
   clientId: string | null
   clientSecret: string | null
+}
+
+export type TenantAdminPublicBookingRuleType = 'weekly' | 'date_exception'
+
+export interface TenantAdminPublicBookingAvailabilityRule {
+  id: string | null
+  ruleType: TenantAdminPublicBookingRuleType
+  businessDate: string | null
+  dayOfWeek: number | null
+  periodKey: string | null
+  quotaMode: 'percentage' | 'table_count' | 'guest_count' | 'closed'
+  quotaPercent: number | null
+  tableCount: number | null
+  guestCount: number | null
+}
+
+export interface TenantAdminPublicBookingAvailabilityRulesResponse {
+  success: true
+  rules: TenantAdminPublicBookingAvailabilityRule[]
+}
+
+export interface TenantAdminPublicBookingAvailabilityRuleMutation {
+  ruleType: TenantAdminPublicBookingRuleType
+  businessDate: string | null
+  dayOfWeek: number | null
+  periodKey: string | null
+  quotaMode: 'percentage' | 'table_count' | 'guest_count' | 'closed'
+  quotaPercent: number | null
+  tableCount: number | null
+  guestCount: number | null
+}
+
+export interface TenantAdminPublicBookingAvailabilityRuleResponse
+  extends TenantAdminPublicBookingAvailabilityRule {
+  success: true
 }
 
 export interface TenantAdminPublicBookingQuotaOverrideMutation {

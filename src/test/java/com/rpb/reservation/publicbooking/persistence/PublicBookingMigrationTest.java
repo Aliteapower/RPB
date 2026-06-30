@@ -76,4 +76,44 @@ class PublicBookingMigrationTest {
             .contains("create unique index if not exists ux_store_public_booking_quota_override_active")
             .contains("on store_public_booking_quota_overrides (tenant_id, store_id, business_date, coalesce(period_key, ''))");
     }
+
+    @Test
+    void migrationCreatesPublicBookingAvailabilityRulesForWeeklyAndDateException() throws Exception {
+        String migration = Files.readString(Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V024__public_booking_availability_rules.sql"
+        ));
+
+        assertThat(migration)
+            .contains("create table if not exists store_public_booking_availability_rules")
+            .contains("tenant_id uuid not null references tenants(id)")
+            .contains("store_id uuid not null")
+            .contains("rule_type text not null")
+            .contains("business_date date null")
+            .contains("day_of_week integer null")
+            .contains("period_key text null")
+            .contains("quota_mode text not null")
+            .contains("constraint fk_store_public_booking_availability_rules_store_scope")
+            .contains("foreign key (store_id, tenant_id) references stores(id, tenant_id)")
+            .contains("constraint ck_store_public_booking_availability_rules_type")
+            .contains("rule_type in ('weekly', 'date_exception')")
+            .contains("constraint ck_store_public_booking_availability_rules_target")
+            .contains("rule_type = 'weekly' and day_of_week between 1 and 7 and business_date is null")
+            .contains("rule_type = 'date_exception' and business_date is not null and day_of_week is null")
+            .contains("constraint ck_store_public_booking_availability_rules_mode")
+            .contains("quota_mode in ('percentage', 'table_count', 'guest_count', 'closed')")
+            .contains("create unique index if not exists ux_store_public_booking_availability_rules_weekly_active")
+            .contains("on store_public_booking_availability_rules (tenant_id, store_id, day_of_week, coalesce(period_key, ''))")
+            .contains("where rule_type = 'weekly' and deleted_at is null")
+            .contains("create unique index if not exists ux_store_public_booking_availability_rules_date_active")
+            .contains("on store_public_booking_availability_rules (tenant_id, store_id, business_date, coalesce(period_key, ''))")
+            .contains("where rule_type = 'date_exception' and deleted_at is null")
+            .contains("insert into store_public_booking_availability_rules")
+            .contains("select tenant_id, store_id, 'date_exception', business_date, null, period_key, quota_mode")
+            .contains("from store_public_booking_quota_overrides");
+    }
 }

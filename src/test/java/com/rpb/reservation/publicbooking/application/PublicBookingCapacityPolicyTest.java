@@ -51,7 +51,7 @@ class PublicBookingCapacityPolicyTest {
     void publicBookingSourceCanUseCustomTableCountOverrideForTheBusinessDateAndPeriod() {
         FakeSettingsRepository settings = new FakeSettingsRepository();
         settings.settings = Optional.of(PublicBookingSettings.enabledPercentage(20));
-        settings.override = Optional.of(PublicBookingQuotaOverride.tableCount("dinner", 2));
+        settings.availabilityRules = List.of(dateRule("dinner", PublicBookingSettings.MODE_TABLE_COUNT, null, 2, null));
         FakeTableCapacityRepository tables = new FakeTableCapacityRepository(List.of(2, 4, 6, 8));
         PublicBookingCapacityPolicy policy = new PublicBookingCapacityPolicy(settings, tables, 50);
 
@@ -59,6 +59,52 @@ class PublicBookingCapacityPolicyTest {
 
         assertThat(decision.accepted()).isTrue();
         assertThat(decision.capacityLimit()).isEqualTo(14);
+    }
+
+    @Test
+    void allPeriodDateRuleAppliesToSpecificMealPeriodWhenNoSpecificRuleExists() {
+        FakeSettingsRepository settings = new FakeSettingsRepository();
+        settings.settings = Optional.of(PublicBookingSettings.enabledPercentage(100));
+        settings.availabilityRules = List.of(dateRule(null, PublicBookingSettings.MODE_CLOSED, null, null, null));
+        FakeTableCapacityRepository tables = new FakeTableCapacityRepository(List.of(4, 4, 6));
+        PublicBookingCapacityPolicy policy = new PublicBookingCapacityPolicy(settings, tables, 50);
+
+        ReservationCapacityDecision decision = policy.evaluate(customerQuery(0, 2));
+
+        assertThat(decision.accepted()).isFalse();
+        assertThat(decision.reasonCode()).isEqualTo("public_booking_closed");
+    }
+
+    @Test
+    void dateSpecificRuleOverridesDateAllPeriodAndWeeklyRules() {
+        FakeSettingsRepository settings = new FakeSettingsRepository();
+        settings.settings = Optional.of(PublicBookingSettings.enabledPercentage(10));
+        settings.availabilityRules = List.of(
+            weeklyRule(null, PublicBookingSettings.MODE_CLOSED, null, null, null),
+            dateRule(null, PublicBookingSettings.MODE_CLOSED, null, null, null),
+            dateRule("dinner", PublicBookingSettings.MODE_TABLE_COUNT, null, 2, null)
+        );
+        FakeTableCapacityRepository tables = new FakeTableCapacityRepository(List.of(4, 6, 8, 10));
+        PublicBookingCapacityPolicy policy = new PublicBookingCapacityPolicy(settings, tables, 50);
+
+        ReservationCapacityDecision decision = policy.evaluate(customerQuery(12, 5));
+
+        assertThat(decision.accepted()).isTrue();
+        assertThat(decision.capacityLimit()).isEqualTo(18);
+    }
+
+    @Test
+    void weeklyAllPeriodRuleAppliesWhenNoDateRuleExists() {
+        FakeSettingsRepository settings = new FakeSettingsRepository();
+        settings.settings = Optional.of(PublicBookingSettings.enabledPercentage(100));
+        settings.availabilityRules = List.of(weeklyRule(null, PublicBookingSettings.MODE_CLOSED, null, null, null));
+        FakeTableCapacityRepository tables = new FakeTableCapacityRepository(List.of(4, 4, 6));
+        PublicBookingCapacityPolicy policy = new PublicBookingCapacityPolicy(settings, tables, 50);
+
+        ReservationCapacityDecision decision = policy.evaluate(customerQuery(0, 2));
+
+        assertThat(decision.accepted()).isFalse();
+        assertThat(decision.reasonCode()).isEqualTo("public_booking_closed");
     }
 
     @Test
@@ -98,13 +144,58 @@ class PublicBookingCapacityPolicyTest {
         );
     }
 
+    private static PublicBookingAvailabilityRule dateRule(
+        String periodKey,
+        String quotaMode,
+        Integer quotaPercent,
+        Integer tableCount,
+        Integer guestCount
+    ) {
+        return new PublicBookingAvailabilityRule(
+            null,
+            PublicBookingAvailabilityRule.TYPE_DATE_EXCEPTION,
+            BUSINESS_DATE.value(),
+            null,
+            periodKey,
+            quotaMode,
+            quotaPercent,
+            tableCount,
+            guestCount
+        );
+    }
+
+    private static PublicBookingAvailabilityRule weeklyRule(
+        String periodKey,
+        String quotaMode,
+        Integer quotaPercent,
+        Integer tableCount,
+        Integer guestCount
+    ) {
+        return new PublicBookingAvailabilityRule(
+            null,
+            PublicBookingAvailabilityRule.TYPE_WEEKLY,
+            null,
+            BUSINESS_DATE.value().getDayOfWeek().getValue(),
+            periodKey,
+            quotaMode,
+            quotaPercent,
+            tableCount,
+            guestCount
+        );
+    }
+
     private static final class FakeSettingsRepository implements PublicBookingSettingsRepositoryPort {
         Optional<PublicBookingSettings> settings = Optional.empty();
-        Optional<PublicBookingQuotaOverride> override = Optional.empty();
+        List<PublicBookingAvailabilityRule> availabilityRules = List.of();
 
         @Override
         public Optional<PublicBookingSettings> findSettings(StoreScope scope) {
             return settings;
+        }
+
+        @Override
+        public List<PublicBookingAvailabilityRule> findAvailabilityRules(StoreScope scope) {
+            return availabilityRules;
         }
 
         @Override
@@ -113,7 +204,7 @@ class PublicBookingCapacityPolicyTest {
             BusinessDate businessDate,
             String periodKey
         ) {
-            return override;
+            return Optional.empty();
         }
     }
 

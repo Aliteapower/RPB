@@ -10,6 +10,9 @@ import type {
   TenantAdminCustomerEmailSettingsResponse,
   TenantAdminCustomerOAuthProviderSettingsMutation,
   TenantAdminCustomerOAuthProviderSettingsResponse,
+  TenantAdminPublicBookingAvailabilityRuleMutation,
+  TenantAdminPublicBookingAvailabilityRuleResponse,
+  TenantAdminPublicBookingAvailabilityRulesResponse,
   TenantAdminPublicBookingQuotaOverrideMutation,
   TenantAdminPublicBookingQuotaOverrideResponse,
   TenantAdminPublicBookingSettingsMutation,
@@ -128,6 +131,28 @@ export async function updateTenantAdminPublicBookingQuotaOverride(
   fetcher?: PublicBookingFetcher
 ): Promise<TenantAdminPublicBookingQuotaOverrideResponse> {
   return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/quota-overrides'), {
+    method: 'PUT',
+    body: request,
+    fetcher
+  })
+}
+
+export async function getTenantAdminPublicBookingAvailabilityRules(
+  storeId: string,
+  fetcher?: PublicBookingFetcher
+): Promise<TenantAdminPublicBookingAvailabilityRulesResponse> {
+  return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/availability-rules'), {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function updateTenantAdminPublicBookingAvailabilityRule(
+  storeId: string,
+  request: TenantAdminPublicBookingAvailabilityRuleMutation,
+  fetcher?: PublicBookingFetcher
+): Promise<TenantAdminPublicBookingAvailabilityRuleResponse> {
+  return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/availability-rules'), {
     method: 'PUT',
     body: request,
     fetcher

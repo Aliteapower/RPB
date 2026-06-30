@@ -105,6 +105,7 @@ public class PublicBookingController {
         SettingsResponse settings,
         LocalDate businessDate,
         List<TimeSlotResponse> timeSlots,
+        boolean emailAuthEnabled,
         List<AuthProviderResponse> authProviders
     ) {
         static PublicBookingContextResponse from(PublicBookingContext context) {
@@ -114,6 +115,7 @@ public class PublicBookingController {
                 SettingsResponse.from(context.settings()),
                 context.businessDate(),
                 context.timeSlots().stream().map(TimeSlotResponse::from).toList(),
+                context.emailAuthEnabled(),
                 context.authProviders().stream().map(AuthProviderResponse::from).toList()
             );
         }

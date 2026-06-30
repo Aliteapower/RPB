@@ -49,9 +49,12 @@ public class PublicBookingCapacityPolicy implements ReservationCapacityPolicyPor
             return ReservationCapacityDecision.reject(0, query.currentUsage(), "public_booking_disabled");
         }
 
-        PublicBookingQuotaPlan quotaPlan = settingsRepository
-            .findQuotaOverride(query.scope(), query.businessDate(), query.periodKey())
-            .map(PublicBookingQuotaPlan::fromOverride)
+        PublicBookingQuotaPlan quotaPlan = PublicBookingAvailabilityRules
+            .effectiveRule(settingsRepository.findAvailabilityRules(query.scope()), query.businessDate(), query.periodKey())
+            .map(PublicBookingQuotaPlan::fromRule)
+            .or(() -> settingsRepository
+                .findQuotaOverride(query.scope(), query.businessDate(), query.periodKey())
+                .map(PublicBookingQuotaPlan::fromOverride))
             .orElseGet(() -> PublicBookingQuotaPlan.fromSettings(settings));
         if (PublicBookingSettings.MODE_CLOSED.equals(quotaPlan.mode())) {
             return ReservationCapacityDecision.reject(0, query.currentUsage(), "public_booking_closed");
@@ -122,6 +125,15 @@ public class PublicBookingCapacityPolicy implements ReservationCapacityPolicyPor
                 override.quotaPercent(),
                 override.tableCount(),
                 override.guestCount()
+            );
+        }
+
+        private static PublicBookingQuotaPlan fromRule(PublicBookingAvailabilityRule rule) {
+            return new PublicBookingQuotaPlan(
+                rule.quotaMode(),
+                rule.quotaPercent(),
+                rule.tableCount(),
+                rule.guestCount()
             );
         }
     }

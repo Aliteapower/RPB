@@ -9,6 +9,7 @@ public record PublicBookingContext(
     PublicBookingSettings settings,
     LocalDate businessDate,
     List<ReservationTimeSlot> timeSlots,
+    boolean emailAuthEnabled,
     List<PublicBookingAuthProvider> authProviders
 ) {
 }

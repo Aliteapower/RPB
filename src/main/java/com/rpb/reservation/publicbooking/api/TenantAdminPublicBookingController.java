@@ -8,6 +8,8 @@ import com.rpb.reservation.customerauth.application.CustomerEmailSettingsCommand
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettings;
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettingsCommand;
 import com.rpb.reservation.publicbooking.application.PublicBookingAdminService;
+import com.rpb.reservation.publicbooking.application.PublicBookingAvailabilityRule;
+import com.rpb.reservation.publicbooking.application.PublicBookingAvailabilityRuleCommand;
 import com.rpb.reservation.publicbooking.application.PublicBookingQuotaOverride;
 import com.rpb.reservation.publicbooking.application.PublicBookingQuotaOverrideCommand;
 import com.rpb.reservation.publicbooking.application.PublicBookingSettings;
@@ -17,6 +19,7 @@ import com.rpb.reservation.tenantadmin.api.TenantAdminApiErrorResponse;
 import com.rpb.reservation.tenantadmin.api.TenantAdminApiException;
 import com.rpb.reservation.tenantadmin.api.TenantAdminScopeResolver;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
@@ -85,6 +88,22 @@ public class TenantAdminPublicBookingController {
         return override
             .map(value -> ResponseEntity.ok(QuotaOverrideResponse.from(value)))
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/availability-rules")
+    public ResponseEntity<AvailabilityRulesResponse> getAvailabilityRules(@PathVariable UUID storeId) {
+        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(AvailabilityRulesResponse.from(service.listAvailabilityRules(scope)));
+    }
+
+    @PutMapping("/availability-rules")
+    public ResponseEntity<AvailabilityRuleResponse> saveAvailabilityRule(
+        @PathVariable UUID storeId,
+        @RequestBody AvailabilityRuleRequest request
+    ) {
+        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        PublicBookingAvailabilityRule rule = service.saveAvailabilityRule(scope, request.toCommand());
+        return ResponseEntity.ok(AvailabilityRuleResponse.from(rule));
     }
 
     @GetMapping("/customer-auth/email-settings")
@@ -192,6 +211,30 @@ public class TenantAdminPublicBookingController {
         }
     }
 
+    public record AvailabilityRuleRequest(
+        String ruleType,
+        LocalDate businessDate,
+        Integer dayOfWeek,
+        String periodKey,
+        String quotaMode,
+        Integer quotaPercent,
+        Integer tableCount,
+        Integer guestCount
+    ) {
+        PublicBookingAvailabilityRuleCommand toCommand() {
+            return new PublicBookingAvailabilityRuleCommand(
+                ruleType,
+                businessDate,
+                dayOfWeek,
+                periodKey,
+                quotaMode,
+                quotaPercent,
+                tableCount,
+                guestCount
+            );
+        }
+    }
+
     public record EmailSettingsRequest(
         Boolean enabled,
         String fromEmail,
@@ -268,6 +311,46 @@ public class TenantAdminPublicBookingController {
                 override.quotaPercent(),
                 override.tableCount(),
                 override.guestCount()
+            );
+        }
+    }
+
+    public record AvailabilityRulesResponse(
+        boolean success,
+        List<AvailabilityRuleResponse> rules
+    ) {
+        static AvailabilityRulesResponse from(List<PublicBookingAvailabilityRule> rules) {
+            return new AvailabilityRulesResponse(
+                true,
+                rules.stream().map(AvailabilityRuleResponse::from).toList()
+            );
+        }
+    }
+
+    public record AvailabilityRuleResponse(
+        boolean success,
+        UUID id,
+        String ruleType,
+        LocalDate businessDate,
+        Integer dayOfWeek,
+        String periodKey,
+        String quotaMode,
+        Integer quotaPercent,
+        Integer tableCount,
+        Integer guestCount
+    ) {
+        static AvailabilityRuleResponse from(PublicBookingAvailabilityRule rule) {
+            return new AvailabilityRuleResponse(
+                true,
+                rule.id(),
+                rule.ruleType(),
+                rule.businessDate(),
+                rule.dayOfWeek(),
+                rule.periodKey(),
+                rule.quotaMode(),
+                rule.quotaPercent(),
+                rule.tableCount(),
+                rule.guestCount()
             );
         }
     }
