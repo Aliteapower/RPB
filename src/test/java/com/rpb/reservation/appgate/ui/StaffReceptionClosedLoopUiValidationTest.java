@@ -232,4 +232,16 @@ class StaffReceptionClosedLoopUiValidationTest {
             .contains("reservation_queue.permissions` contains `walkin.queue.create`")
             .contains("reservation_queue.permissions` contains `queue.cancel`");
     }
+
+    @Test
+    void localRuntimeRestartGuidePinsSharedMediaStorageRootAcrossRuntimeWorktrees() throws Exception {
+        String guide = Files.readString(Path.of("docs", "development", "LOCAL_RUNTIME_QUICK_RESTART_GUIDE.md"));
+
+        assertThat(guide)
+            .contains("mediaStorageRoot=D:\\RPB\\target\\call-screen-media")
+            .contains("$mediaStorageRoot = if ($settings.ContainsKey('mediaStorageRoot'))")
+            .contains("\"--rpb.call-screen-media.storage-root=$mediaStorageRoot\"")
+            .contains("Tenant logo image returns `404`")
+            .contains("Use `mediaStorageRoot` from the pointer");
+    }
 }

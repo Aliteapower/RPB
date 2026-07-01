@@ -67,6 +67,27 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
     }
 
     @Test
+    void staffHomeTopBarProvidesLogoutActionUsingSharedAuthSession() throws Exception {
+        String source = Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"))
+            + Files.readString(Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"));
+
+        assertThat(source)
+            .contains("useRouter")
+            .contains("const router = useRouter()")
+            .contains("const loggingOut = ref(false)")
+            .contains("async function logoutFromStaffHome(): Promise<void>")
+            .contains("await authSession.logoutCurrentUser()")
+            .contains("await router.push({ name: 'login' })")
+            .contains("<slot name=\"utility\" />")
+            .contains("<template #utility>")
+            .contains("class=\"topbar-actions\"")
+            .contains("class=\"topbar-logout\"")
+            .contains("{{ loggingOut ? '退出中' : '退出登录' }}")
+            .contains("@click=\"logoutFromStaffHome\"")
+            .contains(":disabled=\"loggingOut\"");
+    }
+
+    @Test
     void staffPagesShowFriendlyAppGateSubscriptionMessages() throws Exception {
         String staffHomeSource = Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
         String todayListSource = Files.readString(Path.of(
