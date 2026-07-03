@@ -26,17 +26,19 @@ const emit = defineEmits<{
         @input="emit('update:keyword', ($event.target as HTMLInputElement).value)"
         @keydown.enter.prevent="emit('search')"
       />
-      <button type="button" class="secondary-button" :disabled="loading" @click="emit('search')">
-        查询
-      </button>
-      <button
-        type="button"
-        class="secondary-button"
-        :disabled="loading || !hasDirtyQuery"
-        @click="emit('reset')"
-      >
-        重置
-      </button>
+      <div class="query-buttons">
+        <button type="button" class="secondary-button" :disabled="loading" @click="emit('search')">
+          查询
+        </button>
+        <button
+          type="button"
+          class="secondary-button"
+          :disabled="loading || !hasDirtyQuery"
+          @click="emit('reset')"
+        >
+          重置
+        </button>
+      </div>
     </div>
 
     <div class="toolbar-actions">
@@ -59,6 +61,7 @@ const emit = defineEmits<{
 }
 
 .query-box,
+.query-buttons,
 .toolbar-actions {
   display: flex;
   gap: 8px;
@@ -66,8 +69,21 @@ const emit = defineEmits<{
   flex-wrap: wrap;
 }
 
+.query-box {
+  flex: 1 1 360px;
+}
+
+.query-buttons {
+  flex: 0 0 auto;
+}
+
+.toolbar-actions {
+  justify-content: flex-end;
+}
+
 input {
   width: 220px;
+  max-width: 100%;
   min-height: 36px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
@@ -95,12 +111,40 @@ input {
 }
 
 @media (max-width: 700px) {
-  .erp-query-toolbar,
+  .erp-query-toolbar {
+    align-items: stretch;
+    gap: 8px;
+  }
+
   .query-box,
   .toolbar-actions,
-  input,
-  .secondary-button {
+  input {
     width: 100%;
+  }
+
+  .query-box {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .query-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .secondary-button {
+    min-width: 0;
+    width: auto;
+  }
+
+  .toolbar-actions {
+    justify-content: stretch;
+  }
+
+  .toolbar-actions > .secondary-button {
+    flex: 1 1 108px;
   }
 }
 </style>

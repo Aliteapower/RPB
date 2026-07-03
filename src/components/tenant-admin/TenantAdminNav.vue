@@ -91,10 +91,14 @@ async function logoutFromTenantAdmin(): Promise<void> {
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-list {
   gap: 6px;
+  min-width: 0;
 }
 
 .nav-item {
@@ -106,6 +110,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
   color: #334155;
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .nav-item.router-link-active {
@@ -135,10 +140,13 @@ async function logoutFromTenantAdmin(): Promise<void> {
     position: sticky;
     top: 0;
     z-index: 1;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     min-height: auto;
     align-items: center;
+    gap: 10px;
     padding: 12px 16px;
+    border-right: 0;
+    border-bottom: 1px solid #dbe3ea;
   }
 
   .nav-main {
@@ -147,7 +155,15 @@ async function logoutFromTenantAdmin(): Promise<void> {
 
   .nav-list {
     grid-auto-flow: column;
-    justify-content: end;
+    grid-auto-columns: max-content;
+    justify-content: start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
   }
 
   .logout-button {
@@ -158,20 +174,33 @@ async function logoutFromTenantAdmin(): Promise<void> {
 
 @media (max-width: 700px) {
   .tenant-nav {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    padding: 10px 12px;
   }
 
-  .nav-main {
-    display: grid;
-    gap: 12px;
+  .brand-block {
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .brand-block strong {
+    font-size: 18px;
   }
 
   .nav-list {
-    grid-auto-flow: row;
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .nav-item {
+    min-height: 36px;
+    padding: 0 11px;
   }
 
   .logout-button {
-    width: 100%;
+    min-height: 34px;
+    width: auto;
   }
 }
 </style>
