@@ -159,7 +159,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("标准单价")
             .contains("本次金额")
             .contains("calculatedAmount")
-            .contains("amount: calculatedAmount.value")
+            .contains("durationCount: safeDurationCount.value")
             .contains("purchaseProductSubscription")
             .contains("renewProductSubscription")
             .contains("suspendProductSubscription")
@@ -178,6 +178,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("saving")
             .doesNotContain("@submit.prevent=\"purchaseSelectedProduct\"")
             .doesNotContain(":checked=\"row.subscription?.status === 'active'\" disabled")
+            .doesNotContain("amount: calculatedAmount.value")
             .doesNotContain("v-model.number=\"form.amount\"")
             .doesNotContain("type=\"datetime-local\"");
     }

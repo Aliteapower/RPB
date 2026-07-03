@@ -207,7 +207,6 @@ function mutationPayload(version?: number, appKey = form.appKey) {
     appKey,
     billingCycle: form.billingCycle,
     durationCount: safeDurationCount.value,
-    amount: calculatedAmount.value,
     currency: selectedCurrency.value,
     paymentNote: form.paymentNote.trim() || null,
     version

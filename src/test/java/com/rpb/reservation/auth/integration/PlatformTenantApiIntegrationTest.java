@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +66,8 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_account_permissions where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
+        jdbc.update("delete from tenant_product_subscriptions where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("delete from stores where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from tenants where tenant_code like 'codex-%'");
         jdbc.update("""
             update tenants
@@ -240,6 +245,147 @@ class PlatformTenantApiIntegrationTest {
     }
 
     @Test
+    void creatingTenantBootstrapsDefaultStoreAndTenantAdminLoginScope() throws Exception {
+        Cookie session = login("sysadmin");
+
+        UUID tenantId = createTenant(session, "codex-login", "Codex 登录租户");
+        UUID storeId = jdbc.queryForObject(
+            """
+            select id
+            from stores
+            where tenant_id = ?
+              and store_code = ?
+              and status = 'active'
+              and deleted_at is null
+            """,
+            UUID.class,
+            tenantId,
+            "codex-login"
+        );
+
+        assertThat(storeId).isNotNull();
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_store_access access on access.account_id = account.id
+            where account.tenant_id = ?
+              and account.username = 'codex-login'
+              and account.actor_type = 'tenant_admin'
+              and account.default_store_id = ?
+              and access.tenant_id = ?
+              and access.store_id = ?
+              and account.deleted_at is null
+              and access.deleted_at is null
+            """, tenantId, storeId, tenantId, storeId)).isEqualTo(1);
+
+        login("codex-login", "abc123");
+    }
+
+    @Test
+    void tenantOnboardingBackfillMigrationRepairsExistingTenantAdminWithoutStoreScope() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        jdbc.update(
+            """
+            insert into tenants (
+                id, tenant_code, display_name, status,
+                default_locale, contact_phone, address
+            )
+            values (?, 'codex-backfill', 'Codex 回填租户', 'active', 'zh-CN', '021-000008', '上海市回填路 8 号')
+            """,
+            tenantId
+        );
+        jdbc.update(
+            """
+            insert into auth_accounts (
+                id, tenant_id, username, display_name, actor_type,
+                status, password_hash, password_algo
+            )
+            values (?, ?, 'codex-backfill', 'Codex 回填租户', 'tenant_admin',
+                'active', ?, 'bcrypt-lowercase-v1')
+            """,
+            accountId,
+            tenantId,
+            PASSWORD_393930_HASH
+        );
+
+        assertThat(countWhere("select count(*) from stores where tenant_id = ?", tenantId)).isZero();
+
+        replayTenantOnboardingBackfillMigration();
+        replayTenantOnboardingBackfillMigration();
+
+        UUID storeId = jdbc.queryForObject(
+            """
+            select id
+            from stores
+            where tenant_id = ?
+              and store_code = 'codex-backfill'
+              and status = 'active'
+              and share_contact_phone = '021-000008'
+              and share_address = '上海市回填路 8 号'
+              and deleted_at is null
+            """,
+            UUID.class,
+            tenantId
+        );
+        assertThat(storeId).isNotNull();
+        assertThat(countWhere("select count(*) from stores where tenant_id = ? and deleted_at is null", tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_store_access access on access.account_id = account.id
+            where account.id = ?
+              and account.default_store_id = ?
+              and access.tenant_id = ?
+              and access.store_id = ?
+              and access.deleted_at is null
+            """, accountId, storeId, tenantId, storeId)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantSubscriptionZeroAmountBackfillUsesActiveProductLinePrice() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createTenant(session, "codex-price", "Codex 价格租户");
+        jdbc.update(
+            """
+            update platform_product_line_prices
+            set amount = 128.00,
+                currency = 'SGD',
+                status = 'active'
+            where app_key = 'reservation_queue'
+              and billing_cycle = 'monthly'
+            """
+        );
+        jdbc.update(
+            """
+            insert into tenant_product_subscriptions (
+                tenant_id, app_key, billing_cycle, status,
+                current_period_start, current_period_end, amount, currency
+            )
+            values (
+                ?, 'reservation_queue', 'monthly', 'active',
+                '2026-07-01T00:00:00Z', '2026-09-01T00:00:00Z', 0, 'SGD'
+            )
+            """,
+            tenantId
+        );
+
+        replayTenantSubscriptionZeroAmountBackfillMigration();
+        replayTenantSubscriptionZeroAmountBackfillMigration();
+
+        assertThat(jdbc.queryForObject(
+            """
+            select amount
+            from tenant_product_subscriptions
+            where tenant_id = ?
+              and app_key = 'reservation_queue'
+            """,
+            java.math.BigDecimal.class,
+            tenantId
+        )).isEqualByComparingTo("256.00");
+    }
+
+    @Test
     void platformTenantCrudWritesAuditLogs() throws Exception {
         Cookie session = login("sysadmin");
         UUID sysadminActorId = jdbc.queryForObject(
@@ -367,6 +513,20 @@ class PlatformTenantApiIntegrationTest {
 
     private int countWhere(String sql, Object... args) {
         return jdbc.queryForObject(sql, Integer.class, args);
+    }
+
+    private void replayTenantOnboardingBackfillMigration() throws Exception {
+        jdbc.execute(Files.readString(
+            Path.of("src/main/resources/db/migration/V022__tenant_onboarding_default_store_backfill.sql"),
+            StandardCharsets.UTF_8
+        ));
+    }
+
+    private void replayTenantSubscriptionZeroAmountBackfillMigration() throws Exception {
+        jdbc.execute(Files.readString(
+            Path.of("src/main/resources/db/migration/V023__tenant_subscription_zero_amount_price_backfill.sql"),
+            StandardCharsets.UTF_8
+        ));
     }
 
     private String auditMetadata(UUID tenantId, String operationCode) {

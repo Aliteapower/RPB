@@ -102,6 +102,63 @@ public class PlatformTenantRepository {
         );
     }
 
+    public Optional<UUID> findDefaultStoreId(UUID tenantId) {
+        return jdbc.query(
+            """
+            select id
+            from stores
+            where tenant_id = ?
+              and deleted_at is null
+            order by created_at, id
+            limit 1
+            """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            tenantId
+        ).stream().findFirst();
+    }
+
+    public UUID ensureDefaultStore(
+        UUID tenantId,
+        String tenantCode,
+        String displayName,
+        String tenantStatus,
+        String defaultLocale
+    ) {
+        return findDefaultStoreId(tenantId)
+            .orElseGet(() -> insertDefaultStore(
+                tenantId,
+                tenantCode,
+                displayName,
+                storeStatus(tenantStatus),
+                defaultLocale == null || defaultLocale.isBlank() ? "zh-CN" : defaultLocale.trim()
+            ));
+    }
+
+    private UUID insertDefaultStore(
+        UUID tenantId,
+        String storeCode,
+        String displayName,
+        String status,
+        String locale
+    ) {
+        return jdbc.queryForObject(
+            """
+            insert into stores (
+                tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, ?, ?, 'Asia/Singapore', ?, 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            returning id
+            """,
+            UUID.class,
+            tenantId,
+            storeCode,
+            displayName,
+            status,
+            locale
+        );
+    }
+
     public Optional<PlatformTenant> update(
         UUID tenantId,
         String tenantCode,
@@ -213,6 +270,19 @@ public class PlatformTenantRepository {
             rs.getObject("updated_at", OffsetDateTime.class),
             rs.getObject("deleted_at", OffsetDateTime.class)
         );
+    }
+
+    private static String storeStatus(String tenantStatus) {
+        if ("active".equals(tenantStatus)) {
+            return "active";
+        }
+        if ("closed".equals(tenantStatus)) {
+            return "archived";
+        }
+        if ("suspended".equals(tenantStatus)) {
+            return "inactive";
+        }
+        return "created";
     }
 
     private static WhereClause whereClause(PlatformTenantSearchCriteria criteria) {

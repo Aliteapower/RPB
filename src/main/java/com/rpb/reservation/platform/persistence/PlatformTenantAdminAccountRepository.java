@@ -20,17 +20,21 @@ public class PlatformTenantAdminAccountRepository {
         UUID tenantId,
         String username,
         String displayName,
-        String passwordHash
+        String passwordHash,
+        UUID defaultStoreId
     ) {
         Optional<UUID> existingAccountId = findTenantAdminAccountId(tenantId);
         UUID accountId = existingAccountId.orElseGet(UUID::randomUUID);
         if (existingAccountId.isPresent()) {
-            updateTenantAdminAccount(accountId, username, displayName, passwordHash);
+            updateTenantAdminAccount(accountId, username, displayName, passwordHash, defaultStoreId);
         } else {
-            insertTenantAdminAccount(accountId, tenantId, username, displayName, passwordHash);
+            insertTenantAdminAccount(accountId, tenantId, username, displayName, passwordHash, defaultStoreId);
         }
         ensureTenantAdminRole(accountId);
         ensurePermission(accountId, TENANT_ADMIN_MANAGE);
+        if (defaultStoreId != null) {
+            ensureStoreAccess(accountId, tenantId, defaultStoreId);
+        }
     }
 
     private Optional<UUID> findTenantAdminAccountId(UUID tenantId) {
@@ -54,21 +58,23 @@ public class PlatformTenantAdminAccountRepository {
         UUID tenantId,
         String username,
         String displayName,
-        String passwordHash
+        String passwordHash,
+        UUID defaultStoreId
     ) {
         jdbc.update(
             """
             insert into auth_accounts (
                 id, tenant_id, username, display_name, actor_type,
-                status, password_hash, password_algo
+                status, password_hash, password_algo, default_store_id
             )
-            values (?, ?, ?, ?, 'tenant_admin', 'active', ?, 'bcrypt-lowercase-v1')
+            values (?, ?, ?, ?, 'tenant_admin', 'active', ?, 'bcrypt-lowercase-v1', ?)
             """,
             accountId,
             tenantId,
             username,
             displayName,
-            passwordHash
+            passwordHash,
+            defaultStoreId
         );
     }
 
@@ -76,7 +82,8 @@ public class PlatformTenantAdminAccountRepository {
         UUID accountId,
         String username,
         String displayName,
-        String passwordHash
+        String passwordHash,
+        UUID defaultStoreId
     ) {
         if (passwordHash == null) {
             jdbc.update(
@@ -84,6 +91,7 @@ public class PlatformTenantAdminAccountRepository {
                 update auth_accounts
                 set username = ?,
                     display_name = ?,
+                    default_store_id = coalesce(?, default_store_id),
                     status = 'active',
                     updated_at = now(),
                     version = version + 1
@@ -91,6 +99,7 @@ public class PlatformTenantAdminAccountRepository {
                 """,
                 username,
                 displayName,
+                defaultStoreId,
                 accountId
             );
             return;
@@ -101,6 +110,7 @@ public class PlatformTenantAdminAccountRepository {
             update auth_accounts
             set username = ?,
                 display_name = ?,
+                default_store_id = coalesce(?, default_store_id),
                 status = 'active',
                 password_hash = ?,
                 password_algo = 'bcrypt-lowercase-v1',
@@ -112,6 +122,7 @@ public class PlatformTenantAdminAccountRepository {
             """,
             username,
             displayName,
+            defaultStoreId,
             passwordHash,
             accountId
         );
@@ -154,6 +165,29 @@ public class PlatformTenantAdminAccountRepository {
             permissionCode,
             accountId,
             permissionCode
+        );
+    }
+
+    private void ensureStoreAccess(UUID accountId, UUID tenantId, UUID storeId) {
+        jdbc.update(
+            """
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            select ?, ?, ?
+            where not exists (
+                select 1
+                from auth_account_store_access existing
+                where existing.account_id = ?
+                  and existing.tenant_id = ?
+                  and existing.store_id = ?
+                  and existing.deleted_at is null
+            )
+            """,
+            accountId,
+            tenantId,
+            storeId,
+            accountId,
+            tenantId,
+            storeId
         );
     }
 }

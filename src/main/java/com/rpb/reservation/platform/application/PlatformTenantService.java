@@ -71,11 +71,19 @@ public class PlatformTenantService {
                 input.address(),
                 input.principalName()
             );
+            UUID defaultStoreId = repository.ensureDefaultStore(
+                tenant.id(),
+                tenant.tenantCode(),
+                tenant.displayName(),
+                tenant.status(),
+                tenant.defaultLocale()
+            );
             accountRepository.upsertTenantAdminAccount(
                 tenant.id(),
                 tenant.tenantCode(),
                 tenantAdminDisplayName(tenant),
-                passwordHash(input.initialPassword())
+                passwordHash(input.initialPassword()),
+                defaultStoreId
             );
             auditService.recordCreated(tenant, operator);
             return tenant;
@@ -105,7 +113,8 @@ public class PlatformTenantService {
                 tenant.id(),
                 tenant.tenantCode(),
                 tenantAdminDisplayName(tenant),
-                input.password() == null ? null : passwordHash(input.password())
+                input.password() == null ? null : passwordHash(input.password()),
+                repository.findDefaultStoreId(tenant.id()).orElse(null)
             );
             auditService.recordUpdated(existing, tenant, operator, input.password() != null);
             return tenant;
