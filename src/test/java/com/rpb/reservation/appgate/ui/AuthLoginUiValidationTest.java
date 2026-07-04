@@ -69,7 +69,7 @@ class AuthLoginUiValidationTest {
     @Test
     void routerAddsLoginRouteAndGuardsExistingErpPagesWithAuthSession() throws Exception {
         Path routerPath = Path.of("src", "router", "index.ts");
-        String routerSource = Files.readString(routerPath);
+        String routerSource = Files.readString(routerPath).replace("\r\n", "\n");
 
         assertThat(routerSource)
             .contains("LoginPage")

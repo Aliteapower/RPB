@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute, type RouteLocationRaw } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import {
   getStaffHomeOverview,
@@ -46,6 +46,7 @@ interface OperationToolbarItem {
 }
 
 const route = useRoute()
+const router = useRouter()
 const storeContext = useStoreContextStore()
 const authSession = useAuthSessionStore()
 const { currentBusinessDate, currentTimeText } = useCurrentClock()
@@ -53,6 +54,7 @@ const { currentBusinessDate, currentTimeText } = useCurrentClock()
 const overview = ref<StaffHomeOverviewResponse | null>(null)
 const apiError = ref<StaffHomeOverviewApiErrorResponse | null>(null)
 const isLoading = ref(false)
+const loggingOut = ref(false)
 let overviewLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
@@ -279,6 +281,20 @@ async function reloadOverview(): Promise<void> {
   await loadOverview(storeId.value, currentBusinessDate.value)
 }
 
+async function logoutFromStaffHome(): Promise<void> {
+  if (loggingOut.value) {
+    return
+  }
+
+  loggingOut.value = true
+  try {
+    await authSession.logoutCurrentUser()
+    await router.push({ name: 'login' })
+  } finally {
+    loggingOut.value = false
+  }
+}
+
 async function loadOverview(nextStoreId: string | undefined, businessDate: string): Promise<void> {
   const sequence = ++overviewLoadSequence
   overview.value = null
@@ -346,6 +362,13 @@ function hasPermission(permission: string): boolean {
       :current-time-text="currentTimeText"
       :store-label="storeLabel"
     >
+      <template #utility>
+        <div class="topbar-actions">
+          <button class="topbar-logout" type="button" :disabled="loggingOut" @click="logoutFromStaffHome">
+            {{ loggingOut ? '退出中' : '退出登录' }}
+          </button>
+        </div>
+      </template>
       <template #action>
         <button class="topbar-refresh" type="button" :disabled="isLoading" @click="reloadOverview">
           刷新
@@ -475,6 +498,32 @@ function hasPermission(permission: string): boolean {
 .topbar-refresh:disabled {
   cursor: wait;
   opacity: 0.62;
+}
+
+.topbar-actions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.topbar-logout {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #334155;
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.topbar-logout:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: wait;
 }
 
 .date-strip,

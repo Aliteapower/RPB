@@ -24,6 +24,24 @@ For full-stack local backend restart and known PostgreSQL/Flyway pitfalls, use:
 docs/development/LOCAL_RUNTIME_QUICK_RESTART_GUIDE.md
 ```
 
+## Local Validation Database
+
+All local browser validation, backend smoke checks, manual migration checks, and ad hoc SQL must use the PostgreSQL instance identified by:
+
+```text
+target/local-postgres-current.txt
+```
+
+Read the file before each runtime validation session and use its `port` value for the backend datasource:
+
+```text
+jdbc:postgresql://127.0.0.1:<pointer-port>/postgres?stringtype=unspecified
+```
+
+Use database `postgres`, username `postgres`, and a blank password for this local trust database. Do not use `localhost:5432`, `reservation_platform`, a hard-coded historical port, or a system PostgreSQL service unless the pointer file explicitly identifies that runtime.
+
+When validating from an isolated git worktree, confirm which workspace owns the running local PostgreSQL pointer and pass that pointer port into the backend for the worktree under test. The frontend proxy and backend must point to the same validation database.
+
 ## Backend Local Auth
 
 Backend local validation should use:

@@ -27,6 +27,7 @@ const displayAppStatus = computed(() => {
     <div class="topbar-meta" aria-label="门店和应用状态">
       <div class="topbar-row topbar-row--time">
         <span class="time-pill">{{ currentTimeText }}</span>
+        <slot name="utility" />
       </div>
       <div class="topbar-row topbar-row--store">
         <span class="store-pill">{{ storeLabel }}</span>
