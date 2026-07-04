@@ -159,7 +159,7 @@ public class ReservationShareInfoApplicationService {
 
     private Map<String, String> variables(ReservationShareInfoRow row) {
         Map<String, String> variables = new LinkedHashMap<>();
-        for (String allowedVariable : ReservationShareTemplateCatalog.allowedVariables()) {
+        for (String allowedVariable : ReservationShareTemplateCatalog.supportedVariables()) {
             variables.put(allowedVariable, "");
         }
         variables.put("storeName", firstText(row.shareDisplayName(), row.storeDisplayName()));
@@ -176,6 +176,7 @@ public class ReservationShareInfoApplicationService {
         variables.put("googleMapUrl", clean(row.googleMapUrl()));
         variables.put("storePhone", clean(row.shareContactPhone()));
         variables.put("arrivalNote", clean(row.reservationShareNote()));
+        ReservationShareTemplateCatalog.applyLegacyAliases(variables);
         return variables;
     }
 

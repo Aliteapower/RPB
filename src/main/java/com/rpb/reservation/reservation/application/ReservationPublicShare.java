@@ -10,6 +10,8 @@ public record ReservationPublicShare(
     boolean tablePending,
     String arrivalNote,
     String storePhone,
+    String storeEmail,
+    String storeWhatsappPhone,
     String storeAddress,
     String googleMapUrl,
     String shareTitle,

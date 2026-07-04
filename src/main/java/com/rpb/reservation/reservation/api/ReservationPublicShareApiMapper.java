@@ -23,6 +23,8 @@ public class ReservationPublicShareApiMapper {
                 share.tablePending(),
                 share.arrivalNote(),
                 share.storePhone(),
+                share.storeEmail(),
+                share.storeWhatsappPhone(),
                 share.storeAddress(),
                 share.googleMapUrl(),
                 share.shareTitle(),

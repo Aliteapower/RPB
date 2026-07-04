@@ -52,6 +52,10 @@ const pageUrl = computed(() => {
 
   return window.location.href
 })
+const whatsappContactUrl = computed(() => {
+  const digits = (share.value?.storeWhatsappPhone || '').replace(/\D/g, '')
+  return digits ? `https://wa.me/${digits}` : ''
+})
 
 onMounted(() => {
   void loadShare()
@@ -236,9 +240,9 @@ async function shareCurrentPage(): Promise<void> {
 
         <footer class="reservation-public-share__actions">
           <nav
-            v-if="share.googleMapUrl || share.storePhone"
+            v-if="share.googleMapUrl || share.storePhone || share.storeEmail || share.storeWhatsappPhone"
             class="reservation-public-share__contact-actions"
-            aria-label="地图与电话"
+            aria-label="地图与联系方式"
           >
             <a
               v-if="share.googleMapUrl"
@@ -249,6 +253,15 @@ async function shareCurrentPage(): Promise<void> {
               打开地图
             </a>
             <a v-if="share.storePhone" :href="`tel:${share.storePhone}`">拨打电话</a>
+            <a v-if="share.storeEmail" :href="`mailto:${share.storeEmail}`">发送邮件</a>
+            <a
+              v-if="whatsappContactUrl"
+              :href="whatsappContactUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp
+            </a>
           </nav>
           <button type="button" @click="shareCurrentPage">转发订位链接</button>
           <p v-if="shareStatusText" role="status">{{ shareStatusText }}</p>
@@ -413,7 +426,7 @@ async function shareCurrentPage(): Promise<void> {
 .reservation-public-share__contact-actions {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
 }
 
 .reservation-public-share__contact-actions a,

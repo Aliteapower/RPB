@@ -21,6 +21,8 @@ Public, unauthenticated, token-scoped read endpoint for customer-facing reservat
     "tablePending": false,
     "arrivalNote": "请提前 10 分钟到店",
     "storePhone": "6333 1234",
+    "storeEmail": "booking@example.test",
+    "storeWhatsappPhone": "+6588880000",
     "storeAddress": "1 Example Road",
     "googleMapUrl": "https://maps.app.goo.gl/rpb",
     "shareTitle": "食刻订位中心 订位确认",
@@ -29,6 +31,8 @@ Public, unauthenticated, token-scoped read endpoint for customer-facing reservat
   }
 }
 ```
+
+`storeEmail` and `storeWhatsappPhone` are optional customer-facing contact fields maintained by tenant admin share profile settings. `storeWhatsappPhone` is returned only as an E.164 phone number; the frontend may turn it into a click-to-chat link without exposing tenant IDs or staff actor data.
 
 `shareText` is rendered by the backend from the store reservation share template. If the store template is blank or contains unsupported variables, the active platform default template is used. The text may include customer-safe template variables such as contact name and masked phone, but must not expose raw customer phone, tenant ID, store ID, reservation ID, or actor data.
 

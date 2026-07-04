@@ -8,6 +8,8 @@ export interface ReservationPublicShare {
   tablePending: boolean
   arrivalNote: string
   storePhone: string
+  storeEmail: string
+  storeWhatsappPhone: string
   storeAddress: string
   googleMapUrl: string
   shareTitle: string

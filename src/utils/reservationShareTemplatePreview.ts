@@ -1,8 +1,10 @@
 export const reservationShareTemplatePreviewVariables: Record<string, string> = {
   storeName: '示例门店',
   reservationNo: 'R-EXAMPLE-0001',
+  reservationCode: 'R-EXAMPLE-0001',
   reservationDate: '15-07-2026 (星期三)',
   reservationTime: '19:30',
+  reservedStartAt: '15-07-2026 (星期三) 19:30',
   partySize: '2',
   tableCode: 'A01',
   holdMinutes: '15',

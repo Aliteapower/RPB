@@ -8,6 +8,7 @@ public record TenantAdminShareProfile(
     String shareAddress,
     String googleMapUrl,
     String shareContactPhone,
+    String shareEmail,
     String whatsappBusinessPhoneE164,
     String reservationShareNote,
     String reservationShareTemplate,

@@ -83,6 +83,8 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
                    store.share_address,
                    store.google_map_url,
                    store.share_contact_phone,
+                   store.share_email,
+                   store.whatsapp_business_phone_e164,
                    store.reservation_share_note,
                    store.reservation_share_template
             from reservation_public_share_tokens share
@@ -123,6 +125,8 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
             rs.getString("share_address"),
             rs.getString("google_map_url"),
             rs.getString("share_contact_phone"),
+            rs.getString("share_email"),
+            rs.getString("whatsapp_business_phone_e164"),
             rs.getString("reservation_share_note"),
             rs.getString("reservation_share_template")
         );

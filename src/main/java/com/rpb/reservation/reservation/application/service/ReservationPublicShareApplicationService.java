@@ -96,6 +96,8 @@ public class ReservationPublicShareApplicationService {
             tablePending,
             clean(row.reservationShareNote()),
             clean(row.shareContactPhone()),
+            clean(row.shareEmail()),
+            clean(row.whatsappBusinessPhoneE164()),
             clean(row.shareAddress()),
             clean(row.googleMapUrl()),
             ReservationShareInfoApplicationService.shareTitle(storeName),
@@ -124,7 +126,7 @@ public class ReservationPublicShareApplicationService {
         String tableCode
     ) {
         Map<String, String> variables = new LinkedHashMap<>();
-        for (String allowedVariable : ReservationShareTemplateCatalog.allowedVariables()) {
+        for (String allowedVariable : ReservationShareTemplateCatalog.supportedVariables()) {
             variables.put(allowedVariable, "");
         }
         variables.put("storeName", clean(storeName));
@@ -141,6 +143,7 @@ public class ReservationPublicShareApplicationService {
         variables.put("googleMapUrl", clean(row.googleMapUrl()));
         variables.put("storePhone", clean(row.shareContactPhone()));
         variables.put("arrivalNote", clean(row.reservationShareNote()));
+        ReservationShareTemplateCatalog.applyLegacyAliases(variables);
         return variables;
     }
 

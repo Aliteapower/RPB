@@ -172,6 +172,8 @@ class ReservationShareInfoApiIntegrationTest {
             .andExpect(jsonPath("$.share.tablePending").value(false))
             .andExpect(jsonPath("$.share.arrivalNote").value("请提前 10 分钟到店"))
             .andExpect(jsonPath("$.share.storePhone").value("6333 1234"))
+            .andExpect(jsonPath("$.share.storeEmail").value("booking@example.test"))
+            .andExpect(jsonPath("$.share.storeWhatsappPhone").value("+6588880000"))
             .andExpect(jsonPath("$.share.storeAddress").value("1 Example Road"))
             .andExpect(jsonPath("$.share.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
             .andExpect(jsonPath("$.share.shareTitle").value("食刻订位中心 订位确认"))
@@ -272,13 +274,13 @@ class ReservationShareInfoApiIntegrationTest {
                 id, tenant_id, store_code, display_name, status,
                 timezone, locale, date_format, time_format, currency,
                 share_display_name, share_address, google_map_url,
-                share_contact_phone, whatsapp_business_phone_e164,
+                share_contact_phone, share_email, whatsapp_business_phone_e164,
                 reservation_share_note, reservation_share_template
             )
             values (?, ?, 'store-share-it', 'Reservation Store', 'active',
                 'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD',
                 '食刻订位中心', '1 Example Road', 'https://maps.app.goo.gl/rpb',
-                '6333 1234', '+6588880000', '请提前 10 分钟到店',
+                '6333 1234', 'booking@example.test', '+6588880000', '请提前 10 分钟到店',
                 '门店：{{storeName}}\n编号：{{reservationNo}}\n时间：{{reservationDate}} {{reservationTime}}\n人数：{{partySize}}\n桌位：{{tableCode}}\n保留：{{holdMinutes}}分钟\n联系人：{{contactName}}\n电话：{{maskedPhone}}\n地址：{{storeAddress}}\n地图：{{googleMapUrl}}\n提示：{{arrivalNote}}\n门店电话：{{storePhone}}')
             """,
             STORE_ID,
