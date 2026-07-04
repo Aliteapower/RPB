@@ -6,6 +6,7 @@ import com.rpb.reservation.publicbooking.application.port.out.PublicBookingSetti
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingSettingsRepositoryPort;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +86,14 @@ public class PublicBookingAdminService {
             nonNegative(command.guestCount(), null)
         );
         return managementPort.saveAvailabilityRule(scope, rule);
+    }
+
+    @Transactional
+    public void deleteAvailabilityRule(StoreScope scope, UUID ruleId) {
+        if (ruleId == null) {
+            throw new IllegalArgumentException("availability_rule_id_required");
+        }
+        managementPort.deleteAvailabilityRule(scope, ruleId);
     }
 
     @Transactional(readOnly = true)

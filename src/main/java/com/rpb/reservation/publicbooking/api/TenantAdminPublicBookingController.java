@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -104,6 +105,16 @@ public class TenantAdminPublicBookingController {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
         PublicBookingAvailabilityRule rule = service.saveAvailabilityRule(scope, request.toCommand());
         return ResponseEntity.ok(AvailabilityRuleResponse.from(rule));
+    }
+
+    @DeleteMapping("/availability-rules/{ruleId}")
+    public ResponseEntity<Void> deleteAvailabilityRule(
+        @PathVariable UUID storeId,
+        @PathVariable UUID ruleId
+    ) {
+        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        service.deleteAvailabilityRule(scope, ruleId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/customer-auth/email-settings")

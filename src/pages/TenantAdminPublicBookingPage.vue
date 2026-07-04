@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
+  deleteTenantAdminPublicBookingAvailabilityRule,
   getTenantAdminCustomerEmailSettings,
   getTenantAdminCustomerOAuthProviderSettings,
   getTenantAdminPublicBookingAvailabilityRules,
@@ -51,7 +52,7 @@ const form = reactive<TenantAdminPublicBookingSettingsMutation>({
   enabled: false,
   requireCustomerLogin: true,
   defaultQuotaMode: 'percentage',
-  defaultQuotaPercent: 20,
+  defaultQuotaPercent: 100,
   defaultTableCount: null,
   defaultGuestCount: null,
   minLeadMinutes: 60,
@@ -68,7 +69,7 @@ const ruleForm = reactive<TenantAdminPublicBookingAvailabilityRuleMutation>({
   tableCount: 4,
   guestCount: null
 })
-const selectedWeekdays = ref<number[]>([1])
+const selectedWeekdays = ref<number[]>([])
 
 const weekdayOptions = [
   { value: 1, label: '周一' },
@@ -127,7 +128,6 @@ const facebookLoginReady = computed(() => facebookForm.enabled && facebookSettin
 const canSaveEmail = computed(() => !savingEmail.value && (!emailForm.enabled || emailSettingsComplete.value))
 const canSaveGoogle = computed(() => !savingGoogle.value && (!googleForm.enabled || googleSettingsComplete.value))
 const canSaveFacebook = computed(() => !savingFacebook.value && (!facebookForm.enabled || facebookSettingsComplete.value))
-
 onMounted(() => {
   void loadSettings()
 })
@@ -186,6 +186,7 @@ async function loadSettings(): Promise<void> {
     facebookSecretConfigured.value = facebook.secretConfigured
     mealPeriods.value = mealPeriodResponse.effectivePeriods
     availabilityRules.value = [...rulesResponse.rules].sort(compareAvailabilityRules)
+    hydrateWeeklySelectionFromSavedRules()
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -266,25 +267,44 @@ async function saveAvailabilityRule(): Promise<void> {
   if (savingRule.value) {
     return
   }
-  if (ruleForm.ruleType === 'weekly' && selectedWeekdays.value.length === 0) {
-    errorText.value = '至少选择一个星期'
-    savedText.value = ''
-    return
-  }
   savingRule.value = true
   errorText.value = ''
   savedText.value = ''
   try {
-    const responses = ruleForm.ruleType === 'weekly'
-      ? await saveWeeklyAvailabilityRules()
-      : [await updateTenantAdminPublicBookingAvailabilityRule(storeId.value, normalizedAvailabilityRule())]
-    availabilityRules.value = upsertAvailabilityRules(availabilityRules.value, responses)
-    savedText.value = responses.length > 1 ? `公网预约规则已保存（${responses.length} 个星期）` : '公网预约规则已保存'
+    if (ruleForm.ruleType === 'weekly') {
+      const responses = await syncWeeklyAvailabilityRules()
+      savedText.value = selectedWeekdays.value.length === 0
+        ? '公网预约规则已清空'
+        : responses.length > 1 ? `公网预约规则已保存（${responses.length} 个星期）` : '公网预约规则已保存'
+      return
+    }
+    const response = await updateTenantAdminPublicBookingAvailabilityRule(storeId.value, normalizedAvailabilityRule())
+    availabilityRules.value = upsertAvailabilityRules(availabilityRules.value, [response])
+    savedText.value = '公网预约规则已保存'
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     savingRule.value = false
   }
+}
+
+async function syncWeeklyAvailabilityRules(): Promise<TenantAdminPublicBookingAvailabilityRule[]> {
+  const staleWeeklyRules = availabilityRules.value.filter(rule => (
+    sameWeeklyRuleEditGroup(rule) &&
+    rule.dayOfWeek != null &&
+    !selectedWeekdays.value.includes(rule.dayOfWeek)
+  ))
+  await Promise.all(staleWeeklyRules.map(rule => (
+    rule.id ? deleteTenantAdminPublicBookingAvailabilityRule(storeId.value, rule.id) : Promise.resolve()
+  )))
+  const responses = await saveWeeklyAvailabilityRules()
+  availabilityRules.value = upsertAvailabilityRules(
+    availabilityRules.value.filter(rule => (
+      !staleWeeklyRules.some(staleRule => sameAvailabilityRuleTarget(staleRule, rule))
+    )),
+    responses
+  )
+  return responses
 }
 
 async function saveWeeklyAvailabilityRules(): Promise<TenantAdminPublicBookingAvailabilityRule[]> {
@@ -301,7 +321,7 @@ async function copyPublicUrl(): Promise<void> {
 function normalizedSettings(): TenantAdminPublicBookingSettingsMutation {
   return {
     ...form,
-    defaultQuotaPercent: form.defaultQuotaMode === 'percentage' ? Number(form.defaultQuotaPercent ?? 20) : null,
+    defaultQuotaPercent: form.defaultQuotaMode === 'percentage' ? Number(form.defaultQuotaPercent ?? 100) : null,
     defaultTableCount: form.defaultQuotaMode === 'table_count' ? Number(form.defaultTableCount ?? 0) : null,
     defaultGuestCount: form.defaultQuotaMode === 'guest_count' ? Number(form.defaultGuestCount ?? 0) : null,
     minLeadMinutes: Number(form.minLeadMinutes),
@@ -313,7 +333,7 @@ function normalizedAvailabilityRule(dayOfWeek?: number): TenantAdminPublicBookin
   return {
     ruleType: ruleForm.ruleType,
     businessDate: ruleForm.ruleType === 'date_exception' ? ruleForm.businessDate || todayInputValue() : null,
-    dayOfWeek: ruleForm.ruleType === 'weekly' ? Number(dayOfWeek || selectedWeekdays.value[0] || 1) : null,
+    dayOfWeek: ruleForm.ruleType === 'weekly' && dayOfWeek != null ? Number(dayOfWeek) : null,
     periodKey: nullableText(ruleForm.periodKey || ''),
     quotaMode: ruleForm.quotaMode,
     quotaPercent: ruleForm.quotaMode === 'percentage' ? Number(ruleForm.quotaPercent ?? 20) : null,
@@ -354,6 +374,32 @@ function hasText(value: string | null | undefined): boolean {
   return !!value && !!value.trim()
 }
 
+function hydrateWeeklySelectionFromSavedRules(): void {
+  if (ruleForm.ruleType !== 'weekly') {
+    return
+  }
+  const firstWeeklyRule = availabilityRules.value.find(rule => (
+    rule.ruleType === 'weekly' &&
+    rule.dayOfWeek != null
+  ))
+  if (!firstWeeklyRule) {
+    selectedWeekdays.value = []
+    return
+  }
+  Object.assign(ruleForm, {
+    periodKey: firstWeeklyRule.periodKey || '',
+    quotaMode: firstWeeklyRule.quotaMode,
+    quotaPercent: firstWeeklyRule.quotaPercent,
+    tableCount: firstWeeklyRule.tableCount,
+    guestCount: firstWeeklyRule.guestCount
+  })
+  selectedWeekdays.value = availabilityRules.value
+    .filter(sameWeeklyRuleEditGroup)
+    .map(rule => rule.dayOfWeek)
+    .filter((dayOfWeek): dayOfWeek is number => dayOfWeek != null)
+    .sort((left, right) => left - right)
+}
+
 function mealPeriodOptionLabel(period: ReservationMealPeriod): string {
   const startTime = period.startLocalTime.slice(0, 5)
   const endTime = period.endLocalTime.slice(0, 5)
@@ -388,6 +434,18 @@ function sameAvailabilityRuleTarget(
     left.businessDate === right.businessDate &&
     left.dayOfWeek === right.dayOfWeek &&
     (left.periodKey || '') === (right.periodKey || '')
+}
+
+function sameWeeklyRuleEditGroup(rule: TenantAdminPublicBookingAvailabilityRule): boolean {
+  if (rule.ruleType !== 'weekly' || rule.dayOfWeek == null) {
+    return false
+  }
+  const current = normalizedAvailabilityRule(rule.dayOfWeek)
+  return sameNullableText(rule.periodKey, current.periodKey) &&
+    rule.quotaMode === current.quotaMode &&
+    (rule.quotaPercent ?? null) === (current.quotaPercent ?? null) &&
+    (rule.tableCount ?? null) === (current.tableCount ?? null) &&
+    (rule.guestCount ?? null) === (current.guestCount ?? null)
 }
 
 function compareAvailabilityRules(
@@ -427,7 +485,11 @@ function ruleModeLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
 }
 
 function weekdayLabel(dayOfWeek: number | null): string {
-  return weekdayOptions.find(option => option.value === dayOfWeek)?.label || '周一'
+  return weekdayOptions.find(option => option.value === dayOfWeek)?.label || '未选择'
+}
+
+function sameNullableText(left: string | null, right: string | null): boolean {
+  return (left || '') === (right || '')
 }
 
 function todayInputValue(): string {
@@ -774,13 +836,6 @@ function apiErrorText(error: unknown): string {
               </label>
             </div>
           </section>
-          <p
-            v-if="ruleForm.ruleType === 'weekly' && selectedWeekdays.length === 0"
-            class="form-panel__wide field-hint"
-          >
-            至少选择一个星期
-          </p>
-
           <label v-if="ruleForm.ruleType === 'date_exception'">
             <span>日期</span>
             <input v-model="ruleForm.businessDate" type="date" />

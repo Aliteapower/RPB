@@ -311,6 +311,25 @@ public class PublicBookingPersistenceAdapter implements
             .orElse(rule);
     }
 
+    @Override
+    public void deleteAvailabilityRule(StoreScope scope, UUID ruleId) {
+        jdbc.update(
+            """
+            update store_public_booking_availability_rules
+            set deleted_at = now(),
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and id = ?
+              and deleted_at is null
+            """,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            ruleId
+        );
+    }
+
     private static PublicBookingSettings settings(ResultSet rs) throws SQLException {
         return new PublicBookingSettings(
             rs.getBoolean("enabled"),

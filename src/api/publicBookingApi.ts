@@ -159,6 +159,17 @@ export async function updateTenantAdminPublicBookingAvailabilityRule(
   })
 }
 
+export async function deleteTenantAdminPublicBookingAvailabilityRule(
+  storeId: string,
+  ruleId: string,
+  fetcher?: PublicBookingFetcher
+): Promise<void> {
+  await requestJson<unknown>(tenantAdminPublicBookingEndpoint(storeId, `/availability-rules/${ruleId}`), {
+    method: 'DELETE',
+    fetcher
+  })
+}
+
 export async function getTenantAdminCustomerEmailSettings(
   storeId: string,
   fetcher?: PublicBookingFetcher
@@ -208,7 +219,7 @@ export async function updateTenantAdminCustomerOAuthProviderSettings(
 async function requestJson<T>(
   endpoint: string,
   options: {
-    method: 'GET' | 'POST' | 'PUT'
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE'
     body?: unknown
     idempotencyKey?: string
     fetcher?: PublicBookingFetcher

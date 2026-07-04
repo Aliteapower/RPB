@@ -5,6 +5,7 @@ import com.rpb.reservation.publicbooking.application.PublicBookingAvailabilityRu
 import com.rpb.reservation.publicbooking.application.PublicBookingQuotaOverride;
 import com.rpb.reservation.publicbooking.application.PublicBookingSettings;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public interface PublicBookingSettingsManagementPort {
 
@@ -20,4 +21,6 @@ public interface PublicBookingSettingsManagementPort {
         StoreScope scope,
         PublicBookingAvailabilityRule rule
     );
+
+    void deleteAvailabilityRule(StoreScope scope, UUID ruleId);
 }

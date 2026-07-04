@@ -50,7 +50,6 @@ const currentStep = ref<BookingStep>(1)
 const context = ref<PublicBookingContextResponse | null>(null)
 const minBookingDate = todayDate()
 const selectedDate = ref(minBookingDate)
-const displayDate = ref(formatDisplayDate(minBookingDate))
 const selectedStartAt = ref('')
 const selectedPeriodKey = ref('all')
 const dateInputErrorText = ref('')
@@ -70,7 +69,15 @@ const bookingForm = reactive({
 })
 
 const ALL_PERIOD_KEY = 'all'
+const DEFAULT_MAX_ADVANCE_DAYS = 30
 const storeId = computed(() => String(route.params.storeId || '').trim())
+const maxBookingDate = computed(() => {
+  const maxAdvanceDays = context.value?.settings.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS
+  return addDays(minBookingDate, maxAdvanceDays)
+})
+const bookingDateWindowText = computed(() => (
+  `可预约至 ${formatDisplayDate(maxBookingDate.value)}，餐段会按公网预约规则显示`
+))
 const selectableSlots = computed(() => (context.value?.timeSlots || []).filter((slot) => slot.selectable))
 const slotsByPeriod = computed(() => {
   const groups = new Map<string, PublicBookingTimeSlot[]>()
@@ -137,15 +144,22 @@ onMounted(() => {
 })
 
 watch(selectedDate, () => {
-  if (selectedDate.value && selectedDate.value < minBookingDate) {
-    selectedDate.value = minBookingDate
-    displayDate.value = formatDisplayDate(minBookingDate)
+  const clampedDate = clampBookingDate(selectedDate.value)
+  if (clampedDate !== selectedDate.value) {
+    selectedDate.value = clampedDate
     return
   }
-  displayDate.value = formatDisplayDate(selectedDate.value)
+  dateInputErrorText.value = ''
   selectedStartAt.value = ''
   selectedPeriodKey.value = ALL_PERIOD_KEY
   void loadContext()
+})
+
+watch(maxBookingDate, () => {
+  const clampedDate = clampBookingDate(selectedDate.value)
+  if (clampedDate !== selectedDate.value) {
+    selectedDate.value = clampedDate
+  }
 })
 
 watch(slotsByPeriod, () => {
@@ -342,7 +356,6 @@ function selectPeriod(periodKey: string): void {
 }
 
 function goToAuthStep(): void {
-  commitDisplayDate()
   if (canProceedToAuth.value) {
     currentStep.value = 2
   }
@@ -360,25 +373,6 @@ function goBackToTimeStep(): void {
 
 function goBackToAuthStep(): void {
   currentStep.value = 2
-}
-
-function commitDisplayDate(): void {
-  const parsedDate = parseDisplayDate(displayDate.value)
-  if (!parsedDate) {
-    dateInputErrorText.value = '日期格式请使用 DD-MM-YYYY'
-    return
-  }
-  if (parsedDate < minBookingDate) {
-    dateInputErrorText.value = '日期不能早于今天'
-    selectedDate.value = minBookingDate
-    displayDate.value = formatDisplayDate(minBookingDate)
-    return
-  }
-  dateInputErrorText.value = ''
-  displayDate.value = formatDisplayDate(parsedDate)
-  if (parsedDate !== selectedDate.value) {
-    selectedDate.value = parsedDate
-  }
 }
 
 function publicBookingErrorText(error: unknown): string {
@@ -453,9 +447,20 @@ function loadFacebookSdk(appId: string): Promise<void> {
 
 function todayDate(): string {
   const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
+  return formatIsoDate(now)
+}
+
+function addDays(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + Math.max(0, Number(days) || 0))
+  return formatIsoDate(date)
+}
+
+function formatIsoDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -464,21 +469,19 @@ function formatDisplayDate(isoDate: string): string {
   return year && month && day ? `${day}-${month}-${year}` : ''
 }
 
-function parseDisplayDate(value: string): string | null {
-  const match = value.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/)
-  if (!match) {
-    return null
+function clampBookingDate(isoDate: string): string {
+  if (!isoDate) {
+    return minBookingDate
   }
-  const [, day, month, year] = match
-  const date = new Date(Number(year), Number(month) - 1, Number(day))
-  if (
-    date.getFullYear() !== Number(year) ||
-    date.getMonth() + 1 !== Number(month) ||
-    date.getDate() !== Number(day)
-  ) {
-    return null
+  if (isoDate < minBookingDate) {
+    dateInputErrorText.value = '日期不能早于今天'
+    return minBookingDate
   }
-  return `${year}-${month}-${day}`
+  if (isoDate > maxBookingDate.value) {
+    dateInputErrorText.value = '日期超过门店开放预约范围'
+    return maxBookingDate.value
+  }
+  return isoDate
 }
 </script>
 
@@ -532,16 +535,12 @@ function parseDisplayDate(value: string): string | null {
         <label>
           <span>日期</span>
           <input
-            v-model="displayDate"
-            autocomplete="off"
-            inputmode="numeric"
-            maxlength="10"
-            pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}"
-            placeholder="DD-MM-YYYY"
-            type="text"
-            @blur="commitDisplayDate"
-            @keyup.enter="commitDisplayDate"
+            v-model="selectedDate"
+            :min="minBookingDate"
+            :max="maxBookingDate"
+            type="date"
           />
+          <small class="date-window-hint">{{ bookingDateWindowText }}</small>
           <small v-if="dateInputErrorText" class="field-error">{{ dateInputErrorText }}</small>
         </label>
 
@@ -583,7 +582,7 @@ function parseDisplayDate(value: string): string | null {
                 <small>{{ slot.displayName }}{{ slot.nextDay ? ' · 次日' : '' }}</small>
               </button>
             </div>
-            <p v-if="!filteredSlots.length" class="quiet-line">当天暂无可预约时段</p>
+            <p v-if="!filteredSlots.length" class="quiet-line">该日期暂无可预约时段</p>
           </template>
         </div>
 
@@ -834,6 +833,12 @@ textarea {
 
 .field-error {
   color: #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.date-window-hint {
+  color: #64748b;
   font-size: 12px;
   font-weight: 800;
 }
