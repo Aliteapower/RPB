@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
@@ -70,8 +70,6 @@ const ruleForm = reactive<TenantAdminPublicBookingAvailabilityRuleMutation>({
   guestCount: null
 })
 const selectedWeekdays = ref<number[]>([])
-const weekdayValidationAttempted = ref(false)
-const weekdayRequiredMessage = '至少选择一个星期'
 
 const weekdayOptions = [
   { value: 1, label: '周一' },
@@ -130,23 +128,6 @@ const facebookLoginReady = computed(() => facebookForm.enabled && facebookSettin
 const canSaveEmail = computed(() => !savingEmail.value && (!emailForm.enabled || emailSettingsComplete.value))
 const canSaveGoogle = computed(() => !savingGoogle.value && (!googleForm.enabled || googleSettingsComplete.value))
 const canSaveFacebook = computed(() => !savingFacebook.value && (!facebookForm.enabled || facebookSettingsComplete.value))
-const showWeekdayRequired = computed(() => (
-  weekdayValidationAttempted.value &&
-  ruleForm.ruleType === 'weekly' &&
-  selectedWeekdays.value.length === 0
-))
-
-watch(() => selectedWeekdays.value.length, selectedWeekdayCount => {
-  if (selectedWeekdayCount > 0) {
-    clearWeekdayRequiredError()
-  }
-})
-
-watch(() => ruleForm.ruleType, ruleType => {
-  if (ruleType !== 'weekly') {
-    clearWeekdayRequiredError()
-  }
-})
 
 onMounted(() => {
   void loadSettings()
@@ -287,20 +268,15 @@ async function saveAvailabilityRule(): Promise<void> {
   if (savingRule.value) {
     return
   }
-  if (ruleForm.ruleType === 'weekly' && selectedWeekdays.value.length === 0) {
-    weekdayValidationAttempted.value = true
-    errorText.value = weekdayRequiredMessage
-    savedText.value = ''
-    return
-  }
-  clearWeekdayRequiredError()
   savingRule.value = true
   errorText.value = ''
   savedText.value = ''
   try {
     if (ruleForm.ruleType === 'weekly') {
       const responses = await syncWeeklyAvailabilityRules()
-      savedText.value = responses.length > 1 ? `公网预约规则已保存（${responses.length} 个星期）` : '公网预约规则已保存'
+      savedText.value = selectedWeekdays.value.length === 0
+        ? '公网预约规则已清空'
+        : responses.length > 1 ? `公网预约规则已保存（${responses.length} 个星期）` : '公网预约规则已保存'
       return
     }
     const response = await updateTenantAdminPublicBookingAvailabilityRule(storeId.value, normalizedAvailabilityRule())
@@ -399,13 +375,6 @@ function hasText(value: string | null | undefined): boolean {
   return !!value && !!value.trim()
 }
 
-function clearWeekdayRequiredError(): void {
-  weekdayValidationAttempted.value = false
-  if (errorText.value === weekdayRequiredMessage) {
-    errorText.value = ''
-  }
-}
-
 function hydrateWeeklySelectionFromSavedRules(): void {
   if (ruleForm.ruleType !== 'weekly') {
     return
@@ -430,7 +399,6 @@ function hydrateWeeklySelectionFromSavedRules(): void {
     .map(rule => rule.dayOfWeek)
     .filter((dayOfWeek): dayOfWeek is number => dayOfWeek != null)
     .sort((left, right) => left - right)
-  clearWeekdayRequiredError()
 }
 
 function mealPeriodOptionLabel(period: ReservationMealPeriod): string {
@@ -869,12 +837,6 @@ function apiErrorText(error: unknown): string {
               </label>
             </div>
           </section>
-          <p
-            v-if="showWeekdayRequired"
-            class="form-panel__wide field-hint"
-          >
-            至少选择一个星期
-          </p>
 
           <label v-if="ruleForm.ruleType === 'date_exception'">
             <span>日期</span>
