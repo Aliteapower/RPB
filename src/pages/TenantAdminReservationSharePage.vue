@@ -7,13 +7,13 @@ import {
   getTenantAdminShareProfile,
   previewTenantAdminShareProfile,
   resetTenantAdminShareProfileTemplate,
-  updateTenantAdminShareProfileTemplate
+  updateTenantAdminShareProfile
 } from '../api/tenantAdminShareProfileApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
   TenantAdminShareProfile,
-  TenantAdminShareTemplateMutation
+  TenantAdminShareProfileMutation
 } from '../types/tenantAdminShareProfile'
 
 const route = useRoute()
@@ -30,6 +30,12 @@ const availableVariables = ref<string[]>([])
 const storeId = computed(() => String(route.params.storeId || ''))
 
 const form = reactive({
+  storeDisplayName: '',
+  shareDisplayName: '',
+  googleMapUrl: '',
+  shareEmail: '',
+  whatsappBusinessPhoneE164: '',
+  reservationShareNote: '',
   reservationShareTemplate: ''
 })
 
@@ -63,7 +69,7 @@ async function submitShareProfile(): Promise<void> {
   savedText.value = ''
 
   try {
-    const response = await updateTenantAdminShareProfileTemplate(storeId.value, toTemplateMutation())
+    const response = await updateTenantAdminShareProfile(storeId.value, toShareMutation())
     applyShareProfile(response.shareProfile)
     savedText.value = '已保存'
   } catch (error) {
@@ -83,7 +89,7 @@ async function previewShareProfile(): Promise<void> {
   previewText.value = ''
 
   try {
-    const response = await previewTenantAdminShareProfile(storeId.value, toTemplateMutation())
+    const response = await previewTenantAdminShareProfile(storeId.value, toShareMutation())
     previewText.value = response.preview.shareText
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -113,12 +119,23 @@ async function restoreDefaultTemplate(): Promise<void> {
 }
 
 function applyShareProfile(profile: TenantAdminShareProfile): void {
+  form.storeDisplayName = profile.storeDisplayName
+  form.shareDisplayName = profile.shareDisplayName
+  form.googleMapUrl = profile.googleMapUrl
+  form.shareEmail = profile.shareEmail
+  form.whatsappBusinessPhoneE164 = profile.whatsappBusinessPhoneE164
+  form.reservationShareNote = profile.reservationShareNote
   form.reservationShareTemplate = profile.reservationShareTemplate
   availableVariables.value = profile.availableVariables
 }
 
-function toTemplateMutation(): TenantAdminShareTemplateMutation {
+function toShareMutation(): TenantAdminShareProfileMutation {
   return {
+    shareDisplayName: nullableText(form.shareDisplayName),
+    googleMapUrl: nullableText(form.googleMapUrl),
+    shareEmail: nullableText(form.shareEmail),
+    whatsappBusinessPhoneE164: nullableText(form.whatsappBusinessPhoneE164),
+    reservationShareNote: nullableText(form.reservationShareNote),
     reservationShareTemplate: nullableText(form.reservationShareTemplate)
   }
 }
@@ -145,6 +162,9 @@ function apiErrorText(error: unknown): string {
   }
   if (error.response.error.code === 'TEMPLATE_UNKNOWN_VARIABLE') {
     return '模板包含未支持的变量'
+  }
+  if (error.response.error.code === 'REQUEST_INVALID') {
+    return '请检查公网预约设置'
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
     return '没有该店面的后台权限'
@@ -173,26 +193,65 @@ function apiErrorText(error: unknown): string {
       <p v-if="loading" class="loading-line">加载中</p>
 
       <form v-else class="form-panel" @submit.prevent="submitShareProfile">
-        <section class="template-tools form-panel__wide" aria-label="模板变量">
-          <p class="template-tools__hint">
-            点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到分享模板中；调整模板后请保存，保存后的模板会在新的订位分享中生效。
-          </p>
-          <div class="template-tools__buttons">
-            <button
-              v-for="variable in availableVariables"
-              :key="variable"
-              type="button"
-              @click="insertVariable(variable)"
-            >
-              {{ variable }}
-            </button>
+        <section class="section-panel" aria-label="公网预约设置">
+          <div class="section-heading">
+            <h2>公网预约设置</h2>
+          </div>
+
+          <div class="field-grid">
+            <label>
+              <span>后台店名</span>
+              <input v-model.trim="form.storeDisplayName" readonly />
+            </label>
+            <label>
+              <span>分享显示名称</span>
+              <input v-model.trim="form.shareDisplayName" />
+            </label>
+            <label>
+              <span>Google Map 链接</span>
+              <input v-model.trim="form.googleMapUrl" />
+            </label>
+            <label>
+              <span>对外邮箱</span>
+              <input v-model.trim="form.shareEmail" type="email" placeholder="booking@example.com" />
+            </label>
+            <label>
+              <span>WhatsApp 固定号码</span>
+              <input v-model.trim="form.whatsappBusinessPhoneE164" placeholder="+6588880000" />
+            </label>
+            <label class="wide-field">
+              <span>到店提示</span>
+              <input v-model.trim="form.reservationShareNote" />
+            </label>
           </div>
         </section>
 
-        <label class="form-panel__wide">
-          <span>分享模板</span>
-          <textarea v-model="form.reservationShareTemplate" rows="16"></textarea>
-        </label>
+        <section class="section-panel" aria-label="订位分享模板">
+          <div class="section-heading">
+            <h2>订位分享模板</h2>
+          </div>
+
+          <section class="template-tools" aria-label="模板变量">
+            <p class="template-tools__hint">
+              点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到分享模板中；调整模板后请保存，保存后的模板会在新的订位分享中生效。
+            </p>
+            <div class="template-tools__buttons">
+              <button
+                v-for="variable in availableVariables"
+                :key="variable"
+                type="button"
+                @click="insertVariable(variable)"
+              >
+                {{ variable }}
+              </button>
+            </div>
+          </section>
+
+          <label>
+            <span>分享模板</span>
+            <textarea v-model="form.reservationShareTemplate" rows="16"></textarea>
+          </label>
+        </section>
 
         <section v-if="previewText" class="preview-panel form-panel__wide" aria-label="分享预览">
           <pre>{{ previewText }}</pre>
@@ -206,7 +265,7 @@ function apiErrorText(error: unknown): string {
             {{ restoring ? '恢复中' : '恢复默认模板' }}
           </button>
           <button class="primary-button" type="submit" :disabled="saving">
-            {{ saving ? '保存中' : '保存' }}
+            {{ saving ? '保存中' : '保存设置' }}
           </button>
         </div>
       </form>
@@ -275,18 +334,34 @@ function apiErrorText(error: unknown): string {
 }
 
 .form-panel {
-  background: #ffffff;
-  border: 1px solid #dbe3ea;
-  border-radius: 8px;
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 18px;
   width: min(100%, 980px);
 }
 
 .form-panel__wide {
   grid-column: 1 / -1;
+}
+
+.section-panel {
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.section-heading h2 {
+  color: #0f172a;
+  font-size: 18px;
+  margin: 0;
+}
+
+.field-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 label {
@@ -315,9 +390,14 @@ textarea {
   resize: vertical;
 }
 
-input:disabled {
+input:disabled,
+input[readonly] {
   background: #f8fafc;
   color: #64748b;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
 }
 
 .template-tools {
@@ -369,7 +449,6 @@ input:disabled {
 .form-actions {
   display: flex;
   gap: 10px;
-  grid-column: 1 / -1;
   justify-content: flex-end;
 }
 
@@ -385,7 +464,7 @@ input:disabled {
 
 @media (max-width: 980px) {
   .tenant-shell,
-  .form-panel {
+  .field-grid {
     grid-template-columns: 1fr;
   }
 }
