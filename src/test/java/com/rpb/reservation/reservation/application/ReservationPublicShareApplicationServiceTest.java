@@ -93,7 +93,38 @@ class ReservationPublicShareApplicationServiceTest {
         assertThat(result.share().tablePending()).isTrue();
     }
 
+    @Test
+    void rendersLegacyReservationCodeAndReservedStartAtTemplateAliases() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = rowWithTemplate(
+            "active",
+            null,
+            "A01",
+            "您好，您的预约信息：{{reservationCode}}，到店时间 {{reservedStartAt}}，人数 {{partySize}}。"
+        );
+
+        ReservationPublicShareResult result = scenario.service.getPublicShare("legacy-template-token");
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.share().shareText())
+            .isEqualTo("您好，您的预约信息：R-PUBLIC-0007，到店时间 20-06-2030 11:30，人数 4。");
+    }
+
     private static ReservationPublicShareRow row(String status, Instant expiresAt, String tableCode) {
+        return rowWithTemplate(
+            status,
+            expiresAt,
+            tableCode,
+            "【{{storeName}}】\n订位 {{reservationNo}}\n{{reservationDate}} {{reservationTime}} · {{partySize}}人\n桌位 {{tableCode}}\n{{arrivalNote}}"
+        );
+    }
+
+    private static ReservationPublicShareRow rowWithTemplate(
+        String status,
+        Instant expiresAt,
+        String tableCode,
+        String template
+    ) {
         return new ReservationPublicShareRow(
             "share-token-1",
             status,
@@ -114,7 +145,7 @@ class ReservationPublicShareApplicationServiceTest {
             "https://maps.app.goo.gl/rpb",
             "6333 1234",
             "请提前 10 分钟到店",
-            "【{{storeName}}】\n订位 {{reservationNo}}\n{{reservationDate}} {{reservationTime}} · {{partySize}}人\n桌位 {{tableCode}}\n{{arrivalNote}}"
+            template
         );
     }
 

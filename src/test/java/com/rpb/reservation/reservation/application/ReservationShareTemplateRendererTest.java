@@ -45,6 +45,26 @@ class ReservationShareTemplateRendererTest {
     }
 
     @Test
+    void acceptsLegacyReservationCodeAndReservedStartAtAliases() {
+        ReservationShareTemplateRenderer renderer = new ReservationShareTemplateRenderer();
+
+        String template = "编号：{{reservationCode}}\n到店时间：{{reservedStartAt}}\n人数：{{partySize}}";
+
+        assertThat(renderer.unknownVariables(template)).isEmpty();
+        assertThat(renderer.render(
+            template,
+            Map.of(
+                "reservationCode",
+                "R-20300620-0007",
+                "reservedStartAt",
+                "20-06-2030 11:30",
+                "partySize",
+                "4"
+            )
+        )).isEqualTo("编号：R-20300620-0007\n到店时间：20-06-2030 11:30\n人数：4");
+    }
+
+    @Test
     void defaultTemplateIsBackendOwnedPlainTextAndUsesOnlyWhitelistedVariables() {
         String defaultTemplate = ReservationShareTemplateCatalog.defaultTemplate();
 

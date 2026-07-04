@@ -116,6 +116,18 @@ class ReservationShareInfoApplicationServiceTest {
     }
 
     @Test
+    void rendersLegacyReservationCodeAndReservedStartAtTemplateAliases() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = row("您好，您的预约信息：{{reservationCode}}，到店时间 {{reservedStartAt}}，人数 {{partySize}}。");
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.shareInfo().shareText())
+            .isEqualTo("您好，您的预约信息：R-20300620-0007，到店时间 20-06-2030 11:30，人数 4。");
+    }
+
+    @Test
     void emptyCustomerPhoneReturnsEmptyMaskedPhoneAndUnavailableFlag() {
         Scenario scenario = Scenario.ready();
         scenario.readPort.row = rowWithoutPhone();

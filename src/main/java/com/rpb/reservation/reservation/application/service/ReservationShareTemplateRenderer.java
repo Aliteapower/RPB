@@ -14,7 +14,7 @@ public class ReservationShareTemplateRenderer {
     private final Set<String> allowedVariables;
 
     public ReservationShareTemplateRenderer() {
-        this(ReservationShareTemplateCatalog.allowedVariables());
+        this(ReservationShareTemplateCatalog.supportedVariables());
     }
 
     public ReservationShareTemplateRenderer(List<String> allowedVariables) {

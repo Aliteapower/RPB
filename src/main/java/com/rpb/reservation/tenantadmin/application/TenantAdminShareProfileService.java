@@ -129,7 +129,7 @@ public class TenantAdminShareProfileService {
 
     private Map<String, String> previewVariables(TenantAdminShareProfile current, TenantAdminShareProfileUpdate input) {
         Map<String, String> variables = new LinkedHashMap<>();
-        for (String variable : ReservationShareTemplateCatalog.allowedVariables()) {
+        for (String variable : ReservationShareTemplateCatalog.supportedVariables()) {
             variables.put(variable, "");
         }
         variables.put("storeName", firstText(input.shareDisplayName(), current.shareDisplayName(), current.storeDisplayName()));
@@ -145,6 +145,7 @@ public class TenantAdminShareProfileService {
         variables.put("googleMapUrl", firstText(input.googleMapUrl(), current.googleMapUrl()));
         variables.put("storePhone", clean(current.shareContactPhone()));
         variables.put("arrivalNote", firstText(input.reservationShareNote(), current.reservationShareNote()));
+        ReservationShareTemplateCatalog.applyLegacyAliases(variables);
         return variables;
     }
 
