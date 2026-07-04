@@ -105,7 +105,7 @@ public class TenantAdminShareProfileService {
             clean(row.reservationShareNote()),
             usesDefaultTemplate ? defaultTemplate : row.reservationShareTemplate().trim(),
             defaultTemplate,
-            ReservationShareTemplateCatalog.allowedVariables(),
+            ReservationShareTemplateCatalog.supportedVariables(),
             usesDefaultTemplate
         );
     }

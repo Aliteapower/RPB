@@ -42,6 +42,16 @@ class TenantAdminShareProfileServiceTest {
             .isEqualTo("您好，您的预约信息：R-PREVIEW-0001，到店时间 20-06-2030 11:30，人数 4。");
     }
 
+    @Test
+    void exposesLegacyTemplateAliasesAsAvailableVariables() {
+        Scenario scenario = Scenario.ready();
+
+        TenantAdminShareProfile profile = scenario.service.getProfile(SCOPE);
+
+        assertThat(profile.availableVariables())
+            .contains("reservationNo", "reservationCode", "reservedStartAt");
+    }
+
     private static final class Scenario {
         private final FakeTenantAdminShareProfileRepository repository = new FakeTenantAdminShareProfileRepository();
         private final TenantAdminShareProfileService service = new TenantAdminShareProfileService(
