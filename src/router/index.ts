@@ -10,6 +10,7 @@ import PlatformReservationShareTemplateSeedPage from '../pages/PlatformReservati
 import PlatformTenantBillingPage from '../pages/PlatformTenantBillingPage.vue'
 import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
 import PlatformTenantsPage from '../pages/PlatformTenantsPage.vue'
+import PublicBookingPage from '../pages/PublicBookingPage.vue'
 import QueueCallPage from '../pages/QueueCallPage.vue'
 import QueueDisplayPage from '../pages/QueueDisplayPage.vue'
 import QueueTicketListPage from '../pages/QueueTicketListPage.vue'
@@ -23,6 +24,7 @@ import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
 import TableResourceListPage from '../pages/TableResourceListPage.vue'
 import TenantAdminCallScreenPage from '../pages/TenantAdminCallScreenPage.vue'
 import TenantAdminProfilePage from '../pages/TenantAdminProfilePage.vue'
+import TenantAdminPublicBookingPage from '../pages/TenantAdminPublicBookingPage.vue'
 import TenantAdminReservationSharePage from '../pages/TenantAdminReservationSharePage.vue'
 import TenantAdminSettingsPage from '../pages/TenantAdminSettingsPage.vue'
 import TenantAdminStaffFormPage from '../pages/TenantAdminStaffFormPage.vue'
@@ -49,6 +51,12 @@ export const router = createRouter({
       path: '/reservation-share/:token',
       name: 'reservation-public-share',
       component: ReservationPublicSharePage,
+      meta: { public: true }
+    },
+    {
+      path: '/book/:storeId',
+      name: 'public-booking',
+      component: PublicBookingPage,
       meta: { public: true }
     },
     {
@@ -182,6 +190,12 @@ export const router = createRouter({
       path: '/stores/:storeId/admin/share-template',
       name: 'tenant-admin-reservation-share',
       component: TenantAdminReservationSharePage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/public-booking',
+      name: 'tenant-admin-public-booking',
+      component: TenantAdminPublicBookingPage,
       meta: { requiresTenantAdmin: true }
     },
     {

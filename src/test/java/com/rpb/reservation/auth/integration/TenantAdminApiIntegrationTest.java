@@ -89,6 +89,13 @@ class TenantAdminApiIntegrationTest {
             "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
             PASSWORD_393930_HASH
         );
+        jdbc.update("""
+            update stores
+            set share_email = null,
+                whatsapp_business_phone_e164 = null
+            where id = ?
+              and tenant_id = ?
+            """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID);
     }
 
     @Test
@@ -264,12 +271,22 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.shareProfile.reservationShareNote").value("请提前 10 分钟到店"))
             .andExpect(jsonPath("$.shareProfile.usesDefaultReservationShareTemplate").value(false));
 
+        mockMvc.perform(get("/api/v1/public/stores/{storeId}/booking/context", VALIDATION_STORE_ID)
+                .param("businessDate", "2026-06-29"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
+            .andExpect(jsonPath("$.store.shareContactPhone").value("021-393930"))
+            .andExpect(jsonPath("$.store.shareEmail").value("booking@example.test"))
+            .andExpect(jsonPath("$.store.whatsappBusinessPhoneE164").value("+6588880000"));
+
         mockMvc.perform(post(basePath() + "/share-profile/preview")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
                       "shareDisplayName":"食刻订位中心",
                       "googleMapUrl":"https://maps.app.goo.gl/rpb",
+                      "shareEmail":"booking@example.test",
                       "whatsappBusinessPhoneE164":"+6588880000",
                       "reservationShareNote":"请提前 10 分钟到店",
                       "reservationShareTemplate":"门店：{{storeName}}\\n编号：{{reservationNo}}\\n地图：{{googleMapUrl}}"
@@ -294,6 +311,7 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.shareProfile.shareAddress").value("上海市徐汇区示例路 1 号"))
             .andExpect(jsonPath("$.shareProfile.googleMapUrl").value("https://maps.app.goo.gl/rpb"))
             .andExpect(jsonPath("$.shareProfile.shareEmail").value("booking@example.test"))
+            .andExpect(jsonPath("$.shareProfile.whatsappBusinessPhoneE164").value("+6588880000"))
             .andExpect(jsonPath("$.shareProfile.shareContactPhone").value("021-393930"))
             .andExpect(jsonPath("$.shareProfile.reservationShareNote").value("请提前 10 分钟到店"))
             .andExpect(jsonPath("$.shareProfile.reservationShareTemplate").value(org.hamcrest.Matchers.containsString("{{tableCode}}")))

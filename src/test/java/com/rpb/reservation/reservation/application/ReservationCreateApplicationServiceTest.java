@@ -15,6 +15,7 @@ import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
@@ -23,6 +24,7 @@ import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositor
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.status.IdempotencyStatus;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationCapacityPolicyPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
@@ -223,6 +225,21 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void rejectsPublicBookingReservationWhenCapacityPolicyRejectsPublicQuota() {
+        Scenario scenario = Scenario.ready();
+        scenario.capacityPolicy.forcedDecision = ReservationCapacityDecision.reject(12, 10, "public_booking_capacity_insufficient");
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.publicBookingSourceCommand());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT);
+        assertThat(scenario.capacityPolicy.queries).hasSize(1);
+        assertThat(scenario.capacityPolicy.queries.getFirst().source()).isEqualTo(OperationSource.PUBLIC_BOOKING);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+        assertThat(scenario.idempotencyRepository.failed).hasSize(1);
+    }
+
+    @Test
     void rejectsDuplicateActiveReservationForSameCustomerAndTimeRange() {
         Scenario scenario = Scenario.ready();
         scenario.reservationRepository.duplicateActive = true;
@@ -377,12 +394,12 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
-    void arbitraryStartTimeOutsideEffectiveMealPeriodSlotsIsRejected() {
+    void publicBookingStartTimeOutsideEffectiveMealPeriodSlotsIsRejected() {
         Scenario scenario = Scenario.ready();
         Instant arbitraryStartAt = Instant.parse("2026-06-20T04:10:00Z");
 
         ReservationCreateResult result = scenario.service().createReservation(
-            scenario.commandWithRange(arbitraryStartAt, arbitraryStartAt.plusSeconds(90 * 60L))
+            scenario.publicBookingSourceCommandWithRange(arbitraryStartAt, arbitraryStartAt.plusSeconds(90 * 60L))
         );
 
         assertThat(result.success()).isFalse();
@@ -578,6 +595,7 @@ class ReservationCreateApplicationServiceTest {
         final FakeStateTransitionLogRepository stateTransitionLogRepository = new FakeStateTransitionLogRepository();
         final FakeAuditLogRepository auditLogRepository = new FakeAuditLogRepository();
         final FakeIdempotencyRepository idempotencyRepository = new FakeIdempotencyRepository();
+        final FakeReservationCapacityPolicy capacityPolicy = new FakeReservationCapacityPolicy();
         boolean queueTicketCreated;
         boolean seatingCreated;
         boolean tableLockCreated;
@@ -611,7 +629,8 @@ class ReservationCreateApplicationServiceTest {
                 auditLogRepository,
                 idempotencyRepository,
                 Clock.fixed(now, ZoneOffset.UTC),
-                () -> 7
+                () -> 7,
+                capacityPolicy
             );
         }
 
@@ -632,6 +651,48 @@ class ReservationCreateApplicationServiceTest {
                 "staff",
                 null,
                 "staff",
+                null
+            );
+        }
+
+        CreateReservationCommand publicBookingSourceCommand() {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                4,
+                startAt,
+                endAt,
+                existingCustomer.id().value(),
+                null,
+                null,
+                null,
+                "Window seat preferred",
+                "idem-customer-reservation-create",
+                existingCustomer.id().value(),
+                OperationSource.CUSTOMER,
+                null,
+                OperationSource.PUBLIC_BOOKING,
+                null
+            );
+        }
+
+        CreateReservationCommand publicBookingSourceCommandWithRange(Instant reservedStartAt, Instant reservedEndAt) {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                2,
+                reservedStartAt,
+                reservedEndAt,
+                existingCustomer.id().value(),
+                null,
+                null,
+                null,
+                "Window seat preferred",
+                "idem-public-booking-range",
+                existingCustomer.id().value(),
+                OperationSource.CUSTOMER,
+                null,
+                OperationSource.PUBLIC_BOOKING,
                 null
             );
         }
@@ -869,6 +930,26 @@ class ReservationCreateApplicationServiceTest {
                 "staff",
                 null
             );
+        }
+    }
+
+    private static final class FakeReservationCapacityPolicy implements ReservationCapacityPolicyPort {
+        final List<ReservationCapacityQuery> queries = new ArrayList<>();
+        ReservationCapacityDecision forcedDecision;
+
+        @Override
+        public ReservationCapacityDecision evaluate(ReservationCapacityQuery query) {
+            queries.add(query);
+            if (forcedDecision != null) {
+                return forcedDecision;
+            }
+            int limit = 50;
+            int partySize = query.partySize().value();
+            int currentUsage = query.currentUsage();
+            if (currentUsage + partySize <= limit) {
+                return ReservationCapacityDecision.accept(limit, currentUsage);
+            }
+            return ReservationCapacityDecision.reject(limit, currentUsage, "reservation_capacity_insufficient");
         }
     }
 

@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class ReservationMealPeriodScheduleService {
     private final ReservationMealPeriodRepositoryPort repository;
@@ -37,11 +38,22 @@ public class ReservationMealPeriodScheduleService {
         Instant reservedStartAt,
         Instant now
     ) {
+        return findSelectableSlot(scope, timezone, businessDate, reservedStartAt, now).isPresent();
+    }
+
+    public Optional<ReservationTimeSlot> findSelectableSlot(
+        StoreScope scope,
+        String timezone,
+        LocalDate businessDate,
+        Instant reservedStartAt,
+        Instant now
+    ) {
         if (businessDate == null || reservedStartAt == null) {
-            return false;
+            return Optional.empty();
         }
         return listSlots(scope, timezone, businessDate, now).stream()
-            .anyMatch(slot -> slot.selectable() && slot.startAt().equals(reservedStartAt));
+            .filter(slot -> slot.selectable() && slot.startAt().equals(reservedStartAt))
+            .findFirst();
     }
 
     private List<ReservationMealPeriod> effectivePeriods(StoreScope scope) {

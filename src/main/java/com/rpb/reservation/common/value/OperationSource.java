@@ -4,10 +4,11 @@ import java.util.Locale;
 
 public final class OperationSource {
 
-    private static final String STAFF = "staff";
-    private static final String CUSTOMER = "customer";
-    private static final String INTEGRATION = "integration";
-    private static final String SYSTEM = "system";
+    public static final String STAFF = "staff";
+    public static final String CUSTOMER = "customer";
+    public static final String PUBLIC_BOOKING = "public_booking";
+    public static final String INTEGRATION = "integration";
+    public static final String SYSTEM = "system";
 
     private OperationSource() {
     }
@@ -31,6 +32,7 @@ public final class OperationSource {
     private static boolean isSupported(String source) {
         return STAFF.equals(source)
             || CUSTOMER.equals(source)
+            || PUBLIC_BOOKING.equals(source)
             || INTEGRATION.equals(source)
             || SYSTEM.equals(source);
     }
