@@ -39,6 +39,34 @@ class AuthLoginUiValidationTest {
     }
 
     @Test
+    void authApiTimesOutNetworkRequestsSoLoginCannotStayLoadingForever() throws Exception {
+        Path apiPath = Path.of("src", "api", "authApi.ts");
+        String apiSource = Files.readString(apiPath);
+
+        assertThat(apiSource)
+            .contains("AUTH_REQUEST_TIMEOUT_MS")
+            .contains("AbortController")
+            .contains("window.setTimeout")
+            .contains("window.clearTimeout")
+            .contains("signal: controller.signal")
+            .contains("xhr.timeout = AUTH_REQUEST_TIMEOUT_MS");
+    }
+
+    @Test
+    void loginStopsMissingStoreScopeInsteadOfRoutingToValidationStore() throws Exception {
+        Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        Path storePath = Path.of("src", "stores", "authSession.ts");
+        String source = Files.readString(pagePath) + Files.readString(storePath);
+
+        assertThat(source)
+            .contains("missingStoreScopeText")
+            .contains("账号未绑定门店，请联系平台管理员完成租户初始化")
+            .contains("user.storeIds.length === 0")
+            .contains("storeScope=missing")
+            .doesNotContain("state.user?.defaultStoreId || state.user?.storeIds[0] || localValidationStoreId");
+    }
+
+    @Test
     void routerAddsLoginRouteAndGuardsExistingErpPagesWithAuthSession() throws Exception {
         Path routerPath = Path.of("src", "router", "index.ts");
         String routerSource = Files.readString(routerPath);

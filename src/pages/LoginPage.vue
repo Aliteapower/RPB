@@ -60,6 +60,7 @@ const loginEntries: LoginEntry[] = [
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthSessionStore()
+const missingStoreScopeText = '账号未绑定门店，请联系平台管理员完成租户初始化'
 
 const selectedEntryId = ref<LoginEntryId>('tenant-staff')
 const username = ref('1000')
@@ -107,7 +108,7 @@ const pieceStyle = computed(() => ({
 
 onMounted(() => {
   observeSliderCanvas()
-  void refreshSlider()
+  void refreshSlider().then(showRouteStoreScopeMessage)
 })
 
 onBeforeUnmount(() => {
@@ -156,6 +157,12 @@ function updateCanvasWidth(): void {
   canvasWidth.value = sliderCanvas.value?.clientWidth || captcha.value?.imageWidth || 320
 }
 
+function showRouteStoreScopeMessage(): void {
+  if (route.query.storeScope === 'missing') {
+    errorText.value = missingStoreScopeText
+  }
+}
+
 async function submitLogin(): Promise<void> {
   if (!captcha.value || submitting.value || !loginPayloadUsername.value) {
     return
@@ -192,6 +199,11 @@ async function continueAfterLogin(user: AuthUser): Promise<void> {
     return
   }
 
+  if (!auth.isPlatformAdmin && user.storeIds.length === 0) {
+    await stopMissingStoreScopeLogin()
+    return
+  }
+
   if (selectedEntry.value.id === 'tenant-admin' && auth.isTenantAdmin) {
     await router.replace(auth.tenantAdminHomeRoute)
     return
@@ -209,6 +221,14 @@ async function continueAfterLogin(user: AuthUser): Promise<void> {
   }
 
   await router.replace(auth.defaultHomeRoute)
+}
+
+async function stopMissingStoreScopeLogin(): Promise<void> {
+  pendingStoreSelection.value = false
+  selectedStoreId.value = ''
+  await auth.logoutCurrentUser()
+  await refreshSlider()
+  errorText.value = missingStoreScopeText
 }
 
 async function selectStoreAndContinue(): Promise<void> {

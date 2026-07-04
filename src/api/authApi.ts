@@ -20,6 +20,7 @@ export class AuthApiError extends Error {
 }
 
 type AuthFetcher = typeof fetch
+const AUTH_REQUEST_TIMEOUT_MS = 12000
 
 interface TextResponse {
   readonly ok: boolean
@@ -99,12 +100,19 @@ async function sendRequest(
   const fetcher = options.fetcher ?? resolveFetch()
 
   if (fetcher) {
-    return fetcher(endpoint, {
-      method: options.method,
-      credentials: 'include',
-      headers,
-      body
-    })
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS)
+    try {
+      return await fetcher(endpoint, {
+        method: options.method,
+        credentials: 'include',
+        headers,
+        body,
+        signal: controller.signal
+      })
+    } finally {
+      window.clearTimeout(timeoutId)
+    }
   }
 
   return xhrRequest(endpoint, {
@@ -131,6 +139,7 @@ function xhrRequest(
     const xhr = new XMLHttpRequest()
     xhr.open(options.method, endpoint, true)
     xhr.withCredentials = true
+    xhr.timeout = AUTH_REQUEST_TIMEOUT_MS
 
     Object.entries(options.headers).forEach(([name, value]) => {
       xhr.setRequestHeader(name, value)

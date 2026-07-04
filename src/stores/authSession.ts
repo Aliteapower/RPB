@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { AuthApiError, fetchCurrentUser, login, logout } from '../api/authApi'
 import type { AuthUser, LoginRequest } from '../types/auth'
 
-const localValidationStoreId = '20000000-0000-0000-0000-000000000983'
+const missingStoreScopeRoute = '/login?storeScope=missing'
 
 export const useAuthSessionStore = defineStore('authSession', {
   state: () => ({
@@ -19,12 +19,12 @@ export const useAuthSessionStore = defineStore('authSession', {
       state.user?.roles.includes('tenant_admin') === true &&
       state.user?.permissions.includes('tenant.admin.manage') === true,
     tenantAdminHomeRoute: state => {
-      const storeId = state.user?.defaultStoreId || state.user?.storeIds[0] || localValidationStoreId
-      return `/stores/${storeId}/admin/profile`
+      const storeId = state.user?.defaultStoreId || state.user?.storeIds[0]
+      return storeId ? `/stores/${storeId}/admin/profile` : missingStoreScopeRoute
     },
     defaultStoreRoute: state => {
-      const storeId = state.user?.defaultStoreId || state.user?.storeIds[0] || localValidationStoreId
-      return `/stores/${storeId}/staff`
+      const storeId = state.user?.defaultStoreId || state.user?.storeIds[0]
+      return storeId ? `/stores/${storeId}/staff` : missingStoreScopeRoute
     },
     defaultHomeRoute(): string {
       if (this.isPlatformAdmin) {
