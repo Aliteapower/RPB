@@ -41,4 +41,37 @@ class ReservationShareTemplateDefaultMigrationTest {
             .doesNotContain("Google Map：")
             .doesNotContain("{{storePhone}} | {{storeAddress}}");
     }
+
+    @Test
+    void catchUpMigrationRefreshesLateLegacyDefaultsFromActiveSeedOnly() throws Exception {
+        Path migrationPath = Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V027__refresh_legacy_reservation_share_defaults.sql"
+        );
+
+        assertThat(migrationPath).exists();
+        String migration = Files.readString(migrationPath);
+
+        assertThat(migration)
+            .contains("old_default_templates(template_md5)")
+            .contains("'0330ca8282c4ce3c608ebf3fa23c9c4a'")
+            .contains("'470d74c4357fd9e699ad6556e125d7a7'")
+            .contains("active_seed as")
+            .contains("platform_reservation_share_template_seeds")
+            .contains("seed_key = 'restaurant_reservation_confirmation_v1'")
+            .contains("status = 'active'")
+            .contains("deleted_at is null")
+            .contains("update stores")
+            .contains("reservation_share_template = active_seed.template_text")
+            .contains("version = stores.version + 1")
+            .contains("md5(convert_to(replace(replace(btrim(stores.reservation_share_template)")
+            .contains("in (select template_md5 from old_default_templates)")
+            .contains("stores.reservation_share_template is distinct from active_seed.template_text")
+            .doesNotContain("stores.reservation_share_template is not null")
+            .doesNotContain("stores.reservation_share_template <> active_seed.template_text");
+    }
 }
