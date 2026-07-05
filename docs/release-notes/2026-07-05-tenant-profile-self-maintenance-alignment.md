@@ -41,6 +41,17 @@
 - `npm run build`: passed.
 - `git diff --check`: passed.
 
+## Production Deployment
+
+- Deployed frontend artifact from commit `f756b49`.
+- Backup created on production: `/opt/rpb/backups/20260705-1042-f756b49-frontend`.
+- New frontend asset: `/assets/index-BSFDVOuc.js`.
+- Production smoke:
+  - `http://booking.yumstone.sg/login`: 200.
+  - `http://booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/admin/staff/me/edit`: 200.
+  - `http://booking.yumstone.sg/assets/index-BSFDVOuc.js`: 200.
+  - `http://booking.yumstone.sg/api/v1/auth/me`: 401 for unauthenticated access.
+
 ## Rollback Notes
 
 - Roll back the deployed frontend assets to the previous `/opt/rpb/frontend` backup.
