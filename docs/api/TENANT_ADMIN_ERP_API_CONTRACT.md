@@ -17,6 +17,8 @@ Endpoints:
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/v1/stores/{storeId}/tenant-admin/staff` | Staff list, supports `keyword`, `limit`, `offset`. |
+| `GET` | `/api/v1/stores/{storeId}/tenant-admin/staff/me` | Read the current tenant administrator account for self-maintenance. |
+| `PATCH` | `/api/v1/stores/{storeId}/tenant-admin/staff/me` | Update the current tenant administrator account profile and optional password. |
 | `POST` | `/api/v1/stores/{storeId}/tenant-admin/staff` | Create staff account. |
 | `PATCH` | `/api/v1/stores/{storeId}/tenant-admin/staff/{staffId}` | Update staff profile, status, optional password reset. |
 | `GET` | `/api/v1/stores/{storeId}/tenant-admin/tables` | Dining table list, supports `keyword`, `limit`, `offset`. |
@@ -64,6 +66,16 @@ Import overwrite rule:
 - Existing busy rows, such as `occupied`, keep their current runtime status. Import may update their area/table sort order only when `分区组`, `人数`, and `启用=true` still match a safe active table shape.
 - Missing rows are created.
 - Import never writes another tenant or store because the endpoint resolves tenant/store from the authenticated tenant admin actor.
+
+Tenant administrator self-maintenance:
+
+- `staff/me` is scoped to the authenticated account id and requires role `tenant_admin`, permission `tenant.admin.manage`, tenant match, and store access.
+- It updates only the current tenant administrator account, not other tenant administrator accounts and not normal staff accounts.
+- It accepts `name`, `phone`, `email`, and optional `password`.
+- It rejects attempts to change `employeeNo`/username or `status`; tenant admins cannot disable or lock themselves through this endpoint.
+- Password uses the same 6 ASCII letters-or-digits policy as platform tenant admin and staff password resets.
+- The response uses the staff item shape with `accountType = "tenant_admin"` and `self = true` so the Vue list can render it without treating it as a normal staff account.
+- Normal `staff/{staffId}` remains limited to `actor_type = 'staff'`; ordinary staff cannot call tenant-admin APIs and cannot maintain tenant administrator accounts.
 
 Stable errors:
 - `UNAUTHENTICATED` -> 401
