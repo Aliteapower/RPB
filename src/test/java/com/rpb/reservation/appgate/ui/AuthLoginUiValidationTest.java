@@ -335,4 +335,19 @@ class AuthLoginUiValidationTest {
             .contains("uploadSelectedLogo")
             .contains("tenant-admin-staff-self-edit");
     }
+
+    @Test
+    void tenantAdminStaffListShowsTenantProfilePhoneForProtectedAdmin() throws Exception {
+        Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
+
+        String staffPageSource = Files.readString(staffPagePath);
+
+        assertThat(staffPageSource)
+            .contains("getTenantProfile")
+            .contains("tenantContactPhone")
+            .contains("getTenantProfile(storeId.value)")
+            .contains("displayStaffPhone")
+            .contains("item.accountType === 'tenant_admin'")
+            .contains("{{ displayStaffPhone(item) }}");
+    }
 }

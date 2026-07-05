@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   getCurrentTenantAdminStaff,
+  getTenantProfile,
   listStaff,
   TenantAdminApiError,
   type TenantAdminPage,
@@ -19,6 +20,7 @@ const router = useRouter()
 const auth = useAuthSessionStore()
 const staff = ref<TenantAdminStaff[]>([])
 const selfAdminStaff = ref<TenantAdminStaff | null>(null)
+const tenantContactPhone = ref('')
 const loading = ref(false)
 const errorText = ref('')
 const keyword = ref('')
@@ -49,8 +51,9 @@ async function loadStaff(nextOffset = offset.value): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const [selfResponse, response] = await Promise.all([
+    const [selfResponse, profileResponse, response] = await Promise.all([
       getCurrentTenantAdminStaff(storeId.value),
+      getTenantProfile(storeId.value),
       listStaff(storeId.value, {
         keyword: keyword.value,
         limit: limit.value,
@@ -58,6 +61,7 @@ async function loadStaff(nextOffset = offset.value): Promise<void> {
       })
     ])
     selfAdminStaff.value = selfResponse.staff
+    tenantContactPhone.value = profileResponse.profile.contactPhone || ''
     staff.value = response.staff
     page.value = response.page
     offset.value = response.page.offset
@@ -99,6 +103,13 @@ function statusLabel(status: TenantAdminStaff['status']): string {
     return '锁定'
   }
   return '停用'
+}
+
+function displayStaffPhone(item: TenantAdminStaff): string {
+  const phone = item.accountType === 'tenant_admin'
+    ? tenantContactPhone.value || item.phone
+    : item.phone
+  return phone || '-'
 }
 
 function apiErrorText(error: unknown): string {
@@ -184,7 +195,7 @@ function apiErrorText(error: unknown): string {
                   <span v-if="item.accountType === 'tenant_admin'" class="role-badge">管理员</span>
                 </span>
               </td>
-              <td>{{ item.phone || '-' }}</td>
+              <td>{{ displayStaffPhone(item) }}</td>
               <td>{{ item.email || '-' }}</td>
               <td>
                 <span class="status-pill" :class="{ muted: item.status !== 'active' }">
