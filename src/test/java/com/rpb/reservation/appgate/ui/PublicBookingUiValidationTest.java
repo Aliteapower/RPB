@@ -10,7 +10,7 @@ class PublicBookingUiValidationTest {
 
     @Test
     void publicBookingPagePresentsReservationAsThreeStepWizard() throws Exception {
-        String publicBookingPageSource = Files.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
+        String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
 
         assertThat(publicBookingPageSource)
             .contains("type BookingStep = 1 | 2 | 3")
@@ -47,7 +47,7 @@ class PublicBookingUiValidationTest {
 
     @Test
     void publicBookingPageUsesReservationStyleDatePeriodAndTimePicker() throws Exception {
-        String publicBookingPageSource = Files.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
+        String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
 
         assertThat(publicBookingPageSource)
             .contains("v-model=\"selectedDate\"")
@@ -76,7 +76,7 @@ class PublicBookingUiValidationTest {
 
     @Test
     void publicBookingPageDefaultsToLocalDateInsteadOfUtcDate() throws Exception {
-        String publicBookingPageSource = Files.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
+        String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
 
         assertThat(publicBookingPageSource)
             .contains("const minBookingDate = todayDate()")
@@ -129,11 +129,11 @@ class PublicBookingUiValidationTest {
             "PublicBookingPersistenceAdapter.java"
         );
 
-        String publicBookingPageSource = Files.readString(publicBookingPagePath);
-        String publicBookingTypeSource = Files.readString(publicBookingTypePath);
-        String publicBookingControllerSource = Files.readString(publicBookingControllerPath);
-        String publicBookingContextSource = Files.readString(publicBookingContextPath);
-        String publicBookingPersistenceSource = Files.readString(publicBookingPersistencePath);
+        String publicBookingPageSource = FrontendSourceSupport.readString(publicBookingPagePath);
+        String publicBookingTypeSource = FrontendSourceSupport.readString(publicBookingTypePath);
+        String publicBookingControllerSource = FrontendSourceSupport.readString(publicBookingControllerPath);
+        String publicBookingContextSource = FrontendSourceSupport.readString(publicBookingContextPath);
+        String publicBookingPersistenceSource = FrontendSourceSupport.readString(publicBookingPersistencePath);
 
         assertThat(publicBookingPageSource)
             .contains("context.store.shareEmail")
@@ -170,11 +170,11 @@ class PublicBookingUiValidationTest {
 
     @Test
     void tenantAdminPublicBookingPageUsesProjectOperationPanelsForConfiguration() throws Exception {
-        String tenantAdminPublicBookingPageSource = Files.readString(Path.of("src", "pages", "TenantAdminPublicBookingPage.vue"));
-        String publicBookingTypeSource = Files.readString(Path.of("src", "types", "publicBooking.ts"));
-        String publicBookingApiSource = Files.readString(Path.of("src", "api", "publicBookingApi.ts"));
-        String tenantAdminApiSource = Files.readString(Path.of("src", "api", "tenantAdminApi.ts"));
-        String tenantAdminPublicBookingControllerSource = Files.readString(Path.of(
+        String tenantAdminPublicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPublicBookingPage.vue"));
+        String publicBookingTypeSource = FrontendSourceSupport.readString(Path.of("src", "types", "publicBooking.ts"));
+        String publicBookingApiSource = FrontendSourceSupport.readString(Path.of("src", "api", "publicBookingApi.ts"));
+        String tenantAdminApiSource = FrontendSourceSupport.readString(Path.of("src", "api", "tenantAdminApi.ts"));
+        String tenantAdminPublicBookingControllerSource = FrontendSourceSupport.readString(Path.of(
             "src",
             "main",
             "java",
@@ -344,9 +344,9 @@ class PublicBookingUiValidationTest {
 
     @Test
     void downloadableQrCodeComponentIsReusableAndSupportsLogoDownload() throws Exception {
-        String qrComponentSource = Files.readString(Path.of("src", "components", "common", "DownloadableQrCode.vue"));
-        String qrRendererSource = Files.readString(Path.of("src", "utils", "qrCodeRenderer.ts"));
-        String packageJsonSource = Files.readString(Path.of("package.json"));
+        String qrComponentSource = FrontendSourceSupport.readString(Path.of("src", "components", "common", "DownloadableQrCode.vue"));
+        String qrRendererSource = FrontendSourceSupport.readString(Path.of("src", "utils", "qrCodeRenderer.ts"));
+        String packageJsonSource = FrontendSourceSupport.readString(Path.of("package.json"));
 
         assertThat(qrComponentSource)
             .contains("defineProps")
@@ -359,8 +359,8 @@ class PublicBookingUiValidationTest {
             .contains("downloadQrCodePng")
             .contains("canvasRef")
             .contains("<canvas")
-            .contains("下载二维码")
-            .contains("二维码生成失败");
+            .contains("components.downloadableQrCode.download")
+            .contains("components.downloadableQrCode.errors.renderFailed");
 
         assertThat(qrRendererSource)
             .contains("import QRCode from 'qrcode'")

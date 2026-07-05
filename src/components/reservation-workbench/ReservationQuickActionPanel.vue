@@ -3,10 +3,10 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 interface ReservationQuickAction {
-  label: string
-  symbol: string
+  labelKey: string
+  symbolKey: string
   tone: string
-  disabledTitle?: string
+  disabledTitleKey?: string
   disabled?: boolean
   routeName?: string
   includeBusinessDateQuery?: boolean
@@ -25,30 +25,30 @@ const emit = defineEmits<{
 
 const entries = computed<ReservationQuickAction[]>(() => [
   {
-    label: '创建预约',
+    labelKey: 'reservationWorkbench.quickActions.createReservation',
     action: 'create-reservation',
     disabled: !props.canCreateReservationForSelectedDate,
-    disabledTitle: '过去日期不可创建预约',
-    symbol: '约',
+    disabledTitleKey: 'reservationWorkbench.quickActions.createDisabledTitle',
+    symbolKey: 'reservationWorkbench.quickActions.createReservationSymbol',
     tone: 'primary'
   },
   {
-    label: '现场取号',
+    labelKey: 'reservationWorkbench.quickActions.walkInQueue',
     routeName: 'walk-in-queue',
-    symbol: '取',
+    symbolKey: 'reservationWorkbench.quickActions.walkInQueueSymbol',
     tone: 'plain'
   },
   {
-    label: '预约转排队',
+    labelKey: 'reservationWorkbench.quickActions.reservationToQueue',
     routeName: 'reservation-arrived-to-queue',
     includeBusinessDateQuery: true,
-    symbol: '排',
+    symbolKey: 'reservationWorkbench.quickActions.reservationToQueueSymbol',
     tone: 'plain'
   }
 ])
 
 function actionKey(entry: ReservationQuickAction): string {
-  return entry.routeName ?? entry.action ?? entry.label
+  return entry.routeName ?? entry.action ?? entry.labelKey
 }
 
 function routeFor(entry: ReservationQuickAction) {
@@ -77,10 +77,10 @@ function triggerAction(entry: ReservationQuickAction): void {
 </script>
 
 <template>
-  <section class="reservation-actions" aria-label="预约管理">
+  <section class="reservation-actions" :aria-label="$t('reservationWorkbench.quickActions.aria')">
     <header>
       <span></span>
-      <h2>预约管理</h2>
+      <h2>{{ $t('reservationWorkbench.quickActions.title') }}</h2>
     </header>
 
     <div class="reservation-actions__grid">
@@ -91,8 +91,8 @@ function triggerAction(entry: ReservationQuickAction): void {
           :class="`reservation-actions__entry--${entry.tone}`"
           :to="routeFor(entry)"
         >
-          <span class="reservation-actions__symbol" aria-hidden="true">{{ entry.symbol }}</span>
-          <strong>{{ entry.label }}</strong>
+          <span class="reservation-actions__symbol" aria-hidden="true">{{ $t(entry.symbolKey) }}</span>
+          <strong>{{ $t(entry.labelKey) }}</strong>
         </RouterLink>
 
         <button
@@ -101,12 +101,12 @@ function triggerAction(entry: ReservationQuickAction): void {
           :class="`reservation-actions__entry--${entry.tone}`"
           :aria-disabled="entry.disabled ? 'true' : 'false'"
           :disabled="entry.disabled"
-          :title="entry.disabled ? entry.disabledTitle : undefined"
+          :title="entry.disabled && entry.disabledTitleKey ? $t(entry.disabledTitleKey) : undefined"
           type="button"
           @click="triggerAction(entry)"
         >
-          <span class="reservation-actions__symbol" aria-hidden="true">{{ entry.symbol }}</span>
-          <strong>{{ entry.label }}</strong>
+          <span class="reservation-actions__symbol" aria-hidden="true">{{ $t(entry.symbolKey) }}</span>
+          <strong>{{ $t(entry.labelKey) }}</strong>
         </button>
       </template>
     </div>

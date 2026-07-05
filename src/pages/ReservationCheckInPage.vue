@@ -10,6 +10,9 @@ import type {
   CheckInReservationResponse,
   ReservationCheckInApiErrorResponse
 } from '../types/reservationCheckIn'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -183,28 +186,28 @@ function queryValue(value: unknown): string {
   <main class="staff-workbench-shell staff-workbench-shell--padded reservation-check-in-workbench">
     <section class="reservation-check-in-workbench__header">
       <div>
-        <p class="eyebrow">门店员工</p>
-        <h1>预约到店</h1>
-        <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
+        <p class="eyebrow">{{ gt('generated.reservation-check-in.001') }}</p>
+        <h1>{{ gt('generated.reservation-check-in.002') }}</h1>
+        <p class="store-context">{{ gt('generated.reservation-check-in.003') }} {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
       </div>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回</RouterLink>
+      <RouterLink class="home-link" :to="staffHomeRoute">{{ gt('generated.reservation-check-in.004') }}</RouterLink>
     </section>
 
     <form
       class="reservation-check-in-card"
-      aria-label="确认预约客人已到店"
+      :aria-label="gt('generated.reservation-check-in.005')"
       @submit.prevent="submitCheckIn"
     >
       <header class="reservation-check-in-card__header">
-        <span aria-hidden="true">到</span>
+        <span aria-hidden="true">{{ gt('generated.reservation-check-in.006') }}</span>
         <div>
-          <h2>确认预约客人已到店</h2>
-          <p>输入预约 ID，按现有权限和状态机完成到店确认。</p>
+          <h2>{{ gt('generated.reservation-check-in.007') }}</h2>
+          <p>{{ gt('generated.reservation-check-in.008') }}</p>
         </div>
       </header>
 
       <label class="reservation-check-in-card__primary-field">
-        <span>预约 ID</span>
+        <span>{{ gt('generated.reservation-check-in.009') }}</span>
         <input
           v-model="form.reservationId"
           autocomplete="off"
@@ -215,78 +218,75 @@ function queryValue(value: unknown): string {
       </label>
 
       <label>
-        <span>到店时间（可选）</span>
+        <span>{{ gt('generated.reservation-check-in.010') }}</span>
         <input v-model="form.arrivedAt" name="arrivedAt" type="datetime-local" />
       </label>
 
       <label>
-        <span>原因代码（可选）</span>
+        <span>{{ gt('generated.reservation-check-in.011') }}</span>
         <input v-model="form.reasonCode" name="reasonCode" type="text" />
       </label>
 
       <label>
-        <span>备注（可选）</span>
+        <span>{{ gt('generated.reservation-check-in.012') }}</span>
         <textarea v-model="form.note" name="note" rows="3" />
       </label>
 
       <footer class="reservation-check-in-card__actions">
         <button class="reservation-check-in-card__save" :disabled="!canSubmit" type="submit">
-          {{ isSubmitting ? '提交中...' : '确认到店' }}
+          {{ isSubmitting ? gt('generated.reservation-check-in.013') : gt('generated.reservation-check-in.014') }}
         </button>
-        <RouterLink class="reservation-check-in-card__cancel" :to="staffHomeRoute">
-          返回
-        </RouterLink>
+        <RouterLink class="reservation-check-in-card__cancel" :to="staffHomeRoute"> {{ gt('generated.reservation-check-in.015') }} </RouterLink>
       </footer>
     </form>
 
     <section v-if="result" class="check-in-result-card check-in-result-card--success" aria-live="polite">
-      <h2>到店确认成功</h2>
+      <h2>{{ gt('generated.reservation-check-in.016') }}</h2>
       <div class="reservation-highlight status-highlight">
-        <span>预约状态</span>
+        <span>{{ gt('generated.reservation-check-in.017') }}</span>
         <strong>{{ result.status }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>预约编号</span>
+        <span>{{ gt('generated.reservation-check-in.018') }}</span>
         <strong>{{ result.reservationCode }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>是否已到店</span>
+        <span>{{ gt('generated.reservation-check-in.019') }}</span>
         <strong>{{ result.alreadyArrived }}</strong>
       </div>
-      <p v-if="arrivedStatus" class="arrived-note">状态：arrived</p>
-      <p v-if="result.alreadyArrived" class="arrived-note">该预约此前已完成到店确认</p>
+      <p v-if="arrivedStatus" class="arrived-note">{{ gt('generated.reservation-check-in.020') }}</p>
+      <p v-if="result.alreadyArrived" class="arrived-note">{{ gt('generated.reservation-check-in.021') }}</p>
       <dl>
         <div>
-          <dt>预约 ID</dt>
+          <dt>{{ gt('generated.reservation-check-in.022') }}</dt>
           <dd>{{ result.reservationId }}</dd>
         </div>
         <div>
-          <dt>到店时间</dt>
+          <dt>{{ gt('generated.reservation-check-in.023') }}</dt>
           <dd>{{ formatStoreDateTime(result.arrivedAt) }}</dd>
         </div>
         <div>
-          <dt>事件</dt>
+          <dt>{{ gt('generated.reservation-check-in.024') }}</dt>
           <dd>{{ eventsDisplay }}</dd>
         </div>
         <div>
-          <dt>幂等状态</dt>
+          <dt>{{ gt('generated.reservation-check-in.025') }}</dt>
           <dd>{{ result.idempotency.status }}</dd>
         </div>
         <div>
-          <dt>幂等重放</dt>
+          <dt>{{ gt('generated.reservation-check-in.026') }}</dt>
           <dd>{{ result.idempotency.replayed ?? false }}</dd>
         </div>
       </dl>
     </section>
 
     <section v-if="apiError" class="check-in-result-card check-in-result-card--error" aria-live="assertive">
-      <h2>到店确认失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+      <h2>{{ gt('generated.reservation-check-in.027') }}</h2>
+      <p class="error-code">{{ gt('generated.reservation-check-in.028') }}{{ apiError.error.code }}</p>
+      <p class="message-key">{{ gt('generated.reservation-check-in.029') }}{{ apiError.error.messageKey }}</p>
     </section>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
+    <p v-if="lastIdempotencyKey" class="idempotency-key"> {{ gt('generated.reservation-check-in.030') }} {{ lastIdempotencyKey }}
     </p>
 
     <StaffBottomNav :store-id="storeId" active-tab="reservation" />

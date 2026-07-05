@@ -10,18 +10,19 @@ class TemporaryTableGroupUiValidationTest {
 
     @Test
     void staffSeatingEntrancesSupportTemporaryTableGroups() throws Exception {
-        String picker = Files.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
-        String reservationPage = Files.readString(Path.of("src", "pages", "ReservationArrivedDirectSeatingPage.vue"));
-        String queuePage = Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
-        String walkInPage = Files.readString(Path.of("src", "pages", "WalkInDirectSeatingPage.vue"));
-        String seatDialog = Files.readString(Path.of("src", "components", "reservation-workbench", "ReservationSeatDialog.vue"));
-        String tablePage = Files.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
-        String reservationApi = Files.readString(Path.of("src", "api", "reservationArrivedDirectSeatingApi.ts"));
-        String queueApi = Files.readString(Path.of("src", "api", "seatingFromCalledQueueApi.ts"));
-        String walkInApi = Files.readString(Path.of("src", "api", "walkInDirectSeatingApi.ts"));
-        String reservationTypes = Files.readString(Path.of("src", "types", "reservationArrivedDirectSeating.ts"));
-        String queueTypes = Files.readString(Path.of("src", "types", "seatingFromCalledQueue.ts"));
-        String walkInTypes = Files.readString(Path.of("src", "types", "walkInDirectSeating.ts"));
+        String picker = FrontendSourceSupport.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+        String reservationPage = FrontendSourceSupport.readString(Path.of("src", "pages", "ReservationArrivedDirectSeatingPage.vue"));
+        String queuePage = FrontendSourceSupport.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+        String walkInPage = FrontendSourceSupport.readString(Path.of("src", "pages", "WalkInDirectSeatingPage.vue"));
+        String seatDialog = FrontendSourceSupport.readString(Path.of("src", "components", "reservation-workbench", "ReservationSeatDialog.vue"));
+        String tablePage = FrontendSourceSupport.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
+        String reservationApi = FrontendSourceSupport.readString(Path.of("src", "api", "reservationArrivedDirectSeatingApi.ts"));
+        String queueApi = FrontendSourceSupport.readString(Path.of("src", "api", "seatingFromCalledQueueApi.ts"));
+        String walkInApi = FrontendSourceSupport.readString(Path.of("src", "api", "walkInDirectSeatingApi.ts"));
+        String reservationTypes = FrontendSourceSupport.readString(Path.of("src", "types", "reservationArrivedDirectSeating.ts"));
+        String queueTypes = FrontendSourceSupport.readString(Path.of("src", "types", "seatingFromCalledQueue.ts"));
+        String walkInTypes = FrontendSourceSupport.readString(Path.of("src", "types", "walkInDirectSeating.ts"));
+        String zhSource = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "zh-CN.ts"));
 
         assertThat(picker)
             .contains("selectedTemporaryTableIds")
@@ -31,11 +32,15 @@ class TemporaryTableGroupUiValidationTest {
             .contains("showSelectionModeControls")
             .contains("selectionMode")
             .contains("toggleTemporaryTable")
-            .contains("临时组合")
+            .contains("staffControls.tablePicker.temporaryMode")
             .contains("isTemporaryGroupMember")
             .contains("resourceUnavailableReasonText")
-            .contains("临时组占用")
+            .contains("staffControls.tablePicker.unavailable.temporaryGroupMember")
             .doesNotContain("`${statusLabel(resource.status)}，当前不可选`");
+
+        assertThat(zhSource)
+            .contains("temporaryMode: '临时组合'")
+            .contains("temporaryGroupMember: '临时组占用'");
 
         assertThat(reservationPage + queuePage + walkInPage + seatDialog)
             .contains("temporaryTableIds: [] as string[]")

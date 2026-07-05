@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 const props = withDefaults(
   defineProps<{
     customerName: string
@@ -15,7 +18,11 @@ const emit = defineEmits<{
   'update:salutation': [value: string]
 }>()
 
-const SALUTATION_OPTIONS = ['先生', '女士'] as const
+const { t } = useI18n()
+const salutationOptions = computed(() => [
+  t('staffControls.guest.salutations.mr'),
+  t('staffControls.guest.salutations.ms')
+])
 const fieldId = `staff-guest-name-${Math.random().toString(36).slice(2)}`
 
 function updateCustomerName(event: Event): void {
@@ -29,7 +36,7 @@ function selectSalutation(value: string): void {
 
 <template>
   <section class="staff-guest-name-field">
-    <label class="staff-guest-name-field__label" :for="fieldId">顾客姓名</label>
+    <label class="staff-guest-name-field__label" :for="fieldId">{{ t('staffControls.guest.nameLabel') }}</label>
 
     <div class="staff-guest-name-field__row">
       <input
@@ -37,15 +44,15 @@ function selectSalutation(value: string): void {
         :value="customerName"
         autocomplete="name"
         name="customerName"
-        placeholder="姓名"
+        :placeholder="t('staffControls.guest.namePlaceholder')"
         type="text"
         :disabled="disabled"
         @input="updateCustomerName"
       />
 
-      <div class="staff-guest-name-field__salutations" aria-label="顾客称呼">
+      <div class="staff-guest-name-field__salutations" :aria-label="t('staffControls.guest.salutationAria')">
         <button
-          v-for="option in SALUTATION_OPTIONS"
+          v-for="option in salutationOptions"
           :key="option"
           type="button"
           :aria-pressed="salutation === option"

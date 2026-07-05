@@ -30,6 +30,9 @@ import type {
 } from '../types/reservationTodayView'
 import type { MeAppEntry } from '../types/meApps'
 import type { CreateReservationResponse } from '../types/reservation'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -37,14 +40,14 @@ const storeContext = useStoreContextStore()
 const { currentTimeText } = useCurrentClock()
 
 const statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: string }> = [
-  { value: 'operational', label: '进行中' },
-  { value: 'all', label: '全部' },
-  { value: 'confirmed', label: '已预约' },
-  { value: 'arrived', label: '已到店' },
-  { value: 'seated', label: '已入座' },
-  { value: 'cancelled', label: '已取消' },
-  { value: 'no_show', label: '爽约' },
-  { value: 'completed', label: '已完成' }
+  { value: 'operational', label: gt('generated.reservation-today-view.008') },
+  { value: 'all', label: gt('generated.reservation-today-view.009') },
+  { value: 'confirmed', label: gt('generated.reservation-today-view.010') },
+  { value: 'arrived', label: gt('generated.reservation-today-view.011') },
+  { value: 'seated', label: gt('generated.reservation-today-view.012') },
+  { value: 'cancelled', label: gt('generated.reservation-today-view.013') },
+  { value: 'no_show', label: gt('generated.reservation-today-view.014') },
+  { value: 'completed', label: gt('generated.reservation-today-view.015') }
 ]
 
 const businessDate = ref(todayDateInput())
@@ -68,9 +71,9 @@ let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const appStatusLabel = computed(() => (isLoading.value ? '加载中' : '今日预约'))
+const appStatusLabel = computed(() => (isLoading.value ? gt('generated.reservation-today-view.016') : gt('generated.reservation-today-view.017')))
 const items = computed(() => response.value?.items ?? [])
-const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || '后端默认')
+const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || gt('generated.reservation-today-view.018'))
 const storeTimezone = computed(() => response.value?.storeTimezone || 'Asia/Singapore')
 const storeTodayDate = computed(() => todayDateInput(storeTimezone.value))
 const canCreateReservationForSelectedDate = computed(() => businessDate.value >= storeTodayDate.value)
@@ -415,10 +418,10 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.reservation-today-view.019')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.reservation-today-view.007')}${value.slice(0, 8)}`
 }
 
 function monthKeyFromDate(value: string): string {
@@ -459,7 +462,7 @@ function isOpenCreateQuery(value: unknown): boolean {
     >
       <template #action>
         <button type="button" :disabled="isLoading" @click="refreshReservationWorkbench">
-          {{ isLoading ? '刷新中' : '刷新' }}
+          {{ isLoading ? gt('generated.reservation-today-view.001') : gt('generated.reservation-today-view.002') }}
         </button>
       </template>
     </StaffHomeTopBar>
@@ -469,7 +472,7 @@ function isOpenCreateQuery(value: unknown): boolean {
         v-model:selected-date="businessDate"
         :today-date="storeTodayDate"
         :reservation-counts="reservationCounts"
-        calendar-label="预约日历"
+        :calendar-label="gt('generated.reservation-today-view.003')"
         @visible-month-changed="handleVisibleMonthChanged"
       />
 
@@ -501,9 +504,9 @@ function isOpenCreateQuery(value: unknown): boolean {
       />
 
       <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
-        <h2>操作失败</h2>
-        <p>错误代码：{{ checkInApiError.error.code }}</p>
-        <p>消息键：{{ checkInApiError.error.messageKey }}</p>
+        <h2>{{ gt('generated.reservation-today-view.004') }}</h2>
+        <p>{{ gt('generated.reservation-today-view.005') }}{{ checkInApiError.error.code }}</p>
+        <p>{{ gt('generated.reservation-today-view.006') }}{{ checkInApiError.error.messageKey }}</p>
       </section>
     </div>
 

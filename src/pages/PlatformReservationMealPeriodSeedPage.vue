@@ -11,6 +11,9 @@ import { useAuthSessionStore } from '../stores/authSession'
 import type {
   ReservationMealPeriodMutation
 } from '../types/reservationMealPeriod'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const auth = useAuthSessionStore()
 const loading = ref(false)
@@ -72,7 +75,7 @@ async function saveSeed(): Promise<void> {
       sortOrder: period.sortOrder,
       version: period.version
     }))
-    savedText.value = '已保存'
+    savedText.value = gt('generated.platform-reservation-meal-period-seed.023')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -84,7 +87,7 @@ function addPeriod(): void {
   const index = form.periods.length
   form.periods.push({
     periodKey: `period_${index + 1}`,
-    displayName: '新餐段',
+    displayName: gt('generated.platform-reservation-meal-period-seed.024'),
     startLocalTime: '11:00',
     endLocalTime: '15:00',
     crossesNextDay: false,
@@ -114,19 +117,19 @@ function toMutation(period: ReservationMealPeriodMutation): ReservationMealPerio
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof ReservationMealPeriodApiError)) {
-    return '操作失败'
+    return gt('generated.platform-reservation-meal-period-seed.025')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.platform-reservation-meal-period-seed.026')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有平台后台权限'
+    return gt('generated.platform-reservation-meal-period-seed.027')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查餐段名称、时间和间隔'
+    return gt('generated.platform-reservation-meal-period-seed.028')
   }
-  return '操作失败'
+  return gt('generated.platform-reservation-meal-period-seed.029')
 }
 
 function normalizeTime(value: string): string {
@@ -141,34 +144,34 @@ function normalizeTime(value: string): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>平台种子配置</span>
-          <h1>预约餐段种子</h1>
+          <span>{{ gt('generated.platform-reservation-meal-period-seed.001') }}</span>
+          <h1>{{ gt('generated.platform-reservation-meal-period-seed.002') }}</h1>
         </div>
         <button class="primary-button" type="button" :disabled="saving || loading" @click="saveSeed">
-          {{ saving ? '保存中' : '保存' }}
+          {{ saving ? gt('generated.platform-reservation-meal-period-seed.003') : gt('generated.platform-reservation-meal-period-seed.004') }}
         </button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.platform-reservation-meal-period-seed.005') }}</p>
 
-      <form v-else class="period-editor" aria-label="平台预约餐段种子" @submit.prevent="saveSeed">
+      <form v-else class="period-editor" :aria-label="gt('generated.platform-reservation-meal-period-seed.006')" @submit.prevent="saveSeed">
         <div class="editor-toolbar">
-          <h2>平台餐段</h2>
-          <button class="secondary-button" type="button" @click="addPeriod">新增餐段</button>
+          <h2>{{ gt('generated.platform-reservation-meal-period-seed.007') }}</h2>
+          <button class="secondary-button" type="button" @click="addPeriod">{{ gt('generated.platform-reservation-meal-period-seed.008') }}</button>
         </div>
 
-        <div class="period-grid" role="table" aria-label="平台餐段列表">
+        <div class="period-grid" role="table" :aria-label="gt('generated.platform-reservation-meal-period-seed.009')">
           <div class="period-grid__head" role="row">
-            <span>键</span>
-            <span>名称</span>
-            <span>开始</span>
-            <span>结束</span>
-            <span>跨日</span>
-            <span>间隔</span>
-            <span>状态</span>
-            <span>排序</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.010') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.011') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.012') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.013') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.014') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.015') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.016') }}</span>
+            <span>{{ gt('generated.platform-reservation-meal-period-seed.017') }}</span>
             <span></span>
           </div>
 
@@ -184,15 +187,15 @@ function normalizeTime(value: string): string {
             <input v-model="period.endLocalTime" required type="time" />
             <label class="switch-cell">
               <input v-model="period.crossesNextDay" type="checkbox" />
-              <span>{{ period.crossesNextDay ? '是' : '否' }}</span>
+              <span>{{ period.crossesNextDay ? gt('generated.platform-reservation-meal-period-seed.018') : gt('generated.platform-reservation-meal-period-seed.019') }}</span>
             </label>
             <input v-model.number="period.slotIntervalMinutes" required min="5" max="240" step="5" type="number" />
             <select v-model="period.status">
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
+              <option value="active">{{ gt('generated.platform-reservation-meal-period-seed.020') }}</option>
+              <option value="disabled">{{ gt('generated.platform-reservation-meal-period-seed.021') }}</option>
             </select>
             <input v-model.number="period.sortOrder" required type="number" />
-            <button class="link-button" type="button" @click="removePeriod(index)">删除</button>
+            <button class="link-button" type="button" @click="removePeriod(index)">{{ gt('generated.platform-reservation-meal-period-seed.022') }}</button>
           </div>
         </div>
       </form>

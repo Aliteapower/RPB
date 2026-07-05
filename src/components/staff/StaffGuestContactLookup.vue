@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { lookupCustomerByPhone } from '../../api/customerPhoneLookupApi'
 import StaffGuestNameField from './StaffGuestNameField.vue'
@@ -29,7 +30,7 @@ const emit = defineEmits<{
 
 const isLookingUp = ref(false)
 const lookupState = ref<'idle' | 'found' | 'not-found' | 'error'>('idle')
-const lookupMessage = ref('')
+const { t } = useI18n()
 let lookupSequence = 0
 
 watch(
@@ -85,13 +86,11 @@ async function runPhoneLookup(): Promise<void> {
         emit('update:salutation', result.customer.nickname)
       }
       lookupState.value = 'found'
-      lookupMessage.value = '已识别顾客'
       return
     }
 
     emit('update:customerId', '')
     lookupState.value = 'not-found'
-    lookupMessage.value = '新手机号'
   } catch {
     if (currentSequence !== lookupSequence) {
       return
@@ -99,7 +98,6 @@ async function runPhoneLookup(): Promise<void> {
 
     emit('update:customerId', '')
     lookupState.value = 'error'
-    lookupMessage.value = '顾客识别失败'
   } finally {
     if (currentSequence === lookupSequence) {
       isLookingUp.value = false
@@ -110,7 +108,19 @@ async function runPhoneLookup(): Promise<void> {
 function clearLookupState(): void {
   isLookingUp.value = false
   lookupState.value = 'idle'
-  lookupMessage.value = ''
+}
+
+function lookupMessage(): string {
+  if (lookupState.value === 'found') {
+    return t('staffControls.guest.lookup.found')
+  }
+  if (lookupState.value === 'not-found') {
+    return t('staffControls.guest.lookup.notFound')
+  }
+  if (lookupState.value === 'error') {
+    return t('staffControls.guest.lookup.error')
+  }
+  return ''
 }
 </script>
 
@@ -131,12 +141,12 @@ function clearLookupState(): void {
     />
 
     <p
-      v-if="lookupMessage"
+      v-if="lookupState !== 'idle'"
       class="staff-guest-contact-lookup__status"
       :class="`staff-guest-contact-lookup__status--${lookupState}`"
       aria-live="polite"
     >
-      <span>{{ isLookingUp ? '识别中...' : lookupMessage }}</span>
+      <span>{{ isLookingUp ? t('staffControls.guest.lookup.lookingUp') : lookupMessage() }}</span>
       <small v-if="customerId && lookupState === 'found'">{{ customerId }}</small>
     </p>
   </section>

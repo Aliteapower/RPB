@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   cancelReservation,
@@ -44,6 +45,7 @@ const props = defineProps<{
   storeTimezone: string
 }>()
 
+const { t } = useI18n()
 const emit = defineEmits<{
   'update:selectedStatus': [value: ReservationTodayViewStatusFilter]
   cancelled: [value: CancelReservationResponse]
@@ -229,16 +231,16 @@ function createLocalStatusActionError(
 </script>
 
 <template>
-  <section class="reservation-panel reservation-today-list" aria-label="当日预约">
+  <section class="reservation-panel reservation-today-list" :aria-label="$t('reservationWorkbench.todayList.aria')">
     <header class="reservation-panel__header">
       <div>
         <span></span>
-        <h2>当日预约</h2>
+        <h2>{{ $t('reservationWorkbench.todayList.title') }}</h2>
       </div>
-      <strong>共 {{ visibleItems.length }} 条</strong>
+      <strong>{{ $t('reservationWorkbench.todayList.total', { count: visibleItems.length }) }}</strong>
     </header>
 
-    <section class="reservation-today-list__status-filter" aria-label="状态筛选">
+    <section class="reservation-today-list__status-filter" :aria-label="$t('reservationWorkbench.todayList.statusFilterAria')">
       <button
         v-for="option in statusOptions"
         :key="option.value"
@@ -251,56 +253,56 @@ function createLocalStatusActionError(
       </button>
     </section>
 
-    <section class="reservation-today-list__filters" aria-label="预约筛选">
+    <section class="reservation-today-list__filters" :aria-label="$t('reservationWorkbench.todayList.filtersAria')">
       <label>
-        <span>手机号</span>
-        <input v-model.trim="phoneFilter" placeholder="手机号" type="search" />
+        <span>{{ $t('reservationWorkbench.todayList.phone') }}</span>
+        <input v-model.trim="phoneFilter" :placeholder="$t('reservationWorkbench.todayList.phone')" type="search" />
       </label>
 
       <label>
-        <span>人数</span>
+        <span>{{ $t('reservationWorkbench.todayList.partySize') }}</span>
         <select v-model="partySizeFilter">
-          <option value="">全部人数</option>
+          <option value="">{{ $t('reservationWorkbench.todayList.allPartySizes') }}</option>
           <option v-for="size in partySizeOptions" :key="size" :value="String(size)">
-            {{ size }}人
+            {{ $t('reservationWorkbench.todayList.partySizeOption', { size }) }}
           </option>
         </select>
       </label>
 
-      <button type="button" @click="resetFilters">重置</button>
+      <button type="button" @click="resetFilters">{{ $t('common.actions.reset') }}</button>
     </section>
 
     <section v-if="isLoading" class="reservation-today-list__state" aria-live="polite">
-      <h3>加载中...</h3>
-      <p>正在读取当前门店预约。</p>
+      <h3>{{ $t('reservationWorkbench.todayList.loadingTitle') }}</h3>
+      <p>{{ $t('reservationWorkbench.todayList.loadingDescription') }}</p>
     </section>
 
     <section v-if="apiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
-      <h3>{{ formatAppGateErrorTitle(apiError.error, '加载失败') }}</h3>
-      <p>{{ formatAppGateErrorMessage(apiError.error, '暂时无法读取当日预约，请稍后重试。') }}</p>
+      <h3>{{ formatAppGateErrorTitle(apiError.error, t('reservationWorkbench.todayList.loadFailedTitle')) }}</h3>
+      <p>{{ formatAppGateErrorMessage(apiError.error, t('reservationWorkbench.todayList.loadFailedMessage')) }}</p>
     </section>
 
     <section v-if="cancelApiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
-      <h3>{{ formatAppGateErrorTitle(cancelApiError.error, '取消失败') }}</h3>
-      <p>{{ formatAppGateErrorMessage(cancelApiError.error, '暂时无法取消预约，请稍后重试。') }}</p>
+      <h3>{{ formatAppGateErrorTitle(cancelApiError.error, t('reservationWorkbench.todayList.cancelFailedTitle')) }}</h3>
+      <p>{{ formatAppGateErrorMessage(cancelApiError.error, t('reservationWorkbench.todayList.cancelFailedMessage')) }}</p>
     </section>
 
     <section v-if="statusActionApiError" class="reservation-today-list__state reservation-today-list__state--error" aria-live="assertive">
-      <h3>{{ formatAppGateErrorTitle(statusActionApiError.error, '状态操作失败') }}</h3>
-      <p>{{ formatAppGateErrorMessage(statusActionApiError.error, '暂时无法更新预约状态，请稍后重试。') }}</p>
+      <h3>{{ formatAppGateErrorTitle(statusActionApiError.error, t('reservationWorkbench.todayList.statusActionFailedTitle')) }}</h3>
+      <p>{{ formatAppGateErrorMessage(statusActionApiError.error, t('reservationWorkbench.todayList.statusActionFailedMessage')) }}</p>
     </section>
 
     <section v-if="showEmptyState" class="reservation-today-list__state" aria-live="polite">
-      <h3>今日暂无预约</h3>
-      <p>可以切换日期或状态筛选。</p>
+      <h3>{{ $t('reservationWorkbench.todayList.emptyTitle') }}</h3>
+      <p>{{ $t('reservationWorkbench.todayList.emptyDescription') }}</p>
     </section>
 
     <section v-if="showFilteredEmpty" class="reservation-today-list__state" aria-live="polite">
-      <h3>没有匹配的预约</h3>
-      <p>可以重置筛选后再查看。</p>
+      <h3>{{ $t('reservationWorkbench.todayList.filteredEmptyTitle') }}</h3>
+      <p>{{ $t('reservationWorkbench.todayList.filteredEmptyDescription') }}</p>
     </section>
 
-    <section v-if="visibleItems.length" class="reservation-today-list__items" aria-label="今日预约列表">
+    <section v-if="visibleItems.length" class="reservation-today-list__items" :aria-label="$t('reservationWorkbench.todayList.itemsAria')">
       <ReservationTodayListItem
         v-for="item in visibleItems"
         :key="item.reservationId"

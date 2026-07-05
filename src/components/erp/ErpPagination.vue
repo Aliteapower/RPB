@@ -34,11 +34,15 @@ function nextPage(): void {
 
 <template>
   <footer class="erp-pagination">
-    <span>第 {{ start }}-{{ end }} 条 / 共 {{ total }} 条</span>
+    <span>{{ $t('common.pagination.summary', { start, end, total }) }}</span>
     <div class="pager-actions">
-      <button type="button" :disabled="!canPrev" @click="prevPage">上一页</button>
+      <button type="button" :disabled="!canPrev" @click="prevPage">
+        {{ $t('common.actions.previousPage') }}
+      </button>
       <strong>{{ currentPage }} / {{ totalPages }}</strong>
-      <button type="button" :disabled="!canNext" @click="nextPage">下一页</button>
+      <button type="button" :disabled="!canNext" @click="nextPage">
+        {{ $t('common.actions.nextPage') }}
+      </button>
     </div>
   </footer>
 </template>

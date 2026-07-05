@@ -22,9 +22,9 @@ class StaffCommonGuestInputUiValidationTest {
         assertThat(Files.exists(singaporePhonePath)).isTrue();
         assertThat(Files.exists(contactHelperPath)).isTrue();
 
-        String createDialogSource = Files.readString(createDialogPath);
-        String guestContactLookupSource = Files.readString(guestContactLookupPath);
-        String contactHelperSource = Files.readString(contactHelperPath);
+        String createDialogSource = FrontendSourceSupport.readString(createDialogPath);
+        String guestContactLookupSource = FrontendSourceSupport.readString(guestContactLookupPath);
+        String contactHelperSource = FrontendSourceSupport.readString(contactHelperPath);
 
         assertThat(createDialogSource)
             .contains("StaffGuestContactLookup")
@@ -63,22 +63,25 @@ class StaffCommonGuestInputUiValidationTest {
     void sharedInputsExposeSalutationChoiceAndFixedSingaporePrefix() throws Exception {
         Path guestNamePath = Path.of("src", "components", "staff", "StaffGuestNameField.vue");
         Path singaporePhonePath = Path.of("src", "components", "staff", "StaffSingaporePhoneField.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(Files.exists(guestNamePath)).isTrue();
         assertThat(Files.exists(singaporePhonePath)).isTrue();
+        assertThat(Files.exists(zhPath)).isTrue();
 
-        String guestNameSource = Files.readString(guestNamePath);
-        String singaporePhoneSource = Files.readString(singaporePhonePath);
+        String guestNameSource = FrontendSourceSupport.readString(guestNamePath);
+        String singaporePhoneSource = FrontendSourceSupport.readString(singaporePhonePath);
+        String zhSource = FrontendSourceSupport.readString(zhPath);
 
         assertThat(guestNameSource)
             .contains("defineProps")
             .contains("defineEmits")
             .contains("update:customerName")
             .contains("update:salutation")
-            .contains("先生")
-            .contains("女士")
+            .contains("staffControls.guest.salutations.mr")
+            .contains("staffControls.guest.salutations.ms")
             .contains("aria-pressed")
-            .contains("顾客姓名");
+            .contains("staffControls.guest.nameLabel");
 
         assertThat(singaporePhoneSource)
             .contains("defineProps")
@@ -90,7 +93,13 @@ class StaffCommonGuestInputUiValidationTest {
             .contains("inputmode=\"numeric\"")
             .contains("pattern=\"[0-9]*\"")
             .contains("autocomplete=\"tel-national\"")
-            .contains("手机号");
+            .contains("staffControls.guest.phoneLabel");
+
+        assertThat(zhSource)
+            .contains("nameLabel: '顾客姓名'")
+            .contains("phoneLabel: '手机号'")
+            .contains("mr: '先生'")
+            .contains("ms: '女士'");
     }
 
     @Test
@@ -101,8 +110,8 @@ class StaffCommonGuestInputUiValidationTest {
         assertThat(Files.exists(walkInQueuePath)).isTrue();
         assertThat(Files.exists(walkInDirectSeatingPath)).isTrue();
 
-        assertUsesSharedGuestInputPattern(Files.readString(walkInQueuePath));
-        assertUsesSharedGuestInputPattern(Files.readString(walkInDirectSeatingPath));
+        assertUsesSharedGuestInputPattern(FrontendSourceSupport.readString(walkInQueuePath));
+        assertUsesSharedGuestInputPattern(FrontendSourceSupport.readString(walkInDirectSeatingPath));
     }
 
     private static void assertUsesSharedGuestInputPattern(String source) {

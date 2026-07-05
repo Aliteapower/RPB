@@ -51,39 +51,45 @@ function submitSearch(): void {
       <div class="filter-group">
         <input
           v-model.trim="localKeyword"
-          aria-label="产品线关键字"
-          placeholder="产品线 / App Key / 说明"
+          :aria-label="$t('platform.productLines.list.keywordAria')"
+          :placeholder="$t('platform.productLines.list.keywordPlaceholder')"
           @keyup.enter="submitSearch"
         >
-        <select v-model="localStatus" aria-label="产品线状态">
-          <option value="">全部状态</option>
-          <option value="active">启用</option>
-          <option value="disabled">停用</option>
+        <select v-model="localStatus" :aria-label="$t('platform.productLines.list.statusAria')">
+          <option value="">{{ $t('platform.productLines.list.allStatuses') }}</option>
+          <option value="active">{{ $t('platform.productLines.status.active') }}</option>
+          <option value="disabled">{{ $t('platform.productLines.status.disabled') }}</option>
         </select>
-        <button class="secondary-button" type="button" :disabled="loading" @click="submitSearch">查询</button>
-        <button class="secondary-button" type="button" :disabled="loading" @click="emit('reset')">重置</button>
+        <button class="secondary-button" type="button" :disabled="loading" @click="submitSearch">
+          {{ $t('common.actions.query') }}
+        </button>
+        <button class="secondary-button" type="button" :disabled="loading" @click="emit('reset')">
+          {{ $t('common.actions.reset') }}
+        </button>
       </div>
-      <button class="primary-button" type="button" @click="emit('create')">新增产品线</button>
+      <button class="primary-button" type="button" @click="emit('create')">
+        {{ $t('platform.productLines.list.create') }}
+      </button>
     </header>
 
     <div class="table-panel">
       <table class="data-table">
         <thead>
           <tr>
-            <th>产品线</th>
+            <th>{{ $t('platform.productLines.list.columns.productLine') }}</th>
             <th>App Key</th>
-            <th>状态</th>
-            <th>默认入口</th>
-            <th>排序</th>
-            <th>操作</th>
+            <th>{{ $t('platform.productLines.list.columns.status') }}</th>
+            <th>{{ $t('platform.productLines.list.columns.defaultEntry') }}</th>
+            <th>{{ $t('platform.productLines.list.columns.sortOrder') }}</th>
+            <th>{{ $t('platform.productLines.list.columns.actions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="6" class="table-empty">加载中</td>
+            <td colspan="6" class="table-empty">{{ $t('common.actions.loading') }}</td>
           </tr>
           <tr v-else-if="productLines.length === 0">
-            <td colspan="6" class="table-empty">暂无产品线</td>
+            <td colspan="6" class="table-empty">{{ $t('platform.productLines.list.empty') }}</td>
           </tr>
           <tr
             v-for="productLine in productLines"
@@ -93,11 +99,13 @@ function submitSearch(): void {
           >
             <td>{{ productLine.displayName }}</td>
             <td>{{ productLine.appKey }}</td>
-            <td>{{ productLine.status === 'active' ? '启用' : '停用' }}</td>
-            <td>{{ productLine.defaultEntryRoute || '未配置' }}</td>
+            <td>{{ $t(`platform.productLines.status.${productLine.status}`) }}</td>
+            <td>{{ productLine.defaultEntryRoute || $t('platform.productLines.list.unconfigured') }}</td>
             <td>{{ productLine.sortOrder }}</td>
             <td>
-              <button class="text-action" type="button" @click="emit('edit', productLine)">编辑</button>
+              <button class="text-action" type="button" @click="emit('edit', productLine)">
+                {{ $t('platform.productLines.list.edit') }}
+              </button>
             </td>
           </tr>
         </tbody>
@@ -105,10 +113,10 @@ function submitSearch(): void {
     </div>
 
     <footer class="pagination-bar">
-      <span>第 {{ rangeStart }}-{{ rangeEnd }} 条 / 共 {{ total }} 条</span>
+      <span>{{ $t('common.pagination.summary', { start: rangeStart, end: rangeEnd, total }) }}</span>
       <div class="pager-actions">
         <button class="secondary-button" type="button" :disabled="loading || page <= 0" @click="emit('page', page - 1)">
-          上一页
+          {{ $t('common.actions.previousPage') }}
         </button>
         <strong>{{ page + 1 }} / {{ pageCount }}</strong>
         <button
@@ -117,7 +125,7 @@ function submitSearch(): void {
           :disabled="loading || page + 1 >= pageCount"
           @click="emit('page', page + 1)"
         >
-          下一页
+          {{ $t('common.actions.nextPage') }}
         </button>
       </div>
     </footer>

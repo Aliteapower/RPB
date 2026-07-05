@@ -15,18 +15,20 @@ class PlatformCallScreenSeedUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
         Path modeSwitchPath = Path.of("src", "components", "call-screen", "CallScreenAdModeSwitch.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(modeSwitchPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String nav = Files.readString(navPath);
-        String modeSwitch = Files.readString(modeSwitchPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String nav = FrontendSourceSupport.readString(navPath);
+        String modeSwitch = FrontendSourceSupport.readString(modeSwitchPath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("PlatformCallScreenSeedPage")
@@ -36,7 +38,9 @@ class PlatformCallScreenSeedUiImplementationValidationTest {
 
         assertThat(nav)
             .contains("/platform/call-screen/text-seed")
-            .contains("叫号模板");
+            .contains("nav.platform.callScreenSeed");
+        assertThat(zh)
+            .contains("callScreenSeed: '叫号模板'");
 
         assertThat(apiClient)
             .contains("getPlatformCallScreenTextSeed")

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   PlatformProfileApiError,
@@ -28,6 +29,7 @@ interface EditableSocialLink {
   logoFile: File | null
 }
 
+const { t } = useI18n()
 const auth = useAuthSessionStore()
 const loading = ref(false)
 const saving = ref(false)
@@ -184,7 +186,7 @@ async function saveSocialLink(row: EditableSocialLink): Promise<void> {
 }
 
 async function removeSocialLink(row: EditableSocialLink): Promise<void> {
-  if (saving.value || !window.confirm(`删除社交媒体 ${row.displayName}？`)) {
+  if (saving.value || !window.confirm(t('platform.profile.confirmDeleteSocial', { name: row.displayName }))) {
     return
   }
   saving.value = true
@@ -279,19 +281,19 @@ function optionalValue(value: string): string | null {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformProfileApiError)) {
-    return '操作失败'
+    return t('platform.profile.errors.operationFailed')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return t('platform.profile.errors.sessionExpired')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有平台后台权限'
+    return t('platform.profile.errors.forbidden')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查必填项'
+    return t('platform.profile.errors.invalid')
   }
-  return '操作失败'
+  return t('platform.profile.errors.operationFailed')
 }
 </script>
 
@@ -302,24 +304,26 @@ function apiErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>平台</span>
-          <h1>平台资料</h1>
+          <span>{{ $t('platform.profile.page.kicker') }}</span>
+          <h1>{{ $t('platform.profile.page.title') }}</h1>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ $t('common.actions.loading') }}</p>
 
       <template v-else>
-        <section class="settings-panel" aria-label="平台资料">
+        <section class="settings-panel" :aria-label="$t('platform.profile.fields.platformProfile')">
           <div class="section-heading">
-            <h2>平台资料</h2>
-            <button class="primary-button" type="button" :disabled="saving" @click="saveProfile">保存</button>
+            <h2>{{ $t('platform.profile.fields.platformProfile') }}</h2>
+            <button class="primary-button" type="button" :disabled="saving" @click="saveProfile">
+              {{ $t('common.actions.save') }}
+            </button>
           </div>
 
           <div class="profile-grid">
             <label>
-              <span>平台名称</span>
+              <span>{{ $t('platform.profile.fields.platformName') }}</span>
               <input v-model.trim="profileForm.platformName" required maxlength="120" autocomplete="off" />
             </label>
             <label>
@@ -327,93 +331,117 @@ function apiErrorText(error: unknown): string {
               <input v-model.trim="profileForm.uen" maxlength="60" autocomplete="off" />
             </label>
             <label class="span-2">
-              <span>地址</span>
+              <span>{{ $t('platform.profile.fields.address') }}</span>
               <input v-model.trim="profileForm.address" maxlength="240" autocomplete="off" />
             </label>
             <label>
-              <span>电话</span>
+              <span>{{ $t('platform.profile.fields.phone') }}</span>
               <input v-model.trim="profileForm.phone" maxlength="40" autocomplete="off" />
             </label>
             <label>
-              <span>电邮</span>
+              <span>{{ $t('platform.profile.fields.email') }}</span>
               <input v-model.trim="profileForm.email" maxlength="120" autocomplete="off" />
             </label>
             <label class="span-2">
-              <span>网址</span>
+              <span>{{ $t('platform.profile.fields.website') }}</span>
               <input v-model.trim="profileForm.website" maxlength="160" autocomplete="off" />
             </label>
           </div>
 
           <div class="logo-line">
             <div class="logo-preview" :class="{ empty: !profileForm.logoMediaUrl }">
-              <img v-if="profileForm.logoMediaUrl" :src="profileForm.logoMediaUrl" alt="平台 LOGO" />
+              <img v-if="profileForm.logoMediaUrl" :src="profileForm.logoMediaUrl" :alt="$t('platform.profile.fields.platformLogo')" />
               <span v-else>LOGO</span>
             </div>
             <label>
-              <span>平台 LOGO</span>
+              <span>{{ $t('platform.profile.fields.platformLogo') }}</span>
               <input type="file" accept="image/jpeg,image/png,image/webp" @change="handleProfileLogoChange" />
             </label>
             <button class="secondary-button" type="button" :disabled="!profileLogoFile || saving" @click="uploadProfileLogo">
-              上传
+              {{ $t('common.actions.upload') }}
             </button>
             <button class="secondary-button" type="button" :disabled="!profileForm.logoMediaUrl || saving" @click="removeProfileLogo">
-              清空
+              {{ $t('common.actions.clear') }}
             </button>
           </div>
         </section>
 
-        <section class="settings-panel" aria-label="社交媒体">
+        <section class="settings-panel" :aria-label="$t('platform.profile.fields.socialMedia')">
           <div class="section-heading">
-            <h2>社交媒体</h2>
+            <h2>{{ $t('platform.profile.fields.socialMedia') }}</h2>
           </div>
 
           <div class="social-create">
             <div class="social-logo empty">
-              <span>社媒 LOGO</span>
+              <span>{{ $t('platform.profile.fields.socialLogo') }}</span>
             </div>
-            <input v-model.trim="newSocialLink.displayName" maxlength="80" placeholder="名称" />
+            <input v-model.trim="newSocialLink.displayName" maxlength="80" :placeholder="$t('platform.profile.fields.name')" />
             <input v-model.trim="newSocialLink.url" maxlength="240" placeholder="URL" />
-            <input v-model.number="newSocialLink.sortOrder" type="number" min="1" aria-label="排序" />
+            <input v-model.number="newSocialLink.sortOrder" type="number" min="1" :aria-label="$t('platform.profile.fields.sortOrder')" />
             <select v-model="newSocialLink.status">
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
+              <option value="active">{{ $t('platform.productLines.status.active') }}</option>
+              <option value="disabled">{{ $t('platform.productLines.status.disabled') }}</option>
             </select>
-            <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="新增社媒 LOGO" @change="handleNewSocialLogoChange" />
-            <button class="primary-button" type="button" :disabled="saving" @click="addSocialLink">新增</button>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              :aria-label="$t('platform.profile.social.createLogoAria')"
+              @change="handleNewSocialLogoChange"
+            />
+            <button class="primary-button" type="button" :disabled="saving" @click="addSocialLink">
+              {{ $t('common.actions.add') }}
+            </button>
           </div>
 
           <div class="social-list">
             <div v-if="socialLinks.length" class="social-header" aria-hidden="true">
               <span>LOGO</span>
-              <span>名称</span>
+              <span>{{ $t('platform.profile.fields.name') }}</span>
               <span>URL</span>
-              <span>排序</span>
-              <span>状态</span>
-              <span>选择 LOGO</span>
-              <span>保存</span>
-              <span>上传</span>
-              <span>清空</span>
-              <span>删除</span>
+              <span>{{ $t('platform.profile.fields.sortOrder') }}</span>
+              <span>{{ $t('platform.profile.fields.status') }}</span>
+              <span>{{ $t('platform.profile.fields.chooseLogo') }}</span>
+              <span>{{ $t('common.actions.save') }}</span>
+              <span>{{ $t('common.actions.upload') }}</span>
+              <span>{{ $t('common.actions.clear') }}</span>
+              <span>{{ $t('common.actions.delete') }}</span>
             </div>
             <article v-for="row in socialLinks" :key="row.id" class="social-row">
               <div class="social-logo" :class="{ empty: !row.logoMediaUrl }">
-                <img v-if="row.logoMediaUrl" :src="row.logoMediaUrl" :alt="`${row.displayName} 社媒 LOGO`" />
-                <span v-else>社媒 LOGO</span>
+                <img
+                  v-if="row.logoMediaUrl"
+                  :src="row.logoMediaUrl"
+                  :alt="$t('platform.profile.social.logoAlt', { name: row.displayName })"
+                />
+                <span v-else>{{ $t('platform.profile.fields.socialLogo') }}</span>
               </div>
-              <input v-model.trim="row.displayName" maxlength="80" aria-label="社交媒体名称" />
-              <input v-model.trim="row.url" maxlength="240" aria-label="社交媒体 URL" />
-              <input v-model.number="row.sortOrder" type="number" min="1" aria-label="排序" />
-              <select v-model="row.status" aria-label="状态">
-                <option value="active">启用</option>
-                <option value="disabled">停用</option>
+              <input v-model.trim="row.displayName" maxlength="80" :aria-label="$t('platform.profile.social.nameAria')" />
+              <input v-model.trim="row.url" maxlength="240" :aria-label="$t('platform.profile.social.urlAria')" />
+              <input v-model.number="row.sortOrder" type="number" min="1" :aria-label="$t('platform.profile.fields.sortOrder')" />
+              <select v-model="row.status" :aria-label="$t('platform.profile.fields.status')">
+                <option value="active">{{ $t('platform.productLines.status.active') }}</option>
+                <option value="disabled">{{ $t('platform.productLines.status.disabled') }}</option>
               </select>
-              <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="社媒 LOGO" @change="handleSocialLogoChange(row, $event)" />
-              <button class="secondary-button" type="button" :disabled="saving" @click="saveSocialLink(row)">保存</button>
-              <button class="secondary-button" type="button" :disabled="!row.logoFile || saving" @click="uploadSocialLogo(row)">上传 LOGO</button>
-              <button class="secondary-button" type="button" :disabled="!row.logoMediaUrl || saving" @click="removeSocialLogo(row)">清空</button>
-              <button class="danger-button" type="button" :disabled="saving" @click="removeSocialLink(row)">删除</button>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                :aria-label="$t('platform.profile.fields.socialLogo')"
+                @change="handleSocialLogoChange(row, $event)"
+              />
+              <button class="secondary-button" type="button" :disabled="saving" @click="saveSocialLink(row)">
+                {{ $t('common.actions.save') }}
+              </button>
+              <button class="secondary-button" type="button" :disabled="!row.logoFile || saving" @click="uploadSocialLogo(row)">
+                {{ $t('platform.profile.social.uploadLogo') }}
+              </button>
+              <button class="secondary-button" type="button" :disabled="!row.logoMediaUrl || saving" @click="removeSocialLogo(row)">
+                {{ $t('common.actions.clear') }}
+              </button>
+              <button class="danger-button" type="button" :disabled="saving" @click="removeSocialLink(row)">
+                {{ $t('common.actions.delete') }}
+              </button>
             </article>
-            <p v-if="!socialLinks.length" class="empty-line">暂无社交媒体</p>
+            <p v-if="!socialLinks.length" class="empty-line">{{ $t('platform.profile.social.empty') }}</p>
           </div>
         </section>
       </template>

@@ -14,6 +14,9 @@ import ErpPagination from '../components/erp/ErpPagination.vue'
 import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -97,12 +100,12 @@ function openEditPage(item: TenantAdminStaff): void {
 
 function statusLabel(status: TenantAdminStaff['status']): string {
   if (status === 'active') {
-    return '启用'
+    return gt('generated.tenant-admin-staff.019')
   }
   if (status === 'locked') {
-    return '锁定'
+    return gt('generated.tenant-admin-staff.020')
   }
-  return '停用'
+  return gt('generated.tenant-admin-staff.021')
 }
 
 function displayStaffPhone(item: TenantAdminStaff): string {
@@ -114,19 +117,19 @@ function displayStaffPhone(item: TenantAdminStaff): string {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-staff.022')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-staff.023')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-staff.024')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-staff.025')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-staff.026')
 }
 </script>
 
@@ -137,14 +140,14 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>员工管理</h1>
+          <span>{{ gt('generated.tenant-admin-staff.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-staff.002') }}</h1>
         </div>
       </header>
 
       <ErpQueryToolbar
         v-model:keyword="keyword"
-        placeholder="员工号 / 姓名 / 电话 / 电邮"
+        :placeholder="gt('generated.tenant-admin-staff.003')"
         :loading="loading"
         :has-dirty-query="hasDirtyQuery"
         @search="searchStaff"
@@ -153,16 +156,14 @@ function apiErrorText(error: unknown): string {
       >
         <template #filters>
           <div class="summary-strip">
-            <strong>员工 {{ safePage.total }}</strong>
-            <span v-if="selfAdminStaff">管理员 1</span>
-            <span>启用 {{ enabledCount }}</span>
-            <span>停用 {{ disabledCount }}</span>
+            <strong>{{ gt('generated.tenant-admin-staff.004') }} {{ safePage.total }}</strong>
+            <span v-if="selfAdminStaff">{{ gt('generated.tenant-admin-staff.005') }}</span>
+            <span>{{ gt('generated.tenant-admin-staff.006') }} {{ enabledCount }}</span>
+            <span>{{ gt('generated.tenant-admin-staff.007') }} {{ disabledCount }}</span>
           </div>
         </template>
         <template #actions>
-          <button class="primary-button" type="button" @click="openCreatePage">
-            新增员工
-          </button>
+          <button class="primary-button" type="button" @click="openCreatePage"> {{ gt('generated.tenant-admin-staff.008') }} </button>
         </template>
       </ErpQueryToolbar>
 
@@ -172,27 +173,27 @@ function apiErrorText(error: unknown): string {
         <table>
           <thead>
             <tr>
-              <th>员工号</th>
-              <th>姓名</th>
-              <th>电话</th>
-              <th>电邮</th>
-              <th>状态</th>
-              <th>操作</th>
+              <th>{{ gt('generated.tenant-admin-staff.009') }}</th>
+              <th>{{ gt('generated.tenant-admin-staff.010') }}</th>
+              <th>{{ gt('generated.tenant-admin-staff.011') }}</th>
+              <th>{{ gt('generated.tenant-admin-staff.012') }}</th>
+              <th>{{ gt('generated.tenant-admin-staff.013') }}</th>
+              <th>{{ gt('generated.tenant-admin-staff.014') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="6" class="empty-cell">加载中</td>
+              <td colspan="6" class="empty-cell">{{ gt('generated.tenant-admin-staff.015') }}</td>
             </tr>
             <tr v-else-if="visibleStaff.length === 0">
-              <td colspan="6" class="empty-cell">暂无员工</td>
+              <td colspan="6" class="empty-cell">{{ gt('generated.tenant-admin-staff.016') }}</td>
             </tr>
             <tr v-for="item in visibleStaff" v-else :key="item.id" :class="{ 'protected-row': item.accountType === 'tenant_admin' }">
               <td><strong>{{ item.employeeNo }}</strong></td>
               <td>
                 <span class="name-cell">
                   {{ item.name }}
-                  <span v-if="item.accountType === 'tenant_admin'" class="role-badge">管理员</span>
+                  <span v-if="item.accountType === 'tenant_admin'" class="role-badge">{{ gt('generated.tenant-admin-staff.017') }}</span>
                 </span>
               </td>
               <td>{{ displayStaffPhone(item) }}</td>
@@ -203,7 +204,7 @@ function apiErrorText(error: unknown): string {
                 </span>
               </td>
               <td>
-                <button v-if="item.editable" type="button" class="link-button" @click="openEditPage(item)">编辑</button>
+                <button v-if="item.editable" type="button" class="link-button" @click="openEditPage(item)">{{ gt('generated.tenant-admin-staff.018') }}</button>
                 <span v-else>-</span>
               </td>
             </tr>

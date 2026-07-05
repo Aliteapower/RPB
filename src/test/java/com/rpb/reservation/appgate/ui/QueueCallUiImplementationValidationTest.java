@@ -16,17 +16,19 @@ class QueueCallUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path staffHomePath = Path.of("src", "pages", "StoreStaffHomePage.vue");
         Path reportPath = Path.of("docs", "frontend", "QUEUE_CALL_UI_IMPLEMENTATION_REPORT.md");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(reportPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String staffHome = Files.readString(staffHomePath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String staffHome = FrontendSourceSupport.readString(staffHomePath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("QueueCallPage")
@@ -41,9 +43,12 @@ class QueueCallUiImplementationValidationTest {
             .contains("queue.call")
             .contains("canCallQueueTicket")
             .contains("to: queueTicketListRoute.value")
-            .contains("排队叫号")
-            .contains("从列表选择排队票一键叫号")
+            .contains("staffHome.actions.callQueue.label")
+            .contains("staffHome.actions.callQueue.description")
             .contains("hasVisibleOperation");
+        assertThat(zh)
+            .contains("label: '排队叫号'")
+            .contains("description: '从列表选择排队票一键叫号'");
         assertForbiddenQueueOperationsAbsent(staffHome);
 
         assertThat(apiClient)

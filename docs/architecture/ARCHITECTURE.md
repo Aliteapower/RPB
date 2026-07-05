@@ -113,6 +113,8 @@ RBAC
 - System time exchange uses ISO8601.
 - Display uses Store timezone, locale, date format, time format, and currency.
 - Singapore default is Asia/Singapore, en-SG, DD-MM-YYYY, 24H, SGD.
+- Frontend shell fallback is zh-CN for the current admin and staff UI migration.
+- Store operational locale may still be en-SG and remains the long-term display-context source.
 - Phone numbers follow E.164 when present.
 - Phone number is optional for Customer.
 - User-facing text must use i18n keys in later UI and API design.

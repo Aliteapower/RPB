@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { sanitizeSingaporeLocalPhone } from './staffGuestContact'
 
 const props = withDefaults(
@@ -15,6 +17,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
+const { t } = useI18n()
 const fieldId = `staff-singapore-phone-${Math.random().toString(36).slice(2)}`
 
 function updatePhone(event: Event): void {
@@ -24,7 +27,7 @@ function updatePhone(event: Event): void {
 
 <template>
   <section class="staff-singapore-phone-field">
-    <label class="staff-singapore-phone-field__label" :for="fieldId">手机号</label>
+    <label class="staff-singapore-phone-field__label" :for="fieldId">{{ t('staffControls.guest.phoneLabel') }}</label>
 
     <div class="staff-singapore-phone-field__row">
       <span class="staff-singapore-phone-field__prefix" aria-hidden="true">+65</span>

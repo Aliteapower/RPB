@@ -10,6 +10,9 @@ import type {
   QueueDisplayStateResponse,
   QueueDisplayTextAdSlide
 } from '../types/queueDisplay'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const POLL_INTERVAL_SECONDS = 3
 const SLIDE_DURATION_SECONDS = 5
@@ -19,9 +22,9 @@ const FULLSCREEN_CONTROLS_HIDE_MS = 5000
 
 const fallbackSlide: QueueDisplayTextAdSlide = {
   slideId: 'empty-placeholder',
-  title: '广告文案待配置',
-  subtitle: '叫号屏已连接',
-  tagline: '请稍候'
+  title: gt('generated.queue-display.025'),
+  subtitle: gt('generated.queue-display.026'),
+  tagline: gt('generated.queue-display.027')
 }
 
 const route = useRoute()
@@ -81,7 +84,7 @@ const waitingPreview = computed(() => state.value?.waiting.preview.slice(0, 4) ?
 const waitingCount = computed(() => state.value?.waiting.count ?? 0)
 const storeDisplayName = computed(() => {
   const payload = state.value
-  return payload?.storeDisplayName?.trim() || payload?.storeName?.trim() || '门店'
+  return payload?.storeDisplayName?.trim() || payload?.storeName?.trim() || gt('generated.queue-display.028')
 })
 const tenantLogoUrl = computed(() => state.value?.tenantLogoUrl?.trim() || '')
 const showTenantLogoImage = computed(() => !!tenantLogoUrl.value && !tenantLogoFailed.value)
@@ -406,7 +409,7 @@ async function requestQueueDisplayFullscreen(): Promise<void> {
   clearFullscreenMessageTimer()
 
   if (!terminalElement || typeof terminalElement.requestFullscreen !== 'function') {
-    showFullscreenMessage('无法自动进入全屏，可按 F11 使用浏览器全屏。')
+    showFullscreenMessage(gt('generated.queue-display.029'))
     return
   }
 
@@ -417,7 +420,7 @@ async function requestQueueDisplayFullscreen(): Promise<void> {
     blurFullscreenControlFocus()
     showFullscreenControlsTemporarily()
   } catch {
-    showFullscreenMessage('无法自动进入全屏，可按 F11 使用浏览器全屏。')
+    showFullscreenMessage(gt('generated.queue-display.030'))
   }
 }
 
@@ -432,7 +435,7 @@ async function exitQueueDisplayFullscreen(): Promise<void> {
   }
 
   if (typeof document.exitFullscreen !== 'function') {
-    showFullscreenMessage('无法退出全屏，可按 Esc 或 F11 退出。')
+    showFullscreenMessage(gt('generated.queue-display.031'))
     return
   }
 
@@ -441,7 +444,7 @@ async function exitQueueDisplayFullscreen(): Promise<void> {
     persistFullscreenPreference(false)
     syncQueueDisplayFullscreenState()
   } catch {
-    showFullscreenMessage('无法退出全屏，可按 Esc 或 F11 退出。')
+    showFullscreenMessage(gt('generated.queue-display.032'))
   }
 }
 
@@ -522,11 +525,11 @@ onBeforeUnmount(() => {
     @pointerdown="handleFullscreenPointerActivity"
   >
     <header class="terminal-header">
-      <div class="terminal-brand" aria-label="门店叫号屏">
+      <div class="terminal-brand" :aria-label="gt('generated.queue-display.001')">
         <span class="brand-dot"></span>
         <div>
           <strong>{{ storeDisplayName }}</strong>
-          <span>叫号屏</span>
+          <span>{{ gt('generated.queue-display.002') }}</span>
         </div>
       </div>
 
@@ -549,18 +552,14 @@ onBeforeUnmount(() => {
           :aria-pressed="isQueueDisplayFullscreen"
           @click="toggleQueueDisplayFullscreen"
         >
-          {{ isQueueDisplayFullscreen ? '退出全屏' : '全屏展示' }}
+          {{ isQueueDisplayFullscreen ? gt('generated.queue-display.003') : gt('generated.queue-display.004') }}
         </button>
-        <button v-if="showManageButton" class="terminal-manage" type="button" @click="returnToManagement">
-          返回管理
-        </button>
+        <button v-if="showManageButton" class="terminal-manage" type="button" @click="returnToManagement"> {{ gt('generated.queue-display.005') }} </button>
       </div>
     </header>
 
     <div v-if="(apiError && !showErrorScreen) || fullscreenErrorMessage" class="terminal-status-stack">
-      <div v-if="apiError && !showErrorScreen" class="terminal-offline-badge" role="status">
-        连接恢复中
-      </div>
+      <div v-if="apiError && !showErrorScreen" class="terminal-offline-badge" role="status"> {{ gt('generated.queue-display.006') }} </div>
       <div v-if="fullscreenErrorMessage" class="terminal-fullscreen-hint" role="status">
         {{ fullscreenErrorMessage }}
       </div>
@@ -568,35 +567,35 @@ onBeforeUnmount(() => {
 
     <section v-if="screenMode === 'loading'" class="screen-state screen-loading" aria-live="polite">
       <div class="loading-mark"></div>
-      <p>正在连接叫号屏</p>
+      <p>{{ gt('generated.queue-display.007') }}</p>
     </section>
 
     <section v-else-if="screenMode === 'error'" class="screen-state screen-error" role="alert">
-      <p class="state-kicker">服务暂不可用</p>
-      <h1>叫号屏连接中断</h1>
-      <p>请稍后重试</p>
+      <p class="state-kicker">{{ gt('generated.queue-display.008') }}</p>
+      <h1>{{ gt('generated.queue-display.009') }}</h1>
+      <p>{{ gt('generated.queue-display.010') }}</p>
     </section>
 
     <section v-else-if="hasCurrentCall" class="screen-calling" aria-live="assertive">
       <div class="calling-main">
-        <p class="calling-label">当前叫号</p>
+        <p class="calling-label">{{ gt('generated.queue-display.011') }}</p>
         <strong class="calling-number">{{ state?.currentCall?.displayNumber }}</strong>
         <div class="calling-meta">
-          <p class="calling-name">{{ state?.currentCall?.customerDisplayName || '顾客' }}</p>
+          <p class="calling-name">{{ state?.currentCall?.customerDisplayName || gt('generated.queue-display.012') }}</p>
           <span class="calling-group">{{ state?.currentCall?.partySizeGroup }}</span>
         </div>
       </div>
 
-      <aside class="waiting-panel" aria-label="等待队列">
-        <p class="waiting-count">等待 {{ waitingCount }} 人</p>
+      <aside class="waiting-panel" :aria-label="gt('generated.queue-display.013')">
+        <p class="waiting-count">{{ gt('generated.queue-display.014') }} {{ waitingCount }} {{ gt('generated.queue-display.015') }}</p>
         <ul v-if="waitingPreview.length" class="waiting-list">
           <li v-for="item in waitingPreview" :key="item.displayNumber">
             <strong>{{ item.displayNumber }}</strong>
-            <span>{{ item.customerDisplayName || '顾客' }}</span>
+            <span>{{ item.customerDisplayName || gt('generated.queue-display.016') }}</span>
             <em>{{ item.partySizeGroup }}</em>
           </li>
         </ul>
-        <p v-else class="waiting-empty">暂无等待</p>
+        <p v-else class="waiting-empty">{{ gt('generated.queue-display.017') }}</p>
       </aside>
     </section>
 
@@ -607,13 +606,13 @@ onBeforeUnmount(() => {
             v-if="mediaSlide.mediaKind === 'image'"
             class="media-ad-asset"
             :src="mediaSlide.mediaUrl"
-            :alt="mediaSlide.altText || mediaSlide.title || '叫号屏广告图片'"
+            :alt="mediaSlide.altText || mediaSlide.title || gt('generated.queue-display.018')"
           />
           <video
             v-else
             class="media-ad-asset"
             :src="mediaSlide.mediaUrl"
-            :aria-label="mediaSlide.altText || mediaSlide.title || '叫号屏广告视频'"
+            :aria-label="mediaSlide.altText || mediaSlide.title || gt('generated.queue-display.019')"
             autoplay
             muted
             playsinline
@@ -640,10 +639,10 @@ onBeforeUnmount(() => {
               alt=""
               @error="handleTenantLogoError"
             />
-            <span v-else>食</span>
+            <span v-else>{{ gt('generated.queue-display.020') }}</span>
           </div>
-          <p class="ad-kicker">媒体广告待配置</p>
-          <h1>请上传图片或视频</h1>
+          <p class="ad-kicker">{{ gt('generated.queue-display.021') }}</p>
+          <h1>{{ gt('generated.queue-display.022') }}</h1>
         </template>
       </div>
 
@@ -656,9 +655,9 @@ onBeforeUnmount(() => {
             alt=""
             @error="handleTenantLogoError"
           />
-          <span v-else>食</span>
+          <span v-else>{{ gt('generated.queue-display.023') }}</span>
         </div>
-        <p class="ad-kicker">欢迎等候</p>
+        <p class="ad-kicker">{{ gt('generated.queue-display.024') }}</p>
         <h1>{{ currentSlide.title }}</h1>
         <p class="ad-subtitle">{{ currentSlide.subtitle }}</p>
         <p class="ad-tagline">{{ currentSlide.tagline }}</p>

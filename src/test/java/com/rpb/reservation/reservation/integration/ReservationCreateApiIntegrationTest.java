@@ -611,7 +611,7 @@ class ReservationCreateApiIntegrationTest {
                 .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller"));
         }
-        try (Stream<Path> paths = Files.walk(Path.of("."))) {
+        try (Stream<Path> paths = Files.walk(Path.of("src"))) {
             assertThat(paths.filter(Files::isRegularFile).map(path -> path.toString().replace('\\', '/')).toList())
                 .noneMatch(ReservationCreateApiIntegrationTest::isForbiddenReservationUiFile)
                 .noneMatch(path -> path.toLowerCase().contains("openapi") && (

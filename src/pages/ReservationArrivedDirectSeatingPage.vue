@@ -13,6 +13,9 @@ import type {
   SeatArrivedReservationRequest,
   SeatArrivedReservationResponse
 } from '../types/reservationArrivedDirectSeating'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -63,11 +66,11 @@ const seatedStatus = computed(() => result.value?.reservationStatus === 'seated'
 const directSeatingErrorHint = computed(() => {
   switch (apiError.value?.error.code) {
     case 'RESOURCE_SELECTION_REQUIRED':
-      return '请选择桌台、桌组或临时组合'
+      return gt('generated.reservation-arrived-direct-seating.037')
     case 'RESOURCE_SELECTION_CONFLICT':
-      return '桌台、桌组和临时组合只能选择一个'
+      return gt('generated.reservation-arrived-direct-seating.038')
     case 'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED':
-      return '临时组合至少选择 2 张桌台'
+      return gt('generated.reservation-arrived-direct-seating.039')
     default:
       return ''
   }
@@ -220,15 +223,15 @@ function queryValue(value: unknown): string {
 <template>
   <main class="page-shell">
     <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>预约入座</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
+      <p class="eyebrow">{{ gt('generated.reservation-arrived-direct-seating.001') }}</p>
+      <h1>{{ gt('generated.reservation-arrived-direct-seating.002') }}</h1>
+      <p class="store-context">{{ gt('generated.reservation-arrived-direct-seating.003') }} {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
+      <RouterLink class="home-link" :to="staffHomeRoute">{{ gt('generated.reservation-arrived-direct-seating.004') }}</RouterLink>
     </section>
 
     <form class="direct-seating-form" @submit.prevent="submitDirectSeating">
       <label class="reservation-id-field">
-        <span>预约 ID</span>
+        <span>{{ gt('generated.reservation-arrived-direct-seating.005') }}</span>
         <input
           v-model="form.reservationId"
           autocomplete="off"
@@ -238,8 +241,8 @@ function queryValue(value: unknown): string {
         />
       </label>
 
-      <section class="resource-panel" aria-label="桌台选择">
-        <p class="resource-rule">桌台、桌组或临时组合必须三选一</p>
+      <section class="resource-panel" :aria-label="gt('generated.reservation-arrived-direct-seating.006')">
+        <p class="resource-rule">{{ gt('generated.reservation-arrived-direct-seating.007') }}</p>
         <TableResourcePicker
           :store-id="storeId"
           :available-only="true"
@@ -252,108 +255,107 @@ function queryValue(value: unknown): string {
           @select-temporary-tables="selectTemporaryTables"
         />
         <details class="field-group">
-          <summary>手动填写资源 ID</summary>
+          <summary>{{ gt('generated.reservation-arrived-direct-seating.008') }}</summary>
           <label>
-            <span>桌台 ID</span>
+            <span>{{ gt('generated.reservation-arrived-direct-seating.009') }}</span>
             <input v-model="form.tableId" autocomplete="off" name="tableId" type="text" />
           </label>
           <label>
-            <span>桌组 ID</span>
+            <span>{{ gt('generated.reservation-arrived-direct-seating.010') }}</span>
             <input v-model="form.tableGroupId" autocomplete="off" name="tableGroupId" type="text" />
           </label>
         </details>
       </section>
 
       <details class="field-group">
-        <summary>调整信息</summary>
+        <summary>{{ gt('generated.reservation-arrived-direct-seating.011') }}</summary>
         <label>
-          <span>调整原因代码（可选）</span>
+          <span>{{ gt('generated.reservation-arrived-direct-seating.012') }}</span>
           <input v-model="form.overrideReasonCode" name="overrideReasonCode" type="text" />
         </label>
         <label>
-          <span>调整说明（可选）</span>
+          <span>{{ gt('generated.reservation-arrived-direct-seating.013') }}</span>
           <textarea v-model="form.overrideNote" name="overrideNote" rows="3" />
         </label>
       </details>
 
       <details class="field-group">
-        <summary>备注</summary>
+        <summary>{{ gt('generated.reservation-arrived-direct-seating.014') }}</summary>
         <label>
-          <span>备注（可选）</span>
+          <span>{{ gt('generated.reservation-arrived-direct-seating.015') }}</span>
           <textarea v-model="form.note" name="note" rows="3" />
         </label>
       </details>
 
       <button class="submit-button" :disabled="!canSubmit" type="submit">
-        {{ isSubmitting ? '提交中...' : '确认入座' }}
+        {{ isSubmitting ? gt('generated.reservation-arrived-direct-seating.016') : gt('generated.reservation-arrived-direct-seating.017') }}
       </button>
     </form>
 
     <section v-if="result" class="result-panel success-panel" aria-live="polite">
-      <h2>入座成功</h2>
+      <h2>{{ gt('generated.reservation-arrived-direct-seating.018') }}</h2>
       <div class="reservation-highlight status-highlight">
-        <span>预约状态</span>
+        <span>{{ gt('generated.reservation-arrived-direct-seating.019') }}</span>
         <strong>{{ result.reservationStatus }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>预约编号</span>
+        <span>{{ gt('generated.reservation-arrived-direct-seating.020') }}</span>
         <strong>{{ result.reservationCode }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>入座记录 ID</span>
+        <span>{{ gt('generated.reservation-arrived-direct-seating.021') }}</span>
         <strong>{{ result.seatingId }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>资源</span>
+        <span>{{ gt('generated.reservation-arrived-direct-seating.022') }}</span>
         <strong>{{ result.resourceType }} {{ result.resourceId }}</strong>
       </div>
       <div class="reservation-highlight already-seated-highlight">
-        <span>是否已入座</span>
+        <span>{{ gt('generated.reservation-arrived-direct-seating.023') }}</span>
         <strong>{{ result.alreadySeated }}</strong>
       </div>
-      <p v-if="seatedStatus" class="seated-note">状态：seated</p>
-      <p v-if="result.alreadySeated" class="seated-note">该预约此前已完成入座</p>
+      <p v-if="seatedStatus" class="seated-note">{{ gt('generated.reservation-arrived-direct-seating.024') }}</p>
+      <p v-if="result.alreadySeated" class="seated-note">{{ gt('generated.reservation-arrived-direct-seating.025') }}</p>
       <dl>
         <div>
-          <dt>预约 ID</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.026') }}</dt>
           <dd>{{ result.reservationId }}</dd>
         </div>
         <div>
-          <dt>入座状态</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.027') }}</dt>
           <dd>{{ result.seatingStatus }}</dd>
         </div>
         <div>
-          <dt>资源类型</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.028') }}</dt>
           <dd>{{ result.resourceType }}</dd>
         </div>
         <div>
-          <dt>资源 ID</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.029') }}</dt>
           <dd>{{ result.resourceId }}</dd>
         </div>
         <div>
-          <dt>事件</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.030') }}</dt>
           <dd>{{ eventsDisplay }}</dd>
         </div>
         <div>
-          <dt>幂等状态</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.031') }}</dt>
           <dd>{{ result.idempotency.status }}</dd>
         </div>
         <div>
-          <dt>幂等重放</dt>
+          <dt>{{ gt('generated.reservation-arrived-direct-seating.032') }}</dt>
           <dd>{{ result.idempotency.replayed ?? false }}</dd>
         </div>
       </dl>
     </section>
 
     <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>入座失败</h2>
+      <h2>{{ gt('generated.reservation-arrived-direct-seating.033') }}</h2>
       <p v-if="directSeatingErrorHint" class="message-key">{{ directSeatingErrorHint }}</p>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+      <p class="error-code">{{ gt('generated.reservation-arrived-direct-seating.034') }}{{ apiError.error.code }}</p>
+      <p class="message-key">{{ gt('generated.reservation-arrived-direct-seating.035') }}{{ apiError.error.messageKey }}</p>
     </section>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
+    <p v-if="lastIdempotencyKey" class="idempotency-key"> {{ gt('generated.reservation-arrived-direct-seating.036') }} {{ lastIdempotencyKey }}
     </p>
   </main>
 </template>

@@ -12,11 +12,11 @@ class PublicAcceptanceDeploymentPackageValidationTest {
     void protectedPublicAcceptanceDeploymentPackageDocumentsRuntimeAndOuterAccessControls() throws Exception {
         Path packageRoot = Path.of("deploy", "public-acceptance");
 
-        String readme = Files.readString(packageRoot.resolve("README.md"));
-        String nginx = Files.readString(packageRoot.resolve("nginx").resolve("rpb-public-acceptance.conf"));
-        String service = Files.readString(packageRoot.resolve("systemd").resolve("rpb-backend.service"));
-        String env = Files.readString(packageRoot.resolve("env").resolve("rpb-backend.env.example"));
-        String smoke = Files.readString(packageRoot.resolve("scripts").resolve("smoke-check.sh"));
+        String readme = FrontendSourceSupport.readString(packageRoot.resolve("README.md"));
+        String nginx = FrontendSourceSupport.readString(packageRoot.resolve("nginx").resolve("rpb-public-acceptance.conf"));
+        String service = FrontendSourceSupport.readString(packageRoot.resolve("systemd").resolve("rpb-backend.service"));
+        String env = FrontendSourceSupport.readString(packageRoot.resolve("env").resolve("rpb-backend.env.example"));
+        String smoke = FrontendSourceSupport.readString(packageRoot.resolve("scripts").resolve("smoke-check.sh"));
 
         assertThat(readme)
             .contains("protected public acceptance")

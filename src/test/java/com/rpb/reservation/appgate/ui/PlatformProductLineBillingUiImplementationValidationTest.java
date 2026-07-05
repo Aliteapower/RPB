@@ -20,6 +20,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
         Path tenantTablePath = Path.of("src", "components", "platform", "PlatformTenantTable.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(productLinesPagePath).exists();
         assertThat(tenantBillingPagePath).exists();
@@ -30,17 +31,18 @@ class PlatformProductLineBillingUiImplementationValidationTest {
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
 
-        String productLinesPage = Files.readString(productLinesPagePath);
-        String tenantBillingPage = Files.readString(tenantBillingPagePath);
-        String productLineList = Files.readString(productLineListPath);
-        String productLineDrawer = Files.readString(productLineDrawerPath);
-        String productLinePriceForm = Files.readString(productLinePriceFormPath);
-        String productLineCatalog = Files.readString(productLineCatalogPath);
-        String api = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String nav = Files.readString(navPath);
-        String tenantTable = Files.readString(tenantTablePath);
+        String productLinesPage = FrontendSourceSupport.readString(productLinesPagePath);
+        String tenantBillingPage = FrontendSourceSupport.readString(tenantBillingPagePath);
+        String productLineList = FrontendSourceSupport.readString(productLineListPath);
+        String productLineDrawer = FrontendSourceSupport.readString(productLineDrawerPath);
+        String productLinePriceForm = FrontendSourceSupport.readString(productLinePriceFormPath);
+        String productLineCatalog = FrontendSourceSupport.readString(productLineCatalogPath);
+        String api = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String nav = FrontendSourceSupport.readString(navPath);
+        String tenantTable = FrontendSourceSupport.readString(tenantTablePath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("PlatformProductLinesPage")
@@ -53,9 +55,16 @@ class PlatformProductLineBillingUiImplementationValidationTest {
         assertThat(nav)
             .contains("/platform/settings/product-lines")
             .contains("/platform/billing/subscriptions")
-            .contains("产品线")
-            .contains("租户计费");
-        assertThat(tenantTable).contains("计费").contains("订阅/计费").contains("billingOnly").contains("billing");
+            .contains("nav.platform.productLines")
+            .contains("nav.platform.billing");
+        assertThat(zh)
+            .contains("productLines: '产品线'")
+            .contains("billing: '租户计费'");
+        assertThat(tenantTable)
+            .contains("platform.tenants.table.billingShort")
+            .contains("platform.tenants.table.billingFull")
+            .contains("billingOnly")
+            .contains("billing");
 
         assertThat(api)
             .contains("listProductLines")
@@ -85,8 +94,8 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("interface ProductSubscriptionMutation");
 
         assertThat(productLinesPage)
-            .contains("产品线")
-            .contains("预约排队叫号产线")
+            .contains("platform.productLines.page.title")
+            .contains("platform.productLines.page.defaultDisplayName")
             .contains("reservation_queue")
             .contains("PlatformProductLineList")
             .contains("PlatformProductLineDrawer")
@@ -110,13 +119,13 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .doesNotContain("v-model=\"form.appKey\"");
 
         assertThat(productLineList)
-            .contains("新增产品线")
-            .contains("产品线 / App Key / 说明")
-            .contains("全部状态")
-            .contains("查询")
-            .contains("重置")
-            .contains("上一页")
-            .contains("下一页")
+            .contains("platform.productLines.list.create")
+            .contains("platform.productLines.list.keywordPlaceholder")
+            .contains("platform.productLines.list.allStatuses")
+            .contains("common.actions.query")
+            .contains("common.actions.reset")
+            .contains("common.actions.previousPage")
+            .contains("common.actions.nextPage")
             .contains("pageCount")
             .contains("emit('page'")
             .contains("emit('create')")
@@ -124,40 +133,40 @@ class PlatformProductLineBillingUiImplementationValidationTest {
 
         assertThat(productLineDrawer)
             .contains("role=\"dialog\"")
-            .contains("产品线代码")
+            .contains("platform.productLines.drawer.productCode")
             .contains("computedAppKey")
             .contains(":value=\"mode === 'create' ? computedAppKey : form.appKey\"")
             .contains("v-model=\"form.defaultEntryRoute\"")
             .contains("entryRouteOptions")
-            .contains("创建产品线")
+            .contains("platform.productLines.drawer.createAction")
             .contains("PlatformProductLinePriceForm")
             .doesNotContain("v-model=\"form.appKey\"")
             .doesNotContain("<input v-model=\"form.defaultEntryRoute\"");
 
         assertThat(productLinePriceForm)
-            .contains("月付价格")
-            .contains("年付价格")
-            .contains("保存定价")
+            .contains("platform.productLines.priceForm.monthlyAmount")
+            .contains("platform.productLines.priceForm.yearlyAmount")
+            .contains("platform.productLines.priceForm.save")
             .contains("monthlyStatus")
             .contains("yearlyStatus");
 
         assertThat(productLineCatalog)
             .contains("defaultEntryRouteOptions")
-            .contains("暂不配置入口")
+            .contains("platform.productLines.entryRoutes.none.label")
             .contains("/stores/:storeId/staff")
             .contains("normalizeProductLineAppKey")
             .contains("isProductLineAppKeyValid");
 
         assertThat(tenantBillingPage)
-            .contains("订阅 / 计费")
-            .contains("历史赠送 / 永久有效")
-            .contains("有效期开始")
-            .contains("金额")
-            .contains("币种")
-            .contains("购买数量")
-            .contains("个月")
-            .contains("标准单价")
-            .contains("本次金额")
+            .contains("platform.billing.page.title")
+            .contains("platform.billing.cycles.legacyGrant")
+            .contains("platform.billing.table.columns.periodStart")
+            .contains("platform.billing.table.columns.amount")
+            .contains("platform.billing.table.columns.currency")
+            .contains("platform.billing.form.duration")
+            .contains("platform.billing.units.month")
+            .contains("platform.billing.form.unitPrice")
+            .contains("platform.billing.form.amount")
             .contains("calculatedAmount")
             .contains("durationCount: safeDurationCount.value")
             .contains("purchaseProductSubscription")

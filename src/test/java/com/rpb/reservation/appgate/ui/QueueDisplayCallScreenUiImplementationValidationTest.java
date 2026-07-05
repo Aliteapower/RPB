@@ -20,11 +20,11 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
 
-        String page = Files.readString(pagePath);
-        String listPage = Files.readString(listPagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String listPage = FrontendSourceSupport.readString(listPagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
 
         assertThat(router)
             .contains("QueueDisplayPage")
@@ -84,7 +84,7 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
     void queueDisplayTerminalSupportsPersistentFullscreenPresentation() throws Exception {
         Path pagePath = Path.of("src", "pages", "QueueDisplayPage.vue");
 
-        String page = Files.readString(pagePath);
+        String page = FrontendSourceSupport.readString(pagePath);
 
         assertThat(page)
             .contains("QUEUE_DISPLAY_FULLSCREEN_PREFERENCE_KEY")
@@ -120,18 +120,20 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue");
         Path modeSwitchPath = Path.of("src", "components", "call-screen", "CallScreenAdModeSwitch.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(modeSwitchPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String nav = Files.readString(navPath);
-        String modeSwitch = Files.readString(modeSwitchPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String nav = FrontendSourceSupport.readString(navPath);
+        String modeSwitch = FrontendSourceSupport.readString(modeSwitchPath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("TenantAdminCallScreenPage")
@@ -141,7 +143,9 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
 
         assertThat(nav)
             .contains("/admin/call-screen")
-            .contains("叫号屏配置");
+            .contains("nav.tenant.callScreen");
+        assertThat(zh)
+            .contains("callScreen: '叫号屏配置'");
 
         assertThat(apiClient)
             .contains("getCallScreenSettings")
@@ -222,8 +226,8 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
             .contains("defineProps")
             .contains("modelValue")
             .contains("update:modelValue")
-            .contains("文案轮播")
-            .contains("图片/视频轮播")
+            .contains("components.callScreenAdModeSwitch.text")
+            .contains("components.callScreenAdModeSwitch.media")
             .contains("call-screen-ad-mode-switch");
     }
 
@@ -234,19 +238,23 @@ class QueueDisplayCallScreenUiImplementationValidationTest {
         Path typesPath = Path.of("src", "types", "platformCallScreenSeed.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
         Path modeSwitchPath = Path.of("src", "components", "call-screen", "CallScreenAdModeSwitch.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(modeSwitchPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String nav = Files.readString(navPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String nav = FrontendSourceSupport.readString(navPath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(nav)
-            .contains("叫号模板");
+            .contains("nav.platform.callScreenSeed");
+        assertThat(zh)
+            .contains("callScreenSeed: '叫号模板'");
 
         assertThat(apiClient)
             .contains("getPlatformCallScreenTextSeed")

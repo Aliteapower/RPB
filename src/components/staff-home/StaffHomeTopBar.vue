@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   appStatusLabel: string
@@ -8,23 +9,24 @@ const props = defineProps<{
   storeLabel: string
 }>()
 
+const { t } = useI18n()
 const displayAppStatus = computed(() => {
   const status = props.appStatusLabel.trim()
-  return status === '应用可用' ? '' : status
+  return status === t('staffHome.appStatus.available') ? '' : status
 })
 </script>
 
 <template>
-  <header class="staff-topbar" aria-label="员工工作台顶部栏">
+  <header class="staff-topbar" :aria-label="t('staffHome.topbar.aria')">
     <div class="brand-block">
-      <span class="brand-mark" aria-hidden="true">食</span>
+      <span class="brand-mark" aria-hidden="true">{{ t('staffHome.topbar.brandMark') }}</span>
       <div>
-        <p class="brand-kicker">门店员工</p>
-        <h1>食刻 · 管理</h1>
+        <p class="brand-kicker">{{ t('staffHome.topbar.kicker') }}</p>
+        <h1>{{ t('staffHome.topbar.title') }}</h1>
       </div>
     </div>
 
-    <div class="topbar-meta" aria-label="门店和应用状态">
+    <div class="topbar-meta" :aria-label="t('staffHome.topbar.metaAria')">
       <div class="topbar-row topbar-row--time">
         <span class="time-pill">{{ currentTimeText }}</span>
         <slot name="utility" />

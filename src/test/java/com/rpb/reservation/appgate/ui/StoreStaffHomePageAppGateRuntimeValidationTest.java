@@ -46,16 +46,16 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
         assertAppearsInOrder(
             source,
-            "label: '今日预约'",
-            "label: '已到店'",
-            "label: '当前排队'",
-            "label: '可用桌台'"
+            "labelKey: 'staffHome.kpis.reservations'",
+            "labelKey: 'staffHome.kpis.arrived'",
+            "labelKey: 'staffHome.kpis.queue'",
+            "labelKey: 'staffHome.kpis.tables'"
         );
 
         assertThat(source)
-            .contains("今日概览")
-            .contains("当前排队人数组")
-            .contains("桌台状态")
+            .contains("staffHome.aria.todayOverview")
+            .contains("staffHome.aria.queuePartyGroups")
+            .contains("staffHome.aria.tableStatus")
             .contains("waitingTickets")
             .contains("calledTickets")
             .contains("availableTables")
@@ -68,19 +68,19 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
     @Test
     void staffPagesShowFriendlyAppGateSubscriptionMessages() throws Exception {
-        String staffHomeSource = Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
-        String todayListSource = Files.readString(Path.of(
+        String staffHomeSource = FrontendSourceSupport.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
+        String todayListSource = FrontendSourceSupport.readString(Path.of(
             "src",
             "components",
             "reservation-workbench",
             "ReservationTodayListPanel.vue"
         ));
-        String queueTicketListSource = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
-        String tableResourceListSource = Files.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
+        String queueTicketListSource = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String tableResourceListSource = FrontendSourceSupport.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
         Path appGateMessagesPath = Path.of("src", "utils", "appGateErrorMessages.ts");
 
         assertThat(appGateMessagesPath).exists();
-        String appGateMessagesSource = Files.readString(appGateMessagesPath);
+        String appGateMessagesSource = FrontendSourceSupport.readString(appGateMessagesPath);
 
         assertThat(staffHomeSource)
             .contains("formatAppGateErrorMessage")
@@ -117,12 +117,12 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
         assertThat(appGateMessagesSource)
             .contains("TENANT_APP_NOT_ENABLED")
-            .contains("预约排队叫号系统未开通")
-            .contains("请联系平台管理员在租户计费中勾选产品线后再使用")
+            .contains("appGate.errors.tenantAppNotEnabled.title")
+            .contains("appGate.errors.tenantAppNotEnabled.message")
             .contains("TENANT_APP_EXPIRED")
-            .contains("产品线订阅已到期")
+            .contains("appGate.errors.tenantAppExpired.title")
             .contains("PERMISSION_DENIED")
-            .contains("当前账号没有此功能权限")
+            .contains("appGate.errors.permissionDenied.title")
             .doesNotContain("错误代码")
             .doesNotContain("消息键");
     }
@@ -150,9 +150,9 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
     @Test
     void localValidationDefaultsUseSingleStoreBaseline() throws Exception {
-        String routerSource = Files.readString(Path.of("src", "router", "index.ts"));
-        String storeContextSource = Files.readString(Path.of("src", "stores", "storeContext.ts"));
-        String handoffSource = Files.readString(Path.of("docs", "frontend", "STORE_STAFF_OPERATIONAL_HANDOFF.md"));
+        String routerSource = FrontendSourceSupport.readString(Path.of("src", "router", "index.ts"));
+        String storeContextSource = FrontendSourceSupport.readString(Path.of("src", "stores", "storeContext.ts"));
+        String handoffSource = FrontendSourceSupport.readString(Path.of("docs", "frontend", "STORE_STAFF_OPERATIONAL_HANDOFF.md"));
 
         assertThat(routerSource)
             .contains(LOCAL_VALIDATION_STORE_ID)
@@ -187,7 +187,7 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
             Path.of("src", "components", "staff-home", "useCurrentClock.ts")
         )) {
             if (Files.exists(path)) {
-                source.append(Files.readString(path)).append('\n');
+                source.append(FrontendSourceSupport.readString(path)).append('\n');
             }
         }
 

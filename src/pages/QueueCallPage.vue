@@ -9,6 +9,9 @@ import type {
   CallQueueTicketResponse,
   QueueCallApiErrorResponse
 } from '../types/queueCall'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -136,7 +139,7 @@ function optionalDisplay(value: string | number | null | undefined): string {
     return String(value)
   }
 
-  return value?.trim() ? value : '未返回'
+  return value?.trim() ? value : gt('generated.queue-call.035')
 }
 
 function queueTicketDisplayText(value: CallQueueTicketResponse): string {
@@ -179,15 +182,15 @@ function queryValue(value: unknown): string {
 <template>
   <main class="page-shell">
     <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>排队叫号</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
+      <p class="eyebrow">{{ gt('generated.queue-call.001') }}</p>
+      <h1>{{ gt('generated.queue-call.002') }}</h1>
+      <p class="store-context">{{ gt('generated.queue-call.003') }} {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
+      <RouterLink class="home-link" :to="staffHomeRoute">{{ gt('generated.queue-call.004') }}</RouterLink>
     </section>
 
     <form class="call-form" @submit.prevent="submitCall">
       <label class="ticket-id-field">
-        <span>排队票 ID</span>
+        <span>{{ gt('generated.queue-call.005') }}</span>
         <input
           v-model="form.queueTicketId"
           autocomplete="off"
@@ -198,100 +201,99 @@ function queryValue(value: unknown): string {
       </label>
 
       <label class="called-at-field">
-        <span>叫号时间（可选）</span>
+        <span>{{ gt('generated.queue-call.006') }}</span>
         <input v-model="form.calledAt" name="calledAt" type="datetime-local" />
       </label>
 
       <details class="field-group">
-        <summary>补充信息</summary>
+        <summary>{{ gt('generated.queue-call.007') }}</summary>
         <label>
-          <span>原因代码（可选）</span>
+          <span>{{ gt('generated.queue-call.008') }}</span>
           <input v-model="form.reasonCode" name="reasonCode" type="text" />
         </label>
         <label>
-          <span>备注（可选）</span>
+          <span>{{ gt('generated.queue-call.009') }}</span>
           <textarea v-model="form.note" name="note" rows="3" />
         </label>
       </details>
 
       <button class="submit-button" :disabled="!canSubmit" type="submit">
-        {{ isSubmitting ? '叫号中...' : '执行叫号' }}
+        {{ isSubmitting ? gt('generated.queue-call.010') : gt('generated.queue-call.011') }}
       </button>
     </form>
 
     <section v-if="result" class="result-panel success-panel" aria-live="polite">
-      <h2>{{ result.alreadyCalled ? '已叫号' : '叫号成功' }}</h2>
+      <h2>{{ result.alreadyCalled ? gt('generated.queue-call.012') : gt('generated.queue-call.013') }}</h2>
       <div class="call-highlight ticket-highlight">
-        <span>排队号码</span>
+        <span>{{ gt('generated.queue-call.014') }}</span>
         <strong>{{ queueTicketDisplayText(result) }}</strong>
       </div>
       <div class="call-highlight status-highlight">
-        <span>叫号状态</span>
+        <span>{{ gt('generated.queue-call.015') }}</span>
         <strong>{{ result.queueTicketStatus }}</strong>
       </div>
       <div class="call-highlight hold-highlight">
-        <span>保留到</span>
+        <span>{{ gt('generated.queue-call.016') }}</span>
         <strong>{{ result.holdUntilAt }}</strong>
       </div>
       <div class="call-highlight">
-        <span>预约编号</span>
+        <span>{{ gt('generated.queue-call.017') }}</span>
         <strong>{{ optionalDisplay(result.reservationCode) }}</strong>
       </div>
       <div class="call-highlight already-called-highlight">
-        <span>是否已叫号</span>
+        <span>{{ gt('generated.queue-call.018') }}</span>
         <strong>{{ result.alreadyCalled }}</strong>
       </div>
-      <p v-if="calledStatus" class="call-note">排队状态：called</p>
-      <p v-if="arrivedStatus" class="call-note">预约状态：arrived</p>
-      <p v-if="result.alreadyCalled" class="call-note">该排队票已有叫号证据，本次按成功展示。</p>
+      <p v-if="calledStatus" class="call-note">{{ gt('generated.queue-call.019') }}</p>
+      <p v-if="arrivedStatus" class="call-note">{{ gt('generated.queue-call.020') }}</p>
+      <p v-if="result.alreadyCalled" class="call-note">{{ gt('generated.queue-call.021') }}</p>
       <dl>
         <div>
-          <dt>排队记录 ID</dt>
+          <dt>{{ gt('generated.queue-call.022') }}</dt>
           <dd>{{ result.queueTicketId }}</dd>
         </div>
         <div>
-          <dt>排队状态</dt>
+          <dt>{{ gt('generated.queue-call.023') }}</dt>
           <dd>{{ result.queueTicketStatus }}</dd>
         </div>
         <div>
-          <dt>预约 ID</dt>
+          <dt>{{ gt('generated.queue-call.024') }}</dt>
           <dd>{{ optionalDisplay(result.reservationId) }}</dd>
         </div>
         <div>
-          <dt>预约状态</dt>
+          <dt>{{ gt('generated.queue-call.025') }}</dt>
           <dd>{{ optionalDisplay(result.reservationStatus) }}</dd>
         </div>
         <div>
-          <dt>叫号时间</dt>
+          <dt>{{ gt('generated.queue-call.026') }}</dt>
           <dd>{{ result.calledAt }}</dd>
         </div>
         <div>
-          <dt>保留截止</dt>
+          <dt>{{ gt('generated.queue-call.027') }}</dt>
           <dd>{{ result.holdUntilAt }}</dd>
         </div>
         <div>
-          <dt>事件</dt>
+          <dt>{{ gt('generated.queue-call.028') }}</dt>
           <dd>{{ eventsDisplay }}</dd>
         </div>
         <div>
-          <dt>幂等状态</dt>
+          <dt>{{ gt('generated.queue-call.029') }}</dt>
           <dd>{{ result.idempotency.status }}</dd>
         </div>
         <div>
-          <dt>幂等重放</dt>
+          <dt>{{ gt('generated.queue-call.030') }}</dt>
           <dd>{{ result.idempotency.replayed ?? false }}</dd>
         </div>
       </dl>
     </section>
 
     <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>叫号失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+      <h2>{{ gt('generated.queue-call.031') }}</h2>
+      <p class="error-code">{{ gt('generated.queue-call.032') }}{{ apiError.error.code }}</p>
+      <p class="message-key">{{ gt('generated.queue-call.033') }}{{ apiError.error.messageKey }}</p>
     </section>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
+    <p v-if="lastIdempotencyKey" class="idempotency-key"> {{ gt('generated.queue-call.034') }} {{ lastIdempotencyKey }}
     </p>
   </main>
 </template>

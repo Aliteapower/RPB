@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   getReservationShareInfo,
@@ -17,24 +18,24 @@ import ReservationShareCopyPanel from './ReservationShareCopyPanel.vue'
 const cancellableStatuses = new Set(['draft', 'confirmed'])
 const noShowableStatuses = new Set(['confirmed'])
 
-const statusLabels: Record<string, string> = {
-  confirmed: '已预约',
-  arrived: '已到店',
-  seated: '已入桌',
-  cancelled: '已取消',
-  no_show: '爽约',
-  completed: '已完成',
-  draft: '草稿'
+const statusLabelKeys: Record<string, string> = {
+  confirmed: 'reservationWorkbench.statuses.confirmed',
+  arrived: 'reservationWorkbench.statuses.arrived',
+  seated: 'reservationWorkbench.statuses.seated',
+  cancelled: 'reservationWorkbench.statuses.cancelled',
+  no_show: 'reservationWorkbench.statuses.noShow',
+  completed: 'reservationWorkbench.statuses.completed',
+  draft: 'reservationWorkbench.statuses.draft'
 }
 
-const queueStatusLabels: Record<string, string> = {
-  waiting: '排队中',
-  called: '已叫号',
-  skipped: '已过号',
-  rejoined: '已重回',
-  seated: '已入座',
-  cancelled: '排队已取消',
-  expired: '排队已过期'
+const queueStatusLabelKeys: Record<string, string> = {
+  waiting: 'reservationWorkbench.queueStatuses.waiting',
+  called: 'reservationWorkbench.queueStatuses.called',
+  skipped: 'reservationWorkbench.queueStatuses.skipped',
+  rejoined: 'reservationWorkbench.queueStatuses.rejoined',
+  seated: 'reservationWorkbench.queueStatuses.seated',
+  cancelled: 'reservationWorkbench.queueStatuses.cancelled',
+  expired: 'reservationWorkbench.queueStatuses.expired'
 }
 
 const props = defineProps<{
@@ -57,6 +58,7 @@ const emit = defineEmits<{
   'seat-requested': [item: ReservationTodayViewItem]
 }>()
 
+const { t } = useI18n()
 const customerName = computed(() => {
   const values = [props.item.customerName, props.item.customerNickname].filter(Boolean)
   return values.length ? values.join(' / ') : props.item.reservationCode
@@ -66,7 +68,10 @@ const phoneDisplay = computed(() => optionalDisplay(props.item.phoneMasked))
 const timeRange = computed(
   () => `${formatStoreTime(props.item.reservedStartAt)} - ${formatStoreTime(props.item.reservedEndAt)}`
 )
-const statusText = computed(() => statusLabels[props.item.status] ?? props.item.status)
+const statusText = computed(() => {
+  const labelKey = statusLabelKeys[props.item.status]
+  return labelKey ? t(labelKey) : props.item.status
+})
 const statusClass = computed(() => `status-${props.item.status.replace(/_/g, '-')}`)
 const queueTicketStatus = computed(() => props.item.queueTicketStatus?.trim() ?? '')
 const hasQueueTicket = computed(() => !!props.item.queueTicketId?.trim())
@@ -86,25 +91,41 @@ const canCancel = computed(
   () => props.canCancelReservation && cancellableStatuses.has(props.item.status)
 )
 const currentDayActionTitle = computed(() =>
-  props.canRunCurrentDayActions ? undefined : '仅当日预约可以操作'
+  props.canRunCurrentDayActions ? undefined : t('reservationWorkbench.item.currentDayOnly')
 )
-const seatActionText = computed(() => (showQueueSeat.value ? '排队入座' : '入桌'))
-const seatLoadingText = computed(() => (showQueueSeat.value ? '跳转中' : '入桌中'))
+const seatActionText = computed(() => (
+  showQueueSeat.value ? t('reservationWorkbench.item.seatFromQueue') : t('reservationWorkbench.item.seatDirect')
+))
+const seatLoadingText = computed(() => (
+  showQueueSeat.value ? t('reservationWorkbench.item.jumping') : t('reservationWorkbench.item.seating')
+))
 const tableAssignmentText = computed(() => {
   const currentCode = props.item.currentResourceCode?.trim()
 
   if (currentCode) {
-    const label = props.item.status === 'completed' ? '已完成' : '已入桌'
-    return `${resourceLabel(props.item.currentResourceType)}：${currentCode}（${label}）`
+    const label = props.item.status === 'completed'
+      ? t('reservationWorkbench.item.completed')
+      : t('reservationWorkbench.item.seated')
+    return t('reservationWorkbench.item.tableAssigned', {
+      resource: resourceLabel(props.item.currentResourceType),
+      code: currentCode,
+      label
+    })
   }
 
   const assignedCode = props.item.assignedResourceCode?.trim()
 
   if (assignedCode) {
-    return `${resourceLabel(props.item.assignedResourceType)}：${assignedCode}（预约指定）`
+    return t('reservationWorkbench.item.tableAssigned', {
+      resource: resourceLabel(props.item.assignedResourceType),
+      code: assignedCode,
+      label: t('reservationWorkbench.item.reservationAssigned')
+    })
   }
 
-  return props.item.status === 'seated' ? '桌台：已入桌' : '桌台：未指定'
+  return props.item.status === 'seated'
+    ? t('reservationWorkbench.item.tableSeated')
+    : t('reservationWorkbench.item.tableUnassigned')
 })
 const queueAssignmentText = computed(() => {
   if (!props.item.queueTicketId) {
@@ -112,7 +133,10 @@ const queueAssignmentText = computed(() => {
   }
 
   const status = props.item.queueTicketStatus?.trim()
-  const statusText = status ? queueStatusLabels[status] ?? status : '已排队'
+  const labelKey = status ? queueStatusLabelKeys[status] : ''
+  const statusText = labelKey
+    ? t(labelKey)
+    : (status || t('reservationWorkbench.queueStatuses.queued'))
   const numberText = queueTicketDisplayText(props.item)
 
   return `${numberText} · ${statusText}`
@@ -160,7 +184,7 @@ async function systemShareReservationLink(): Promise<void> {
   const info = await ensureShareInfo()
   const url = info ? reservationShareUrl(info) : ''
   if (!info || !url) {
-    shareInfoErrorText.value = '暂无可转发链接'
+    shareInfoErrorText.value = t('reservationWorkbench.share.noForwardLink')
     return
   }
 
@@ -179,25 +203,31 @@ async function systemShareReservationLink(): Promise<void> {
   if (result === 'copied' || result === 'native-share') {
     await recordShareIntent(result === 'copied' ? 'copy_link' : 'system_share')
     shareInfoShared.value = true
-    shareInfoStatusText.value = result === 'copied' ? '链接已复制' : '已打开系统转发'
+    shareInfoStatusText.value = result === 'copied'
+      ? t('reservationWorkbench.share.copied')
+      : t('reservationWorkbench.share.nativeOpened')
     return
   }
 
   shareInfoFallbackText.value = url
-  shareInfoErrorText.value = '当前浏览器限制转发，请手动复制下方链接'
+  shareInfoErrorText.value = t('reservationWorkbench.share.manualShare')
 }
 
 async function openWhatsApp(): Promise<void> {
   const info = await ensureShareInfo()
   if (!info?.canOpenWhatsAppLink || !info.whatsappLink) {
-    shareInfoErrorText.value = info?.customerPhoneAvailable ? '顾客手机号暂不可用于 WhatsApp' : '顾客未填写可用手机号'
+    shareInfoErrorText.value = info?.customerPhoneAvailable
+      ? t('reservationWorkbench.share.phoneUnavailable')
+      : t('reservationWorkbench.share.phoneMissing')
     return
   }
 
   resetShareFeedback()
   await recordShareIntent('whatsapp')
   shareInfoShared.value = true
-  shareInfoStatusText.value = `将以 ${info.senderLabel || '门店'} 身份提示打开 WhatsApp`
+  shareInfoStatusText.value = t('reservationWorkbench.share.whatsappOpening', {
+    sender: info.senderLabel || t('reservationWorkbench.share.defaultSender')
+  })
   window.location.href = info.whatsappLink
 }
 
@@ -206,19 +236,19 @@ async function openWechat(): Promise<void> {
   const url = info ? reservationShareUrl(info) : ''
   const text = info ? reservationWechatShareText(info, url) : ''
   if (!info || !text) {
-    shareInfoErrorText.value = '暂无可发送文案'
+    shareInfoErrorText.value = t('reservationWorkbench.share.noText')
     return
   }
 
   resetShareFeedback()
   if (!(await copyPlainText(text))) {
     shareInfoFallbackText.value = text
-    shareInfoErrorText.value = '当前浏览器限制复制，请手动复制文案后打开微信'
+    shareInfoErrorText.value = t('reservationWorkbench.share.manualTextCopy')
     return
   }
   await recordShareIntent('wechat')
   shareInfoShared.value = true
-  shareInfoStatusText.value = '文案已复制，正在打开微信'
+  shareInfoStatusText.value = t('reservationWorkbench.share.wechatOpening')
   if (info.wechatLink) {
     window.location.href = info.wechatLink
   }
@@ -228,7 +258,7 @@ async function copyReservationShareLink(): Promise<void> {
   const info = await ensureShareInfo()
   const url = info ? reservationShareUrl(info) : ''
   if (!info || !url) {
-    shareInfoErrorText.value = '暂无可复制链接'
+    shareInfoErrorText.value = t('reservationWorkbench.share.noCopyLink')
     return
   }
 
@@ -236,12 +266,12 @@ async function copyReservationShareLink(): Promise<void> {
   if (await copyPlainText(url)) {
     await recordShareIntent('copy_link')
     shareInfoShared.value = true
-    shareInfoStatusText.value = '链接已复制'
+    shareInfoStatusText.value = t('reservationWorkbench.share.copied')
     return
   }
 
   shareInfoFallbackText.value = url
-  shareInfoErrorText.value = '当前浏览器限制复制，请手动复制下方链接'
+  shareInfoErrorText.value = t('reservationWorkbench.share.manualCopyLink')
 }
 
 async function ensureShareInfo(): Promise<ReservationShareInfo | null> {
@@ -283,10 +313,9 @@ async function loadReservationShareInfo(): Promise<void> {
     shareInfo.value = response.shareInfo
   } catch (error) {
     shareInfo.value = null
-    shareInfoErrorText.value =
-      error instanceof ReservationShareInfoApiError
-        ? '订位信息读取失败'
-        : '订位信息读取失败'
+    shareInfoErrorText.value = error instanceof ReservationShareInfoApiError
+      ? t('reservationWorkbench.share.loadFailed')
+      : t('reservationWorkbench.share.loadFailed')
   } finally {
     isLoadingShareInfo.value = false
   }
@@ -311,7 +340,7 @@ function formatStoreTime(value: string): string {
 }
 
 function optionalDisplay(value: string | null | undefined): string {
-  return value?.trim() ? value : '未填写'
+  return value?.trim() ? value : t('reservationWorkbench.item.unset')
 }
 
 function queueTicketDisplayText(item: ReservationTodayViewItem): string {
@@ -319,7 +348,7 @@ function queueTicketDisplayText(item: ReservationTodayViewItem): string {
     item.queueTicketDisplayNumber?.trim() ||
     (typeof item.queueTicketNumber === 'number' ? String(item.queueTicketNumber) : '')
 
-  return displayNumber ? `#${displayNumber}` : '排队票'
+  return displayNumber ? `#${displayNumber}` : t('reservationWorkbench.item.queueTicket')
 }
 
 function reservationShareUrl(info: ReservationShareInfo): string {
@@ -329,14 +358,14 @@ function reservationShareUrl(info: ReservationShareInfo): string {
 
 function resourceLabel(type: string | null | undefined): string {
   if (type === 'table_group') {
-    return '桌组'
+    return t('reservationWorkbench.item.tableGroup')
   }
 
   if (type === 'dining_table') {
-    return '桌号'
+    return t('reservationWorkbench.item.diningTable')
   }
 
-  return '桌台'
+  return t('reservationWorkbench.item.tableResource')
 }
 </script>
 
@@ -348,11 +377,11 @@ function resourceLabel(type: string | null | undefined): string {
         <span>{{ phoneDisplay }}</span>
       </div>
       <p>{{ timeRange }}</p>
-      <p>{{ item.partySize }}人 · {{ tableAssignmentText }}</p>
+      <p>{{ $t('reservationWorkbench.item.partySizeSummary', { count: item.partySize, table: tableAssignmentText }) }}</p>
       <p v-if="queueAssignmentText">{{ queueAssignmentText }}</p>
     </div>
 
-    <div class="reservation-today-list-item__actions" aria-label="预约操作">
+    <div class="reservation-today-list-item__actions" :aria-label="$t('reservationWorkbench.item.actionsAria')">
       <span class="reservation-today-list-item__status" :class="statusClass">
         {{ statusText }}
       </span>
@@ -378,7 +407,7 @@ function resourceLabel(type: string | null | undefined): string {
         type="button"
         @click="requestCheckIn"
       >
-        {{ isCheckingIn ? '到店中' : '到店' }}
+        {{ isCheckingIn ? $t('reservationWorkbench.item.checkingIn') : $t('reservationWorkbench.item.checkIn') }}
       </button>
 
       <button
@@ -400,18 +429,18 @@ function resourceLabel(type: string | null | undefined): string {
         type="button"
         @click="requestNoShow"
       >
-        {{ isNoShowing ? '爽约中' : '爽约' }}
+        {{ isNoShowing ? $t('reservationWorkbench.item.noShowing') : $t('reservationWorkbench.item.noShow') }}
       </button>
 
       <button
         v-if="canCancel"
         class="reservation-today-list-item__action reservation-today-list-item__action--danger"
         :disabled="isCancelling"
-        title="取消预约"
+        :title="$t('reservationWorkbench.item.cancelTitle')"
         type="button"
         @click="requestCancel"
       >
-        {{ isCancelling ? '取消中' : '取消' }}
+        {{ isCancelling ? $t('reservationWorkbench.item.cancelling') : $t('common.actions.cancel') }}
       </button>
     </div>
   </article>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -18,6 +19,7 @@ import { useAuthSessionStore } from '../stores/authSession'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const auth = useAuthSessionStore()
 
 const loading = ref(false)
@@ -26,13 +28,17 @@ const errorText = ref('')
 
 const mode = computed<'create' | 'edit'>(() => (route.name === 'platform-tenant-create' ? 'create' : 'edit'))
 const tenantId = computed(() => String(route.params.tenantId || ''))
-const pageTitle = computed(() => (mode.value === 'create' ? '新增租户' : '编辑租户'))
+const pageTitle = computed(() => (
+  mode.value === 'create'
+    ? t('platform.tenants.formPage.createTitle')
+    : t('platform.tenants.formPage.editTitle')
+))
 
 const statusOptions: TenantStatusOption[] = [
-  { value: 'created', label: '已创建' },
-  { value: 'active', label: '启用' },
-  { value: 'suspended', label: '停用' },
-  { value: 'closed', label: '关闭' }
+  { value: 'created', labelKey: 'platform.tenants.status.created' },
+  { value: 'active', labelKey: 'platform.tenants.status.active' },
+  { value: 'suspended', labelKey: 'platform.tenants.status.suspended' },
+  { value: 'closed', labelKey: 'platform.tenants.status.closed' }
 ]
 
 const form = reactive<PlatformTenantFormModel>({
@@ -161,25 +167,25 @@ function optionalValue(value: string): string | null {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformApiError)) {
-    return '操作失败'
+    return t('platform.tenants.errors.operationFailed')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return t('platform.tenants.errors.sessionExpired')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有平台后台权限'
+    return t('platform.tenants.errors.forbidden')
   }
   if (error.response.error.code === 'TENANT_CODE_CONFLICT') {
-    return '租户代码或管理员账号已存在'
+    return t('platform.tenants.errors.conflict')
   }
   if (error.response.error.code === 'TENANT_NOT_FOUND') {
-    return '租户不存在'
+    return t('platform.tenants.errors.notFound')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查必填项和 6 位密码'
+    return t('platform.tenants.errors.invalid')
   }
-  return '操作失败'
+  return t('platform.tenants.errors.operationFailed')
 }
 </script>
 
@@ -190,16 +196,16 @@ function apiErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>平台</span>
+          <span>{{ $t('platform.tenants.formPage.kicker') }}</span>
           <h1>{{ pageTitle }}</h1>
         </div>
         <button type="button" class="secondary-button" @click="router.push({ name: 'platform-tenants' })">
-          返回列表
+          {{ $t('platform.tenants.formPage.backToList') }}
         </button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ $t('common.actions.loading') }}</p>
 
       <PlatformTenantForm
         v-else

@@ -21,6 +21,9 @@ import type {
   PlatformCallScreenSeedSlide,
   PlatformCallScreenSeedStatus
 } from '../types/platformCallScreenSeed'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 type PlatformSeedMode = 'text' | 'media'
 type PlatformPreviewSlide = PlatformCallScreenSeedSlide | PlatformCallScreenMediaSeedSlide
@@ -44,7 +47,7 @@ let previewCarouselTimer: number | undefined
 
 const MAX_CALL_SCREEN_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_CALL_SCREEN_VIDEO_BYTES = 80 * 1024 * 1024
-const CALL_SCREEN_MEDIA_UPLOAD_HINT = '支持 JPG、PNG、WebP、MP4、WebM；图片不超过 10MB，视频不超过 80MB。'
+const CALL_SCREEN_MEDIA_UPLOAD_HINT = gt('generated.platform-call-screen-seed.083')
 const CALL_SCREEN_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const CALL_SCREEN_VIDEO_TYPES = new Set(['video/mp4', 'video/webm'])
 
@@ -52,8 +55,8 @@ const sortedSlides = computed(() => sortSlides(seedSet.value?.slides ?? []))
 const sortedMediaPreviewSlides = computed(() => sortMediaSlides(mediaSeedSet.value?.mediaSlides ?? []))
 const selectedSeedSetDisplayName = computed(() =>
   selectedSeedMode.value === 'media'
-    ? mediaSeedSet.value?.displayName ?? '图片/视频模板'
-    : seedSet.value?.displayName ?? '文案种子模板'
+    ? mediaSeedSet.value?.displayName ?? gt('generated.platform-call-screen-seed.084')
+    : seedSet.value?.displayName ?? gt('generated.platform-call-screen-seed.085')
 )
 const selectedSeedSetStatus = computed(() =>
   selectedSeedMode.value === 'media'
@@ -132,7 +135,7 @@ async function saveMediaSeedSet(): Promise<void> {
       version: mediaSeedSet.value.version
     })
     mediaSeedSet.value = cloneMediaSeedSet(response.seedSet)
-    savedText.value = '图片/视频种子模板已保存'
+    savedText.value = gt('generated.platform-call-screen-seed.086')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -206,7 +209,7 @@ async function saveSeedSet(): Promise<void> {
       version: seedSet.value.version
     })
     seedSet.value = cloneSeedSet(response.seedSet)
-    savedText.value = '文案种子模板已保存'
+    savedText.value = gt('generated.platform-call-screen-seed.087')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -321,23 +324,23 @@ function toMediaSlideMutation(slide: PlatformCallScreenMediaSeedSlide): Platform
 
 function validateSeedSet(nextSeedSet: PlatformCallScreenSeedSet): string {
   if (!nextSeedSet.displayName.trim()) {
-    return '请填写模板名称'
+    return gt('generated.platform-call-screen-seed.088')
   }
   if (nextSeedSet.slides.length === 0) {
-    return '文案种子模板至少需要一条文案'
+    return gt('generated.platform-call-screen-seed.089')
   }
 
   const sortOrders = new Set<number>()
   for (const slide of nextSeedSet.slides) {
     if (!slide.title.trim() || !slide.subtitle.trim() || !slide.tagline.trim()) {
-      return '请填写完整的标题、副标题和标语'
+      return gt('generated.platform-call-screen-seed.090')
     }
     const sortOrder = Number(slide.sortOrder)
     if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
-      return '排序必须是大于 0 的整数'
+      return gt('generated.platform-call-screen-seed.091')
     }
     if (sortOrders.has(sortOrder)) {
-      return '排序号不能重复'
+      return gt('generated.platform-call-screen-seed.092')
     }
     sortOrders.add(sortOrder)
   }
@@ -347,19 +350,19 @@ function validateSeedSet(nextSeedSet: PlatformCallScreenSeedSet): string {
 
 function validateMediaSeedSet(nextSeedSet: PlatformCallScreenMediaSeedSet): string {
   if (!nextSeedSet.displayName.trim()) {
-    return '请填写图片/视频模板名称'
+    return gt('generated.platform-call-screen-seed.093')
   }
   if (nextSeedSet.status === 'active' && nextSeedSet.mediaSlides.length === 0) {
-    return '启用图片/视频模板前至少需要一个媒体'
+    return gt('generated.platform-call-screen-seed.094')
   }
   const sortOrders = new Set<number>()
   for (const slide of nextSeedSet.mediaSlides) {
     const sortOrder = Number(slide.sortOrder)
     if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
-      return '排序必须是大于 0 的整数'
+      return gt('generated.platform-call-screen-seed.095')
     }
     if (sortOrders.has(sortOrder)) {
-      return '排序号不能重复'
+      return gt('generated.platform-call-screen-seed.096')
     }
     sortOrders.add(sortOrder)
   }
@@ -376,47 +379,47 @@ function isMediaSlide(slide: PlatformPreviewSlide | undefined): slide is Platfor
 
 function validateMediaUploadFile(file: File): string {
   if (CALL_SCREEN_IMAGE_TYPES.has(file.type)) {
-    return file.size > MAX_CALL_SCREEN_IMAGE_BYTES ? '图片不能超过 10MB' : ''
+    return file.size > MAX_CALL_SCREEN_IMAGE_BYTES ? gt('generated.platform-call-screen-seed.097') : ''
   }
   if (CALL_SCREEN_VIDEO_TYPES.has(file.type)) {
-    return file.size > MAX_CALL_SCREEN_VIDEO_BYTES ? '视频不能超过 80MB' : ''
+    return file.size > MAX_CALL_SCREEN_VIDEO_BYTES ? gt('generated.platform-call-screen-seed.098') : ''
   }
-  return '仅支持 JPG、PNG、WebP、MP4、WebM'
+  return gt('generated.platform-call-screen-seed.099')
 }
 
 function statusLabel(status: PlatformCallScreenSeedStatus): string {
-  return status === 'active' ? '启用' : '停用'
+  return status === 'active' ? gt('generated.platform-call-screen-seed.100') : gt('generated.platform-call-screen-seed.101')
 }
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformCallScreenSeedApiError)) {
-    return '操作失败'
+    return gt('generated.platform-call-screen-seed.102')
   }
   if (error.status === 401 || error.response.error.code === 'UNAUTHENTICATED') {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.platform-call-screen-seed.103')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有平台模板维护权限'
+    return gt('generated.platform-call-screen-seed.104')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查模板名称、文案和排序'
+    return gt('generated.platform-call-screen-seed.105')
   }
   if (error.response.error.code === 'SEED_NOT_FOUND') {
-    return '默认种子模板不存在'
+    return gt('generated.platform-call-screen-seed.106')
   }
   if (error.response.error.code === 'MEDIA_NOT_FOUND') {
-    return '媒体资源不存在或已被删除'
+    return gt('generated.platform-call-screen-seed.107')
   }
   if (error.response.error.code === 'VERSION_CONFLICT') {
-    return '模板已被其他操作更新，请重新加载后再保存'
+    return gt('generated.platform-call-screen-seed.108')
   }
-  return '操作失败'
+  return gt('generated.platform-call-screen-seed.109')
 }
 
 function mediaUploadErrorText(error: unknown): string {
   if (error instanceof PlatformCallScreenSeedApiError && error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查媒体文件格式或大小，图片不超过 10MB，视频不超过 80MB'
+    return gt('generated.platform-call-screen-seed.110')
   }
   return apiErrorText(error)
 }
@@ -429,73 +432,70 @@ function mediaUploadErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>平台</span>
-          <h1>平台叫号模板</h1>
+          <span>{{ gt('generated.platform-call-screen-seed.001') }}</span>
+          <h1>{{ gt('generated.platform-call-screen-seed.002') }}</h1>
         </div>
-        <button class="secondary-button" type="button" :disabled="loading" @click="loadSeedSet">
-          刷新
-        </button>
+        <button class="secondary-button" type="button" :disabled="loading" @click="loadSeedSet"> {{ gt('generated.platform-call-screen-seed.003') }} </button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.platform-call-screen-seed.004') }}</p>
 
       <div v-else-if="seedSet && mediaSeedSet" class="workspace-grid">
         <section class="config-panel" aria-labelledby="platform-seed-settings-title">
           <div class="panel-heading">
             <div>
-              <span>模板设置</span>
+              <span>{{ gt('generated.platform-call-screen-seed.005') }}</span>
               <h2 id="platform-seed-settings-title">
-                {{ selectedSeedMode === 'media' ? '图片/视频种子模板' : '文案种子模板' }}
+                {{ selectedSeedMode === 'media' ? gt('generated.platform-call-screen-seed.006') : gt('generated.platform-call-screen-seed.007') }}
               </h2>
             </div>
             <small>
-              {{ selectedSeedMode === 'media' ? mediaSeedSet.seedKey : seedSet.seedKey }}
-              · 版本 {{ selectedSeedMode === 'media' ? mediaSeedSet.version : seedSet.version }}
+              {{ selectedSeedMode === 'media' ? mediaSeedSet.seedKey : seedSet.seedKey }} {{ gt('generated.platform-call-screen-seed.008') }} {{ selectedSeedMode === 'media' ? mediaSeedSet.version : seedSet.version }}
             </small>
           </div>
 
           <CallScreenAdModeSwitch
             v-model="selectedSeedMode"
-            aria-label="模板类型"
-            text-label="文案模板"
-            media-label="图片/视频模板"
+            :aria-label="gt('generated.platform-call-screen-seed.009')"
+            :text-label="gt('generated.platform-call-screen-seed.010')"
+            :media-label="gt('generated.platform-call-screen-seed.011')"
           />
 
-          <p class="phase-note">平台维护文案种子模板和图片/视频种子模板；租户启用时仍使用自己的隔离副本。</p>
+          <p class="phase-note">{{ gt('generated.platform-call-screen-seed.012') }}</p>
 
           <div v-if="selectedSeedMode === 'text'" class="settings-grid">
             <label>
-              <span>模板名称</span>
+              <span>{{ gt('generated.platform-call-screen-seed.013') }}</span>
               <input v-model.trim="seedSet.displayName" maxlength="40" required />
             </label>
             <label>
-              <span>状态</span>
+              <span>{{ gt('generated.platform-call-screen-seed.014') }}</span>
               <select v-model="seedSet.status" required>
-                <option value="active">启用</option>
-                <option value="disabled">停用</option>
+                <option value="active">{{ gt('generated.platform-call-screen-seed.015') }}</option>
+                <option value="disabled">{{ gt('generated.platform-call-screen-seed.016') }}</option>
               </select>
             </label>
             <label>
-              <span>类型</span>
+              <span>{{ gt('generated.platform-call-screen-seed.017') }}</span>
               <input :value="seedSet.adType" disabled />
             </label>
           </div>
           <div v-else class="settings-grid">
             <label>
-              <span>模板名称</span>
+              <span>{{ gt('generated.platform-call-screen-seed.018') }}</span>
               <input v-model.trim="mediaSeedSet.displayName" maxlength="40" required />
             </label>
             <label>
-              <span>状态</span>
+              <span>{{ gt('generated.platform-call-screen-seed.019') }}</span>
               <select v-model="mediaSeedSet.status" required>
-                <option value="active">启用</option>
-                <option value="disabled">停用</option>
+                <option value="active">{{ gt('generated.platform-call-screen-seed.020') }}</option>
+                <option value="disabled">{{ gt('generated.platform-call-screen-seed.021') }}</option>
               </select>
             </label>
             <label>
-              <span>类型</span>
+              <span>{{ gt('generated.platform-call-screen-seed.022') }}</span>
               <input value="media" disabled />
             </label>
           </div>
@@ -504,24 +504,22 @@ function mediaUploadErrorText(error: unknown): string {
         <section v-if="selectedSeedMode === 'text'" class="config-panel" aria-labelledby="platform-seed-slides-title">
           <div class="panel-heading">
             <div>
-              <span>平台文案库</span>
-              <h2 id="platform-seed-slides-title">种子文案编辑</h2>
+              <span>{{ gt('generated.platform-call-screen-seed.023') }}</span>
+              <h2 id="platform-seed-slides-title">{{ gt('generated.platform-call-screen-seed.024') }}</h2>
             </div>
-            <button class="secondary-button compact" type="button" @click="addSlide">
-              新增一组
-            </button>
+            <button class="secondary-button compact" type="button" @click="addSlide"> {{ gt('generated.platform-call-screen-seed.025') }} </button>
           </div>
 
           <div class="slide-editor">
             <table>
               <thead>
                 <tr>
-                  <th>排序</th>
-                  <th>状态</th>
-                  <th>标题</th>
-                  <th>副标题</th>
-                  <th>标语</th>
-                  <th>版本</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.026') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.027') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.028') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.029') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.030') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.031') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -531,8 +529,8 @@ function mediaUploadErrorText(error: unknown): string {
                   </td>
                   <td>
                     <select v-model="slide.status" class="status-select" required>
-                      <option value="active">启用</option>
-                      <option value="disabled">停用</option>
+                      <option value="active">{{ gt('generated.platform-call-screen-seed.032') }}</option>
+                      <option value="disabled">{{ gt('generated.platform-call-screen-seed.033') }}</option>
                     </select>
                   </td>
                   <td>
@@ -552,7 +550,7 @@ function mediaUploadErrorText(error: unknown): string {
 
           <div class="panel-actions">
             <button class="primary-button" type="button" :disabled="saving" @click="saveSeedSet">
-              {{ saving ? '保存中' : '保存文案种子模板' }}
+              {{ saving ? gt('generated.platform-call-screen-seed.034') : gt('generated.platform-call-screen-seed.035') }}
             </button>
           </div>
         </section>
@@ -560,8 +558,8 @@ function mediaUploadErrorText(error: unknown): string {
         <section v-else class="config-panel media-seed-panel" aria-labelledby="platform-media-seed-title">
           <div class="panel-heading">
             <div>
-              <span>平台媒体库</span>
-              <h2 id="platform-media-seed-title">图片/视频模板</h2>
+              <span>{{ gt('generated.platform-call-screen-seed.036') }}</span>
+              <h2 id="platform-media-seed-title">{{ gt('generated.platform-call-screen-seed.037') }}</h2>
             </div>
             <div class="panel-heading-actions">
               <label class="upload-button">
@@ -571,9 +569,9 @@ function mediaUploadErrorText(error: unknown): string {
                   :disabled="uploadingMedia"
                   @change="uploadMediaSlide"
                 />
-                {{ uploadingMedia ? '上传中' : '上传媒体' }}
+                {{ uploadingMedia ? gt('generated.platform-call-screen-seed.038') : gt('generated.platform-call-screen-seed.039') }}
               </label>
-              <small>{{ mediaSeedSet.seedKey }} · 版本 {{ mediaSeedSet.version }}</small>
+              <small>{{ mediaSeedSet.seedKey }} {{ gt('generated.platform-call-screen-seed.040') }} {{ mediaSeedSet.version }}</small>
             </div>
           </div>
           <p class="media-upload-hint">{{ CALL_SCREEN_MEDIA_UPLOAD_HINT }}</p>
@@ -582,14 +580,14 @@ function mediaUploadErrorText(error: unknown): string {
             <table>
               <thead>
                 <tr>
-                  <th>排序</th>
-                  <th>状态</th>
-                  <th>类型</th>
-                  <th>预览</th>
-                  <th>标题</th>
-                  <th>替代文本</th>
-                  <th>版本</th>
-                  <th>操作</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.041') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.042') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.043') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.044') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.045') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.046') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.047') }}</th>
+                  <th>{{ gt('generated.platform-call-screen-seed.048') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -599,17 +597,17 @@ function mediaUploadErrorText(error: unknown): string {
                   </td>
                   <td>
                     <select v-model="slide.status" class="status-select" required>
-                      <option value="active">启用</option>
-                      <option value="disabled">停用</option>
+                      <option value="active">{{ gt('generated.platform-call-screen-seed.049') }}</option>
+                      <option value="disabled">{{ gt('generated.platform-call-screen-seed.050') }}</option>
                     </select>
                   </td>
-                  <td class="version-cell">{{ slide.mediaKind === 'video' ? '视频' : '图片' }}</td>
+                  <td class="version-cell">{{ slide.mediaKind === 'video' ? gt('generated.platform-call-screen-seed.051') : gt('generated.platform-call-screen-seed.052') }}</td>
                   <td>
                     <img
                       v-if="slide.mediaKind === 'image'"
                       class="media-thumb"
                       :src="slide.mediaUrl"
-                      :alt="slide.altText || slide.title || '媒体预览'"
+                      :alt="slide.altText || slide.title || gt('generated.platform-call-screen-seed.053')"
                     />
                     <video
                       v-else
@@ -628,41 +626,39 @@ function mediaUploadErrorText(error: unknown): string {
                   </td>
                   <td class="version-cell">{{ slide.version }}</td>
                   <td>
-                    <button class="danger-button compact" type="button" @click="removeMediaSlide(index)">
-                      删除
-                    </button>
+                    <button class="danger-button compact" type="button" @click="removeMediaSlide(index)"> {{ gt('generated.platform-call-screen-seed.054') }} </button>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div class="media-preview-strip" aria-label="图片/视频模板预览">
+          <div class="media-preview-strip" :aria-label="gt('generated.platform-call-screen-seed.055')">
             <template v-if="mediaSeedSet.mediaSlides.length">
               <div v-for="slide in sortMediaSlides(mediaSeedSet.mediaSlides).slice(0, 2)" :key="`preview-${slide.mediaAssetId}`" class="media-preview-card">
                 <img
                   v-if="slide.mediaKind === 'image'"
                   :src="slide.mediaUrl"
-                  :alt="slide.altText || slide.title || '媒体预览'"
+                  :alt="slide.altText || slide.title || gt('generated.platform-call-screen-seed.056')"
                 />
                 <video v-else :src="slide.mediaUrl" muted playsinline autoplay loop />
-                <strong>{{ slide.title || (slide.mediaKind === 'video' ? '视频广告' : '图片广告') }}</strong>
+                <strong>{{ slide.title || (slide.mediaKind === 'video' ? gt('generated.platform-call-screen-seed.057') : gt('generated.platform-call-screen-seed.058')) }}</strong>
               </div>
             </template>
-            <p v-else class="empty-media-line">上传图片或视频后可轮播预览。</p>
+            <p v-else class="empty-media-line">{{ gt('generated.platform-call-screen-seed.059') }}</p>
           </div>
 
           <div class="panel-actions">
             <button class="primary-button" type="button" :disabled="savingMedia" @click="saveMediaSeedSet">
-              {{ savingMedia ? '保存中' : '保存图片/视频种子模板' }}
+              {{ savingMedia ? gt('generated.platform-call-screen-seed.060') : gt('generated.platform-call-screen-seed.061') }}
             </button>
           </div>
         </section>
 
-        <aside class="preview-panel" aria-label="平台叫号文案预览">
+        <aside class="preview-panel" :aria-label="gt('generated.platform-call-screen-seed.062')">
           <div class="preview-header">
             <div class="preview-title">
-              <span>终端预览</span>
+              <span>{{ gt('generated.platform-call-screen-seed.063') }}</span>
               <strong>{{ selectedSeedSetDisplayName }} · {{ statusLabel(selectedSeedSetStatus) }}</strong>
             </div>
             <button
@@ -671,9 +667,7 @@ function mediaUploadErrorText(error: unknown): string {
               :disabled="previewSlides.length === 0"
               @click="openPreviewFullscreen"
             >
-              <span class="preview-expand-icon" aria-hidden="true" />
-              大屏预览
-            </button>
+              <span class="preview-expand-icon" aria-hidden="true" /> {{ gt('generated.platform-call-screen-seed.064') }} </button>
           </div>
           <div class="preview-screen">
             <template v-if="isMediaSlide(previewSlide)">
@@ -681,7 +675,7 @@ function mediaUploadErrorText(error: unknown): string {
                 v-if="previewSlide.mediaKind === 'image'"
                 class="preview-media"
                 :src="previewSlide.mediaUrl"
-                :alt="previewSlide.altText || previewSlide.title || '媒体预览'"
+                :alt="previewSlide.altText || previewSlide.title || gt('generated.platform-call-screen-seed.065')"
               />
               <video
                 v-else
@@ -691,7 +685,7 @@ function mediaUploadErrorText(error: unknown): string {
                 playsinline
                 autoplay
               />
-              <h3 class="preview-media-title">{{ previewSlide.title || '媒体广告' }}</h3>
+              <h3 class="preview-media-title">{{ previewSlide.title || gt('generated.platform-call-screen-seed.066') }}</h3>
             </template>
             <template v-else>
               <span class="preview-mark">
@@ -702,19 +696,19 @@ function mediaUploadErrorText(error: unknown): string {
                   alt=""
                   @error="handlePreviewLogoError"
                 />
-                <span v-else>食</span>
+                <span v-else>{{ gt('generated.platform-call-screen-seed.067') }}</span>
               </span>
-              <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
-              <p class="preview-subtitle">{{ previewSlide?.subtitle || '请维护文案模板' }}</p>
-              <p class="preview-tagline">{{ previewSlide?.tagline || '新租户默认副本将使用平台种子文案' }}</p>
+              <h3>{{ previewSlide?.title || gt('generated.platform-call-screen-seed.068') }}</h3>
+              <p class="preview-subtitle">{{ previewSlide?.subtitle || gt('generated.platform-call-screen-seed.069') }}</p>
+              <p class="preview-tagline">{{ previewSlide?.tagline || gt('generated.platform-call-screen-seed.070') }}</p>
             </template>
           </div>
-          <div class="preview-dots" aria-label="预览文案轮播">
+          <div class="preview-dots" :aria-label="gt('generated.platform-call-screen-seed.071')">
             <button
               v-for="(slide, index) in previewSlides"
               :key="slide.id || `dot-${index}-${slide.sortOrder}`"
               type="button"
-              :aria-label="`切换预览文案 ${index + 1}`"
+              :aria-label="`${gt('generated.platform-call-screen-seed.072')}${index + 1}`"
               :class="{ active: index === previewSlideIndex }"
               @click="selectPreviewSlide(index)"
             />
@@ -726,19 +720,17 @@ function mediaUploadErrorText(error: unknown): string {
           class="preview-fullscreen"
           role="dialog"
           aria-modal="true"
-          aria-label="大屏预览"
+          :aria-label="gt('generated.platform-call-screen-seed.073')"
           @click.self="closePreviewFullscreen"
         >
-          <button class="preview-close-button" type="button" @click="closePreviewFullscreen">
-            关闭预览
-          </button>
-          <section class="preview-fullscreen-stage" aria-label="平台叫号文案大屏预览">
+          <button class="preview-close-button" type="button" @click="closePreviewFullscreen"> {{ gt('generated.platform-call-screen-seed.074') }} </button>
+          <section class="preview-fullscreen-stage" :aria-label="gt('generated.platform-call-screen-seed.075')">
             <template v-if="isMediaSlide(previewSlide)">
               <img
                 v-if="previewSlide.mediaKind === 'image'"
                 class="preview-fullscreen-media"
                 :src="previewSlide.mediaUrl"
-                :alt="previewSlide.altText || previewSlide.title || '媒体大屏预览'"
+                :alt="previewSlide.altText || previewSlide.title || gt('generated.platform-call-screen-seed.076')"
               />
               <video
                 v-else
@@ -760,18 +752,18 @@ function mediaUploadErrorText(error: unknown): string {
                   alt=""
                   @error="handlePreviewLogoError"
                 />
-                <span v-else>食</span>
+                <span v-else>{{ gt('generated.platform-call-screen-seed.077') }}</span>
               </span>
-              <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
-              <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请维护文案模板' }}</p>
-              <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '新租户默认副本将使用平台种子文案' }}</p>
+              <h2>{{ previewSlide?.title || gt('generated.platform-call-screen-seed.078') }}</h2>
+              <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || gt('generated.platform-call-screen-seed.079') }}</p>
+              <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || gt('generated.platform-call-screen-seed.080') }}</p>
             </template>
-            <div class="preview-dots preview-dots-large" aria-label="大屏预览文案轮播">
+            <div class="preview-dots preview-dots-large" :aria-label="gt('generated.platform-call-screen-seed.081')">
               <button
                 v-for="(slide, index) in previewSlides"
                 :key="slide.id || `fullscreen-dot-${index}-${slide.sortOrder}`"
                 type="button"
-                :aria-label="`切换预览文案 ${index + 1}`"
+                :aria-label="`${gt('generated.platform-call-screen-seed.082')}${index + 1}`"
                 :class="{ active: index === previewSlideIndex }"
                 @click="selectPreviewSlide(index)"
               />

@@ -15,18 +15,20 @@ class PlatformReservationShareTemplateSeedUiImplementationValidationTest {
         Path previewPath = Path.of("src", "utils", "reservationShareTemplatePreview.ts");
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(previewPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String preview = Files.readString(previewPath);
-        String router = Files.readString(routerPath);
-        String nav = Files.readString(navPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String preview = FrontendSourceSupport.readString(previewPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String nav = FrontendSourceSupport.readString(navPath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("PlatformReservationShareTemplateSeedPage")
@@ -36,7 +38,9 @@ class PlatformReservationShareTemplateSeedUiImplementationValidationTest {
 
         assertThat(nav)
             .contains("/platform/reservation/share-template-seed")
-            .contains("预约确认模板");
+            .contains("nav.platform.shareTemplateSeed");
+        assertThat(zh)
+            .contains("shareTemplateSeed: '预约确认模板'");
 
         assertThat(apiClient)
             .contains("getPlatformReservationShareTemplateSeed")
@@ -76,8 +80,8 @@ class PlatformReservationShareTemplateSeedUiImplementationValidationTest {
             .contains("templateText")
             .contains("version")
             .contains("平台种子模板")
-            .contains("点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到模板内容中")
-            .contains("保存后的平台种子模板会用于租户默认订位分享模板")
+            .contains("generated.platform-reservation-share-template-seed.016")
+            .contains("generated.platform-reservation-share-template-seed.017")
             .doesNotContain("ReservationPublicSharePage")
             .doesNotContain("getReservationPublicShare")
             .doesNotContain("/reservation-share/")
@@ -91,12 +95,7 @@ class PlatformReservationShareTemplateSeedUiImplementationValidationTest {
             .contains("renderReservationShareTemplatePreview")
             .contains("buildReservationShareTemplatePreviewVariables")
             .contains("reservationShareTemplatePreviewVariables")
-            .contains("示例门店")
-            .contains("示例地址 1 号")
-            .contains("https://example.com/map")
-            .contains("0000 0000")
-            .contains("15-07-2026")
-            .contains("A01")
+            .contains("translate(`reservationShareTemplatePreview.variables.${key}`)")
             .contains("storeName")
             .contains("reservationDate")
             .contains("reservationTime")

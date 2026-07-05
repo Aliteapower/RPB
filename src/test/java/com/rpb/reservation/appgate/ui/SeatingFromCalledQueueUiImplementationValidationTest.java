@@ -16,17 +16,19 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path staffHomePath = Path.of("src", "pages", "StoreStaffHomePage.vue");
         Path reportPath = Path.of("docs", "frontend", "SEATING_FROM_CALLED_QUEUE_UI_IMPLEMENTATION_REPORT.md");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(reportPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String staffHome = Files.readString(staffHomePath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String staffHome = FrontendSourceSupport.readString(staffHomePath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("SeatingFromCalledQueuePage")
@@ -42,9 +44,12 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
             .contains("queue.seat")
             .contains("canSeatCalledQueueTicket")
             .contains("to: queueTicketListRoute.value")
-            .contains("排队入座")
-            .contains("从已叫号票直接安排桌台")
+            .contains("staffHome.actions.seatQueue.label")
+            .contains("staffHome.actions.seatQueue.description")
             .contains("hasVisibleOperation");
+        assertThat(zh)
+            .contains("label: '排队入座'")
+            .contains("description: '从已叫号票直接安排桌台'");
         assertForbiddenQueueSeatOperationsAbsent(staffHome);
 
         assertThat(apiClient)
@@ -119,7 +124,7 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
 
     @Test
     void seatingFromCalledQueueUiDoesNotShowRequiredResourceAsInitialError() throws Exception {
-        String page = Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+        String page = FrontendSourceSupport.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
 
         int errorStart = page.indexOf("const resourceSelectionError = computed");
         int hintStart = page.indexOf("const resourceSelectionHint = computed");
@@ -141,8 +146,8 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
 
     @Test
     void queueSeatingApiAcceptsWalkInSuccessResponseWithoutReservationFields() throws Exception {
-        String apiClient = Files.readString(Path.of("src", "api", "seatingFromCalledQueueApi.ts"));
-        String types = Files.readString(Path.of("src", "types", "seatingFromCalledQueue.ts"));
+        String apiClient = FrontendSourceSupport.readString(Path.of("src", "api", "seatingFromCalledQueueApi.ts"));
+        String types = FrontendSourceSupport.readString(Path.of("src", "types", "seatingFromCalledQueue.ts"));
 
         assertThat(types)
             .contains("reservationId?: string | null")
@@ -160,8 +165,8 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
 
     @Test
     void queueSeatingRoutesCarryReservationPreassignmentContext() throws Exception {
-        String queueListPage = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
-        String todayViewPage = Files.readString(Path.of("src", "pages", "ReservationTodayViewPage.vue"));
+        String queueListPage = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String todayViewPage = FrontendSourceSupport.readString(Path.of("src", "pages", "ReservationTodayViewPage.vue"));
 
         assertThat(queueListPage)
             .contains("queueSeatRoute(item: QueueTicketListItem)")
@@ -182,7 +187,7 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
 
     @Test
     void seatingFromCalledQueueUiAutoSelectsAndLocksReservationAssignedResource() throws Exception {
-        String page = Files.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+        String page = FrontendSourceSupport.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
 
         assertThat(page)
             .contains("route.query.assignedResourceType")
@@ -205,7 +210,8 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
 
     @Test
     void tableResourcePickerCanRestrictSelectionToRequiredResource() throws Exception {
-        String picker = Files.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+        String picker = FrontendSourceSupport.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+        String zhSource = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "zh-CN.ts"));
 
         assertThat(picker)
             .contains("requiredResourceType?: string | null")
@@ -213,8 +219,12 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
             .contains("hasRequiredResource")
             .contains("matchesRequiredResource")
             .contains("if (hasRequiredResource.value && !matchesRequiredResource(resource))")
-            .contains("需使用预约指定桌台")
+            .contains("staffControls.tablePicker.mustUseRequiredResource")
             .contains("resource.selectable || matchesRequiredResource(resource)");
+
+        assertThat(zhSource)
+            .contains("requiredResource: '预约指定'")
+            .contains("mustUseRequiredResource: '需使用预约指定桌台'");
     }
 
     @Test

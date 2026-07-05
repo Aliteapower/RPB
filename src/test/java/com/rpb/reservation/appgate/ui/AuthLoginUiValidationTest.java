@@ -18,7 +18,7 @@ class AuthLoginUiValidationTest {
         assertThat(apiPath).exists();
         assertThat(storePath).exists();
 
-        String source = Files.readString(pagePath) + Files.readString(apiPath) + Files.readString(storePath);
+        String source = FrontendSourceSupport.readString(pagePath) + FrontendSourceSupport.readString(apiPath) + FrontendSourceSupport.readString(storePath);
 
         assertThat(source)
             .contains("/api/v1/auth/captcha/slider")
@@ -39,7 +39,7 @@ class AuthLoginUiValidationTest {
             .contains("slider-refresh")
             .contains("refreshSlider")
             .contains("useAuthSessionStore")
-            .contains("密码为 6 位数字或英文字母")
+            .contains("login.passwordPolicy")
             .doesNotContain("type=\"range\"")
             .doesNotContain("/register")
             .doesNotContain("注册");
@@ -48,7 +48,7 @@ class AuthLoginUiValidationTest {
     @Test
     void authApiTimesOutNetworkRequestsSoLoginCannotStayLoadingForever() throws Exception {
         Path apiPath = Path.of("src", "api", "authApi.ts");
-        String apiSource = Files.readString(apiPath);
+        String apiSource = FrontendSourceSupport.readString(apiPath);
 
         assertThat(apiSource)
             .contains("AUTH_REQUEST_TIMEOUT_MS")
@@ -63,11 +63,11 @@ class AuthLoginUiValidationTest {
     void loginStopsMissingStoreScopeInsteadOfRoutingToValidationStore() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
         Path storePath = Path.of("src", "stores", "authSession.ts");
-        String source = Files.readString(pagePath) + Files.readString(storePath);
+        String source = FrontendSourceSupport.readString(pagePath) + FrontendSourceSupport.readString(storePath);
 
         assertThat(source)
             .contains("missingStoreScopeText")
-            .contains("账号未绑定门店，请联系平台管理员完成租户初始化")
+            .contains("login.errors.missingStoreScope")
             .contains("user.storeIds.length === 0")
             .contains("storeScope=missing")
             .doesNotContain("state.user?.defaultStoreId || state.user?.storeIds[0] || localValidationStoreId");
@@ -76,7 +76,7 @@ class AuthLoginUiValidationTest {
     @Test
     void routerAddsLoginRouteAndGuardsExistingErpPagesWithAuthSession() throws Exception {
         Path routerPath = Path.of("src", "router", "index.ts");
-        String routerSource = Files.readString(routerPath).replace("\r\n", "\n");
+        String routerSource = FrontendSourceSupport.readString(routerPath).replace("\r\n", "\n");
 
         assertThat(routerSource)
             .contains("LoginPage")
@@ -94,15 +94,15 @@ class AuthLoginUiValidationTest {
     @Test
     void loginPageSeparatesPlatformTenantAndStaffEntrancesWithFutureStoreSelection() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
-        String pageSource = Files.readString(pagePath);
+        String pageSource = FrontendSourceSupport.readString(pagePath);
 
         assertThat(pageSource)
             .contains("platform-admin")
             .contains("tenant-admin")
             .contains("tenant-staff")
-            .contains("平台后台")
-            .contains("租户后台")
-            .contains("租户员工")
+            .contains("login.entries.platformAdmin.title")
+            .contains("login.entries.tenantAdmin.title")
+            .contains("login.entries.tenantStaff.title")
             .contains("tenantCode")
             .contains("employeeUsername")
             .contains("loginUsername: '1000'")
@@ -111,8 +111,8 @@ class AuthLoginUiValidationTest {
             .contains("1000")
             .contains("pendingStoreSelection")
             .contains("selectedStoreId")
-            .contains("授权店面")
-            .contains("切换店面")
+            .contains("login.store.authorized")
+            .contains("login.store.switch")
             .contains("selectStoreAndContinue")
             .contains("loginPayloadUsername");
     }
@@ -134,14 +134,14 @@ class AuthLoginUiValidationTest {
         assertThat(platformTablePath).exists();
         assertThat(platformFormPath).exists();
 
-        String source = Files.readString(routerPath)
-            + Files.readString(storePath)
-            + Files.readString(pagePath)
-            + Files.readString(platformPagePath)
-            + Files.readString(platformApiPath)
-            + Files.readString(erpToolbarPath)
-            + Files.readString(platformTablePath)
-            + Files.readString(platformFormPath);
+        String source = FrontendSourceSupport.readString(routerPath)
+            + FrontendSourceSupport.readString(storePath)
+            + FrontendSourceSupport.readString(pagePath)
+            + FrontendSourceSupport.readString(platformPagePath)
+            + FrontendSourceSupport.readString(platformApiPath)
+            + FrontendSourceSupport.readString(erpToolbarPath)
+            + FrontendSourceSupport.readString(platformTablePath)
+            + FrontendSourceSupport.readString(platformFormPath);
 
         assertThat(source)
             .contains("PlatformTenantsPage")
@@ -154,10 +154,10 @@ class AuthLoginUiValidationTest {
             .contains("updateTenant")
             .contains("deleteTenant")
             .contains("restoreTenant")
-            .contains("租户管理")
-            .contains("新增租户")
-            .contains("恢复")
-            .contains("已删除");
+            .contains("platform.tenants.list.title")
+            .contains("platform.tenants.list.create")
+            .contains("common.actions.restore")
+            .contains("platform.tenants.status.deleted");
     }
 
     @Test
@@ -177,15 +177,15 @@ class AuthLoginUiValidationTest {
         assertThat(erpToolbarPath).exists();
         assertThat(navPath).exists();
 
-        String source = Files.readString(routerPath)
-            + Files.readString(listPagePath)
-            + Files.readString(formPagePath)
-            + Files.readString(platformApiPath)
-            + Files.readString(erpPaginationPath)
-            + Files.readString(erpToolbarPath)
-            + Files.readString(navPath)
-            + Files.readString(tablePath)
-            + Files.readString(formPath);
+        String source = FrontendSourceSupport.readString(routerPath)
+            + FrontendSourceSupport.readString(listPagePath)
+            + FrontendSourceSupport.readString(formPagePath)
+            + FrontendSourceSupport.readString(platformApiPath)
+            + FrontendSourceSupport.readString(erpPaginationPath)
+            + FrontendSourceSupport.readString(erpToolbarPath)
+            + FrontendSourceSupport.readString(navPath)
+            + FrontendSourceSupport.readString(tablePath)
+            + FrontendSourceSupport.readString(formPath);
 
         assertThat(source)
             .contains("path: '/platform/tenants/new'")
@@ -205,7 +205,7 @@ class AuthLoginUiValidationTest {
             .contains("password")
             .contains("router.push({ name: 'platform-tenant-create' })")
             .contains("router.push({ name: 'platform-tenant-edit'")
-            .contains("退出登录")
+            .contains("common.actions.logout")
             .contains("logoutCurrentUser")
             .contains("name: 'login'")
             .contains(":readonly=\"mode === 'edit'\"")
@@ -236,17 +236,17 @@ class AuthLoginUiValidationTest {
         assertThat(settingsPagePath).exists();
         assertThat(navPath).exists();
 
-        String source = Files.readString(routerPath)
-            + Files.readString(storePath)
-            + Files.readString(loginPagePath)
-            + Files.readString(tenantApiPath)
-            + Files.readString(profilePagePath)
-            + Files.readString(staffPagePath)
-            + Files.readString(staffFormPath)
-            + Files.readString(tablesPagePath)
-            + Files.readString(tableFormPath)
-            + Files.readString(settingsPagePath)
-            + Files.readString(navPath);
+        String source = FrontendSourceSupport.readString(routerPath)
+            + FrontendSourceSupport.readString(storePath)
+            + FrontendSourceSupport.readString(loginPagePath)
+            + FrontendSourceSupport.readString(tenantApiPath)
+            + FrontendSourceSupport.readString(profilePagePath)
+            + FrontendSourceSupport.readString(staffPagePath)
+            + FrontendSourceSupport.readString(staffFormPath)
+            + FrontendSourceSupport.readString(tablesPagePath)
+            + FrontendSourceSupport.readString(tableFormPath)
+            + FrontendSourceSupport.readString(settingsPagePath)
+            + FrontendSourceSupport.readString(navPath);
 
         assertThat(source)
             .contains("tenantAdminHomeRoute")
@@ -281,7 +281,7 @@ class AuthLoginUiValidationTest {
             .contains("logoMediaUrl")
             .contains("principalName")
             .contains("reservationHoldMinutes")
-            .contains("退出登录")
+            .contains("common.actions.logout")
             .contains("auth.defaultHomeRoute")
             .doesNotContain("v-if=\"formOpen\"");
     }
@@ -290,7 +290,7 @@ class AuthLoginUiValidationTest {
     void tenantAdminProfileSaveAlsoUploadsSelectedLogo() throws Exception {
         Path profilePagePath = Path.of("src", "pages", "TenantAdminProfilePage.vue");
 
-        String profilePageSource = Files.readString(profilePagePath);
+        String profilePageSource = FrontendSourceSupport.readString(profilePagePath);
 
         assertThat(profilePageSource)
             .contains("async function uploadSelectedLogo(successMessage: string): Promise<void>")
@@ -308,10 +308,10 @@ class AuthLoginUiValidationTest {
         Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
         Path staffFormPath = Path.of("src", "pages", "TenantAdminStaffFormPage.vue");
 
-        String source = Files.readString(routerPath)
-            + Files.readString(tenantApiPath)
-            + Files.readString(staffPagePath)
-            + Files.readString(staffFormPath);
+        String source = FrontendSourceSupport.readString(routerPath)
+            + FrontendSourceSupport.readString(tenantApiPath)
+            + FrontendSourceSupport.readString(staffPagePath)
+            + FrontendSourceSupport.readString(staffFormPath);
 
         assertThat(source)
             .contains("path: '/stores/:storeId/admin/staff/me/edit'")
@@ -347,7 +347,7 @@ class AuthLoginUiValidationTest {
     void tenantAdminStaffListShowsTenantProfilePhoneForProtectedAdmin() throws Exception {
         Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
 
-        String staffPageSource = Files.readString(staffPagePath);
+        String staffPageSource = FrontendSourceSupport.readString(staffPagePath);
 
         assertThat(staffPageSource)
             .contains("getTenantProfile")

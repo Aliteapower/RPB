@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { useAuthSessionStore } from '../../stores/authSession'
 
 const router = useRouter()
 const auth = useAuthSessionStore()
+const { t } = useI18n()
 const loggingOut = ref(false)
+
+const navItems = [
+  { to: '/platform/tenants', labelKey: 'nav.platform.tenants' },
+  { to: '/platform/billing/subscriptions', labelKey: 'nav.platform.billing' },
+  { to: '/platform/settings/profile', labelKey: 'nav.platform.profile' },
+  { to: '/platform/settings/product-lines', labelKey: 'nav.platform.productLines' },
+  { to: '/platform/call-screen/text-seed', labelKey: 'nav.platform.callScreenSeed' },
+  { to: '/platform/reservation/meal-period-seed', labelKey: 'nav.platform.mealPeriodSeed' },
+  { to: '/platform/reservation/share-template-seed', labelKey: 'nav.platform.shareTemplateSeed' }
+]
 
 async function logoutFromPlatform(): Promise<void> {
   if (loggingOut.value) {
@@ -24,25 +36,26 @@ async function logoutFromPlatform(): Promise<void> {
 </script>
 
 <template>
-  <aside class="platform-nav" aria-label="平台后台导航">
+  <aside class="platform-nav" :aria-label="t('nav.platform.aria')">
     <div class="nav-main">
       <div class="brand-block">
         <span class="brand-mark">RPB</span>
-        <strong>平台后台</strong>
+        <strong>{{ t('nav.platform.title') }}</strong>
       </div>
       <nav class="nav-list">
-        <RouterLink class="nav-item" to="/platform/tenants">租户管理</RouterLink>
-        <RouterLink class="nav-item" to="/platform/billing/subscriptions">租户计费</RouterLink>
-        <RouterLink class="nav-item" to="/platform/settings/profile">平台资料</RouterLink>
-        <RouterLink class="nav-item" to="/platform/settings/product-lines">产品线</RouterLink>
-        <RouterLink class="nav-item" to="/platform/call-screen/text-seed">叫号模板</RouterLink>
-        <RouterLink class="nav-item" to="/platform/reservation/meal-period-seed">预约餐段</RouterLink>
-        <RouterLink class="nav-item" to="/platform/reservation/share-template-seed">预约确认模板</RouterLink>
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          class="nav-item"
+          :to="item.to"
+        >
+          {{ t(item.labelKey) }}
+        </RouterLink>
       </nav>
     </div>
 
     <button class="logout-button" type="button" :disabled="loggingOut" @click="logoutFromPlatform">
-      {{ loggingOut ? '退出中' : '退出登录' }}
+      {{ loggingOut ? t('common.actions.loggingOut') : t('common.actions.logout') }}
     </button>
   </aside>
 </template>

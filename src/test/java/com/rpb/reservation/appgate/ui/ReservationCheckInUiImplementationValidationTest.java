@@ -20,11 +20,11 @@ class ReservationCheckInUiImplementationValidationTest {
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String staffHome = Files.readString(staffHomePath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String staffHome = FrontendSourceSupport.readString(staffHomePath);
 
         assertThat(router)
             .contains("ReservationCheckInPage")

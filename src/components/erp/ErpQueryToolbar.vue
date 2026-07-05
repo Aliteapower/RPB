@@ -28,7 +28,7 @@ const emit = defineEmits<{
       />
       <div class="query-buttons">
         <button type="button" class="secondary-button" :disabled="loading" @click="emit('search')">
-          查询
+          {{ $t('common.actions.query') }}
         </button>
         <button
           type="button"
@@ -36,14 +36,14 @@ const emit = defineEmits<{
           :disabled="loading || !hasDirtyQuery"
           @click="emit('reset')"
         >
-          重置
+          {{ $t('common.actions.reset') }}
         </button>
       </div>
     </div>
 
     <div class="toolbar-actions">
       <button type="button" class="secondary-button" :disabled="loading" @click="emit('refresh')">
-        刷新
+        {{ $t('common.actions.refresh') }}
       </button>
       <slot name="actions" />
     </div>

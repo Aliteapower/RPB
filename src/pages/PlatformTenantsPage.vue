@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -20,6 +21,7 @@ import { useAuthSessionStore } from '../stores/authSession'
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const auth = useAuthSessionStore()
 const tenants = ref<PlatformTenant[]>([])
 const loading = ref(false)
@@ -36,10 +38,10 @@ const page = ref<PlatformPage>({
 })
 
 const statusOptions: TenantStatusOption[] = [
-  { value: 'created', label: '已创建' },
-  { value: 'active', label: '启用' },
-  { value: 'suspended', label: '停用' },
-  { value: 'closed', label: '关闭' }
+  { value: 'created', labelKey: 'platform.tenants.status.created' },
+  { value: 'active', labelKey: 'platform.tenants.status.active' },
+  { value: 'suspended', labelKey: 'platform.tenants.status.suspended' },
+  { value: 'closed', labelKey: 'platform.tenants.status.closed' }
 ]
 
 const activeCount = computed(() => tenants.value.filter(tenant => !tenant.deleted).length)
@@ -107,7 +109,7 @@ function openBillingPage(tenant: PlatformTenant): void {
 }
 
 async function deleteSelectedTenant(tenant: PlatformTenant): Promise<void> {
-  if (saving.value || !window.confirm(`删除租户 ${tenant.tenantCode}？`)) {
+  if (saving.value || !window.confirm(t('platform.tenants.list.confirmDelete', { tenantCode: tenant.tenantCode }))) {
     return
   }
   saving.value = true
@@ -140,16 +142,16 @@ async function restoreSelectedTenant(tenant: PlatformTenant): Promise<void> {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformApiError)) {
-    return '操作失败'
+    return t('platform.tenants.errors.operationFailed')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return t('platform.tenants.errors.sessionExpired')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有平台后台权限'
+    return t('platform.tenants.errors.forbidden')
   }
-  return '操作失败'
+  return t('platform.tenants.errors.operationFailed')
 }
 </script>
 
@@ -160,14 +162,14 @@ function apiErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>{{ billingIndexMode ? '计费' : '平台' }}</span>
-          <h1>{{ billingIndexMode ? '租户计费' : '租户管理' }}</h1>
+          <span>{{ billingIndexMode ? $t('platform.tenants.list.kickerBilling') : $t('platform.tenants.list.kickerPlatform') }}</span>
+          <h1>{{ billingIndexMode ? $t('platform.tenants.list.billingTitle') : $t('platform.tenants.list.title') }}</h1>
         </div>
       </header>
 
       <ErpQueryToolbar
         v-model:keyword="keyword"
-        placeholder="代码 / 名称 / 电话 / 地址"
+        :placeholder="$t('platform.tenants.list.keywordPlaceholder')"
         :loading="loading"
         :has-dirty-query="hasDirtyQuery"
         @search="searchTenants"
@@ -175,21 +177,21 @@ function apiErrorText(error: unknown): string {
         @refresh="loadTenants()"
       >
         <template #filters>
-          <div class="segmented-control" aria-label="租户状态筛选">
+          <div class="segmented-control" :aria-label="$t('platform.tenants.list.statusFilterAria')">
             <button type="button" :class="{ active: filter === 'all' }" @click="filter = 'all'; searchTenants()">
-              全部 {{ safePage.total }}
+              {{ $t('platform.tenants.list.allFilter', { count: safePage.total }) }}
             </button>
             <button type="button" :class="{ active: filter === 'active' }" @click="filter = 'active'; searchTenants()">
-              正常 {{ activeCount }}
+              {{ $t('platform.tenants.list.activeFilter', { count: activeCount }) }}
             </button>
             <button type="button" :class="{ active: filter === 'deleted' }" @click="filter = 'deleted'; searchTenants()">
-              已删除 {{ deletedCount }}
+              {{ $t('platform.tenants.list.deletedFilter', { count: deletedCount }) }}
             </button>
           </div>
         </template>
         <template #actions>
           <button v-if="!billingIndexMode" class="primary-button" type="button" @click="openCreatePage">
-            新增租户
+            {{ $t('platform.tenants.list.create') }}
           </button>
         </template>
       </ErpQueryToolbar>

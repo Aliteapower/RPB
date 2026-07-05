@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import {
@@ -22,7 +23,7 @@ import {
 
 interface KpiItem {
   key: string
-  label: string
+  labelKey: string
   value: number
   unit: string
   detail: string
@@ -31,16 +32,16 @@ interface KpiItem {
 
 interface StatusRow {
   key: string
-  label: string
+  labelKey: string
   value: number
   detail: string
 }
 
 interface OperationToolbarItem {
   id: string
-  label: string
-  description: string
-  symbol: string
+  labelKey: string
+  descriptionKey: string
+  symbolKey: string
   to: RouteLocationRaw
   tone: 'reservation' | 'queue' | 'success'
 }
@@ -50,6 +51,7 @@ const router = useRouter()
 const storeContext = useStoreContextStore()
 const authSession = useAuthSessionStore()
 const { currentBusinessDate, currentTimeText } = useCurrentClock()
+const { t } = useI18n()
 
 const overview = ref<StaffHomeOverviewResponse | null>(null)
 const apiError = ref<StaffHomeOverviewApiErrorResponse | null>(null)
@@ -80,14 +82,14 @@ const hasVisibleOperation = computed(
 )
 const appStatusLabel = computed(() => {
   if (isLoading.value) {
-    return '刷新中'
+    return t('staffHome.appStatus.refreshing')
   }
 
   if (apiError.value) {
-    return '暂不可用'
+    return t('staffHome.appStatus.unavailable')
   }
 
-  return '首页'
+  return t('staffHome.appStatus.home')
 })
 const reservationConfirmedTodayRoute = computed(() => ({
   name: 'reservation-today-view',
@@ -108,9 +110,9 @@ const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactTool
   canCheckInReservation.value
     ? {
         id: 'reservation-confirmed-today',
-        label: '预约到店',
-        description: '从今日预约确认客人到店',
-        symbol: '到',
+        labelKey: 'staffHome.actions.checkIn.label',
+        descriptionKey: 'staffHome.actions.checkIn.description',
+        symbolKey: 'staffHome.actions.checkIn.symbol',
         to: reservationConfirmedTodayRoute.value,
         tone: 'reservation'
       }
@@ -118,9 +120,9 @@ const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactTool
   canCallQueueTicket.value
     ? {
         id: 'queue-call',
-        label: '排队叫号',
-        description: '从列表选择排队票一键叫号',
-        symbol: '叫',
+        labelKey: 'staffHome.actions.callQueue.label',
+        descriptionKey: 'staffHome.actions.callQueue.description',
+        symbolKey: 'staffHome.actions.callQueue.symbol',
         to: queueTicketListRoute.value,
         tone: 'queue'
       }
@@ -128,9 +130,9 @@ const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactTool
   canSeatCalledQueueTicket.value
     ? {
         id: 'seating-from-called-queue',
-        label: '排队入座',
-        description: '从已叫号票直接安排桌台',
-        symbol: '座',
+        labelKey: 'staffHome.actions.seatQueue.label',
+        descriptionKey: 'staffHome.actions.seatQueue.description',
+        symbolKey: 'staffHome.actions.seatQueue.symbol',
         to: queueTicketListRoute.value,
         tone: 'success'
       }
@@ -161,34 +163,34 @@ const primaryKpis = computed<KpiItem[]>(() => {
   return [
     {
       key: 'reservations',
-      label: '今日预约',
+      labelKey: 'staffHome.kpis.reservations',
       value: reservation?.totalReservations ?? 0,
-      unit: '组',
-      detail: `${reservation?.totalPartySize ?? 0} 人`,
+      unit: t('staffHome.units.groups'),
+      detail: t('staffHome.units.people', { count: reservation?.totalPartySize ?? 0 }),
       tone: 'reservation'
     },
     {
       key: 'arrived',
-      label: '已到店',
+      labelKey: 'staffHome.kpis.arrived',
       value: arrivedReservationGroups.value,
-      unit: '组',
-      detail: `${arrivedReservationPartySize.value} 人`,
+      unit: t('staffHome.units.groups'),
+      detail: t('staffHome.units.people', { count: arrivedReservationPartySize.value }),
       tone: 'arrival'
     },
     {
       key: 'queue',
-      label: '当前排队',
+      labelKey: 'staffHome.kpis.queue',
       value: activeQueueTickets.value,
-      unit: '组',
-      detail: `${activeQueuePartySize.value} 人`,
+      unit: t('staffHome.units.groups'),
+      detail: t('staffHome.units.people', { count: activeQueuePartySize.value }),
       tone: 'queue'
     },
     {
       key: 'tables',
-      label: '可用桌台',
+      labelKey: 'staffHome.kpis.tables',
       value: tables?.availableTables ?? 0,
-      unit: '张',
-      detail: `共 ${tables?.totalTables ?? 0} 张`,
+      unit: t('staffHome.units.tables'),
+      detail: t('staffHome.units.totalTables', { count: tables?.totalTables ?? 0 }),
       tone: 'table'
     }
   ]
@@ -198,21 +200,21 @@ const queueRows = computed<StatusRow[]>(() => {
   return [
     {
       key: 'waiting',
-      label: '等待中',
+      labelKey: 'staffHome.queueRows.waiting.label',
       value: queue?.waitingTickets ?? 0,
-      detail: `${queue?.waitingPartySize ?? 0} 人`
+      detail: t('staffHome.units.people', { count: queue?.waitingPartySize ?? 0 })
     },
     {
       key: 'called',
-      label: '已叫号',
+      labelKey: 'staffHome.queueRows.called.label',
       value: queue?.calledTickets ?? 0,
-      detail: `${queue?.calledPartySize ?? 0} 人`
+      detail: t('staffHome.units.people', { count: queue?.calledPartySize ?? 0 })
     },
     {
       key: 'skipped',
-      label: '已过号',
+      labelKey: 'staffHome.queueRows.skipped.label',
       value: queue?.skippedTickets ?? 0,
-      detail: '可重回或取消'
+      detail: t('staffHome.queueRows.skipped.detail')
     }
   ]
 })
@@ -221,53 +223,53 @@ const tableRows = computed<StatusRow[]>(() => {
   return [
     {
       key: 'available',
-      label: '可用',
+      labelKey: 'staffHome.tableRows.available.label',
       value: tables?.availableTables ?? 0,
-      detail: '可安排入座'
+      detail: t('staffHome.tableRows.available.detail')
     },
     {
       key: 'occupied',
-      label: '占用',
+      labelKey: 'staffHome.tableRows.occupied.label',
       value: tables?.occupiedTables ?? 0,
-      detail: '当前服务中'
+      detail: t('staffHome.tableRows.occupied.detail')
     },
     {
       key: 'reserved',
-      label: '预留',
+      labelKey: 'staffHome.tableRows.reserved.label',
       value: tables?.reservedTables ?? 0,
-      detail: '预约占用'
+      detail: t('staffHome.tableRows.reserved.detail')
     },
     {
       key: 'cleaning',
-      label: '清台',
+      labelKey: 'staffHome.tableRows.cleaning.label',
       value: tables?.cleaningTables ?? 0,
-      detail: '待恢复可用'
+      detail: t('staffHome.tableRows.cleaning.detail')
     },
     {
       key: 'temporary',
-      label: '临时组',
+      labelKey: 'staffHome.tableRows.temporary.label',
       value: tables?.temporaryGroups ?? 0,
-      detail: '按桌组使用'
+      detail: t('staffHome.tableRows.temporary.detail')
     }
   ]
 })
 const overviewHint = computed(() => {
   if (apiError.value) {
-    return '今日概览暂不可用'
+    return t('staffHome.hints.unavailable')
   }
 
   if (!overview.value) {
-    return '正在读取今日营业数据'
+    return t('staffHome.hints.loading')
   }
 
   if (activeQueueTickets.value > 0) {
-    return `排队 ${activeQueueTickets.value} 组，优先看等待和已叫号`
+    return t('staffHome.hints.queuePressure', { groups: activeQueueTickets.value })
   }
 
-  return '当前没有排队压力'
+  return t('staffHome.hints.calm')
 })
-const errorTitle = computed(() => formatAppGateErrorTitle(apiError.value?.error, '今日概览暂不可用'))
-const errorText = computed(() => formatAppGateErrorMessage(apiError.value?.error, '暂时无法读取今日概览，请稍后重试。'))
+const errorTitle = computed(() => formatAppGateErrorTitle(apiError.value?.error, t('staffHome.errors.overviewUnavailable')))
+const errorText = computed(() => formatAppGateErrorMessage(apiError.value?.error, t('staffHome.errors.overviewLoadFailed')))
 
 watch(
   [storeId, currentBusinessDate],
@@ -339,10 +341,10 @@ function createLocalError(): StaffHomeOverviewApiErrorResponse {
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return t('staffHome.store.defaultLabel')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return t('staffHome.store.label', { shortId: value.slice(0, 8) })
 }
 
 function compactToolbarItems(actions: Array<OperationToolbarItem | null>): OperationToolbarItem[] {
@@ -365,32 +367,32 @@ function hasPermission(permission: string): boolean {
       <template #utility>
         <div class="topbar-actions">
           <button class="topbar-logout" type="button" :disabled="loggingOut" @click="logoutFromStaffHome">
-            {{ loggingOut ? '退出中' : '退出登录' }}
+            {{ loggingOut ? t('common.actions.loggingOut') : t('common.actions.logout') }}
           </button>
         </div>
       </template>
       <template #action>
         <button class="topbar-refresh" type="button" :disabled="isLoading" @click="reloadOverview">
-          刷新
+          {{ t('common.actions.refresh') }}
         </button>
       </template>
     </StaffHomeTopBar>
 
     <div class="home-overview-body">
-      <section class="date-strip" aria-label="今日营业日期">
+      <section class="date-strip" :aria-label="t('staffHome.aria.businessDate')">
         <div>
-          <span>今日</span>
+          <span>{{ t('staffHome.date.today') }}</span>
           <strong>{{ displayedBusinessDate }}</strong>
         </div>
         <em>{{ overviewHint }}</em>
       </section>
 
-      <section v-if="apiError" class="overview-error" aria-label="今日概览加载失败">
+      <section v-if="apiError" class="overview-error" :aria-label="t('staffHome.aria.overviewLoadFailed')">
         <strong>{{ errorTitle }}</strong>
         <span>{{ errorText }}</span>
       </section>
 
-      <nav v-if="showOperationToolbar" class="operation-toolbar" aria-label="门店员工操作">
+      <nav v-if="showOperationToolbar" class="operation-toolbar" :aria-label="t('staffHome.aria.operations')">
         <RouterLink
           v-for="item in operationToolbarItems"
           :key="item.id"
@@ -398,10 +400,10 @@ function hasPermission(permission: string): boolean {
           :class="`operation-tool--${item.tone}`"
           :to="item.to"
         >
-          <span class="operation-symbol" aria-hidden="true">{{ item.symbol }}</span>
+          <span class="operation-symbol" aria-hidden="true">{{ t(item.symbolKey) }}</span>
           <span class="operation-copy">
-            <strong>{{ item.label }}</strong>
-            <em>{{ item.description }}</em>
+            <strong>{{ t(item.labelKey) }}</strong>
+            <em>{{ t(item.descriptionKey) }}</em>
           </span>
         </RouterLink>
       </nav>
@@ -409,30 +411,30 @@ function hasPermission(permission: string): boolean {
       <section
         v-else-if="hasReservationQueue && authSession.loaded"
         class="empty-state"
-        aria-label="当前权限无可用入口"
+        :aria-label="t('staffHome.aria.unavailableByPermission')"
       >
-        <p>当前权限无可用入口</p>
-        <strong>入口会按 App Gate 权限自动显示。</strong>
+        <p>{{ t('staffHome.empty.noEntry') }}</p>
+        <strong>{{ t('staffHome.empty.permissionHint') }}</strong>
       </section>
 
-      <section class="kpi-grid" aria-label="今日概览">
+      <section class="kpi-grid" :aria-label="t('staffHome.aria.todayOverview')">
         <article
           v-for="item in primaryKpis"
           :key="item.key"
           class="kpi-card"
           :class="`kpi-card--${item.tone}`"
         >
-          <span>{{ item.label }}</span>
+          <span>{{ t(item.labelKey) }}</span>
           <strong>{{ item.value }}<small>{{ item.unit }}</small></strong>
           <em>{{ item.detail }}</em>
         </article>
       </section>
 
-      <section class="overview-section" aria-label="当前排队人数组">
+      <section class="overview-section" :aria-label="t('staffHome.aria.queuePartyGroups')">
         <header>
           <div>
-            <span>当前排队</span>
-            <strong>{{ activeQueueTickets }} 组 / {{ activeQueuePartySize }} 人</strong>
+            <span>{{ t('staffHome.kpis.queue') }}</span>
+            <strong>{{ t('staffHome.units.queueSummary', { groups: activeQueueTickets, people: activeQueuePartySize }) }}</strong>
           </div>
         </header>
         <div class="party-size-row">
@@ -442,28 +444,28 @@ function hasPermission(permission: string): boolean {
             class="party-size-chip"
           >
             <strong>{{ group.label }}</strong>
-            <span>{{ group.groups }}组 / {{ group.partySize }}人</span>
+            <span>{{ t('staffHome.units.partySizeSummary', { groups: group.groups, people: group.partySize }) }}</span>
           </div>
         </div>
         <div class="status-grid">
           <div v-for="row in queueRows" :key="row.key" class="status-item">
-            <span>{{ row.label }}</span>
+            <span>{{ t(row.labelKey) }}</span>
             <strong>{{ row.value }}</strong>
             <em>{{ row.detail }}</em>
           </div>
         </div>
       </section>
 
-      <section class="overview-section" aria-label="桌台状态">
+      <section class="overview-section" :aria-label="t('staffHome.aria.tableStatus')">
         <header>
           <div>
-            <span>桌台状态</span>
-            <strong>{{ overview?.tables.availableTables ?? 0 }} 可用 / {{ overview?.tables.totalTables ?? 0 }} 总桌</strong>
+            <span>{{ t('staffHome.aria.tableStatus') }}</span>
+            <strong>{{ t('staffHome.units.tableSummary', { available: overview?.tables.availableTables ?? 0, total: overview?.tables.totalTables ?? 0 }) }}</strong>
           </div>
         </header>
         <div class="status-grid status-grid--tables">
           <div v-for="row in tableRows" :key="row.key" class="status-item">
-            <span>{{ row.label }}</span>
+            <span>{{ t(row.labelKey) }}</span>
             <strong>{{ row.value }}</strong>
             <em>{{ row.detail }}</em>
           </div>

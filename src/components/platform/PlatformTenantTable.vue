@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import type { PlatformTenant, TenantStatus } from '../../api/platformApi'
 import type { TenantStatusOption } from './platformTenantUi'
 
@@ -17,8 +19,11 @@ const emit = defineEmits<{
   restore: [tenant: PlatformTenant]
 }>()
 
+const { t } = useI18n()
+
 function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]): string {
-  return statusOptions.find(option => option.value === status)?.label ?? status
+  const labelKey = statusOptions.find(option => option.value === status)?.labelKey
+  return labelKey ? t(labelKey) : status
 }
 </script>
 
@@ -27,22 +32,22 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
     <table class="tenant-table">
       <thead>
         <tr>
-          <th>租户代码</th>
-          <th>名称</th>
-          <th>负责人</th>
-          <th>电话</th>
-          <th>地址</th>
-          <th>状态</th>
-          <th>更新时间</th>
-          <th>操作</th>
+          <th>{{ $t('platform.tenants.table.columns.tenantCode') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.name') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.principal') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.phone') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.address') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.status') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.updatedAt') }}</th>
+          <th>{{ $t('platform.tenants.table.columns.actions') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td colspan="8" class="table-empty">加载中</td>
+          <td colspan="8" class="table-empty">{{ $t('common.actions.loading') }}</td>
         </tr>
         <tr v-else-if="tenants.length === 0">
-          <td colspan="8" class="table-empty">暂无租户</td>
+          <td colspan="8" class="table-empty">{{ $t('platform.tenants.table.empty') }}</td>
         </tr>
         <template v-else>
           <tr v-for="tenant in tenants" :key="tenant.id" :class="{ deleted: tenant.deleted }">
@@ -55,15 +60,17 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
             <td class="address-cell">{{ tenant.address || '-' }}</td>
             <td>
               <span class="status-pill" :class="{ deleted: tenant.deleted }">
-                {{ tenant.deleted ? '已删除' : statusLabel(tenant.status, statusOptions) }}
+                {{ tenant.deleted ? $t('platform.tenants.status.deleted') : statusLabel(tenant.status, statusOptions) }}
               </span>
             </td>
             <td>{{ new Date(tenant.updatedAt).toLocaleString() }}</td>
             <td>
               <div class="row-actions">
-                <button v-if="!billingOnly" type="button" class="text-action" @click="emit('edit', tenant)">编辑</button>
+                <button v-if="!billingOnly" type="button" class="text-action" @click="emit('edit', tenant)">
+                  {{ $t('common.actions.edit') }}
+                </button>
                 <button type="button" class="text-action" @click="emit('billing', tenant)">
-                  {{ billingOnly ? '订阅/计费' : '计费' }}
+                  {{ billingOnly ? $t('platform.tenants.table.billingFull') : $t('platform.tenants.table.billingShort') }}
                 </button>
                 <button
                   v-if="!billingOnly && tenant.deleted"
@@ -72,7 +79,7 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
                   :disabled="saving"
                   @click="emit('restore', tenant)"
                 >
-                  恢复
+                  {{ $t('common.actions.restore') }}
                 </button>
                 <button
                   v-else-if="!billingOnly"
@@ -81,7 +88,7 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
                   :disabled="saving"
                   @click="emit('delete', tenant)"
                 >
-                  删除
+                  {{ $t('common.actions.delete') }}
                 </button>
               </div>
             </td>

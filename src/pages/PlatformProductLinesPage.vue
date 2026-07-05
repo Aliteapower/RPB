@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   PlatformBillingApiError,
@@ -21,6 +22,7 @@ import type { PlatformProductLine, ProductLinePriceStatus, ProductLineStatus } f
 
 type ProductLineEditorMode = 'create' | 'edit'
 
+const { t } = useI18n()
 const auth = useAuthSessionStore()
 const productLines = ref<PlatformProductLine[]>([])
 const loading = ref(false)
@@ -40,10 +42,10 @@ const filters = reactive({
 const form = reactive({
   appKey: 'reservation_queue',
   productCode: 'reservation_queue',
-  displayName: '预约排队叫号产线',
+  displayName: t('platform.productLines.page.defaultDisplayName'),
   status: 'active' as ProductLineStatus,
   defaultEntryRoute: '/stores/:storeId/staff',
-  description: '预约、排队、叫号一体化产线',
+  description: t('platform.productLines.page.defaultDescription'),
   sortOrder: 10
 })
 const priceForm = reactive({
@@ -165,7 +167,9 @@ async function saveProductLine(): Promise<void> {
     upsertProductLine(response.productLine)
     selectProductLine(response.productLine)
     drawerMode.value = 'edit'
-    savedText.value = wasCreate ? '产品线已创建' : '已保存'
+    savedText.value = wasCreate
+      ? t('platform.productLines.messages.created')
+      : t('platform.productLines.messages.saved')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -202,7 +206,7 @@ async function saveProductLinePrices(): Promise<void> {
     })
     upsertProductLine(response.productLine)
     selectProductLine(response.productLine)
-    savedText.value = '定价已保存'
+    savedText.value = t('platform.productLines.messages.pricesSaved')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -249,22 +253,22 @@ function nextSortOrder(): number {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformBillingApiError)) {
-    return '操作失败，请稍后重试'
+    return t('platform.productLines.errors.operationFailed')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效，请重新登录'
+    return t('platform.productLines.errors.sessionExpired')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有产品线管理权限'
+    return t('platform.productLines.errors.forbidden')
   }
   if (error.response.error.code === 'PRODUCT_LINE_CONFLICT') {
-    return '产品线 App Key 已存在，请换一个产品线代码'
+    return t('platform.productLines.errors.conflict')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '产品线信息不完整，请检查名称、代码、状态和默认入口'
+    return t('platform.productLines.errors.invalid')
   }
-  return '操作失败，请稍后重试'
+  return t('platform.productLines.errors.operationFailed')
 }
 </script>
 
@@ -275,11 +279,11 @@ function apiErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>基础设置</span>
-          <h1>产品线</h1>
+          <span>{{ $t('platform.productLines.page.kicker') }}</span>
+          <h1>{{ $t('platform.productLines.page.title') }}</h1>
         </div>
         <button class="secondary-button" type="button" :disabled="loading" @click="loadProductLines()">
-          刷新
+          {{ $t('common.actions.refresh') }}
         </button>
       </header>
 

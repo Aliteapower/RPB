@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { AuthApiError, createSliderCaptcha } from '../api/authApi'
@@ -11,57 +12,58 @@ type LoginEntryId = 'platform-admin' | 'tenant-admin' | 'tenant-staff'
 
 interface LoginEntry {
   id: LoginEntryId
-  label: string
-  title: string
-  description: string
-  accountLabel: string
+  labelKey: string
+  titleKey: string
+  descriptionKey: string
+  accountLabelKey: string
   loginUsername: string
   presetPassword: string
   tenantCode?: string
   employeeUsername?: string
-  targetHint: string
+  targetHintKey: string
 }
 
 const loginEntries: LoginEntry[] = [
   {
     id: 'platform-admin',
-    label: '平台',
-    title: '平台后台',
-    description: '创建租户、开通租户后台和平台级管理。',
-    accountLabel: '平台账号',
+    labelKey: 'login.entries.platformAdmin.tab',
+    titleKey: 'login.entries.platformAdmin.title',
+    descriptionKey: 'login.entries.platformAdmin.description',
+    accountLabelKey: 'login.entries.platformAdmin.accountLabel',
     loginUsername: 'sysadmin',
     presetPassword: '393930',
-    targetHint: '平台范围'
+    targetHintKey: 'login.entries.platformAdmin.targetHint'
   },
   {
     id: 'tenant-admin',
-    label: '租户',
-    title: '租户后台',
-    description: '设置店面、维护员工账号和授权范围。',
-    accountLabel: '租户账号',
+    labelKey: 'login.entries.tenantAdmin.tab',
+    titleKey: 'login.entries.tenantAdmin.title',
+    descriptionKey: 'login.entries.tenantAdmin.description',
+    accountLabelKey: 'login.entries.tenantAdmin.accountLabel',
     loginUsername: '20000000',
     presetPassword: '393930',
     tenantCode: '20000000',
-    targetHint: '租户 20000000'
+    targetHintKey: 'login.entries.tenantAdmin.targetHint'
   },
   {
     id: 'tenant-staff',
-    label: '员工',
-    title: '租户员工',
-    description: '按租户代码进入已授权店面，可为多店切换预留。',
-    accountLabel: '员工账号',
+    labelKey: 'login.entries.tenantStaff.tab',
+    titleKey: 'login.entries.tenantStaff.title',
+    descriptionKey: 'login.entries.tenantStaff.description',
+    accountLabelKey: 'login.entries.tenantStaff.accountLabel',
     loginUsername: '1000',
     presetPassword: '393930',
     tenantCode: '20000000',
     employeeUsername: '1000',
-    targetHint: '租户 20000000 / 员工 1000'
+    targetHintKey: 'login.entries.tenantStaff.targetHint'
   }
 ]
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthSessionStore()
-const missingStoreScopeText = '账号未绑定门店，请联系平台管理员完成租户初始化'
+const { t } = useI18n()
+const missingStoreScopeText = computed(() => t('login.errors.missingStoreScope'))
 
 const selectedEntryId = ref<LoginEntryId>('tenant-staff')
 const username = ref('1000')
@@ -83,6 +85,10 @@ let activeSliderPointerId: number | null = null
 let sliderDragOffsetX = 0
 
 const selectedEntry = computed(() => loginEntries.find(entry => entry.id === selectedEntryId.value) ?? loginEntries[0])
+const selectedEntryTargetParams = computed(() => ({
+  tenantCode: selectedEntry.value.tenantCode ?? tenantCode.value,
+  employeeUsername: selectedEntry.value.employeeUsername ?? employeeUsername.value
+}))
 const isStaffEntry = computed(() => selectedEntry.value.id === 'tenant-staff')
 const loginPayloadUsername = computed(() =>
   isStaffEntry.value ? employeeUsername.value.trim() : username.value.trim()
@@ -141,7 +147,7 @@ async function refreshSlider(): Promise<void> {
     await nextTick()
     updateCanvasWidth()
   } catch {
-    errorText.value = '滑块校验加载失败'
+    errorText.value = t('login.errors.captchaLoadFailed')
   } finally {
     loadingCaptcha.value = false
   }
@@ -248,7 +254,7 @@ function isSliderInteractive(): boolean {
 
 function showRouteStoreScopeMessage(): void {
   if (route.query.storeScope === 'missing') {
-    errorText.value = missingStoreScopeText
+    errorText.value = missingStoreScopeText.value
   }
 }
 
@@ -317,7 +323,7 @@ async function stopMissingStoreScopeLogin(): Promise<void> {
   selectedStoreId.value = ''
   await auth.logoutCurrentUser()
   await refreshSlider()
-  errorText.value = missingStoreScopeText
+  errorText.value = missingStoreScopeText.value
 }
 
 async function selectStoreAndContinue(): Promise<void> {
@@ -333,32 +339,32 @@ function storeRoute(storeId: string): string {
 
 function loginErrorText(error: unknown): string {
   if (!(error instanceof AuthApiError)) {
-    return '登录失败'
+    return t('login.errors.loginFailed')
   }
 
   const code = error.response.error.code
   if (code === 'CAPTCHA_MISMATCH' || code === 'CAPTCHA_EXPIRED' || code === 'CAPTCHA_REQUIRED') {
-    return '滑块校验未通过'
+    return t('login.errors.captchaMismatch')
   }
   if (code === 'PASSWORD_POLICY_VIOLATION') {
-    return '密码为 6 位数字或英文字母'
+    return t('login.passwordPolicy')
   }
   if (code === 'INVALID_CREDENTIALS') {
-    return '账号或密码不正确'
+    return t('login.errors.invalidCredentials')
   }
-  return '登录失败'
+  return t('login.errors.loginFailed')
 }
 </script>
 
 <template>
   <main class="login-shell">
-    <section class="login-panel" aria-label="后台登录">
+    <section class="login-panel" :aria-label="t('login.shellAria')">
       <div class="login-heading">
         <p class="login-kicker">RPB</p>
-        <h1>后台入口</h1>
+        <h1>{{ t('login.heading') }}</h1>
       </div>
 
-      <div class="entry-tabs" role="tablist" aria-label="选择后台入口">
+      <div class="entry-tabs" role="tablist" :aria-label="t('login.entryTabAria')">
         <button
           v-for="entry in loginEntries"
           :key="entry.id"
@@ -369,36 +375,36 @@ function loginErrorText(error: unknown): string {
           role="tab"
           @click="selectEntry(entry)"
         >
-          <span>{{ entry.label }}</span>
+          <span>{{ t(entry.labelKey) }}</span>
         </button>
       </div>
 
       <div class="entry-summary" :data-entry="selectedEntry.id">
-        <p class="entry-title">{{ selectedEntry.title }}</p>
-        <p class="entry-description">{{ selectedEntry.description }}</p>
-        <p class="entry-target">{{ selectedEntry.targetHint }}</p>
+        <p class="entry-title">{{ t(selectedEntry.titleKey) }}</p>
+        <p class="entry-description">{{ t(selectedEntry.descriptionKey) }}</p>
+        <p class="entry-target">{{ t(selectedEntry.targetHintKey, selectedEntryTargetParams) }}</p>
       </div>
 
       <form class="login-form" @submit.prevent="submitLogin">
         <div v-if="isStaffEntry" class="field-grid field-grid--split">
           <label class="login-field">
-            <span>租户代码</span>
+            <span>{{ t('login.fields.tenantCode') }}</span>
             <input v-model.trim="tenantCode" name="tenantCode" autocomplete="organization" inputmode="numeric" required />
           </label>
 
           <label class="login-field">
-            <span>员工账号</span>
+            <span>{{ t('login.fields.employeeUsername') }}</span>
             <input v-model.trim="employeeUsername" name="employeeUsername" autocomplete="username" inputmode="text" required />
           </label>
         </div>
 
         <label v-else class="login-field">
-          <span>{{ selectedEntry.accountLabel }}</span>
+          <span>{{ t(selectedEntry.accountLabelKey) }}</span>
           <input v-model.trim="username" name="username" autocomplete="username" inputmode="text" required />
         </label>
 
         <label class="login-field">
-          <span>密码</span>
+          <span>{{ t('login.fields.password') }}</span>
           <PasswordInput
             v-model="password"
             name="password"
@@ -406,12 +412,12 @@ function loginErrorText(error: unknown): string {
             maxlength="6"
             required
           />
-          <small>密码为 6 位数字或英文字母</small>
+          <small>{{ t('login.passwordPolicy') }}</small>
         </label>
 
         <div v-if="isStaffEntry" class="store-preview">
-          <span>授权店面</span>
-          <strong>登录后按授权进入，可在多店权限下切换店面</strong>
+          <span>{{ t('login.store.authorized') }}</span>
+          <strong>{{ t('login.store.authorizedDescription') }}</strong>
         </div>
 
         <div class="slider-block">
@@ -423,7 +429,7 @@ function loginErrorText(error: unknown): string {
               :class="{ 'slider-piece-handle--dragging': draggingSlider }"
               :style="pieceStyle"
               role="slider"
-              aria-label="滑块校验"
+              :aria-label="t('login.captcha.aria')"
               aria-valuemin="0"
               :aria-valuemax="sliderMax"
               :aria-valuenow="Math.round(captchaX)"
@@ -439,29 +445,31 @@ function loginErrorText(error: unknown): string {
               <img class="slider-piece" :src="captcha.pieceImage" alt="" draggable="false" />
             </div>
             <button type="button" class="slider-refresh" :disabled="loadingCaptcha || submitting" @click="refreshSlider">
-              换一张
+              {{ t('login.captcha.refresh') }}
             </button>
-            <span v-if="!captcha" class="slider-empty">加载中</span>
+            <span v-if="!captcha" class="slider-empty">{{ t('login.captcha.loading') }}</span>
           </div>
         </div>
 
         <p v-if="errorText" class="login-error" role="alert">{{ errorText }}</p>
 
         <button class="login-submit" type="submit" :disabled="!captcha || submitting || !loginPayloadUsername">
-          {{ submitting ? '登录中...' : '登录' }}
+          {{ submitting ? t('common.actions.loggingIn') : t('common.actions.login') }}
         </button>
       </form>
 
-      <section v-if="canChooseStore" class="store-selection" aria-label="选择授权店面">
+      <section v-if="canChooseStore" class="store-selection" :aria-label="t('login.store.selectionAria')">
         <label class="login-field">
-          <span>选择店面</span>
+          <span>{{ t('login.store.select') }}</span>
           <select v-model="selectedStoreId">
             <option v-for="storeId in authorizedStoreIds" :key="storeId" :value="storeId">
               {{ storeId }}
             </option>
           </select>
         </label>
-        <button class="login-submit" type="button" @click="selectStoreAndContinue">进入店面</button>
+        <button class="login-submit" type="button" :aria-label="t('login.store.switch')" @click="selectStoreAndContinue">
+          {{ t('login.store.enter') }}
+        </button>
       </section>
     </section>
   </main>

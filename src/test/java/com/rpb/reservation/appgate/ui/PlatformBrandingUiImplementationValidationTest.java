@@ -14,10 +14,10 @@ class PlatformBrandingUiImplementationValidationTest {
         Path apiPath = Path.of("src", "api", "platformApi.ts");
         Path uiPath = Path.of("src", "components", "platform", "platformTenantUi.ts");
 
-        String page = Files.readString(pagePath);
-        String form = Files.readString(formPath);
-        String api = Files.readString(apiPath);
-        String ui = Files.readString(uiPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String form = FrontendSourceSupport.readString(formPath);
+        String api = FrontendSourceSupport.readString(apiPath);
+        String ui = FrontendSourceSupport.readString(uiPath);
 
         assertThat(api)
             .contains("logoMediaUrl")
@@ -39,13 +39,13 @@ class PlatformBrandingUiImplementationValidationTest {
             .contains("removeTenantLogo");
 
         assertThat(form)
-            .contains("租户 LOGO")
+            .contains("platform.tenants.form.tenantLogo")
             .contains("type=\"file\"")
             .contains("accept=\"image/jpeg,image/png,image/webp\"")
             .contains("logoMediaUrl")
             .contains("logoFile")
-            .contains("选择图片")
-            .contains("清空 LOGO")
+            .contains("platform.tenants.form.chooseImage")
+            .contains("platform.tenants.form.clearLogo")
             .doesNotContain("accept=\"image/jpeg,image/png,image/webp,video/mp4,video/webm\"");
     }
 
@@ -55,14 +55,16 @@ class PlatformBrandingUiImplementationValidationTest {
         Path apiPath = Path.of("src", "api", "platformProfileApi.ts");
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
 
-        String page = Files.readString(pagePath);
-        String api = Files.readString(apiPath);
-        String router = Files.readString(routerPath);
-        String nav = Files.readString(navPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String api = FrontendSourceSupport.readString(apiPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String nav = FrontendSourceSupport.readString(navPath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("PlatformProfilePage")
@@ -72,7 +74,9 @@ class PlatformBrandingUiImplementationValidationTest {
 
         assertThat(nav)
             .contains("/platform/settings/profile")
-            .contains("平台资料");
+            .contains("nav.platform.profile");
+        assertThat(zh)
+            .contains("profile: '平台资料'");
 
         assertThat(api)
             .contains("getPlatformProfile")
@@ -87,17 +91,17 @@ class PlatformBrandingUiImplementationValidationTest {
             .contains("FormData");
 
         assertThat(page)
-            .contains("平台资料")
-            .contains("平台名称")
+            .contains("platform.profile.page.title")
+            .contains("platform.profile.fields.platformName")
             .contains("UEN")
-            .contains("地址")
-            .contains("电话")
-            .contains("电邮")
-            .contains("网址")
-            .contains("平台 LOGO")
-            .contains("社交媒体")
-            .contains("社媒 LOGO")
-            .contains("新增社媒 LOGO")
+            .contains("platform.profile.fields.address")
+            .contains("platform.profile.fields.phone")
+            .contains("platform.profile.fields.email")
+            .contains("platform.profile.fields.website")
+            .contains("platform.profile.fields.platformLogo")
+            .contains("platform.profile.fields.socialMedia")
+            .contains("platform.profile.fields.socialLogo")
+            .contains("platform.profile.social.createLogoAria")
             .contains("handleNewSocialLogoChange")
             .contains("newSocialLink.logoFile")
             .contains("uploadPlatformSocialLinkLogo")
@@ -113,9 +117,9 @@ class PlatformBrandingUiImplementationValidationTest {
         Path apiPath = Path.of("src", "api", "queueDisplayApi.ts");
         Path typesPath = Path.of("src", "types", "queueDisplay.ts");
 
-        String page = Files.readString(pagePath);
-        String api = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String api = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
 
         assertThat(types)
             .contains("tenantLogoUrl?: string | null");

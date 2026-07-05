@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { createReservation, ReservationCreateApiError } from '../../api/reservationCreateApi'
 import {
@@ -59,6 +60,7 @@ const emit = defineEmits<{
   created: [response: CreateReservationResponse]
 }>()
 
+const { t } = useI18n()
 type TablePickerSelectionMode = 'single' | 'temporary'
 type MealPeriodFilterOption = {
   periodKey: string
@@ -136,7 +138,7 @@ const mealPeriodFilterOptions = computed<MealPeriodFilterOption[]>(() => {
   return [
     {
       periodKey: ALL_MEAL_PERIOD_KEY,
-      displayName: '全部',
+      displayName: t('reservationWorkbench.createDialog.allMealPeriods'),
       count: availableTimeSlots.value.length
     },
     ...periodOptions.values()
@@ -166,7 +168,7 @@ const selectedTableGroupId = computed(() =>
     : null
 )
 const tablePreferenceDisplay = computed(() =>
-  selectedResource.value ? resourceDisplayName(selectedResource.value) : '未指定'
+  selectedResource.value ? resourceDisplayName(selectedResource.value) : t('reservationWorkbench.createDialog.unassigned')
 )
 const tablePreferenceMeta = computed(() => {
   const resource = selectedResource.value
@@ -176,14 +178,14 @@ const tablePreferenceMeta = computed(() => {
   }
 
   if (isLoadingTableResources.value) {
-    return '正在读取桌台'
+    return t('reservationWorkbench.createDialog.loadingTables')
   }
 
   if (tableResourceApiError.value) {
-    return '桌台列表读取失败'
+    return t('reservationWorkbench.createDialog.tableLoadFailed')
   }
 
-  return '点击选择桌号'
+  return t('reservationWorkbench.createDialog.chooseTable')
 })
 const canSaveTemporaryGroup = computed(
   () =>
@@ -552,24 +554,24 @@ function resourceDisplayName(resource: TableResourceItem): string {
 }
 
 function resourceCapacityText(resource: TableResourceItem): string {
-  return `${resource.capacityMax}人`
+  return t('reservationWorkbench.createDialog.capacity', { count: resource.capacityMax })
 }
 
 function resourcePickerStatusText(resource: TableResourceItem): string {
-  return resource.selectable ? '空闲' : statusDisabledText(resource)
+  return resource.selectable ? t('reservationWorkbench.createDialog.available') : statusDisabledText(resource)
 }
 
 function statusDisabledText(resource: TableResourceItem): string {
   const reasonLabels: Record<string, string> = {
-    status_unavailable: '不可选',
-    capacity_mismatch: '人数不匹配',
-    locked: '已锁定',
-    occupied: '已占用',
-    cleaning: '清台中',
-    reservation_preassigned: '已预留'
+    status_unavailable: t('reservationWorkbench.createDialog.unavailable'),
+    capacity_mismatch: t('reservationWorkbench.createDialog.capacityMismatch'),
+    locked: t('reservationWorkbench.createDialog.locked'),
+    occupied: t('reservationWorkbench.createDialog.occupied'),
+    cleaning: t('reservationWorkbench.createDialog.cleaning'),
+    reservation_preassigned: t('reservationWorkbench.createDialog.reserved')
   }
   const reason = resource.selectionDisabledReason?.trim()
-  return reason ? reasonLabels[reason] ?? '不可选' : '不可选'
+  return reason ? reasonLabels[reason] ?? t('reservationWorkbench.createDialog.unavailable') : t('reservationWorkbench.createDialog.unavailable')
 }
 
 function optionalValue(value: string): string | null {
@@ -658,10 +660,9 @@ async function loadCreatedShareInfo(reservationId: string): Promise<void> {
     createdShareInfo.value = response.shareInfo
   } catch (error) {
     createdShareInfo.value = null
-    createdShareErrorText.value =
-      error instanceof ReservationShareInfoApiError
-        ? '订位信息读取失败'
-        : '订位信息读取失败'
+    createdShareErrorText.value = error instanceof ReservationShareInfoApiError
+      ? t('reservationWorkbench.share.loadFailed')
+      : t('reservationWorkbench.share.loadFailed')
   } finally {
     isLoadingCreatedShare.value = false
   }
@@ -675,7 +676,7 @@ async function systemShareCreatedReservationLink(): Promise<void> {
   const info = await ensureCreatedShareInfo()
   const url = info ? reservationShareUrl(info) : ''
   if (!info || !url) {
-    createdShareErrorText.value = '暂无可转发链接'
+    createdShareErrorText.value = t('reservationWorkbench.share.noForwardLink')
     return
   }
 
@@ -694,25 +695,31 @@ async function systemShareCreatedReservationLink(): Promise<void> {
   if (result === 'copied' || result === 'native-share') {
     await recordCreatedShareIntent(result === 'copied' ? 'copy_link' : 'system_share')
     createdShareShared.value = true
-    createdShareStatusText.value = result === 'copied' ? '链接已复制' : '已打开系统转发'
+    createdShareStatusText.value = result === 'copied'
+      ? t('reservationWorkbench.share.copied')
+      : t('reservationWorkbench.share.nativeOpened')
     return
   }
 
   createdShareFallbackText.value = url
-  createdShareErrorText.value = '当前浏览器限制转发，请手动复制下方链接'
+  createdShareErrorText.value = t('reservationWorkbench.share.manualShare')
 }
 
 async function openWhatsApp(): Promise<void> {
   const info = await ensureCreatedShareInfo()
   if (!info?.canOpenWhatsAppLink || !info.whatsappLink) {
-    createdShareErrorText.value = info?.customerPhoneAvailable ? '顾客手机号暂不可用于 WhatsApp' : '顾客未填写可用手机号'
+    createdShareErrorText.value = info?.customerPhoneAvailable
+      ? t('reservationWorkbench.share.phoneUnavailable')
+      : t('reservationWorkbench.share.phoneMissing')
     return
   }
 
   resetCreatedShareFeedback()
   await recordCreatedShareIntent('whatsapp')
   createdShareShared.value = true
-  createdShareStatusText.value = `将以 ${info.senderLabel || '门店'} 身份提示打开 WhatsApp`
+  createdShareStatusText.value = t('reservationWorkbench.share.whatsappOpening', {
+    sender: info.senderLabel || t('reservationWorkbench.share.defaultSender')
+  })
   window.location.href = info.whatsappLink
 }
 
@@ -721,19 +728,19 @@ async function openWechat(): Promise<void> {
   const url = info ? reservationShareUrl(info) : ''
   const text = info ? reservationWechatShareText(info, url) : ''
   if (!info || !text) {
-    createdShareErrorText.value = '暂无可发送文案'
+    createdShareErrorText.value = t('reservationWorkbench.share.noText')
     return
   }
 
   resetCreatedShareFeedback()
   if (!(await copyPlainText(text))) {
     createdShareFallbackText.value = text
-    createdShareErrorText.value = '当前浏览器限制复制，请手动复制文案后打开微信'
+    createdShareErrorText.value = t('reservationWorkbench.share.manualTextCopy')
     return
   }
   await recordCreatedShareIntent('wechat')
   createdShareShared.value = true
-  createdShareStatusText.value = '文案已复制，正在打开微信'
+  createdShareStatusText.value = t('reservationWorkbench.share.wechatOpening')
   if (info.wechatLink) {
     window.location.href = info.wechatLink
   }
@@ -743,7 +750,7 @@ async function copyCreatedReservationShareLink(): Promise<void> {
   const info = await ensureCreatedShareInfo()
   const url = info ? reservationShareUrl(info) : ''
   if (!info || !url) {
-    createdShareErrorText.value = '暂无可复制链接'
+    createdShareErrorText.value = t('reservationWorkbench.share.noCopyLink')
     return
   }
 
@@ -751,12 +758,12 @@ async function copyCreatedReservationShareLink(): Promise<void> {
   if (await copyPlainText(url)) {
     await recordCreatedShareIntent('copy_link')
     createdShareShared.value = true
-    createdShareStatusText.value = '链接已复制'
+    createdShareStatusText.value = t('reservationWorkbench.share.copied')
     return
   }
 
   createdShareFallbackText.value = url
-  createdShareErrorText.value = '当前浏览器限制复制，请手动复制下方链接'
+  createdShareErrorText.value = t('reservationWorkbench.share.manualCopyLink')
 }
 
 async function ensureCreatedShareInfo(): Promise<ReservationShareInfo | null> {
@@ -831,7 +838,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
     <section
       v-if="open"
       class="reservation-create-dialog"
-      aria-label="新增预约弹窗"
+      :aria-label="$t('reservationWorkbench.createDialog.aria')"
       aria-modal="true"
       role="dialog"
     >
@@ -839,10 +846,10 @@ function reservationShareUrl(info: ReservationShareInfo): string {
 
       <form class="reservation-create-dialog__panel" @submit.prevent="submit">
         <header>
-          <h2>新增预约</h2>
+          <h2>{{ $t('reservationWorkbench.createDialog.title') }}</h2>
           <button
             type="button"
-            aria-label="关闭新增预约"
+            :aria-label="$t('reservationWorkbench.createDialog.closeAria')"
             :disabled="isSubmitting || isLoadingCreatedShare"
             @click="close"
           >
@@ -852,8 +859,15 @@ function reservationShareUrl(info: ReservationShareInfo): string {
 
         <section v-if="createdReservation" class="reservation-create-dialog__success" aria-live="polite">
           <div>
-            <strong>预约已创建</strong>
-            <span>{{ createdReservation.reservationCode }} · {{ createdReservation.partySize }}人</span>
+            <strong>{{ $t('reservationWorkbench.createDialog.success') }}</strong>
+            <span>
+              {{
+                $t('reservationWorkbench.createDialog.successSummary', {
+                  code: createdReservation.reservationCode,
+                  count: createdReservation.partySize
+                })
+              }}
+            </span>
           </div>
 
           <ReservationShareCopyPanel
@@ -871,7 +885,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
 
           <footer>
             <button class="reservation-create-dialog__save" type="button" @click="finishCreatedReservationFlow">
-              完成
+              {{ $t('reservationWorkbench.createDialog.done') }}
             </button>
           </footer>
         </section>
@@ -887,17 +901,17 @@ function reservationShareUrl(info: ReservationShareInfo): string {
         />
 
         <label>
-          <span>日期</span>
+          <span>{{ $t('reservationWorkbench.createDialog.date') }}</span>
           <input v-model="form.businessDate" :min="minDate" name="businessDate" type="date" />
         </label>
 
         <div class="reservation-create-dialog__field">
-          <span>时间</span>
+          <span>{{ $t('reservationWorkbench.createDialog.time') }}</span>
           <div
             v-if="mealPeriodFilterOptions.length > 1"
             class="reservation-create-meal-period-filter"
             role="group"
-            aria-label="餐段筛选"
+            :aria-label="$t('reservationWorkbench.createDialog.mealFilterAria')"
           >
             <button
               v-for="option in mealPeriodFilterOptions"
@@ -913,7 +927,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
               <small>{{ option.count }}</small>
             </button>
           </div>
-          <div class="reservation-create-time-slots" role="listbox" aria-label="预约可选时间">
+          <div class="reservation-create-time-slots" role="listbox" :aria-label="$t('reservationWorkbench.createDialog.timeSlotsAria')">
             <button
               v-for="slot in filteredTimeSlots"
               :key="slot.startAt"
@@ -924,27 +938,27 @@ function reservationShareUrl(info: ReservationShareInfo): string {
               @click="selectTimeSlot(slot)"
             >
               <strong>{{ slot.time }}</strong>
-              <small>{{ slot.displayName }}{{ slot.nextDay ? ' · 次日' : '' }}</small>
+              <small>{{ slot.displayName }}{{ slot.nextDay ? $t('reservationWorkbench.createDialog.nextDay') : '' }}</small>
             </button>
           </div>
           <small v-if="isLoadingTimeSlots" class="reservation-create-dialog__hint">
-            正在读取时间
+            {{ $t('reservationWorkbench.createDialog.loadingTime') }}
           </small>
           <small v-else-if="timeSlotApiError" class="reservation-create-dialog__hint">
-            时间列表读取失败
+            {{ $t('reservationWorkbench.createDialog.timeLoadFailed') }}
           </small>
           <small v-else-if="filteredTimeSlots.length === 0" class="reservation-create-dialog__hint">
-            暂无可选时间
+            {{ $t('reservationWorkbench.createDialog.noTimeSlots') }}
           </small>
         </div>
 
         <label>
-          <span>人数</span>
+          <span>{{ $t('reservationWorkbench.createDialog.partySize') }}</span>
           <input v-model.number="form.partySize" min="1" name="partySize" type="number" />
         </label>
 
         <div class="reservation-create-dialog__field">
-          <span>桌号（可选）</span>
+          <span>{{ $t('reservationWorkbench.createDialog.optionalTable') }}</span>
           <div class="reservation-create-dialog__table-field">
             <button
               class="reservation-create-dialog__table-trigger"
@@ -962,48 +976,55 @@ function reservationShareUrl(info: ReservationShareInfo): string {
               :disabled="isSubmitting"
               @click="clearTablePreference"
             >
-              未指定
+              {{ $t('reservationWorkbench.createDialog.unassigned') }}
             </button>
           </div>
           <small v-if="isLoadingTableResources" class="reservation-create-dialog__hint">
-            正在读取桌台
+            {{ $t('reservationWorkbench.createDialog.loadingTables') }}
           </small>
           <small v-else-if="tableResourceApiError" class="reservation-create-dialog__hint">
-            桌台列表读取失败
+            {{ $t('reservationWorkbench.createDialog.tableLoadFailed') }}
           </small>
         </div>
 
         <section
           v-if="isTablePickerOpen"
           class="reservation-create-table-picker"
-          aria-label="选择预约桌号弹窗"
+          :aria-label="$t('reservationWorkbench.createDialog.tablePickerAria')"
           aria-modal="true"
           role="dialog"
         >
           <div class="reservation-create-table-picker__backdrop" @click="closeTablePicker"></div>
           <div class="reservation-create-table-picker__panel">
             <header>
-              <h3>选择预约桌号</h3>
-              <button type="button" aria-label="关闭桌号选择" @click="closeTablePicker">
+              <h3>{{ $t('reservationWorkbench.createDialog.tablePickerTitle') }}</h3>
+              <button type="button" :aria-label="$t('reservationWorkbench.createDialog.closeTablePicker')" @click="closeTablePicker">
                 ×
               </button>
             </header>
 
             <p class="reservation-create-table-picker__summary">
-              当前选择：{{ tablePreferenceDisplay }}
+              {{ $t('reservationWorkbench.createDialog.currentSelection', { selection: tablePreferenceDisplay }) }}
             </p>
 
-            <section class="reservation-create-table-picker__temporary-panel" aria-label="预约临时分组">
+            <section class="reservation-create-table-picker__temporary-panel" :aria-label="$t('reservationWorkbench.createDialog.temporaryGroupAria')">
               <div>
-                <strong>临时分组</strong>
-                <span>{{ form.businessDate }} · 已选 {{ form.temporaryTableIds.length }} 张</span>
+                <strong>{{ $t('reservationWorkbench.createDialog.temporaryGroup') }}</strong>
+                <span>
+                  {{
+                    $t('reservationWorkbench.createDialog.temporarySummary', {
+                      date: form.businessDate,
+                      count: form.temporaryTableIds.length
+                    })
+                  }}
+                </span>
               </div>
               <label>
-                <span>组名</span>
+                <span>{{ $t('reservationWorkbench.createDialog.groupName') }}</span>
                 <input
                   v-model.trim="temporaryGroupName"
                   name="reservationTemporaryGroupName"
-                  placeholder="例如 A区临组1"
+                  :placeholder="$t('reservationWorkbench.createDialog.groupNamePlaceholder')"
                   type="text"
                 />
               </label>
@@ -1020,14 +1041,14 @@ function reservationShareUrl(info: ReservationShareInfo): string {
                   :disabled="isSavingTemporaryGroup"
                   @click="toggleTemporaryGroupMode"
                 >
-                  {{ isTemporaryGroupMode ? '退出选择' : '组合桌台' }}
+                  {{ isTemporaryGroupMode ? $t('reservationWorkbench.createDialog.exitSelection') : $t('reservationWorkbench.createDialog.composeTables') }}
                 </button>
                 <button
                   type="button"
                   :disabled="form.temporaryTableIds.length === 0 || isSavingTemporaryGroup"
                   @click="clearTemporaryGroupDraft"
                 >
-                  清空
+                  {{ $t('common.actions.clear') }}
                 </button>
                 <button
                   class="reservation-create-table-picker__temporary-save"
@@ -1035,7 +1056,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
                   :disabled="!canSaveTemporaryGroup"
                   @click="saveTemporaryGroupForReservation"
                 >
-                  {{ isSavingTemporaryGroup ? '保存中' : '保存分组' }}
+                  {{ isSavingTemporaryGroup ? $t('reservationWorkbench.createDialog.saveGroupSubmitting') : $t('reservationWorkbench.createDialog.saveGroup') }}
                 </button>
               </div>
             </section>
@@ -1057,7 +1078,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
             />
 
             <footer>
-              <button type="button" @click="closeTablePicker">取消</button>
+              <button type="button" @click="closeTablePicker">{{ $t('common.actions.cancel') }}</button>
             </footer>
           </div>
         </section>
@@ -1068,10 +1089,10 @@ function reservationShareUrl(info: ReservationShareInfo): string {
 
         <footer>
           <button class="reservation-create-dialog__save" :disabled="!canSubmit" type="submit">
-            {{ isSubmitting ? '保存中...' : '保存' }}
+            {{ isSubmitting ? $t('reservationWorkbench.createDialog.saveSubmitting') : $t('reservationWorkbench.createDialog.save') }}
           </button>
           <button class="reservation-create-dialog__cancel" type="button" :disabled="isSubmitting" @click="close">
-            取消
+            {{ $t('common.actions.cancel') }}
           </button>
         </footer>
         </template>

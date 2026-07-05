@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthSessionStore } from '../../stores/authSession'
@@ -7,9 +8,19 @@ import { useAuthSessionStore } from '../../stores/authSession'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthSessionStore()
+const { t } = useI18n()
 const loggingOut = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || auth.user?.defaultStoreId || auth.user?.storeIds[0] || ''))
+const navItems = computed(() => [
+  { to: `/stores/${storeId.value}/admin/profile`, labelKey: 'nav.tenant.profile' },
+  { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },
+  { to: `/stores/${storeId.value}/admin/tables`, labelKey: 'nav.tenant.tables' },
+  { to: `/stores/${storeId.value}/admin/settings`, labelKey: 'nav.tenant.settings' },
+  { to: `/stores/${storeId.value}/admin/share-template`, labelKey: 'nav.tenant.shareTemplate' },
+  { to: `/stores/${storeId.value}/admin/public-booking`, labelKey: 'nav.tenant.publicBooking' },
+  { to: `/stores/${storeId.value}/admin/call-screen`, labelKey: 'nav.tenant.callScreen' }
+])
 
 async function logoutFromTenantAdmin(): Promise<void> {
   if (loggingOut.value) {
@@ -27,26 +38,27 @@ async function logoutFromTenantAdmin(): Promise<void> {
 </script>
 
 <template>
-  <aside class="tenant-nav" aria-label="租户后台导航">
+  <aside class="tenant-nav" :aria-label="t('nav.tenant.aria')">
     <div class="nav-main">
       <div class="brand-block">
         <span class="brand-mark">RPB</span>
-        <strong>租户后台</strong>
-        <small>门店 {{ auth.user?.username || '20000000' }}</small>
+        <strong>{{ t('nav.tenant.title') }}</strong>
+        <small>{{ t('nav.tenant.storePrefix') }} {{ auth.user?.username || '20000000' }}</small>
       </div>
       <nav class="nav-list">
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/profile`">租户资料</RouterLink>
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/staff`">员工管理</RouterLink>
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/tables`">桌号管理</RouterLink>
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/settings`">基础设置</RouterLink>
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/share-template`">订位分享</RouterLink>
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/public-booking`">公网预约</RouterLink>
-        <RouterLink class="nav-item" :to="`/stores/${storeId}/admin/call-screen`">叫号屏配置</RouterLink>
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          class="nav-item"
+          :to="item.to"
+        >
+          {{ t(item.labelKey) }}
+        </RouterLink>
       </nav>
     </div>
 
     <button class="logout-button" type="button" :disabled="loggingOut" @click="logoutFromTenantAdmin">
-      {{ loggingOut ? '退出中' : '退出登录' }}
+      {{ loggingOut ? t('common.actions.loggingOut') : t('common.actions.logout') }}
     </button>
   </aside>
 </template>

@@ -13,6 +13,7 @@ class ReservationCreateDialogUiValidationTest {
         Path dialogPath = Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue");
         Path timePath = Path.of("src", "components", "reservation-workbench", "reservationCreateTime.ts");
         Path messagePath = Path.of("src", "utils", "reservationCreateMessages.ts");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(dialogPath).exists();
         assertThat(timePath).exists();
@@ -22,6 +23,7 @@ class ReservationCreateDialogUiValidationTest {
         String pickerSource = readSource(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
         String timeSource = readSource(timePath);
         String messageSource = readSource(messagePath);
+        String zhSource = readSource(zhPath);
 
         assertThat(dialogSource)
             .contains("fetchTableResources")
@@ -48,8 +50,8 @@ class ReservationCreateDialogUiValidationTest {
             .contains("tableIds: form.temporaryTableIds")
             .contains("businessDate: form.businessDate")
             .contains("fetchTableResources(props.storeId, {\n      includeGroups: true,")
-            .contains("组合桌台")
-            .contains("保存分组")
+            .contains("reservationWorkbench.createDialog.composeTables")
+            .contains("reservationWorkbench.createDialog.saveGroup")
             .contains("tableId:")
             .contains("tableGroupId:")
             .contains("resource.resourceType === 'dining_table'")
@@ -62,7 +64,7 @@ class ReservationCreateDialogUiValidationTest {
             .contains("v-for=\"option in mealPeriodFilterOptions\"")
             .contains("@click=\"selectMealPeriod(option.periodKey)\"")
             .contains("v-for=\"slot in filteredTimeSlots\"")
-            .contains("全部")
+            .contains("reservationWorkbench.createDialog.allMealPeriods")
             .contains(":disabled=\"isSubmitting\"")
             .contains("formatReservationCreateErrorMessage")
             .contains("RESERVATION_START_IN_PAST")
@@ -85,8 +87,8 @@ class ReservationCreateDialogUiValidationTest {
             .contains("selectedArea")
             .contains("areaFilterOptions")
             .contains("selectArea")
-            .contains("桌台分区")
-            .contains("全部分区")
+            .contains("staffControls.tablePicker.areaFilter")
+            .contains("staffControls.tablePicker.allAreas")
             .contains("areaName")
             .contains("resource.selectable || matchesRequiredResource(resource)")
             .contains("filterGroupResourceByArea")
@@ -100,13 +102,17 @@ class ReservationCreateDialogUiValidationTest {
             .contains("30 * 60 * 1000");
 
         assertThat(messageSource)
+            .contains("translate(")
             .contains("export function formatReservationCreateErrorMessage")
             .contains("reservation.start_in_past")
-            .contains("预约开始时间不能早于当前时间")
             .contains("reservation.time_slot_unavailable")
-            .contains("请选择门店餐段内的可预约时间")
-            .contains("reservation.invalid_phone_e164")
-            .contains("手机号必须是 8 位新加坡号码");
+            .contains("reservation.invalid_phone_e164");
+        assertThat(zhSource)
+            .contains("startInPast: '预约开始时间不能早于当前时间")
+            .contains("timeSlotUnavailable: '请选择门店餐段内的可预约时间")
+            .contains("invalidPhoneE164: '手机号必须是 8 位新加坡号码")
+            .contains("areaFilter: '桌台分区'")
+            .contains("allAreas: '全部分区'");
     }
 
     @Test
@@ -145,7 +151,7 @@ class ReservationCreateDialogUiValidationTest {
     }
 
     private static String readSource(Path path) throws Exception {
-        return Files.readString(path)
+        return FrontendSourceSupport.readString(path)
             .replace("\r\n", "\n")
             .replace('\r', '\n');
     }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ReservationShareInfo } from '../../types/reservationShareInfo'
 
 const props = withDefaults(
@@ -17,7 +18,6 @@ const props = withDefaults(
     shared: false,
     errorText: '',
     fallbackText: '',
-    statusText: '已准备链接',
     disabled: false
   }
 )
@@ -29,6 +29,8 @@ const emit = defineEmits<{
   'copy-requested': []
 }>()
 
+const { t } = useI18n()
+const resolvedStatusText = computed(() => props.statusText || t('reservationWorkbench.share.prepared'))
 const whatsappUnavailable = computed(() => {
   return !!props.shareInfo && (!props.shareInfo.canOpenWhatsAppLink || !props.shareInfo.whatsappLink)
 })
@@ -55,7 +57,7 @@ function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-sha
 </script>
 
 <template>
-  <section class="reservation-share-copy" aria-label="订位链接转发">
+  <section class="reservation-share-copy" :aria-label="$t('reservationWorkbench.share.aria')">
     <div class="reservation-share-copy__actions">
       <button
         class="reservation-share-copy__button reservation-share-copy__button--whatsapp"
@@ -63,7 +65,7 @@ function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-sha
         :disabled="loading || disabled || whatsappUnavailable"
         @click="request('whatsapp-requested')"
       >
-        {{ loading ? '读取中' : 'WhatsApp发送' }}
+        {{ loading ? $t('reservationWorkbench.share.loading') : $t('reservationWorkbench.share.whatsapp') }}
       </button>
       <button
         class="reservation-share-copy__button reservation-share-copy__button--wechat"
@@ -71,7 +73,7 @@ function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-sha
         :disabled="loading || disabled"
         @click="request('wechat-requested')"
       >
-        微信发送
+        {{ $t('reservationWorkbench.share.wechat') }}
       </button>
       <button
         class="reservation-share-copy__button"
@@ -79,7 +81,7 @@ function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-sha
         :disabled="loading || disabled"
         @click="request('system-share-requested')"
       >
-        系统转发
+        {{ $t('reservationWorkbench.share.system') }}
       </button>
       <button
         class="reservation-share-copy__button reservation-share-copy__button--secondary"
@@ -87,11 +89,11 @@ function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-sha
         :disabled="loading || disabled"
         @click="request('copy-requested')"
       >
-        复制链接
+        {{ $t('reservationWorkbench.share.copy') }}
       </button>
     </div>
 
-    <p v-if="shared" class="reservation-share-copy__status" role="status">{{ statusText }}</p>
+    <p v-if="shared" class="reservation-share-copy__status" role="status">{{ resolvedStatusText }}</p>
     <p v-else-if="errorText" class="reservation-share-copy__error" role="alert">{{ errorText }}</p>
 
     <textarea
@@ -99,7 +101,7 @@ function request(action: 'whatsapp-requested' | 'wechat-requested' | 'system-sha
       class="reservation-share-copy__fallback"
       readonly
       :value="fallbackText"
-      aria-label="订位分享链接"
+      :aria-label="$t('reservationWorkbench.share.linkAria')"
     ></textarea>
   </section>
 </template>

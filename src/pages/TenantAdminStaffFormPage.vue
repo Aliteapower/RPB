@@ -21,6 +21,9 @@ import {
 import PasswordInput from '../components/common/PasswordInput.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 interface TenantProfileForm {
   tenantCode: string
@@ -53,9 +56,9 @@ const mode = computed<'create' | 'edit' | 'self'>(() => {
 })
 const pageTitle = computed(() => {
   if (mode.value === 'create') {
-    return '新增员工'
+    return gt('generated.tenant-admin-staff-form.038')
   }
-  return mode.value === 'self' ? '租户资料与管理员账号' : '编辑员工'
+  return mode.value === 'self' ? gt('generated.tenant-admin-staff-form.039') : gt('generated.tenant-admin-staff-form.040')
 })
 const statusFieldVisible = computed(() => mode.value !== 'self')
 const storeId = computed(() => String(route.params.storeId || ''))
@@ -137,9 +140,9 @@ async function submitStaff(): Promise<void> {
       ])
       applyTenantProfile(profileResponse.profile)
       applyAdminAccount(staffResponse.staff)
-      savedText.value = '已保存'
+      savedText.value = gt('generated.tenant-admin-staff-form.041')
       if (logoFile.value) {
-        await uploadSelectedLogo('资料和 LOGO 已保存')
+        await uploadSelectedLogo(gt('generated.tenant-admin-staff-form.042'))
       }
     } else {
       await updateStaff(storeId.value, staffId.value, toPayload())
@@ -160,7 +163,7 @@ async function submitLogo(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   try {
-    await uploadSelectedLogo('LOGO 已更新')
+    await uploadSelectedLogo(gt('generated.tenant-admin-staff-form.043'))
   } catch (error) {
     errorText.value = apiErrorText(error)
   }
@@ -194,7 +197,7 @@ async function removeLogo(): Promise<void> {
     const response = await clearTenantProfileLogo(storeId.value)
     applyTenantProfile(response.profile)
     clearSelectedLogo()
-    savedText.value = 'LOGO 已清空'
+    savedText.value = gt('generated.tenant-admin-staff-form.044')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -273,11 +276,11 @@ function validateSelfForm(): boolean {
   errorText.value = ''
   savedText.value = ''
   if (!tenantProfileForm.displayName.trim() || !tenantProfileForm.defaultLocale.trim()) {
-    errorText.value = '请检查租户名称和默认语言'
+    errorText.value = gt('generated.tenant-admin-staff-form.045')
     return false
   }
   if (form.password.trim() && !/^[A-Za-z0-9]{6}$/.test(form.password.trim())) {
-    errorText.value = '密码为 6 位数字或英文字母'
+    errorText.value = gt('generated.tenant-admin-staff-form.046')
     return false
   }
   return true
@@ -301,41 +304,41 @@ function optionalValue(value: string): string | null {
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
-    created: '已创建',
-    active: '启用',
-    suspended: '停用',
-    closed: '关闭'
+    created: gt('generated.tenant-admin-staff-form.047'),
+    active: gt('generated.tenant-admin-staff-form.048'),
+    suspended: gt('generated.tenant-admin-staff-form.049'),
+    closed: gt('generated.tenant-admin-staff-form.050')
   }
   return labels[status] || status || '-'
 }
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-staff-form.051')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-staff-form.052')
   }
   if (error.response.error.code === 'STAFF_CODE_CONFLICT') {
-    return '员工号已存在'
+    return gt('generated.tenant-admin-staff-form.053')
   }
   if (error.response.error.code === 'STAFF_NOT_FOUND') {
-    return '员工不存在'
+    return gt('generated.tenant-admin-staff-form.054')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return mode.value === 'self' ? '请检查租户名称、默认语言和 6 位密码' : '请检查必填项和 6 位密码'
+    return mode.value === 'self' ? gt('generated.tenant-admin-staff-form.055') : gt('generated.tenant-admin-staff-form.056')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-staff-form.057')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-staff-form.058')
   }
   if (error.response.error.code === 'TENANT_PROFILE_NOT_FOUND') {
-    return '租户资料不存在'
+    return gt('generated.tenant-admin-staff-form.059')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-staff-form.060')
 }
 </script>
 
@@ -346,66 +349,64 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>员工管理</span>
+          <span>{{ gt('generated.tenant-admin-staff-form.001') }}</span>
           <h1>{{ pageTitle }}</h1>
         </div>
-        <button type="button" class="secondary-button" @click="router.push({ name: 'tenant-admin-staff', params: { storeId } })">
-          返回列表
-        </button>
+        <button type="button" class="secondary-button" @click="router.push({ name: 'tenant-admin-staff', params: { storeId } })"> {{ gt('generated.tenant-admin-staff-form.002') }} </button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-staff-form.003') }}</p>
 
       <form v-else class="form-panel" :class="{ 'self-form': mode === 'self' }" @submit.prevent="submitStaff">
         <template v-if="mode === 'self'">
           <section class="section-panel">
             <div class="section-heading">
-              <h2>租户资料</h2>
+              <h2>{{ gt('generated.tenant-admin-staff-form.004') }}</h2>
             </div>
 
             <div class="field-grid">
               <label>
-                <span>租户代码</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.005') }}</span>
                 <input :value="tenantProfileForm.tenantCode" readonly />
               </label>
               <label>
-                <span>租户名称</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.006') }}</span>
                 <input v-model.trim="tenantProfileForm.displayName" required />
               </label>
               <label>
-                <span>状态</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.007') }}</span>
                 <input :value="statusLabel(tenantProfileForm.status)" readonly />
               </label>
               <label>
-                <span>默认语言</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.008') }}</span>
                 <input v-model.trim="tenantProfileForm.defaultLocale" required />
               </label>
               <label>
-                <span>负责人</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.009') }}</span>
                 <input v-model.trim="tenantProfileForm.principalName" />
               </label>
               <label>
-                <span>电话</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.010') }}</span>
                 <input v-model.trim="tenantProfileForm.contactPhone" inputmode="tel" />
               </label>
               <label class="wide-field">
-                <span>租户地址</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.011') }}</span>
                 <input v-model.trim="tenantProfileForm.address" />
               </label>
             </div>
           </section>
 
           <section class="section-panel logo-panel">
-            <div class="logo-preview" aria-label="租户 LOGO 预览">
-              <img v-if="logoPreviewUrl" :src="logoPreviewUrl" alt="租户 LOGO" />
+            <div class="logo-preview" :aria-label="gt('generated.tenant-admin-staff-form.012')">
+              <img v-if="logoPreviewUrl" :src="logoPreviewUrl" :alt="gt('generated.tenant-admin-staff-form.013')" />
               <span v-else>LOGO</span>
             </div>
 
             <div class="logo-control">
               <div class="section-heading compact-heading">
-                <h2>租户 LOGO</h2>
+                <h2>{{ gt('generated.tenant-admin-staff-form.014') }}</h2>
               </div>
               <input
                 ref="logoFileInput"
@@ -415,40 +416,40 @@ function apiErrorText(error: unknown): string {
               />
               <div class="button-row">
                 <button type="button" class="secondary-button" :disabled="!logoFile || logoSaving || saving" @click="submitLogo">
-                  {{ logoSaving && logoFile ? '上传中' : '上传 LOGO' }}
+                  {{ logoSaving && logoFile ? gt('generated.tenant-admin-staff-form.015') : gt('generated.tenant-admin-staff-form.016') }}
                 </button>
-                <button type="button" class="ghost-button" :disabled="logoSaving || saving" @click="removeLogo">清空 LOGO</button>
+                <button type="button" class="ghost-button" :disabled="logoSaving || saving" @click="removeLogo">{{ gt('generated.tenant-admin-staff-form.017') }}</button>
               </div>
             </div>
           </section>
 
           <section class="section-panel">
             <div class="section-heading">
-              <h2>管理员账号</h2>
+              <h2>{{ gt('generated.tenant-admin-staff-form.018') }}</h2>
             </div>
 
             <div class="field-grid">
               <label>
-                <span>员工号</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.019') }}</span>
                 <input v-model.trim="form.employeeNo" readonly required />
               </label>
               <label>
-                <span>姓名</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.020') }}</span>
                 <input v-model.trim="form.name" required />
               </label>
               <label>
-                <span>电邮</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.021') }}</span>
                 <input v-model.trim="form.email" type="email" />
               </label>
               <label>
-                <span>修改密码</span>
+                <span>{{ gt('generated.tenant-admin-staff-form.022') }}</span>
                 <PasswordInput
                   v-model="form.password"
                   maxlength="6"
                   pattern="[A-Za-z0-9]{6}"
                   autocomplete="new-password"
                 />
-                <small>密码为 6 位数字或英文字母</small>
+                <small>{{ gt('generated.tenant-admin-staff-form.023') }}</small>
               </label>
             </div>
           </section>
@@ -456,44 +457,44 @@ function apiErrorText(error: unknown): string {
 
         <template v-else>
           <label>
-            <span>员工号</span>
+            <span>{{ gt('generated.tenant-admin-staff-form.024') }}</span>
             <input v-model.trim="form.employeeNo" :readonly="mode !== 'create'" required />
           </label>
           <label>
-            <span>姓名</span>
+            <span>{{ gt('generated.tenant-admin-staff-form.025') }}</span>
             <input v-model.trim="form.name" required />
           </label>
           <label>
-            <span>电话</span>
+            <span>{{ gt('generated.tenant-admin-staff-form.026') }}</span>
             <input v-model.trim="form.phone" inputmode="tel" />
           </label>
           <label>
-            <span>电邮</span>
+            <span>{{ gt('generated.tenant-admin-staff-form.027') }}</span>
             <input v-model.trim="form.email" type="email" />
           </label>
           <label v-if="statusFieldVisible">
-            <span>状态</span>
+            <span>{{ gt('generated.tenant-admin-staff-form.028') }}</span>
             <select v-model="form.status">
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
-              <option value="locked">锁定</option>
+              <option value="active">{{ gt('generated.tenant-admin-staff-form.029') }}</option>
+              <option value="disabled">{{ gt('generated.tenant-admin-staff-form.030') }}</option>
+              <option value="locked">{{ gt('generated.tenant-admin-staff-form.031') }}</option>
             </select>
           </label>
           <label>
-            <span>{{ mode === 'create' ? '初始密码' : '修改密码' }}</span>
+            <span>{{ mode === 'create' ? gt('generated.tenant-admin-staff-form.032') : gt('generated.tenant-admin-staff-form.033') }}</span>
             <PasswordInput
               v-model="form.password"
               maxlength="6"
               :required="mode === 'create'"
               autocomplete="new-password"
             />
-            <small>密码为 6 位数字或英文字母</small>
+            <small>{{ gt('generated.tenant-admin-staff-form.034') }}</small>
           </label>
         </template>
 
         <div class="form-actions">
           <button class="primary-button" type="submit" :disabled="saving || logoSaving">
-            {{ saving ? '保存中' : mode === 'self' ? '保存资料' : '保存' }}
+            {{ saving ? gt('generated.tenant-admin-staff-form.035') : mode === 'self' ? gt('generated.tenant-admin-staff-form.036') : gt('generated.tenant-admin-staff-form.037') }}
           </button>
         </div>
       </form>

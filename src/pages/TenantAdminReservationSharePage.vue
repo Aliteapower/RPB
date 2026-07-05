@@ -15,6 +15,9 @@ import type {
   TenantAdminShareProfile,
   TenantAdminShareProfileMutation
 } from '../types/tenantAdminShareProfile'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -71,7 +74,7 @@ async function submitShareProfile(): Promise<void> {
   try {
     const response = await updateTenantAdminShareProfile(storeId.value, toShareMutation())
     applyShareProfile(response.shareProfile)
-    savedText.value = '已保存'
+    savedText.value = gt('generated.tenant-admin-reservation-share.024')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -110,7 +113,7 @@ async function restoreDefaultTemplate(): Promise<void> {
   try {
     const response = await resetTenantAdminShareProfileTemplate(storeId.value)
     applyShareProfile(response.shareProfile)
-    savedText.value = '已恢复默认模板'
+    savedText.value = gt('generated.tenant-admin-reservation-share.025')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -154,25 +157,25 @@ function insertVariable(variable: string): void {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-reservation-share.026')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-reservation-share.027')
   }
   if (error.response.error.code === 'TEMPLATE_UNKNOWN_VARIABLE') {
-    return '模板包含未支持的变量'
+    return gt('generated.tenant-admin-reservation-share.028')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查公网预约设置'
+    return gt('generated.tenant-admin-reservation-share.029')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-reservation-share.030')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-reservation-share.031')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-reservation-share.032')
 }
 </script>
 
@@ -183,58 +186,56 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>订位分享模板</h1>
+          <span>{{ gt('generated.tenant-admin-reservation-share.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-reservation-share.002') }}</h1>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-reservation-share.003') }}</p>
 
       <form v-else class="form-panel" @submit.prevent="submitShareProfile">
-        <section class="section-panel" aria-label="公网预约设置">
+        <section class="section-panel" :aria-label="gt('generated.tenant-admin-reservation-share.004')">
           <div class="section-heading">
-            <h2>公网预约设置</h2>
+            <h2>{{ gt('generated.tenant-admin-reservation-share.005') }}</h2>
           </div>
 
           <div class="field-grid">
             <label>
-              <span>后台店名</span>
+              <span>{{ gt('generated.tenant-admin-reservation-share.006') }}</span>
               <input v-model.trim="form.storeDisplayName" readonly />
             </label>
             <label>
-              <span>分享显示名称</span>
+              <span>{{ gt('generated.tenant-admin-reservation-share.007') }}</span>
               <input v-model.trim="form.shareDisplayName" />
             </label>
             <label>
-              <span>Google Map 链接</span>
+              <span>{{ gt('generated.tenant-admin-reservation-share.008') }}</span>
               <input v-model.trim="form.googleMapUrl" />
             </label>
             <label>
-              <span>对外邮箱</span>
+              <span>{{ gt('generated.tenant-admin-reservation-share.009') }}</span>
               <input v-model.trim="form.shareEmail" type="email" placeholder="booking@example.com" />
             </label>
             <label>
-              <span>WhatsApp 固定号码</span>
+              <span>{{ gt('generated.tenant-admin-reservation-share.010') }}</span>
               <input v-model.trim="form.whatsappBusinessPhoneE164" placeholder="+6588880000" />
             </label>
             <label class="wide-field">
-              <span>到店提示</span>
+              <span>{{ gt('generated.tenant-admin-reservation-share.011') }}</span>
               <input v-model.trim="form.reservationShareNote" />
             </label>
           </div>
         </section>
 
-        <section class="section-panel" aria-label="订位分享模板">
+        <section class="section-panel" :aria-label="gt('generated.tenant-admin-reservation-share.012')">
           <div class="section-heading">
-            <h2>订位分享模板</h2>
+            <h2>{{ gt('generated.tenant-admin-reservation-share.013') }}</h2>
           </div>
 
-          <section class="template-tools" aria-label="模板变量">
-            <p class="template-tools__hint">
-              点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到分享模板中；调整模板后请保存，保存后的模板会在新的订位分享中生效。
-            </p>
+          <section class="template-tools" :aria-label="gt('generated.tenant-admin-reservation-share.014')">
+            <p class="template-tools__hint"> {{ gt('generated.tenant-admin-reservation-share.015') }} </p>
             <div class="template-tools__buttons">
               <button
                 v-for="variable in availableVariables"
@@ -248,24 +249,24 @@ function apiErrorText(error: unknown): string {
           </section>
 
           <label>
-            <span>分享模板</span>
+            <span>{{ gt('generated.tenant-admin-reservation-share.016') }}</span>
             <textarea v-model="form.reservationShareTemplate" rows="16"></textarea>
           </label>
         </section>
 
-        <section v-if="previewText" class="preview-panel form-panel__wide" aria-label="分享预览">
+        <section v-if="previewText" class="preview-panel form-panel__wide" :aria-label="gt('generated.tenant-admin-reservation-share.017')">
           <pre>{{ previewText }}</pre>
         </section>
 
         <div class="form-actions">
           <button type="button" :disabled="previewing" @click="previewShareProfile">
-            {{ previewing ? '预览中' : '预览' }}
+            {{ previewing ? gt('generated.tenant-admin-reservation-share.018') : gt('generated.tenant-admin-reservation-share.019') }}
           </button>
           <button type="button" :disabled="restoring" @click="restoreDefaultTemplate">
-            {{ restoring ? '恢复中' : '恢复默认模板' }}
+            {{ restoring ? gt('generated.tenant-admin-reservation-share.020') : gt('generated.tenant-admin-reservation-share.021') }}
           </button>
           <button class="primary-button" type="submit" :disabled="saving">
-            {{ saving ? '保存中' : '保存设置' }}
+            {{ saving ? gt('generated.tenant-admin-reservation-share.022') : gt('generated.tenant-admin-reservation-share.023') }}
           </button>
         </div>
       </form>

@@ -22,11 +22,11 @@ class ReservationCancelUiImplementationValidationTest {
         assertThat(todayListPanelPath).exists();
         assertThat(todayListItemPath).exists();
 
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String todayPage = Files.readString(todayPagePath);
-        String todayListPanel = Files.readString(todayListPanelPath);
-        String todayListItem = Files.readString(todayListItemPath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String todayPage = FrontendSourceSupport.readString(todayPagePath);
+        String todayListPanel = FrontendSourceSupport.readString(todayListPanelPath);
+        String todayListItem = FrontendSourceSupport.readString(todayListItemPath);
 
         assertThat(apiClient)
             .contains("cancelReservation")
@@ -55,7 +55,7 @@ class ReservationCancelUiImplementationValidationTest {
             .contains("canCancel")
             .contains("cancellableStatuses")
             .contains("cancel-requested")
-            .contains("取消")
+            .contains("common.actions.cancel")
             .doesNotContain("取消预约需后端契约");
 
         assertThat(todayListPanel)
@@ -96,7 +96,7 @@ class ReservationCancelUiImplementationValidationTest {
 
         assertThat(apiPath).exists();
 
-        String apiClient = Files.readString(apiPath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
         assertForbiddenCancelApiSideEffectsAbsent(apiClient);
     }
 

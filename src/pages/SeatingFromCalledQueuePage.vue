@@ -16,6 +16,9 @@ import type {
   SeatCalledQueueTicketRequest,
   SeatingFromCalledQueueApiErrorResponse
 } from '../types/seatingFromCalledQueue'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -40,7 +43,7 @@ const assignedResourceAreaName = ref('')
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const appStatusLabel = computed(() => (isSubmitting.value ? '入座中' : '排队入座'))
+const appStatusLabel = computed(() => (isSubmitting.value ? gt('generated.seating-from-called-queue.019') : gt('generated.seating-from-called-queue.020')))
 const tableResourceListRoute = computed(() => ({
   name: 'table-resource-list',
   params: {
@@ -107,15 +110,15 @@ const resourceSelectionError = computed(() => {
 const resourceSelectionHint = computed(() => {
   if (hasAssignedResource.value) {
     return assignedResourceSelectionSatisfied.value
-      ? '已自动选择预约指定资源，请按该桌号入座'
-      : '请使用预约指定资源入座'
+      ? gt('generated.seating-from-called-queue.021')
+      : gt('generated.seating-from-called-queue.022')
   }
 
   if (!hasQueueTicketId.value || selectedResourceCount.value !== 0) {
     return ''
   }
 
-  return '请选择桌台、桌组，或在临时组合中选择至少 2 张桌台'
+  return gt('generated.seating-from-called-queue.023')
 })
 const canSubmit = computed(
   () =>
@@ -126,11 +129,11 @@ const canSubmit = computed(
     assignedResourceSelectionSatisfied.value
 )
 const queueTicketContextText = computed(() =>
-  hasQueueTicketId.value ? '已从排队列表带入' : '请从排队列表选择已叫号排队票'
+  hasQueueTicketId.value ? gt('generated.seating-from-called-queue.024') : gt('generated.seating-from-called-queue.025')
 )
 const assignedResourceDisplayText = computed(() => {
   const code = assignedResourceLabel.value || assignedResourceCode.value || assignedResourceId.value
-  const prefix = assignedResourceType.value === 'table_group' ? '预约指定桌组' : '预约指定桌号'
+  const prefix = assignedResourceType.value === 'table_group' ? gt('generated.seating-from-called-queue.026') : gt('generated.seating-from-called-queue.027')
   const area = assignedResourceAreaName.value ? ` · ${assignedResourceAreaName.value}` : ''
 
   return `${prefix} ${code}${area}`
@@ -337,10 +340,10 @@ function createLocalError(
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.seating-from-called-queue.028')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.seating-from-called-queue.018')}${value.slice(0, 8)}`
 }
 
 function queryValue(value: unknown): string {
@@ -376,24 +379,24 @@ function normalizeAssignedResourceType(value: string): string {
       <form class="queue-seating-form" @submit.prevent="submitQueueSeating">
         <header class="queue-seating-heading">
           <div>
-            <p>排队管理</p>
-            <h1>排队入座</h1>
+            <p>{{ gt('generated.seating-from-called-queue.001') }}</p>
+            <h1>{{ gt('generated.seating-from-called-queue.002') }}</h1>
           </div>
           <span class="queue-source-pill">{{ queueTicketContextText }}</span>
         </header>
 
-        <section class="queue-ticket-context" aria-label="排队票来源">
-          <span>入座来源</span>
-          <strong>{{ hasQueueTicketId ? '排队列表已选中' : '缺少排队票' }}</strong>
+        <section class="queue-ticket-context" :aria-label="gt('generated.seating-from-called-queue.003')">
+          <span>{{ gt('generated.seating-from-called-queue.004') }}</span>
+          <strong>{{ hasQueueTicketId ? gt('generated.seating-from-called-queue.005') : gt('generated.seating-from-called-queue.006') }}</strong>
         </section>
 
-        <section v-if="hasAssignedResource" class="assigned-resource-context" aria-label="预约指定资源">
-          <span>预约指定</span>
+        <section v-if="hasAssignedResource" class="assigned-resource-context" :aria-label="gt('generated.seating-from-called-queue.007')">
+          <span>{{ gt('generated.seating-from-called-queue.008') }}</span>
           <strong>{{ assignedResourceDisplayText }}</strong>
-          <small>已自动选择，请按指定桌台入座</small>
+          <small>{{ gt('generated.seating-from-called-queue.009') }}</small>
         </section>
 
-        <section class="resource-panel" aria-label="桌台选择">
+        <section class="resource-panel" :aria-label="gt('generated.seating-from-called-queue.010')">
           <TableResourcePicker
             :store-id="storeId"
             :party-size="queuePartySize"
@@ -410,9 +413,7 @@ function normalizeAssignedResourceType(value: string): string {
             @select-table-group="selectTableGroup"
             @select-temporary-tables="selectTemporaryTables"
           />
-          <p v-if="resourceSelectionError" class="resource-error">
-            错误代码：{{ resourceSelectionError.code }}<br />
-            消息键：{{ resourceSelectionError.messageKey }}
+          <p v-if="resourceSelectionError" class="resource-error"> {{ gt('generated.seating-from-called-queue.011') }}{{ resourceSelectionError.code }}<br /> {{ gt('generated.seating-from-called-queue.012') }}{{ resourceSelectionError.messageKey }}
           </p>
           <p v-if="resourceSelectionHint" class="resource-hint">
             {{ resourceSelectionHint }}
@@ -420,13 +421,13 @@ function normalizeAssignedResourceType(value: string): string {
         </section>
 
         <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-          <h2>入座失败</h2>
-          <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-          <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+          <h2>{{ gt('generated.seating-from-called-queue.013') }}</h2>
+          <p class="error-code">{{ gt('generated.seating-from-called-queue.014') }}{{ apiError.error.code }}</p>
+          <p class="message-key">{{ gt('generated.seating-from-called-queue.015') }}{{ apiError.error.messageKey }}</p>
         </section>
 
         <button class="submit-button" :disabled="!canSubmit" type="submit">
-          {{ isSubmitting ? '入座中...' : '确认入座' }}
+          {{ isSubmitting ? gt('generated.seating-from-called-queue.016') : gt('generated.seating-from-called-queue.017') }}
         </button>
       </form>
     </div>

@@ -9,6 +9,9 @@ import {
 } from '../api/reservationPublicShareApi'
 import { shareLinkOrCopy } from '../utils/reservationShareLauncher'
 import type { ReservationPublicShare } from '../types/reservationPublicShare'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const share = ref<ReservationPublicShare | null>(null)
@@ -21,21 +24,21 @@ const hiddenShareTextLabels = [
   '\u9884\u8ba2\u7f16\u53f7',
   '\u9884\u7ea6\u7f16\u53f7',
   '\u8ba2\u4f4d\u7f16\u53f7',
-  '日期',
-  '时间',
-  '人数',
-  '桌位'
+  gt('generated.reservation-public-share.019'),
+  gt('generated.reservation-public-share.020'),
+  gt('generated.reservation-public-share.021'),
+  gt('generated.reservation-public-share.022')
 ]
 
 const token = computed(() => String(route.params.token || '').trim())
 const tableLabel = computed(() => {
   if (!share.value || share.value.tablePending || !share.value.tableCode.trim()) {
-    return '待确认'
+    return gt('generated.reservation-public-share.023')
   }
 
   return share.value.tableCode.trim()
 })
-const tableStatus = computed(() => (share.value?.tablePending ? '到店后确认' : '已预留'))
+const tableStatus = computed(() => (share.value?.tablePending ? gt('generated.reservation-public-share.024') : gt('generated.reservation-public-share.025')))
 const customerShareText = computed(() => {
   if (!share.value) {
     return { intro: '', details: '' }
@@ -68,7 +71,7 @@ watch(token, () => {
 async function loadShare(): Promise<void> {
   if (!token.value) {
     share.value = null
-    errorText.value = '预约信息不存在'
+    errorText.value = gt('generated.reservation-public-share.026')
     return
   }
 
@@ -85,7 +88,7 @@ async function loadShare(): Promise<void> {
     errorText.value =
       error instanceof ReservationPublicShareApiError
         ? publicSharePageErrorText(error)
-        : '预约信息读取失败'
+        : gt('generated.reservation-public-share.027')
   } finally {
     isLoading.value = false
   }
@@ -93,7 +96,7 @@ async function loadShare(): Promise<void> {
 
 function publicSharePageErrorText(error: ReservationPublicShareApiError): string {
   if (error.response.error.code === 'TOKEN_EXPIRED' || error.response.error.code === 'TOKEN_REVOKED') {
-    return '链接已失效'
+    return gt('generated.reservation-public-share.028')
   }
 
   return reservationPublicShareErrorMessage(error.response.error.code)
@@ -173,67 +176,65 @@ async function shareCurrentPage(): Promise<void> {
   }
 
   if (result === 'copied' || result === 'native-share') {
-    shareStatusText.value = result === 'copied' ? '链接已复制' : '已打开转发'
+    shareStatusText.value = result === 'copied' ? gt('generated.reservation-public-share.029') : gt('generated.reservation-public-share.030')
     return
   }
 
   fallbackUrl.value = pageUrl.value
-  shareStatusText.value = '请手动复制链接'
+  shareStatusText.value = gt('generated.reservation-public-share.031')
 }
 </script>
 
 <template>
   <main class="reservation-public-share">
-    <section class="reservation-public-share__shell" aria-label="预约信息">
-      <section v-if="isLoading" class="reservation-public-share__state" aria-live="polite">
-        正在读取预约信息
-      </section>
+    <section class="reservation-public-share__shell" :aria-label="gt('generated.reservation-public-share.001')">
+      <section v-if="isLoading" class="reservation-public-share__state" aria-live="polite"> {{ gt('generated.reservation-public-share.002') }} </section>
 
       <section v-else-if="errorText" class="reservation-public-share__state" role="alert">
         <strong>{{ errorText }}</strong>
-        <span>请联系门店确认最新订位状态。</span>
+        <span>{{ gt('generated.reservation-public-share.003') }}</span>
       </section>
 
       <template v-else-if="share">
         <section
           v-if="customerIntroText"
           class="reservation-public-share__intro"
-          aria-label="顾客确认文案"
+          :aria-label="gt('generated.reservation-public-share.004')"
         >
           {{ customerIntroText }}
         </section>
 
-        <section class="reservation-public-share__focus" aria-label="订位重点信息">
-          <p class="reservation-public-share__focus-label">订位确认</p>
+        <section class="reservation-public-share__focus" :aria-label="gt('generated.reservation-public-share.005')">
+          <p class="reservation-public-share__focus-label">{{ gt('generated.reservation-public-share.006') }}</p>
           <h1>{{ share.storeName }}</h1>
 
           <div class="reservation-public-share__datetime">
             <div>
-              <span>日期</span>
+              <span>{{ gt('generated.reservation-public-share.007') }}</span>
               <strong>{{ share.reservationDate }}</strong>
             </div>
             <div>
-              <span>时间</span>
+              <span>{{ gt('generated.reservation-public-share.008') }}</span>
               <strong>{{ share.reservationTime }}</strong>
             </div>
           </div>
 
           <div class="reservation-public-share__table">
-            <span>桌位</span>
+            <span>{{ gt('generated.reservation-public-share.009') }}</span>
             <strong>{{ tableLabel }}</strong>
             <small>{{ tableStatus }}</small>
           </div>
 
           <div class="reservation-public-share__party">
-            <span>人数</span>
-            <strong>{{ share.partySize }}位成人</strong>
+            <span>{{ gt('generated.reservation-public-share.010') }}</span>
+            <strong>{{ share.partySize }}{{ gt('generated.reservation-public-share.011') }}</strong>
           </div>
         </section>
 
         <section
           v-if="customerVisibleShareText"
           class="reservation-public-share__template"
-          aria-label="订位确认内容"
+          :aria-label="gt('generated.reservation-public-share.012')"
         >
           {{ customerVisibleShareText }}
         </section>
@@ -242,18 +243,16 @@ async function shareCurrentPage(): Promise<void> {
           <nav
             v-if="share.googleMapUrl || share.storePhone || share.storeEmail || share.storeWhatsappPhone"
             class="reservation-public-share__contact-actions"
-            aria-label="地图与联系方式"
+            :aria-label="gt('generated.reservation-public-share.013')"
           >
             <a
               v-if="share.googleMapUrl"
               :href="share.googleMapUrl"
               target="_blank"
               rel="noopener noreferrer"
-            >
-              打开地图
-            </a>
-            <a v-if="share.storePhone" :href="`tel:${share.storePhone}`">拨打电话</a>
-            <a v-if="share.storeEmail" :href="`mailto:${share.storeEmail}`">发送邮件</a>
+            > {{ gt('generated.reservation-public-share.014') }} </a>
+            <a v-if="share.storePhone" :href="`tel:${share.storePhone}`">{{ gt('generated.reservation-public-share.015') }}</a>
+            <a v-if="share.storeEmail" :href="`mailto:${share.storeEmail}`">{{ gt('generated.reservation-public-share.016') }}</a>
             <a
               v-if="whatsappContactUrl"
               :href="whatsappContactUrl"
@@ -263,13 +262,13 @@ async function shareCurrentPage(): Promise<void> {
               WhatsApp
             </a>
           </nav>
-          <button type="button" @click="shareCurrentPage">转发订位链接</button>
+          <button type="button" @click="shareCurrentPage">{{ gt('generated.reservation-public-share.017') }}</button>
           <p v-if="shareStatusText" role="status">{{ shareStatusText }}</p>
           <textarea
             v-if="fallbackUrl"
             readonly
             :value="fallbackUrl"
-            aria-label="订位分享链接"
+            :aria-label="gt('generated.reservation-public-share.018')"
           ></textarea>
         </footer>
       </template>

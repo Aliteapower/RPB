@@ -10,20 +10,20 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void staffHomeShowsTodayOverviewInsteadOfReceptionActionGrid() throws Exception {
-        String staffHome = Files.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
+        String staffHome = FrontendSourceSupport.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
 
         assertThat(staffHome)
             .contains("getStaffHomeOverview")
             .contains("StaffHomeTopBar")
             .contains("StaffBottomNav")
             .contains("displayedBusinessDate")
-            .contains("label: '今日预约'")
-            .contains("label: '已到店'")
-            .contains("label: '当前排队'")
-            .contains("label: '可用桌台'")
-            .contains("aria-label=\"今日概览\"")
-            .contains("aria-label=\"当前排队人数组\"")
-            .contains("aria-label=\"桌台状态\"")
+            .contains("labelKey: 'staffHome.kpis.reservations'")
+            .contains("labelKey: 'staffHome.kpis.arrived'")
+            .contains("labelKey: 'staffHome.kpis.queue'")
+            .contains("labelKey: 'staffHome.kpis.tables'")
+            .contains("staffHome.aria.todayOverview")
+            .contains("staffHome.aria.queuePartyGroups")
+            .contains("staffHome.aria.tableStatus")
             .contains("active-tab=\"home\"");
 
         assertThat(staffHome)
@@ -36,7 +36,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void queueListProvidesOneTapCallSkipCancelAndSeatWithoutCopyIdWorkflow() throws Exception {
-        String queueList = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String queueList = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
 
         assertThat(queueList)
             .contains("callQueueTicket")
@@ -57,7 +57,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void calledQueueTicketShowsRepeatCallBeforeSkip() throws Exception {
-        String queueList = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String queueList = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
 
         assertThat(queueList)
             .contains("['waiting', 'called', 'rejoined'].includes(item.queueTicketStatus)")
@@ -67,7 +67,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void queueListUsesCurrentReceptionWorkbenchUiInsteadOfLegacyNarrowPage() throws Exception {
-        String queueList = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String queueList = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
 
         assertThat(queueList)
             .contains("StaffHomeTopBar")
@@ -98,9 +98,9 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void queueListProvidesReceptionFiltersForTableAreaPartySizeAndPhone() throws Exception {
-        String queueList = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
-        String apiClient = Files.readString(Path.of("src", "api", "queueTicketListApi.ts"));
-        String types = Files.readString(Path.of("src", "types", "queueTicketList.ts"));
+        String queueList = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String apiClient = FrontendSourceSupport.readString(Path.of("src", "api", "queueTicketListApi.ts"));
+        String types = FrontendSourceSupport.readString(Path.of("src", "types", "queueTicketList.ts"));
 
         assertThat(queueList)
             .contains("fetchTableResources")
@@ -140,10 +140,10 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void queueListUsesStableDisplayNumberGuestFallbackAndResourceLabel() throws Exception {
-        String queueList = Files.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
-        String apiClient = Files.readString(Path.of("src", "api", "queueTicketListApi.ts"));
-        String types = Files.readString(Path.of("src", "types", "queueTicketList.ts"));
-        String reservationItem = Files.readString(
+        String queueList = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String apiClient = FrontendSourceSupport.readString(Path.of("src", "api", "queueTicketListApi.ts"));
+        String types = FrontendSourceSupport.readString(Path.of("src", "types", "queueTicketList.ts"));
+        String reservationItem = FrontendSourceSupport.readString(
             Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue")
         );
 
@@ -172,7 +172,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void routesUseNewWalkInQueuePageAndOldReservationCreatePageIsRemoved() throws Exception {
-        String router = Files.readString(Path.of("src", "router", "index.ts"));
+        String router = FrontendSourceSupport.readString(Path.of("src", "router", "index.ts"));
 
         assertThat(router)
             .contains("WalkInQueuePage")
@@ -185,7 +185,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void walkInQueuePageUsesNewQuickTicketWorkbenchAndRedirectsToQueueList() throws Exception {
-        String walkInQueue = Files.readString(Path.of("src", "pages", "WalkInQueuePage.vue"));
+        String walkInQueue = FrontendSourceSupport.readString(Path.of("src", "pages", "WalkInQueuePage.vue"));
 
         assertThat(walkInQueue)
             .contains("StaffHomeTopBar")
@@ -210,7 +210,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void reservationQueuePageKeepsSingleWalkInQueueEntryInEmptyState() throws Exception {
-        String reservationQueue = Files.readString(Path.of("src", "pages", "ReservationArrivedToQueuePage.vue"));
+        String reservationQueue = FrontendSourceSupport.readString(Path.of("src", "pages", "ReservationArrivedToQueuePage.vue"));
 
         assertThat(reservationQueue)
             .contains("walkInQueueRoute")
@@ -224,7 +224,7 @@ class StaffReceptionClosedLoopUiValidationTest {
 
     @Test
     void localRuntimeRestartGuideIncludesClosedLoopQueuePermissions() throws Exception {
-        String guide = Files.readString(Path.of("docs", "development", "LOCAL_RUNTIME_QUICK_RESTART_GUIDE.md"));
+        String guide = FrontendSourceSupport.readString(Path.of("docs", "development", "LOCAL_RUNTIME_QUICK_RESTART_GUIDE.md"));
 
         assertThat(guide)
             .contains("'walkin.queue.create'")

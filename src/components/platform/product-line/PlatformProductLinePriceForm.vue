@@ -20,37 +20,37 @@ const emit = defineEmits<{
 
 <template>
   <form class="price-form-module" @submit.prevent="emit('save')">
-    <h3>定价</h3>
+    <h3>{{ $t('platform.productLines.priceForm.title') }}</h3>
     <label>
-      <span>月付价格</span>
+      <span>{{ $t('platform.productLines.priceForm.monthlyAmount') }}</span>
       <input v-model.number="form.monthlyAmount" type="number" min="0" step="0.01" :disabled="disabled">
     </label>
     <label>
-      <span>年付价格</span>
+      <span>{{ $t('platform.productLines.priceForm.yearlyAmount') }}</span>
       <input v-model.number="form.yearlyAmount" type="number" min="0" step="0.01" :disabled="disabled">
     </label>
     <label>
-      <span>币种</span>
+      <span>{{ $t('platform.productLines.priceForm.currency') }}</span>
       <input v-model.trim="form.currency" maxlength="3" :disabled="disabled">
     </label>
     <div class="price-status-grid">
       <label>
-        <span>月付状态</span>
+        <span>{{ $t('platform.productLines.priceForm.monthlyStatus') }}</span>
         <select v-model="form.monthlyStatus" :disabled="disabled">
-          <option value="active">启用</option>
-          <option value="disabled">停用</option>
+          <option value="active">{{ $t('platform.productLines.status.active') }}</option>
+          <option value="disabled">{{ $t('platform.productLines.status.disabled') }}</option>
         </select>
       </label>
       <label>
-        <span>年付状态</span>
+        <span>{{ $t('platform.productLines.priceForm.yearlyStatus') }}</span>
         <select v-model="form.yearlyStatus" :disabled="disabled">
-          <option value="active">启用</option>
-          <option value="disabled">停用</option>
+          <option value="active">{{ $t('platform.productLines.status.active') }}</option>
+          <option value="disabled">{{ $t('platform.productLines.status.disabled') }}</option>
         </select>
       </label>
     </div>
     <button class="primary-button" type="submit" :disabled="saving || disabled">
-      {{ saving ? '保存中' : '保存定价' }}
+      {{ saving ? $t('common.actions.saving') : $t('platform.productLines.priceForm.save') }}
     </button>
   </form>
 </template>

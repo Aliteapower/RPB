@@ -26,6 +26,7 @@ class ReservationShareInfoUiValidationTest {
         Path publicShareTypePath = Path.of("src", "types", "reservationPublicShare.ts");
         Path publicSharePagePath = Path.of("src", "pages", "ReservationPublicSharePage.vue");
         Path localSecurityPath = Path.of("src", "main", "java", "com", "rpb", "reservation", "walkin", "auth", "LocalRuntimeSecurityConfiguration.java");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(adminPagePath).exists();
         assertThat(shareApiPath).exists();
@@ -36,22 +37,23 @@ class ReservationShareInfoUiValidationTest {
         assertThat(shareLauncherPath).exists();
         assertThat(channelSharePayloadPath).exists();
 
-        String routerSource = Files.readString(routerPath);
-        String navSource = Files.readString(navPath);
-        String profilePageSource = Files.readString(profilePagePath);
-        String adminPageSource = Files.readString(adminPagePath);
-        String createDialogSource = Files.readString(createDialogPath);
-        String todayItemSource = Files.readString(todayItemPath);
-        String copyPanelSource = Files.readString(copyPanelPath);
-        String shareLauncherSource = Files.readString(shareLauncherPath);
-        String channelSharePayloadSource = Files.readString(channelSharePayloadPath);
-        String shareApiSource = Files.readString(shareApiPath);
-        String shareInfoTypeSource = Files.readString(shareInfoTypePath);
-        String adminApiSource = Files.readString(adminApiPath);
-        String publicShareApiSource = Files.readString(publicShareApiPath);
-        String publicShareTypeSource = Files.readString(publicShareTypePath);
-        String publicSharePageSource = Files.readString(publicSharePagePath);
-        String localSecuritySource = Files.readString(localSecurityPath);
+        String routerSource = FrontendSourceSupport.readString(routerPath);
+        String navSource = FrontendSourceSupport.readString(navPath);
+        String profilePageSource = FrontendSourceSupport.readString(profilePagePath);
+        String adminPageSource = FrontendSourceSupport.readString(adminPagePath);
+        String createDialogSource = FrontendSourceSupport.readString(createDialogPath);
+        String todayItemSource = FrontendSourceSupport.readString(todayItemPath);
+        String copyPanelSource = FrontendSourceSupport.readString(copyPanelPath);
+        String shareLauncherSource = FrontendSourceSupport.readString(shareLauncherPath);
+        String channelSharePayloadSource = FrontendSourceSupport.readString(channelSharePayloadPath);
+        String shareApiSource = FrontendSourceSupport.readString(shareApiPath);
+        String shareInfoTypeSource = FrontendSourceSupport.readString(shareInfoTypePath);
+        String adminApiSource = FrontendSourceSupport.readString(adminApiPath);
+        String publicShareApiSource = FrontendSourceSupport.readString(publicShareApiPath);
+        String publicShareTypeSource = FrontendSourceSupport.readString(publicShareTypePath);
+        String publicSharePageSource = FrontendSourceSupport.readString(publicSharePagePath);
+        String localSecuritySource = FrontendSourceSupport.readString(localSecurityPath);
+        String zhSource = FrontendSourceSupport.readString(zhPath);
 
         assertThat(routerSource)
             .contains("ReservationPublicSharePage")
@@ -62,8 +64,10 @@ class ReservationShareInfoUiValidationTest {
             .contains("name: 'tenant-admin-reservation-share'")
             .contains("meta: { public: true }");
         assertThat(navSource)
-            .contains("/stores/${storeId}/admin/share-template")
-            .contains("订位分享");
+            .contains("/admin/share-template")
+            .contains("nav.tenant.shareTemplate");
+        assertThat(zhSource)
+            .contains("shareTemplate: '订位分享'");
         assertThat(profilePageSource)
             .contains("getTenantAdminShareProfile")
             .contains("updateTenantAdminShareProfile")
@@ -94,8 +98,8 @@ class ReservationShareInfoUiValidationTest {
             .contains("v-model.trim=\"form.shareEmail\"")
             .contains("v-model.trim=\"form.whatsappBusinessPhoneE164\"")
             .contains("v-model.trim=\"form.reservationShareNote\"")
-            .contains("点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到分享模板中")
-            .contains("保存后的模板会在新的订位分享中生效")
+            .contains("generated.tenant-admin-reservation-share.018")
+            .contains("generated.tenant-admin-reservation-share.019")
             .doesNotContain("ReservationPublicSharePage")
             .doesNotContain("getReservationPublicShare")
             .doesNotContain("/reservation-share/")
@@ -137,12 +141,12 @@ class ReservationShareInfoUiValidationTest {
             .contains("wechat-requested")
             .contains("system-share-requested")
             .contains("copy-requested")
-            .contains("WhatsApp发送")
-            .contains("微信发送")
-            .contains("系统转发")
-            .contains("复制链接")
-            .contains("statusText: '已准备链接'")
-            .contains("已准备链接");
+            .contains("reservationWorkbench.share.whatsapp")
+            .contains("reservationWorkbench.share.wechat")
+            .contains("reservationWorkbench.share.system")
+            .contains("reservationWorkbench.share.copy")
+            .contains("reservationWorkbench.share.prepared")
+            .contains("resolvedStatusText");
         assertThat(shareLauncherSource)
             .contains("shareLinkOrCopy")
             .contains("canUseNativeShare")
@@ -257,7 +261,7 @@ class ReservationShareInfoUiValidationTest {
 
     private static String readUnchecked(Path path) {
         try {
-            return Files.readString(path);
+            return FrontendSourceSupport.readString(path);
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }

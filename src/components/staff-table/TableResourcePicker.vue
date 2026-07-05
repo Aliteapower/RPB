@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   fetchTableResources,
@@ -44,19 +45,30 @@ const isLoading = ref(false)
 const apiError = ref<TableResourceApiErrorResponse | null>(null)
 const selectionMode = ref<SelectionMode>('single')
 const selectedArea = ref('all')
+const { t } = useI18n()
 let loadSequence = 0
 
-const statusLabels: Record<string, string> = {
-  available: '可用',
-  occupied: '占用',
-  cleaning: '清台中',
-  locked: '锁定',
-  reserved: '预留',
-  inactive: '停用',
-  active: '分组',
-  created: '已创建',
-  released: '已释放',
-  ended: '已结束'
+const statusLabelKeys: Record<string, string> = {
+  available: 'staffControls.tablePicker.status.available',
+  occupied: 'staffControls.tablePicker.status.occupied',
+  cleaning: 'staffControls.tablePicker.status.cleaning',
+  locked: 'staffControls.tablePicker.status.locked',
+  reserved: 'staffControls.tablePicker.status.reserved',
+  inactive: 'staffControls.tablePicker.status.inactive',
+  active: 'staffControls.tablePicker.status.active',
+  created: 'staffControls.tablePicker.status.created',
+  released: 'staffControls.tablePicker.status.released',
+  ended: 'staffControls.tablePicker.status.ended'
+}
+
+const unavailableReasonLabelKeys: Record<string, string> = {
+  status_unavailable: 'staffControls.tablePicker.unavailable.statusUnavailable',
+  capacity_mismatch: 'staffControls.tablePicker.unavailable.capacityMismatch',
+  locked: 'staffControls.tablePicker.unavailable.locked',
+  occupied: 'staffControls.tablePicker.unavailable.occupied',
+  cleaning: 'staffControls.tablePicker.unavailable.cleaning',
+  reservation_preassigned: 'staffControls.tablePicker.unavailable.reservationPreassigned',
+  temporary_group_member: 'staffControls.tablePicker.unavailable.temporaryGroupMember'
 }
 
 const displayableResources = computed(() =>
@@ -105,7 +117,7 @@ const areaFilterOptions = computed<AreaFilterOption[]>(() => {
   }
 
   return [
-    { value: 'all', label: '全部分区', count: tableResources.value.length },
+    { value: 'all', label: t('staffControls.tablePicker.allAreas'), count: tableResources.value.length },
     ...Array.from(areaCounts, ([label, count]) => ({ value: label, label, count }))
   ]
 })
@@ -139,15 +151,19 @@ const showEmpty = computed(
 )
 const emptyText = computed(() => {
   if (selectedArea.value !== 'all') {
-    return props.availableOnly ? '当前分区暂无可用桌台。' : '当前分区暂无桌台。'
+    return props.availableOnly
+      ? t('staffControls.tablePicker.empty.currentAreaNoAvailable')
+      : t('staffControls.tablePicker.empty.currentAreaNoTables')
   }
 
-  return props.availableOnly ? '暂无可用桌台。' : '暂无桌台，请先在后台配置桌台。'
+  return props.availableOnly
+    ? t('staffControls.tablePicker.empty.noAvailable')
+    : t('staffControls.tablePicker.empty.noTables')
 })
 const pickerSubtitle = computed(() =>
   selectionMode.value === 'temporary'
-    ? `临时组合 · 已选 ${temporarySelectionCount.value} 张`
-    : '后台已配置资源'
+    ? t('staffControls.tablePicker.subtitle.temporary', { count: temporarySelectionCount.value })
+    : t('staffControls.tablePicker.subtitle.configured')
 )
 const shouldShowSelectionModeControls = computed(
   () => props.temporarySelectionEnabled && props.showSelectionModeControls !== false
@@ -350,25 +366,29 @@ function isTemporaryModeSavedGroup(resource: TableResourceItem): boolean {
 }
 
 function capacityText(resource: TableResourceItem): string {
-  return `${resource.capacityMin}-${resource.capacityMax}人`
+  return t('staffControls.tablePicker.capacityRange', {
+    min: resource.capacityMin,
+    max: resource.capacityMax
+  })
 }
 
 function statusText(resource: TableResourceItem): string {
   if (matchesRequiredResource(resource)) {
     return resource.selectable || canUseRequiredPreassignedResource(resource)
-      ? '预约指定'
+      ? t('staffControls.tablePicker.requiredResource')
       : resourceUnavailableReasonText(resource)
   }
 
   if (hasRequiredResource.value) {
-    return '需使用预约指定桌台'
+    return t('staffControls.tablePicker.mustUseRequiredResource')
   }
 
   return resource.selectable ? statusLabel(resource.status) : resourceUnavailableReasonText(resource)
 }
 
 function statusLabel(status: string): string {
-  return statusLabels[status] ?? status
+  const key = statusLabelKeys[status]
+  return key ? t(key) : status
 }
 
 function isTemporaryGroupMember(resource: TableResourceItem): boolean {
@@ -398,27 +418,24 @@ function tableIdentityKeys(resource: TableResourceItem): string[] {
 
 function resourceUnavailableReasonText(resource: TableResourceItem): string {
   if (isTemporaryGroupMember(resource)) {
-    return '临时组占用'
+    return t('staffControls.tablePicker.unavailable.temporaryGroupMember')
   }
 
-  const reasonLabels: Record<string, string> = {
-    status_unavailable: '当前状态不可选',
-    capacity_mismatch: '人数不匹配',
-    locked: '桌台已锁定',
-    occupied: '桌台已占用',
-    cleaning: '正在清台',
-    reservation_preassigned: '已被预约预留',
-    temporary_group_member: '临时组占用'
-  }
   const reason = resource.selectionDisabledReason?.trim()
-  const reasonText = reason ? reasonLabels[reason] ?? '当前不可选' : '当前不可选'
+  const reasonKey = reason ? unavailableReasonLabelKeys[reason] : undefined
+  const reasonText = reasonKey
+    ? t(reasonKey)
+    : t('staffControls.tablePicker.unavailable.default')
 
-  return `${statusLabel(resource.status)}，${reasonText}`
+  return t('staffControls.tablePicker.unavailable.summary', {
+    status: statusLabel(resource.status),
+    reason: reasonText
+  })
 }
 
 function areaTitle(resource: TableResourceItem): string {
   const areaName = resource.areaName?.trim()
-  return areaName || '未分区'
+  return areaName || t('staffControls.tablePicker.unassignedArea')
 }
 
 function createLocalError(code: string, messageKey: string): TableResourceApiErrorResponse {
@@ -434,17 +451,17 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
 </script>
 
 <template>
-  <section class="table-picker" aria-label="桌号及分组选取">
+  <section class="table-picker" :aria-label="t('staffControls.tablePicker.aria')">
     <header class="table-picker__header">
       <div>
-        <p>桌号及分组</p>
+        <p>{{ t('staffControls.tablePicker.title') }}</p>
         <strong>{{ pickerSubtitle }}</strong>
       </div>
       <div class="table-picker__header-actions">
         <div
           v-if="shouldShowSelectionModeControls"
           class="table-picker__mode"
-          aria-label="资源选择模式"
+          :aria-label="t('staffControls.tablePicker.selectionModeAria')"
           role="group"
         >
           <button
@@ -453,7 +470,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
             :aria-pressed="selectionMode === 'single'"
             @click="switchSelectionMode('single')"
           >
-            单桌/桌组
+            {{ t('staffControls.tablePicker.singleMode') }}
           </button>
           <button
             type="button"
@@ -461,15 +478,17 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
             :aria-pressed="selectionMode === 'temporary'"
             @click="switchSelectionMode('temporary')"
           >
-            临时组合
+            {{ t('staffControls.tablePicker.temporaryMode') }}
           </button>
         </div>
-        <button class="table-picker__refresh" type="button" :disabled="isLoading" @click="loadResources">刷新</button>
+        <button class="table-picker__refresh" type="button" :disabled="isLoading" @click="loadResources">
+          {{ t('common.actions.refresh') }}
+        </button>
       </div>
     </header>
 
     <section v-if="isLoading" class="table-picker__state" aria-live="polite">
-      正在读取桌台资源
+      {{ t('staffControls.tablePicker.loading') }}
     </section>
 
     <section v-if="apiError" class="table-picker__state table-picker__state--error" aria-live="assertive">
@@ -480,8 +499,8 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       {{ emptyText }}
     </section>
 
-    <section v-if="areaFilterOptions.length > 1" class="table-picker__area-filter" aria-label="桌台分区">
-      <span>桌台分区</span>
+    <section v-if="areaFilterOptions.length > 1" class="table-picker__area-filter" :aria-label="t('staffControls.tablePicker.areaFilterAria')">
+      <span>{{ t('staffControls.tablePicker.areaFilter') }}</span>
       <div>
         <button
           v-for="option in areaFilterOptions"
@@ -501,7 +520,7 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       v-for="group in groupedTableResources"
       :key="group.title"
       class="table-picker__section"
-      :aria-label="`${group.title}桌号`"
+      :aria-label="t('staffControls.tablePicker.tableGroupAria', { area: group.title })"
     >
       <p class="table-picker__section-title">{{ group.title }}</p>
       <div class="table-picker__grid">
@@ -525,8 +544,8 @@ function createLocalError(code: string, messageKey: string): TableResourceApiErr
       </div>
     </section>
 
-    <section v-if="showGroupResources" class="table-picker__section" aria-label="桌组">
-      <p class="table-picker__section-title">分组</p>
+    <section v-if="showGroupResources" class="table-picker__section" :aria-label="t('staffControls.tablePicker.groupAria')">
+      <p class="table-picker__section-title">{{ t('staffControls.tablePicker.groups') }}</p>
       <div class="table-picker__grid">
         <button
           v-for="resource in visibleGroupResources"

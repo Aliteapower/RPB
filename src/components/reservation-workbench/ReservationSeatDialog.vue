@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   ReservationArrivedDirectSeatingApiError,
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   seated: [response: SeatArrivedReservationResponse]
 }>()
 
+const { t } = useI18n()
 const selectedTableId = ref('')
 const selectedTableGroupId = ref('')
 const selectedTemporaryTableIds = ref<string[]>([])
@@ -34,7 +36,7 @@ const customerLabel = computed(() => {
   const item = props.item
 
   if (!item) {
-    return '当前预约'
+    return t('reservationWorkbench.dialogs.currentReservation')
   }
 
   const values = [item.customerName, item.customerNickname].filter(Boolean)
@@ -45,11 +47,13 @@ const assignedResourceLabel = computed(() => {
   const item = props.item
 
   if (!item?.assignedResourceId) {
-    return '未指定'
+    return t('reservationWorkbench.dialogs.unassigned')
   }
 
   const code = item.assignedResourceCode?.trim() || item.assignedResourceId
-  return item.assignedResourceType === 'table_group' ? `桌组 ${code}` : `桌号 ${code}`
+  return item.assignedResourceType === 'table_group'
+    ? t('reservationWorkbench.dialogs.tableGroupWithCode', { code })
+    : t('reservationWorkbench.dialogs.tableWithCode', { code })
 })
 const canSubmit = computed(
   () =>
@@ -219,7 +223,7 @@ function createLocalError(
     <section
       v-if="open"
       class="reservation-seat-dialog"
-      aria-label="选择桌号入桌弹窗"
+      :aria-label="$t('reservationWorkbench.dialogs.seatAria')"
       aria-modal="true"
       role="dialog"
     >
@@ -227,18 +231,23 @@ function createLocalError(
 
       <form class="reservation-seat-dialog__panel" @submit.prevent="submit">
         <header>
-          <h2>选择桌号（入桌）</h2>
-          <button type="button" aria-label="关闭选择桌号" :disabled="isSubmitting" @click="close">
+          <h2>{{ $t('reservationWorkbench.dialogs.seatTitle') }}</h2>
+          <button
+            type="button"
+            :aria-label="$t('reservationWorkbench.dialogs.seatClose')"
+            :disabled="isSubmitting"
+            @click="close"
+          >
             ×
           </button>
         </header>
 
         <p class="reservation-seat-dialog__summary">
-          为 {{ customerLabel }}（预约）分配座位
+          {{ $t('reservationWorkbench.dialogs.seatSubject', { customer: customerLabel }) }}
         </p>
 
         <section v-if="hasAssignedResource" class="reservation-seat-dialog__assigned-resource">
-          <span>预约指定</span>
+          <span>{{ $t('reservationWorkbench.dialogs.requiredResource') }}</span>
           <strong>{{ assignedResourceLabel }}</strong>
         </section>
 
@@ -257,17 +266,17 @@ function createLocalError(
         />
 
         <section v-if="apiError" class="reservation-seat-dialog__error" aria-live="assertive">
-          <h3>入桌失败</h3>
-          <p>错误代码：{{ apiError.error.code }}</p>
-          <p>消息键：{{ apiError.error.messageKey }}</p>
+          <h3>{{ $t('reservationWorkbench.dialogs.seatFailed') }}</h3>
+          <p>{{ $t('reservationWorkbench.dialogs.errorCode', { code: apiError.error.code }) }}</p>
+          <p>{{ $t('reservationWorkbench.dialogs.messageKey', { messageKey: apiError.error.messageKey }) }}</p>
         </section>
 
         <footer>
           <button class="reservation-seat-dialog__save" :disabled="!canSubmit" type="submit">
-            {{ isSubmitting ? '入桌中...' : '确认入桌' }}
+            {{ isSubmitting ? $t('reservationWorkbench.dialogs.seatSubmitting') : $t('reservationWorkbench.dialogs.confirmSeat') }}
           </button>
           <button class="reservation-seat-dialog__cancel" type="button" :disabled="isSubmitting" @click="close">
-            取消
+            {{ $t('common.actions.cancel') }}
           </button>
         </footer>
       </form>
@@ -322,7 +331,7 @@ function createLocalError(
 
 .reservation-seat-dialog__panel h2::before {
   color: #8b5e5e;
-  content: '椅';
+  content: '▦';
   font-size: 1rem;
   margin-right: 8px;
 }

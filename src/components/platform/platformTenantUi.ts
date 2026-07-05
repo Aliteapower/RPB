@@ -4,7 +4,7 @@ export type TenantFilter = 'all' | 'active' | 'deleted'
 
 export interface TenantStatusOption {
   value: TenantStatus
-  label: string
+  labelKey: string
 }
 
 export interface PlatformTenantFormModel {

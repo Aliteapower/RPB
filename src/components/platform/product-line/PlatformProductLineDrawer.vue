@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductLinePriceStatus, ProductLineStatus } from '../../../types/platformProductLineBilling'
+import type { ProductLineEntryRouteOption } from './productLineCatalog'
 import PlatformProductLinePriceForm from './PlatformProductLinePriceForm.vue'
 
 type ProductLineEditorMode = 'create' | 'edit'
@@ -25,11 +26,7 @@ interface ProductLinePriceFormState {
 defineProps<{
   appKeyValid: boolean
   computedAppKey: string
-  entryRouteOptions: ReadonlyArray<{
-    value: string
-    label: string
-    description: string
-  }>
+  entryRouteOptions: ReadonlyArray<ProductLineEntryRouteOption>
   form: ProductLineForm
   loading: boolean
   mode: ProductLineEditorMode
@@ -51,25 +48,38 @@ const emit = defineEmits<{
     <div
       v-if="open"
       class="drawer-backdrop"
-      aria-label="关闭产品线编辑"
+      :aria-label="$t('platform.productLines.drawer.closeAria')"
       @click.self="emit('close')"
     >
       <aside class="product-line-drawer" role="dialog" aria-modal="true" aria-labelledby="product-line-drawer-title">
         <header class="drawer-header">
           <div>
-            <span>{{ mode === 'create' ? '新增产品线' : '产品线' }}</span>
-            <h2 id="product-line-drawer-title">{{ mode === 'create' ? '登记产品线' : form.displayName }}</h2>
+            <span>{{ mode === 'create' ? $t('platform.productLines.drawer.createLabel') : $t('platform.productLines.drawer.editLabel') }}</span>
+            <h2 id="product-line-drawer-title">
+              {{ mode === 'create' ? $t('platform.productLines.drawer.createTitle') : form.displayName }}
+            </h2>
           </div>
-          <button class="drawer-close-button" type="button" aria-label="关闭" @click="emit('close')">关闭</button>
+          <button
+            class="drawer-close-button"
+            type="button"
+            :aria-label="$t('platform.productLines.drawer.close')"
+            @click="emit('close')"
+          >
+            {{ $t('platform.productLines.drawer.close') }}
+          </button>
         </header>
 
         <div class="drawer-body">
           <form class="edit-panel" @submit.prevent="emit('save')">
-            <h3>产品线设置</h3>
+            <h3>{{ $t('platform.productLines.drawer.settings') }}</h3>
 
             <label v-if="mode === 'create'">
-              <span>产品线代码</span>
-              <input v-model.trim="form.productCode" placeholder="例如 crm suite" required>
+              <span>{{ $t('platform.productLines.drawer.productCode') }}</span>
+              <input
+                v-model.trim="form.productCode"
+                :placeholder="$t('platform.productLines.drawer.productCodePlaceholder')"
+                required
+              >
             </label>
 
             <label>
@@ -77,48 +87,54 @@ const emit = defineEmits<{
               <input :value="mode === 'create' ? computedAppKey : form.appKey" disabled>
             </label>
             <p v-if="mode === 'create' && !appKeyValid" class="field-error">
-              请输入英文开头的产品线代码，系统会生成 snake_case App Key。
+              {{ $t('platform.productLines.drawer.appKeyHint') }}
             </p>
 
             <label>
-              <span>展示名称</span>
+              <span>{{ $t('platform.productLines.drawer.displayName') }}</span>
               <input v-model.trim="form.displayName" required>
             </label>
             <label>
-              <span>状态</span>
+              <span>{{ $t('platform.productLines.drawer.status') }}</span>
               <select v-model="form.status">
-                <option value="active">启用</option>
-                <option value="disabled">停用</option>
+                <option value="active">{{ $t('platform.productLines.status.active') }}</option>
+                <option value="disabled">{{ $t('platform.productLines.status.disabled') }}</option>
               </select>
             </label>
             <label>
-              <span>默认入口</span>
+              <span>{{ $t('platform.productLines.drawer.defaultEntry') }}</span>
               <select v-model="form.defaultEntryRoute">
                 <option
                   v-for="option in entryRouteOptions"
                   :key="option.value"
                   :value="option.value"
                 >
-                  {{ option.label }}
+                  {{ $t(option.labelKey) }}
                 </option>
               </select>
             </label>
             <p class="form-note">
-              {{ entryRouteOptions.find(option => option.value === form.defaultEntryRoute)?.description }}
+              {{ $t(entryRouteOptions.find(option => option.value === form.defaultEntryRoute)?.descriptionKey ?? '') }}
             </p>
             <label>
-              <span>排序</span>
+              <span>{{ $t('platform.productLines.drawer.sortOrder') }}</span>
               <input v-model.number="form.sortOrder" type="number" min="0">
             </label>
             <label>
-              <span>说明</span>
+              <span>{{ $t('platform.productLines.drawer.description') }}</span>
               <textarea v-model.trim="form.description" rows="4" />
             </label>
             <p class="form-note">
-              {{ mode === 'create' ? '新增产品线默认建议先停用，后续业务开发完成后再启用给租户选择。' : '停用产品线会影响所有已购买该产品线的租户。' }}
+              {{ mode === 'create' ? $t('platform.productLines.drawer.createNote') : $t('platform.productLines.drawer.editNote') }}
             </p>
             <button class="primary-button" type="submit" :disabled="saving || loading || (mode === 'create' && !appKeyValid)">
-              {{ saving ? '保存中' : (mode === 'create' ? '创建产品线' : '保存产品线') }}
+              {{
+                saving
+                  ? $t('common.actions.saving')
+                  : (mode === 'create'
+                    ? $t('platform.productLines.drawer.createAction')
+                    : $t('platform.productLines.drawer.saveAction'))
+              }}
             </button>
           </form>
 

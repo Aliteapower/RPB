@@ -19,6 +19,9 @@ import {
   buildReservationShareTemplatePreviewVariables,
   renderReservationShareTemplatePreview
 } from '../utils/reservationShareTemplatePreview'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const auth = useAuthSessionStore()
 const loading = ref(false)
@@ -74,7 +77,7 @@ async function saveSeed(): Promise<void> {
   try {
     const response = await updatePlatformReservationShareTemplateSeed(toMutation())
     applySeed(response.seed)
-    savedText.value = '已保存'
+    savedText.value = gt('generated.platform-reservation-share-template-seed.021')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -118,25 +121,25 @@ function insertVariable(variable: string): void {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformReservationShareTemplateSeedApiError)) {
-    return '操作失败'
+    return gt('generated.platform-reservation-share-template-seed.022')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.platform-reservation-share-template-seed.023')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有平台后台权限'
+    return gt('generated.platform-reservation-share-template-seed.024')
   }
   if (error.response.error.code === 'TEMPLATE_UNKNOWN_VARIABLE') {
-    return '模板包含未支持的变量'
+    return gt('generated.platform-reservation-share-template-seed.025')
   }
   if (error.response.error.code === 'VERSION_CONFLICT') {
-    return '模板已被更新，请刷新后重试'
+    return gt('generated.platform-reservation-share-template-seed.026')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查必填项'
+    return gt('generated.platform-reservation-share-template-seed.027')
   }
-  return '操作失败'
+  return gt('generated.platform-reservation-share-template-seed.028')
 }
 
 function platformMapUrl(profile: PlatformProfile): string | null {
@@ -155,51 +158,49 @@ function platformMapUrl(profile: PlatformProfile): string | null {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>平台种子模板</span>
-          <h1>平台预约确认模板</h1>
+          <span>{{ gt('generated.platform-reservation-share-template-seed.001') }}</span>
+          <h1>{{ gt('generated.platform-reservation-share-template-seed.002') }}</h1>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.platform-reservation-share-template-seed.003') }}</p>
 
-      <form v-else class="settings-panel" aria-label="平台预约确认模板" @submit.prevent="saveSeed">
+      <form v-else class="settings-panel" :aria-label="gt('generated.platform-reservation-share-template-seed.004')" @submit.prevent="saveSeed">
         <div class="section-heading">
-          <h2>平台种子模板</h2>
-          <button class="primary-button" type="submit" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
+          <h2>{{ gt('generated.platform-reservation-share-template-seed.005') }}</h2>
+          <button class="primary-button" type="submit" :disabled="saving">{{ saving ? gt('generated.platform-reservation-share-template-seed.006') : gt('generated.platform-reservation-share-template-seed.007') }}</button>
         </div>
 
         <div class="profile-grid">
           <label>
-            <span>模板键</span>
+            <span>{{ gt('generated.platform-reservation-share-template-seed.008') }}</span>
             <input v-model="form.seedKey" disabled autocomplete="off" />
           </label>
           <label>
-            <span>版本</span>
+            <span>{{ gt('generated.platform-reservation-share-template-seed.009') }}</span>
             <input v-model.number="form.version" disabled autocomplete="off" />
           </label>
           <label>
-            <span>显示名称</span>
+            <span>{{ gt('generated.platform-reservation-share-template-seed.010') }}</span>
             <input v-model.trim="form.displayName" required maxlength="120" autocomplete="off" />
           </label>
           <label>
-            <span>语言</span>
+            <span>{{ gt('generated.platform-reservation-share-template-seed.011') }}</span>
             <input v-model.trim="form.locale" required maxlength="20" autocomplete="off" />
           </label>
           <label>
-            <span>状态</span>
+            <span>{{ gt('generated.platform-reservation-share-template-seed.012') }}</span>
             <select v-model="form.status">
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
+              <option value="active">{{ gt('generated.platform-reservation-share-template-seed.013') }}</option>
+              <option value="disabled">{{ gt('generated.platform-reservation-share-template-seed.014') }}</option>
             </select>
           </label>
         </div>
 
-        <section class="template-tools" aria-label="模板变量">
-          <p class="template-tools__hint">
-            点击字段会把 &#123;&#123;字段名&#125;&#125; 加入到模板内容中；调整模板后请保存，保存后的平台种子模板会用于租户默认订位分享模板。
-          </p>
+        <section class="template-tools" :aria-label="gt('generated.platform-reservation-share-template-seed.015')">
+          <p class="template-tools__hint"> {{ gt('generated.platform-reservation-share-template-seed.016') }} </p>
           <div class="template-tools__buttons">
             <button
               v-for="variable in availableVariables"
@@ -214,14 +215,14 @@ function platformMapUrl(profile: PlatformProfile): string | null {
 
         <section class="template-layout">
           <label class="template-editor">
-            <span>模板内容</span>
+            <span>{{ gt('generated.platform-reservation-share-template-seed.017') }}</span>
             <textarea v-model="form.templateText" rows="22" required></textarea>
           </label>
 
-          <aside class="preview-panel" aria-label="模板预览">
+          <aside class="preview-panel" :aria-label="gt('generated.platform-reservation-share-template-seed.018')">
             <div class="preview-heading">
-              <span>模板预览</span>
-              <strong>A01 / 2位 / 15-07-2026</strong>
+              <span>{{ gt('generated.platform-reservation-share-template-seed.019') }}</span>
+              <strong>{{ gt('generated.platform-reservation-share-template-seed.020') }}</strong>
             </div>
             <pre>{{ previewText }}</pre>
           </aside>

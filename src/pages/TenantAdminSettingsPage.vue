@@ -19,6 +19,9 @@ import type {
   ReservationMealPeriod,
   ReservationMealPeriodMutation
 } from '../types/reservationMealPeriod'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -84,7 +87,7 @@ async function submitMealPeriods(): Promise<void> {
       periods: mealPeriodForm.usePlatformSeed ? [] : mealPeriodForm.periods.map(toMutation)
     })
     applyMealPeriodSettings(response.usePlatformSeed, response.platformPeriods, response.storePeriods)
-    savedText.value = '已保存'
+    savedText.value = gt('generated.tenant-admin-settings.038')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -107,7 +110,7 @@ function addPeriod(): void {
   mealPeriodForm.usePlatformSeed = false
   mealPeriodForm.periods.push({
     periodKey: `period_${index + 1}`,
-    displayName: '新餐段',
+    displayName: gt('generated.tenant-admin-settings.039'),
     startLocalTime: '11:00',
     endLocalTime: '15:00',
     crossesNextDay: false,
@@ -185,7 +188,7 @@ async function submitSettings(): Promise<void> {
       expectedDiningMinutes: Number(form.expectedDiningMinutes)
     })
     Object.assign(form, response.settings)
-    savedText.value = '已保存'
+    savedText.value = gt('generated.tenant-admin-settings.040')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -197,33 +200,33 @@ function apiErrorText(error: unknown): string {
   if (error instanceof ReservationMealPeriodApiError) {
     if (error.status === 401) {
       auth.clear()
-      return '登录已失效'
+      return gt('generated.tenant-admin-settings.041')
     }
     if (error.response.error.code === 'REQUEST_INVALID') {
-      return '请检查餐段名称、时间和间隔'
+      return gt('generated.tenant-admin-settings.042')
     }
     if (error.response.error.code === 'FORBIDDEN') {
-      return '没有租户后台权限'
+      return gt('generated.tenant-admin-settings.043')
     }
-    return '操作失败'
+    return gt('generated.tenant-admin-settings.044')
   }
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-settings.045')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-settings.046')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查店面名称、时间格式和分钟数'
+    return gt('generated.tenant-admin-settings.047')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-settings.048')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-settings.049')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-settings.050')
 }
 
 function normalizeTime(value: string): string {
@@ -238,67 +241,67 @@ function normalizeTime(value: string): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>基础设置</h1>
+          <span>{{ gt('generated.tenant-admin-settings.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-settings.002') }}</h1>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-settings.003') }}</p>
 
       <form v-else class="form-panel" @submit.prevent="submitSettings">
         <label>
-          <span>店面名称</span>
+          <span>{{ gt('generated.tenant-admin-settings.004') }}</span>
           <input v-model.trim="form.storeName" required />
         </label>
         <label>
-          <span>时区</span>
+          <span>{{ gt('generated.tenant-admin-settings.005') }}</span>
           <input v-model.trim="form.timezone" required />
         </label>
         <label>
-          <span>语言</span>
+          <span>{{ gt('generated.tenant-admin-settings.006') }}</span>
           <input v-model.trim="form.locale" required />
         </label>
         <label>
-          <span>币种</span>
+          <span>{{ gt('generated.tenant-admin-settings.007') }}</span>
           <input v-model.trim="form.currency" required />
         </label>
         <label>
-          <span>日期格式</span>
+          <span>{{ gt('generated.tenant-admin-settings.008') }}</span>
           <input v-model.trim="form.dateFormat" placeholder="DD-MM-YYYY" required />
         </label>
         <label>
-          <span>时间格式</span>
+          <span>{{ gt('generated.tenant-admin-settings.009') }}</span>
           <input v-model.trim="form.timeFormat" required />
         </label>
         <label>
-          <span>预约保留分钟</span>
+          <span>{{ gt('generated.tenant-admin-settings.010') }}</span>
           <input v-model.number="form.reservationHoldMinutes" type="number" min="1" required />
         </label>
         <label>
-          <span>叫号保留分钟</span>
+          <span>{{ gt('generated.tenant-admin-settings.011') }}</span>
           <input v-model.number="form.queueCallHoldMinutes" type="number" min="1" required />
         </label>
         <label>
-          <span>预计用餐分钟</span>
+          <span>{{ gt('generated.tenant-admin-settings.012') }}</span>
           <input v-model.number="form.expectedDiningMinutes" type="number" min="1" required />
         </label>
         <div class="form-actions">
           <button class="primary-button" type="submit" :disabled="saving">
-            {{ saving ? '保存中' : '保存' }}
+            {{ saving ? gt('generated.tenant-admin-settings.013') : gt('generated.tenant-admin-settings.014') }}
           </button>
         </div>
       </form>
 
-      <form v-if="!loading" class="meal-period-panel" aria-label="门店预约餐段" @submit.prevent="submitMealPeriods">
+      <form v-if="!loading" class="meal-period-panel" :aria-label="gt('generated.tenant-admin-settings.015')" @submit.prevent="submitMealPeriods">
         <div class="section-heading">
-          <h2>预约餐段</h2>
+          <h2>{{ gt('generated.tenant-admin-settings.016') }}</h2>
           <div class="section-actions">
-            <button class="secondary-button" type="button" @click="usePlatformSeed">使用平台种子</button>
-            <button class="secondary-button" type="button" @click="copyPlatformSeed">复制平台餐段</button>
+            <button class="secondary-button" type="button" @click="usePlatformSeed">{{ gt('generated.tenant-admin-settings.017') }}</button>
+            <button class="secondary-button" type="button" @click="copyPlatformSeed">{{ gt('generated.tenant-admin-settings.018') }}</button>
             <button class="primary-button" type="submit" :disabled="savingMealPeriods">
-              {{ savingMealPeriods ? '保存中' : '保存餐段' }}
+              {{ savingMealPeriods ? gt('generated.tenant-admin-settings.019') : gt('generated.tenant-admin-settings.020') }}
             </button>
           </div>
         </div>
@@ -306,24 +309,24 @@ function normalizeTime(value: string): string {
         <div class="mode-row">
           <label>
             <input v-model="mealPeriodForm.usePlatformSeed" :value="true" type="radio" />
-            <span>平台种子</span>
+            <span>{{ gt('generated.tenant-admin-settings.021') }}</span>
           </label>
           <label>
             <input v-model="mealPeriodForm.usePlatformSeed" :value="false" type="radio" />
-            <span>门店维护</span>
+            <span>{{ gt('generated.tenant-admin-settings.022') }}</span>
           </label>
         </div>
 
-        <div class="period-grid" role="table" aria-label="门店预约餐段列表">
+        <div class="period-grid" role="table" :aria-label="gt('generated.tenant-admin-settings.023')">
           <div class="period-grid__head" role="row">
-            <span>键</span>
-            <span>名称</span>
-            <span>开始</span>
-            <span>结束</span>
-            <span>跨日</span>
-            <span>间隔</span>
-            <span>状态</span>
-            <span>排序</span>
+            <span>{{ gt('generated.tenant-admin-settings.024') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.025') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.026') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.027') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.028') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.029') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.030') }}</span>
+            <span>{{ gt('generated.tenant-admin-settings.031') }}</span>
             <span></span>
           </div>
 
@@ -339,7 +342,7 @@ function normalizeTime(value: string): string {
             <input v-model="period.endLocalTime" :disabled="mealPeriodForm.usePlatformSeed" required type="time" />
             <label class="switch-cell">
               <input v-model="period.crossesNextDay" :disabled="mealPeriodForm.usePlatformSeed" type="checkbox" />
-              <span>{{ period.crossesNextDay ? '是' : '否' }}</span>
+              <span>{{ period.crossesNextDay ? gt('generated.tenant-admin-settings.032') : gt('generated.tenant-admin-settings.033') }}</span>
             </label>
             <input
               v-model.number="period.slotIntervalMinutes"
@@ -351,8 +354,8 @@ function normalizeTime(value: string): string {
               type="number"
             />
             <select v-model="period.status" :disabled="mealPeriodForm.usePlatformSeed">
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
+              <option value="active">{{ gt('generated.tenant-admin-settings.034') }}</option>
+              <option value="disabled">{{ gt('generated.tenant-admin-settings.035') }}</option>
             </select>
             <input v-model.number="period.sortOrder" :disabled="mealPeriodForm.usePlatformSeed" required type="number" />
             <button
@@ -360,16 +363,12 @@ function normalizeTime(value: string): string {
               type="button"
               :disabled="mealPeriodForm.usePlatformSeed"
               @click="removePeriod(index)"
-            >
-              删除
-            </button>
+            > {{ gt('generated.tenant-admin-settings.036') }} </button>
           </div>
         </div>
 
         <div class="form-actions">
-          <button class="secondary-button" type="button" :disabled="mealPeriodForm.usePlatformSeed" @click="addPeriod">
-            新增餐段
-          </button>
+          <button class="secondary-button" type="button" :disabled="mealPeriodForm.usePlatformSeed" @click="addPeriod"> {{ gt('generated.tenant-admin-settings.037') }} </button>
         </div>
       </form>
     </section>

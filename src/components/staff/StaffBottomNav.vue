@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
 import {
@@ -12,6 +13,7 @@ const props = defineProps<{
   activeTab: StaffBottomNavTab
 }>()
 
+const { t } = useI18n()
 const items = computed(() =>
   staffBottomNavItems.map(item => ({
     ...item,
@@ -26,7 +28,7 @@ const items = computed(() =>
 </script>
 
 <template>
-  <nav class="staff-bottom-nav" aria-label="员工工作台导航">
+  <nav class="staff-bottom-nav" :aria-label="t('nav.staff.aria')">
     <RouterLink
       v-for="item in items"
       :key="item.tab"
@@ -35,7 +37,7 @@ const items = computed(() =>
       :to="item.to"
     >
       <span class="staff-bottom-nav__symbol" aria-hidden="true">{{ item.symbol }}</span>
-      <span class="staff-bottom-nav__label">{{ item.label }}</span>
+      <span class="staff-bottom-nav__label">{{ t(item.labelKey) }}</span>
     </RouterLink>
   </nav>
 </template>

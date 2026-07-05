@@ -16,6 +16,9 @@ import type {
   PublicBookingContextResponse,
   PublicBookingTimeSlot
 } from '../types/publicBooking'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 declare global {
   interface Window {
@@ -76,7 +79,7 @@ const maxBookingDate = computed(() => {
   return addDays(minBookingDate, maxAdvanceDays)
 })
 const bookingDateWindowText = computed(() => (
-  `可预约至 ${formatDisplayDate(maxBookingDate.value)}，餐段会按公网预约规则显示`
+  `${gt('generated.public-booking.042')}${formatDisplayDate(maxBookingDate.value)}${gt('generated.public-booking.043')}`
 ))
 const selectableSlots = computed(() => (context.value?.timeSlots || []).filter((slot) => slot.selectable))
 const slotsByPeriod = computed(() => {
@@ -94,7 +97,7 @@ const slotsByPeriod = computed(() => {
 const periodFilterOptions = computed(() => [
   {
     periodKey: ALL_PERIOD_KEY,
-    displayName: '全部',
+    displayName: gt('generated.public-booking.045'),
     count: selectableSlots.value.length
   },
   ...slotsByPeriod.value.map((group) => ({
@@ -183,7 +186,7 @@ async function loadCustomer(): Promise<void> {
 
 async function loadContext(): Promise<void> {
   if (!storeId.value) {
-    errorText.value = '门店链接无效'
+    errorText.value = gt('generated.public-booking.046')
     return
   }
   loading.value = true
@@ -192,7 +195,7 @@ async function loadContext(): Promise<void> {
   try {
     context.value = await getPublicBookingContext(storeId.value, selectedDate.value)
     if (!context.value.settings.enabled) {
-      errorText.value = '门店暂未开放公网预约'
+      errorText.value = gt('generated.public-booking.047')
     }
   } catch (error) {
     context.value = null
@@ -213,7 +216,7 @@ async function sendEmailCode(): Promise<void> {
     const response = await requestCustomerEmailCode(storeId.value, authForm.email)
     authForm.email = response.email
     authForm.devCode = response.devCode || ''
-    statusText.value = response.devCode ? '验证码已生成' : '验证码已发送'
+    statusText.value = response.devCode ? gt('generated.public-booking.048') : gt('generated.public-booking.049')
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
   } finally {
@@ -235,7 +238,7 @@ async function loginWithEmail(): Promise<void> {
       authForm.displayName
     )
     customer.value = response.principal
-    statusText.value = '已登录'
+    statusText.value = gt('generated.public-booking.050')
     currentStep.value = 3
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
@@ -250,7 +253,7 @@ async function startOAuthLogin(provider: 'google' | 'facebook'): Promise<void> {
   }
   const clientId = providerClientId(provider)
   if (!clientId) {
-    errorText.value = '门店尚未开放该登录方式'
+    errorText.value = gt('generated.public-booking.051')
     return
   }
   if (provider === 'google') {
@@ -269,7 +272,7 @@ async function startGoogleLogin(clientId: string): Promise<void> {
       client_id: clientId,
       callback: (response) => {
         if (!response.credential) {
-          errorText.value = '第三方授权已失效'
+          errorText.value = gt('generated.public-booking.052')
           return
         }
         void completeOAuthLogin('google', response.credential)
@@ -277,7 +280,7 @@ async function startGoogleLogin(clientId: string): Promise<void> {
     })
     window.google?.accounts.id.prompt()
   } catch {
-    errorText.value = '第三方授权已失效'
+    errorText.value = gt('generated.public-booking.053')
   } finally {
     authBusy.value = false
   }
@@ -292,13 +295,13 @@ async function startFacebookLogin(appId: string): Promise<void> {
       const token = response.authResponse?.[`access${'Token'}`] || ''
       if (!token) {
         authBusy.value = false
-        errorText.value = '第三方授权已失效'
+        errorText.value = gt('generated.public-booking.054')
         return
       }
       void completeOAuthLogin('facebook', token)
     }, { scope: 'email,public_profile' })
   } catch {
-    errorText.value = '第三方授权已失效'
+    errorText.value = gt('generated.public-booking.055')
     authBusy.value = false
   }
 }
@@ -309,7 +312,7 @@ async function completeOAuthLogin(provider: 'google' | 'facebook', token: string
   try {
     const response = await loginCustomerWithOAuth(storeId.value, provider, token)
     customer.value = response.principal
-    statusText.value = '已登录'
+    statusText.value = gt('generated.public-booking.056')
     currentStep.value = 3
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
@@ -337,7 +340,7 @@ async function submitBooking(): Promise<void> {
         note: nullableText(bookingForm.note)
       }
     )
-    statusText.value = `预约成功，编号 ${response.reservationCode}`
+    statusText.value = `${gt('generated.public-booking.044')}${response.reservationCode}`
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
   } finally {
@@ -377,32 +380,32 @@ function goBackToAuthStep(): void {
 
 function publicBookingErrorText(error: unknown): string {
   if (!(error instanceof PublicBookingApiError)) {
-    return '操作失败'
+    return gt('generated.public-booking.057')
   }
   switch (error.response.error) {
     case 'login_required':
     case 'unauthenticated':
-      return '请先登录'
+      return gt('generated.public-booking.058')
     case 'booking_disabled':
-      return '门店暂未开放公网预约'
+      return gt('generated.public-booking.059')
     case 'invalid_booking_window':
-      return '该时间暂不可预约'
+      return gt('generated.public-booking.060')
     case 'reservation_rejected':
-      return '该时段预约名额已满'
+      return gt('generated.public-booking.061')
     case 'code_mismatch':
-      return '验证码不正确'
+      return gt('generated.public-booking.062')
     case 'code_expired':
-      return '验证码已过期'
+      return gt('generated.public-booking.063')
     case 'email_channel_not_configured':
-      return '门店尚未配置邮件服务'
+      return gt('generated.public-booking.064')
     case 'email_delivery_failed':
-      return '验证码发送失败'
+      return gt('generated.public-booking.065')
     case 'provider_not_configured':
-      return '门店尚未开放该登录方式'
+      return gt('generated.public-booking.066')
     case 'provider_token_invalid':
-      return '第三方授权已失效'
+      return gt('generated.public-booking.067')
     default:
-      return '操作失败'
+      return gt('generated.public-booking.068')
   }
 }
 
@@ -474,11 +477,11 @@ function clampBookingDate(isoDate: string): string {
     return minBookingDate
   }
   if (isoDate < minBookingDate) {
-    dateInputErrorText.value = '日期不能早于今天'
+    dateInputErrorText.value = gt('generated.public-booking.069')
     return minBookingDate
   }
   if (isoDate > maxBookingDate.value) {
-    dateInputErrorText.value = '日期超过门店开放预约范围'
+    dateInputErrorText.value = gt('generated.public-booking.070')
     return maxBookingDate.value
   }
   return isoDate
@@ -490,7 +493,7 @@ function clampBookingDate(isoDate: string): string {
     <section class="booking-shell">
       <header class="booking-heading">
         <span>Online Booking</span>
-        <h1>{{ context?.store.storeName || '餐厅预约' }}</h1>
+        <h1>{{ context?.store.storeName || gt('generated.public-booking.001') }}</h1>
         <p v-if="context?.store.shareAddress">{{ context.store.shareAddress }}</p>
         <nav
           v-if="
@@ -500,18 +503,16 @@ function clampBookingDate(isoDate: string): string {
             context?.store.whatsappBusinessPhoneE164
           "
           class="booking-contact-actions"
-          aria-label="门店联系方式"
+          :aria-label="gt('generated.public-booking.002')"
         >
           <a
             v-if="context.store.googleMapUrl"
             :href="context.store.googleMapUrl"
             target="_blank"
             rel="noopener noreferrer"
-          >
-            打开地图
-          </a>
-          <a v-if="context.store.shareContactPhone" :href="`tel:${context.store.shareContactPhone}`">拨打电话</a>
-          <a v-if="context.store.shareEmail" :href="`mailto:${context.store.shareEmail}`">发送邮件</a>
+          > {{ gt('generated.public-booking.003') }} </a>
+          <a v-if="context.store.shareContactPhone" :href="`tel:${context.store.shareContactPhone}`">{{ gt('generated.public-booking.004') }}</a>
+          <a v-if="context.store.shareEmail" :href="`mailto:${context.store.shareEmail}`">{{ gt('generated.public-booking.005') }}</a>
           <a
             v-if="whatsappContactUrl"
             :href="whatsappContactUrl"
@@ -526,14 +527,14 @@ function clampBookingDate(isoDate: string): string {
       <p v-if="errorText" class="alert alert--error" role="alert">{{ errorText }}</p>
       <p v-if="statusText" class="alert alert--success" role="status">{{ statusText }}</p>
 
-      <section v-if="currentStep === 1" class="booking-panel" aria-label="预约时间">
+      <section v-if="currentStep === 1" class="booking-panel" :aria-label="gt('generated.public-booking.006')">
         <div class="panel-title">
           <span>1</span>
-          <strong>选择日期、餐段与人数</strong>
+          <strong>{{ gt('generated.public-booking.007') }}</strong>
         </div>
 
         <label>
-          <span>日期</span>
+          <span>{{ gt('generated.public-booking.008') }}</span>
           <input
             v-model="selectedDate"
             :min="minBookingDate"
@@ -545,12 +546,12 @@ function clampBookingDate(isoDate: string): string {
         </label>
 
         <div class="booking-time-field">
-          <span>时间</span>
+          <span>{{ gt('generated.public-booking.009') }}</span>
           <div
             v-if="periodFilterOptions.length > 1"
             class="booking-period-tabs"
             role="group"
-            aria-label="餐段筛选"
+            :aria-label="gt('generated.public-booking.010')"
           >
             <button
               v-for="option in periodFilterOptions"
@@ -566,9 +567,9 @@ function clampBookingDate(isoDate: string): string {
             </button>
           </div>
 
-          <div v-if="loading" class="quiet-line">加载中</div>
+          <div v-if="loading" class="quiet-line">{{ gt('generated.public-booking.011') }}</div>
           <template v-else>
-            <div class="booking-time-slots" role="listbox" aria-label="预约可选时间">
+            <div class="booking-time-slots" role="listbox" :aria-label="gt('generated.public-booking.012')">
               <button
                 v-for="slot in filteredSlots"
                 :key="slot.startAt"
@@ -579,111 +580,99 @@ function clampBookingDate(isoDate: string): string {
                 @click="selectedStartAt = slot.startAt"
               >
                 <strong>{{ slot.localTime.slice(0, 5) }}</strong>
-                <small>{{ slot.displayName }}{{ slot.nextDay ? ' · 次日' : '' }}</small>
+                <small>{{ slot.displayName }}{{ slot.nextDay ? gt('generated.public-booking.013') : '' }}</small>
               </button>
             </div>
-            <p v-if="!filteredSlots.length" class="quiet-line">该日期暂无可预约时段</p>
+            <p v-if="!filteredSlots.length" class="quiet-line">{{ gt('generated.public-booking.014') }}</p>
           </template>
         </div>
 
         <label>
-          <span>人数</span>
+          <span>{{ gt('generated.public-booking.015') }}</span>
           <input v-model.number="bookingForm.partySize" min="1" max="20" type="number" />
         </label>
 
-        <button class="submit-button" type="button" :disabled="!canProceedToAuth" @click="goToAuthStep">
-          下一步：登录
-        </button>
+        <button class="submit-button" type="button" :disabled="!canProceedToAuth" @click="goToAuthStep"> {{ gt('generated.public-booking.016') }} </button>
       </section>
 
-      <section v-else-if="currentStep === 2" class="booking-panel" aria-label="登录">
+      <section v-else-if="currentStep === 2" class="booking-panel" :aria-label="gt('generated.public-booking.017')">
         <div class="panel-title">
           <span>2</span>
-          <strong>顾客登录</strong>
+          <strong>{{ gt('generated.public-booking.018') }}</strong>
         </div>
 
         <div v-if="customer" class="customer-chip">
           <span>{{ customer.email }}</span>
-          <strong>已登录</strong>
+          <strong>{{ gt('generated.public-booking.019') }}</strong>
         </div>
 
         <template v-else>
-          <p v-if="!hasConfiguredLoginMethod" class="quiet-line">门店尚未配置顾客登录方式，请联系门店</p>
+          <p v-if="!hasConfiguredLoginMethod" class="quiet-line">{{ gt('generated.public-booking.020') }}</p>
 
-          <section v-if="emailAuthEnabled" class="auth-method-panel" aria-label="邮箱注册 / 登录">
-            <strong>邮箱注册 / 登录</strong>
-            <p class="quiet-line">已注册邮箱通过验证码登录，未注册邮箱自动注册</p>
+          <section v-if="emailAuthEnabled" class="auth-method-panel" :aria-label="gt('generated.public-booking.021')">
+            <strong>{{ gt('generated.public-booking.022') }}</strong>
+            <p class="quiet-line">{{ gt('generated.public-booking.023') }}</p>
             <div class="auth-grid">
               <label>
-                <span>邮箱</span>
+                <span>{{ gt('generated.public-booking.024') }}</span>
                 <input v-model="authForm.email" autocomplete="email" type="email" />
               </label>
               <label>
-                <span>姓名</span>
+                <span>{{ gt('generated.public-booking.025') }}</span>
                 <input v-model="authForm.displayName" autocomplete="name" />
               </label>
             </div>
-            <button class="secondary-button" type="button" :disabled="authBusy" @click="sendEmailCode">
-              发送验证码
-            </button>
+            <button class="secondary-button" type="button" :disabled="authBusy" @click="sendEmailCode"> {{ gt('generated.public-booking.026') }} </button>
             <label>
-              <span>验证码</span>
+              <span>{{ gt('generated.public-booking.027') }}</span>
               <input v-model="authForm.code" inputmode="numeric" />
             </label>
-            <p v-if="authForm.devCode" class="quiet-line">验证码 {{ authForm.devCode }}</p>
-            <button class="primary-button" type="button" :disabled="authBusy" @click="loginWithEmail">
-              登录
-            </button>
+            <p v-if="authForm.devCode" class="quiet-line">{{ gt('generated.public-booking.028') }} {{ authForm.devCode }}</p>
+            <button class="primary-button" type="button" :disabled="authBusy" @click="loginWithEmail"> {{ gt('generated.public-booking.029') }} </button>
           </section>
 
-          <div v-if="enabledAuthProviders.length" class="auth-actions" aria-label="联合登录">
+          <div v-if="enabledAuthProviders.length" class="auth-actions" :aria-label="gt('generated.public-booking.030')">
             <button
               v-if="providerClientId('google')"
               type="button"
               :disabled="authBusy"
               @click="startOAuthLogin('google')"
-            >
-              Google 登录
-            </button>
+            > {{ gt('generated.public-booking.031') }} </button>
             <button
               v-if="providerClientId('facebook')"
               type="button"
               :disabled="authBusy"
               @click="startOAuthLogin('facebook')"
-            >
-              Facebook 登录
-            </button>
+            > {{ gt('generated.public-booking.032') }} </button>
           </div>
         </template>
 
         <div class="step-actions">
-          <button class="secondary-button" type="button" @click="goBackToTimeStep">上一步</button>
-          <button class="submit-button" type="button" :disabled="!canProceedToContact" @click="goToContactStep">
-            下一步：填写手机号
-          </button>
+          <button class="secondary-button" type="button" @click="goBackToTimeStep">{{ gt('generated.public-booking.033') }}</button>
+          <button class="submit-button" type="button" :disabled="!canProceedToContact" @click="goToContactStep"> {{ gt('generated.public-booking.034') }} </button>
         </div>
       </section>
 
-      <form v-else class="booking-panel" aria-label="提交预约" @submit.prevent="submitBooking">
+      <form v-else class="booking-panel" :aria-label="gt('generated.public-booking.035')" @submit.prevent="submitBooking">
         <div class="panel-title">
           <span>3</span>
-          <strong>填写手机号并提交</strong>
+          <strong>{{ gt('generated.public-booking.036') }}</strong>
         </div>
 
         <label>
-          <span>手机号</span>
+          <span>{{ gt('generated.public-booking.037') }}</span>
           <input v-model="bookingForm.phoneE164" inputmode="tel" placeholder="+6591234567" />
         </label>
 
         <label>
-          <span>备注</span>
+          <span>{{ gt('generated.public-booking.038') }}</span>
           <textarea v-model="bookingForm.note" rows="3"></textarea>
         </label>
 
         <div class="step-actions">
-          <button class="secondary-button" type="button" @click="goBackToAuthStep">上一步</button>
+          <button class="secondary-button" type="button" @click="goBackToAuthStep">{{ gt('generated.public-booking.039') }}</button>
           <button class="submit-button" type="submit" :disabled="!canSubmit">
-            {{ submitting ? '提交中' : '提交预约' }}
+            {{ submitting ? gt('generated.public-booking.040') : gt('generated.public-booking.041') }}
           </button>
         </div>
       </form>

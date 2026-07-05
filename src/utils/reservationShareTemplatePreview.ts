@@ -1,25 +1,31 @@
-export const reservationShareTemplatePreviewVariables: Record<string, string> = {
-  storeName: '示例门店',
-  reservationNo: 'R-EXAMPLE-0001',
-  reservationCode: 'R-EXAMPLE-0001',
-  reservationDate: '15-07-2026 (星期三)',
-  reservationTime: '19:30',
-  reservedStartAt: '15-07-2026 (星期三) 19:30',
-  partySize: '2',
-  tableCode: 'A01',
-  holdMinutes: '15',
-  contactName: '示例顾客',
-  guestSalutation: '先生',
-  maskedPhone: '0000****',
-  storeAddress: '示例地址 1 号',
-  googleMapUrl: 'https://example.com/map',
-  storePhone: '0000 0000',
-  arrivalNote: '请提前 10 分钟到店',
-  confirmInstruction: '回复确认可保留订位',
-  cancelInstruction: '如需取消，请提前 2 小时联系我们',
-  changeInstruction: '如需修改人数或时间，请致电门店',
-  replyInstruction: '收到请回复确认'
-}
+import { translate } from '../i18n'
+
+const previewVariableKeys = [
+  'storeName',
+  'reservationNo',
+  'reservationCode',
+  'reservationDate',
+  'reservationTime',
+  'reservedStartAt',
+  'partySize',
+  'tableCode',
+  'holdMinutes',
+  'contactName',
+  'guestSalutation',
+  'maskedPhone',
+  'storeAddress',
+  'googleMapUrl',
+  'storePhone',
+  'arrivalNote',
+  'confirmInstruction',
+  'cancelInstruction',
+  'changeInstruction',
+  'replyInstruction'
+] as const
+
+type ReservationShareTemplatePreviewVariableKey = (typeof previewVariableKeys)[number]
+
+export const reservationShareTemplatePreviewVariables = buildDefaultPreviewVariables()
 
 export interface ReservationShareTemplatePreviewSource {
   storeName?: string | null
@@ -35,7 +41,7 @@ export function buildReservationShareTemplatePreviewVariables(
   source: ReservationShareTemplatePreviewSource = {}
 ): Record<string, string> {
   return {
-    ...reservationShareTemplatePreviewVariables,
+    ...buildDefaultPreviewVariables(),
     ...definedPreviewValues({
       storeName: source.storeName,
       storeAddress: source.storeAddress,
@@ -48,7 +54,7 @@ export function buildReservationShareTemplatePreviewVariables(
 
 export function renderReservationShareTemplatePreview(
   templateText: string,
-  variables: Record<string, string> = reservationShareTemplatePreviewVariables
+  variables: Record<string, string> = buildDefaultPreviewVariables()
 ): string {
   return (templateText || '')
     .replace(templateVariablePattern, (token, variableName: string) => {
@@ -56,6 +62,15 @@ export function renderReservationShareTemplatePreview(
       return replacement === undefined ? token : replacement
     })
     .trimEnd()
+}
+
+function buildDefaultPreviewVariables(): Record<ReservationShareTemplatePreviewVariableKey, string> {
+  return Object.fromEntries(
+    previewVariableKeys.map((key) => [
+      key,
+      translate(`reservationShareTemplatePreview.variables.${key}`)
+    ])
+  ) as Record<ReservationShareTemplatePreviewVariableKey, string>
 }
 
 function definedPreviewValues(values: Record<string, string | null | undefined>): Record<string, string> {

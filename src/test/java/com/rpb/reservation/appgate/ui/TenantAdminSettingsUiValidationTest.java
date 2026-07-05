@@ -10,7 +10,7 @@ class TenantAdminSettingsUiValidationTest {
 
     @Test
     void tenantAdminSettingsUsesBusinessDateFormatRule() throws Exception {
-        String page = Files.readString(Path.of("src", "pages", "TenantAdminSettingsPage.vue"));
+        String page = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminSettingsPage.vue"));
 
         assertThat(page)
             .contains("dateFormat: 'DD-MM-YYYY'")

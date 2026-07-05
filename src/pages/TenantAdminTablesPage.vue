@@ -16,6 +16,9 @@ import ErpPagination from '../components/erp/ErpPagination.vue'
 import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -214,7 +217,7 @@ async function uploadTables(event: Event): Promise<void> {
   successText.value = ''
   try {
     const response = await importTables(storeId.value, file)
-    const message = `导入完成：新增 ${response.imported.created}，覆盖 ${response.imported.updated}`
+    const message = `${gt('generated.tenant-admin-tables.032')}${response.imported.created}${gt('generated.tenant-admin-tables.033')}${response.imported.updated}`
     await loadTables(0)
     successText.value = message
   } catch (error) {
@@ -244,7 +247,7 @@ async function persistSortMutations(mutations: TableSortMutation[]): Promise<voi
         tableSortPayload(mutation.item, mutation.areaSortOrder, mutation.tableSortOrder)
       )
     }
-    const message = '排序已更新'
+    const message = gt('generated.tenant-admin-tables.034')
     await loadTables(offset.value)
     successText.value = message
   } catch (error) {
@@ -294,25 +297,25 @@ function compareTablesInArea(left: TenantAdminTable, right: TenantAdminTable): n
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-tables.035')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-tables.036')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-tables.037')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-tables.038')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查 Excel 表头、分区组、桌号、人数和启用状态'
+    return gt('generated.tenant-admin-tables.039')
   }
   if (error.response.error.code === 'TABLE_IN_USE') {
-    return '桌号正在使用，仅支持调整排序'
+    return gt('generated.tenant-admin-tables.040')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-tables.041')
 }
 </script>
 
@@ -323,14 +326,14 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>桌号管理</h1>
+          <span>{{ gt('generated.tenant-admin-tables.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-tables.002') }}</h1>
         </div>
       </header>
 
       <ErpQueryToolbar
         v-model:keyword="keyword"
-        placeholder="分区组 / 桌号"
+        :placeholder="gt('generated.tenant-admin-tables.003')"
         :loading="actionDisabled"
         :has-dirty-query="hasDirtyQuery"
         @search="searchTables"
@@ -339,18 +342,14 @@ function apiErrorText(error: unknown): string {
       >
         <template #filters>
           <div class="summary-strip">
-            <strong>全部 {{ safePage.total }}</strong>
-            <span>启用 {{ enabledCount }}</span>
-            <span>停用 {{ disabledCount }}</span>
+            <strong>{{ gt('generated.tenant-admin-tables.004') }} {{ safePage.total }}</strong>
+            <span>{{ gt('generated.tenant-admin-tables.005') }} {{ enabledCount }}</span>
+            <span>{{ gt('generated.tenant-admin-tables.006') }} {{ disabledCount }}</span>
           </div>
         </template>
         <template #actions>
-          <button class="secondary-button" type="button" :disabled="actionDisabled" @click="downloadTables">
-            导出 Excel
-          </button>
-          <button class="secondary-button" type="button" :disabled="actionDisabled" @click="pickImportFile">
-            导入 Excel
-          </button>
+          <button class="secondary-button" type="button" :disabled="actionDisabled" @click="downloadTables"> {{ gt('generated.tenant-admin-tables.007') }} </button>
+          <button class="secondary-button" type="button" :disabled="actionDisabled" @click="pickImportFile"> {{ gt('generated.tenant-admin-tables.008') }} </button>
           <input
             ref="fileInput"
             class="hidden-file"
@@ -358,9 +357,7 @@ function apiErrorText(error: unknown): string {
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             @change="uploadTables"
           />
-          <button class="primary-button" type="button" :disabled="actionDisabled" @click="openCreatePage">
-            新增桌号
-          </button>
+          <button class="primary-button" type="button" :disabled="actionDisabled" @click="openCreatePage"> {{ gt('generated.tenant-admin-tables.009') }} </button>
         </template>
       </ErpQueryToolbar>
 
@@ -371,32 +368,32 @@ function apiErrorText(error: unknown): string {
         <table>
           <thead>
             <tr>
-              <th>大类排序</th>
-              <th>分区组</th>
-              <th>桌号排序</th>
-              <th>桌号</th>
-              <th>人数</th>
-              <th>启用</th>
-              <th>操作</th>
+              <th>{{ gt('generated.tenant-admin-tables.010') }}</th>
+              <th>{{ gt('generated.tenant-admin-tables.011') }}</th>
+              <th>{{ gt('generated.tenant-admin-tables.012') }}</th>
+              <th>{{ gt('generated.tenant-admin-tables.013') }}</th>
+              <th>{{ gt('generated.tenant-admin-tables.014') }}</th>
+              <th>{{ gt('generated.tenant-admin-tables.015') }}</th>
+              <th>{{ gt('generated.tenant-admin-tables.016') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="7" class="empty-cell">加载中</td>
+              <td colspan="7" class="empty-cell">{{ gt('generated.tenant-admin-tables.017') }}</td>
             </tr>
             <tr v-else-if="tables.length === 0">
-              <td colspan="7" class="empty-cell">暂无桌号</td>
+              <td colspan="7" class="empty-cell">{{ gt('generated.tenant-admin-tables.018') }}</td>
             </tr>
             <tr v-for="item in tables" v-else :key="item.id">
               <td>
                 <div class="sort-cell">
                   <span class="sort-value">{{ item.areaSortOrder }}</span>
-                  <span class="sort-controls" aria-label="分区组排序">
+                  <span class="sort-controls" :aria-label="gt('generated.tenant-admin-tables.019')">
                     <button
                       class="sort-icon-button"
                       type="button"
-                      title="上移分区组"
-                      :aria-label="`${item.areaName} 上移分区组`"
+                      :title="gt('generated.tenant-admin-tables.020')"
+                      :aria-label="`${item.areaName}${gt('generated.tenant-admin-tables.021')}`"
                       :disabled="!canMoveArea(item, -1)"
                       @click="moveArea(item, -1)"
                     >
@@ -405,8 +402,8 @@ function apiErrorText(error: unknown): string {
                     <button
                       class="sort-icon-button"
                       type="button"
-                      title="下移分区组"
-                      :aria-label="`${item.areaName} 下移分区组`"
+                      :title="gt('generated.tenant-admin-tables.022')"
+                      :aria-label="`${item.areaName}${gt('generated.tenant-admin-tables.023')}`"
                       :disabled="!canMoveArea(item, 1)"
                       @click="moveArea(item, 1)"
                     >
@@ -419,12 +416,12 @@ function apiErrorText(error: unknown): string {
               <td>
                 <div class="sort-cell">
                   <span class="sort-value">{{ item.tableSortOrder }}</span>
-                  <span class="sort-controls" aria-label="桌号排序">
+                  <span class="sort-controls" :aria-label="gt('generated.tenant-admin-tables.024')">
                     <button
                       class="sort-icon-button"
                       type="button"
-                      title="上移桌号"
-                      :aria-label="`${item.tableCode} 上移桌号`"
+                      :title="gt('generated.tenant-admin-tables.025')"
+                      :aria-label="`${item.tableCode}${gt('generated.tenant-admin-tables.026')}`"
                       :disabled="!canMoveTable(item, -1)"
                       @click="moveTable(item, -1)"
                     >
@@ -433,8 +430,8 @@ function apiErrorText(error: unknown): string {
                     <button
                       class="sort-icon-button"
                       type="button"
-                      title="下移桌号"
-                      :aria-label="`${item.tableCode} 下移桌号`"
+                      :title="gt('generated.tenant-admin-tables.027')"
+                      :aria-label="`${item.tableCode}${gt('generated.tenant-admin-tables.028')}`"
                       :disabled="!canMoveTable(item, 1)"
                       @click="moveTable(item, 1)"
                     >
@@ -447,11 +444,11 @@ function apiErrorText(error: unknown): string {
               <td>{{ item.capacity }}</td>
               <td>
                 <span class="status-pill" :class="{ muted: !item.enabled }">
-                  {{ item.enabled ? '启用' : '停用' }}
+                  {{ item.enabled ? gt('generated.tenant-admin-tables.029') : gt('generated.tenant-admin-tables.030') }}
                 </span>
               </td>
               <td>
-                <button type="button" class="link-button" @click="openEditPage(item)">编辑</button>
+                <button type="button" class="link-button" @click="openEditPage(item)">{{ gt('generated.tenant-admin-tables.031') }}</button>
               </td>
             </tr>
           </tbody>

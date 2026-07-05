@@ -28,6 +28,9 @@ import type {
   QueueArrivedReservationRequest,
   ReservationArrivedToQueueApiErrorResponse
 } from '../types/reservationArrivedToQueue'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -52,7 +55,7 @@ const showEmptyState = computed(
   () => !isLoading.value && !listApiError.value && queueCandidateReservations.value.length === 0
 )
 const appStatusLabel = computed(() =>
-  submittingReservationId.value ? '取号中' : '预约排队'
+  submittingReservationId.value ? gt('generated.reservation-arrived-to-queue.024') : gt('generated.reservation-arrived-to-queue.025')
 )
 const queueTicketListRoute = computed(() => ({
   name: 'queue-ticket-list',
@@ -188,14 +191,14 @@ function shouldCheckInBeforeQueue(item: ReservationTodayViewItem): boolean {
 
 function actionLabel(item: ReservationTodayViewItem): string {
   if (submittingReservationId.value === item.reservationId) {
-    return '进入中...'
+    return gt('generated.reservation-arrived-to-queue.026')
   }
 
   if (item.queueTicketId) {
-    return '已在排队线'
+    return gt('generated.reservation-arrived-to-queue.027')
   }
 
-  return shouldCheckInBeforeQueue(item) ? '到店取号' : '进入排队线'
+  return shouldCheckInBeforeQueue(item) ? gt('generated.reservation-arrived-to-queue.028') : gt('generated.reservation-arrived-to-queue.029')
 }
 
 function toRequest(): QueueArrivedReservationRequest {
@@ -269,10 +272,10 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.reservation-arrived-to-queue.030')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.reservation-arrived-to-queue.022')}${value.slice(0, 8)}`
 }
 
 function formatTime(value: string): string {
@@ -294,20 +297,20 @@ function formatTime(value: string): string {
 }
 
 function customerLabel(item: ReservationTodayViewItem): string {
-  return item.customerName?.trim() || item.customerNickname?.trim() || '未留姓名'
+  return item.customerName?.trim() || item.customerNickname?.trim() || gt('generated.reservation-arrived-to-queue.031')
 }
 
 function queueHint(item: ReservationTodayViewItem): string {
   if (!item.queueTicketId) {
-    return shouldCheckInBeforeQueue(item) ? '待到店，可一键取号' : '已到店，可进排队线'
+    return shouldCheckInBeforeQueue(item) ? gt('generated.reservation-arrived-to-queue.032') : gt('generated.reservation-arrived-to-queue.033')
   }
 
   const ticket = item.queueTicketDisplayNumber?.trim()
     ? `#${item.queueTicketDisplayNumber.trim()}`
     : item.queueTicketNumber
       ? `#${item.queueTicketNumber}`
-      : '已取号'
-  return `${ticket} · ${item.queueTicketStatus || '排队中'}`
+      : gt('generated.reservation-arrived-to-queue.034')
+  return `${ticket} · ${item.queueTicketStatus || gt('generated.reservation-arrived-to-queue.023')}`
 }
 </script>
 
@@ -323,36 +326,34 @@ function queueHint(item: ReservationTodayViewItem): string {
     <div class="reservation-queue-body">
       <section class="queue-heading">
         <div>
-          <p>预约</p>
-          <h1>预约排队</h1>
+          <p>{{ gt('generated.reservation-arrived-to-queue.001') }}</p>
+          <h1>{{ gt('generated.reservation-arrived-to-queue.002') }}</h1>
         </div>
       </section>
 
-      <section class="queue-list-panel" aria-label="可取号预约">
+      <section class="queue-list-panel" :aria-label="gt('generated.reservation-arrived-to-queue.003')">
         <header>
           <div>
-            <p>可取号预约</p>
-            <h2>到店排队</h2>
+            <p>{{ gt('generated.reservation-arrived-to-queue.004') }}</p>
+            <h2>{{ gt('generated.reservation-arrived-to-queue.005') }}</h2>
           </div>
-          <button type="button" :disabled="isLoading" @click="loadArrivedReservations">刷新</button>
+          <button type="button" :disabled="isLoading" @click="loadArrivedReservations">{{ gt('generated.reservation-arrived-to-queue.006') }}</button>
         </header>
 
-        <div v-if="isLoading" class="queue-state">
-          加载中...
-        </div>
+        <div v-if="isLoading" class="queue-state"> {{ gt('generated.reservation-arrived-to-queue.007') }} </div>
 
         <section v-else-if="listApiError" class="result-panel error-panel" aria-live="assertive">
-          <h2>加载失败</h2>
-          <p class="error-code">错误代码：{{ listApiError.error.code }}</p>
-          <p class="message-key">消息键：{{ listApiError.error.messageKey }}</p>
+          <h2>{{ gt('generated.reservation-arrived-to-queue.008') }}</h2>
+          <p class="error-code">{{ gt('generated.reservation-arrived-to-queue.009') }}{{ listApiError.error.code }}</p>
+          <p class="message-key">{{ gt('generated.reservation-arrived-to-queue.010') }}{{ listApiError.error.messageKey }}</p>
         </section>
 
         <div v-else-if="showEmptyState" class="queue-state queue-state--actions">
-          <strong>暂无可取号预约</strong>
-          <span>可以先去今日预约确认到店，或给散客现场取号。</span>
+          <strong>{{ gt('generated.reservation-arrived-to-queue.011') }}</strong>
+          <span>{{ gt('generated.reservation-arrived-to-queue.012') }}</span>
           <div class="empty-actions">
-            <RouterLink class="empty-action-link" :to="reservationTodayViewRoute">去今日预约</RouterLink>
-            <RouterLink class="empty-action-link primary" :to="walkInQueueRoute">现场取号</RouterLink>
+            <RouterLink class="empty-action-link" :to="reservationTodayViewRoute">{{ gt('generated.reservation-arrived-to-queue.013') }}</RouterLink>
+            <RouterLink class="empty-action-link primary" :to="walkInQueueRoute">{{ gt('generated.reservation-arrived-to-queue.014') }}</RouterLink>
           </div>
         </div>
 
@@ -370,15 +371,15 @@ function queueHint(item: ReservationTodayViewItem): string {
 
           <dl>
             <div>
-              <dt>时间</dt>
+              <dt>{{ gt('generated.reservation-arrived-to-queue.015') }}</dt>
               <dd>{{ formatTime(item.reservedStartAt) }} - {{ formatTime(item.reservedEndAt) }}</dd>
             </div>
             <div>
-              <dt>人数</dt>
-              <dd>{{ item.partySize }}人</dd>
+              <dt>{{ gt('generated.reservation-arrived-to-queue.016') }}</dt>
+              <dd>{{ item.partySize }}{{ gt('generated.reservation-arrived-to-queue.017') }}</dd>
             </div>
             <div>
-              <dt>状态</dt>
+              <dt>{{ gt('generated.reservation-arrived-to-queue.018') }}</dt>
               <dd>{{ queueHint(item) }}</dd>
             </div>
           </dl>
@@ -395,9 +396,9 @@ function queueHint(item: ReservationTodayViewItem): string {
       </section>
 
       <section v-if="queueApiError" class="result-panel error-panel" aria-live="assertive">
-        <h2>排队失败</h2>
-        <p class="error-code">错误代码：{{ queueApiError.error.code }}</p>
-        <p class="message-key">消息键：{{ queueApiError.error.messageKey }}</p>
+        <h2>{{ gt('generated.reservation-arrived-to-queue.019') }}</h2>
+        <p class="error-code">{{ gt('generated.reservation-arrived-to-queue.020') }}{{ queueApiError.error.code }}</p>
+        <p class="message-key">{{ gt('generated.reservation-arrived-to-queue.021') }}{{ queueApiError.error.messageKey }}</p>
       </section>
     </div>
 

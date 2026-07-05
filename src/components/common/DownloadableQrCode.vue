@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   qrCanvasToPngDataUrl,
@@ -16,17 +17,19 @@ const props = withDefaults(defineProps<{
   size?: number
   downloadLabel?: string
 }>(), {
-  title: '二维码',
   description: '',
   fileName: 'qr-code.png',
-  size: 220,
-  downloadLabel: '下载二维码'
+  size: 220
 })
 
+const { t } = useI18n()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const renderError = ref('')
+const renderErrorKey = ref('')
 const rendering = ref(false)
 
+const resolvedTitle = computed(() => props.title ?? t('components.downloadableQrCode.title'))
+const resolvedDownloadLabel = computed(() => props.downloadLabel ?? t('components.downloadableQrCode.download'))
+const renderError = computed(() => renderErrorKey.value ? t(renderErrorKey.value) : '')
 const normalizedFileName = computed(() => safeQrDownloadFileName(props.fileName))
 const canDownload = computed(() => !!props.value.trim() && !rendering.value && !renderError.value)
 
@@ -43,9 +46,9 @@ async function renderQrCode(): Promise<void> {
   if (!canvas) {
     return
   }
-  renderError.value = ''
+  renderErrorKey.value = ''
   if (!props.value.trim()) {
-    renderError.value = '二维码内容为空'
+    renderErrorKey.value = 'components.downloadableQrCode.errors.empty'
     return
   }
   rendering.value = true
@@ -56,7 +59,7 @@ async function renderQrCode(): Promise<void> {
       size: props.size
     })
   } catch {
-    renderError.value = '二维码生成失败'
+    renderErrorKey.value = 'components.downloadableQrCode.errors.renderFailed'
   } finally {
     rendering.value = false
   }
@@ -75,10 +78,10 @@ function downloadQrCodePng(): void {
 </script>
 
 <template>
-  <section class="downloadable-qr-code" aria-label="二维码下载">
+  <section class="downloadable-qr-code" :aria-label="$t('components.downloadableQrCode.aria')">
     <div class="downloadable-qr-code__header">
       <div>
-        <h2>{{ title }}</h2>
+        <h2>{{ resolvedTitle }}</h2>
         <p v-if="description">{{ description }}</p>
       </div>
     </div>
@@ -89,7 +92,7 @@ function downloadQrCodePng(): void {
         :width="size"
         :height="size"
         role="img"
-        :aria-label="title"
+        :aria-label="resolvedTitle"
       ></canvas>
     </div>
 
@@ -101,7 +104,7 @@ function downloadQrCodePng(): void {
       :disabled="!canDownload"
       @click="downloadQrCodePng"
     >
-      {{ rendering ? '生成中' : downloadLabel }}
+      {{ rendering ? $t('components.downloadableQrCode.rendering') : resolvedDownloadLabel }}
     </button>
   </section>
 </template>

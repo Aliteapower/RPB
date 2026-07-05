@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   switchTable,
@@ -34,6 +35,7 @@ const emit = defineEmits<{
   switched: [response: SwitchTableResponse]
 }>()
 
+const { t } = useI18n()
 const selectedTableId = ref('')
 const selectedTableGroupId = ref('')
 const isSubmitting = ref(false)
@@ -43,14 +45,16 @@ const customerLabel = computed(() => {
   const item = props.item
 
   if (!item) {
-    return '当前预约'
+    return t('reservationWorkbench.dialogs.currentReservation')
   }
 
   const values = [item.customerName, item.customerNickname].filter(Boolean)
   return values.length ? values.join(' / ') : item.reservationCode
 })
 const currentResourceLabel = computed(() =>
-  props.item?.currentResourceCode ? `当前桌号：${props.item.currentResourceCode}` : '当前桌号：未识别'
+  props.item?.currentResourceCode
+    ? t('reservationWorkbench.dialogs.currentTable', { code: props.item.currentResourceCode })
+    : t('reservationWorkbench.dialogs.unknownTable')
 )
 const pickerBusinessDate = computed(() => props.businessDate || props.item?.businessDate || null)
 const canSubmit = computed(
@@ -178,7 +182,7 @@ function createLocalError(code: string, messageKey: string): TableSwitchApiError
     <section
       v-if="open"
       class="reservation-table-switch-dialog"
-      aria-label="选择桌号换桌弹窗"
+      :aria-label="$t('reservationWorkbench.dialogs.switchAria')"
       aria-modal="true"
       role="dialog"
     >
@@ -186,14 +190,19 @@ function createLocalError(code: string, messageKey: string): TableSwitchApiError
 
       <form class="reservation-table-switch-dialog__panel" @submit.prevent="submit">
         <header>
-          <h2>选择桌号（换桌）</h2>
-          <button type="button" aria-label="关闭换桌" :disabled="isSubmitting" @click="close">
+          <h2>{{ $t('reservationWorkbench.dialogs.switchTitle') }}</h2>
+          <button
+            type="button"
+            :aria-label="$t('reservationWorkbench.dialogs.switchClose')"
+            :disabled="isSubmitting"
+            @click="close"
+          >
             ×
           </button>
         </header>
 
         <p class="reservation-table-switch-dialog__summary">
-          为 {{ customerLabel }} 更换桌台
+          {{ $t('reservationWorkbench.dialogs.switchSubject', { customer: customerLabel }) }}
         </p>
         <p class="reservation-table-switch-dialog__current">{{ currentResourceLabel }}</p>
 
@@ -209,17 +218,17 @@ function createLocalError(code: string, messageKey: string): TableSwitchApiError
         />
 
         <section v-if="apiError" class="reservation-table-switch-dialog__error" aria-live="assertive">
-          <h3>换桌失败</h3>
-          <p>错误代码：{{ apiError.error.code }}</p>
-          <p>消息键：{{ apiError.error.messageKey }}</p>
+          <h3>{{ $t('reservationWorkbench.dialogs.switchFailed') }}</h3>
+          <p>{{ $t('reservationWorkbench.dialogs.errorCode', { code: apiError.error.code }) }}</p>
+          <p>{{ $t('reservationWorkbench.dialogs.messageKey', { messageKey: apiError.error.messageKey }) }}</p>
         </section>
 
         <footer>
           <button class="reservation-table-switch-dialog__save" :disabled="!canSubmit" type="submit">
-            {{ isSubmitting ? '换桌中...' : '确认换桌' }}
+            {{ isSubmitting ? $t('reservationWorkbench.dialogs.switchSubmitting') : $t('reservationWorkbench.dialogs.confirmSwitch') }}
           </button>
           <button class="reservation-table-switch-dialog__cancel" type="button" :disabled="isSubmitting" @click="close">
-            取消
+            {{ $t('common.actions.cancel') }}
           </button>
         </footer>
       </form>
@@ -274,7 +283,7 @@ function createLocalError(code: string, messageKey: string): TableSwitchApiError
 
 .reservation-table-switch-dialog__panel h2::before {
   color: #8b5e5e;
-  content: '椅';
+  content: '▦';
   font-size: 1rem;
   margin-right: 8px;
 }

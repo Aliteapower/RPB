@@ -32,6 +32,9 @@ import type {
   TenantAdminPublicBookingAvailabilityRuleMutation,
   TenantAdminPublicBookingSettingsMutation
 } from '../types/publicBooking'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const loading = ref(false)
@@ -78,13 +81,13 @@ const ruleForm = reactive<TenantAdminPublicBookingAvailabilityRuleMutation>({
 const selectedWeekdays = ref<number[]>([])
 
 const weekdayOptions = [
-  { value: 1, label: '周一' },
-  { value: 2, label: '周二' },
-  { value: 3, label: '周三' },
-  { value: 4, label: '周四' },
-  { value: 5, label: '周五' },
-  { value: 6, label: '周六' },
-  { value: 7, label: '周日' }
+  { value: 1, label: gt('generated.tenant-admin-public-booking.114') },
+  { value: 2, label: gt('generated.tenant-admin-public-booking.115') },
+  { value: 3, label: gt('generated.tenant-admin-public-booking.116') },
+  { value: 4, label: gt('generated.tenant-admin-public-booking.117') },
+  { value: 5, label: gt('generated.tenant-admin-public-booking.118') },
+  { value: 6, label: gt('generated.tenant-admin-public-booking.119') },
+  { value: 7, label: gt('generated.tenant-admin-public-booking.120') }
 ]
 
 const emailForm = reactive<TenantAdminCustomerEmailSettingsMutation>({
@@ -215,7 +218,7 @@ async function saveEmailSettings(): Promise<void> {
     const response = await updateTenantAdminCustomerEmailSettings(storeId.value, normalizedEmailSettings())
     emailSecretConfigured.value = response.secretConfigured
     emailForm.smtpPassword = ''
-    savedText.value = '邮箱登录服务已保存'
+    savedText.value = gt('generated.tenant-admin-public-booking.121')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -242,11 +245,11 @@ async function saveOAuthSettings(provider: 'google' | 'facebook'): Promise<void>
     if (provider === 'google') {
       googleSecretConfigured.value = response.secretConfigured
       googleForm.clientSecret = ''
-      savedText.value = 'Google 登录已保存'
+      savedText.value = gt('generated.tenant-admin-public-booking.122')
     } else {
       facebookSecretConfigured.value = response.secretConfigured
       facebookForm.clientSecret = ''
-      savedText.value = 'Facebook 登录已保存'
+      savedText.value = gt('generated.tenant-admin-public-booking.123')
     }
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -265,7 +268,7 @@ async function saveSettings(): Promise<void> {
   try {
     const response = await updateTenantAdminPublicBookingSettings(storeId.value, normalizedSettings())
     Object.assign(form, response)
-    savedText.value = '公网预约设置已保存'
+    savedText.value = gt('generated.tenant-admin-public-booking.124')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -284,13 +287,13 @@ async function saveAvailabilityRule(): Promise<void> {
     if (ruleForm.ruleType === 'weekly') {
       const responses = await syncWeeklyAvailabilityRules()
       savedText.value = selectedWeekdays.value.length === 0
-        ? '公网预约规则已清空'
-        : responses.length > 1 ? `公网预约规则已保存（${responses.length} 个星期）` : '公网预约规则已保存'
+        ? gt('generated.tenant-admin-public-booking.125')
+        : responses.length > 1 ? `${gt('generated.tenant-admin-public-booking.103')}${responses.length}${gt('generated.tenant-admin-public-booking.104')}` : gt('generated.tenant-admin-public-booking.126')
       return
     }
     const response = await updateTenantAdminPublicBookingAvailabilityRule(storeId.value, normalizedAvailabilityRule())
     availabilityRules.value = upsertAvailabilityRules(availabilityRules.value, [response])
-    savedText.value = '公网预约规则已保存'
+    savedText.value = gt('generated.tenant-admin-public-booking.127')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -327,10 +330,10 @@ async function copyPublicUrl(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   if (await copyText(publicBookingUrl.value)) {
-    savedText.value = '公网预约入口已复制'
+    savedText.value = gt('generated.tenant-admin-public-booking.128')
     return
   }
-  errorText.value = `公网预约入口复制失败，请手动复制：${publicBookingUrl.value}`
+  errorText.value = `${gt('generated.tenant-admin-public-booking.105')}${publicBookingUrl.value}`
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -450,7 +453,7 @@ function hydrateWeeklySelectionFromSavedRules(): void {
 function mealPeriodOptionLabel(period: ReservationMealPeriod): string {
   const startTime = period.startLocalTime.slice(0, 5)
   const endTime = period.endLocalTime.slice(0, 5)
-  const nextDay = period.crossesNextDay ? ' 次日' : ''
+  const nextDay = period.crossesNextDay ? gt('generated.tenant-admin-public-booking.129') : ''
   return `${period.displayName} (${period.periodKey}, ${startTime}-${endTime}${nextDay})`
 }
 
@@ -505,14 +508,14 @@ function compareAvailabilityRules(
 
 function ruleTargetLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
   if (rule.ruleType === 'weekly') {
-    return `每周固定 ${weekdayLabel(rule.dayOfWeek)}`
+    return `${gt('generated.tenant-admin-public-booking.106')}${weekdayLabel(rule.dayOfWeek)}`
   }
-  return `指定日期例外 ${rule.businessDate || '未选择日期'}`
+  return `${gt('generated.tenant-admin-public-booking.107')}${rule.businessDate || gt('generated.tenant-admin-public-booking.108')}`
 }
 
 function rulePeriodLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
   if (!rule.periodKey) {
-    return '全部餐段'
+    return gt('generated.tenant-admin-public-booking.130')
   }
   const period = activeMealPeriods.value.find(candidate => candidate.periodKey === rule.periodKey)
   return period ? `${period.displayName} (${period.periodKey})` : rule.periodKey
@@ -520,19 +523,19 @@ function rulePeriodLabel(rule: TenantAdminPublicBookingAvailabilityRule): string
 
 function ruleModeLabel(rule: TenantAdminPublicBookingAvailabilityRule): string {
   if (rule.quotaMode === 'closed') {
-    return '关闭预约'
+    return gt('generated.tenant-admin-public-booking.131')
   }
   if (rule.quotaMode === 'percentage') {
-    return `容量 ${rule.quotaPercent ?? 0}%`
+    return `${gt('generated.tenant-admin-public-booking.109')}${rule.quotaPercent ?? 0}%`
   }
   if (rule.quotaMode === 'table_count') {
-    return `开放 ${rule.tableCount ?? 0} 桌`
+    return `${gt('generated.tenant-admin-public-booking.110')}${rule.tableCount ?? 0}${gt('generated.tenant-admin-public-booking.111')}`
   }
-  return `开放 ${rule.guestCount ?? 0} 人`
+  return `${gt('generated.tenant-admin-public-booking.112')}${rule.guestCount ?? 0}${gt('generated.tenant-admin-public-booking.113')}`
 }
 
 function weekdayLabel(dayOfWeek: number | null): string {
-  return weekdayOptions.find(option => option.value === dayOfWeek)?.label || '未选择'
+  return weekdayOptions.find(option => option.value === dayOfWeek)?.label || gt('generated.tenant-admin-public-booking.132')
 }
 
 function sameNullableText(left: string | null, right: string | null): boolean {
@@ -548,23 +551,23 @@ function todayInputValue(): string {
 function apiErrorText(error: unknown): string {
   if (error instanceof ReservationMealPeriodApiError) {
     if (error.status === 401) {
-      return '登录已失效'
+      return gt('generated.tenant-admin-public-booking.133')
     }
     if (error.status === 403 || error.response.error.code === 'FORBIDDEN') {
-      return '没有租户后台权限'
+      return gt('generated.tenant-admin-public-booking.134')
     }
-    return '预约餐段加载失败'
+    return gt('generated.tenant-admin-public-booking.135')
   }
   if (!(error instanceof PublicBookingApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-public-booking.136')
   }
   if (error.status === 401) {
-    return '登录已失效'
+    return gt('generated.tenant-admin-public-booking.137')
   }
   if (error.status === 403) {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-public-booking.138')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-public-booking.139')
 }
 </script>
 
@@ -575,117 +578,107 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>公网预约</h1>
+          <span>{{ gt('generated.tenant-admin-public-booking.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-public-booking.002') }}</h1>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-public-booking.003') }}</p>
 
       <section v-else class="settings-layout">
-        <section class="public-entry-panel" aria-label="租户公网预约入口">
+        <section class="public-entry-panel" :aria-label="gt('generated.tenant-admin-public-booking.004')">
           <div class="public-entry-panel__content">
-            <span>租户公网预约入口</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.005') }}</span>
             <strong>{{ publicBookingUrl }}</strong>
-            <p>可复制链接，也可下载二维码用于海报、桌牌或社媒分享。</p>
-            <button type="button" aria-label="复制公网预约入口" @click="copyPublicUrl">复制公网预约入口</button>
+            <p>{{ gt('generated.tenant-admin-public-booking.006') }}</p>
+            <button type="button" :aria-label="gt('generated.tenant-admin-public-booking.007')" @click="copyPublicUrl">{{ gt('generated.tenant-admin-public-booking.008') }}</button>
           </div>
           <DownloadableQrCode
             :value="publicBookingUrl"
             :logo-url="tenantLogoUrl"
             :file-name="publicBookingQrFileName"
-            title="预约入口二维码"
-            description="已配置时嵌入租户 LOGO"
-            download-label="下载二维码"
+            :title="gt('generated.tenant-admin-public-booking.009')"
+            :description="gt('generated.tenant-admin-public-booking.010')"
+            :download-label="gt('generated.tenant-admin-public-booking.011')"
           />
         </section>
 
-        <section class="settings-operation-list" aria-label="公网预约项目操作">
-          <h2 class="operation-list-title">项目操作</h2>
+        <section class="settings-operation-list" :aria-label="gt('generated.tenant-admin-public-booking.012')">
+          <h2 class="operation-list-title">{{ gt('generated.tenant-admin-public-booking.013') }}</h2>
 
           <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'settings' }">
             <div>
-              <span>开放规则</span>
-              <small>默认配额 / 登录要求</small>
+              <span>{{ gt('generated.tenant-admin-public-booking.014') }}</span>
+              <small>{{ gt('generated.tenant-admin-public-booking.015') }}</small>
             </div>
             <strong class="status-chip" :class="{ 'status-chip--ready': form.enabled }">
-              {{ form.enabled ? '已开放' : '未开放' }}
+              {{ form.enabled ? gt('generated.tenant-admin-public-booking.016') : gt('generated.tenant-admin-public-booking.017') }}
             </strong>
             <button
               type="button"
               :aria-expanded="activePanel === 'settings'"
               @click="openPanel('settings')"
-            >
-              配置
-            </button>
+            > {{ gt('generated.tenant-admin-public-booking.018') }} </button>
           </article>
 
           <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'email' }">
             <div>
-              <span>邮箱注册 / 登录</span>
-              <small>验证码邮件服务</small>
+              <span>{{ gt('generated.tenant-admin-public-booking.019') }}</span>
+              <small>{{ gt('generated.tenant-admin-public-booking.020') }}</small>
             </div>
             <strong class="status-chip" :class="{ 'status-chip--ready': emailLoginReady }">
-              {{ emailLoginReady ? '可用' : '待配置' }}
+              {{ emailLoginReady ? gt('generated.tenant-admin-public-booking.021') : gt('generated.tenant-admin-public-booking.022') }}
             </strong>
             <button
               type="button"
               :aria-expanded="activePanel === 'email'"
               @click="openPanel('email')"
-            >
-              配置
-            </button>
+            > {{ gt('generated.tenant-admin-public-booking.023') }} </button>
           </article>
 
           <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'google' }">
             <div>
-              <span>Google 登录</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.024') }}</span>
               <small>OAuth Client ID</small>
             </div>
             <strong class="status-chip" :class="{ 'status-chip--ready': googleLoginReady }">
-              {{ googleLoginReady ? '可用' : '待配置' }}
+              {{ googleLoginReady ? gt('generated.tenant-admin-public-booking.025') : gt('generated.tenant-admin-public-booking.026') }}
             </strong>
             <button
               type="button"
               :aria-expanded="activePanel === 'google'"
               @click="openPanel('google')"
-            >
-              配置
-            </button>
+            > {{ gt('generated.tenant-admin-public-booking.027') }} </button>
           </article>
 
           <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'facebook' }">
             <div>
-              <span>Facebook 登录</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.028') }}</span>
               <small>App ID / App Secret</small>
             </div>
             <strong class="status-chip" :class="{ 'status-chip--ready': facebookLoginReady }">
-              {{ facebookLoginReady ? '可用' : '待配置' }}
+              {{ facebookLoginReady ? gt('generated.tenant-admin-public-booking.029') : gt('generated.tenant-admin-public-booking.030') }}
             </strong>
             <button
               type="button"
               :aria-expanded="activePanel === 'facebook'"
               @click="openPanel('facebook')"
-            >
-              配置
-            </button>
+            > {{ gt('generated.tenant-admin-public-booking.031') }} </button>
           </article>
 
           <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'rules' }">
             <div>
-              <span>公网预约规则</span>
-              <small>每周固定 / 指定日期例外</small>
+              <span>{{ gt('generated.tenant-admin-public-booking.032') }}</span>
+              <small>{{ gt('generated.tenant-admin-public-booking.033') }}</small>
             </div>
-            <strong class="status-chip status-chip--ready">可选</strong>
+            <strong class="status-chip status-chip--ready">{{ gt('generated.tenant-admin-public-booking.034') }}</strong>
             <button
               type="button"
               :aria-expanded="activePanel === 'rules'"
               @click="openPanel('rules')"
-            >
-              配置
-            </button>
+            > {{ gt('generated.tenant-admin-public-booking.035') }} </button>
           </article>
         </section>
 
@@ -693,82 +686,80 @@ function apiErrorText(error: unknown): string {
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="form.enabled" type="checkbox" />
-              <span>开放公网预约</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.036') }}</span>
             </label>
             <label>
               <input v-model="form.requireCustomerLogin" type="checkbox" />
-              <span>要求顾客登录</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.037') }}</span>
             </label>
           </section>
 
           <label>
-            <span>默认配额模式</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.038') }}</span>
             <select v-model="form.defaultQuotaMode">
-              <option value="percentage">桌台容量百分比</option>
-              <option value="table_count">自定义桌数</option>
-              <option value="guest_count">自定义人数</option>
+              <option value="percentage">{{ gt('generated.tenant-admin-public-booking.039') }}</option>
+              <option value="table_count">{{ gt('generated.tenant-admin-public-booking.040') }}</option>
+              <option value="guest_count">{{ gt('generated.tenant-admin-public-booking.041') }}</option>
             </select>
           </label>
 
           <label v-if="form.defaultQuotaMode === 'percentage'">
-            <span>默认百分比</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.042') }}</span>
             <input v-model.number="form.defaultQuotaPercent" min="0" max="100" type="number" />
           </label>
 
           <label v-if="form.defaultQuotaMode === 'table_count'">
-            <span>默认桌数</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.043') }}</span>
             <input v-model.number="form.defaultTableCount" min="0" type="number" />
           </label>
 
           <label v-if="form.defaultQuotaMode === 'guest_count'">
-            <span>默认人数</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.044') }}</span>
             <input v-model.number="form.defaultGuestCount" min="0" type="number" />
           </label>
 
           <label>
-            <span>最少提前分钟</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.045') }}</span>
             <input v-model.number="form.minLeadMinutes" min="0" type="number" />
           </label>
 
           <label>
-            <span>最多提前天数</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.046') }}</span>
             <input v-model.number="form.maxAdvanceDays" min="0" max="366" type="number" />
           </label>
 
           <div class="form-actions">
             <button class="primary-button" type="submit" :disabled="saving">
-              {{ saving ? '保存中' : '保存设置' }}
+              {{ saving ? gt('generated.tenant-admin-public-booking.047') : gt('generated.tenant-admin-public-booking.048') }}
             </button>
           </div>
         </form>
 
         <form v-else-if="activePanel === 'email'" class="form-panel" @submit.prevent="saveEmailSettings">
           <div class="form-panel__wide panel-heading-row">
-            <h2>邮箱注册 / 登录邮件服务</h2>
+            <h2>{{ gt('generated.tenant-admin-public-booking.049') }}</h2>
             <strong class="status-chip" :class="{ 'status-chip--ready': emailLoginReady }">
-              {{ emailLoginReady ? '可用' : '待配置' }}
+              {{ emailLoginReady ? gt('generated.tenant-admin-public-booking.050') : gt('generated.tenant-admin-public-booking.051') }}
             </strong>
           </div>
-          <p class="form-panel__wide panel-note">用于公网预约邮箱验证码，已注册邮箱登录，未注册邮箱注册</p>
+          <p class="form-panel__wide panel-note">{{ gt('generated.tenant-admin-public-booking.052') }}</p>
 
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="emailForm.enabled" type="checkbox" />
-              <span>启用邮箱注册 / 登录</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.053') }}</span>
             </label>
-            <span class="secret-hint">{{ emailSecretConfigured ? 'SMTP 密钥已配置' : 'SMTP 密钥未配置' }}</span>
+            <span class="secret-hint">{{ emailSecretConfigured ? gt('generated.tenant-admin-public-booking.054') : gt('generated.tenant-admin-public-booking.055') }}</span>
           </section>
-          <p v-if="emailForm.enabled && !emailSettingsComplete" class="form-panel__wide field-hint">
-            启用后需填写发件邮箱、SMTP Host、SMTP Port；填写 SMTP 用户名时需保存 SMTP 密钥
-          </p>
+          <p v-if="emailForm.enabled && !emailSettingsComplete" class="form-panel__wide field-hint"> {{ gt('generated.tenant-admin-public-booking.056') }} </p>
 
           <label>
-            <span>发件邮箱</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.057') }}</span>
             <input v-model="emailForm.fromEmail" autocomplete="off" type="email" />
           </label>
 
           <label>
-            <span>发件名称</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.058') }}</span>
             <input v-model="emailForm.fromName" autocomplete="off" />
           </label>
 
@@ -783,12 +774,12 @@ function apiErrorText(error: unknown): string {
           </label>
 
           <label>
-            <span>SMTP 用户名</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.059') }}</span>
             <input v-model="emailForm.smtpUsername" autocomplete="off" />
           </label>
 
           <label>
-            <span>SMTP 密钥</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.060') }}</span>
             <PasswordInput v-model="emailForm.smtpPassword" autocomplete="new-password" />
           </label>
 
@@ -801,28 +792,26 @@ function apiErrorText(error: unknown): string {
 
           <div class="form-actions">
             <button class="primary-button" type="submit" :disabled="!canSaveEmail">
-              {{ savingEmail ? '保存中' : '保存邮箱登录服务' }}
+              {{ savingEmail ? gt('generated.tenant-admin-public-booking.061') : gt('generated.tenant-admin-public-booking.062') }}
             </button>
           </div>
         </form>
 
         <form v-else-if="activePanel === 'google'" class="form-panel" @submit.prevent="saveOAuthSettings('google')">
           <div class="form-panel__wide panel-heading-row">
-            <h2>Google 登录</h2>
+            <h2>{{ gt('generated.tenant-admin-public-booking.063') }}</h2>
             <strong class="status-chip" :class="{ 'status-chip--ready': googleLoginReady }">
-              {{ googleLoginReady ? '可用' : '待配置' }}
+              {{ googleLoginReady ? gt('generated.tenant-admin-public-booking.064') : gt('generated.tenant-admin-public-booking.065') }}
             </strong>
           </div>
 
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="googleForm.enabled" type="checkbox" />
-              <span>启用 Google</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.066') }}</span>
             </label>
           </section>
-          <p v-if="googleForm.enabled && !googleSettingsComplete" class="form-panel__wide field-hint">
-            启用后需填写 Client ID
-          </p>
+          <p v-if="googleForm.enabled && !googleSettingsComplete" class="form-panel__wide field-hint"> {{ gt('generated.tenant-admin-public-booking.067') }} </p>
 
           <label>
             <span>Client ID</span>
@@ -831,29 +820,27 @@ function apiErrorText(error: unknown): string {
 
           <div class="form-actions">
             <button class="primary-button" type="submit" :disabled="!canSaveGoogle">
-              {{ savingGoogle ? '保存中' : '保存 Google' }}
+              {{ savingGoogle ? gt('generated.tenant-admin-public-booking.068') : gt('generated.tenant-admin-public-booking.069') }}
             </button>
           </div>
         </form>
 
         <form v-else-if="activePanel === 'facebook'" class="form-panel" @submit.prevent="saveOAuthSettings('facebook')">
           <div class="form-panel__wide panel-heading-row">
-            <h2>Facebook 登录</h2>
+            <h2>{{ gt('generated.tenant-admin-public-booking.070') }}</h2>
             <strong class="status-chip" :class="{ 'status-chip--ready': facebookLoginReady }">
-              {{ facebookLoginReady ? '可用' : '待配置' }}
+              {{ facebookLoginReady ? gt('generated.tenant-admin-public-booking.071') : gt('generated.tenant-admin-public-booking.072') }}
             </strong>
           </div>
 
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="facebookForm.enabled" type="checkbox" />
-              <span>启用 Facebook</span>
+              <span>{{ gt('generated.tenant-admin-public-booking.073') }}</span>
             </label>
-            <span class="secret-hint">{{ facebookSecretConfigured ? 'App Secret 已配置' : 'App Secret 未配置' }}</span>
+            <span class="secret-hint">{{ facebookSecretConfigured ? gt('generated.tenant-admin-public-booking.074') : gt('generated.tenant-admin-public-booking.075') }}</span>
           </section>
-          <p v-if="facebookForm.enabled && !facebookSettingsComplete" class="form-panel__wide field-hint">
-            启用后需填写 App ID，并保存 App Secret
-          </p>
+          <p v-if="facebookForm.enabled && !facebookSettingsComplete" class="form-panel__wide field-hint"> {{ gt('generated.tenant-admin-public-booking.076') }} </p>
 
           <label>
             <span>App ID</span>
@@ -867,28 +854,26 @@ function apiErrorText(error: unknown): string {
 
           <div class="form-actions">
             <button class="primary-button" type="submit" :disabled="!canSaveFacebook">
-              {{ savingFacebook ? '保存中' : '保存 Facebook' }}
+              {{ savingFacebook ? gt('generated.tenant-admin-public-booking.077') : gt('generated.tenant-admin-public-booking.078') }}
             </button>
           </div>
         </form>
 
         <form v-else-if="activePanel === 'rules'" class="form-panel" @submit.prevent="saveAvailabilityRule">
-          <h2 class="form-panel__wide">公网预约规则</h2>
-          <p class="form-panel__wide panel-note">
-            用于设置公网预约是否开放以及可预约配额；每周固定适合周一店休，指定日期例外适合节假日或临时调整
-          </p>
+          <h2 class="form-panel__wide">{{ gt('generated.tenant-admin-public-booking.079') }}</h2>
+          <p class="form-panel__wide panel-note"> {{ gt('generated.tenant-admin-public-booking.080') }} </p>
 
           <label>
-            <span>规则类型</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.081') }}</span>
             <select v-model="ruleForm.ruleType">
-              <option value="weekly">每周固定</option>
-              <option value="date_exception">指定日期例外</option>
+              <option value="weekly">{{ gt('generated.tenant-admin-public-booking.082') }}</option>
+              <option value="date_exception">{{ gt('generated.tenant-admin-public-booking.083') }}</option>
             </select>
           </label>
 
           <section v-if="ruleForm.ruleType === 'weekly'" class="weekday-field">
-            <span>星期</span>
-            <div class="weekday-checkbox-grid" role="group" aria-label="星期">
+            <span>{{ gt('generated.tenant-admin-public-booking.084') }}</span>
+            <div class="weekday-checkbox-grid" role="group" :aria-label="gt('generated.tenant-admin-public-booking.085')">
               <label
                 v-for="weekday in weekdayOptions"
                 :key="weekday.value"
@@ -901,14 +886,14 @@ function apiErrorText(error: unknown): string {
           </section>
 
           <label v-if="ruleForm.ruleType === 'date_exception'">
-            <span>日期</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.086') }}</span>
             <input v-model="ruleForm.businessDate" type="date" />
           </label>
 
           <label>
-            <span>选择餐段</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.087') }}</span>
             <select v-model="ruleForm.periodKey">
-              <option value="">全部餐段</option>
+              <option value="">{{ gt('generated.tenant-admin-public-booking.088') }}</option>
               <option
                 v-for="period in activeMealPeriods"
                 :key="period.id"
@@ -919,44 +904,42 @@ function apiErrorText(error: unknown): string {
             </select>
           </label>
 
-          <p v-if="activeMealPeriods.length === 0" class="form-panel__wide field-hint">
-            暂无可用预约餐段，请先在基础设置的预约餐段中启用餐段
-          </p>
+          <p v-if="activeMealPeriods.length === 0" class="form-panel__wide field-hint"> {{ gt('generated.tenant-admin-public-booking.089') }} </p>
 
           <label>
-            <span>覆盖模式</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.090') }}</span>
             <select v-model="ruleForm.quotaMode">
-              <option value="percentage">百分比</option>
-              <option value="table_count">桌数</option>
-              <option value="guest_count">人数</option>
-              <option value="closed">关闭</option>
+              <option value="percentage">{{ gt('generated.tenant-admin-public-booking.091') }}</option>
+              <option value="table_count">{{ gt('generated.tenant-admin-public-booking.092') }}</option>
+              <option value="guest_count">{{ gt('generated.tenant-admin-public-booking.093') }}</option>
+              <option value="closed">{{ gt('generated.tenant-admin-public-booking.094') }}</option>
             </select>
           </label>
 
           <label v-if="ruleForm.quotaMode === 'percentage'">
-            <span>百分比</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.095') }}</span>
             <input v-model.number="ruleForm.quotaPercent" min="0" max="100" type="number" />
           </label>
 
           <label v-if="ruleForm.quotaMode === 'table_count'">
-            <span>桌数</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.096') }}</span>
             <input v-model.number="ruleForm.tableCount" min="0" type="number" />
           </label>
 
           <label v-if="ruleForm.quotaMode === 'guest_count'">
-            <span>人数</span>
+            <span>{{ gt('generated.tenant-admin-public-booking.097') }}</span>
             <input v-model.number="ruleForm.guestCount" min="0" type="number" />
           </label>
 
           <div class="form-actions">
             <button class="primary-button" type="submit" :disabled="savingRule">
-              {{ savingRule ? '保存中' : '保存规则' }}
+              {{ savingRule ? gt('generated.tenant-admin-public-booking.098') : gt('generated.tenant-admin-public-booking.099') }}
             </button>
           </div>
 
-          <section class="form-panel__wide rule-list" aria-label="已保存规则">
-            <h3>已保存规则</h3>
-            <p v-if="availabilityRules.length === 0" class="rule-list__empty">还没有单独规则，当前使用开放规则里的默认配置</p>
+          <section class="form-panel__wide rule-list" :aria-label="gt('generated.tenant-admin-public-booking.100')">
+            <h3>{{ gt('generated.tenant-admin-public-booking.101') }}</h3>
+            <p v-if="availabilityRules.length === 0" class="rule-list__empty">{{ gt('generated.tenant-admin-public-booking.102') }}</p>
             <article
               v-for="rule in availabilityRules"
               :key="`${rule.ruleType}-${rule.businessDate || rule.dayOfWeek}-${rule.periodKey || 'all'}`"

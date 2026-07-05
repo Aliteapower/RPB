@@ -23,12 +23,12 @@ class ReservationStatusActionUiImplementationValidationTest {
         assertThat(todayListItemPath).exists();
         assertThat(tablePagePath).exists();
 
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String todayPage = Files.readString(todayPagePath);
-        String todayListPanel = Files.readString(todayListPanelPath);
-        String todayListItem = Files.readString(todayListItemPath);
-        String tablePage = Files.readString(tablePagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String todayPage = FrontendSourceSupport.readString(todayPagePath);
+        String todayListPanel = FrontendSourceSupport.readString(todayListPanelPath);
+        String todayListItem = FrontendSourceSupport.readString(todayListItemPath);
+        String tablePage = FrontendSourceSupport.readString(tablePagePath);
 
         assertThat(apiClient)
             .contains("markReservationNoShow")
@@ -69,7 +69,7 @@ class ReservationStatusActionUiImplementationValidationTest {
         assertThat(todayListItem)
             .contains("noShowableStatuses")
             .contains("no-show-requested")
-            .contains("爽约")
+            .contains("reservationWorkbench.item.noShow")
             .doesNotContain("showComplete")
             .doesNotContain("complete-requested")
             .doesNotContain("结桌")

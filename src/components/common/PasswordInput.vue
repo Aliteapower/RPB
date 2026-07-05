@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface PasswordModelModifiers {
   trim?: boolean
@@ -25,9 +26,10 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
+const { t } = useI18n()
 const passwordVisible = ref(false)
 const inputType = computed(() => (passwordVisible.value ? 'text' : 'password'))
-const toggleLabel = computed(() => (passwordVisible.value ? '隐藏密码' : '显示密码'))
+const toggleLabel = computed(() => t(passwordVisible.value ? 'common.password.hide' : 'common.password.show'))
 const inputValue = computed(() => props.modelValue ?? '')
 
 function updateValue(event: Event): void {

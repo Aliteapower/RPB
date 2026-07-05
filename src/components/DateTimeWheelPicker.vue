@@ -116,9 +116,9 @@ function pad2(value: number): string {
       <strong>{{ pickerDisplay }}</strong>
     </div>
     <input :name="name" type="hidden" :value="modelValue" />
-    <div class="picker-row date-picker-row" :aria-label="`${label} 日期`">
+    <div class="picker-row date-picker-row" :aria-label="`${label} ${$t('common.dateTime.date')}`">
       <label class="picker-column">
-        <span>年</span>
+        <span>{{ $t('common.dateTime.year') }}</span>
         <select v-model.number="picker.year" @change="onPickerChanged">
           <option v-for="year in yearOptions" :key="year" :value="year">
             {{ year }}
@@ -126,7 +126,7 @@ function pad2(value: number): string {
         </select>
       </label>
       <label class="picker-column">
-        <span>月</span>
+        <span>{{ $t('common.dateTime.month') }}</span>
         <select v-model.number="picker.month" @change="onPickerChanged">
           <option v-for="month in MONTH_OPTIONS" :key="month" :value="month">
             {{ pad2(month) }}
@@ -134,7 +134,7 @@ function pad2(value: number): string {
         </select>
       </label>
       <label class="picker-column">
-        <span>日</span>
+        <span>{{ $t('common.dateTime.day') }}</span>
         <select v-model.number="picker.day" @change="onPickerChanged">
           <option v-for="day in dayOptions" :key="day" :value="day">
             {{ pad2(day) }}
@@ -142,9 +142,9 @@ function pad2(value: number): string {
         </select>
       </label>
     </div>
-    <div class="picker-row time-picker-row" :aria-label="`${label} 时间`">
+    <div class="picker-row time-picker-row" :aria-label="`${label} ${$t('common.dateTime.time')}`">
       <label class="picker-column">
-        <span>时</span>
+        <span>{{ $t('common.dateTime.hour') }}</span>
         <select v-model.number="picker.hour" @change="onPickerChanged">
           <option v-for="hour in HOUR_OPTIONS" :key="hour" :value="hour">
             {{ pad2(hour) }}
@@ -152,7 +152,7 @@ function pad2(value: number): string {
         </select>
       </label>
       <label class="picker-column">
-        <span>分</span>
+        <span>{{ $t('common.dateTime.minute') }}</span>
         <select v-model.number="picker.minute" @change="onPickerChanged">
           <option v-for="minute in MINUTE_OPTIONS" :key="minute" :value="minute">
             {{ pad2(minute) }}

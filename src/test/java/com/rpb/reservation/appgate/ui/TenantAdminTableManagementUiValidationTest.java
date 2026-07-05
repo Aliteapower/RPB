@@ -10,9 +10,9 @@ class TenantAdminTableManagementUiValidationTest {
 
     @Test
     void tenantAdminTableManagementSupportsSortOrderAndExcelImportExport() throws Exception {
-        String listPage = Files.readString(Path.of("src", "pages", "TenantAdminTablesPage.vue"));
-        String formPage = Files.readString(Path.of("src", "pages", "TenantAdminTableFormPage.vue"));
-        String api = Files.readString(Path.of("src", "api", "tenantAdminApi.ts"));
+        String listPage = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminTablesPage.vue"));
+        String formPage = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminTableFormPage.vue"));
+        String api = FrontendSourceSupport.readString(Path.of("src", "api", "tenantAdminApi.ts"));
 
         assertThat(listPage)
             .contains("exportTables")

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import ReservationMonthCalendar from '../reservation-workbench/ReservationMonthCalendar.vue'
 
@@ -11,7 +12,7 @@ const props = withDefaults(
     reservationCounts?: Record<string, number>
   }>(),
   {
-    calendarLabel: '业务日期日历',
+    calendarLabel: '',
     reservationCounts: () => ({})
   }
 )
@@ -22,6 +23,8 @@ const emit = defineEmits<{
 }>()
 
 const calendarOpen = ref(false)
+const { t } = useI18n()
+const effectiveCalendarLabel = computed(() => props.calendarLabel || t('staffControls.businessDate.calendarLabel'))
 
 const dateTone = computed(() => {
   if (props.selectedDate > props.todayDate) {
@@ -37,29 +40,33 @@ const dateTone = computed(() => {
 
 const dateLabel = computed(() => {
   if (dateTone.value === 'future') {
-    return `未来日期 ${props.selectedDate}`
+    return t('staffControls.businessDate.future', { date: props.selectedDate })
   }
 
   if (dateTone.value === 'past') {
-    return `过去日期 ${props.selectedDate}`
+    return t('staffControls.businessDate.past', { date: props.selectedDate })
   }
 
-  return `今日 ${props.selectedDate}`
+  return t('staffControls.businessDate.today', { date: props.selectedDate })
 })
 
 const statusLabel = computed(() => {
   if (dateTone.value === 'future') {
-    return '规划模式'
+    return t('staffControls.businessDate.futureMode')
   }
 
   if (dateTone.value === 'past') {
-    return '历史查看'
+    return t('staffControls.businessDate.pastMode')
   }
 
-  return '营业中'
+  return t('staffControls.businessDate.todayMode')
 })
 
-const changeButtonLabel = computed(() => (dateTone.value === 'today' ? '切换日期' : '改日期'))
+const changeButtonLabel = computed(() =>
+  dateTone.value === 'today'
+    ? t('staffControls.businessDate.changeDate')
+    : t('staffControls.businessDate.editDate')
+)
 
 watch(
   () => props.selectedDate,
@@ -85,7 +92,7 @@ function resetToToday(): void {
 
 <template>
   <section class="business-date-switcher" :class="`business-date-switcher--${dateTone}`">
-    <div class="business-date-switcher__bar" aria-label="业务日期">
+    <div class="business-date-switcher__bar" :aria-label="t('staffControls.businessDate.aria')">
       <div class="business-date-switcher__state">
         <span class="business-date-switcher__dot" aria-hidden="true"></span>
         <strong>{{ dateLabel }}</strong>
@@ -99,7 +106,7 @@ function resetToToday(): void {
           type="button"
           @click="resetToToday"
         >
-          回到今日
+          {{ t('staffControls.businessDate.backToday') }}
         </button>
         <button
           class="business-date-switcher__primary"
@@ -115,7 +122,7 @@ function resetToToday(): void {
     <ReservationMonthCalendar
       v-if="calendarOpen"
       :selected-date="selectedDate"
-      :calendar-label="calendarLabel"
+      :calendar-label="effectiveCalendarLabel"
       :min-date="todayDate"
       :reservation-counts="reservationCounts"
       @update:selected-date="selectDate"

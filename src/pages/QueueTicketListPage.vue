@@ -39,6 +39,9 @@ import type {
   SkipQueueTicketResponse
 } from '../types/queueSkip'
 import type { TableResourceItem } from '../types/tableResource'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 type UiStatusFilter =
   | 'all'
@@ -64,30 +67,30 @@ const todayListLimit = 100
 const storeTimezone = 'Asia/Singapore'
 
 const statusOptions: Array<{ value: UiStatusFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'waiting', label: '等待中' },
-  { value: 'called', label: '已叫号' },
-  { value: 'skipped', label: '已过号' },
-  { value: 'rejoined', label: '已重回' },
-  { value: 'seated', label: '已入座' },
-  { value: 'cancelled', label: '已取消' },
-  { value: 'expired', label: '已过期' }
+  { value: 'all', label: gt('generated.queue-ticket-list.074') },
+  { value: 'waiting', label: gt('generated.queue-ticket-list.075') },
+  { value: 'called', label: gt('generated.queue-ticket-list.076') },
+  { value: 'skipped', label: gt('generated.queue-ticket-list.077') },
+  { value: 'rejoined', label: gt('generated.queue-ticket-list.078') },
+  { value: 'seated', label: gt('generated.queue-ticket-list.079') },
+  { value: 'cancelled', label: gt('generated.queue-ticket-list.080') },
+  { value: 'expired', label: gt('generated.queue-ticket-list.081') }
 ]
 
-const seatActionLabel = { label: '入桌' }
+const seatActionLabel = { label: gt('generated.queue-ticket-list.082') }
 const allTableAreasValue = 'all'
 const unassignedTableAreaValue = '__unassigned__'
-const unassignedTableAreaLabel = '未指定分区'
+const unassignedTableAreaLabel = gt('generated.queue-ticket-list.083')
 const allPartySizeGroupsValue = 'all'
 
 const statusLabels: Record<string, string> = {
-  waiting: '等待中',
-  called: '已叫号',
-  seated: '已入座',
-  skipped: '已过号',
-  rejoined: '已重回',
-  expired: '已过期',
-  cancelled: '已取消'
+  waiting: gt('generated.queue-ticket-list.084'),
+  called: gt('generated.queue-ticket-list.085'),
+  seated: gt('generated.queue-ticket-list.086'),
+  skipped: gt('generated.queue-ticket-list.087'),
+  rejoined: gt('generated.queue-ticket-list.088'),
+  expired: gt('generated.queue-ticket-list.089'),
+  cancelled: gt('generated.queue-ticket-list.090')
 }
 
 const selectedStatus = ref<UiStatusFilter>('all')
@@ -180,7 +183,7 @@ const tableAreaOptions = computed(() => {
   return [
     {
       value: allTableAreasValue,
-      label: '全部分区',
+      label: gt('generated.queue-ticket-list.091'),
       count: tableResources.value.filter(resource => resource.resourceType === 'dining_table').length
     },
     {
@@ -226,7 +229,7 @@ const queueGroupOptions = computed(() => {
   return [
     {
       value: allPartySizeGroupsValue,
-      label: '全部人数组',
+      label: gt('generated.queue-ticket-list.092'),
       partyCount: items.value.length,
       peopleCount: totalPartySize(items.value)
     },
@@ -244,10 +247,10 @@ const reservationQueueEntry = computed(() =>
 )
 const appStatusLabel = computed(() => {
   if (appsLoading.value) {
-    return '检查中'
+    return gt('generated.queue-ticket-list.093')
   }
 
-  return reservationQueueEntry.value ? '排队' : '暂无应用'
+  return reservationQueueEntry.value ? gt('generated.queue-ticket-list.094') : gt('generated.queue-ticket-list.095')
 })
 const canSkipQueueTicket = computed(
   () => reservationQueueEntry.value?.permissions.includes('queue.skip') ?? false
@@ -497,8 +500,8 @@ function confirmCallTicket(item: QueueTicketListItem): void {
 
   clearQueueActionMessages()
 
-  const actionLabel = item.queueTicketStatus === 'called' ? '重复叫号' : '叫号'
-  if (!globalThis.confirm(`确认${actionLabel} ${queueTicketDisplayText(item)}？`)) {
+  const actionLabel = item.queueTicketStatus === 'called' ? gt('generated.queue-ticket-list.096') : gt('generated.queue-ticket-list.097')
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.062')}${actionLabel} ${queueTicketDisplayText(item)}？`)) {
     return
   }
 
@@ -512,7 +515,7 @@ function confirmSkipTicket(item: QueueTicketListItem): void {
 
   clearQueueActionMessages()
 
-  if (!globalThis.confirm(`确认过号 ${queueTicketDisplayText(item)}？`)) {
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.063')}${queueTicketDisplayText(item)}？`)) {
     return
   }
 
@@ -526,7 +529,7 @@ function confirmRejoinTicket(item: QueueTicketListItem): void {
 
   clearQueueActionMessages()
 
-  if (!globalThis.confirm(`确认重新入队 ${queueTicketDisplayText(item)}？`)) {
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.064')}${queueTicketDisplayText(item)}？`)) {
     return
   }
 
@@ -540,7 +543,7 @@ function confirmCancelTicket(item: QueueTicketListItem): void {
 
   clearQueueActionMessages()
 
-  if (!globalThis.confirm(`确认取消 ${queueTicketDisplayText(item)}？`)) {
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.065')}${queueTicketDisplayText(item)}？`)) {
     return
   }
 
@@ -857,7 +860,7 @@ function optionalQueryValue(value: string | null | undefined): string | undefine
 
 function formatStoreDateTime(value: string | null | undefined): string {
   if (!value) {
-    return '未返回'
+    return gt('generated.queue-ticket-list.098')
   }
 
   const date = new Date(value)
@@ -888,7 +891,7 @@ function statusClass(status: string): string {
 }
 
 function optionalDisplay(value: string | null | undefined): string {
-  return value?.trim() ? value : '未返回'
+  return value?.trim() ? value : gt('generated.queue-ticket-list.099')
 }
 
 function customerDisplayName(value: string | null | undefined): string {
@@ -896,7 +899,7 @@ function customerDisplayName(value: string | null | undefined): string {
     return value.trim()
   }
 
-  return '顾客'
+  return gt('generated.queue-ticket-list.100')
 }
 
 function queueTicketDisplayValue(item: QueueTicketListItem): string {
@@ -933,11 +936,11 @@ function queueGroupKey(item: QueueTicketListItem): string {
 }
 
 function queueGroupLabel(value: string | null | undefined): string {
-  return value?.trim() ? value.trim() : '未分组'
+  return value?.trim() ? value.trim() : gt('generated.queue-ticket-list.101')
 }
 
 function formatQueueGroupCount(partyCount: number, peopleCount: number): string {
-  return `${partyCount}组 / ${peopleCount}人`
+  return `${partyCount}${gt('generated.queue-ticket-list.066')}${peopleCount}${gt('generated.queue-ticket-list.067')}`
 }
 
 function compareQueueGroups(first: string, second: string): number {
@@ -966,18 +969,18 @@ function leadingNumber(value: string): number | null {
 
 function queueTimeText(item: QueueTicketListItem): string {
   if (item.calledAt) {
-    return `叫号 ${formatStoreDateTime(item.calledAt)}`
+    return `${gt('generated.queue-ticket-list.068')}${formatStoreDateTime(item.calledAt)}`
   }
 
-  return `取号 ${formatStoreDateTime(item.createdAt)}`
+  return `${gt('generated.queue-ticket-list.069')}${formatStoreDateTime(item.createdAt)}`
 }
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.queue-ticket-list.102')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.queue-ticket-list.070')}${value.slice(0, 8)}`
 }
 
 function assignedResourceText(item: QueueTicketListItem): string {
@@ -990,20 +993,20 @@ function assignedResourceText(item: QueueTicketListItem): string {
   const code = item.assignedResourceCode?.trim()
 
   if (!code) {
-    return '未指定'
+    return gt('generated.queue-ticket-list.103')
   }
 
-  return item.assignedResourceType === 'table_group' ? `桌组 ${code}` : `桌号 ${code}`
+  return item.assignedResourceType === 'table_group' ? `${gt('generated.queue-ticket-list.071')}${code}` : `${gt('generated.queue-ticket-list.072')}${code}`
 }
 
 function assignedAreaText(item: QueueTicketListItem): string {
   const areaName = item.assignedResourceAreaName?.trim()
-  return areaName ? `分区 ${areaName}` : '分区未指定'
+  return areaName ? `${gt('generated.queue-ticket-list.073')}${areaName}` : gt('generated.queue-ticket-list.104')
 }
 
 function areaTitle(resource: TableResourceItem): string {
   const areaName = resource.areaName?.trim()
-  return areaName || '未分区'
+  return areaName || gt('generated.queue-ticket-list.105')
 }
 
 function isCalledTicket(item: QueueTicketListItem): boolean {
@@ -1088,33 +1091,31 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
     />
 
     <div class="queue-workbench-body">
-      <section class="queue-management-panel" aria-label="当日排队管理">
+      <section class="queue-management-panel" :aria-label="gt('generated.queue-ticket-list.001')">
         <header class="queue-panel-heading">
           <div>
-            <p class="section-kicker">营业日期 {{ currentBusinessDate }}</p>
-            <h1>当日排队管理</h1>
+            <p class="section-kicker">{{ gt('generated.queue-ticket-list.002') }} {{ currentBusinessDate }}</p>
+            <h1>{{ gt('generated.queue-ticket-list.003') }}</h1>
           </div>
           <div class="queue-heading-actions">
             <RouterLink
               v-if="canOpenQueueDisplay"
-              aria-label="打开叫号终端屏"
+              :aria-label="gt('generated.queue-ticket-list.004')"
               class="queue-display-link"
               :to="queueDisplayRoute"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <span aria-hidden="true" class="queue-display-icon" />
-              大屏
-            </RouterLink>
+              <span aria-hidden="true" class="queue-display-icon" /> {{ gt('generated.queue-ticket-list.005') }} </RouterLink>
             <button type="button" :disabled="isLoading" @click="refresh">
-              {{ isLoading ? '刷新中' : '刷新' }}
+              {{ isLoading ? gt('generated.queue-ticket-list.006') : gt('generated.queue-ticket-list.007') }}
             </button>
           </div>
         </header>
 
         <div class="queue-toolbar today-queue-management">
-          <section class="queue-status-tabs" aria-label="状态筛选">
-            <p>当日队列</p>
+          <section class="queue-status-tabs" :aria-label="gt('generated.queue-ticket-list.008')">
+            <p>{{ gt('generated.queue-ticket-list.009') }}</p>
             <div class="status-options">
               <button
                 v-for="option in statusOptions"
@@ -1129,11 +1130,11 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
             </div>
           </section>
 
-          <section class="queue-list-filters compact-queue-filters" aria-label="叫号筛选">
-            <div class="table-area-filter compact-table-area-filter" aria-label="桌台分区">
+          <section class="queue-list-filters compact-queue-filters" :aria-label="gt('generated.queue-ticket-list.010')">
+            <div class="table-area-filter compact-table-area-filter" :aria-label="gt('generated.queue-ticket-list.011')">
               <div class="compact-filter-heading">
-                <p>桌台分区</p>
-                <span>{{ activeFilterCount ? `${resultCountLabel} · 已选 ${activeFilterCount} 项` : resultCountLabel }}</span>
+                <p>{{ gt('generated.queue-ticket-list.012') }}</p>
+                <span>{{ activeFilterCount ? `${resultCountLabel}${gt('generated.queue-ticket-list.013')}${activeFilterCount}${gt('generated.queue-ticket-list.014')}` : resultCountLabel }}</span>
               </div>
               <div class="filter-chip-row">
                 <button
@@ -1150,10 +1151,10 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
               </div>
             </div>
 
-            <div class="party-group-filter" aria-label="人数组">
+            <div class="party-group-filter" :aria-label="gt('generated.queue-ticket-list.015')">
               <div class="compact-filter-heading">
-                <p>人数组</p>
-                <span>当前队列</span>
+                <p>{{ gt('generated.queue-ticket-list.016') }}</p>
+                <span>{{ gt('generated.queue-ticket-list.017') }}</span>
               </div>
               <div class="filter-chip-row">
                 <button
@@ -1173,87 +1174,85 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 
             <div class="queue-filter-controls compact-filter-controls">
               <label class="queue-phone-filter">
-                <span class="visually-hidden">手机号</span>
+                <span class="visually-hidden">{{ gt('generated.queue-ticket-list.018') }}</span>
                 <input
                   v-model="phoneFilter"
                   autocomplete="off"
                   inputmode="numeric"
                   name="queuePhoneFilter"
-                  placeholder="手机号"
+                  :placeholder="gt('generated.queue-ticket-list.019')"
                   type="search"
                 />
               </label>
 
-              <button class="reset-filter-button" type="button" @click="resetReceptionFilters">
-                重置
-              </button>
+              <button class="reset-filter-button" type="button" @click="resetReceptionFilters"> {{ gt('generated.queue-ticket-list.020') }} </button>
             </div>
           </section>
         </div>
       </section>
 
-      <section class="queue-message-stack" aria-label="排队操作反馈">
+      <section class="queue-message-stack" :aria-label="gt('generated.queue-ticket-list.021')">
         <section v-if="isLoading" class="state-panel" aria-live="polite">
-          <h2>加载中...</h2>
-          <p>正在读取当前门店排队票。</p>
+          <h2>{{ gt('generated.queue-ticket-list.022') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.023') }}</p>
         </section>
 
         <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>{{ formatAppGateErrorTitle(apiError.error, '加载失败') }}</h2>
-          <p>{{ formatAppGateErrorMessage(apiError.error, '暂时无法读取排队列表，请稍后重试。') }}</p>
+          <h2>{{ formatAppGateErrorTitle(apiError.error, gt('generated.queue-ticket-list.024')) }}</h2>
+          <p>{{ formatAppGateErrorMessage(apiError.error, gt('generated.queue-ticket-list.025')) }}</p>
         </section>
 
         <section v-if="callApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>{{ formatAppGateErrorTitle(callApiError.error, '叫号失败') }}</h2>
-          <p>{{ formatAppGateErrorMessage(callApiError.error, '暂时无法叫号，请稍后重试。') }}</p>
+          <h2>{{ formatAppGateErrorTitle(callApiError.error, gt('generated.queue-ticket-list.026')) }}</h2>
+          <p>{{ formatAppGateErrorMessage(callApiError.error, gt('generated.queue-ticket-list.027')) }}</p>
         </section>
 
         <section v-if="skipApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>{{ formatAppGateErrorTitle(skipApiError.error, '过号失败') }}</h2>
+          <h2>{{ formatAppGateErrorTitle(skipApiError.error, gt('generated.queue-ticket-list.028')) }}</h2>
           <p :data-message-key="skipApiError.error.messageKey">
-            {{ formatAppGateErrorMessage(skipApiError.error, '暂时无法过号，请稍后重试。') }}
+            {{ formatAppGateErrorMessage(skipApiError.error, gt('generated.queue-ticket-list.029')) }}
           </p>
         </section>
 
         <section v-if="rejoinApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>{{ formatAppGateErrorTitle(rejoinApiError.error, '重新入队失败') }}</h2>
+          <h2>{{ formatAppGateErrorTitle(rejoinApiError.error, gt('generated.queue-ticket-list.030')) }}</h2>
           <p :data-message-key="rejoinApiError.error.messageKey">
-            {{ formatAppGateErrorMessage(rejoinApiError.error, '暂时无法重回队列，请稍后重试。') }}
+            {{ formatAppGateErrorMessage(rejoinApiError.error, gt('generated.queue-ticket-list.031')) }}
           </p>
         </section>
 
         <section v-if="cancelApiError" class="state-panel error-panel" aria-live="assertive">
-          <h2>{{ formatAppGateErrorTitle(cancelApiError.error, '取消失败') }}</h2>
-          <p>{{ formatAppGateErrorMessage(cancelApiError.error, '暂时无法取消排队，请稍后重试。') }}</p>
+          <h2>{{ formatAppGateErrorTitle(cancelApiError.error, gt('generated.queue-ticket-list.032')) }}</h2>
+          <p>{{ formatAppGateErrorMessage(cancelApiError.error, gt('generated.queue-ticket-list.033')) }}</p>
         </section>
 
         <section v-if="callSuccess" class="state-panel success-panel" aria-live="polite">
-          <h2>{{ callSuccess.alreadyCalled ? '叫号已完成' : '叫号成功' }}</h2>
-          <p>排队号码 {{ queueTicketDisplayTextByResult(callSuccess) }}，保留到 {{ formatStoreDateTime(callSuccess.holdUntilAt) }}</p>
+          <h2>{{ callSuccess.alreadyCalled ? gt('generated.queue-ticket-list.034') : gt('generated.queue-ticket-list.035') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.036') }} {{ queueTicketDisplayTextByResult(callSuccess) }}{{ gt('generated.queue-ticket-list.037') }} {{ formatStoreDateTime(callSuccess.holdUntilAt) }}</p>
         </section>
 
         <section v-if="skipSuccess" class="state-panel success-panel" aria-live="polite">
-          <h2>{{ skipSuccess.alreadySkipped ? '过号已完成' : '过号成功' }}</h2>
-          <p>排队号码 {{ queueTicketDisplayTextByResult(skipSuccess) }}</p>
+          <h2>{{ skipSuccess.alreadySkipped ? gt('generated.queue-ticket-list.038') : gt('generated.queue-ticket-list.039') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.040') }} {{ queueTicketDisplayTextByResult(skipSuccess) }}</p>
         </section>
 
         <section v-if="rejoinSuccess" class="state-panel success-panel" aria-live="polite">
-          <h2>{{ rejoinSuccess.alreadyRejoined ? '重新入队已完成' : '重新入队成功' }}</h2>
-          <p>排队号码 {{ queueTicketDisplayTextByResult(rejoinSuccess) }}</p>
+          <h2>{{ rejoinSuccess.alreadyRejoined ? gt('generated.queue-ticket-list.041') : gt('generated.queue-ticket-list.042') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.043') }} {{ queueTicketDisplayTextByResult(rejoinSuccess) }}</p>
         </section>
 
         <section v-if="cancelSuccess" class="state-panel success-panel" aria-live="polite">
-          <h2>{{ cancelSuccess.alreadyCancelled ? '取消已完成' : '取消成功' }}</h2>
-          <p>排队号码 {{ queueTicketDisplayTextByResult(cancelSuccess) }}</p>
+          <h2>{{ cancelSuccess.alreadyCancelled ? gt('generated.queue-ticket-list.044') : gt('generated.queue-ticket-list.045') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.046') }} {{ queueTicketDisplayTextByResult(cancelSuccess) }}</p>
         </section>
       </section>
 
       <section v-if="showEmptyState" class="empty-queue-panel" aria-live="polite">
-        <h2>暂无排队票</h2>
-        <p>当前状态下暂无当日排队票，可以切换状态筛选或刷新列表。</p>
+        <h2>{{ gt('generated.queue-ticket-list.047') }}</h2>
+        <p>{{ gt('generated.queue-ticket-list.048') }}</p>
       </section>
 
-      <section v-if="visibleItems.length" class="queue-list" aria-label="当日排队列表">
+      <section v-if="visibleItems.length" class="queue-list" :aria-label="gt('generated.queue-ticket-list.049')">
         <article v-for="item in visibleItems" :key="item.queueTicketId" class="compact-ticket-card">
           <div class="compact-ticket-main">
             <div class="compact-ticket-number">
@@ -1269,7 +1268,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
               </div>
 
               <p>
-                {{ item.partySize }}人 · {{ item.partySizeGroup }} ·
+                {{ item.partySize }}{{ gt('generated.queue-ticket-list.050') }} {{ item.partySizeGroup }} ·
                 {{ optionalDisplay(item.customerPhoneMasked) }}
               </p>
               <p>{{ assignedAreaText(item) }} · {{ assignedResourceText(item) }}</p>
@@ -1277,12 +1276,12 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
             </div>
           </div>
 
-          <p v-if="isCalledTicket(item)" class="hold-highlight">保留到 {{ formatStoreDateTime(item.holdUntilAt) }}</p>
+          <p v-if="isCalledTicket(item)" class="hold-highlight">{{ gt('generated.queue-ticket-list.051') }} {{ formatStoreDateTime(item.holdUntilAt) }}</p>
 
           <section
             v-if="canShowAnyQueueAction(item)"
             class="compact-ticket-actions"
-            aria-label="排队票操作"
+            :aria-label="gt('generated.queue-ticket-list.052')"
           >
             <button
               v-if="canShowCallAction(item)"
@@ -1291,7 +1290,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
               :disabled="isTicketActionBusy(item)"
               @click="confirmCallTicket(item)"
             >
-              {{ isCallingTicket(item) ? '叫号中...' : item.queueTicketStatus === 'called' ? '重复叫号' : '叫号' }}
+              {{ isCallingTicket(item) ? gt('generated.queue-ticket-list.053') : item.queueTicketStatus === 'called' ? gt('generated.queue-ticket-list.054') : gt('generated.queue-ticket-list.055') }}
             </button>
             <button
               v-if="canShowSkipAction(item)"
@@ -1300,7 +1299,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
               :disabled="isTicketActionBusy(item)"
               @click="confirmSkipTicket(item)"
             >
-              {{ isSkippingTicket(item) ? '过号中...' : '过号' }}
+              {{ isSkippingTicket(item) ? gt('generated.queue-ticket-list.056') : gt('generated.queue-ticket-list.057') }}
             </button>
             <button
               v-if="canShowRejoinAction(item)"
@@ -1309,7 +1308,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
               :disabled="isTicketActionBusy(item)"
               @click="confirmRejoinTicket(item)"
             >
-              {{ isRejoiningTicket(item) ? '入队中...' : '重新入队' }}
+              {{ isRejoiningTicket(item) ? gt('generated.queue-ticket-list.058') : gt('generated.queue-ticket-list.059') }}
             </button>
             <RouterLink
               v-if="canShowSeatAction(item)"
@@ -1325,7 +1324,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
               :disabled="isTicketActionBusy(item)"
               @click="confirmCancelTicket(item)"
             >
-              {{ isCancellingTicket(item) ? '取消中...' : '取消' }}
+              {{ isCancellingTicket(item) ? gt('generated.queue-ticket-list.060') : gt('generated.queue-ticket-list.061') }}
             </button>
           </section>
         </article>

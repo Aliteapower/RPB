@@ -23,12 +23,12 @@ class CustomerPhoneLookupUiValidationTest {
         assertThat(servicePath).exists();
         assertThat(portPath).exists();
 
-        String source = Files.readString(contractPath)
-            + Files.readString(permissionPath)
-            + Files.readString(localSecurityPath)
-            + Files.readString(controllerPath)
-            + Files.readString(servicePath)
-            + Files.readString(portPath);
+        String source = FrontendSourceSupport.readString(contractPath)
+            + FrontendSourceSupport.readString(permissionPath)
+            + FrontendSourceSupport.readString(localSecurityPath)
+            + FrontendSourceSupport.readString(controllerPath)
+            + FrontendSourceSupport.readString(servicePath)
+            + FrontendSourceSupport.readString(portPath);
 
         assertThat(source)
             .contains("/api/v1/stores/{storeId}/customers/phone-lookup")
@@ -49,14 +49,17 @@ class CustomerPhoneLookupUiValidationTest {
         Path typesPath = Path.of("src", "types", "customerPhoneLookup.ts");
         Path apiPath = Path.of("src", "api", "customerPhoneLookupApi.ts");
         Path componentPath = Path.of("src", "components", "staff", "StaffGuestContactLookup.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(typesPath).exists();
         assertThat(apiPath).exists();
         assertThat(componentPath).exists();
+        assertThat(zhPath).exists();
 
-        String sharedSource = Files.readString(typesPath)
-            + Files.readString(apiPath)
-            + Files.readString(componentPath);
+        String sharedSource = FrontendSourceSupport.readString(typesPath)
+            + FrontendSourceSupport.readString(apiPath)
+            + FrontendSourceSupport.readString(componentPath);
+        String zhSource = FrontendSourceSupport.readString(zhPath);
 
         assertThat(sharedSource)
             .contains("lookupCustomerByPhone")
@@ -71,14 +74,19 @@ class CustomerPhoneLookupUiValidationTest {
             .contains("StaffGuestNameField")
             .contains("StaffSingaporePhoneField")
             .contains("customer-lookup")
-            .contains("已识别顾客");
+            .contains("staffControls.guest.lookup.found");
+
+        assertThat(zhSource)
+            .contains("found: '已识别顾客'")
+            .contains("notFound: '新手机号'")
+            .contains("error: '顾客识别失败'");
 
         for (Path path : List.of(
             Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue"),
             Path.of("src", "pages", "WalkInQueuePage.vue"),
             Path.of("src", "pages", "WalkInDirectSeatingPage.vue")
         )) {
-            String pageSource = Files.readString(path);
+            String pageSource = FrontendSourceSupport.readString(path);
 
             assertThat(pageSource)
                 .as("%s should use the shared phone lookup component", path)

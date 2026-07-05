@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 type CallScreenAdMode = 'text' | 'media'
 
 const props = withDefaults(defineProps<{
@@ -8,15 +11,17 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string
   disabled?: boolean
 }>(), {
-  textLabel: '文案轮播',
-  mediaLabel: '图片/视频轮播',
-  ariaLabel: '轮播类型',
   disabled: false
 })
 
+const { t } = useI18n()
 const emit = defineEmits<{
   'update:modelValue': [value: CallScreenAdMode]
 }>()
+
+const resolvedTextLabel = computed(() => props.textLabel ?? t('components.callScreenAdModeSwitch.text'))
+const resolvedMediaLabel = computed(() => props.mediaLabel ?? t('components.callScreenAdModeSwitch.media'))
+const resolvedAriaLabel = computed(() => props.ariaLabel ?? t('components.callScreenAdModeSwitch.aria'))
 
 function selectMode(value: CallScreenAdMode): void {
   if (props.disabled || props.modelValue === value) {
@@ -27,7 +32,7 @@ function selectMode(value: CallScreenAdMode): void {
 </script>
 
 <template>
-  <div class="call-screen-ad-mode-switch" role="radiogroup" :aria-label="ariaLabel">
+  <div class="call-screen-ad-mode-switch" role="radiogroup" :aria-label="resolvedAriaLabel">
     <label class="call-screen-ad-mode-switch__option" :class="{ selected: modelValue === 'text' }">
       <input
         type="radio"
@@ -37,7 +42,7 @@ function selectMode(value: CallScreenAdMode): void {
         @change="selectMode('text')"
       />
       <span class="call-screen-ad-mode-switch__marker" aria-hidden="true" />
-      <span>{{ textLabel }}</span>
+      <span>{{ resolvedTextLabel }}</span>
     </label>
     <label class="call-screen-ad-mode-switch__option" :class="{ selected: modelValue === 'media' }">
       <input
@@ -48,7 +53,7 @@ function selectMode(value: CallScreenAdMode): void {
         @change="selectMode('media')"
       />
       <span class="call-screen-ad-mode-switch__marker" aria-hidden="true" />
-      <span>{{ mediaLabel }}</span>
+      <span>{{ resolvedMediaLabel }}</span>
     </label>
   </div>
 </template>

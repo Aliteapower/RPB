@@ -25,6 +25,9 @@ import type {
   CallScreenTextSlide,
   CallScreenTextSlideMutation
 } from '../types/callScreenAdmin'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 type PreviewSlide = CallScreenTextSlide | CallScreenMediaSlide
 
@@ -49,7 +52,7 @@ let previewCarouselTimer: number | undefined
 
 const MAX_CALL_SCREEN_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_CALL_SCREEN_VIDEO_BYTES = 80 * 1024 * 1024
-const CALL_SCREEN_MEDIA_UPLOAD_HINT = '支持 JPG、PNG、WebP、MP4、WebM；图片不超过 10MB，视频不超过 80MB。'
+const CALL_SCREEN_MEDIA_UPLOAD_HINT = gt('generated.tenant-admin-call-screen.077')
 const CALL_SCREEN_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const CALL_SCREEN_VIDEO_TYPES = new Set(['video/mp4', 'video/webm'])
 
@@ -146,7 +149,7 @@ async function saveSettings(): Promise<void> {
   }
   const activeAdSetId = selectedAdSetId.value || null
   if (!activeAdSetId) {
-    errorText.value = adMode.value === 'media' ? '请先上传图片或视频并选择媒体组' : '请选择要启用的文案组'
+    errorText.value = adMode.value === 'media' ? gt('generated.tenant-admin-call-screen.078') : gt('generated.tenant-admin-call-screen.079')
     return
   }
 
@@ -165,7 +168,7 @@ async function saveSettings(): Promise<void> {
     })
     settings.value = { ...response.settings, adMode: normalizeAdMode(response.settings.adMode) }
     selectedAdSetId.value = response.settings.activeAdSetId ?? activeAdSetId
-    savedText.value = '门店叫号屏设置已保存'
+    savedText.value = gt('generated.tenant-admin-call-screen.080')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -191,7 +194,7 @@ async function saveAdSet(): Promise<void> {
     replaceAdSet(response.adSet)
     selectedAdSetId.value = response.adSet.id
     editableAdSet.value = cloneAdSet(response.adSet)
-    savedText.value = editableAdSet.value.adType === 'media' ? '媒体组已保存' : '文案组已保存'
+    savedText.value = editableAdSet.value.adType === 'media' ? gt('generated.tenant-admin-call-screen.081') : gt('generated.tenant-admin-call-screen.082')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -234,7 +237,7 @@ async function uploadMediaSlide(event: Event): Promise<void> {
       return
     }
     const response = await createCallScreenAdSet(storeId.value, {
-      name: '默认图片/视频轮播',
+      name: gt('generated.tenant-admin-call-screen.083'),
       adType: 'media',
       status: 'active',
       slides: [],
@@ -391,19 +394,19 @@ function toMediaSlideMutation(slide: CallScreenMediaSlide): CallScreenMediaSlide
 
 function validateAdSet(adSet: CallScreenAdSet): string {
   if (!adSet.name.trim()) {
-    return '请填写广告组名称'
+    return gt('generated.tenant-admin-call-screen.084')
   }
   return normalizeAdMode(adSet.adType) === 'media' ? validateMediaAdSet(adSet) : validateTextAdSet(adSet)
 }
 
 function validateTextAdSet(adSet: CallScreenAdSet): string {
   if (adSet.slides.length === 0) {
-    return '文案组至少需要一条文案'
+    return gt('generated.tenant-admin-call-screen.085')
   }
   const sortOrders = new Set<number>()
   for (const slide of adSet.slides) {
     if (!slide.title.trim() || !slide.subtitle.trim() || !slide.tagline.trim()) {
-      return '请填写完整的标题、副标题和标语'
+      return gt('generated.tenant-admin-call-screen.086')
     }
     const error = validateSortOrder(slide.sortOrder, sortOrders)
     if (error) {
@@ -415,12 +418,12 @@ function validateTextAdSet(adSet: CallScreenAdSet): string {
 
 function validateMediaAdSet(adSet: CallScreenAdSet): string {
   if (adSet.mediaSlides.length === 0) {
-    return '媒体组至少需要一张图片或一个视频'
+    return gt('generated.tenant-admin-call-screen.087')
   }
   const sortOrders = new Set<number>()
   for (const slide of adSet.mediaSlides) {
     if (!slide.mediaAssetId || !slide.mediaKind) {
-      return '请先上传图片或视频'
+      return gt('generated.tenant-admin-call-screen.088')
     }
     const error = validateSortOrder(slide.sortOrder, sortOrders)
     if (error) {
@@ -433,10 +436,10 @@ function validateMediaAdSet(adSet: CallScreenAdSet): string {
 function validateSortOrder(value: number, sortOrders: Set<number>): string {
   const sortOrder = Number(value)
   if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
-    return '排序必须是大于 0 的整数'
+    return gt('generated.tenant-admin-call-screen.089')
   }
   if (sortOrders.has(sortOrder)) {
-    return '排序号不能重复'
+    return gt('generated.tenant-admin-call-screen.090')
   }
   sortOrders.add(sortOrder)
   return ''
@@ -452,12 +455,12 @@ function isMediaSlide(slide: PreviewSlide | undefined): slide is CallScreenMedia
 
 function validateMediaUploadFile(file: File): string {
   if (CALL_SCREEN_IMAGE_TYPES.has(file.type)) {
-    return file.size > MAX_CALL_SCREEN_IMAGE_BYTES ? '图片不能超过 10MB' : ''
+    return file.size > MAX_CALL_SCREEN_IMAGE_BYTES ? gt('generated.tenant-admin-call-screen.091') : ''
   }
   if (CALL_SCREEN_VIDEO_TYPES.has(file.type)) {
-    return file.size > MAX_CALL_SCREEN_VIDEO_BYTES ? '视频不能超过 80MB' : ''
+    return file.size > MAX_CALL_SCREEN_VIDEO_BYTES ? gt('generated.tenant-admin-call-screen.092') : ''
   }
-  return '仅支持 JPG、PNG、WebP、MP4、WebM'
+  return gt('generated.tenant-admin-call-screen.093')
 }
 
 function normalizeAdMode(value: string | null | undefined): CallScreenAdMode {
@@ -465,38 +468,38 @@ function normalizeAdMode(value: string | null | undefined): CallScreenAdMode {
 }
 
 function statusLabel(status: CallScreenStatus): string {
-  return status === 'active' ? '启用' : '停用'
+  return status === 'active' ? gt('generated.tenant-admin-call-screen.094') : gt('generated.tenant-admin-call-screen.095')
 }
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof CallScreenAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-call-screen.096')
   }
   if (error.status === 401 || error.response.error.code === 'UNAUTHENTICATED') {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-call-screen.097')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-call-screen.098')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-call-screen.099')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查广告组、排序和轮播时间'
+    return gt('generated.tenant-admin-call-screen.100')
   }
   if (error.response.error.code === 'AD_SET_NOT_FOUND' || error.response.error.code === 'MEDIA_NOT_FOUND') {
-    return '广告资源不存在或已被删除'
+    return gt('generated.tenant-admin-call-screen.101')
   }
   if (error.response.error.code === 'VERSION_CONFLICT') {
-    return '配置已被其他操作更新，请重新加载后再保存'
+    return gt('generated.tenant-admin-call-screen.102')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-call-screen.103')
 }
 
 function mediaUploadErrorText(error: unknown): string {
   if (error instanceof CallScreenAdminApiError && error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查媒体文件格式或大小，图片不超过 10MB，视频不超过 80MB'
+    return gt('generated.tenant-admin-call-screen.104')
   }
   return apiErrorText(error)
 }
@@ -509,35 +512,33 @@ function mediaUploadErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>叫号屏配置</h1>
+          <span>{{ gt('generated.tenant-admin-call-screen.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-call-screen.002') }}</h1>
         </div>
-        <button class="secondary-button" type="button" :disabled="loading" @click="loadCallScreenConfig">
-          刷新
-        </button>
+        <button class="secondary-button" type="button" :disabled="loading" @click="loadCallScreenConfig"> {{ gt('generated.tenant-admin-call-screen.003') }} </button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-call-screen.004') }}</p>
 
       <div v-else-if="settings" class="workspace-grid">
         <section class="config-panel" aria-labelledby="call-screen-settings-title">
           <div class="panel-heading">
             <div>
-              <span>门店设置</span>
-              <h2 id="call-screen-settings-title">播放参数</h2>
+              <span>{{ gt('generated.tenant-admin-call-screen.005') }}</span>
+              <h2 id="call-screen-settings-title">{{ gt('generated.tenant-admin-call-screen.006') }}</h2>
             </div>
-            <small>版本 {{ settings.version }}</small>
+            <small>{{ gt('generated.tenant-admin-call-screen.007') }} {{ settings.version }}</small>
           </div>
 
-          <CallScreenAdModeSwitch v-model="settings.adMode" aria-label="轮播类型" />
+          <CallScreenAdModeSwitch v-model="settings.adMode" :aria-label="gt('generated.tenant-admin-call-screen.008')" />
 
-          <p class="phase-note">媒体轮播支持 JPG、PNG、WebP、MP4、WebM，租户只可使用自己上传的资源。</p>
+          <p class="phase-note">{{ gt('generated.tenant-admin-call-screen.009') }}</p>
 
           <div class="settings-grid">
             <label>
-              <span>{{ adMode === 'media' ? '启用媒体组' : '启用文案组' }}</span>
+              <span>{{ adMode === 'media' ? gt('generated.tenant-admin-call-screen.010') : gt('generated.tenant-admin-call-screen.011') }}</span>
               <select v-model="selectedAdSetId" :disabled="!hasSelectableSets" required>
                 <option v-for="adSet in selectableAdSets" :key="adSet.id" :value="adSet.id">
                   {{ adSet.name }} · {{ statusLabel(adSet.status) }}
@@ -545,22 +546,22 @@ function mediaUploadErrorText(error: unknown): string {
               </select>
             </label>
             <label>
-              <span>单页秒数</span>
+              <span>{{ gt('generated.tenant-admin-call-screen.012') }}</span>
               <input v-model.number="settings.slideDurationSeconds" type="number" min="3" max="60" required />
             </label>
             <label>
-              <span>状态轮询秒数</span>
+              <span>{{ gt('generated.tenant-admin-call-screen.013') }}</span>
               <input v-model.number="settings.statePollSeconds" type="number" min="2" max="30" required />
             </label>
             <label class="checkbox-field">
               <input v-model="settings.showWaitingPreview" type="checkbox" />
-              <span>显示等待预览</span>
+              <span>{{ gt('generated.tenant-admin-call-screen.014') }}</span>
             </label>
           </div>
 
           <div class="panel-actions">
             <button class="primary-button" type="button" :disabled="savingSettings || !hasSelectableSets" @click="saveSettings">
-              {{ savingSettings ? '保存中' : '保存播放参数' }}
+              {{ savingSettings ? gt('generated.tenant-admin-call-screen.015') : gt('generated.tenant-admin-call-screen.016') }}
             </button>
           </div>
         </section>
@@ -568,8 +569,8 @@ function mediaUploadErrorText(error: unknown): string {
         <section class="config-panel" aria-labelledby="call-screen-copy-title">
           <div class="panel-heading">
             <div>
-              <span>文案组</span>
-              <h2 id="call-screen-copy-title">{{ editableAdSet?.adType === 'media' ? '媒体编辑' : '文案编辑' }}</h2>
+              <span>{{ gt('generated.tenant-admin-call-screen.017') }}</span>
+              <h2 id="call-screen-copy-title">{{ editableAdSet?.adType === 'media' ? gt('generated.tenant-admin-call-screen.018') : gt('generated.tenant-admin-call-screen.019') }}</h2>
             </div>
             <div class="panel-heading-actions">
               <label v-if="editableAdSet?.adType === 'media' || adMode === 'media'" class="upload-button">
@@ -579,7 +580,7 @@ function mediaUploadErrorText(error: unknown): string {
                   :disabled="uploadingMedia"
                   @change="uploadMediaSlide"
                 />
-                {{ uploadingMedia ? '上传中' : '上传媒体' }}
+                {{ uploadingMedia ? gt('generated.tenant-admin-call-screen.020') : gt('generated.tenant-admin-call-screen.021') }}
               </label>
               <button
                 v-if="editableAdSet?.adType !== 'media'"
@@ -587,15 +588,13 @@ function mediaUploadErrorText(error: unknown): string {
                 type="button"
                 :disabled="!editableAdSet"
                 @click="addSlide"
-              >
-                新增一组
-              </button>
-              <small v-if="editableAdSet">版本 {{ editableAdSet.version }}</small>
+              > {{ gt('generated.tenant-admin-call-screen.022') }} </button>
+              <small v-if="editableAdSet">{{ gt('generated.tenant-admin-call-screen.023') }} {{ editableAdSet.version }}</small>
             </div>
           </div>
 
           <p v-if="!editableAdSet" class="empty-line">
-            {{ adMode === 'media' ? '暂无媒体组，请先上传图片或视频' : '暂无可编辑文案组' }}
+            {{ adMode === 'media' ? gt('generated.tenant-admin-call-screen.024') : gt('generated.tenant-admin-call-screen.025') }}
           </p>
 
           <template v-else>
@@ -604,14 +603,14 @@ function mediaUploadErrorText(error: unknown): string {
             </p>
             <div class="ad-set-fields">
               <label>
-                <span>名称</span>
+                <span>{{ gt('generated.tenant-admin-call-screen.026') }}</span>
                 <input v-model.trim="editableAdSet.name" maxlength="40" required />
               </label>
               <label>
-                <span>状态</span>
+                <span>{{ gt('generated.tenant-admin-call-screen.027') }}</span>
                 <select v-model="editableAdSet.status" required>
-                  <option value="active">启用</option>
-                  <option value="disabled">停用</option>
+                  <option value="active">{{ gt('generated.tenant-admin-call-screen.028') }}</option>
+                  <option value="disabled">{{ gt('generated.tenant-admin-call-screen.029') }}</option>
                 </select>
               </label>
             </div>
@@ -620,12 +619,12 @@ function mediaUploadErrorText(error: unknown): string {
               <table>
                 <thead>
                   <tr>
-                    <th>排序</th>
-                    <th>状态</th>
-                    <th>标题</th>
-                    <th>副标题</th>
-                    <th>标语</th>
-                    <th>版本</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.030') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.031') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.032') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.033') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.034') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.035') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -635,8 +634,8 @@ function mediaUploadErrorText(error: unknown): string {
                     </td>
                     <td>
                       <select v-model="slide.status" class="status-select" required>
-                        <option value="active">启用</option>
-                        <option value="disabled">停用</option>
+                        <option value="active">{{ gt('generated.tenant-admin-call-screen.036') }}</option>
+                        <option value="disabled">{{ gt('generated.tenant-admin-call-screen.037') }}</option>
                       </select>
                     </td>
                     <td>
@@ -658,14 +657,14 @@ function mediaUploadErrorText(error: unknown): string {
               <table>
                 <thead>
                   <tr>
-                    <th>排序</th>
-                    <th>状态</th>
-                    <th>类型</th>
-                    <th>预览</th>
-                    <th>标题</th>
-                    <th>替代文本</th>
-                    <th>版本</th>
-                    <th>操作</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.038') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.039') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.040') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.041') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.042') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.043') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.044') }}</th>
+                    <th>{{ gt('generated.tenant-admin-call-screen.045') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -675,17 +674,17 @@ function mediaUploadErrorText(error: unknown): string {
                     </td>
                     <td>
                       <select v-model="slide.status" class="status-select" required>
-                        <option value="active">启用</option>
-                        <option value="disabled">停用</option>
+                        <option value="active">{{ gt('generated.tenant-admin-call-screen.046') }}</option>
+                        <option value="disabled">{{ gt('generated.tenant-admin-call-screen.047') }}</option>
                       </select>
                     </td>
-                    <td class="version-cell">{{ slide.mediaKind === 'video' ? '视频' : '图片' }}</td>
+                    <td class="version-cell">{{ slide.mediaKind === 'video' ? gt('generated.tenant-admin-call-screen.048') : gt('generated.tenant-admin-call-screen.049') }}</td>
                     <td>
                       <img
                         v-if="slide.mediaKind === 'image'"
                         class="media-thumb"
                         :src="slide.mediaUrl"
-                        :alt="slide.altText || slide.title || '媒体预览'"
+                        :alt="slide.altText || slide.title || gt('generated.tenant-admin-call-screen.050')"
                       />
                       <video
                         v-else
@@ -704,9 +703,7 @@ function mediaUploadErrorText(error: unknown): string {
                     </td>
                     <td class="version-cell">{{ slide.version }}</td>
                     <td>
-                      <button class="danger-button compact" type="button" @click="removeMediaSlide(index)">
-                        删除
-                      </button>
+                      <button class="danger-button compact" type="button" @click="removeMediaSlide(index)"> {{ gt('generated.tenant-admin-call-screen.051') }} </button>
                     </td>
                   </tr>
                 </tbody>
@@ -715,17 +712,17 @@ function mediaUploadErrorText(error: unknown): string {
 
             <div class="panel-actions">
               <button class="primary-button" type="button" :disabled="savingAdSet" @click="saveAdSet">
-                {{ savingAdSet ? '保存中' : editableAdSet.adType === 'media' ? '保存媒体组' : '保存文案组' }}
+                {{ savingAdSet ? gt('generated.tenant-admin-call-screen.052') : editableAdSet.adType === 'media' ? gt('generated.tenant-admin-call-screen.053') : gt('generated.tenant-admin-call-screen.054') }}
               </button>
             </div>
           </template>
         </section>
 
-        <aside class="preview-panel" aria-label="叫号屏文案预览">
+        <aside class="preview-panel" :aria-label="gt('generated.tenant-admin-call-screen.055')">
           <div class="preview-header">
             <div class="preview-title">
-              <span>叫号屏预览</span>
-              <strong>{{ editableAdSet?.name || '未选择文案组' }}</strong>
+              <span>{{ gt('generated.tenant-admin-call-screen.056') }}</span>
+              <strong>{{ editableAdSet?.name || gt('generated.tenant-admin-call-screen.057') }}</strong>
             </div>
             <button
               class="preview-expand-button"
@@ -733,9 +730,7 @@ function mediaUploadErrorText(error: unknown): string {
               :disabled="previewSlides.length === 0"
               @click="openPreviewFullscreen"
             >
-              <span class="preview-expand-icon" aria-hidden="true" />
-              大屏预览
-            </button>
+              <span class="preview-expand-icon" aria-hidden="true" /> {{ gt('generated.tenant-admin-call-screen.058') }} </button>
           </div>
           <div class="preview-screen">
             <template v-if="isMediaSlide(previewSlide)">
@@ -743,7 +738,7 @@ function mediaUploadErrorText(error: unknown): string {
                 v-if="previewSlide.mediaKind === 'image'"
                 class="preview-media"
                 :src="previewSlide.mediaUrl"
-                :alt="previewSlide.altText || previewSlide.title || '媒体预览'"
+                :alt="previewSlide.altText || previewSlide.title || gt('generated.tenant-admin-call-screen.059')"
               />
               <video
                 v-else
@@ -753,7 +748,7 @@ function mediaUploadErrorText(error: unknown): string {
                 playsinline
                 autoplay
               />
-              <h3 class="preview-media-title">{{ previewSlide.title || '媒体广告' }}</h3>
+              <h3 class="preview-media-title">{{ previewSlide.title || gt('generated.tenant-admin-call-screen.060') }}</h3>
             </template>
             <template v-else>
               <span class="preview-mark">
@@ -764,19 +759,19 @@ function mediaUploadErrorText(error: unknown): string {
                   alt=""
                   @error="handlePreviewLogoError"
                 />
-                <span v-else>食</span>
+                <span v-else>{{ gt('generated.tenant-admin-call-screen.061') }}</span>
               </span>
-              <h3>{{ previewSlide?.title || '暂无文案' }}</h3>
-              <p class="preview-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
-              <p class="preview-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
+              <h3>{{ previewSlide?.title || gt('generated.tenant-admin-call-screen.062') }}</h3>
+              <p class="preview-subtitle">{{ previewSlide?.subtitle || gt('generated.tenant-admin-call-screen.063') }}</p>
+              <p class="preview-tagline">{{ previewSlide?.tagline || gt('generated.tenant-admin-call-screen.064') }}</p>
             </template>
           </div>
-          <div class="preview-dots" aria-label="预览文案轮播">
+          <div class="preview-dots" :aria-label="gt('generated.tenant-admin-call-screen.065')">
             <button
               v-for="(slide, index) in previewSlides"
               :key="slide.id"
               type="button"
-              :aria-label="`切换预览文案 ${index + 1}`"
+              :aria-label="`${gt('generated.tenant-admin-call-screen.066')}${index + 1}`"
               :class="{ active: index === previewSlideIndex }"
               @click="selectPreviewSlide(index)"
             />
@@ -788,19 +783,17 @@ function mediaUploadErrorText(error: unknown): string {
           class="preview-fullscreen"
           role="dialog"
           aria-modal="true"
-          aria-label="大屏预览"
+          :aria-label="gt('generated.tenant-admin-call-screen.067')"
           @click.self="closePreviewFullscreen"
         >
-          <button class="preview-close-button" type="button" @click="closePreviewFullscreen">
-            关闭预览
-          </button>
-          <section class="preview-fullscreen-stage" aria-label="叫号屏文案大屏预览">
+          <button class="preview-close-button" type="button" @click="closePreviewFullscreen"> {{ gt('generated.tenant-admin-call-screen.068') }} </button>
+          <section class="preview-fullscreen-stage" :aria-label="gt('generated.tenant-admin-call-screen.069')">
             <template v-if="isMediaSlide(previewSlide)">
               <img
                 v-if="previewSlide.mediaKind === 'image'"
                 class="preview-fullscreen-media"
                 :src="previewSlide.mediaUrl"
-                :alt="previewSlide.altText || previewSlide.title || '媒体大屏预览'"
+                :alt="previewSlide.altText || previewSlide.title || gt('generated.tenant-admin-call-screen.070')"
               />
               <video
                 v-else
@@ -822,18 +815,18 @@ function mediaUploadErrorText(error: unknown): string {
                   alt=""
                   @error="handlePreviewLogoError"
                 />
-                <span v-else>食</span>
+                <span v-else>{{ gt('generated.tenant-admin-call-screen.071') }}</span>
               </span>
-              <h2>{{ previewSlide?.title || '暂无文案' }}</h2>
-              <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || '请选择文案组' }}</p>
-              <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || '保存后将在终端屏生效' }}</p>
+              <h2>{{ previewSlide?.title || gt('generated.tenant-admin-call-screen.072') }}</h2>
+              <p class="preview-fullscreen-subtitle">{{ previewSlide?.subtitle || gt('generated.tenant-admin-call-screen.073') }}</p>
+              <p class="preview-fullscreen-tagline">{{ previewSlide?.tagline || gt('generated.tenant-admin-call-screen.074') }}</p>
             </template>
-            <div class="preview-dots preview-dots-large" aria-label="大屏预览文案轮播">
+            <div class="preview-dots preview-dots-large" :aria-label="gt('generated.tenant-admin-call-screen.075')">
               <button
                 v-for="(slide, index) in previewSlides"
                 :key="`fullscreen-dot-${slide.id}`"
                 type="button"
-                :aria-label="`切换预览文案 ${index + 1}`"
+                :aria-label="`${gt('generated.tenant-admin-call-screen.076')}${index + 1}`"
                 :class="{ active: index === previewSlideIndex }"
                 @click="selectPreviewSlide(index)"
               />

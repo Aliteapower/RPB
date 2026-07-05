@@ -1,0 +1,114 @@
+package com.rpb.reservation.appgate.ui;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class FrontendI18nFoundationValidationTest {
+
+    @Test
+    void frontendRegistersVueI18nWithExplicitDefaultLocaleStrategy() throws Exception {
+        Path packagePath = Path.of("package.json");
+        Path mainPath = Path.of("src", "main.ts");
+        Path i18nPath = Path.of("src", "i18n", "index.ts");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
+        Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
+
+        assertThat(i18nPath).exists();
+        assertThat(zhPath).exists();
+        assertThat(enPath).exists();
+
+        String packageSource = FrontendSourceSupport.readString(packagePath);
+        String mainSource = FrontendSourceSupport.readString(mainPath);
+        String i18nSource = FrontendSourceSupport.readString(i18nPath);
+        String localeSource = FrontendSourceSupport.readString(zhPath) + FrontendSourceSupport.readString(enPath);
+
+        assertThat(packageSource).contains("\"vue-i18n\"");
+        assertThat(mainSource)
+            .contains("import { i18n } from './i18n'")
+            .contains(".use(i18n)");
+        assertThat(i18nSource)
+            .contains("DEFAULT_FRONTEND_LOCALE = 'zh-CN'")
+            .contains("SUPPORTED_FRONTEND_LOCALES")
+            .contains("localStorage")
+            .contains("navigator.languages")
+            .contains("document.documentElement.lang");
+        assertThat(localeSource)
+            .contains("platformAdmin")
+            .contains("tenantAppNotEnabled")
+            .contains("reservations: '今日预约'")
+            .contains("reservation: '预约'");
+    }
+
+    @Test
+    void firstRoundCommonCopyUsesI18nKeysInsteadOfHardcodedChinese() throws Exception {
+        List<Path> migratedPaths = List.of(
+            Path.of("src", "components", "common", "PasswordInput.vue"),
+            Path.of("src", "components", "platform", "PlatformAdminNav.vue"),
+            Path.of("src", "components", "staff", "StaffBottomNav.vue"),
+            Path.of("src", "components", "staff", "staffBottomNavItems.ts"),
+            Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"),
+            Path.of("src", "components", "staff-home", "useCurrentClock.ts"),
+            Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue"),
+            Path.of("src", "pages", "LoginPage.vue"),
+            Path.of("src", "pages", "StoreStaffHomePage.vue"),
+            Path.of("src", "utils", "appGateErrorMessages.ts"),
+            Path.of("src", "utils", "reservationCreateMessages.ts")
+        );
+
+        StringBuilder source = new StringBuilder();
+        for (Path path : migratedPaths) {
+            assertThat(path).exists();
+            source.append(FrontendSourceSupport.readString(path)).append('\n');
+        }
+
+        assertThat(source)
+            .contains("useI18n")
+            .contains("translate(")
+            .contains("labelKey")
+            .contains("login.entries.platformAdmin.title")
+            .contains("staffHome.kpis.reservations")
+            .contains("nav.platform.tenants")
+            .contains("appGate.errors.permissionDenied.message")
+            .contains("reservationCreate.errors.capacityInsufficient")
+            .doesNotContain("后台入口")
+            .doesNotContain("平台后台")
+            .doesNotContain("租户后台")
+            .doesNotContain("租户员工")
+            .doesNotContain("账号或密码不正确")
+            .doesNotContain("滑块校验加载失败")
+            .doesNotContain("预约排队叫号系统未开通")
+            .doesNotContain("当前账号没有此功能权限")
+            .doesNotContain("今日概览")
+            .doesNotContain("今日预约")
+            .doesNotContain("当前排队")
+            .doesNotContain("桌台状态")
+            .doesNotContain("员工工作台导航")
+            .doesNotContain("显示密码")
+            .doesNotContain("隐藏密码");
+    }
+
+    @Test
+    void defaultLocaleStrategyIsDocumentedWithoutBackendCatalogCoupling() throws Exception {
+        Path architecturePath = Path.of("docs", "architecture", "ARCHITECTURE.md");
+        Path frontendDocPath = Path.of("docs", "frontend", "I18N_FRONTEND_FOUNDATION.md");
+
+        assertThat(frontendDocPath).exists();
+
+        String architectureSource = FrontendSourceSupport.readString(architecturePath);
+        String frontendDocSource = FrontendSourceSupport.readString(frontendDocPath);
+
+        assertThat(architectureSource)
+            .contains("Frontend shell fallback is zh-CN")
+            .contains("Store operational locale may still be en-SG");
+        assertThat(frontendDocSource)
+            .contains("Frontend fallback locale: `zh-CN`")
+            .contains("Supported first-round locales: `zh-CN`, `en-SG`")
+            .contains("Store locale remains the operational display context")
+            .contains("No backend message resolver or catalog API")
+            .contains("Do not move all static UI labels into `i18n_message_catalog`");
+    }
+}

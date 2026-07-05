@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import {
@@ -21,6 +22,7 @@ import type {
 import { useAuthSessionStore } from '../stores/authSession'
 
 const route = useRoute()
+const { t } = useI18n()
 const auth = useAuthSessionStore()
 const tenantId = computed(() => String(route.params.tenantId || ''))
 const productLines = ref<PlatformProductLine[]>([])
@@ -53,22 +55,26 @@ const selectedUnitPrice = computed(() => selectedPrice.value?.amount ?? 0)
 const selectedCurrency = computed(() => selectedPrice.value?.currency ?? (form.currency.trim().toUpperCase() || 'SGD'))
 const safeDurationCount = computed(() => Math.max(1, Number(form.durationCount) || 1))
 const calculatedAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
-const durationUnitLabel = computed(() => form.billingCycle === 'yearly' ? '年' : '个月')
+const durationUnitLabel = computed(() => (
+  form.billingCycle === 'yearly'
+    ? t('platform.billing.units.year')
+    : t('platform.billing.units.month')
+))
 const primaryActionLabel = computed(() => {
   const subscription = selectedSubscription.value
   if (!subscription) {
-    return '购买'
+    return t('platform.billing.actions.purchase')
   }
   if (subscription.billingCycle === 'legacy_grant') {
-    return '转付费'
+    return t('platform.billing.actions.convert')
   }
   if (subscription.status === 'cancelled') {
-    return '重新开通'
+    return t('platform.billing.actions.reactivate')
   }
   if (subscription.status === 'suspended') {
-    return '恢复并续费'
+    return t('platform.billing.actions.resumeRenew')
   }
-  return '续费'
+  return t('platform.billing.actions.renew')
 })
 
 onMounted(() => {
@@ -169,18 +175,26 @@ async function renewSelectedProduct(subscription: TenantProductSubscription): Pr
 async function convertLegacyProduct(subscription: TenantProductSubscription): Promise<void> {
   if (form.billingCycle === 'manual') {
     savedText.value = ''
-    errorText.value = '历史赠送只能转月付或年付'
+    errorText.value = t('platform.billing.errors.legacyConvertCycle')
     return
   }
   await saveMutation(() => convertLegacyProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
 }
 
 async function suspendSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
-  await saveMutation(() => suspendProductSubscription(tenantId.value, subscription.id, statusPayload(subscription.version, '手工暂停')))
+  await saveMutation(() => suspendProductSubscription(
+    tenantId.value,
+    subscription.id,
+    statusPayload(subscription.version, t('platform.billing.notes.manualSuspend'))
+  ))
 }
 
 async function cancelSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
-  await saveMutation(() => cancelProductSubscription(tenantId.value, subscription.id, statusPayload(subscription.version, '手工取消')))
+  await saveMutation(() => cancelProductSubscription(
+    tenantId.value,
+    subscription.id,
+    statusPayload(subscription.version, t('platform.billing.notes.manualCancel'))
+  ))
 }
 
 async function saveMutation(action: () => Promise<unknown>): Promise<void> {
@@ -192,7 +206,7 @@ async function saveMutation(action: () => Promise<unknown>): Promise<void> {
   savedText.value = ''
   try {
     await action()
-    savedText.value = '已保存'
+    savedText.value = t('platform.billing.messages.saved')
     await loadBilling()
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -235,33 +249,33 @@ function selectBillingRow(row: BillingRow): void {
 
 function billingCycleLabel(cycle: ProductBillingCycle): string {
   if (cycle === 'legacy_grant') {
-    return '历史赠送 / 永久有效'
+    return t('platform.billing.cycles.legacyGrant')
   }
   if (cycle === 'monthly') {
-    return '月付'
+    return t('platform.billing.cycles.monthly')
   }
   if (cycle === 'yearly') {
-    return '年付'
+    return t('platform.billing.cycles.yearly')
   }
-  return '手工'
+  return t('platform.billing.cycles.manual')
 }
 
 function statusLabel(subscription: TenantProductSubscription): string {
   if (subscription.effectiveStatus === 'expired') {
-    return '已到期'
+    return t('platform.billing.status.expired')
   }
   if (subscription.status === 'active') {
-    return '生效中'
+    return t('platform.billing.status.active')
   }
   if (subscription.status === 'suspended') {
-    return '已暂停'
+    return t('platform.billing.status.suspended')
   }
-  return '已取消'
+  return t('platform.billing.status.cancelled')
 }
 
 function formatDateTime(value: string | null): string {
   if (!value) {
-    return '永久有效'
+    return t('platform.billing.status.permanent')
   }
   return new Date(value).toLocaleString()
 }
@@ -294,24 +308,34 @@ function canReactivate(subscription: TenantProductSubscription): boolean {
   return subscription.status === 'cancelled'
 }
 
+function renewalActionLabel(subscription: TenantProductSubscription): string {
+  if (canReactivate(subscription)) {
+    return t('platform.billing.actions.reactivate')
+  }
+  if (subscription.status === 'suspended') {
+    return t('platform.billing.actions.resumeRenew')
+  }
+  return t('platform.billing.actions.renew')
+}
+
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformBillingApiError)) {
-    return '操作失败'
+    return t('platform.billing.errors.operationFailed')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return t('platform.billing.errors.sessionExpired')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有计费管理权限'
+    return t('platform.billing.errors.forbidden')
   }
   if (error.response.error.code === 'SUBSCRIPTION_CONFLICT') {
-    return '订阅状态冲突'
+    return t('platform.billing.errors.subscriptionConflict')
   }
   if (error.response.error.code === 'VERSION_CONFLICT') {
-    return '订阅已被其他操作更新，请刷新后重试'
+    return t('platform.billing.errors.versionConflict')
   }
-  return '操作失败'
+  return t('platform.billing.errors.operationFailed')
 }
 </script>
 
@@ -322,11 +346,11 @@ function apiErrorText(error: unknown): string {
     <section class="platform-workspace">
       <header class="page-heading">
         <div>
-          <span>租户管理</span>
-          <h1>订阅 / 计费</h1>
+          <span>{{ $t('platform.billing.page.kicker') }}</span>
+          <h1>{{ $t('platform.billing.page.title') }}</h1>
         </div>
         <button class="secondary-button" type="button" :disabled="loading" @click="loadBilling">
-          刷新
+          {{ $t('common.actions.refresh') }}
         </button>
       </header>
 
@@ -338,23 +362,23 @@ function apiErrorText(error: unknown): string {
           <table class="data-table">
             <thead>
               <tr>
-                <th>产品线</th>
-                <th>计费周期</th>
-                <th>状态</th>
-                <th>有效期开始</th>
-                <th>有效期结束</th>
-                <th>金额</th>
-                <th>币种</th>
-                <th>授权</th>
-                <th>操作</th>
+                <th>{{ $t('platform.billing.table.columns.productLine') }}</th>
+                <th>{{ $t('platform.billing.table.columns.billingCycle') }}</th>
+                <th>{{ $t('platform.billing.table.columns.status') }}</th>
+                <th>{{ $t('platform.billing.table.columns.periodStart') }}</th>
+                <th>{{ $t('platform.billing.table.columns.periodEnd') }}</th>
+                <th>{{ $t('platform.billing.table.columns.amount') }}</th>
+                <th>{{ $t('platform.billing.table.columns.currency') }}</th>
+                <th>{{ $t('platform.billing.table.columns.entitlement') }}</th>
+                <th>{{ $t('platform.billing.table.columns.actions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="9" class="table-empty">加载中</td>
+                <td colspan="9" class="table-empty">{{ $t('common.actions.loading') }}</td>
               </tr>
               <tr v-else-if="billingRows.length === 0">
-                <td colspan="9" class="table-empty">暂无产品线</td>
+                <td colspan="9" class="table-empty">{{ $t('platform.billing.table.empty') }}</td>
               </tr>
               <tr v-for="row in billingRows" v-else :key="row.productLine.appKey">
                 <td>
@@ -369,7 +393,7 @@ function apiErrorText(error: unknown): string {
                   </label>
                 </td>
                 <td>{{ row.subscription ? billingCycleLabel(row.subscription.billingCycle) : '-' }}</td>
-                <td>{{ row.subscription ? statusLabel(row.subscription) : '未开通' }}</td>
+                <td>{{ row.subscription ? statusLabel(row.subscription) : $t('platform.billing.status.notOpened') }}</td>
                 <td>{{ row.subscription ? formatDateTime(row.subscription.currentPeriodStart) : '-' }}</td>
                 <td>{{ row.subscription ? formatDateTime(row.subscription.currentPeriodEnd) : '-' }}</td>
                 <td>{{ row.subscription ? formatAmount(row.subscription.amount) : '-' }}</td>
@@ -384,7 +408,7 @@ function apiErrorText(error: unknown): string {
                       :disabled="saving"
                       @click="purchaseBillingRow(row)"
                     >
-                      开通
+                      {{ $t('platform.billing.actions.open') }}
                     </button>
                     <button
                       v-if="row.subscription && canRenew(row.subscription)"
@@ -393,7 +417,7 @@ function apiErrorText(error: unknown): string {
                       :disabled="saving"
                       @click="renewBillingRow(row)"
                     >
-                      {{ canReactivate(row.subscription) ? '重新开通' : row.subscription.status === 'suspended' ? '恢复并续费' : '续费' }}
+                      {{ renewalActionLabel(row.subscription) }}
                     </button>
                     <button
                       v-if="row.subscription && canConvertLegacy(row.subscription)"
@@ -402,7 +426,7 @@ function apiErrorText(error: unknown): string {
                       :disabled="saving"
                       @click="convertLegacyBillingRow(row)"
                     >
-                      转付费
+                      {{ $t('platform.billing.actions.convert') }}
                     </button>
                     <button
                       v-if="row.subscription && canSuspend(row.subscription)"
@@ -411,7 +435,7 @@ function apiErrorText(error: unknown): string {
                       :disabled="saving"
                       @click="suspendBillingRow(row)"
                     >
-                      暂停
+                      {{ $t('platform.billing.actions.suspend') }}
                     </button>
                     <button
                       v-if="row.subscription && canCancel(row.subscription)"
@@ -420,7 +444,7 @@ function apiErrorText(error: unknown): string {
                       :disabled="saving"
                       @click="cancelBillingRow(row)"
                     >
-                      取消
+                      {{ $t('platform.billing.actions.cancel') }}
                     </button>
                   </div>
                 </td>
@@ -430,9 +454,9 @@ function apiErrorText(error: unknown): string {
         </section>
 
         <form class="edit-panel" @submit.prevent="submitSelectedProductMutation">
-          <h2>手工购买 / 续费</h2>
+          <h2>{{ $t('platform.billing.form.title') }}</h2>
           <label>
-            <span>产品线</span>
+            <span>{{ $t('platform.billing.form.productLine') }}</span>
             <select v-model="form.appKey">
               <option v-for="productLine in productLines" :key="productLine.appKey" :value="productLine.appKey">
                 {{ productLine.displayName }}
@@ -440,37 +464,37 @@ function apiErrorText(error: unknown): string {
             </select>
           </label>
           <label>
-            <span>计费周期</span>
+            <span>{{ $t('platform.billing.form.billingCycle') }}</span>
             <select v-model="form.billingCycle">
-              <option value="monthly">月付</option>
-              <option value="yearly">年付</option>
+              <option value="monthly">{{ $t('platform.billing.cycles.monthly') }}</option>
+              <option value="yearly">{{ $t('platform.billing.cycles.yearly') }}</option>
             </select>
           </label>
           <label>
-            <span>购买数量</span>
+            <span>{{ $t('platform.billing.form.duration') }}</span>
             <div class="duration-row">
               <input v-model.number="form.durationCount" type="number" min="1" :max="form.billingCycle === 'monthly' ? 120 : 10">
               <span>{{ durationUnitLabel }}</span>
             </div>
           </label>
           <div class="quote-summary">
-            <span>标准单价</span>
+            <span>{{ $t('platform.billing.form.unitPrice') }}</span>
             <strong>{{ formatAmount(selectedUnitPrice) }} {{ selectedCurrency }} / {{ durationUnitLabel }}</strong>
           </div>
           <div class="quote-summary">
-            <span>本次金额</span>
+            <span>{{ $t('platform.billing.form.amount') }}</span>
             <strong>{{ formatAmount(calculatedAmount) }} {{ selectedCurrency }}</strong>
           </div>
           <label>
-            <span>币种</span>
+            <span>{{ $t('platform.billing.form.currency') }}</span>
             <input v-model.trim="form.currency" maxlength="3" :placeholder="selectedCurrency">
           </label>
           <label>
-            <span>备注</span>
+            <span>{{ $t('platform.billing.form.paymentNote') }}</span>
             <textarea v-model.trim="form.paymentNote" rows="4" />
           </label>
           <button class="primary-button" type="submit" :disabled="saving || loading">
-            {{ saving ? '保存中' : primaryActionLabel }}
+            {{ saving ? $t('common.actions.saving') : primaryActionLabel }}
           </button>
         </form>
       </div>

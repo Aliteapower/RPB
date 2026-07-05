@@ -25,15 +25,15 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
         assertThat(todayQuickActionsPath).exists();
         assertThat(todayListItemPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String staffHome = Files.readString(staffHomePath);
-        String todayView = Files.readString(todayViewPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String staffHome = FrontendSourceSupport.readString(staffHomePath);
+        String todayView = FrontendSourceSupport.readString(todayViewPath);
         String todayWorkbenchSource = todayView
-            + Files.readString(todayQuickActionsPath)
-            + Files.readString(todayListItemPath);
+            + FrontendSourceSupport.readString(todayQuickActionsPath)
+            + FrontendSourceSupport.readString(todayListItemPath);
 
         assertThat(router)
             .contains("ReservationArrivedToQueuePage")
@@ -48,20 +48,20 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
             .contains("getStaffHomeOverview")
             .contains("StaffHomeTopBar")
             .contains("StaffBottomNav")
-            .contains("aria-label=\"今日概览\"")
+            .contains("staffHome.aria.todayOverview")
             .contains("active-tab=\"home\"");
         assertForbiddenQueueOperationsAbsent(staffHome);
 
         assertThat(todayWorkbenchSource)
             .contains("ReservationQuickActionPanel")
             .contains("routeName: 'reservation-arrived-to-queue'")
-            .contains("label: '预约转排队'")
+            .contains("labelKey: 'reservationWorkbench.quickActions.reservationToQueue'")
             .contains("routeName: 'walk-in-queue'")
-            .contains("label: '现场取号'")
-            .contains("label: '创建预约'")
+            .contains("labelKey: 'reservationWorkbench.quickActions.walkInQueue'")
+            .contains("labelKey: 'reservationWorkbench.quickActions.createReservation'")
             .contains("grid-template-columns: repeat(3, minmax(0, 1fr))")
-            .doesNotContain("label: '预约到店'")
-            .doesNotContain("label: '预约入座'")
+            .doesNotContain("labelKey: 'reservationWorkbench.quickActions.checkIn'")
+            .doesNotContain("labelKey: 'reservationWorkbench.quickActions.seat'")
             .doesNotContain("show-confirmed-reservations")
             .doesNotContain("show-arrived-reservations")
             .doesNotContain("已到店预约进入排队")
@@ -173,8 +173,8 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
         assertThat(todayViewPath).exists();
         assertThat(todayListItemPath).exists();
 
-        String todayView = Files.readString(todayViewPath);
-        String todayListItem = Files.readString(todayListItemPath);
+        String todayView = FrontendSourceSupport.readString(todayViewPath);
+        String todayListItem = FrontendSourceSupport.readString(todayListItemPath);
 
         assertThat(todayListItem)
             .contains("const queueTicketStatus")
@@ -182,7 +182,7 @@ class ReservationArrivedToQueueUiImplementationValidationTest {
             .contains("const showQueueSeat")
             .contains("queueTicketStatus.value === 'called'")
             .contains("const seatActionText")
-            .contains("排队入座")
+            .contains("reservationWorkbench.item.seatFromQueue")
             .contains("resourceLabel")
             .doesNotContain("const showSeat = computed(() => props.item.status === 'arrived')");
 

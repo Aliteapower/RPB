@@ -14,6 +14,9 @@ import type {
   QueueWalkInRequest,
   WalkInQueueApiErrorResponse
 } from '../types/walkInQueue'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -34,7 +37,7 @@ const apiError = ref<WalkInQueueApiErrorResponse | null>(null)
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const appStatusLabel = computed(() => (isSubmitting.value ? '取号中' : '现场取号'))
+const appStatusLabel = computed(() => (isSubmitting.value ? gt('generated.walk-in-queue.016') : gt('generated.walk-in-queue.017')))
 const queueTicketListRoute = computed(() => ({
   name: 'queue-ticket-list',
   params: {
@@ -130,10 +133,10 @@ function createLocalError(code: string, messageKey: string): WalkInQueueApiError
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.walk-in-queue.018')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.walk-in-queue.015')}${value.slice(0, 8)}`
 }
 </script>
 
@@ -151,17 +154,17 @@ function formatStoreLabel(value: string | undefined): string {
 
       <section class="quick-ticket-panel">
         <div>
-          <p>无预约到店取号</p>
-          <h1>快速取号</h1>
+          <p>{{ gt('generated.walk-in-queue.001') }}</p>
+          <h1>{{ gt('generated.walk-in-queue.002') }}</h1>
         </div>
-        <strong>默认 2 人，可直接取号</strong>
+        <strong>{{ gt('generated.walk-in-queue.003') }}</strong>
       </section>
 
       <form class="walk-in-queue-form" @submit.prevent="submitWalkInQueue">
-        <section class="party-size-panel" aria-label="现场人数">
+        <section class="party-size-panel" :aria-label="gt('generated.walk-in-queue.004')">
           <div>
-            <span>人数</span>
-            <strong>{{ form.partySize }}人</strong>
+            <span>{{ gt('generated.walk-in-queue.005') }}</span>
+            <strong>{{ form.partySize }}{{ gt('generated.walk-in-queue.006') }}</strong>
           </div>
           <div class="party-size-stepper">
             <button type="button" :disabled="form.partySize <= 1" @click="updatePartySize(-1)">-</button>
@@ -172,8 +175,8 @@ function formatStoreLabel(value: string | undefined): string {
 
         <details class="optional-customer-panel">
           <summary>
-            <span>客户信息</span>
-            <strong>可选</strong>
+            <span>{{ gt('generated.walk-in-queue.007') }}</span>
+            <strong>{{ gt('generated.walk-in-queue.008') }}</strong>
           </summary>
 
           <div class="optional-customer-fields">
@@ -187,21 +190,21 @@ function formatStoreLabel(value: string | undefined): string {
             />
 
             <label class="note-field">
-              <span>备注</span>
+              <span>{{ gt('generated.walk-in-queue.009') }}</span>
               <textarea v-model="form.note" name="note" rows="3" />
             </label>
           </div>
         </details>
 
         <button class="submit-button" :disabled="!canSubmit" type="submit">
-          {{ isSubmitting ? '取号中...' : '确认取号入队' }}
+          {{ isSubmitting ? gt('generated.walk-in-queue.010') : gt('generated.walk-in-queue.011') }}
         </button>
       </form>
 
       <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-        <h2>取号失败</h2>
-        <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-        <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+        <h2>{{ gt('generated.walk-in-queue.012') }}</h2>
+        <p class="error-code">{{ gt('generated.walk-in-queue.013') }}{{ apiError.error.code }}</p>
+        <p class="message-key">{{ gt('generated.walk-in-queue.014') }}{{ apiError.error.messageKey }}</p>
       </section>
     </div>
 

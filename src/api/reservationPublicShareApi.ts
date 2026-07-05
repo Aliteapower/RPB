@@ -2,6 +2,7 @@ import type {
   ReservationPublicShareApiErrorResponse,
   ReservationPublicShareResponse
 } from '../types/reservationPublicShare'
+import { translate } from '../i18n'
 
 export class ReservationPublicShareApiError extends Error {
   readonly status: number
@@ -60,12 +61,12 @@ export function reservationPublicShareErrorMessage(code: string): string {
   switch (code) {
     case 'TOKEN_EXPIRED':
     case 'TOKEN_REVOKED':
-      return '链接已失效'
+      return translate('reservationPublicShare.errors.expired')
     case 'TOKEN_NOT_FOUND':
     case 'RESERVATION_NOT_FOUND':
-      return '预约信息不存在'
+      return translate('reservationPublicShare.errors.notFound')
     default:
-      return '预约信息读取失败'
+      return translate('reservationPublicShare.errors.loadFailed')
   }
 }
 

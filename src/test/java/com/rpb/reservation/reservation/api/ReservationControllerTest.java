@@ -495,6 +495,8 @@ class ReservationControllerTest {
             .containsExactlyInAnyOrder(
                 "src/App.vue",
                 "src/components/call-screen/CallScreenAdModeSwitch.vue",
+                "src/components/common/DownloadableQrCode.vue",
+                "src/components/common/PasswordInput.vue",
                 "src/components/DateTimeWheelPicker.vue",
                 "src/components/erp/ErpPagination.vue",
                 "src/components/erp/ErpQueryToolbar.vue",

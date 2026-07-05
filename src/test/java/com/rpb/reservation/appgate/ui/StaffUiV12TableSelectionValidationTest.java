@@ -24,13 +24,13 @@ class StaffUiV12TableSelectionValidationTest {
 
         assertAppearsInOrder(
             itemsSource,
-            "label: '首页'",
+            "labelKey: 'nav.staff.home'",
             "routeName: 'store-staff-home'",
-            "label: '预约'",
+            "labelKey: 'nav.staff.reservation'",
             "routeName: 'reservation-today-view'",
-            "label: '排队'",
+            "labelKey: 'nav.staff.queue'",
             "routeName: 'queue-ticket-list'",
-            "label: '桌台'",
+            "labelKey: 'nav.staff.table'",
             "routeName: 'table-resource-list'"
         );
         assertThat(componentSource)
@@ -52,6 +52,7 @@ class StaffUiV12TableSelectionValidationTest {
         Path apiPath = Path.of("src", "api", "tableResourceApi.ts");
         Path seatingApiPath = Path.of("src", "api", "reservationArrivedDirectSeatingApi.ts");
         Path typePath = Path.of("src", "types", "tableResource.ts");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(Files.exists(tablePagePath)).isTrue();
         assertThat(Files.exists(dateSwitcherPath)).isTrue();
@@ -60,10 +61,12 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(apiPath)).isTrue();
         assertThat(Files.exists(seatingApiPath)).isTrue();
         assertThat(Files.exists(typePath)).isTrue();
+        assertThat(Files.exists(zhPath)).isTrue();
 
         String tablePageSource = readSource(tablePagePath);
         String dateSwitcherSource = readSource(dateSwitcherPath);
         String createDialogSource = readSource(createDialogPath);
+        String zhSource = readSource(zhPath);
         String source = tablePageSource
             + dateSwitcherSource
             + readSource(pickerPath)
@@ -106,7 +109,7 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("temporaryGroupName")
             .contains("saveTemporaryTableGroup")
             .contains("dissolveTemporaryTableGroup")
-            .contains("保存分组")
+            .contains("reservationWorkbench.createDialog.saveGroup")
             .contains("解散")
             .contains("temporary_group_member")
             .contains("临时组占用")
@@ -118,11 +121,11 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("StaffBusinessDateSwitcher")
             .contains("ReservationMonthCalendar")
             .contains("calendarOpen")
-            .contains("切换日期")
-            .contains("回到今日")
-            .contains("改日期")
-            .contains("未来日期")
-            .contains("营业中")
+            .contains("staffControls.businessDate.changeDate")
+            .contains("staffControls.businessDate.backToday")
+            .contains("staffControls.businessDate.editDate")
+            .contains("staffControls.businessDate.future")
+            .contains("staffControls.businessDate.todayMode")
             .contains("reservationCounts")
             .contains("preassignedReservationId")
             .contains("preassignedReservationCode")
@@ -166,10 +169,17 @@ class StaffUiV12TableSelectionValidationTest {
             .doesNotContain("mock")
             .doesNotContain("fake");
 
+        assertThat(zhSource)
+            .contains("changeDate: '切换日期'")
+            .contains("backToday: '回到今日'")
+            .contains("editDate: '改日期'")
+            .contains("future: '未来日期 {date}'")
+            .contains("todayMode: '营业中'");
+
         assertThat(tablePageSource)
             .contains("StaffBusinessDateSwitcher")
             .contains("v-model:selected-date=\"selectedBusinessDate\"")
-            .contains("calendar-label=\"桌台日历\"")
+            .contains("generated.table-resource-list.003")
             .contains(":today-date=\"currentBusinessDate\"")
             .contains(":reservation-counts=\"reservationCounts\"")
             .contains("@visible-month-changed=\"handleVisibleMonthChanged\"")
@@ -228,7 +238,7 @@ class StaffUiV12TableSelectionValidationTest {
             .contains(":show-selection-mode-controls=\"false\"")
             .contains("saveTemporaryTableGroup")
             .contains("toggleTemporaryGroupMode")
-            .contains("保存分组")
+            .contains("reservationWorkbench.createDialog.saveGroup")
             .contains("form.tablePreference = `table_group:${result.tableGroupId}`")
             .contains("tableIds: form.temporaryTableIds")
             .contains(":business-date=\"form.businessDate\"")
@@ -365,7 +375,7 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(topBar)
             .contains("businessDate?: string | null")
             .contains("<slot name=\"action\" />")
-            .contains("aria-label=\"门店和应用状态\"")
+            .contains("staffHome.topbar.metaAria")
             .doesNotContain("displayBusinessDate")
             .doesNotContain("aria-label=\"营业日期\"")
             .doesNotContain("topbar-business-date")
@@ -379,7 +389,7 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(readSource(Path.of("src", "pages", "StoreStaffHomePage.vue")))
             .contains(":business-date=\"displayedBusinessDate\"")
             .contains("getStaffHomeOverview")
-            .contains("return '首页'");
+            .contains("staffHome.appStatus.home");
         assertThat(readSource(Path.of("src", "pages", "WalkInQueuePage.vue")))
             .contains(":business-date=\"currentBusinessDate\"");
         assertThat(readSource(Path.of("src", "pages", "QueueTicketListPage.vue")))
@@ -464,6 +474,7 @@ class StaffUiV12TableSelectionValidationTest {
         Path cancelApiPath = Path.of("src", "api", "reservationCancelApi.ts");
         Path calendarSummaryApiPath = Path.of("src", "api", "reservationCalendarSummaryApi.ts");
         Path calendarSummaryTypePath = Path.of("src", "types", "reservationCalendarSummary.ts");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(Files.exists(actionsPath)).isTrue();
         assertThat(Files.exists(dateSwitcherPath)).isTrue();
@@ -475,10 +486,12 @@ class StaffUiV12TableSelectionValidationTest {
         assertThat(Files.exists(cancelApiPath)).isTrue();
         assertThat(Files.exists(calendarSummaryApiPath)).isTrue();
         assertThat(Files.exists(calendarSummaryTypePath)).isTrue();
+        assertThat(Files.exists(zhPath)).isTrue();
 
         String pageSource = readSource(pagePath);
         String actionPanelSource = readSource(actionsPath);
         String dateSwitcherSource = readSource(dateSwitcherPath);
+        String zhSource = readSource(zhPath);
         String source = pageSource
             + actionPanelSource
             + dateSwitcherSource
@@ -502,16 +515,16 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("v-model:open=\"showCreateReservationDialog\"")
             .contains("v-model:open=\"showSeatDialog\"")
             .contains("v-model:selected-status=\"selectedStatus\"")
-            .contains("label: '创建预约'")
+            .contains("labelKey: 'reservationWorkbench.quickActions.createReservation'")
             .contains("open-create-reservation")
-            .contains("label: '现场取号'")
+            .contains("labelKey: 'reservationWorkbench.quickActions.walkInQueue'")
             .contains("routeName: 'walk-in-queue'")
-            .contains("label: '预约转排队'")
+            .contains("labelKey: 'reservationWorkbench.quickActions.reservationToQueue'")
             .contains("routeName: 'reservation-arrived-to-queue'")
             .contains("createReservation")
-            .contains("新增预约")
+            .contains("reservationWorkbench.createDialog.title")
             .contains("ReservationSeatDialog")
-            .contains("选择桌号（入桌）")
+            .contains("reservationWorkbench.dialogs.seatTitle")
             .contains("TableResourcePicker")
             .contains("seatArrivedReservation")
             .contains("select-table")
@@ -529,14 +542,14 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("reservation-create-meal-period-filter")
             .contains("reservation-create-time-slots")
             .contains("v-for=\"slot in filteredTimeSlots\"")
-            .contains("桌号（可选）")
-            .contains("今日预约")
-            .contains("当日预约")
-            .contains("label: '已预约'")
+            .contains("reservationWorkbench.createDialog.optionalTable")
+            .contains("generated.reservation-today-view.017")
+            .contains("reservationWorkbench.todayList.title")
+            .contains("generated.reservation-today-view.010")
             .contains("reservation-today-list")
-            .contains("placeholder=\"手机号\"")
-            .contains("全部人数")
-            .contains("重置")
+            .contains("reservationWorkbench.todayList.phone")
+            .contains("reservationWorkbench.todayList.allPartySizes")
+            .contains("common.actions.reset")
             .contains("fetchMeApps")
             .contains("reservation.cancel")
             .contains("canCancelReservation")
@@ -554,11 +567,11 @@ class StaffUiV12TableSelectionValidationTest {
             .contains(":today-date=\"storeTodayDate\"")
             .contains("visibleMonthKey")
             .contains("loadCalendarSummary")
-            .contains("切换日期")
-            .contains("回到今日")
-            .contains("改日期")
-            .contains("未来日期")
-            .contains("营业中")
+            .contains("staffControls.businessDate.changeDate")
+            .contains("staffControls.businessDate.backToday")
+            .contains("staffControls.businessDate.editDate")
+            .contains("staffControls.businessDate.future")
+            .contains("staffControls.businessDate.todayMode")
             .contains("reservation-calendar__reservation-count")
             .contains("fetchTableResources")
             .contains("tableResourceOptions")
@@ -579,7 +592,7 @@ class StaffUiV12TableSelectionValidationTest {
             .contains(":min=\"minDate\"")
             .contains("is-past")
             .contains("aria-disabled")
-            .contains("仅当日预约可以操作")
+            .contains("reservationWorkbench.item.currentDayOnly")
             .contains("aria-label")
             .doesNotContain("routeName: 'reservation-check-in'")
             .doesNotContain("routeName: 'reservation-arrived-direct-seating'")
@@ -595,6 +608,13 @@ class StaffUiV12TableSelectionValidationTest {
             .doesNotContain("ReservationCancellationPage")
             .doesNotContain("ReservationNoShowPage")
             .doesNotContain("seatingId: request.seatingId");
+
+        assertThat(zhSource)
+            .contains("changeDate: '切换日期'")
+            .contains("backToday: '回到今日'")
+            .contains("editDate: '改日期'")
+            .contains("future: '未来日期 {date}'")
+            .contains("todayMode: '营业中'");
 
         assertThat(pageSource)
             .contains("StaffBusinessDateSwitcher")
@@ -686,7 +706,7 @@ class StaffUiV12TableSelectionValidationTest {
             .contains(":party-size=\"null\"")
             .contains(":business-date=\"pickerBusinessDate\"")
             .contains("换桌")
-            .contains("选择桌号（换桌）")
+            .contains("reservationWorkbench.dialogs.switchTitle")
             .contains("TableResourcePicker")
             .contains("switchTable")
             .contains("/api/v1/stores/${encodeURIComponent(storeId)}/seatings/${encodeURIComponent(seatingId)}/table-switch")
@@ -755,7 +775,7 @@ class StaffUiV12TableSelectionValidationTest {
     }
 
     private static String readSource(Path path) throws Exception {
-        return Files.readString(path)
+        return FrontendSourceSupport.readString(path)
             .replace("\r\n", "\n")
             .replace('\r', '\n');
     }

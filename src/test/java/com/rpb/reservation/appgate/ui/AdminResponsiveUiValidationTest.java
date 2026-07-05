@@ -13,8 +13,8 @@ class AdminResponsiveUiValidationTest {
         Path platformNavPath = Path.of("src", "components", "platform", "PlatformAdminNav.vue");
         Path tenantNavPath = Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue");
 
-        String platformNav = Files.readString(platformNavPath);
-        String tenantNav = Files.readString(tenantNavPath);
+        String platformNav = FrontendSourceSupport.readString(platformNavPath);
+        String tenantNav = FrontendSourceSupport.readString(tenantNavPath);
 
         assertCompactMobileNav(platformNav);
         assertCompactMobileNav(tenantNav);
@@ -24,7 +24,7 @@ class AdminResponsiveUiValidationTest {
     void erpQueryToolbarKeepsSearchAndResetGroupedOnMobile() throws Exception {
         Path toolbarPath = Path.of("src", "components", "erp", "ErpQueryToolbar.vue");
 
-        String toolbar = Files.readString(toolbarPath);
+        String toolbar = FrontendSourceSupport.readString(toolbarPath);
 
         assertThat(toolbar)
             .contains("class=\"query-buttons\"")

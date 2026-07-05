@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -22,6 +23,7 @@ const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, index) => index)
 
 const picker = reactive(toPickerState(props.modelValue))
 const isOpen = ref(false)
+const { t } = useI18n()
 const fieldId = `time-wheel-picker-${Math.random().toString(36).slice(2)}`
 const panelId = `${fieldId}-panel`
 
@@ -104,11 +106,11 @@ function pad2(value: number): string {
       v-if="isOpen"
       :id="panelId"
       class="time-wheel-picker__panel"
-      aria-label="24小时制时间选择"
+      :aria-label="t('staffControls.timePicker.aria')"
     >
       <div class="time-wheel-picker__frame">
         <label class="time-wheel-picker__column">
-          <span>时</span>
+          <span>{{ t('staffControls.timePicker.hour') }}</span>
           <select v-model.number="picker.hour" size="5" @change="onWheelChanged">
             <option v-for="hour in HOUR_OPTIONS" :key="hour" :value="hour">
               {{ pad2(hour) }}
@@ -119,7 +121,7 @@ function pad2(value: number): string {
         <span class="time-wheel-picker__separator" aria-hidden="true">:</span>
 
         <label class="time-wheel-picker__column">
-          <span>分</span>
+          <span>{{ t('staffControls.timePicker.minute') }}</span>
           <select v-model.number="picker.minute" size="5" @change="onWheelChanged">
             <option v-for="minute in MINUTE_OPTIONS" :key="minute" :value="minute">
               {{ pad2(minute) }}
@@ -129,7 +131,7 @@ function pad2(value: number): string {
       </div>
 
       <button class="time-wheel-picker__done" type="button" @click="closePicker">
-        完成
+        {{ t('staffControls.timePicker.done') }}
       </button>
     </section>
   </section>

@@ -18,6 +18,9 @@ import type {
   ApiErrorResponse,
   SeatWalkInDirectlyRequest
 } from '../types/walkInDirectSeating'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -40,7 +43,7 @@ const apiError = ref<ApiErrorResponse | null>(null)
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const appStatusLabel = computed(() => (isSubmitting.value ? '入座中' : '直接入座'))
+const appStatusLabel = computed(() => (isSubmitting.value ? gt('generated.walk-in-direct-seating.014') : gt('generated.walk-in-direct-seating.015')))
 const businessDate = computed(() => currentBusinessDate.value)
 const tableResourceListRoute = computed(() => ({
   name: 'table-resource-list',
@@ -212,10 +215,10 @@ function createLocalError(code: string, messageKey: string): ApiErrorResponse {
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.walk-in-direct-seating.016')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.walk-in-direct-seating.013')}${value.slice(0, 8)}`
 }
 
 </script>
@@ -235,13 +238,13 @@ function formatStoreLabel(value: string | undefined): string {
       <form class="direct-seating-form" @submit.prevent="submitDirectSeating">
         <header class="direct-seating-heading">
           <div>
-            <p>接待</p>
-            <h1>散客直接入座</h1>
+            <p>{{ gt('generated.walk-in-direct-seating.001') }}</p>
+            <h1>{{ gt('generated.walk-in-direct-seating.002') }}</h1>
           </div>
         </header>
 
-        <section class="party-size-panel" aria-label="现场人数">
-          <span>人数</span>
+        <section class="party-size-panel" :aria-label="gt('generated.walk-in-direct-seating.003')">
+          <span>{{ gt('generated.walk-in-direct-seating.004') }}</span>
           <div class="party-size-stepper">
             <button type="button" :disabled="form.partySize <= 1" @click="updatePartySize(-1)">-</button>
             <input v-model.number="form.partySize" inputmode="numeric" min="1" name="partySize" type="number" />
@@ -249,8 +252,8 @@ function formatStoreLabel(value: string | undefined): string {
           </div>
         </section>
 
-        <section class="guest-panel" aria-label="客户信息">
-          <h2>客户信息</h2>
+        <section class="guest-panel" :aria-label="gt('generated.walk-in-direct-seating.005')">
+          <h2>{{ gt('generated.walk-in-direct-seating.006') }}</h2>
           <StaffGuestContactLookup
             :store-id="storeId || ''"
             v-model:customer-id="form.customerId"
@@ -261,7 +264,7 @@ function formatStoreLabel(value: string | undefined): string {
           />
         </section>
 
-        <section class="resource-panel" aria-label="桌号及分组">
+        <section class="resource-panel" :aria-label="gt('generated.walk-in-direct-seating.007')">
           <TableResourcePicker
             :store-id="storeId"
             :party-size="null"
@@ -278,13 +281,13 @@ function formatStoreLabel(value: string | undefined): string {
         </section>
 
         <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-          <h2>入座失败</h2>
-          <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-          <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+          <h2>{{ gt('generated.walk-in-direct-seating.008') }}</h2>
+          <p class="error-code">{{ gt('generated.walk-in-direct-seating.009') }}{{ apiError.error.code }}</p>
+          <p class="message-key">{{ gt('generated.walk-in-direct-seating.010') }}{{ apiError.error.messageKey }}</p>
         </section>
 
         <button class="submit-button" :disabled="!canSubmit" type="submit">
-          {{ isSubmitting ? '入座中...' : '确认入座' }}
+          {{ isSubmitting ? gt('generated.walk-in-direct-seating.011') : gt('generated.walk-in-direct-seating.012') }}
         </button>
       </form>
     </div>

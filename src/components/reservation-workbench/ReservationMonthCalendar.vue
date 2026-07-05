@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface CalendarDay {
   date: Date
@@ -23,7 +24,6 @@ const props = withDefaults(
     showCountInAria?: boolean
   }>(),
   {
-    calendarLabel: '预约日历',
     markedDates: () => [],
     minDate: '',
     reservationCounts: () => ({}),
@@ -36,6 +36,7 @@ const emit = defineEmits<{
   'visible-month-changed': [value: string]
 }>()
 
+const { t } = useI18n()
 const visibleMonth = ref(toMonthDate(props.selectedDate))
 const markedDateSet = computed(() => new Set(props.markedDates))
 const visibleMonthKey = computed(() => monthKey(visibleMonth.value))
@@ -43,8 +44,18 @@ const visibleMonthKey = computed(() => monthKey(visibleMonth.value))
 const monthTitle = computed(() => {
   const year = visibleMonth.value.getFullYear()
   const month = visibleMonth.value.getMonth() + 1
-  return `${year}年${month}月`
+  return t('reservationWorkbench.monthCalendar.monthTitle', { year, month })
 })
+const resolvedCalendarLabel = computed(() => props.calendarLabel ?? t('reservationWorkbench.monthCalendar.aria'))
+const weekdayLabels = computed(() => [
+  t('reservationWorkbench.monthCalendar.weekdays.sunday'),
+  t('reservationWorkbench.monthCalendar.weekdays.monday'),
+  t('reservationWorkbench.monthCalendar.weekdays.tuesday'),
+  t('reservationWorkbench.monthCalendar.weekdays.wednesday'),
+  t('reservationWorkbench.monthCalendar.weekdays.thursday'),
+  t('reservationWorkbench.monthCalendar.weekdays.friday'),
+  t('reservationWorkbench.monthCalendar.weekdays.saturday')
+])
 
 const monthDays = computed<CalendarDay[]>(() => {
   const year = visibleMonth.value.getFullYear()
@@ -151,33 +162,29 @@ function reservationCountLabel(count: number): string {
 }
 
 function dayAriaLabel(day: CalendarDay): string {
-  const prefix = day.selected ? '已选择' : '选择'
+  const prefix = day.selected
+    ? t('reservationWorkbench.monthCalendar.selectedPrefix')
+    : t('reservationWorkbench.monthCalendar.selectPrefix')
   const reservationText = props.showCountInAria
     ? day.reservationCount > 0
-      ? `，${day.reservationCount} 个预订`
-      : '，暂无预订'
+      ? t('reservationWorkbench.monthCalendar.reservationCount', { count: day.reservationCount })
+      : t('reservationWorkbench.monthCalendar.noReservation')
     : ''
-  const dateLimitText = day.past ? '，不可创建新预约' : ''
+  const dateLimitText = day.past ? t('reservationWorkbench.monthCalendar.dateLimit') : ''
   return `${prefix} ${day.isoDate}${reservationText}${dateLimitText}`
 }
 </script>
 
 <template>
-  <section class="reservation-calendar" :aria-label="calendarLabel">
+  <section class="reservation-calendar" :aria-label="resolvedCalendarLabel">
     <header class="reservation-calendar__header">
-      <button type="button" aria-label="上个月" @click="previousMonth">‹</button>
+      <button type="button" :aria-label="$t('reservationWorkbench.monthCalendar.previousMonth')" @click="previousMonth">‹</button>
       <h2>{{ monthTitle }}</h2>
-      <button type="button" aria-label="下个月" @click="nextMonth">›</button>
+      <button type="button" :aria-label="$t('reservationWorkbench.monthCalendar.nextMonth')" @click="nextMonth">›</button>
     </header>
 
     <div class="reservation-calendar__weekdays" aria-hidden="true">
-      <span>日</span>
-      <span>一</span>
-      <span>二</span>
-      <span>三</span>
-      <span>四</span>
-      <span>五</span>
-      <span>六</span>
+      <span v-for="weekday in weekdayLabels" :key="weekday">{{ weekday }}</span>
     </div>
 
     <div class="reservation-calendar__grid">

@@ -9,6 +9,9 @@ import type {
   CompleteCleaningResponse,
   StartCleaningResponse
 } from '../types/cleaning'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 type CleaningAction = 'start' | 'complete'
 
@@ -195,22 +198,22 @@ function asSingleValue(value: unknown): string {
 <template>
   <main class="page-shell">
     <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>清台处理</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <p v-if="hasQuerySeatingId" class="handoff-note">已从路由参数带入入座记录 ID</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
+      <p class="eyebrow">{{ gt('generated.cleaning-complete.001') }}</p>
+      <h1>{{ gt('generated.cleaning-complete.002') }}</h1>
+      <p class="store-context">{{ gt('generated.cleaning-complete.003') }} {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
+      <p v-if="hasQuerySeatingId" class="handoff-note">{{ gt('generated.cleaning-complete.004') }}</p>
+      <RouterLink class="home-link" :to="staffHomeRoute">{{ gt('generated.cleaning-complete.005') }}</RouterLink>
     </section>
 
     <section class="workflow-stack">
       <form class="cleaning-form" @submit.prevent="submitStartCleaning">
         <header>
-          <p class="form-kicker">开始清台</p>
-          <h2>入座记录 ID</h2>
+          <p class="form-kicker">{{ gt('generated.cleaning-complete.006') }}</p>
+          <h2>{{ gt('generated.cleaning-complete.007') }}</h2>
         </header>
 
         <label class="primary-field">
-          <span>入座记录 ID</span>
+          <span>{{ gt('generated.cleaning-complete.008') }}</span>
           <input
             v-model="startForm.seatingId"
             autocomplete="off"
@@ -221,30 +224,30 @@ function asSingleValue(value: unknown): string {
         </label>
 
         <details class="field-group">
-          <summary>备注</summary>
+          <summary>{{ gt('generated.cleaning-complete.009') }}</summary>
           <label>
-            <span>原因代码（可选）</span>
+            <span>{{ gt('generated.cleaning-complete.010') }}</span>
             <input v-model="startForm.reasonCode" name="startReasonCode" type="text" />
           </label>
           <label>
-            <span>备注（可选）</span>
+            <span>{{ gt('generated.cleaning-complete.011') }}</span>
             <textarea v-model="startForm.note" name="startNote" rows="3" />
           </label>
         </details>
 
         <button class="submit-button" :disabled="!canSubmit" type="submit">
-          {{ isSubmittingStart ? '提交中...' : '开始清台' }}
+          {{ isSubmittingStart ? gt('generated.cleaning-complete.012') : gt('generated.cleaning-complete.013') }}
         </button>
       </form>
 
       <form class="cleaning-form" @submit.prevent="submitCompleteCleaning">
         <header>
-          <p class="form-kicker">完成清台</p>
-          <h2>清台记录 ID</h2>
+          <p class="form-kicker">{{ gt('generated.cleaning-complete.014') }}</p>
+          <h2>{{ gt('generated.cleaning-complete.015') }}</h2>
         </header>
 
         <label class="primary-field">
-          <span>清台记录 ID</span>
+          <span>{{ gt('generated.cleaning-complete.016') }}</span>
           <input
             v-model="completeForm.cleaningId"
             autocomplete="off"
@@ -255,105 +258,104 @@ function asSingleValue(value: unknown): string {
         </label>
 
         <details class="field-group">
-          <summary>备注</summary>
+          <summary>{{ gt('generated.cleaning-complete.017') }}</summary>
           <label>
-            <span>原因代码（可选）</span>
+            <span>{{ gt('generated.cleaning-complete.018') }}</span>
             <input v-model="completeForm.reasonCode" name="completeReasonCode" type="text" />
           </label>
           <label>
-            <span>备注（可选）</span>
+            <span>{{ gt('generated.cleaning-complete.019') }}</span>
             <textarea v-model="completeForm.note" name="completeNote" rows="3" />
           </label>
         </details>
 
         <button class="submit-button complete-button" :disabled="!canCompleteImmediately" type="submit">
-          {{ isSubmittingComplete ? '提交中...' : '完成清台' }}
+          {{ isSubmittingComplete ? gt('generated.cleaning-complete.020') : gt('generated.cleaning-complete.021') }}
         </button>
       </form>
     </section>
 
     <section v-if="startResult" class="result-panel success-panel" aria-live="polite">
-      <h2>清台操作成功</h2>
+      <h2>{{ gt('generated.cleaning-complete.022') }}</h2>
       <dl>
         <div>
-          <dt>清台记录 ID</dt>
+          <dt>{{ gt('generated.cleaning-complete.023') }}</dt>
           <dd>{{ startResult.cleaningId }}</dd>
         </div>
         <div>
-          <dt>入座记录 ID</dt>
+          <dt>{{ gt('generated.cleaning-complete.024') }}</dt>
           <dd>{{ startResult.seatingId }}</dd>
         </div>
         <div>
-          <dt>资源</dt>
+          <dt>{{ gt('generated.cleaning-complete.025') }}</dt>
           <dd>{{ startResult.resource.type }} {{ startResult.resource.label || startResult.resource.id }}</dd>
         </div>
         <div>
-          <dt>清台状态</dt>
+          <dt>{{ gt('generated.cleaning-complete.026') }}</dt>
           <dd>{{ startResult.cleaningStatus }}</dd>
         </div>
         <div>
-          <dt>桌台状态</dt>
+          <dt>{{ gt('generated.cleaning-complete.027') }}</dt>
           <dd>{{ startResult.tableStatus }}</dd>
         </div>
         <div>
-          <dt>事件</dt>
+          <dt>{{ gt('generated.cleaning-complete.028') }}</dt>
           <dd>{{ startResult.events.join(', ') }}</dd>
         </div>
         <div>
-          <dt>幂等状态</dt>
+          <dt>{{ gt('generated.cleaning-complete.029') }}</dt>
           <dd>
             {{ startResult.idempotency.status }}
-            <span v-if="startResult.idempotency.replayed">重放：true</span>
+            <span v-if="startResult.idempotency.replayed">{{ gt('generated.cleaning-complete.030') }}</span>
           </dd>
         </div>
       </dl>
-      <p class="handoff-note">清台已开始，可继续完成清台</p>
+      <p class="handoff-note">{{ gt('generated.cleaning-complete.031') }}</p>
     </section>
 
     <section v-if="completeResult" class="result-panel success-panel" aria-live="polite">
-      <h2>{{ isClosedLoopComplete ? '桌位已释放' : '清台操作成功' }}</h2>
+      <h2>{{ isClosedLoopComplete ? gt('generated.cleaning-complete.032') : gt('generated.cleaning-complete.033') }}</h2>
       <dl>
         <div>
-          <dt>清台记录 ID</dt>
+          <dt>{{ gt('generated.cleaning-complete.034') }}</dt>
           <dd>{{ completeResult.cleaningId }}</dd>
         </div>
         <div>
-          <dt>资源</dt>
+          <dt>{{ gt('generated.cleaning-complete.035') }}</dt>
           <dd>
             {{ completeResult.resource.type }}
             {{ completeResult.resource.label || completeResult.resource.id }}
           </dd>
         </div>
         <div>
-          <dt>清台状态</dt>
+          <dt>{{ gt('generated.cleaning-complete.036') }}</dt>
           <dd>{{ completeResult.cleaningStatus }}</dd>
         </div>
         <div>
-          <dt>桌台状态</dt>
+          <dt>{{ gt('generated.cleaning-complete.037') }}</dt>
           <dd>{{ completeResult.tableStatus }}</dd>
         </div>
         <div>
-          <dt>事件</dt>
+          <dt>{{ gt('generated.cleaning-complete.038') }}</dt>
           <dd>{{ completeResult.events.join(', ') }}</dd>
         </div>
         <div>
-          <dt>幂等状态</dt>
+          <dt>{{ gt('generated.cleaning-complete.039') }}</dt>
           <dd>
             {{ completeResult.idempotency.status }}
-            <span v-if="completeResult.idempotency.replayed">重放：true</span>
+            <span v-if="completeResult.idempotency.replayed">{{ gt('generated.cleaning-complete.040') }}</span>
           </dd>
         </div>
       </dl>
     </section>
 
     <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>清台操作失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+      <h2>{{ gt('generated.cleaning-complete.041') }}</h2>
+      <p class="error-code">{{ gt('generated.cleaning-complete.042') }}{{ apiError.error.code }}</p>
+      <p class="message-key">{{ gt('generated.cleaning-complete.043') }}{{ apiError.error.messageKey }}</p>
     </section>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
+    <p v-if="lastIdempotencyKey" class="idempotency-key"> {{ gt('generated.cleaning-complete.044') }} {{ lastIdempotencyKey }}
     </p>
   </main>
 </template>

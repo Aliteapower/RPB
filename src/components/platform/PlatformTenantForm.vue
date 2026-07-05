@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import PasswordInput from '../common/PasswordInput.vue'
 import type { PlatformTenantFormModel, TenantStatusOption } from './platformTenantUi'
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   clearLogo: []
 }>()
 
+const { t } = useI18n()
 const localForm = reactive<PlatformTenantFormModel>({
   id: '',
   tenantCode: '',
@@ -32,8 +34,16 @@ const localForm = reactive<PlatformTenantFormModel>({
   password: ''
 })
 
-const passwordLabel = computed(() => (props.mode === 'create' ? '初始密码' : '修改密码'))
-const passwordPlaceholder = computed(() => (props.mode === 'create' ? '6 位数字或英文字母' : '留空则不修改'))
+const passwordLabel = computed(() => (
+  props.mode === 'create'
+    ? t('platform.tenants.form.initialPassword')
+    : t('platform.tenants.form.password')
+))
+const passwordPlaceholder = computed(() => (
+  props.mode === 'create'
+    ? t('platform.tenants.form.initialPasswordPlaceholder')
+    : t('platform.tenants.form.passwordPlaceholder')
+))
 
 watch(
   () => props.form,
@@ -66,9 +76,9 @@ function clearLogo(): void {
 
 <template>
   <form class="tenant-form" @submit.prevent="submitForm">
-    <section class="form-section" aria-label="基础信息">
+    <section class="form-section" :aria-label="$t('platform.tenants.form.basicInfo')">
       <label>
-        <span>租户代码</span>
+        <span>{{ $t('platform.tenants.form.tenantCode') }}</span>
         <input
           v-model.trim="localForm.tenantCode"
           required
@@ -80,43 +90,43 @@ function clearLogo(): void {
       </label>
 
       <label>
-        <span>名称</span>
+        <span>{{ $t('platform.tenants.form.name') }}</span>
         <input v-model.trim="localForm.displayName" required maxlength="120" autocomplete="off" />
       </label>
 
       <label>
-        <span>状态</span>
+        <span>{{ $t('platform.tenants.form.status') }}</span>
         <select v-model="localForm.status">
           <option v-for="option in statusOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
+            {{ $t(option.labelKey) }}
           </option>
         </select>
       </label>
 
       <label>
-        <span>默认语言</span>
+        <span>{{ $t('platform.tenants.form.defaultLocale') }}</span>
         <input v-model.trim="localForm.defaultLocale" maxlength="20" autocomplete="off" />
       </label>
     </section>
 
-    <section class="form-section" aria-label="联系方式">
+    <section class="form-section" :aria-label="$t('platform.tenants.form.contactInfo')">
       <label>
-        <span>负责人</span>
+        <span>{{ $t('platform.tenants.form.principal') }}</span>
         <input v-model.trim="localForm.principalName" maxlength="80" autocomplete="off" />
       </label>
 
       <label>
-        <span>电话</span>
+        <span>{{ $t('platform.tenants.form.phone') }}</span>
         <input v-model.trim="localForm.contactPhone" maxlength="40" autocomplete="off" />
       </label>
 
       <label class="span-2">
-        <span>地址</span>
+        <span>{{ $t('platform.tenants.form.address') }}</span>
         <input v-model.trim="localForm.address" maxlength="240" autocomplete="off" />
       </label>
     </section>
 
-    <section class="form-section" aria-label="租户管理员账号">
+    <section class="form-section" :aria-label="$t('platform.tenants.form.adminAccount')">
       <label>
         <span>{{ passwordLabel }}</span>
         <PasswordInput
@@ -137,23 +147,28 @@ function clearLogo(): void {
       </label>
     </section>
 
-    <section v-if="mode === 'edit'" class="form-section form-section--logo" aria-label="租户 LOGO">
+    <section v-if="mode === 'edit'" class="form-section form-section--logo" :aria-label="$t('platform.tenants.form.tenantLogo')">
       <div class="logo-preview" :class="{ empty: !localForm.logoMediaUrl }">
-        <img v-if="localForm.logoMediaUrl" :src="localForm.logoMediaUrl" alt="租户 LOGO" />
+        <img v-if="localForm.logoMediaUrl" :src="localForm.logoMediaUrl" :alt="$t('platform.tenants.form.tenantLogo')" />
         <span v-else>LOGO</span>
       </div>
 
       <div class="logo-fields">
         <label>
-          <span>租户 LOGO</span>
-          <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="选择图片" @change="handleLogoFileChange" />
+          <span>{{ $t('platform.tenants.form.tenantLogo') }}</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            :aria-label="$t('platform.tenants.form.chooseImage')"
+            @change="handleLogoFileChange"
+          />
         </label>
         <div class="logo-actions">
           <button class="secondary-button" type="button" :disabled="!localForm.logoFile || saving" @click="submitLogo">
-            上传 LOGO
+            {{ $t('platform.tenants.form.uploadLogo') }}
           </button>
           <button class="secondary-button" type="button" :disabled="!localForm.logoMediaUrl || saving" @click="clearLogo">
-            清空 LOGO
+            {{ $t('platform.tenants.form.clearLogo') }}
           </button>
         </div>
       </div>
@@ -161,7 +176,7 @@ function clearLogo(): void {
 
     <div class="form-actions">
       <button class="primary-button" type="submit" :disabled="saving">
-        {{ saving ? '保存中' : '保存' }}
+        {{ saving ? $t('common.actions.saving') : $t('common.actions.save') }}
       </button>
     </div>
   </form>

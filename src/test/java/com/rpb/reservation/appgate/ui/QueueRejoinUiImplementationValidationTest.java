@@ -18,9 +18,9 @@ class QueueRejoinUiImplementationValidationTest {
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
 
         assertThat(apiClient)
             .contains("rejoinQueueTicket")

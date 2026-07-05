@@ -11,6 +11,9 @@ import {
 } from '../api/tenantAdminApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const router = useRouter()
@@ -20,7 +23,7 @@ const saving = ref(false)
 const errorText = ref('')
 
 const mode = computed<'create' | 'edit'>(() => (route.name === 'tenant-admin-table-create' ? 'create' : 'edit'))
-const pageTitle = computed(() => (mode.value === 'create' ? '新增桌号' : '编辑桌号'))
+const pageTitle = computed(() => (mode.value === 'create' ? gt('generated.tenant-admin-table-form.014') : gt('generated.tenant-admin-table-form.015')))
 const storeId = computed(() => String(route.params.storeId || ''))
 const tableId = computed(() => String(route.params.tableId || ''))
 
@@ -121,28 +124,28 @@ function optionalSortOrder(value: number | null): number | undefined {
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-table-form.016')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-table-form.017')
   }
   if (error.response.error.code === 'TABLE_CODE_CONFLICT') {
-    return '桌号已存在'
+    return gt('generated.tenant-admin-table-form.018')
   }
   if (error.response.error.code === 'TABLE_NOT_FOUND') {
-    return '桌号不存在'
+    return gt('generated.tenant-admin-table-form.019')
   }
   if (error.response.error.code === 'TABLE_IN_USE') {
-    return '桌号正在使用，暂不能修改'
+    return gt('generated.tenant-admin-table-form.020')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查分区组、桌号、人数和排序'
+    return gt('generated.tenant-admin-table-form.021')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-table-form.022')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-table-form.023')
 }
 </script>
 
@@ -153,57 +156,55 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>桌号管理</span>
+          <span>{{ gt('generated.tenant-admin-table-form.001') }}</span>
           <h1>{{ pageTitle }}</h1>
         </div>
-        <button type="button" class="secondary-button" @click="router.push({ name: 'tenant-admin-tables', params: { storeId } })">
-          返回列表
-        </button>
+        <button type="button" class="secondary-button" @click="router.push({ name: 'tenant-admin-tables', params: { storeId } })"> {{ gt('generated.tenant-admin-table-form.002') }} </button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-table-form.003') }}</p>
 
       <form v-else class="form-panel" @submit.prevent="submitTable">
         <label>
-          <span>分区组</span>
+          <span>{{ gt('generated.tenant-admin-table-form.004') }}</span>
           <input v-model.trim="form.areaName" required />
         </label>
         <label>
-          <span>桌号</span>
+          <span>{{ gt('generated.tenant-admin-table-form.005') }}</span>
           <input v-model.trim="form.tableCode" required />
         </label>
         <label>
-          <span>人数</span>
+          <span>{{ gt('generated.tenant-admin-table-form.006') }}</span>
           <input v-model.number="form.capacity" type="number" min="1" max="999" required />
         </label>
         <label>
-          <span>大类排序</span>
+          <span>{{ gt('generated.tenant-admin-table-form.007') }}</span>
           <input
             :value="form.areaSortOrder ?? ''"
             type="number"
             min="0"
-            placeholder="自动"
+            :placeholder="gt('generated.tenant-admin-table-form.008')"
             @input="setSortOrder('areaSortOrder', $event)"
           />
         </label>
         <label>
-          <span>桌号排序</span>
+          <span>{{ gt('generated.tenant-admin-table-form.009') }}</span>
           <input
             :value="form.tableSortOrder ?? ''"
             type="number"
             min="0"
-            placeholder="自动"
+            :placeholder="gt('generated.tenant-admin-table-form.010')"
             @input="setSortOrder('tableSortOrder', $event)"
           />
         </label>
         <label class="check-row">
           <input v-model="form.enabled" type="checkbox" />
-          <span>启用</span>
+          <span>{{ gt('generated.tenant-admin-table-form.011') }}</span>
         </label>
         <div class="form-actions">
           <button class="primary-button" type="submit" :disabled="saving">
-            {{ saving ? '保存中' : '保存' }}
+            {{ saving ? gt('generated.tenant-admin-table-form.012') : gt('generated.tenant-admin-table-form.013') }}
           </button>
         </div>
       </form>

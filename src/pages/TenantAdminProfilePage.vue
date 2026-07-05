@@ -21,6 +21,9 @@ import type {
   TenantAdminShareProfile,
   TenantAdminShareProfileMutation
 } from '../types/tenantAdminShareProfile'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 interface TenantProfileForm {
   tenantCode: string
@@ -121,9 +124,9 @@ async function submitProfile(): Promise<void> {
     ])
     applyProfile(profileResponse.profile)
     applyShareProfile(shareProfileResponse.shareProfile)
-    savedText.value = '已保存'
+    savedText.value = gt('generated.tenant-admin-profile.027')
     if (logoFile.value) {
-      await uploadSelectedLogo('资料和 LOGO 已保存')
+      await uploadSelectedLogo(gt('generated.tenant-admin-profile.028'))
     }
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -140,7 +143,7 @@ async function submitLogo(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   try {
-    await uploadSelectedLogo('LOGO 已更新')
+    await uploadSelectedLogo(gt('generated.tenant-admin-profile.029'))
   } catch (error) {
     errorText.value = apiErrorText(error)
   }
@@ -174,7 +177,7 @@ async function removeLogo(): Promise<void> {
     const response = await clearTenantProfileLogo(storeId.value)
     applyProfile(response.profile)
     clearSelectedLogo()
-    savedText.value = 'LOGO 已清空'
+    savedText.value = gt('generated.tenant-admin-profile.030')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -263,35 +266,35 @@ function optionalValue(value: string): string | null {
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
-    created: '已创建',
-    active: '启用',
-    suspended: '停用',
-    closed: '关闭'
+    created: gt('generated.tenant-admin-profile.031'),
+    active: gt('generated.tenant-admin-profile.032'),
+    suspended: gt('generated.tenant-admin-profile.033'),
+    closed: gt('generated.tenant-admin-profile.034')
   }
   return labels[status] || status || '-'
 }
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof TenantAdminApiError)) {
-    return '操作失败'
+    return gt('generated.tenant-admin-profile.035')
   }
   if (error.status === 401) {
     auth.clear()
-    return '登录已失效'
+    return gt('generated.tenant-admin-profile.036')
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
-    return '请检查租户名称和默认语言'
+    return gt('generated.tenant-admin-profile.037')
   }
   if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return '没有该店面的后台权限'
+    return gt('generated.tenant-admin-profile.038')
   }
   if (error.response.error.code === 'FORBIDDEN') {
-    return '没有租户后台权限'
+    return gt('generated.tenant-admin-profile.039')
   }
   if (error.response.error.code === 'TENANT_PROFILE_NOT_FOUND') {
-    return '租户资料不存在'
+    return gt('generated.tenant-admin-profile.040')
   }
-  return '操作失败'
+  return gt('generated.tenant-admin-profile.041')
 }
 </script>
 
@@ -302,48 +305,48 @@ function apiErrorText(error: unknown): string {
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
-          <span>租户</span>
-          <h1>租户资料</h1>
+          <span>{{ gt('generated.tenant-admin-profile.001') }}</span>
+          <h1>{{ gt('generated.tenant-admin-profile.002') }}</h1>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
-      <p v-if="loading" class="loading-line">加载中</p>
+      <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-profile.003') }}</p>
 
       <form v-else class="form-panel" @submit.prevent="submitProfile">
         <section class="section-panel">
           <div class="section-heading">
-            <h2>基础信息</h2>
+            <h2>{{ gt('generated.tenant-admin-profile.004') }}</h2>
           </div>
 
           <div class="field-grid">
             <label>
-              <span>租户代码</span>
+              <span>{{ gt('generated.tenant-admin-profile.005') }}</span>
               <input :value="form.tenantCode" readonly />
             </label>
             <label>
-              <span>状态</span>
+              <span>{{ gt('generated.tenant-admin-profile.006') }}</span>
               <input :value="statusLabel(form.status)" readonly />
             </label>
             <label>
-              <span>租户名称</span>
+              <span>{{ gt('generated.tenant-admin-profile.007') }}</span>
               <input v-model.trim="form.displayName" required />
             </label>
             <label>
-              <span>默认语言</span>
+              <span>{{ gt('generated.tenant-admin-profile.008') }}</span>
               <input v-model.trim="form.defaultLocale" required />
             </label>
             <label>
-              <span>负责人</span>
+              <span>{{ gt('generated.tenant-admin-profile.009') }}</span>
               <input v-model.trim="form.principalName" />
             </label>
             <label>
-              <span>电话</span>
+              <span>{{ gt('generated.tenant-admin-profile.010') }}</span>
               <input v-model.trim="form.contactPhone" />
             </label>
             <label class="wide-field">
-              <span>租户地址</span>
+              <span>{{ gt('generated.tenant-admin-profile.011') }}</span>
               <input v-model.trim="form.address" />
             </label>
           </div>
@@ -351,46 +354,46 @@ function apiErrorText(error: unknown): string {
 
         <section class="section-panel">
           <div class="section-heading">
-            <h2>门店分享资料</h2>
+            <h2>{{ gt('generated.tenant-admin-profile.012') }}</h2>
           </div>
 
           <div class="field-grid">
             <label>
-              <span>后台店名</span>
+              <span>{{ gt('generated.tenant-admin-profile.013') }}</span>
               <input v-model.trim="shareForm.storeDisplayName" readonly />
             </label>
             <label>
-              <span>分享显示名称</span>
+              <span>{{ gt('generated.tenant-admin-profile.014') }}</span>
               <input v-model.trim="shareForm.shareDisplayName" />
             </label>
             <label>
-              <span>Google Map 链接</span>
+              <span>{{ gt('generated.tenant-admin-profile.015') }}</span>
               <input v-model.trim="shareForm.googleMapUrl" />
             </label>
             <label>
-              <span>对外邮箱</span>
+              <span>{{ gt('generated.tenant-admin-profile.016') }}</span>
               <input v-model.trim="shareForm.shareEmail" type="email" placeholder="booking@example.com" />
             </label>
             <label>
-              <span>WhatsApp 固定号码</span>
+              <span>{{ gt('generated.tenant-admin-profile.017') }}</span>
               <input v-model.trim="shareForm.whatsappBusinessPhoneE164" placeholder="+6588880000" />
             </label>
             <label class="wide-field">
-              <span>到店提示</span>
+              <span>{{ gt('generated.tenant-admin-profile.018') }}</span>
               <input v-model.trim="shareForm.reservationShareNote" />
             </label>
           </div>
         </section>
 
         <section class="section-panel logo-panel">
-          <div class="logo-preview" aria-label="租户 LOGO 预览">
-            <img v-if="logoPreviewUrl" :src="logoPreviewUrl" alt="租户 LOGO" />
+          <div class="logo-preview" :aria-label="gt('generated.tenant-admin-profile.019')">
+            <img v-if="logoPreviewUrl" :src="logoPreviewUrl" :alt="gt('generated.tenant-admin-profile.020')" />
             <span v-else>LOGO</span>
           </div>
 
           <div class="logo-control">
             <div class="section-heading">
-              <h2>租户 LOGO</h2>
+              <h2>{{ gt('generated.tenant-admin-profile.021') }}</h2>
             </div>
             <input
               ref="logoFileInput"
@@ -400,16 +403,16 @@ function apiErrorText(error: unknown): string {
             />
             <div class="button-row">
               <button type="button" class="secondary-button" :disabled="!logoFile || logoSaving || saving" @click="submitLogo">
-                {{ logoSaving && logoFile ? '上传中' : '上传 LOGO' }}
+                {{ logoSaving && logoFile ? gt('generated.tenant-admin-profile.022') : gt('generated.tenant-admin-profile.023') }}
               </button>
-              <button type="button" class="ghost-button" :disabled="logoSaving || saving" @click="removeLogo">清空 LOGO</button>
+              <button type="button" class="ghost-button" :disabled="logoSaving || saving" @click="removeLogo">{{ gt('generated.tenant-admin-profile.024') }}</button>
             </div>
           </div>
         </section>
 
         <div class="form-actions">
           <button class="primary-button" type="submit" :disabled="saving">
-            {{ saving ? '保存中' : '保存资料' }}
+            {{ saving ? gt('generated.tenant-admin-profile.025') : gt('generated.tenant-admin-profile.026') }}
           </button>
         </div>
       </form>

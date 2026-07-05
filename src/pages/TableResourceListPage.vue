@@ -48,6 +48,9 @@ import type { ReservationStatusActionApiErrorResponse } from '../types/reservati
 import type { SeatingFromCalledQueueApiErrorResponse } from '../types/seatingFromCalledQueue'
 import type { SwitchTableResponse } from '../types/tableSwitch'
 import type { TemporaryTableGroupApiErrorResponse } from '../types/temporaryTableGroup'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 type StatusFilter = 'all' | 'available' | 'reserved' | 'occupied' | 'cleaning' | 'active'
 type AreaFilter = 'all' | string
@@ -85,44 +88,44 @@ const storeContext = useStoreContextStore()
 const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
 const statusOptions: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'available', label: '可用' },
-  { value: 'reserved', label: '预留' },
-  { value: 'occupied', label: '占用' },
-  { value: 'cleaning', label: '清台' },
-  { value: 'active', label: '分组' }
+  { value: 'all', label: gt('generated.table-resource-list.073') },
+  { value: 'available', label: gt('generated.table-resource-list.074') },
+  { value: 'reserved', label: gt('generated.table-resource-list.075') },
+  { value: 'occupied', label: gt('generated.table-resource-list.076') },
+  { value: 'cleaning', label: gt('generated.table-resource-list.077') },
+  { value: 'active', label: gt('generated.table-resource-list.078') }
 ]
 
 const statusLabels: Record<string, string> = {
-  available: '可用',
-  occupied: '占用',
-  cleaning: '清台',
-  locked: '锁定',
-  reserved: '预留',
-  inactive: '停用',
-  active: '分组',
-  created: '已创建',
-  released: '已释放',
-  ended: '已结束'
+  available: gt('generated.table-resource-list.079'),
+  occupied: gt('generated.table-resource-list.080'),
+  cleaning: gt('generated.table-resource-list.081'),
+  locked: gt('generated.table-resource-list.082'),
+  reserved: gt('generated.table-resource-list.083'),
+  inactive: gt('generated.table-resource-list.084'),
+  active: gt('generated.table-resource-list.085'),
+  created: gt('generated.table-resource-list.086'),
+  released: gt('generated.table-resource-list.087'),
+  ended: gt('generated.table-resource-list.088')
 }
 
 const reservationStatusLabels: Record<string, string> = {
-  confirmed: '待到店',
-  arrived: '已到店',
-  seated: '已入桌',
-  cancelled: '已取消',
-  no_show: '爽约',
-  completed: '已完成'
+  confirmed: gt('generated.table-resource-list.089'),
+  arrived: gt('generated.table-resource-list.090'),
+  seated: gt('generated.table-resource-list.091'),
+  cancelled: gt('generated.table-resource-list.092'),
+  no_show: gt('generated.table-resource-list.093'),
+  completed: gt('generated.table-resource-list.094')
 }
 
 const queueStatusLabels: Record<string, string> = {
-  waiting: '排队中',
-  called: '已叫号',
-  skipped: '已过号',
-  rejoined: '已重回',
-  seated: '已入座',
-  cancelled: '排队已取消',
-  expired: '排队已过期'
+  waiting: gt('generated.table-resource-list.095'),
+  called: gt('generated.table-resource-list.096'),
+  skipped: gt('generated.table-resource-list.097'),
+  rejoined: gt('generated.table-resource-list.098'),
+  seated: gt('generated.table-resource-list.099'),
+  cancelled: gt('generated.table-resource-list.100'),
+  expired: gt('generated.table-resource-list.101')
 }
 
 const partySizeOptions = [2, 4, 6, 8, 10, 12]
@@ -155,7 +158,7 @@ let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const appStatusLabel = computed(() => (isLoading.value ? '刷新中' : '桌台'))
+const appStatusLabel = computed(() => (isLoading.value ? gt('generated.table-resource-list.102') : gt('generated.table-resource-list.103')))
 const resources = computed(() => response.value?.resources ?? [])
 const allTableResources = computed(() =>
   resources.value.filter(resource => resource.resourceType === 'dining_table')
@@ -212,7 +215,7 @@ const areaFilterOptions = computed<AreaFilterOption[]>(() => {
   }
 
   return [
-    { value: 'all', label: '全部分区', count: statusFilteredTableResources.value.length },
+    { value: 'all', label: gt('generated.table-resource-list.104'), count: statusFilteredTableResources.value.length },
     ...Array.from(areaCounts, ([label, count]) => ({ value: label, label, count }))
   ]
 })
@@ -276,11 +279,11 @@ const canRunBulkCompleteCleaning = computed(
 )
 const bulkCleaningProgressText = computed(() => {
   if (bulkCleaningMode.value) {
-    const action = bulkCleaningMode.value === 'start' ? '批量清台' : '批量完成'
+    const action = bulkCleaningMode.value === 'start' ? gt('generated.table-resource-list.105') : gt('generated.table-resource-list.106')
     return `${action} ${bulkCleaningCompletedCount.value}/${bulkCleaningTotalCount.value}`
   }
 
-  return `当前筛选：可清 ${bulkStartCleaningResources.value.length} · 清台中 ${bulkCompleteCleaningResources.value.length}`
+  return `${gt('generated.table-resource-list.067')}${bulkStartCleaningResources.value.length}${gt('generated.table-resource-list.068')}${bulkCompleteCleaningResources.value.length}`
 })
 const selectedTemporaryTableResources = computed(() =>
   allTableResources.value.filter(resource => selectedTemporaryTableIdSet.value.has(resource.resourceId))
@@ -854,11 +857,11 @@ function isTemporaryGroupResource(resource: TableResourceItem): boolean {
 
 function resourceDisplayStatusLabel(resource: TableResourceItem): string {
   if (isTemporaryGroupMember(resource)) {
-    return '临时组占用'
+    return gt('generated.table-resource-list.107')
   }
 
   if (isTemporaryGroupResource(resource)) {
-    return '临时组'
+    return gt('generated.table-resource-list.108')
   }
 
   return statusLabel(resource.status)
@@ -877,11 +880,11 @@ function resourceDisplayStatusClass(resource: TableResourceItem): string {
 }
 
 function capacityText(resource: TableResourceItem): string {
-  return `${resource.capacityMin}-${resource.capacityMax}人`
+  return `${resource.capacityMin}-${resource.capacityMax}${gt('generated.table-resource-list.069')}`
 }
 
 function membersText(resource: TableResourceItem): string {
-  return resource.memberTableCodes.length ? resource.memberTableCodes.join(' + ') : '暂无成员'
+  return resource.memberTableCodes.length ? resource.memberTableCodes.join(' + ') : gt('generated.table-resource-list.109')
 }
 
 function preassignedReservationText(resource: TableResourceItem): string {
@@ -890,7 +893,7 @@ function preassignedReservationText(resource: TableResourceItem): string {
   }
 
   const customer = preassignedCustomerText(resource)
-  const partySize = resource.preassignedPartySize ? `${resource.preassignedPartySize}人` : ''
+  const partySize = resource.preassignedPartySize ? `${resource.preassignedPartySize}${gt('generated.table-resource-list.070')}` : ''
   const timeRange = preassignedTimeRange(resource)
   const status = resource.preassignedReservationStatus
     ? reservationStatusLabels[resource.preassignedReservationStatus] ?? resource.preassignedReservationStatus
@@ -906,7 +909,7 @@ function preassignedCustomerText(resource: TableResourceItem): string {
   if (name && phone) {
     return `${name} ${phone}`
   }
-  return name || phone || '预约客户'
+  return name || phone || gt('generated.table-resource-list.110')
 }
 
 function preassignedQueueText(resource: TableResourceItem): string {
@@ -917,10 +920,10 @@ function preassignedQueueText(resource: TableResourceItem): string {
   const numberText =
     typeof resource.preassignedQueueTicketNumber === 'number'
       ? `#${resource.preassignedQueueTicketNumber}`
-      : '排队票'
+      : gt('generated.table-resource-list.111')
   const status = resource.preassignedQueueTicketStatus
     ? queueStatusLabels[resource.preassignedQueueTicketStatus] ?? resource.preassignedQueueTicketStatus
-    : '已排队'
+    : gt('generated.table-resource-list.112')
 
   return `${numberText} · ${status}`
 }
@@ -963,7 +966,7 @@ function switchResourceTitle(resource: TableResourceItem): string | undefined {
     return undefined
   }
 
-  return resource.currentSeatingId ? '仅当日已入桌可换桌' : '缺少入桌记录，暂不能换桌'
+  return resource.currentSeatingId ? gt('generated.table-resource-list.113') : gt('generated.table-resource-list.114')
 }
 
 function openTableSwitchDialog(resource: TableResourceItem): void {
@@ -1043,7 +1046,7 @@ function isTemporaryTableSelected(resource: TableResourceItem): boolean {
 function temporaryGroupCapacityText(): string {
   const capacity = temporaryGroupCapacity.value
 
-  return capacity.max > 0 ? `${capacity.min}-${capacity.max}人` : '未选择'
+  return capacity.max > 0 ? `${capacity.min}-${capacity.max}${gt('generated.table-resource-list.071')}` : gt('generated.table-resource-list.115')
 }
 
 function isSeatingResource(resource: TableResourceItem): boolean {
@@ -1052,10 +1055,10 @@ function isSeatingResource(resource: TableResourceItem): boolean {
 
 function seatAssignedReservationActionText(resource: TableResourceItem): string {
   if (isSeatingResource(resource)) {
-    return '入桌中'
+    return gt('generated.table-resource-list.116')
   }
 
-  return resource.preassignedReservationStatus === 'confirmed' ? '到店入桌' : '预约入桌'
+  return resource.preassignedReservationStatus === 'confirmed' ? gt('generated.table-resource-list.117') : gt('generated.table-resource-list.118')
 }
 
 function preassignedPendingActionText(resource: TableResourceItem): string {
@@ -1067,7 +1070,7 @@ function preassignedPendingActionText(resource: TableResourceItem): string {
     return reservationStatusLabels[resource.preassignedReservationStatus] ?? resource.preassignedReservationStatus
   }
 
-  return '预约预留'
+  return gt('generated.table-resource-list.119')
 }
 
 function walkInDirectSeatingRoute(resource: TableResourceItem): Record<string, unknown> {
@@ -1084,7 +1087,7 @@ function walkInDirectSeatingRoute(resource: TableResourceItem): Record<string, u
 }
 
 function walkInActionText(resource: TableResourceItem): string {
-  return isTemporaryGroupResource(resource) ? '临时入桌' : '入桌'
+  return isTemporaryGroupResource(resource) ? gt('generated.table-resource-list.120') : gt('generated.table-resource-list.121')
 }
 
 function resourceSeatRequest(resource: TableResourceItem): {
@@ -1098,7 +1101,7 @@ function resourceSeatRequest(resource: TableResourceItem): {
 
 function areaTitle(resource: TableResourceItem): string {
   const areaName = resource.areaName?.trim()
-  return areaName || '未分区'
+  return areaName || gt('generated.table-resource-list.122')
 }
 
 function createLocalError(code: string, messageKey: string): TableResourceApiErrorResponse {
@@ -1248,10 +1251,10 @@ function todayDateInput(timeZone = 'Asia/Singapore'): string {
 
 function formatStoreLabel(value: string | undefined): string {
   if (!value) {
-    return '默认门店'
+    return gt('generated.table-resource-list.123')
   }
 
-  return `门店 ${value.slice(0, 8)}`
+  return `${gt('generated.table-resource-list.072')}${value.slice(0, 8)}`
 }
 </script>
 
@@ -1265,21 +1268,21 @@ function formatStoreLabel(value: string | undefined): string {
     >
       <template #action>
         <button type="button" :disabled="isLoading" @click="loadResources">
-          {{ isLoading ? '刷新中' : '刷新' }}
+          {{ isLoading ? gt('generated.table-resource-list.001') : gt('generated.table-resource-list.002') }}
         </button>
       </template>
     </StaffHomeTopBar>
 
     <div class="table-page-body">
       <StaffBusinessDateSwitcher
-        calendar-label="桌台日历"
+        :calendar-label="gt('generated.table-resource-list.003')"
         :today-date="currentBusinessDate"
         :reservation-counts="reservationCounts"
         v-model:selected-date="selectedBusinessDate"
         @visible-month-changed="handleVisibleMonthChanged"
       />
 
-      <section class="summary-row" aria-label="桌台概览">
+      <section class="summary-row" :aria-label="gt('generated.table-resource-list.004')">
         <button
           v-for="item in summaryItems"
           :key="item.key"
@@ -1294,87 +1297,76 @@ function formatStoreLabel(value: string | undefined): string {
         </button>
       </section>
 
-    <section class="temporary-group-panel" aria-label="临时桌组">
+    <section class="temporary-group-panel" :aria-label="gt('generated.table-resource-list.005')">
       <div>
-        <strong>临时桌组</strong>
-        <span>{{ temporaryGroupCapacityText() }} · 已选 {{ selectedTemporaryTableIds.length }} 张</span>
+        <strong>{{ gt('generated.table-resource-list.006') }}</strong>
+        <span>{{ temporaryGroupCapacityText() }} {{ gt('generated.table-resource-list.007') }} {{ selectedTemporaryTableIds.length }} {{ gt('generated.table-resource-list.008') }}</span>
       </div>
       <label class="temporary-group-panel__name">
-        <span>组名</span>
+        <span>{{ gt('generated.table-resource-list.009') }}</span>
         <input
           v-model.trim="temporaryGroupName"
           name="temporaryGroupName"
-          placeholder="例如 A区临组1"
+          :placeholder="gt('generated.table-resource-list.010')"
           type="text"
         />
       </label>
       <div class="temporary-group-panel__actions">
         <button type="button" @click="toggleTemporaryGroupMode">
-          {{ temporaryGroupMode ? '退出选择' : '组合桌台' }}
+          {{ temporaryGroupMode ? gt('generated.table-resource-list.011') : gt('generated.table-resource-list.012') }}
         </button>
         <button
           type="button"
           :disabled="!selectedTemporaryTableIds.length"
           @click="clearTemporaryGroupSelection"
-        >
-          清空
-        </button>
+        > {{ gt('generated.table-resource-list.013') }} </button>
         <button
           class="temporary-group-panel__save"
           type="button"
           :disabled="!canSaveTemporaryGroup"
           @click="saveSelectedTemporaryGroup"
         >
-          {{ savingTemporaryGroup ? '保存中' : '保存分组' }}
+          {{ savingTemporaryGroup ? gt('generated.table-resource-list.014') : gt('generated.table-resource-list.015') }}
         </button>
         <RouterLink
           v-if="canSeatTemporaryGroup"
           class="temporary-group-panel__seat"
           :to="temporaryGroupRoute"
-        >
-          临时入桌
-        </RouterLink>
-        <button v-else class="temporary-group-panel__seat" disabled type="button">临时入桌</button>
+        > {{ gt('generated.table-resource-list.016') }} </RouterLink>
+        <button v-else class="temporary-group-panel__seat" disabled type="button">{{ gt('generated.table-resource-list.017') }}</button>
       </div>
     </section>
 
-    <section v-if="isLoading" class="state-panel" aria-live="polite">
-      正在读取后台已配置桌台
-    </section>
+    <section v-if="isLoading" class="state-panel" aria-live="polite"> {{ gt('generated.table-resource-list.018') }} </section>
 
     <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
-      <strong>{{ formatAppGateErrorTitle(apiError.error, '桌台加载失败') }}</strong>
-      <span>{{ formatAppGateErrorMessage(apiError.error, '暂时无法读取桌台，请稍后重试。') }}</span>
+      <strong>{{ formatAppGateErrorTitle(apiError.error, gt('generated.table-resource-list.019')) }}</strong>
+      <span>{{ formatAppGateErrorMessage(apiError.error, gt('generated.table-resource-list.020')) }}</span>
     </section>
 
     <section v-if="actionError" class="state-panel error-panel" aria-live="assertive">
-      <strong>{{ formatAppGateErrorTitle(actionError.error, '桌台操作失败') }}</strong>
-      <span>{{ formatAppGateErrorMessage(actionError.error, '暂时无法完成桌台操作，请稍后重试。') }}</span>
+      <strong>{{ formatAppGateErrorTitle(actionError.error, gt('generated.table-resource-list.021')) }}</strong>
+      <span>{{ formatAppGateErrorMessage(actionError.error, gt('generated.table-resource-list.022')) }}</span>
     </section>
 
-    <section v-if="showNoConfiguredResources" class="state-panel" aria-live="polite">
-      暂无桌台，请先在后台配置桌台。
-    </section>
+    <section v-if="showNoConfiguredResources" class="state-panel" aria-live="polite"> {{ gt('generated.table-resource-list.023') }} </section>
 
-    <section v-if="showFilteredEmpty" class="state-panel" aria-live="polite">
-      当前筛选下暂无可显示桌台。
-    </section>
+    <section v-if="showFilteredEmpty" class="state-panel" aria-live="polite"> {{ gt('generated.table-resource-list.024') }} </section>
 
-    <section v-if="groupedAreaResources.length" class="table-page__area-list" aria-label="桌台分区">
+    <section v-if="groupedAreaResources.length" class="table-page__area-list" :aria-label="gt('generated.table-resource-list.025')">
       <header class="table-page__section-heading table-page__area-heading">
-        <h2>桌台分区</h2>
+        <h2>{{ gt('generated.table-resource-list.026') }}</h2>
         <div class="table-page__area-tools">
           <label class="table-area-party-filter">
-            <span>人数</span>
+            <span>{{ gt('generated.table-resource-list.027') }}</span>
             <select v-model="partySizeValue" name="partySize">
-              <option value="">不限</option>
+              <option value="">{{ gt('generated.table-resource-list.028') }}</option>
               <option v-for="option in partySizeOptions" :key="option" :value="String(option)">
-                {{ option }} 人
-              </option>
+                {{ option }} {{ gt('generated.table-resource-list.029') }} </option>
             </select>
           </label>
-          <span>共 {{ tableResources.length }} 个</span>
-          <div class="table-page__bulk-actions" aria-label="批量清台操作">
+          <span>{{ gt('generated.table-resource-list.030') }} {{ tableResources.length }} {{ gt('generated.table-resource-list.031') }}</span>
+          <div class="table-page__bulk-actions" :aria-label="gt('generated.table-resource-list.032')">
             <span>{{ bulkCleaningProgressText }}</span>
             <button
               class="table-page__bulk-action table-page__bulk-action--danger"
@@ -1382,7 +1374,7 @@ function formatStoreLabel(value: string | undefined): string {
               type="button"
               @click="startVisibleResourcesCleaning"
             >
-              {{ bulkCleaningMode === 'start' ? '批量清台中' : `批量清台 ${bulkStartCleaningResources.length}` }}
+              {{ bulkCleaningMode === 'start' ? gt('generated.table-resource-list.034') : `${gt('generated.table-resource-list.033')}${bulkStartCleaningResources.length}` }}
             </button>
             <button
               class="table-page__bulk-action table-page__bulk-action--primary"
@@ -1390,13 +1382,13 @@ function formatStoreLabel(value: string | undefined): string {
               type="button"
               @click="completeVisibleResourcesCleaning"
             >
-              {{ bulkCleaningMode === 'complete' ? '批量完成中' : `批量完成 ${bulkCompleteCleaningResources.length}` }}
+              {{ bulkCleaningMode === 'complete' ? gt('generated.table-resource-list.036') : `${gt('generated.table-resource-list.035')}${bulkCompleteCleaningResources.length}` }}
             </button>
           </div>
         </div>
       </header>
 
-      <div class="table-page__area-filter" aria-label="分区过滤">
+      <div class="table-page__area-filter" :aria-label="gt('generated.table-resource-list.037')">
         <button
           v-for="option in areaFilterOptions"
           :key="option.value"
@@ -1414,11 +1406,11 @@ function formatStoreLabel(value: string | undefined): string {
         v-for="area in groupedAreaResources"
         :key="area.title"
         class="table-page__area-section"
-        :aria-label="`${area.title}桌号`"
+        :aria-label="`${area.title}${gt('generated.table-resource-list.038')}`"
       >
         <header>
           <h3>{{ area.title }}</h3>
-          <span>{{ area.items.length }} 个</span>
+          <span>{{ area.items.length }} {{ gt('generated.table-resource-list.039') }}</span>
         </header>
 
         <div class="table-page__resource-grid">
@@ -1439,13 +1431,13 @@ function formatStoreLabel(value: string | undefined): string {
             <section
               v-if="resource.preassignedReservationId"
               class="table-page__assignment"
-              aria-label="预约指定资源"
+              :aria-label="gt('generated.table-resource-list.040')"
             >
-              <span>预约指定</span>
+              <span>{{ gt('generated.table-resource-list.041') }}</span>
               <strong>{{ preassignedReservationText(resource) }}</strong>
               <small v-if="preassignedQueueText(resource)">{{ preassignedQueueText(resource) }}</small>
             </section>
-            <div class="table-page__resource-actions" aria-label="桌台操作">
+            <div class="table-page__resource-actions" :aria-label="gt('generated.table-resource-list.042')">
               <button
                 v-if="temporaryGroupMode"
                 class="table-page__resource-action"
@@ -1454,7 +1446,7 @@ function formatStoreLabel(value: string | undefined): string {
                 type="button"
                 @click="toggleTemporaryTable(resource)"
               >
-                {{ isTemporaryTableSelected(resource) ? '移出组合' : '加入组合' }}
+                {{ isTemporaryTableSelected(resource) ? gt('generated.table-resource-list.043') : gt('generated.table-resource-list.044') }}
               </button>
               <button
                 v-if="canSeatCalledQueue(resource)"
@@ -1463,7 +1455,7 @@ function formatStoreLabel(value: string | undefined): string {
                 type="button"
                 @click="seatCalledAssignedQueue(resource)"
               >
-                {{ isSeatingResource(resource) ? '入桌中' : '叫号入桌' }}
+                {{ isSeatingResource(resource) ? gt('generated.table-resource-list.045') : gt('generated.table-resource-list.046') }}
               </button>
               <button
                 v-else-if="canSeatAssignedReservation(resource)"
@@ -1496,16 +1488,14 @@ function formatStoreLabel(value: string | undefined): string {
                   :title="switchResourceTitle(resource)"
                   type="button"
                   @click="openTableSwitchDialog(resource)"
-                >
-                  换桌
-                </button>
+                > {{ gt('generated.table-resource-list.047') }} </button>
                 <button
                   class="table-page__resource-action table-page__resource-action--danger"
                   :disabled="!canStartCleaning(resource) || isStartingCleaning(resource)"
                   type="button"
                   @click="startResourceCleaning(resource)"
                 >
-                  {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
+                  {{ isStartingCleaning(resource) ? gt('generated.table-resource-list.048') : gt('generated.table-resource-list.049') }}
                 </button>
               </div>
               <button
@@ -1515,7 +1505,7 @@ function formatStoreLabel(value: string | undefined): string {
                 type="button"
                 @click="completeResourceCleaning(resource)"
               >
-                {{ isCompletingCleaning(resource) ? '完成中' : '完成清台' }}
+                {{ isCompletingCleaning(resource) ? gt('generated.table-resource-list.050') : gt('generated.table-resource-list.051') }}
               </button>
             </div>
           </article>
@@ -1526,11 +1516,11 @@ function formatStoreLabel(value: string | undefined): string {
     <section
       v-if="displayedGroupResources.length"
       class="table-page__group-section"
-      aria-label="桌台分组"
+      :aria-label="gt('generated.table-resource-list.052')"
     >
       <header class="table-page__section-heading">
-        <h2>桌台分组</h2>
-        <span>{{ displayedGroupResources.length }} 个</span>
+        <h2>{{ gt('generated.table-resource-list.053') }}</h2>
+        <span>{{ displayedGroupResources.length }} {{ gt('generated.table-resource-list.054') }}</span>
       </header>
 
       <div class="table-page__resource-grid table-page__resource-grid--groups">
@@ -1549,13 +1539,13 @@ function formatStoreLabel(value: string | undefined): string {
           <section
             v-if="resource.preassignedReservationId"
             class="table-page__assignment"
-            aria-label="预约指定桌组"
+            :aria-label="gt('generated.table-resource-list.055')"
           >
-            <span>预约指定</span>
+            <span>{{ gt('generated.table-resource-list.056') }}</span>
             <strong>{{ preassignedReservationText(resource) }}</strong>
             <small v-if="preassignedQueueText(resource)">{{ preassignedQueueText(resource) }}</small>
           </section>
-          <div class="table-page__resource-actions" aria-label="桌台分组操作">
+          <div class="table-page__resource-actions" :aria-label="gt('generated.table-resource-list.057')">
             <button
               v-if="canDissolveTemporaryGroup(resource)"
               class="table-page__resource-action table-page__resource-action--danger"
@@ -1563,7 +1553,7 @@ function formatStoreLabel(value: string | undefined): string {
               type="button"
               @click="dissolveTemporaryGroup(resource)"
             >
-              {{ isDissolvingTemporaryGroup(resource) ? '解散中' : '解散' }}
+              {{ isDissolvingTemporaryGroup(resource) ? gt('generated.table-resource-list.058') : gt('generated.table-resource-list.059') }}
             </button>
             <button
               v-if="canSeatCalledQueue(resource)"
@@ -1572,7 +1562,7 @@ function formatStoreLabel(value: string | undefined): string {
               type="button"
               @click="seatCalledAssignedQueue(resource)"
             >
-              {{ isSeatingResource(resource) ? '入桌中' : '叫号入桌' }}
+              {{ isSeatingResource(resource) ? gt('generated.table-resource-list.060') : gt('generated.table-resource-list.061') }}
             </button>
             <button
               v-else-if="canSeatAssignedReservation(resource)"
@@ -1605,16 +1595,14 @@ function formatStoreLabel(value: string | undefined): string {
                 :title="switchResourceTitle(resource)"
                 type="button"
                 @click="openTableSwitchDialog(resource)"
-              >
-                换桌
-              </button>
+              > {{ gt('generated.table-resource-list.062') }} </button>
               <button
                 class="table-page__resource-action table-page__resource-action--danger"
                 :disabled="!canStartCleaning(resource) || isStartingCleaning(resource)"
                 type="button"
                 @click="startResourceCleaning(resource)"
               >
-                {{ isStartingCleaning(resource) ? '清台中' : '清台' }}
+                {{ isStartingCleaning(resource) ? gt('generated.table-resource-list.063') : gt('generated.table-resource-list.064') }}
               </button>
             </div>
             <button
@@ -1624,7 +1612,7 @@ function formatStoreLabel(value: string | undefined): string {
               type="button"
               @click="completeResourceCleaning(resource)"
             >
-              {{ isCompletingCleaning(resource) ? '完成中' : '完成清台' }}
+              {{ isCompletingCleaning(resource) ? gt('generated.table-resource-list.065') : gt('generated.table-resource-list.066') }}
             </button>
           </div>
         </article>

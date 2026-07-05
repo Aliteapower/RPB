@@ -2,7 +2,7 @@ export type StaffBottomNavTab = 'home' | 'reservation' | 'queue' | 'table'
 
 export interface StaffBottomNavItem {
   tab: StaffBottomNavTab
-  label: string
+  labelKey: string
   routeName: string
   symbol: string
 }
@@ -10,25 +10,25 @@ export interface StaffBottomNavItem {
 export const staffBottomNavItems: StaffBottomNavItem[] = [
   {
     tab: 'home',
-    label: '首页',
+    labelKey: 'nav.staff.home',
     routeName: 'store-staff-home',
     symbol: '⌂'
   },
   {
     tab: 'reservation',
-    label: '预约',
+    labelKey: 'nav.staff.reservation',
     routeName: 'reservation-today-view',
     symbol: '□'
   },
   {
     tab: 'queue',
-    label: '排队',
+    labelKey: 'nav.staff.queue',
     routeName: 'queue-ticket-list',
     symbol: '≡'
   },
   {
     tab: 'table',
-    label: '桌台',
+    labelKey: 'nav.staff.table',
     routeName: 'table-resource-list',
     symbol: '▦'
   }
