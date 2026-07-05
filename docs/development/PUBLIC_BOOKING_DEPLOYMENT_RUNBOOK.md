@@ -8,9 +8,9 @@ This captures the 2026-07-04 deployment lessons so the next deployment does not 
 
 ## Known Good Public Baseline
 
-- Public site: `http://booking.yumstone.sg`
-- Public login page: `http://booking.yumstone.sg/login`
-- Public backend health smoke target: `http://booking.yumstone.sg/api/v1/auth/me`
+- Public site: `https://booking.yumstone.sg`
+- Public login page: `https://booking.yumstone.sg/login`
+- Public backend health smoke target: `https://booking.yumstone.sg/api/v1/auth/me`
 - Server: `43.134.69.75`
 - SSH user: `ubuntu`
 - SSH key on this workstation: `%USERPROFILE%\.ssh\codex_tt_lighthouse_ed25519`
@@ -19,7 +19,10 @@ This captures the 2026-07-04 deployment lessons so the next deployment does not 
 - Frontend root: `/opt/rpb/frontend`
 - Backend env file: `/etc/rpb/rpb-backend.env`
 - Backend app port behind nginx: `127.0.0.1:8080`
-- Nginx public listener observed on 2026-07-04: port `80` only
+- Nginx public listeners observed on 2026-07-05: ports `80` and `443`
+- TLS certificate path: `/etc/letsencrypt/live/booking.yumstone.sg/fullchain.pem`
+- HTTP requests redirect to HTTPS.
+- HTTPS responses include `Strict-Transport-Security: max-age=31536000`.
 
 Do not commit private keys, production passwords, database passwords, or real customer credentials into this repository.
 
@@ -219,7 +222,7 @@ Frontend artifacts are served from `/opt/rpb/frontend`. The 2026-07-04 frontend 
 Verify the public page loads the expected asset:
 
 ```powershell
-Invoke-WebRequest -Uri 'http://booking.yumstone.sg/login' -UseBasicParsing -TimeoutSec 15 |
+Invoke-WebRequest -Uri 'https://booking.yumstone.sg/login' -UseBasicParsing -TimeoutSec 15 |
   Select-Object StatusCode,@{Name='Asset';Expression={ if ($_.Content -match '/assets/index-[^"'']+\.js') { $Matches[0] } else { 'missing' } }}
 ```
 
@@ -279,7 +282,7 @@ Expected after the 2026-07-04 deployment:
 Backend unauthenticated smoke test should return `401`, not `502` or `000`:
 
 ```powershell
-curl.exe -sS -o NUL -w "%{http_code}" http://booking.yumstone.sg/api/v1/auth/me
+curl.exe -sS -o NUL -w "%{http_code}" https://booking.yumstone.sg/api/v1/auth/me
 ```
 
 Server-side equivalent:
