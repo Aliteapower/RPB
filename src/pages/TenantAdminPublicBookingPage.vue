@@ -22,6 +22,7 @@ import {
   getTenantProfile
 } from '../api/tenantAdminApi'
 import DownloadableQrCode from '../components/common/DownloadableQrCode.vue'
+import PasswordInput from '../components/common/PasswordInput.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import type { ReservationMealPeriod } from '../types/reservationMealPeriod'
 import type {
@@ -788,7 +789,7 @@ function apiErrorText(error: unknown): string {
 
           <label>
             <span>SMTP 密钥</span>
-            <input v-model="emailForm.smtpPassword" autocomplete="new-password" type="password" />
+            <PasswordInput v-model="emailForm.smtpPassword" autocomplete="new-password" />
           </label>
 
           <section class="form-panel__wide switch-row">
@@ -861,7 +862,7 @@ function apiErrorText(error: unknown): string {
 
           <label>
             <span>App Secret</span>
-            <input v-model="facebookForm.clientSecret" autocomplete="new-password" type="password" />
+            <PasswordInput v-model="facebookForm.clientSecret" autocomplete="new-password" />
           </label>
 
           <div class="form-actions">

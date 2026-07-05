@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { AuthApiError, createSliderCaptcha } from '../api/authApi'
+import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type { AuthUser, SliderCaptchaChallenge } from '../types/auth'
 
@@ -398,10 +399,9 @@ function loginErrorText(error: unknown): string {
 
         <label class="login-field">
           <span>密码</span>
-          <input
+          <PasswordInput
             v-model="password"
             name="password"
-            type="password"
             autocomplete="current-password"
             maxlength="6"
             required

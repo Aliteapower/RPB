@@ -18,6 +18,7 @@ import {
   type TenantAdminStaff,
   type TenantAdminStaffMutation
 } from '../api/tenantAdminApi'
+import PasswordInput from '../components/common/PasswordInput.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 
@@ -441,7 +442,12 @@ function apiErrorText(error: unknown): string {
               </label>
               <label>
                 <span>修改密码</span>
-                <input v-model="form.password" type="password" maxlength="6" pattern="[A-Za-z0-9]{6}" />
+                <PasswordInput
+                  v-model="form.password"
+                  maxlength="6"
+                  pattern="[A-Za-z0-9]{6}"
+                  autocomplete="new-password"
+                />
                 <small>密码为 6 位数字或英文字母</small>
               </label>
             </div>
@@ -475,7 +481,12 @@ function apiErrorText(error: unknown): string {
           </label>
           <label>
             <span>{{ mode === 'create' ? '初始密码' : '修改密码' }}</span>
-            <input v-model="form.password" type="password" maxlength="6" :required="mode === 'create'" />
+            <PasswordInput
+              v-model="form.password"
+              maxlength="6"
+              :required="mode === 'create'"
+              autocomplete="new-password"
+            />
             <small>密码为 6 位数字或英文字母</small>
           </label>
         </template>

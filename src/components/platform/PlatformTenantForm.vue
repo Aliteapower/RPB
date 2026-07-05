@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 
+import PasswordInput from '../common/PasswordInput.vue'
 import type { PlatformTenantFormModel, TenantStatusOption } from './platformTenantUi'
 
 const props = defineProps<{
@@ -118,19 +119,17 @@ function clearLogo(): void {
     <section class="form-section" aria-label="租户管理员账号">
       <label>
         <span>{{ passwordLabel }}</span>
-        <input
+        <PasswordInput
           v-if="mode === 'create'"
           v-model.trim="localForm.initialPassword"
-          type="password"
           required
           maxlength="6"
           :placeholder="passwordPlaceholder"
           autocomplete="new-password"
         />
-        <input
+        <PasswordInput
           v-else
           v-model.trim="localForm.password"
-          type="password"
           maxlength="6"
           :placeholder="passwordPlaceholder"
           autocomplete="new-password"
