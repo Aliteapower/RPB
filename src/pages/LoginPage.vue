@@ -73,10 +73,13 @@ const sliderCanvas = ref<HTMLElement | null>(null)
 const canvasWidth = ref(320)
 const loadingCaptcha = ref(false)
 const submitting = ref(false)
+const draggingSlider = ref(false)
 const errorText = ref('')
 const pendingStoreSelection = ref(false)
 const selectedStoreId = ref('')
 let sliderResizeObserver: ResizeObserver | null = null
+let activeSliderPointerId: number | null = null
+let sliderDragOffsetX = 0
 
 const selectedEntry = computed(() => loginEntries.find(entry => entry.id === selectedEntryId.value) ?? loginEntries[0])
 const isStaffEntry = computed(() => selectedEntry.value.id === 'tenant-staff')
@@ -127,6 +130,7 @@ function selectEntry(entry: LoginEntry): void {
 }
 
 async function refreshSlider(): Promise<void> {
+  resetSliderDrag()
   loadingCaptcha.value = true
   errorText.value = ''
   try {
@@ -155,6 +159,90 @@ function observeSliderCanvas(): void {
 
 function updateCanvasWidth(): void {
   canvasWidth.value = sliderCanvas.value?.clientWidth || captcha.value?.imageWidth || 320
+}
+
+function startSliderDrag(event: PointerEvent): void {
+  if (!isSliderInteractive()) {
+    return
+  }
+
+  const handle = event.currentTarget as HTMLElement
+  sliderDragOffsetX = event.clientX - handle.getBoundingClientRect().left
+  activeSliderPointerId = event.pointerId
+  draggingSlider.value = true
+  handle.setPointerCapture(event.pointerId)
+  setCaptchaXFromClient(event.clientX)
+  event.preventDefault()
+}
+
+function moveSliderDrag(event: PointerEvent): void {
+  if (!draggingSlider.value || activeSliderPointerId !== event.pointerId) {
+    return
+  }
+
+  setCaptchaXFromClient(event.clientX)
+  event.preventDefault()
+}
+
+function stopSliderDrag(event: PointerEvent): void {
+  if (activeSliderPointerId !== event.pointerId) {
+    return
+  }
+
+  const handle = event.currentTarget as HTMLElement
+  if (handle.hasPointerCapture(event.pointerId)) {
+    handle.releasePointerCapture(event.pointerId)
+  }
+  resetSliderDrag()
+  event.preventDefault()
+}
+
+function handleSliderKeydown(event: KeyboardEvent): void {
+  if (!isSliderInteractive()) {
+    return
+  }
+
+  const step = event.shiftKey ? 10 : 2
+  let nextX: number | null = null
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+    nextX = captchaX.value - step
+  } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+    nextX = captchaX.value + step
+  } else if (event.key === 'Home') {
+    nextX = 0
+  } else if (event.key === 'End') {
+    nextX = sliderMax.value
+  }
+
+  if (nextX === null) {
+    return
+  }
+
+  setCaptchaX(nextX)
+  event.preventDefault()
+}
+
+function setCaptchaXFromClient(clientX: number): void {
+  const canvasRect = sliderCanvas.value?.getBoundingClientRect()
+  if (!canvasRect || sliderScale.value <= 0) {
+    return
+  }
+
+  setCaptchaX((clientX - canvasRect.left - sliderDragOffsetX) / sliderScale.value)
+}
+
+function setCaptchaX(nextX: number): void {
+  captchaX.value = Math.min(sliderMax.value, Math.max(0, Math.round(nextX)))
+}
+
+function resetSliderDrag(): void {
+  draggingSlider.value = false
+  activeSliderPointerId = null
+  sliderDragOffsetX = 0
+}
+
+function isSliderInteractive(): boolean {
+  return captcha.value !== null && !loadingCaptcha.value && !submitting.value
 }
 
 function showRouteStoreScopeMessage(): void {
@@ -329,27 +417,31 @@ function loginErrorText(error: unknown): string {
         <div class="slider-block">
           <div ref="sliderCanvas" class="slider-canvas" :aria-busy="loadingCaptcha">
             <img v-if="captcha" class="slider-bg" :src="captcha.backgroundImage" alt="" />
-            <img
+            <div
               v-if="captcha"
-              class="slider-piece"
-              :src="captcha.pieceImage"
+              class="slider-piece-handle"
+              :class="{ 'slider-piece-handle--dragging': draggingSlider }"
               :style="pieceStyle"
-              alt=""
-            />
-            <span v-if="!captcha" class="slider-empty">加载中</span>
-          </div>
-          <div class="slider-control">
-            <input
-              v-model.number="captchaX"
-              type="range"
-              min="0"
-              :max="sliderMax"
-              :disabled="!captcha || loadingCaptcha || submitting"
+              role="slider"
               aria-label="滑块校验"
-            />
-            <button type="button" class="text-button" :disabled="loadingCaptcha || submitting" @click="refreshSlider">
+              aria-valuemin="0"
+              :aria-valuemax="sliderMax"
+              :aria-valuenow="Math.round(captchaX)"
+              :aria-disabled="loadingCaptcha || submitting"
+              :tabindex="loadingCaptcha || submitting ? -1 : 0"
+              @pointerdown="startSliderDrag"
+              @pointermove="moveSliderDrag"
+              @pointerup="stopSliderDrag"
+              @pointercancel="stopSliderDrag"
+              @lostpointercapture="resetSliderDrag"
+              @keydown="handleSliderKeydown"
+            >
+              <img class="slider-piece" :src="captcha.pieceImage" alt="" draggable="false" />
+            </div>
+            <button type="button" class="slider-refresh" :disabled="loadingCaptcha || submitting" @click="refreshSlider">
               换一张
             </button>
+            <span v-if="!captcha" class="slider-empty">加载中</span>
           </div>
         </div>
 
@@ -544,7 +636,6 @@ function loginErrorText(error: unknown): string {
 
 .slider-block {
   display: grid;
-  gap: 10px;
 }
 
 .slider-canvas {
@@ -564,11 +655,62 @@ function loginErrorText(error: unknown): string {
   object-fit: cover;
 }
 
-.slider-piece {
+.slider-piece-handle {
   position: absolute;
   top: 0;
   left: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
   filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.22));
+}
+
+.slider-piece-handle--dragging {
+  cursor: grabbing;
+}
+
+.slider-piece-handle:focus-visible {
+  border-radius: 8px;
+  outline: 3px solid rgba(15, 118, 110, 0.35);
+  outline-offset: 3px;
+}
+
+.slider-piece-handle[aria-disabled='true'] {
+  cursor: default;
+}
+
+.slider-piece {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.slider-refresh {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-height: 32px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #0f766e;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.slider-refresh:disabled {
+  color: #94a3b8;
+  cursor: default;
 }
 
 .slider-empty {
@@ -578,31 +720,6 @@ function loginErrorText(error: unknown): string {
   place-items: center;
   color: #64748b;
   font-size: 14px;
-}
-
-.slider-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-}
-
-.slider-control input {
-  width: 100%;
-  accent-color: #0f766e;
-}
-
-.text-button {
-  border: 0;
-  background: transparent;
-  color: #0f766e;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.text-button:disabled {
-  color: #94a3b8;
-  cursor: default;
 }
 
 .login-error {
