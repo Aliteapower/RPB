@@ -15,7 +15,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class TenantAdminStaffRepository {
-    private static final String STORE_STAFF = "store_staff";
+    private static final String STORE_STAFF_ROLE = "store_staff";
+    private static final String STAFF_ACCOUNT_TYPE = "staff";
+    private static final String TENANT_ADMIN = "tenant_admin";
     private static final List<String> STAFF_PERMISSIONS = List.of(
         "reservation.create",
         "reservation.check_in",
@@ -104,6 +106,29 @@ public class TenantAdminStaffRepository {
         ).stream().findFirst();
     }
 
+    public Optional<TenantAdminStaff> findTenantAdminById(StoreScope scope, UUID accountId) {
+        return jdbc.query(
+            """
+            select account.id, account.username, account.display_name, account.status,
+                   account.contact_phone, account.email, account.created_at, account.updated_at
+            from auth_accounts account
+            join auth_account_store_access access on access.account_id = account.id
+            where account.id = ?
+              and account.tenant_id = ?
+              and account.actor_type = 'tenant_admin'
+              and account.deleted_at is null
+              and access.tenant_id = ?
+              and access.store_id = ?
+              and access.deleted_at is null
+            """,
+            (rs, rowNum) -> tenantAdminSelf(rs),
+            accountId,
+            scope.tenantId().value(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).stream().findFirst();
+    }
+
     public TenantAdminStaff insert(
         StoreScope scope,
         UUID staffId,
@@ -130,7 +155,7 @@ public class TenantAdminStaffRepository {
             phone,
             email
         );
-        ensureRole(staffId, STORE_STAFF);
+        ensureRole(staffId, STORE_STAFF_ROLE);
         STAFF_PERMISSIONS.forEach(permission -> ensurePermission(staffId, permission));
         ensureStoreAccess(scope, staffId);
         return findById(scope, staffId).orElseThrow();
@@ -197,6 +222,84 @@ public class TenantAdminStaffRepository {
             scope.tenantId().value()
         );
         return findById(scope, staffId);
+    }
+
+    public Optional<TenantAdminStaff> updateTenantAdminSelf(
+        StoreScope scope,
+        UUID accountId,
+        String name,
+        String phone,
+        String email,
+        String passwordHash
+    ) {
+        if (passwordHash == null) {
+            jdbc.update(
+                """
+                update auth_accounts
+                set display_name = ?,
+                    contact_phone = ?,
+                    email = ?,
+                    updated_at = now(),
+                    version = version + 1
+                where id = ?
+                  and tenant_id = ?
+                  and actor_type = 'tenant_admin'
+                  and deleted_at is null
+                  and exists (
+                      select 1
+                      from auth_account_store_access access
+                      where access.account_id = auth_accounts.id
+                        and access.tenant_id = ?
+                        and access.store_id = ?
+                        and access.deleted_at is null
+                  )
+                """,
+                name,
+                phone,
+                email,
+                accountId,
+                scope.tenantId().value(),
+                scope.tenantId().value(),
+                scope.storeId().value()
+            );
+            return findTenantAdminById(scope, accountId);
+        }
+
+        jdbc.update(
+            """
+            update auth_accounts
+            set display_name = ?,
+                contact_phone = ?,
+                email = ?,
+                password_hash = ?,
+                password_algo = 'bcrypt-lowercase-v1',
+                failed_login_count = 0,
+                locked_until_at = null,
+                updated_at = now(),
+                version = version + 1
+            where id = ?
+              and tenant_id = ?
+              and actor_type = 'tenant_admin'
+              and deleted_at is null
+              and exists (
+                  select 1
+                  from auth_account_store_access access
+                  where access.account_id = auth_accounts.id
+                    and access.tenant_id = ?
+                    and access.store_id = ?
+                    and access.deleted_at is null
+              )
+            """,
+            name,
+            phone,
+            email,
+            passwordHash,
+            accountId,
+            scope.tenantId().value(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        );
+        return findTenantAdminById(scope, accountId);
     }
 
     private void ensureRole(UUID accountId, String roleCode) {
@@ -301,6 +404,27 @@ public class TenantAdminStaffRepository {
             rs.getString("contact_phone"),
             rs.getString("email"),
             rs.getString("status"),
+            STAFF_ACCOUNT_TYPE,
+            false,
+            true,
+            true,
+            rs.getObject("created_at", OffsetDateTime.class),
+            rs.getObject("updated_at", OffsetDateTime.class)
+        );
+    }
+
+    private static TenantAdminStaff tenantAdminSelf(ResultSet rs) throws SQLException {
+        return new TenantAdminStaff(
+            rs.getObject("id", UUID.class),
+            rs.getString("username"),
+            rs.getString("display_name"),
+            rs.getString("contact_phone"),
+            rs.getString("email"),
+            rs.getString("status"),
+            TENANT_ADMIN,
+            true,
+            true,
+            false,
             rs.getObject("created_at", OffsetDateTime.class),
             rs.getObject("updated_at", OffsetDateTime.class)
         );

@@ -157,6 +157,12 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
+      path: '/stores/:storeId/admin/staff/me/edit',
+      name: 'tenant-admin-staff-self-edit',
+      component: TenantAdminStaffFormPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
       path: '/stores/:storeId/admin/staff/:staffId/edit',
       name: 'tenant-admin-staff-edit',
       component: TenantAdminStaffFormPage,

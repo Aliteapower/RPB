@@ -17,10 +17,16 @@ public class TenantAdminStaffService {
 
     private final TenantAdminStaffRepository repository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantAdminStaffAuditService auditService;
 
-    public TenantAdminStaffService(TenantAdminStaffRepository repository, PasswordEncoder passwordEncoder) {
+    public TenantAdminStaffService(
+        TenantAdminStaffRepository repository,
+        PasswordEncoder passwordEncoder,
+        TenantAdminStaffAuditService auditService
+    ) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -35,6 +41,12 @@ public class TenantAdminStaffService {
     @Transactional(readOnly = true)
     public TenantAdminStaff getStaff(StoreScope scope, UUID staffId) {
         return repository.findById(scope, staffId)
+            .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public TenantAdminStaff getCurrentTenantAdmin(StoreScope scope, UUID accountId) {
+        return repository.findTenantAdminById(scope, accountId)
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
     }
 
@@ -73,6 +85,28 @@ public class TenantAdminStaffService {
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
     }
 
+    @Transactional
+    public TenantAdminStaff updateCurrentTenantAdmin(
+        StoreScope scope,
+        UUID accountId,
+        TenantAdminStaffMutationCommand command
+    ) {
+        TenantAdminStaff existing = repository.findTenantAdminById(scope, accountId)
+            .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
+        NormalizedStaffInput input = normalizeTenantAdminSelfUpdate(existing, command);
+        TenantAdminStaff updated = repository.updateTenantAdminSelf(
+                scope,
+                accountId,
+                input.name(),
+                input.phone(),
+                input.email(),
+                input.password() == null ? null : passwordHash(input.password())
+            )
+            .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
+        auditService.recordSelfUpdated(scope, existing, updated, accountId, input.password() != null);
+        return updated;
+    }
+
     private static NormalizedStaffInput normalizeCreate(TenantAdminStaffMutationCommand command) {
         if (command == null) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
@@ -104,6 +138,26 @@ public class TenantAdminStaffService {
             optionalTextOrExisting(command.phone(), existing.phone()),
             optionalTextOrExisting(command.email(), existing.email()),
             normalizeStatus(firstText(command.status(), existing.status())),
+            optionalPassword(command.password())
+        );
+    }
+
+    private static NormalizedStaffInput normalizeTenantAdminSelfUpdate(
+        TenantAdminStaff existing,
+        TenantAdminStaffMutationCommand command
+    ) {
+        if (command == null) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        if (optionalText(command.employeeNo()) != null || optionalText(command.status()) != null) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return new NormalizedStaffInput(
+            existing.employeeNo(),
+            firstText(command.name(), existing.name()),
+            optionalTextOrExisting(command.phone(), existing.phone()),
+            optionalTextOrExisting(command.email(), existing.email()),
+            existing.status(),
             optionalPassword(command.password())
         );
     }

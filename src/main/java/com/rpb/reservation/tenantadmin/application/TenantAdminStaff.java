@@ -10,6 +10,10 @@ public record TenantAdminStaff(
     String phone,
     String email,
     String status,
+    String accountType,
+    boolean self,
+    boolean editable,
+    boolean statusEditable,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {

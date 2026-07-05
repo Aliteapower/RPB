@@ -11,6 +11,10 @@ export interface TenantAdminStaff {
   phone: string | null
   email: string | null
   status: 'active' | 'disabled' | 'locked'
+  accountType: 'staff' | 'tenant_admin'
+  self: boolean
+  editable: boolean
+  statusEditable: boolean
   createdAt: string
   updatedAt: string
 }
@@ -177,6 +181,13 @@ export async function getStaff(
   return requestJson(`${baseEndpoint(storeId)}/staff/${encodeURIComponent(staffId)}`, { method: 'GET', fetcher })
 }
 
+export async function getCurrentTenantAdminStaff(
+  storeId: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminStaffResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/staff/me`, { method: 'GET', fetcher })
+}
+
 export async function createStaff(
   storeId: string,
   request: TenantAdminStaffMutation,
@@ -192,6 +203,18 @@ export async function updateStaff(
   fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminStaffResponse> {
   return requestJson(`${baseEndpoint(storeId)}/staff/${encodeURIComponent(staffId)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function updateCurrentTenantAdminStaff(
+  storeId: string,
+  request: TenantAdminStaffMutation,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminStaffResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/staff/me`, {
     method: 'PATCH',
     body: request,
     fetcher

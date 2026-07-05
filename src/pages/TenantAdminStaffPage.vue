@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
+  getCurrentTenantAdminStaff,
   listStaff,
   TenantAdminApiError,
   type TenantAdminPage,
@@ -17,6 +18,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthSessionStore()
 const staff = ref<TenantAdminStaff[]>([])
+const selfAdminStaff = ref<TenantAdminStaff | null>(null)
 const loading = ref(false)
 const errorText = ref('')
 const keyword = ref('')
@@ -30,8 +32,9 @@ const page = ref<TenantAdminPage>({
 
 const storeId = computed(() => String(route.params.storeId || ''))
 const hasDirtyQuery = computed(() => keyword.value.trim() !== '')
-const enabledCount = computed(() => staff.value.filter(item => item.status === 'active').length)
-const disabledCount = computed(() => staff.value.filter(item => item.status !== 'active').length)
+const visibleStaff = computed(() => (selfAdminStaff.value ? [selfAdminStaff.value, ...staff.value] : staff.value))
+const enabledCount = computed(() => visibleStaff.value.filter(item => item.status === 'active').length)
+const disabledCount = computed(() => visibleStaff.value.filter(item => item.status !== 'active').length)
 const safePage = computed<TenantAdminPage>(() => page.value ?? {
   limit: limit.value,
   offset: offset.value,
@@ -46,11 +49,15 @@ async function loadStaff(nextOffset = offset.value): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const response = await listStaff(storeId.value, {
-      keyword: keyword.value,
-      limit: limit.value,
-      offset: nextOffset
-    })
+    const [selfResponse, response] = await Promise.all([
+      getCurrentTenantAdminStaff(storeId.value),
+      listStaff(storeId.value, {
+        keyword: keyword.value,
+        limit: limit.value,
+        offset: nextOffset
+      })
+    ])
+    selfAdminStaff.value = selfResponse.staff
     staff.value = response.staff
     page.value = response.page
     offset.value = response.page.offset
@@ -77,6 +84,10 @@ function openCreatePage(): void {
 }
 
 function openEditPage(item: TenantAdminStaff): void {
+  if (item.accountType === 'tenant_admin' && item.self) {
+    void router.push({ name: 'tenant-admin-staff-self-edit', params: { storeId: storeId.value } })
+    return
+  }
   void router.push({ name: 'tenant-admin-staff-edit', params: { storeId: storeId.value, staffId: item.id } })
 }
 
@@ -131,7 +142,8 @@ function apiErrorText(error: unknown): string {
       >
         <template #filters>
           <div class="summary-strip">
-            <strong>全部 {{ safePage.total }}</strong>
+            <strong>员工 {{ safePage.total }}</strong>
+            <span v-if="selfAdminStaff">管理员 1</span>
             <span>启用 {{ enabledCount }}</span>
             <span>停用 {{ disabledCount }}</span>
           </div>
@@ -161,12 +173,17 @@ function apiErrorText(error: unknown): string {
             <tr v-if="loading">
               <td colspan="6" class="empty-cell">加载中</td>
             </tr>
-            <tr v-else-if="staff.length === 0">
+            <tr v-else-if="visibleStaff.length === 0">
               <td colspan="6" class="empty-cell">暂无员工</td>
             </tr>
-            <tr v-for="item in staff" v-else :key="item.id">
+            <tr v-for="item in visibleStaff" v-else :key="item.id" :class="{ 'protected-row': item.accountType === 'tenant_admin' }">
               <td><strong>{{ item.employeeNo }}</strong></td>
-              <td>{{ item.name }}</td>
+              <td>
+                <span class="name-cell">
+                  {{ item.name }}
+                  <span v-if="item.accountType === 'tenant_admin'" class="role-badge">管理员</span>
+                </span>
+              </td>
               <td>{{ item.phone || '-' }}</td>
               <td>{{ item.email || '-' }}</td>
               <td>
@@ -175,7 +192,8 @@ function apiErrorText(error: unknown): string {
                 </span>
               </td>
               <td>
-                <button type="button" class="link-button" @click="openEditPage(item)">编辑</button>
+                <button v-if="item.editable" type="button" class="link-button" @click="openEditPage(item)">编辑</button>
+                <span v-else>-</span>
               </td>
             </tr>
           </tbody>
@@ -319,6 +337,29 @@ tr:last-child td {
 .status-pill.muted {
   color: #64748b;
   background: #e2e8f0;
+}
+
+.protected-row td {
+  background: #f0fdfa;
+}
+
+.name-cell {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.role-badge {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: #0f766e;
+  background: #ccfbf1;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .link-button {

@@ -11,6 +11,10 @@ public record TenantAdminStaffItemResponse(
     String phone,
     String email,
     String status,
+    String accountType,
+    boolean self,
+    boolean editable,
+    boolean statusEditable,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {
@@ -22,6 +26,10 @@ public record TenantAdminStaffItemResponse(
             staff.phone(),
             staff.email(),
             staff.status(),
+            staff.accountType(),
+            staff.self(),
+            staff.editable(),
+            staff.statusEditable(),
             staff.createdAt(),
             staff.updatedAt()
         );

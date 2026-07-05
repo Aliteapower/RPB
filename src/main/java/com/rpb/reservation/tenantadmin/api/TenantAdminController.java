@@ -22,6 +22,7 @@ import com.rpb.reservation.tenantadmin.application.TenantAdminStaffMutationComma
 import com.rpb.reservation.tenantadmin.application.TenantAdminStaffService;
 import com.rpb.reservation.tenantadmin.application.TenantAdminTableMutationCommand;
 import com.rpb.reservation.tenantadmin.application.TenantAdminTableService;
+import com.rpb.reservation.tenantadmin.api.TenantAdminScopeResolver.TenantAdminActorScope;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.core.io.Resource;
@@ -118,6 +119,25 @@ public class TenantAdminController {
         StoreScope scope = requireTenantAdminScope(storeId);
         return ResponseEntity.ok(TenantAdminStaffListResponse.from(
             staffService.listStaff(scope, new TenantAdminSearchCommand(keyword, limit, offset))
+        ));
+    }
+
+    @GetMapping("/staff/me")
+    public ResponseEntity<TenantAdminStaffResponse> getCurrentTenantAdminStaff(@PathVariable UUID storeId) {
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
+        return ResponseEntity.ok(TenantAdminStaffResponse.from(
+            staffService.getCurrentTenantAdmin(actorScope.scope(), actorScope.actor().actorId())
+        ));
+    }
+
+    @PatchMapping("/staff/me")
+    public ResponseEntity<TenantAdminStaffResponse> updateCurrentTenantAdminStaff(
+        @PathVariable UUID storeId,
+        @RequestBody(required = false) TenantAdminStaffMutationRequest request
+    ) {
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
+        return ResponseEntity.ok(TenantAdminStaffResponse.from(
+            staffService.updateCurrentTenantAdmin(actorScope.scope(), actorScope.actor().actorId(), toCommand(request))
         ));
     }
 

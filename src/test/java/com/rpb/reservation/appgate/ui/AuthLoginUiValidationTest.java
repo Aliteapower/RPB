@@ -293,4 +293,32 @@ class AuthLoginUiValidationTest {
             .contains(":disabled=\"!logoFile || logoSaving || saving\"")
             .contains(":disabled=\"logoSaving || saving\"");
     }
+
+    @Test
+    void tenantAdminStaffManagementSupportsProtectedSelfAdminMaintenance() throws Exception {
+        Path routerPath = Path.of("src", "router", "index.ts");
+        Path tenantApiPath = Path.of("src", "api", "tenantAdminApi.ts");
+        Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
+        Path staffFormPath = Path.of("src", "pages", "TenantAdminStaffFormPage.vue");
+
+        String source = Files.readString(routerPath)
+            + Files.readString(tenantApiPath)
+            + Files.readString(staffPagePath)
+            + Files.readString(staffFormPath);
+
+        assertThat(source)
+            .contains("path: '/stores/:storeId/admin/staff/me/edit'")
+            .contains("name: 'tenant-admin-staff-self-edit'")
+            .contains("getCurrentTenantAdminStaff")
+            .contains("updateCurrentTenantAdminStaff")
+            .contains("`${baseEndpoint(storeId)}/staff/me`")
+            .contains("accountType: 'staff' | 'tenant_admin'")
+            .contains("statusEditable")
+            .contains("selfAdminStaff")
+            .contains("visibleStaff")
+            .contains("管理员")
+            .contains("mode.value === 'self'")
+            .contains("v-if=\"mode !== 'self'\"")
+            .contains("tenant-admin-staff-self-edit");
+    }
 }

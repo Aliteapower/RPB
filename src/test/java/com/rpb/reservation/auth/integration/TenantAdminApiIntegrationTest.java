@@ -66,6 +66,7 @@ class TenantAdminApiIntegrationTest {
     void setUp() {
         jdbc.update("delete from auth_user_sessions");
         jdbc.update("delete from auth_slider_captcha_challenges");
+        jdbc.update("delete from audit_logs where operation_code = 'tenant_admin.account.self_update'");
         jdbc.update("delete from auth_account_roles where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_permissions where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
@@ -86,7 +87,23 @@ class TenantAdminApiIntegrationTest {
               and tenant_id = ?
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID);
         jdbc.update(
-            "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
+            """
+            update auth_accounts
+            set password_hash = ?,
+                display_name = case username
+                    when '20000000' then '租户管理员'
+                    when '1000' then '租户员工'
+                    else display_name
+                end,
+                contact_phone = case username when '20000000' then null else contact_phone end,
+                email = case username when '20000000' then null else email end,
+                status = 'active',
+                failed_login_count = 0,
+                locked_until_at = null,
+                updated_at = now(),
+                version = version + 1
+            where username in ('sysadmin', '20000000', '1000')
+            """,
             PASSWORD_393930_HASH
         );
         jdbc.update("""
@@ -107,7 +124,10 @@ class TenantAdminApiIntegrationTest {
                 .cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.staff[0].employeeNo").value("1000"));
+            .andExpect(jsonPath("$.staff[0].employeeNo").value("1000"))
+            .andExpect(jsonPath("$.staff[0].accountType").value("staff"))
+            .andExpect(jsonPath("$.staff[0].self").value(false))
+            .andExpect(jsonPath("$.staff[0].statusEditable").value(true));
 
         mockMvc.perform(get(basePath() + "/settings").cookie(session))
             .andExpect(status().isOk())
@@ -217,6 +237,89 @@ class TenantAdminApiIntegrationTest {
               and policy.effective_to_at is null
               and policy.deleted_at is null
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminMaintainsOnlyOwnAdministratorAccountFromStaffManagement() throws Exception {
+        Cookie session = login("20000000");
+        UUID tenantAdminAccountId = accountId("20000000");
+
+        mockMvc.perform(get(basePath() + "/staff/me").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.staff.id").value(tenantAdminAccountId.toString()))
+            .andExpect(jsonPath("$.staff.employeeNo").value("20000000"))
+            .andExpect(jsonPath("$.staff.name").value("租户管理员"))
+            .andExpect(jsonPath("$.staff.accountType").value("tenant_admin"))
+            .andExpect(jsonPath("$.staff.self").value(true))
+            .andExpect(jsonPath("$.staff.editable").value(true))
+            .andExpect(jsonPath("$.staff.statusEditable").value(false));
+
+        mockMvc.perform(patch(basePath() + "/staff/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name":"租户负责人",
+                      "phone":"+6598765432",
+                      "email":"tenant-admin@example.test",
+                      "password":"ADM123"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.staff.id").value(tenantAdminAccountId.toString()))
+            .andExpect(jsonPath("$.staff.employeeNo").value("20000000"))
+            .andExpect(jsonPath("$.staff.name").value("租户负责人"))
+            .andExpect(jsonPath("$.staff.phone").value("+6598765432"))
+            .andExpect(jsonPath("$.staff.email").value("tenant-admin@example.test"))
+            .andExpect(jsonPath("$.staff.accountType").value("tenant_admin"))
+            .andExpect(jsonPath("$.staff.self").value(true))
+            .andExpect(jsonPath("$.staff.statusEditable").value(false));
+
+        login("20000000", "adm123");
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts
+            where id = ?
+              and tenant_id = ?
+              and username = '20000000'
+              and actor_type = 'tenant_admin'
+              and display_name = '租户负责人'
+              and contact_phone = '+6598765432'
+              and email = 'tenant-admin@example.test'
+              and status = 'active'
+            """, tenantAdminAccountId, VALIDATION_TENANT_ID)).isEqualTo(1);
+
+        assertThat(countWhere("""
+            select count(*)
+            from audit_logs
+            where tenant_id = ?
+              and store_id = ?
+              and operation_code = 'tenant_admin.account.self_update'
+              and target_type = 'auth_account'
+              and target_id = ?
+              and actor_type = 'tenant_admin'
+              and actor_id = ?
+              and source = 'staff'
+              and metadata ->> 'passwordChanged' = 'true'
+              and jsonb_exists(metadata -> 'changedFields', 'password')
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID, tenantAdminAccountId, tenantAdminAccountId)).isEqualTo(1);
+
+        mockMvc.perform(patch(basePath() + "/staff/{staffId}", tenantAdminAccountId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name":"不应被普通员工接口修改",
+                      "status":"disabled",
+                      "password":"BAD123"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("STAFF_NOT_FOUND"));
     }
 
     @Test
@@ -691,8 +794,18 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
 
+        mockMvc.perform(get(basePath() + "/staff/me").cookie(staffSession))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+
         Cookie adminSession = login("20000000");
         mockMvc.perform(get("/api/v1/stores/{storeId}/tenant-admin/staff", UUID.randomUUID()).cookie(adminSession))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("STORE_SCOPE_MISMATCH"));
+
+        mockMvc.perform(get("/api/v1/stores/{storeId}/tenant-admin/staff/me", UUID.randomUUID()).cookie(adminSession))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("STORE_SCOPE_MISMATCH"));
@@ -954,6 +1067,14 @@ class TenantAdminApiIntegrationTest {
 
     private int countWhere(String sql, Object... args) {
         return jdbc.queryForObject(sql, Integer.class, args);
+    }
+
+    private UUID accountId(String username) {
+        return jdbc.queryForObject(
+            "select id from auth_accounts where username = ? and deleted_at is null",
+            UUID.class,
+            username
+        );
     }
 
     private record SliderTarget(String challengeId, int targetX) {

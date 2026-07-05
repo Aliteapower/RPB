@@ -20,6 +20,10 @@ public class TenantAdminScopeResolver {
     }
 
     public StoreScope requireTenantAdminScope(UUID storeId) {
+        return requireTenantAdminActorScope(storeId).scope();
+    }
+
+    public TenantAdminActorScope requireTenantAdminActorScope(UUID storeId) {
         CurrentActor actor = currentActorProvider.currentActor()
             .orElseThrow(() -> new TenantAdminApiException(TenantAdminApiErrorCode.UNAUTHENTICATED));
         if (!actor.roles().contains(TENANT_ADMIN) || !actor.hasPermission(TENANT_ADMIN_MANAGE)) {
@@ -28,6 +32,9 @@ public class TenantAdminScopeResolver {
         if (actor.tenantId() == null || !actor.storeIds().contains(storeId)) {
             throw new TenantAdminApiException(TenantAdminApiErrorCode.STORE_SCOPE_MISMATCH);
         }
-        return new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
+        return new TenantAdminActorScope(actor, new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId)));
+    }
+
+    public record TenantAdminActorScope(CurrentActor actor, StoreScope scope) {
     }
 }

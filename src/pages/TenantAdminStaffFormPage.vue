@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   createStaff,
+  getCurrentTenantAdminStaff,
   getStaff,
   TenantAdminApiError,
+  updateCurrentTenantAdminStaff,
   updateStaff,
   type TenantAdminStaffMutation
 } from '../api/tenantAdminApi'
@@ -19,8 +21,18 @@ const loading = ref(false)
 const saving = ref(false)
 const errorText = ref('')
 
-const mode = computed<'create' | 'edit'>(() => (route.name === 'tenant-admin-staff-create' ? 'create' : 'edit'))
-const pageTitle = computed(() => (mode.value === 'create' ? '新增员工' : '编辑员工'))
+const mode = computed<'create' | 'edit' | 'self'>(() => {
+  if (route.name === 'tenant-admin-staff-create') {
+    return 'create'
+  }
+  return route.name === 'tenant-admin-staff-self-edit' ? 'self' : 'edit'
+})
+const pageTitle = computed(() => {
+  if (mode.value === 'create') {
+    return '新增员工'
+  }
+  return mode.value === 'self' ? '我的管理员账号' : '编辑员工'
+})
 const storeId = computed(() => String(route.params.storeId || ''))
 const staffId = computed(() => String(route.params.staffId || ''))
 
@@ -34,7 +46,7 @@ const form = reactive({
 })
 
 onMounted(() => {
-  if (mode.value === 'edit') {
+  if (mode.value !== 'create') {
     void loadStaff()
   }
 })
@@ -43,7 +55,9 @@ async function loadStaff(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const response = await getStaff(storeId.value, staffId.value)
+    const response = mode.value === 'self'
+      ? await getCurrentTenantAdminStaff(storeId.value)
+      : await getStaff(storeId.value, staffId.value)
     Object.assign(form, {
       employeeNo: response.staff.employeeNo,
       name: response.staff.name,
@@ -70,6 +84,8 @@ async function submitStaff(): Promise<void> {
     const payload = toPayload()
     if (mode.value === 'create') {
       await createStaff(storeId.value, payload)
+    } else if (mode.value === 'self') {
+      await updateCurrentTenantAdminStaff(storeId.value, payload)
     } else {
       await updateStaff(storeId.value, staffId.value, payload)
     }
@@ -82,6 +98,15 @@ async function submitStaff(): Promise<void> {
 }
 
 function toPayload(): TenantAdminStaffMutation {
+  if (mode.value === 'self') {
+    return {
+      name: form.name.trim(),
+      phone: optionalValue(form.phone),
+      email: optionalValue(form.email),
+      password: optionalValue(form.password)
+    }
+  }
+
   return {
     employeeNo: mode.value === 'create' ? form.employeeNo.trim() : undefined,
     name: form.name.trim(),
@@ -142,7 +167,7 @@ function apiErrorText(error: unknown): string {
       <form v-else class="form-panel" @submit.prevent="submitStaff">
         <label>
           <span>员工号</span>
-          <input v-model.trim="form.employeeNo" :readonly="mode === 'edit'" required />
+          <input v-model.trim="form.employeeNo" :readonly="mode !== 'create'" required />
         </label>
         <label>
           <span>姓名</span>
@@ -156,7 +181,7 @@ function apiErrorText(error: unknown): string {
           <span>电邮</span>
           <input v-model.trim="form.email" type="email" />
         </label>
-        <label>
+        <label v-if="mode !== 'self'">
           <span>状态</span>
           <select v-model="form.status">
             <option value="active">启用</option>
