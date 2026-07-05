@@ -78,7 +78,7 @@ Expected: PASS.
 - [x] Write release notes with no-migration statement, permission impact, risk, and rollback.
 - [x] Run `mvn "-Dtest=TenantAdminApiIntegrationTest,AuthLoginUiValidationTest" test`.
 - [x] Run `npm run build`.
-- [ ] Run `git diff --check`.
-- [ ] Commit and push the branch.
-- [ ] Deploy backend jar and frontend dist to `booking.yumstone.sg`.
-- [ ] Smoke test production `/api/v1/auth/me`, tenant admin staff page asset, and nginx/backend service status.
+- [x] Run `git diff --check`.
+- [x] Commit and push the branch.
+- [x] Deploy backend jar and frontend dist to `booking.yumstone.sg`.
+- [x] Smoke test production `/api/v1/auth/me`, tenant admin staff page asset, and nginx/backend service status.

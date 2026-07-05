@@ -49,3 +49,14 @@
 
 - `mvn "-Dtest=TenantAdminApiIntegrationTest,AuthLoginUiValidationTest" test` passed: 22 tests.
 - `npm run build` passed with the existing Vite chunk-size warning.
+- `mvn -DskipTests package` passed from clean deploy worktree `target/deploy-worktree-7e8a088`.
+- Clean worktree frontend deploy build produced `/assets/index-D0VbTzf5.js`.
+- Production backend smoke `http://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+- Production frontend smoke `http://booking.yumstone.sg/login` returned `200` and referenced `/assets/index-D0VbTzf5.js`.
+- Production Flyway history remains valid through v027.
+
+## Deployment
+
+- Code deployed from commit `7e8a088`.
+- Backend backup: `/opt/rpb/backups/20260705-1012-7e8a088`.
+- Frontend backup: `/opt/rpb/backups/20260705-1013-7e8a088-frontend`.
