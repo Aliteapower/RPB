@@ -13,6 +13,7 @@ The migration uses two frontend locale data layers:
 
 - Frontend fallback locale: `zh-CN`.
 - Supported first-round locales: `zh-CN`, `en-SG`.
+- A global `FrontendLocaleSwitcher` is mounted from `App.vue` so public pages, login, and authenticated workspaces all expose the same locale entrypoint.
 - Store locale remains the operational display context for date, time, currency, and later tenant/store-specific display behavior.
 - If no user preference is stored, the frontend may use browser language when it maps to a supported locale.
 - If browser language is unsupported, the frontend falls back to `zh-CN`.

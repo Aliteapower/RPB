@@ -12,21 +12,29 @@ class FrontendI18nFoundationValidationTest {
     @Test
     void frontendRegistersVueI18nWithExplicitDefaultLocaleStrategy() throws Exception {
         Path packagePath = Path.of("package.json");
+        Path appPath = Path.of("src", "App.vue");
         Path mainPath = Path.of("src", "main.ts");
         Path i18nPath = Path.of("src", "i18n", "index.ts");
+        Path switcherPath = Path.of("src", "components", "common", "FrontendLocaleSwitcher.vue");
         Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
         Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
 
         assertThat(i18nPath).exists();
+        assertThat(switcherPath).exists();
         assertThat(zhPath).exists();
         assertThat(enPath).exists();
 
         String packageSource = FrontendSourceSupport.readString(packagePath);
+        String appSource = FrontendSourceSupport.readString(appPath);
         String mainSource = FrontendSourceSupport.readString(mainPath);
         String i18nSource = FrontendSourceSupport.readString(i18nPath);
+        String switcherSource = FrontendSourceSupport.readString(switcherPath);
         String localeSource = FrontendSourceSupport.readString(zhPath) + FrontendSourceSupport.readString(enPath);
 
         assertThat(packageSource).contains("\"vue-i18n\"");
+        assertThat(appSource)
+            .contains("FrontendLocaleSwitcher")
+            .contains("<FrontendLocaleSwitcher");
         assertThat(mainSource)
             .contains("import { i18n } from './i18n'")
             .contains(".use(i18n)");
@@ -36,8 +44,15 @@ class FrontendI18nFoundationValidationTest {
             .contains("localStorage")
             .contains("navigator.languages")
             .contains("document.documentElement.lang");
+        assertThat(switcherSource)
+            .contains("SUPPORTED_FRONTEND_LOCALES")
+            .contains("setFrontendLocale")
+            .contains("common.localeSwitcher.aria")
+            .contains("common.localeSwitcher.zhCN")
+            .contains("common.localeSwitcher.enSG");
         assertThat(localeSource)
             .contains("platformAdmin")
+            .contains("localeSwitcher")
             .contains("tenantAppNotEnabled")
             .contains("reservations: '今日预约'")
             .contains("reservation: '预约'");

@@ -38,6 +38,11 @@ export const enSG = {
       show: 'Show password',
       hide: 'Hide password'
     },
+    localeSwitcher: {
+      aria: 'Language switcher',
+      zhCN: '中文',
+      enSG: 'EN'
+    },
     product: {
       reservationQueueCallSystem: 'Reservation, queue, and calling system'
     }

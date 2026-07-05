@@ -38,6 +38,11 @@ export const zhCN = {
       show: '显示密码',
       hide: '隐藏密码'
     },
+    localeSwitcher: {
+      aria: '语言切换',
+      zhCN: '中文',
+      enSG: 'EN'
+    },
     product: {
       reservationQueueCallSystem: '预约排队叫号系统'
     }
