@@ -315,8 +315,45 @@ async function saveWeeklyAvailabilityRules(): Promise<TenantAdminPublicBookingAv
 }
 
 async function copyPublicUrl(): Promise<void> {
-  await navigator.clipboard.writeText(publicBookingUrl.value)
-  savedText.value = '链接已复制'
+  errorText.value = ''
+  savedText.value = ''
+  if (await copyText(publicBookingUrl.value)) {
+    savedText.value = '公网预约入口已复制'
+    return
+  }
+  errorText.value = `公网预约入口复制失败，请手动复制：${publicBookingUrl.value}`
+}
+
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Fall back for HTTP deployments where Clipboard API may be blocked.
+    }
+  }
+  return fallbackCopyText(text)
+}
+
+function fallbackCopyText(text: string): boolean {
+  const textArea = document.createElement('textarea')
+  textArea.value = text
+  textArea.setAttribute('readonly', '')
+  textArea.style.left = '0'
+  textArea.style.opacity = '0'
+  textArea.style.position = 'fixed'
+  textArea.style.top = '0'
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+  try {
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    document.body.removeChild(textArea)
+  }
 }
 
 function normalizedSettings(): TenantAdminPublicBookingSettingsMutation {
@@ -532,7 +569,7 @@ function apiErrorText(error: unknown): string {
           <span>租户</span>
           <h1>公网预约</h1>
         </div>
-        <button type="button" @click="copyPublicUrl">复制公网链接</button>
+        <button type="button" aria-label="复制公网预约入口" @click="copyPublicUrl">复制公网预约入口</button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
