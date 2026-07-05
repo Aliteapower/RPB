@@ -173,6 +173,7 @@ class PublicBookingUiValidationTest {
         String tenantAdminPublicBookingPageSource = Files.readString(Path.of("src", "pages", "TenantAdminPublicBookingPage.vue"));
         String publicBookingTypeSource = Files.readString(Path.of("src", "types", "publicBooking.ts"));
         String publicBookingApiSource = Files.readString(Path.of("src", "api", "publicBookingApi.ts"));
+        String tenantAdminApiSource = Files.readString(Path.of("src", "api", "tenantAdminApi.ts"));
         String tenantAdminPublicBookingControllerSource = Files.readString(Path.of(
             "src",
             "main",
@@ -186,15 +187,27 @@ class PublicBookingUiValidationTest {
         ));
 
         assertThat(tenantAdminPublicBookingPageSource)
+            .contains("import DownloadableQrCode from '../components/common/DownloadableQrCode.vue'")
+            .contains("getTenantProfile")
             .contains("type PublicBookingPanel = 'settings' | 'email' | 'google' | 'facebook' | 'rules'")
             .contains("const activePanel = ref<PublicBookingPanel>('settings')")
+            .contains("const tenantLogoUrl = ref('')")
             .contains("function openPanel(panel: PublicBookingPanel)")
             .contains("const publicBookingUrl = computed(() => `${window.location.origin}/book/${storeId.value}`)")
+            .contains("const publicBookingQrFileName = computed(() => `public-booking-${storeId.value}.png`)")
             .contains("function fallbackCopyText(text: string): boolean")
             .contains("document.execCommand('copy')")
             .contains("复制公网预约入口")
             .contains("公网预约入口已复制")
             .contains("公网预约入口复制失败")
+            .contains("getTenantProfile(storeId.value).catch(() => null)")
+            .contains("tenantLogoUrl.value = tenantProfileResponse?.profile.logoMediaUrl || ''")
+            .contains("<DownloadableQrCode")
+            .contains(":value=\"publicBookingUrl\"")
+            .contains(":logo-url=\"tenantLogoUrl\"")
+            .contains(":file-name=\"publicBookingQrFileName\"")
+            .contains("download-label=\"下载二维码\"")
+            .contains("预约入口二维码")
             .contains("defaultQuotaPercent: 100")
             .contains("defaultQuotaPercent: form.defaultQuotaMode === 'percentage' ? Number(form.defaultQuotaPercent ?? 100) : null")
             .doesNotContain("defaultQuotaPercent: 20")
@@ -315,6 +328,10 @@ class PublicBookingUiValidationTest {
             .contains("method: 'PUT'")
             .contains("method: 'DELETE'");
 
+        assertThat(tenantAdminApiSource)
+            .contains("export async function getTenantProfile")
+            .contains("logoMediaUrl: string | null");
+
         assertThat(tenantAdminPublicBookingControllerSource)
             .contains("@GetMapping(\"/availability-rules\")")
             .contains("@PutMapping(\"/availability-rules\")")
@@ -323,5 +340,40 @@ class PublicBookingUiValidationTest {
             .contains("AvailabilityRuleRequest")
             .contains("AvailabilityRulesResponse")
             .contains("AvailabilityRuleResponse");
+    }
+
+    @Test
+    void downloadableQrCodeComponentIsReusableAndSupportsLogoDownload() throws Exception {
+        String qrComponentSource = Files.readString(Path.of("src", "components", "common", "DownloadableQrCode.vue"));
+        String qrRendererSource = Files.readString(Path.of("src", "utils", "qrCodeRenderer.ts"));
+        String packageJsonSource = Files.readString(Path.of("package.json"));
+
+        assertThat(qrComponentSource)
+            .contains("defineProps")
+            .contains("value: string")
+            .contains("logoUrl?: string | null")
+            .contains("fileName?: string")
+            .contains("downloadLabel?: string")
+            .contains("renderQrCodeToCanvas")
+            .contains("safeQrDownloadFileName")
+            .contains("downloadQrCodePng")
+            .contains("canvasRef")
+            .contains("<canvas")
+            .contains("下载二维码")
+            .contains("二维码生成失败");
+
+        assertThat(qrRendererSource)
+            .contains("import QRCode from 'qrcode'")
+            .contains("export async function renderQrCodeToCanvas")
+            .contains("QRCode.toCanvas")
+            .contains("errorCorrectionLevel: options.errorCorrectionLevel ?? 'H'")
+            .contains("drawLogoOnCanvas")
+            .contains("loadImage")
+            .contains("canvas.toDataURL('image/png')")
+            .contains("export function safeQrDownloadFileName");
+
+        assertThat(packageJsonSource)
+            .contains("\"qrcode\"")
+            .contains("\"@types/qrcode\"");
     }
 }

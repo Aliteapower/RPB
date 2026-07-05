@@ -18,6 +18,10 @@ import {
   getStoreReservationMealPeriods,
   ReservationMealPeriodApiError
 } from '../api/reservationMealPeriodApi'
+import {
+  getTenantProfile
+} from '../api/tenantAdminApi'
+import DownloadableQrCode from '../components/common/DownloadableQrCode.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import type { ReservationMealPeriod } from '../types/reservationMealPeriod'
 import type {
@@ -40,6 +44,7 @@ const savedText = ref('')
 const emailSecretConfigured = ref(false)
 const googleSecretConfigured = ref(false)
 const facebookSecretConfigured = ref(false)
+const tenantLogoUrl = ref('')
 const mealPeriods = ref<ReservationMealPeriod[]>([])
 const availabilityRules = ref<TenantAdminPublicBookingAvailabilityRule[]>([])
 
@@ -105,6 +110,7 @@ const facebookForm = reactive<TenantAdminCustomerOAuthProviderSettingsMutation>(
 })
 
 const publicBookingUrl = computed(() => `${window.location.origin}/book/${storeId.value}`)
+const publicBookingQrFileName = computed(() => `public-booking-${storeId.value}.png`)
 const activeMealPeriods = computed(() => mealPeriods.value.filter(period => period.status === 'active'))
 const emailSmtpCredentialComplete = computed(() => (
   !hasText(emailForm.smtpUsername) ||
@@ -144,13 +150,14 @@ async function loadSettings(): Promise<void> {
   errorText.value = ''
   savedText.value = ''
   try {
-    const [settings, email, google, facebook, mealPeriodResponse, rulesResponse] = await Promise.all([
+    const [settings, email, google, facebook, mealPeriodResponse, rulesResponse, tenantProfileResponse] = await Promise.all([
       getTenantAdminPublicBookingSettings(storeId.value),
       getTenantAdminCustomerEmailSettings(storeId.value),
       getTenantAdminCustomerOAuthProviderSettings(storeId.value, 'google'),
       getTenantAdminCustomerOAuthProviderSettings(storeId.value, 'facebook'),
       getStoreReservationMealPeriods(storeId.value),
-      getTenantAdminPublicBookingAvailabilityRules(storeId.value)
+      getTenantAdminPublicBookingAvailabilityRules(storeId.value),
+      getTenantProfile(storeId.value).catch(() => null)
     ])
     Object.assign(form, {
       enabled: settings.enabled,
@@ -185,6 +192,7 @@ async function loadSettings(): Promise<void> {
       clientSecret: ''
     })
     facebookSecretConfigured.value = facebook.secretConfigured
+    tenantLogoUrl.value = tenantProfileResponse?.profile.logoMediaUrl || ''
     mealPeriods.value = mealPeriodResponse.effectivePeriods
     availabilityRules.value = [...rulesResponse.rules].sort(compareAvailabilityRules)
     hydrateWeeklySelectionFromSavedRules()
@@ -569,7 +577,6 @@ function apiErrorText(error: unknown): string {
           <span>租户</span>
           <h1>公网预约</h1>
         </div>
-        <button type="button" aria-label="复制公网预约入口" @click="copyPublicUrl">复制公网预约入口</button>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
@@ -577,6 +584,23 @@ function apiErrorText(error: unknown): string {
       <p v-if="loading" class="loading-line">加载中</p>
 
       <section v-else class="settings-layout">
+        <section class="public-entry-panel" aria-label="租户公网预约入口">
+          <div class="public-entry-panel__content">
+            <span>租户公网预约入口</span>
+            <strong>{{ publicBookingUrl }}</strong>
+            <p>可复制链接，也可下载二维码用于海报、桌牌或社媒分享。</p>
+            <button type="button" aria-label="复制公网预约入口" @click="copyPublicUrl">复制公网预约入口</button>
+          </div>
+          <DownloadableQrCode
+            :value="publicBookingUrl"
+            :logo-url="tenantLogoUrl"
+            :file-name="publicBookingQrFileName"
+            title="预约入口二维码"
+            description="已配置时嵌入租户 LOGO"
+            download-label="下载二维码"
+          />
+        </section>
+
         <section class="settings-operation-list" aria-label="公网预约项目操作">
           <h2 class="operation-list-title">项目操作</h2>
 
@@ -981,7 +1005,7 @@ function apiErrorText(error: unknown): string {
   margin: 0;
 }
 
-.page-heading button,
+.public-entry-panel__content button,
 .form-actions button {
   border-radius: 6px;
   font: inherit;
@@ -990,10 +1014,54 @@ function apiErrorText(error: unknown): string {
   padding: 0 12px;
 }
 
-.page-heading button {
+.public-entry-panel__content button {
   background: #ffffff;
   border: 1px solid #cbd5e1;
   color: #334155;
+  justify-self: start;
+}
+
+.public-entry-panel {
+  align-items: stretch;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 286px;
+  padding: 14px;
+}
+
+.public-entry-panel__content {
+  align-content: start;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.public-entry-panel__content span {
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.public-entry-panel__content strong {
+  background: #f8fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+}
+
+.public-entry-panel__content p {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+  margin: 0;
 }
 
 .error-banner,
@@ -1315,6 +1383,7 @@ button:disabled {
 @media (max-width: 980px) {
   .tenant-shell,
   .form-panel,
+  .public-entry-panel,
   .settings-operation-list {
     grid-template-columns: 1fr;
   }
@@ -1329,6 +1398,10 @@ button:disabled {
   .form-actions {
     align-items: stretch;
     display: grid;
+  }
+
+  .public-entry-panel__content button {
+    justify-self: stretch;
   }
 
   .operation-card {
