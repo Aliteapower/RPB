@@ -278,4 +278,19 @@ class AuthLoginUiValidationTest {
             .contains("auth.defaultHomeRoute")
             .doesNotContain("v-if=\"formOpen\"");
     }
+
+    @Test
+    void tenantAdminProfileSaveAlsoUploadsSelectedLogo() throws Exception {
+        Path profilePagePath = Path.of("src", "pages", "TenantAdminProfilePage.vue");
+
+        String profilePageSource = Files.readString(profilePagePath);
+
+        assertThat(profilePageSource)
+            .contains("async function uploadSelectedLogo(successMessage: string): Promise<void>")
+            .contains("await uploadSelectedLogo('资料和 LOGO 已保存')")
+            .contains("await uploadSelectedLogo('LOGO 已更新')")
+            .contains("savedText.value = successMessage")
+            .contains(":disabled=\"!logoFile || logoSaving || saving\"")
+            .contains(":disabled=\"logoSaving || saving\"");
+    }
 }

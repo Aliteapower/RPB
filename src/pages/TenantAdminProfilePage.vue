@@ -122,6 +122,9 @@ async function submitProfile(): Promise<void> {
     applyProfile(profileResponse.profile)
     applyShareProfile(shareProfileResponse.shareProfile)
     savedText.value = '已保存'
+    if (logoFile.value) {
+      await uploadSelectedLogo('资料和 LOGO 已保存')
+    }
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -130,27 +133,37 @@ async function submitProfile(): Promise<void> {
 }
 
 async function submitLogo(): Promise<void> {
-  if (logoSaving.value || !logoFile.value) {
+  if (logoSaving.value || saving.value || !logoFile.value) {
+    return
+  }
+
+  errorText.value = ''
+  savedText.value = ''
+  try {
+    await uploadSelectedLogo('LOGO 已更新')
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  }
+}
+
+async function uploadSelectedLogo(successMessage: string): Promise<void> {
+  if (!logoFile.value) {
     return
   }
 
   logoSaving.value = true
-  errorText.value = ''
-  savedText.value = ''
   try {
     const response = await uploadTenantProfileLogo(storeId.value, logoFile.value)
     applyProfile(response.profile)
     clearSelectedLogo()
-    savedText.value = 'LOGO 已更新'
-  } catch (error) {
-    errorText.value = apiErrorText(error)
+    savedText.value = successMessage
   } finally {
     logoSaving.value = false
   }
 }
 
 async function removeLogo(): Promise<void> {
-  if (logoSaving.value) {
+  if (logoSaving.value || saving.value) {
     return
   }
 
@@ -386,10 +399,10 @@ function apiErrorText(error: unknown): string {
               @change="handleLogoFileChange"
             />
             <div class="button-row">
-              <button type="button" class="secondary-button" :disabled="!logoFile || logoSaving" @click="submitLogo">
+              <button type="button" class="secondary-button" :disabled="!logoFile || logoSaving || saving" @click="submitLogo">
                 {{ logoSaving && logoFile ? '上传中' : '上传 LOGO' }}
               </button>
-              <button type="button" class="ghost-button" :disabled="logoSaving" @click="removeLogo">清空 LOGO</button>
+              <button type="button" class="ghost-button" :disabled="logoSaving || saving" @click="removeLogo">清空 LOGO</button>
             </div>
           </div>
         </section>
