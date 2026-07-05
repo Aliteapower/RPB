@@ -1,39 +1,42 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import CleaningCompletePage from '../pages/CleaningCompletePage.vue'
-import LoginPage from '../pages/LoginPage.vue'
-import PlatformCallScreenSeedPage from '../pages/PlatformCallScreenSeedPage.vue'
-import PlatformProductLinesPage from '../pages/PlatformProductLinesPage.vue'
-import PlatformProfilePage from '../pages/PlatformProfilePage.vue'
-import PlatformReservationMealPeriodSeedPage from '../pages/PlatformReservationMealPeriodSeedPage.vue'
-import PlatformReservationShareTemplateSeedPage from '../pages/PlatformReservationShareTemplateSeedPage.vue'
-import PlatformTenantBillingPage from '../pages/PlatformTenantBillingPage.vue'
-import PlatformTenantFormPage from '../pages/PlatformTenantFormPage.vue'
-import PlatformTenantsPage from '../pages/PlatformTenantsPage.vue'
-import PublicBookingPage from '../pages/PublicBookingPage.vue'
-import QueueCallPage from '../pages/QueueCallPage.vue'
-import QueueDisplayPage from '../pages/QueueDisplayPage.vue'
-import QueueTicketListPage from '../pages/QueueTicketListPage.vue'
-import ReservationArrivedDirectSeatingPage from '../pages/ReservationArrivedDirectSeatingPage.vue'
-import ReservationArrivedToQueuePage from '../pages/ReservationArrivedToQueuePage.vue'
-import ReservationCheckInPage from '../pages/ReservationCheckInPage.vue'
-import ReservationPublicSharePage from '../pages/ReservationPublicSharePage.vue'
-import ReservationTodayViewPage from '../pages/ReservationTodayViewPage.vue'
-import SeatingFromCalledQueuePage from '../pages/SeatingFromCalledQueuePage.vue'
-import StoreStaffHomePage from '../pages/StoreStaffHomePage.vue'
-import TableResourceListPage from '../pages/TableResourceListPage.vue'
-import TenantAdminCallScreenPage from '../pages/TenantAdminCallScreenPage.vue'
-import TenantAdminProfilePage from '../pages/TenantAdminProfilePage.vue'
-import TenantAdminPublicBookingPage from '../pages/TenantAdminPublicBookingPage.vue'
-import TenantAdminReservationSharePage from '../pages/TenantAdminReservationSharePage.vue'
-import TenantAdminSettingsPage from '../pages/TenantAdminSettingsPage.vue'
-import TenantAdminStaffFormPage from '../pages/TenantAdminStaffFormPage.vue'
-import TenantAdminStaffPage from '../pages/TenantAdminStaffPage.vue'
-import TenantAdminTableFormPage from '../pages/TenantAdminTableFormPage.vue'
-import TenantAdminTablesPage from '../pages/TenantAdminTablesPage.vue'
-import WalkInDirectSeatingPage from '../pages/WalkInDirectSeatingPage.vue'
-import WalkInQueuePage from '../pages/WalkInQueuePage.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+
+const CleaningCompletePage = () => import('../pages/CleaningCompletePage.vue')
+const LoginPage = () => import('../pages/LoginPage.vue')
+const PlatformCallScreenSeedPage = () => import('../pages/PlatformCallScreenSeedPage.vue')
+const PlatformI18nCatalogPage = () => import('../pages/PlatformI18nCatalogPage.vue')
+const PlatformProductLinesPage = () => import('../pages/PlatformProductLinesPage.vue')
+const PlatformProfilePage = () => import('../pages/PlatformProfilePage.vue')
+const PlatformReservationMealPeriodSeedPage = () => import('../pages/PlatformReservationMealPeriodSeedPage.vue')
+const PlatformReservationShareTemplateSeedPage = () => import('../pages/PlatformReservationShareTemplateSeedPage.vue')
+const PlatformTenantBillingPage = () => import('../pages/PlatformTenantBillingPage.vue')
+const PlatformTenantFormPage = () => import('../pages/PlatformTenantFormPage.vue')
+const PlatformTenantsPage = () => import('../pages/PlatformTenantsPage.vue')
+const PublicBookingPage = () => import('../pages/PublicBookingPage.vue')
+const QueueCallPage = () => import('../pages/QueueCallPage.vue')
+const QueueDisplayPage = () => import('../pages/QueueDisplayPage.vue')
+const QueueTicketListPage = () => import('../pages/QueueTicketListPage.vue')
+const ReservationArrivedDirectSeatingPage = () => import('../pages/ReservationArrivedDirectSeatingPage.vue')
+const ReservationArrivedToQueuePage = () => import('../pages/ReservationArrivedToQueuePage.vue')
+const ReservationCheckInPage = () => import('../pages/ReservationCheckInPage.vue')
+const ReservationPublicSharePage = () => import('../pages/ReservationPublicSharePage.vue')
+const ReservationTodayViewPage = () => import('../pages/ReservationTodayViewPage.vue')
+const SeatingFromCalledQueuePage = () => import('../pages/SeatingFromCalledQueuePage.vue')
+const StoreStaffHomePage = () => import('../pages/StoreStaffHomePage.vue')
+const TableResourceListPage = () => import('../pages/TableResourceListPage.vue')
+const TenantAdminCallScreenPage = () => import('../pages/TenantAdminCallScreenPage.vue')
+const TenantAdminI18nCatalogPage = () => import('../pages/TenantAdminI18nCatalogPage.vue')
+const TenantAdminProfilePage = () => import('../pages/TenantAdminProfilePage.vue')
+const TenantAdminPublicBookingPage = () => import('../pages/TenantAdminPublicBookingPage.vue')
+const TenantAdminReservationSharePage = () => import('../pages/TenantAdminReservationSharePage.vue')
+const TenantAdminSettingsPage = () => import('../pages/TenantAdminSettingsPage.vue')
+const TenantAdminStaffFormPage = () => import('../pages/TenantAdminStaffFormPage.vue')
+const TenantAdminStaffPage = () => import('../pages/TenantAdminStaffPage.vue')
+const TenantAdminTableFormPage = () => import('../pages/TenantAdminTableFormPage.vue')
+const TenantAdminTablesPage = () => import('../pages/TenantAdminTablesPage.vue')
+const WalkInDirectSeatingPage = () => import('../pages/WalkInDirectSeatingPage.vue')
+const WalkInQueuePage = () => import('../pages/WalkInQueuePage.vue')
 
 const localValidationStoreId = '20000000-0000-0000-0000-000000000983'
 const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationStoreId
@@ -106,6 +109,12 @@ export const router = createRouter({
       path: '/platform/settings/product-lines',
       name: 'platform-product-lines',
       component: PlatformProductLinesPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/i18n/catalog',
+      name: 'platform-i18n-catalog',
+      component: PlatformI18nCatalogPage,
       meta: { requiresPlatformAdmin: true }
     },
     {
@@ -190,6 +199,12 @@ export const router = createRouter({
       path: '/stores/:storeId/admin/settings',
       name: 'tenant-admin-settings',
       component: TenantAdminSettingsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/i18n-catalog',
+      name: 'tenant-admin-i18n-catalog',
+      component: TenantAdminI18nCatalogPage,
       meta: { requiresTenantAdmin: true }
     },
     {

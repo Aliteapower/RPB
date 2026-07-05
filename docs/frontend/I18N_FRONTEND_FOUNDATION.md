@@ -24,6 +24,23 @@ This keeps the current Chinese-first admin/staff UI stable while preserving the 
 
 Do not move all static UI labels into `i18n_message_catalog`. Static application shell copy should live in frontend locale dictionaries. The database catalog remains reserved for configurable platform, tenant, or store messages, including reason labels, status display overrides, and future tenant-managed wording.
 
+## Backend Catalog Administration
+
+The catalog administration round adds a controlled backend registry for platform defaults and tenant/store overrides:
+
+- `i18n_message_key_registry` defines which keys are maintainable, their namespace, text kind, tenant editability, placeholder allowlist, status, and sort order.
+- `i18n_message_catalog` stores platform defaults, tenant overrides, and store overrides. Runtime resolution follows `store override -> tenant override -> platform default -> frontend fallback`.
+- Platform admin can maintain platform default messages through `/api/v1/platform/i18n/catalog`.
+- Tenant admin can maintain only registry-authorized tenant/store override messages through `/api/v1/stores/{storeId}/tenant-admin/i18n/catalog`.
+- Static product UI copy, login copy, navigation, permission errors, route names, API paths, and generated page dictionaries remain source-controlled frontend locale data unless a specific key is deliberately promoted into the backend registry.
+
+The backend catalog migration also imports configurable business copy from existing data sources without changing their runtime ownership in the same release:
+
+- Platform reservation share template seeds become platform catalog defaults.
+- Customized store reservation share templates and arrival notes become store overrides.
+- Platform and store reservation meal period display names become catalog messages.
+- Platform call-screen text seed slides become platform defaults, and tenant text-slide edits linked to platform seeds become tenant overrides.
+
 ## Migration Rule
 
 When migrating a Vue page:
@@ -36,9 +53,6 @@ When migrating a Vue page:
 - Prefer curated module namespaces for shared components and behavior. Use generated page keys only as a mechanical bridge for legacy page copy.
 - When touching a generated page key for product work, promote that key into a named module namespace if it is shared, reused, or business-significant.
 
-## Non-Scope
+## Initial Foundation Non-Scope
 
-- No backend API change.
-- No database migration.
-- No `i18n_message_catalog` seed data.
-- No backend message resolver or catalog API.
+The first frontend foundation migration intentionally had no backend API change, no database migration, no `i18n_message_catalog` seed data, and no backend resolver/catalog API. Those items are now handled separately by the backend catalog administration round above.

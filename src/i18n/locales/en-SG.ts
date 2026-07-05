@@ -72,6 +72,7 @@ export const enSG = {
       billing: 'Tenant billing',
       profile: 'Platform profile',
       productLines: 'Product lines',
+      i18nCatalog: 'I18n catalog',
       callScreenSeed: 'Call screen templates',
       mealPeriodSeed: 'Reservation meal periods',
       shareTemplateSeed: 'Confirmation templates'
@@ -84,6 +85,7 @@ export const enSG = {
       staff: 'Staff',
       tables: 'Tables',
       settings: 'Settings',
+      i18nCatalog: 'I18n catalog',
       shareTemplate: 'Booking share',
       publicBooking: 'Public booking',
       callScreen: 'Call screen'
@@ -422,6 +424,37 @@ export const enSG = {
     }
   },
   platform: {
+    i18nCatalog: {
+      page: {
+        kicker: 'Platform settings',
+        title: 'I18n catalog',
+        note: 'This page maintains platform default business copy only. Login, navigation, buttons, permission errors, and admin menus still ship from frontend locale files.'
+      },
+      fields: {
+        namespaceFilter: 'Catalog namespace filter',
+        allNamespaces: 'All namespaces',
+        noPlaceholders: 'No placeholders',
+        status: 'Status',
+        empty: 'No matching catalog entries'
+      },
+      status: {
+        active: 'Enabled',
+        inactive: 'Disabled'
+      },
+      messages: {
+        saved: 'Platform defaults saved',
+        noChanges: 'No platform copy changes to save'
+      },
+      errors: {
+        operationFailed: 'Operation failed. Please try again later.',
+        sessionExpired: 'Session expired. Please sign in again.',
+        forbidden: 'You do not have platform i18n catalog permission.',
+        invalid: 'Check catalog content, language, and status.',
+        versionConflict: 'The catalog was updated elsewhere. Refresh and try again.',
+        placeholderUnknown: 'The template contains an unsupported placeholder.',
+        keyNotAllowed: 'This message cannot be maintained in the admin console.'
+      }
+    },
     productLines: {
       page: {
         kicker: 'Settings',
@@ -680,6 +713,48 @@ export const enSG = {
         empty: 'No social media',
         logoAlt: '{name} social logo',
         uploadLogo: 'Upload logo'
+      }
+    }
+  },
+  tenant: {
+    i18nCatalog: {
+      page: {
+        kicker: 'Tenant settings',
+        title: 'I18n catalog',
+        note: 'This page maintains only platform-authorised business copy overrides. Save a blank override to clear it; display falls back from store override to tenant override, platform default, then frontend fallback.'
+      },
+      scope: {
+        store: 'Store override',
+        tenant: 'Tenant override'
+      },
+      sources: {
+        store: 'Store override',
+        tenant: 'Tenant override',
+        platform: 'Platform default',
+        frontend: 'Frontend fallback'
+      },
+      fields: {
+        namespaceFilter: 'Catalog namespace filter',
+        allNamespaces: 'All namespaces',
+        scopeLevel: 'Override scope',
+        override: 'Override copy',
+        effective: 'Effective',
+        clearOverride: 'Clear override',
+        noPlaceholders: 'No placeholders',
+        empty: 'No matching catalog entries'
+      },
+      messages: {
+        saved: 'Overrides saved',
+        noChanges: 'No overrides to save'
+      },
+      errors: {
+        operationFailed: 'Operation failed. Please try again later.',
+        sessionExpired: 'Session expired. Please sign in again.',
+        forbidden: 'You do not have tenant admin permission.',
+        invalid: 'Check catalog content and language.',
+        versionConflict: 'The catalog was updated elsewhere. Refresh and try again.',
+        placeholderUnknown: 'The template contains an unsupported placeholder.',
+        keyNotAllowed: 'This message cannot be maintained by tenants.'
       }
     }
   },

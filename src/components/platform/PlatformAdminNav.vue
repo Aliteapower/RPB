@@ -15,6 +15,7 @@ const navItems = [
   { to: '/platform/billing/subscriptions', labelKey: 'nav.platform.billing' },
   { to: '/platform/settings/profile', labelKey: 'nav.platform.profile' },
   { to: '/platform/settings/product-lines', labelKey: 'nav.platform.productLines' },
+  { to: '/platform/i18n/catalog', labelKey: 'nav.platform.i18nCatalog' },
   { to: '/platform/call-screen/text-seed', labelKey: 'nav.platform.callScreenSeed' },
   { to: '/platform/reservation/meal-period-seed', labelKey: 'nav.platform.mealPeriodSeed' },
   { to: '/platform/reservation/share-template-seed', labelKey: 'nav.platform.shareTemplateSeed' }

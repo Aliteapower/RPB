@@ -17,6 +17,7 @@ const navItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },
   { to: `/stores/${storeId.value}/admin/tables`, labelKey: 'nav.tenant.tables' },
   { to: `/stores/${storeId.value}/admin/settings`, labelKey: 'nav.tenant.settings' },
+  { to: `/stores/${storeId.value}/admin/i18n-catalog`, labelKey: 'nav.tenant.i18nCatalog' },
   { to: `/stores/${storeId.value}/admin/share-template`, labelKey: 'nav.tenant.shareTemplate' },
   { to: `/stores/${storeId.value}/admin/public-booking`, labelKey: 'nav.tenant.publicBooking' },
   { to: `/stores/${storeId.value}/admin/call-screen`, labelKey: 'nav.tenant.callScreen' }

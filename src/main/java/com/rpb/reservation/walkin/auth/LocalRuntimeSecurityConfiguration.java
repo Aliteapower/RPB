@@ -115,6 +115,8 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/call-screen/media-seed").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/call-screen/media").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/platform/call-screen/media/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/platform/i18n/catalog").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/platform/i18n/catalog").permitAll()
                 .requestMatchers("/api/v1/stores/*/tenant-admin/**").permitAll()
                 .anyRequest().denyAll()
             )

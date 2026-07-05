@@ -72,6 +72,7 @@ export const zhCN = {
       billing: '租户计费',
       profile: '平台资料',
       productLines: '产品线',
+      i18nCatalog: '国际化字典',
       callScreenSeed: '叫号模板',
       mealPeriodSeed: '预约餐段',
       shareTemplateSeed: '预约确认模板'
@@ -84,6 +85,7 @@ export const zhCN = {
       staff: '员工管理',
       tables: '桌号管理',
       settings: '基础设置',
+      i18nCatalog: '国际化字典',
       shareTemplate: '订位分享',
       publicBooking: '公网预约',
       callScreen: '叫号屏配置'
@@ -422,6 +424,37 @@ export const zhCN = {
     }
   },
   platform: {
+    i18nCatalog: {
+      page: {
+        kicker: '平台配置',
+        title: '国际化字典',
+        note: '这里只维护平台默认业务文案。登录、导航、按钮、权限错误和后台菜单仍由前端语言包随版本发布。'
+      },
+      fields: {
+        namespaceFilter: '字典命名空间筛选',
+        allNamespaces: '全部命名空间',
+        noPlaceholders: '无占位符',
+        status: '状态',
+        empty: '暂无匹配字典'
+      },
+      status: {
+        active: '启用',
+        inactive: '停用'
+      },
+      messages: {
+        saved: '平台默认文案已保存',
+        noChanges: '没有需要保存的平台文案'
+      },
+      errors: {
+        operationFailed: '操作失败，请稍后重试',
+        sessionExpired: '登录已失效，请重新登录',
+        forbidden: '没有平台国际化字典权限',
+        invalid: '请检查字典内容、语言和状态',
+        versionConflict: '字典已被其他操作更新，请刷新后重试',
+        placeholderUnknown: '模板包含未授权占位符',
+        keyNotAllowed: '该文案不允许在后台维护'
+      }
+    },
     productLines: {
       page: {
         kicker: '基础设置',
@@ -680,6 +713,48 @@ export const zhCN = {
         empty: '暂无社交媒体',
         logoAlt: '{name} 社媒 LOGO',
         uploadLogo: '上传 LOGO'
+      }
+    }
+  },
+  tenant: {
+    i18nCatalog: {
+      page: {
+        kicker: '租户配置',
+        title: '国际化字典',
+        note: '这里只维护平台授权的业务文案覆盖值。留空并保存会清除当前覆盖，按门店覆盖、租户覆盖、平台默认、前端兜底的顺序显示。'
+      },
+      scope: {
+        store: '门店覆盖',
+        tenant: '租户覆盖'
+      },
+      sources: {
+        store: '门店覆盖',
+        tenant: '租户覆盖',
+        platform: '平台默认',
+        frontend: '前端兜底'
+      },
+      fields: {
+        namespaceFilter: '字典命名空间筛选',
+        allNamespaces: '全部命名空间',
+        scopeLevel: '覆盖层级',
+        override: '覆盖文案',
+        effective: '当前生效',
+        clearOverride: '清除覆盖',
+        noPlaceholders: '无占位符',
+        empty: '暂无匹配字典'
+      },
+      messages: {
+        saved: '覆盖文案已保存',
+        noChanges: '没有需要保存的覆盖文案'
+      },
+      errors: {
+        operationFailed: '操作失败，请稍后重试',
+        sessionExpired: '登录已失效，请重新登录',
+        forbidden: '没有租户后台权限',
+        invalid: '请检查字典内容和语言',
+        versionConflict: '字典已被其他操作更新，请刷新后重试',
+        placeholderUnknown: '模板包含未授权占位符',
+        keyNotAllowed: '该文案不允许租户维护'
       }
     }
   },

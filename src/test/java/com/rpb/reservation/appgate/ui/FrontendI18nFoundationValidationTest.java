@@ -107,7 +107,7 @@ class FrontendI18nFoundationValidationTest {
     }
 
     @Test
-    void defaultLocaleStrategyIsDocumentedWithoutBackendCatalogCoupling() throws Exception {
+    void defaultLocaleStrategyAndCatalogBoundaryAreDocumented() throws Exception {
         Path architecturePath = Path.of("docs", "architecture", "ARCHITECTURE.md");
         Path frontendDocPath = Path.of("docs", "frontend", "I18N_FRONTEND_FOUNDATION.md");
 
@@ -123,7 +123,10 @@ class FrontendI18nFoundationValidationTest {
             .contains("Frontend fallback locale: `zh-CN`")
             .contains("Supported first-round locales: `zh-CN`, `en-SG`")
             .contains("Store locale remains the operational display context")
-            .contains("No backend message resolver or catalog API")
-            .contains("Do not move all static UI labels into `i18n_message_catalog`");
+            .contains("Do not move all static UI labels into `i18n_message_catalog`")
+            .contains("`i18n_message_key_registry` defines which keys are maintainable")
+            .contains("store override -> tenant override -> platform default -> frontend fallback")
+            .contains("/api/v1/platform/i18n/catalog")
+            .contains("/api/v1/stores/{storeId}/tenant-admin/i18n/catalog");
     }
 }
