@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,6 +54,7 @@ public class ReservationShareInfoController {
     public ResponseEntity<?> shareInfo(
         @PathVariable UUID storeId,
         @PathVariable UUID reservationId,
+        @RequestParam(required = false) String locale,
         HttpServletRequest request
     ) {
         Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
@@ -73,7 +75,8 @@ public class ReservationShareInfoController {
             reservationId,
             actor.actorId(),
             actor.actorType(),
-            requestOrigin(request)
+            requestOrigin(request),
+            locale
         ));
         if (!result.success()) {
             return errorMapper.toResponse(result);
@@ -86,6 +89,7 @@ public class ReservationShareInfoController {
     public ResponseEntity<?> recordShareIntent(
         @PathVariable UUID storeId,
         @PathVariable UUID reservationId,
+        @RequestParam(required = false) String locale,
         @RequestBody(required = false) ReservationShareIntentRequest body,
         HttpServletRequest request
     ) {
@@ -108,7 +112,8 @@ public class ReservationShareInfoController {
             actor.actorId(),
             actor.actorType(),
             requestOrigin(request),
-            body == null ? null : body.channel()
+            body == null ? null : body.channel(),
+            locale
         ));
         if (!result.success()) {
             return errorMapper.toResponse(result);

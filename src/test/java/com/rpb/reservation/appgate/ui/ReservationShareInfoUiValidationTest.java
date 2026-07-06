@@ -167,7 +167,10 @@ class ReservationShareInfoUiValidationTest {
             .contains("shareToken")
             .contains("sharePath")
             .contains("recordReservationShareIntent")
-            .contains("}/intent`")
+            .contains("locale?: string")
+            .contains("searchParams.set('locale'")
+            .contains("suffix = ''")
+            .contains("'/intent'")
             .doesNotContain("send")
             .doesNotContain("webhook");
         assertThat(shareInfoTypeSource)
@@ -176,6 +179,8 @@ class ReservationShareInfoUiValidationTest {
             .contains("/api/v1/public/reservation-shares")
             .contains("ReservationPublicShareApiError")
             .contains("TOKEN_EXPIRED")
+            .contains("locale?: string")
+            .contains("searchParams.set('locale'")
             .doesNotContain("Authorization")
             .doesNotContain("currentActor");
         assertThat(publicShareTypeSource)
@@ -188,6 +193,8 @@ class ReservationShareInfoUiValidationTest {
             .doesNotContain("customerPhone");
         assertThat(publicSharePageSource)
             .contains("getReservationPublicShare")
+            .contains("useI18n({ useScope: 'global' })")
+            .contains("activeLocale")
             .contains("route.params.token")
             .contains("预约信息")
             .contains("链接已失效")

@@ -44,7 +44,8 @@ public class ReservationShareIntentApplicationService {
             command.reservationId(),
             command.actorId(),
             command.actorType(),
-            command.publicShareBaseUrl()
+            command.publicShareBaseUrl(),
+            command.locale()
         ));
         if (!shareInfoResult.success()) {
             return ReservationShareIntentResult.failure(shareInfoResult.error());

@@ -2,6 +2,8 @@ package com.rpb.reservation.reservation.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.i18n.application.I18nMessageResolver;
 import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareReadPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareRow;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareTemplateSeedPort;
@@ -11,11 +13,16 @@ import com.rpb.reservation.reservation.application.service.ReservationShareTempl
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateSeedService;
 import com.rpb.reservation.reservation.application.service.StoreShareDateTimeFormatter;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class ReservationPublicShareApplicationServiceTest {
+    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000001301");
+    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000001301");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000001301");
     private static final Instant NOW = Instant.parse("2030-06-18T00:00:00Z");
 
@@ -112,6 +119,36 @@ class ReservationPublicShareApplicationServiceTest {
             .isEqualTo("您好，您的预约信息：R-PUBLIC-0007，到店时间 20-06-2030 11:30，人数 4。");
     }
 
+    @Test
+    void resolvesPublicShareTemplateAndArrivalNoteFromI18nCatalogForRequestedLocale() {
+        Scenario scenario = Scenario.ready();
+        scenario.readPort.row = row("active", null, null);
+        scenario.i18nResolver.messages.put(
+            "reservation.share.arrival_note",
+            "Please arrive 10 minutes early."
+        );
+        scenario.i18nResolver.messages.put(
+            "reservation.share.restaurant_reservation_confirmation_v1",
+            "{{storeName}} booking {{reservationNo}} at {{reservationDate}} {{reservationTime}}, " +
+                "{{partySize}} pax, table {{tableCode}}. {{arrivalNote}}{{guestSalutation}}"
+        );
+
+        ReservationPublicShareResult result = scenario.service.getPublicShare("share-token-1", "en-SG");
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.share().tableCode()).isEqualTo("To be confirmed");
+        assertThat(result.share().arrivalNote()).isEqualTo("Please arrive 10 minutes early.");
+        assertThat(result.share().shareTitle()).isEqualTo("食刻订位中心 booking confirmation");
+        assertThat(result.share().shareSummary()).isEqualTo("20-06-2030 11:30 · 4 pax");
+        assertThat(result.share().shareText())
+            .contains("booking R-PUBLIC-0007")
+            .contains("4 pax")
+            .contains("table To be confirmed")
+            .contains("Please arrive 10 minutes early.")
+            .doesNotContain("请提前 10 分钟到店")
+            .doesNotContain("先生/女士");
+    }
+
     private static ReservationPublicShareRow row(String status, Instant expiresAt, String tableCode) {
         return rowWithTemplate(
             status,
@@ -129,6 +166,8 @@ class ReservationPublicShareApplicationServiceTest {
     ) {
         return new ReservationPublicShareRow(
             "share-token-1",
+            TENANT_ID,
+            STORE_ID,
             status,
             expiresAt,
             RESERVATION_ID,
@@ -155,10 +194,12 @@ class ReservationPublicShareApplicationServiceTest {
 
     private static final class Scenario {
         private final FakeReservationPublicShareReadPort readPort = new FakeReservationPublicShareReadPort();
+        private final FakeI18nMessageResolver i18nResolver = new FakeI18nMessageResolver();
         private final ReservationPublicShareApplicationService service = new ReservationPublicShareApplicationService(
             readPort,
             new ReservationShareTemplateRenderer(),
             new ReservationShareTemplateSeedService(new FakeReservationShareTemplateSeedPort()),
+            i18nResolver,
             new PhoneMaskingPolicy(),
             new StoreShareDateTimeFormatter(),
             () -> NOW
@@ -187,6 +228,23 @@ class ReservationPublicShareApplicationServiceTest {
                 seedKey,
                 "默认 {{storeName}} {{reservationNo}} {{reservationDate}} {{reservationTime}} {{partySize}} {{tableCode}} {{arrivalNote}}"
             ));
+        }
+    }
+
+    private static final class FakeI18nMessageResolver implements I18nMessageResolver {
+        private final Map<String, String> messages = new HashMap<>();
+
+        @Override
+        public Map<String, String> resolve(StoreScope scope, Collection<String> i18nKeys, String locale) {
+            assertThat(scope.tenantId().value()).isEqualTo(TENANT_ID);
+            assertThat(scope.storeId().value()).isEqualTo(STORE_ID);
+            Map<String, String> resolved = new HashMap<>();
+            for (String i18nKey : i18nKeys) {
+                if (messages.containsKey(i18nKey)) {
+                    resolved.put(i18nKey, messages.get(i18nKey));
+                }
+            }
+            return resolved;
         }
     }
 }

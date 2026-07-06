@@ -18,9 +18,15 @@ export class ReservationPublicShareApiError extends Error {
 
 export async function getReservationPublicShare(
   token: string,
+  locale?: string,
   fetcher: typeof fetch = fetch
 ): Promise<ReservationPublicShareResponse> {
-  const endpoint = `/api/v1/public/reservation-shares/${encodeURIComponent(token)}`
+  const searchParams = new URLSearchParams()
+  if (locale?.trim()) {
+    searchParams.set('locale', locale.trim())
+  }
+  const query = searchParams.toString()
+  const endpoint = `/api/v1/public/reservation-shares/${encodeURIComponent(token)}${query ? `?${query}` : ''}`
   let response: Response
 
   try {

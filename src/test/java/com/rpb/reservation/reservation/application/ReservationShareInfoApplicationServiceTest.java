@@ -3,6 +3,7 @@ package com.rpb.reservation.reservation.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.i18n.application.I18nMessageResolver;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoReadPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareInfoRow;
 import com.rpb.reservation.reservation.application.port.out.ReservationShareTemplateSeedPort;
@@ -21,6 +22,9 @@ import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -128,6 +132,32 @@ class ReservationShareInfoApplicationServiceTest {
     }
 
     @Test
+    void resolvesShareTemplateAndArrivalNoteFromI18nCatalogForRequestedLocale() {
+        Scenario scenario = Scenario.ready();
+        scenario.i18nResolver.messages.put(
+            "reservation.share.arrival_note",
+            "Please arrive 10 minutes early."
+        );
+        scenario.i18nResolver.messages.put(
+            "reservation.share.restaurant_reservation_confirmation_v1",
+            "Hi {{contactName}}, {{storeName}} confirmed booking {{reservationNo}} for {{partySize}} pax. " +
+                "Table {{tableCode}}. {{arrivalNote}}{{guestSalutation}}"
+        );
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query("en-SG"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.shareInfo().shareText())
+            .contains("Hi Ada Guest")
+            .contains("confirmed booking R-20300620-0007 for 4 pax")
+            .contains("Please arrive 10 minutes early.")
+            .doesNotContain("请提前 10 分钟到店")
+            .doesNotContain("先生/女士");
+        assertThat(result.shareInfo().shareTitle()).isEqualTo("食刻订位中心 booking confirmation");
+        assertThat(result.shareInfo().shareSummary()).isEqualTo("20-06-2030 11:30 · 4 pax");
+    }
+
+    @Test
     void emptyCustomerPhoneReturnsEmptyMaskedPhoneAndUnavailableFlag() {
         Scenario scenario = Scenario.ready();
         scenario.readPort.row = rowWithoutPhone();
@@ -169,13 +199,18 @@ class ReservationShareInfoApplicationServiceTest {
     }
 
     private static ReservationShareInfoQuery query() {
+        return query(null);
+    }
+
+    private static ReservationShareInfoQuery query(String locale) {
         return new ReservationShareInfoQuery(
             TENANT_ID,
             STORE_ID,
             RESERVATION_ID,
             ACTOR_ID,
             "staff",
-            "https://staff.rpb.test"
+            "https://staff.rpb.test",
+            locale
         );
     }
 
@@ -230,12 +265,14 @@ class ReservationShareInfoApplicationServiceTest {
         private final FakeStoreRepository storeRepository = new FakeStoreRepository(scope);
         private final FakeReservationShareInfoReadPort readPort = new FakeReservationShareInfoReadPort();
         private final FakeReservationPublicShareTokenPort publicShareTokenPort = new FakeReservationPublicShareTokenPort();
+        private final FakeI18nMessageResolver i18nResolver = new FakeI18nMessageResolver();
         private final ReservationShareInfoApplicationService service = new ReservationShareInfoApplicationService(
             storeRepository,
             readPort,
             publicShareTokenPort,
             new ReservationShareTemplateRenderer(),
             new ReservationShareTemplateSeedService(new FakeReservationShareTemplateSeedPort()),
+            i18nResolver,
             new PhoneMaskingPolicy(),
             new StoreShareDateTimeFormatter(),
             () -> "generated-token"
@@ -309,6 +346,21 @@ class ReservationShareInfoApplicationServiceTest {
         @Override
         public Optional<ReservationShareTemplateSeed> findActiveBySeedKey(String seedKey) {
             return Optional.of(new ReservationShareTemplateSeed(seedKey, ReservationShareTemplateCatalog.defaultTemplate()));
+        }
+    }
+
+    private static final class FakeI18nMessageResolver implements I18nMessageResolver {
+        private final Map<String, String> messages = new HashMap<>();
+
+        @Override
+        public Map<String, String> resolve(StoreScope scope, Collection<String> i18nKeys, String locale) {
+            Map<String, String> resolved = new HashMap<>();
+            for (String i18nKey : i18nKeys) {
+                if (messages.containsKey(i18nKey)) {
+                    resolved.put(i18nKey, messages.get(i18nKey));
+                }
+            }
+            return resolved;
         }
     }
 }

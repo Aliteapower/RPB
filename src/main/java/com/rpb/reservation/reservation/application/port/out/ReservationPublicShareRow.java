@@ -5,6 +5,8 @@ import java.util.UUID;
 
 public record ReservationPublicShareRow(
     String token,
+    UUID tenantId,
+    UUID storeId,
     String status,
     Instant expiresAt,
     UUID reservationId,

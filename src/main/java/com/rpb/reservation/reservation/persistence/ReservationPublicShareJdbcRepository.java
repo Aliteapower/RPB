@@ -46,6 +46,8 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
         return jdbc.query(
             """
             select share.token,
+                   share.tenant_id,
+                   share.store_id,
                    share.status,
                    share.expires_at,
                    reservation.id as reservation_id,
@@ -108,6 +110,8 @@ public class ReservationPublicShareJdbcRepository implements ReservationPublicSh
     private static ReservationPublicShareRow row(ResultSet rs) throws SQLException {
         return new ReservationPublicShareRow(
             rs.getString("token"),
+            rs.getObject("tenant_id", UUID.class),
+            rs.getObject("store_id", UUID.class),
             rs.getString("status"),
             toInstant(rs.getObject("expires_at", OffsetDateTime.class)),
             rs.getObject("reservation_id", UUID.class),

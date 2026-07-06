@@ -6,6 +6,12 @@
 
 Public, unauthenticated, token-scoped read endpoint for customer-facing reservation share pages.
 
+Optional query parameter:
+
+```text
+locale=zh-CN|en-SG
+```
+
 ## Success Response
 
 ```json
@@ -34,7 +40,7 @@ Public, unauthenticated, token-scoped read endpoint for customer-facing reservat
 
 `storeEmail` and `storeWhatsappPhone` are optional customer-facing contact fields maintained by tenant admin share profile settings. `storeWhatsappPhone` is returned only as an E.164 phone number; the frontend may turn it into a click-to-chat link without exposing tenant IDs or staff actor data.
 
-`shareText` is rendered by the backend from the store reservation share template. If the store template is blank or contains unsupported variables, the active platform default template is used. The text may include customer-safe template variables such as contact name and masked phone, but must not expose raw customer phone, tenant ID, store ID, reservation ID, or actor data.
+`shareText` and `arrivalNote` are rendered by the backend from persisted `i18n_message_catalog` messages when available. Resolution follows store override, tenant override, platform default, then `zh-CN` fallback. Legacy store share template and arrival note fields remain the final fallback when no catalog message exists. If the resolved template contains unsupported variables, the active platform default template is used. The text may include customer-safe template variables such as contact name and masked phone, but must not expose raw customer phone, tenant ID, store ID, reservation ID, or actor data.
 
 ## Errors
 

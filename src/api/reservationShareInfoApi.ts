@@ -20,9 +20,10 @@ export class ReservationShareInfoApiError extends Error {
 export async function getReservationShareInfo(
   storeId: string,
   reservationId: string,
+  locale?: string,
   fetcher: typeof fetch = fetch
 ): Promise<ReservationShareInfoResponse> {
-  const endpoint = shareInfoEndpoint(storeId, reservationId)
+  const endpoint = shareInfoEndpoint(storeId, reservationId, locale)
   let response: Response
 
   try {
@@ -60,9 +61,10 @@ export async function recordReservationShareIntent(
   storeId: string,
   reservationId: string,
   channel: ReservationShareIntentChannel,
+  locale?: string,
   fetcher: typeof fetch = fetch
 ): Promise<ReservationShareIntentResponse> {
-  const endpoint = `${shareInfoEndpoint(storeId, reservationId)}/intent`
+  const endpoint = shareInfoEndpoint(storeId, reservationId, locale, '/intent')
   let response: Response
 
   try {
@@ -98,8 +100,18 @@ export async function recordReservationShareIntent(
   return payload
 }
 
-function shareInfoEndpoint(storeId: string, reservationId: string): string {
-  return `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/share-info`
+function shareInfoEndpoint(
+  storeId: string,
+  reservationId: string,
+  locale?: string,
+  suffix = ''
+): string {
+  const searchParams = new URLSearchParams()
+  if (locale?.trim()) {
+    searchParams.set('locale', locale.trim())
+  }
+  const query = searchParams.toString()
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/share-info${suffix}${query ? `?${query}` : ''}`
 }
 
 async function readJson(response: Response): Promise<unknown> {

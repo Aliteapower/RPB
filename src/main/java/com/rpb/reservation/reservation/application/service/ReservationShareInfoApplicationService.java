@@ -3,6 +3,7 @@ package com.rpb.reservation.reservation.application.service;
 import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.i18n.application.I18nMessageResolver;
 import com.rpb.reservation.reservation.application.ReservationShareInfo;
 import com.rpb.reservation.reservation.application.ReservationShareInfoError;
 import com.rpb.reservation.reservation.application.ReservationShareInfoResult;
@@ -21,6 +22,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
+import com.rpb.reservation.reservation.application.service.ReservationShareRuntimeTextResolver.ReservationShareRuntimeText;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +35,7 @@ public class ReservationShareInfoApplicationService {
     private final ReservationShareInfoReadPort readPort;
     private final ReservationPublicShareTokenPort publicShareTokenPort;
     private final ReservationShareTemplateRenderer templateRenderer;
-    private final ReservationShareTemplateSeedService templateSeedService;
+    private final ReservationShareRuntimeTextResolver runtimeTextResolver;
     private final PhoneMaskingPolicy phoneMaskingPolicy;
     private final StoreShareDateTimeFormatter dateTimeFormatter;
     private final ReservationShareChannelLinkFactory channelLinkFactory = new ReservationShareChannelLinkFactory();
@@ -47,6 +49,7 @@ public class ReservationShareInfoApplicationService {
         ReservationPublicShareTokenPort publicShareTokenPort,
         ReservationShareTemplateRenderer templateRenderer,
         ReservationShareTemplateSeedService templateSeedService,
+        I18nMessageResolver i18nMessageResolver,
         PhoneMaskingPolicy phoneMaskingPolicy,
         StoreShareDateTimeFormatter dateTimeFormatter
     ) {
@@ -56,6 +59,7 @@ public class ReservationShareInfoApplicationService {
             publicShareTokenPort,
             templateRenderer,
             templateSeedService,
+            i18nMessageResolver,
             phoneMaskingPolicy,
             dateTimeFormatter,
             ReservationShareInfoApplicationService::newToken
@@ -68,6 +72,7 @@ public class ReservationShareInfoApplicationService {
         ReservationPublicShareTokenPort publicShareTokenPort,
         ReservationShareTemplateRenderer templateRenderer,
         ReservationShareTemplateSeedService templateSeedService,
+        I18nMessageResolver i18nMessageResolver,
         PhoneMaskingPolicy phoneMaskingPolicy,
         StoreShareDateTimeFormatter dateTimeFormatter,
         Supplier<String> tokenSupplier
@@ -76,7 +81,7 @@ public class ReservationShareInfoApplicationService {
         this.readPort = readPort;
         this.publicShareTokenPort = publicShareTokenPort;
         this.templateRenderer = templateRenderer;
-        this.templateSeedService = templateSeedService;
+        this.runtimeTextResolver = new ReservationShareRuntimeTextResolver(templateSeedService, i18nMessageResolver);
         this.phoneMaskingPolicy = phoneMaskingPolicy;
         this.dateTimeFormatter = dateTimeFormatter;
         this.tokenSupplier = tokenSupplier;
@@ -108,23 +113,31 @@ public class ReservationShareInfoApplicationService {
             if (row == null) {
                 return ReservationShareInfoResult.failure(ReservationShareInfoError.RESERVATION_NOT_FOUND);
             }
-            return ReservationShareInfoResult.success(toShareInfo(scope, row, query.publicShareBaseUrl()));
+            return ReservationShareInfoResult.success(toShareInfo(scope, row, query.publicShareBaseUrl(), query.locale()));
         } catch (RuntimeException exception) {
             return ReservationShareInfoResult.failure(ReservationShareInfoError.PERSISTENCE_ERROR);
         }
     }
 
-    private ReservationShareInfo toShareInfo(StoreScope scope, ReservationShareInfoRow row, String publicShareBaseUrl) {
-        Map<String, String> variables = variables(row);
-        String defaultTemplate = templateSeedService.defaultTemplate();
-        String template = hasText(row.reservationShareTemplate())
-            ? row.reservationShareTemplate()
-            : defaultTemplate;
+    private ReservationShareInfo toShareInfo(
+        StoreScope scope,
+        ReservationShareInfoRow row,
+        String publicShareBaseUrl,
+        String locale
+    ) {
+        ReservationShareRuntimeText runtimeText = runtimeTextResolver.resolve(
+            scope,
+            locale,
+            row.reservationShareNote(),
+            row.reservationShareTemplate()
+        );
+        Map<String, String> variables = variables(row, runtimeText);
+        String template = runtimeText.template();
         String shareText;
         if (templateRenderer.unknownVariables(template).isEmpty()) {
             shareText = templateRenderer.render(template, variables);
         } else {
-            shareText = templateRenderer.render(defaultTemplate, variables);
+            shareText = templateRenderer.render(runtimeText.defaultTemplate(), variables);
         }
         String maskedPhone = variables.get("maskedPhone");
         String token = publicShareTokenPort.ensureActiveToken(scope, row.reservationId(), tokenSupplier.get());
@@ -152,12 +165,12 @@ public class ReservationShareInfoApplicationService {
             shareMessage,
             token,
             sharePath,
-            shareTitle(storeName),
-            shareSummary(date, time, partySize)
+            runtimeText.shareTitle(storeName),
+            runtimeText.shareSummary(date, time, partySize)
         );
     }
 
-    private Map<String, String> variables(ReservationShareInfoRow row) {
+    private Map<String, String> variables(ReservationShareInfoRow row, ReservationShareRuntimeText runtimeText) {
         Map<String, String> variables = new LinkedHashMap<>();
         for (String allowedVariable : ReservationShareTemplateCatalog.supportedVariables()) {
             variables.put(allowedVariable, "");
@@ -167,15 +180,15 @@ public class ReservationShareInfoApplicationService {
         variables.put("reservationDate", dateTimeFormatter.formatDate(row.reservedStartAt(), row.storeTimezone()));
         variables.put("reservationTime", dateTimeFormatter.formatTime(row.reservedStartAt(), row.storeTimezone()));
         variables.put("partySize", Integer.toString(row.partySize()));
-        variables.put("tableCode", firstText(row.tableCode(), "待确认"));
+        variables.put("tableCode", firstText(row.tableCode(), runtimeText.tablePendingLabel()));
         variables.put("holdMinutes", holdMinutes(row.reservedStartAt(), row.holdUntilAt()));
         variables.put("contactName", firstText(row.customerName(), row.customerNickname()));
-        variables.put("guestSalutation", "先生/女士");
+        variables.put("guestSalutation", runtimeText.guestSalutation());
         variables.put("maskedPhone", phoneMaskingPolicy.mask(row.customerPhoneE164()));
         variables.put("storeAddress", clean(row.shareAddress()));
         variables.put("googleMapUrl", clean(row.googleMapUrl()));
         variables.put("storePhone", clean(row.shareContactPhone()));
-        variables.put("arrivalNote", clean(row.reservationShareNote()));
+        variables.put("arrivalNote", clean(runtimeText.arrivalNote()));
         ReservationShareTemplateCatalog.applyLegacyAliases(variables);
         return variables;
     }
@@ -223,12 +236,23 @@ public class ReservationShareInfoApplicationService {
     }
 
     static String shareTitle(String storeName) {
-        return firstText(storeName, "门店") + " 订位确认";
+        return shareTitle(storeName, null);
+    }
+
+    static String shareTitle(String storeName, String locale) {
+        boolean english = "en-SG".equalsIgnoreCase(clean(locale));
+        String name = firstText(storeName, english ? "Store" : "门店");
+        return english ? name + " booking confirmation" : name + " 订位确认";
     }
 
     static String shareSummary(String date, String time, String partySize) {
+        return shareSummary(date, time, partySize, null);
+    }
+
+    static String shareSummary(String date, String time, String partySize, String locale) {
+        boolean english = "en-SG".equalsIgnoreCase(clean(locale));
         String dateTime = (clean(date) + " " + clean(time)).trim();
-        String party = hasText(partySize) ? partySize.trim() + "人" : "";
+        String party = hasText(partySize) ? partySize.trim() + (english ? " pax" : "人") : "";
         if (!dateTime.isBlank() && !party.isBlank()) {
             return dateTime + " · " + party;
         }

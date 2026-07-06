@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import {
@@ -58,7 +58,8 @@ const emit = defineEmits<{
   'seat-requested': [item: ReservationTodayViewItem]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 const customerName = computed(() => {
   const values = [props.item.customerName, props.item.customerNickname].filter(Boolean)
   return values.length ? values.join(' / ') : props.item.reservationCode
@@ -147,6 +148,11 @@ const shareInfoErrorText = ref('')
 const shareInfoShared = ref(false)
 const shareInfoStatusText = ref('')
 const shareInfoFallbackText = ref('')
+
+watch(activeLocale, () => {
+  shareInfo.value = null
+  resetShareFeedback()
+})
 
 function requestCancel(): void {
   emit('cancel-requested', props.item)
@@ -284,7 +290,7 @@ async function ensureShareInfo(): Promise<ReservationShareInfo | null> {
 
 async function recordShareIntent(channel: ReservationShareIntentChannel): Promise<void> {
   try {
-    await recordReservationShareIntent(props.storeId, props.item.reservationId, channel)
+    await recordReservationShareIntent(props.storeId, props.item.reservationId, channel, activeLocale.value)
   } catch {
     // Sending should remain possible even when audit recording is temporarily unavailable.
   }
@@ -309,7 +315,7 @@ async function loadReservationShareInfo(): Promise<void> {
   shareInfoFallbackText.value = ''
 
   try {
-    const response = await getReservationShareInfo(props.storeId, props.item.reservationId)
+    const response = await getReservationShareInfo(props.storeId, props.item.reservationId, activeLocale.value)
     shareInfo.value = response.shareInfo
   } catch (error) {
     shareInfo.value = null

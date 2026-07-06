@@ -60,7 +60,8 @@ const emit = defineEmits<{
   created: [response: CreateReservationResponse]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 type TablePickerSelectionMode = 'single' | 'temporary'
 type MealPeriodFilterOption = {
   periodKey: string
@@ -233,6 +234,13 @@ watch(
     }
   }
 )
+
+watch(activeLocale, () => {
+  if (createdReservation.value) {
+    createdShareInfo.value = null
+    resetCreatedShareFeedback()
+  }
+})
 
 watch(
   [() => props.open, () => props.storeId, () => form.businessDate],
@@ -656,7 +664,7 @@ async function loadCreatedShareInfo(reservationId: string): Promise<void> {
   createdShareFallbackText.value = ''
 
   try {
-    const response = await getReservationShareInfo(props.storeId, reservationId)
+    const response = await getReservationShareInfo(props.storeId, reservationId, activeLocale.value)
     createdShareInfo.value = response.shareInfo
   } catch (error) {
     createdShareInfo.value = null
@@ -779,7 +787,12 @@ async function recordCreatedShareIntent(channel: ReservationShareIntentChannel):
     return
   }
   try {
-    await recordReservationShareIntent(props.storeId, createdReservation.value.reservationId, channel)
+    await recordReservationShareIntent(
+      props.storeId,
+      createdReservation.value.reservationId,
+      channel,
+      activeLocale.value
+    )
   } catch {
     // Sending should remain possible even when audit recording is temporarily unavailable.
   }

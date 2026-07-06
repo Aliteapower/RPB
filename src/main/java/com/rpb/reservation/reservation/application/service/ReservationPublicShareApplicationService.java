@@ -1,15 +1,20 @@
 package com.rpb.reservation.reservation.application.service;
 
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.i18n.application.I18nMessageResolver;
 import com.rpb.reservation.reservation.application.ReservationPublicShare;
 import com.rpb.reservation.reservation.application.ReservationPublicShareError;
 import com.rpb.reservation.reservation.application.ReservationPublicShareResult;
 import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareReadPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationPublicShareRow;
+import com.rpb.reservation.store.value.StoreId;
+import com.rpb.reservation.tenant.value.TenantId;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
+import com.rpb.reservation.reservation.application.service.ReservationShareRuntimeTextResolver.ReservationShareRuntimeText;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReservationPublicShareApplicationService {
     private final ReservationPublicShareReadPort readPort;
     private final ReservationShareTemplateRenderer templateRenderer;
-    private final ReservationShareTemplateSeedService templateSeedService;
+    private final ReservationShareRuntimeTextResolver runtimeTextResolver;
     private final PhoneMaskingPolicy phoneMaskingPolicy;
     private final StoreShareDateTimeFormatter dateTimeFormatter;
     private final Supplier<Instant> clock;
@@ -28,23 +33,33 @@ public class ReservationPublicShareApplicationService {
         ReservationPublicShareReadPort readPort,
         ReservationShareTemplateRenderer templateRenderer,
         ReservationShareTemplateSeedService templateSeedService,
+        I18nMessageResolver i18nMessageResolver,
         PhoneMaskingPolicy phoneMaskingPolicy,
         StoreShareDateTimeFormatter dateTimeFormatter
     ) {
-        this(readPort, templateRenderer, templateSeedService, phoneMaskingPolicy, dateTimeFormatter, Instant::now);
+        this(
+            readPort,
+            templateRenderer,
+            templateSeedService,
+            i18nMessageResolver,
+            phoneMaskingPolicy,
+            dateTimeFormatter,
+            Instant::now
+        );
     }
 
     public ReservationPublicShareApplicationService(
         ReservationPublicShareReadPort readPort,
         ReservationShareTemplateRenderer templateRenderer,
         ReservationShareTemplateSeedService templateSeedService,
+        I18nMessageResolver i18nMessageResolver,
         PhoneMaskingPolicy phoneMaskingPolicy,
         StoreShareDateTimeFormatter dateTimeFormatter,
         Supplier<Instant> clock
     ) {
         this.readPort = readPort;
         this.templateRenderer = templateRenderer;
-        this.templateSeedService = templateSeedService;
+        this.runtimeTextResolver = new ReservationShareRuntimeTextResolver(templateSeedService, i18nMessageResolver);
         this.phoneMaskingPolicy = phoneMaskingPolicy;
         this.dateTimeFormatter = dateTimeFormatter;
         this.clock = clock;
@@ -52,6 +67,11 @@ public class ReservationPublicShareApplicationService {
 
     @Transactional(readOnly = true)
     public ReservationPublicShareResult getPublicShare(String token) {
+        return getPublicShare(token, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationPublicShareResult getPublicShare(String token, String locale) {
         if (!hasText(token)) {
             return ReservationPublicShareResult.failure(ReservationPublicShareError.INVALID_TOKEN);
         }
@@ -70,21 +90,32 @@ public class ReservationPublicShareApplicationService {
             if (row.reservationId() == null) {
                 return ReservationPublicShareResult.failure(ReservationPublicShareError.RESERVATION_NOT_FOUND);
             }
+            if (row.tenantId() == null || row.storeId() == null) {
+                return ReservationPublicShareResult.failure(ReservationPublicShareError.PERSISTENCE_ERROR);
+            }
 
-            return ReservationPublicShareResult.success(toShare(row));
+            return ReservationPublicShareResult.success(toShare(row, locale));
         } catch (RuntimeException exception) {
             return ReservationPublicShareResult.failure(ReservationPublicShareError.PERSISTENCE_ERROR);
         }
     }
 
-    private ReservationPublicShare toShare(ReservationPublicShareRow row) {
+    private ReservationPublicShare toShare(ReservationPublicShareRow row, String locale) {
+        StoreScope scope = new StoreScope(new TenantId(row.tenantId()), new StoreId(row.storeId()));
+        ReservationShareRuntimeText runtimeText = runtimeTextResolver.resolve(
+            scope,
+            locale,
+            row.reservationShareNote(),
+            row.reservationShareTemplate()
+        );
         String storeName = firstText(row.shareDisplayName(), row.storeDisplayName());
         String date = dateTimeFormatter.formatDate(row.reservedStartAt(), row.storeTimezone());
         String time = dateTimeFormatter.formatTime(row.reservedStartAt(), row.storeTimezone());
         String tableCode = clean(row.tableCode());
         boolean tablePending = tableCode.isBlank();
         String partySize = Integer.toString(row.partySize());
-        Map<String, String> variables = variables(row, storeName, date, time, tablePending ? "待确认" : tableCode);
+        String displayTableCode = tablePending ? runtimeText.tablePendingLabel() : tableCode;
+        Map<String, String> variables = variables(row, runtimeText, storeName, date, time, displayTableCode);
 
         return new ReservationPublicShare(
             clean(row.reservationNo()),
@@ -92,34 +123,31 @@ public class ReservationPublicShareApplicationService {
             date,
             time,
             row.partySize(),
-            tablePending ? "待确认" : tableCode,
+            displayTableCode,
             tablePending,
-            clean(row.reservationShareNote()),
+            clean(runtimeText.arrivalNote()),
             clean(row.shareContactPhone()),
             clean(row.shareEmail()),
             clean(row.whatsappBusinessPhoneE164()),
             clean(row.shareAddress()),
             clean(row.googleMapUrl()),
-            ReservationShareInfoApplicationService.shareTitle(storeName),
-            ReservationShareInfoApplicationService.shareSummary(date, time, partySize),
-            renderShareText(row, variables)
+            runtimeText.shareTitle(storeName),
+            runtimeText.shareSummary(date, time, partySize),
+            renderShareText(runtimeText, variables)
         );
     }
 
-    private String renderShareText(ReservationPublicShareRow row, Map<String, String> variables) {
-        String defaultTemplate = templateSeedService.defaultTemplate();
-        String template = hasText(row.reservationShareTemplate())
-            ? row.reservationShareTemplate()
-            : defaultTemplate;
-
+    private String renderShareText(ReservationShareRuntimeText runtimeText, Map<String, String> variables) {
+        String template = runtimeText.template();
         if (templateRenderer.unknownVariables(template).isEmpty()) {
             return templateRenderer.render(template, variables);
         }
-        return templateRenderer.render(defaultTemplate, variables);
+        return templateRenderer.render(runtimeText.defaultTemplate(), variables);
     }
 
     private Map<String, String> variables(
         ReservationPublicShareRow row,
+        ReservationShareRuntimeText runtimeText,
         String storeName,
         String date,
         String time,
@@ -137,12 +165,12 @@ public class ReservationPublicShareApplicationService {
         variables.put("tableCode", clean(tableCode));
         variables.put("holdMinutes", holdMinutes(row.reservedStartAt(), row.holdUntilAt()));
         variables.put("contactName", firstText(row.customerName(), row.customerNickname()));
-        variables.put("guestSalutation", "先生/女士");
+        variables.put("guestSalutation", runtimeText.guestSalutation());
         variables.put("maskedPhone", phoneMaskingPolicy.mask(row.customerPhoneE164()));
         variables.put("storeAddress", clean(row.shareAddress()));
         variables.put("googleMapUrl", clean(row.googleMapUrl()));
         variables.put("storePhone", clean(row.shareContactPhone()));
-        variables.put("arrivalNote", clean(row.reservationShareNote()));
+        variables.put("arrivalNote", clean(runtimeText.arrivalNote()));
         ReservationShareTemplateCatalog.applyLegacyAliases(variables);
         return variables;
     }

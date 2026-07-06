@@ -8,6 +8,17 @@ public record ReservationShareInfoQuery(
     UUID reservationId,
     UUID actorId,
     String actorType,
-    String publicShareBaseUrl
+    String publicShareBaseUrl,
+    String locale
 ) {
+    public ReservationShareInfoQuery(
+        UUID tenantId,
+        UUID storeId,
+        UUID reservationId,
+        UUID actorId,
+        String actorType,
+        String publicShareBaseUrl
+    ) {
+        this(tenantId, storeId, reservationId, actorId, actorType, publicShareBaseUrl, null);
+    }
 }

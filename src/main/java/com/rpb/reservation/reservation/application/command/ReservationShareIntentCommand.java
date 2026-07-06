@@ -9,6 +9,18 @@ public record ReservationShareIntentCommand(
     UUID actorId,
     String actorType,
     String publicShareBaseUrl,
-    String channel
+    String channel,
+    String locale
 ) {
+    public ReservationShareIntentCommand(
+        UUID tenantId,
+        UUID storeId,
+        UUID reservationId,
+        UUID actorId,
+        String actorType,
+        String publicShareBaseUrl,
+        String channel
+    ) {
+        this(tenantId, storeId, reservationId, actorId, actorType, publicShareBaseUrl, channel, null);
+    }
 }

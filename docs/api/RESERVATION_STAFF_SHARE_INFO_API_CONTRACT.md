@@ -10,6 +10,8 @@ Returns backend-rendered reservation share copy, a public H5 token path, and sta
 
 Records a staff sharing intent audit event. It does not send a message and does not mutate reservation workflow state.
 
+Both endpoints accept optional `locale=zh-CN|en-SG`. When omitted, backend default/fallback locale behavior is used.
+
 ## Permission
 
 Both endpoints are store-scoped and require the existing App Gate entry:
@@ -49,7 +51,10 @@ The controller also requires a current actor that can access `{storeId}` and has
 
 ## Link Rules
 
-- `shareText` is rendered by the backend from the store reservation share template. If the store template is blank or contains unsupported variables, the platform default template is used.
+- `shareText` is rendered by the backend from the persisted reservation share template catalog when available. Resolution follows store override, tenant override, platform default, then `zh-CN` fallback.
+- `reservation.share.restaurant_reservation_confirmation_v1` controls the rendered share template, and `reservation.share.arrival_note` controls `arrivalNote`.
+- Legacy `stores.reservation_share_template` and `stores.reservation_share_note` remain the final fallback when no persisted catalog message exists.
+- If the resolved template contains unsupported variables, the platform default template is used.
 - `shareToken` and `sharePath` point to the customer-facing public H5 reservation share page.
 - `whatsappLink` is generated only when the customer phone is valid E.164. The link format is `https://wa.me/{customerPhoneDigits}?text={encodedShareMessage}`.
 - `whatsappLink` necessarily contains the recipient phone digits because it is a click-to-chat URL. Frontend must use it only as the action target and must not render or log it as customer phone display text.

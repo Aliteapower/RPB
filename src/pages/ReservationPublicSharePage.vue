@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import {
@@ -12,6 +13,7 @@ import type { ReservationPublicShare } from '../types/reservationPublicShare'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const { locale } = useI18n({ useScope: 'global' })
 
 const route = useRoute()
 const share = ref<ReservationPublicShare | null>(null)
@@ -31,6 +33,7 @@ const hiddenShareTextLabels = [
 ]
 
 const token = computed(() => String(route.params.token || '').trim())
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 const tableLabel = computed(() => {
   if (!share.value || share.value.tablePending || !share.value.tableCode.trim()) {
     return gt('generated.reservation-public-share.023')
@@ -64,7 +67,7 @@ onMounted(() => {
   void loadShare()
 })
 
-watch(token, () => {
+watch([token, activeLocale], () => {
   void loadShare()
 })
 
@@ -81,7 +84,7 @@ async function loadShare(): Promise<void> {
   fallbackUrl.value = ''
 
   try {
-    const response = await getReservationPublicShare(token.value)
+    const response = await getReservationPublicShare(token.value, activeLocale.value)
     share.value = response.share
   } catch (error) {
     share.value = null

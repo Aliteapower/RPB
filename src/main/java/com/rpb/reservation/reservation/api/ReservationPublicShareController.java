@@ -5,6 +5,7 @@ import com.rpb.reservation.reservation.application.service.ReservationPublicShar
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,8 +24,11 @@ public class ReservationPublicShareController {
     }
 
     @GetMapping("/{token}")
-    public ResponseEntity<?> publicShare(@PathVariable String token) {
-        ReservationPublicShareResult result = applicationService.getPublicShare(token);
+    public ResponseEntity<?> publicShare(
+        @PathVariable String token,
+        @RequestParam(required = false) String locale
+    ) {
+        ReservationPublicShareResult result = applicationService.getPublicShare(token, locale);
         if (!result.success()) {
             return apiMapper.toErrorResponse(result);
         }
