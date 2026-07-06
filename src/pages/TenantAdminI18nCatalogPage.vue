@@ -10,6 +10,10 @@ import {
 } from '../api/i18nCatalogApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import {
+  i18nCatalogEntryMetaLabel,
+  i18nCatalogNamespaceLabel
+} from '../utils/i18nCatalogDisplayLabels'
 import type {
   I18nCatalogEntry,
   I18nCatalogLocaleEntry,
@@ -210,7 +214,7 @@ function apiErrorText(error: unknown): string {
           <select v-model="namespaceFilter" :aria-label="$t('tenant.i18nCatalog.fields.namespaceFilter')">
             <option value="">{{ $t('tenant.i18nCatalog.fields.allNamespaces') }}</option>
             <option v-for="namespace in namespaceOptions" :key="namespace" :value="namespace">
-              {{ namespace }}
+              {{ i18nCatalogNamespaceLabel(namespace, t) }}
             </option>
           </select>
           <button class="secondary-button" type="button" :disabled="loading" @click="loadCatalog">
@@ -244,7 +248,7 @@ function apiErrorText(error: unknown): string {
           <div class="key-column">
             <strong>{{ entry.source.key.displayName }}</strong>
             <code>{{ entry.source.key.i18nKey }}</code>
-            <span>{{ entry.source.key.namespace }} / {{ entry.source.key.category }} / {{ entry.source.key.textKind }}</span>
+            <span>{{ i18nCatalogEntryMetaLabel(entry.source.key, t) }}</span>
             <small>{{ placeholderText(entry) }}</small>
           </div>
 

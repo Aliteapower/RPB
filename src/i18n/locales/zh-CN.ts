@@ -47,6 +47,36 @@ export const zhCN = {
       reservationQueueCallSystem: '预约排队叫号系统'
     }
   },
+  i18nCatalog: {
+    namespaces: {
+      reason: '原因文案',
+      status: '状态文案',
+      public_booking: '公开预约',
+      reservation_share: '预约分享',
+      queue: '排队',
+      call_screen: '叫号大屏',
+      reservation_meal_period: '预约餐段'
+    },
+    categories: {
+      cancellation: '取消原因',
+      no_show: '爽约原因',
+      queue: '排队',
+      table: '桌台',
+      cleaning: '清台',
+      reservation: '预约',
+      prompt: '提示文案',
+      template: '模板',
+      display: '展示文案',
+      display_name: '展示名称',
+      restaurant_default: '餐厅默认'
+    },
+    textKinds: {
+      label: '标签',
+      template: '模板',
+      status: '状态',
+      prompt: '提示文案'
+    }
+  },
   components: {
     callScreenAdModeSwitch: {
       text: '文案轮播',

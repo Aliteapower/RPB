@@ -47,6 +47,36 @@ export const enSG = {
       reservationQueueCallSystem: 'Reservation, queue, and calling system'
     }
   },
+  i18nCatalog: {
+    namespaces: {
+      reason: 'Reason copy',
+      status: 'Status copy',
+      public_booking: 'Public booking',
+      reservation_share: 'Reservation share',
+      queue: 'Queue',
+      call_screen: 'Call screen',
+      reservation_meal_period: 'Reservation meal periods'
+    },
+    categories: {
+      cancellation: 'Cancellation',
+      no_show: 'No-show',
+      queue: 'Queue',
+      table: 'Tables',
+      cleaning: 'Cleaning',
+      reservation: 'Reservations',
+      prompt: 'Prompt copy',
+      template: 'Template',
+      display: 'Display copy',
+      display_name: 'Display name',
+      restaurant_default: 'Restaurant default'
+    },
+    textKinds: {
+      label: 'Label',
+      template: 'Template',
+      status: 'Status',
+      prompt: 'Prompt copy'
+    }
+  },
   components: {
     callScreenAdModeSwitch: {
       text: 'Text carousel',
