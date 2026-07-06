@@ -31,11 +31,11 @@ final class ReservationShareRuntimeTextResolver {
             List.of(ARRIVAL_NOTE_KEY, TEMPLATE_KEY),
             locale
         );
-        String defaultTemplate = templateSeedService.defaultTemplate();
+        String defaultTemplate = ReservationShareTemplateTextNormalizer.normalize(templateSeedService.defaultTemplate());
         return new ReservationShareRuntimeText(
             normalizeLocale(locale),
             firstText(messages.get(ARRIVAL_NOTE_KEY), legacyArrivalNote),
-            firstText(messages.get(TEMPLATE_KEY), legacyTemplate, defaultTemplate),
+            firstTemplateText(messages.get(TEMPLATE_KEY), legacyTemplate, defaultTemplate),
             defaultTemplate
         );
     }
@@ -51,14 +51,14 @@ final class ReservationShareRuntimeTextResolver {
         return clean(second);
     }
 
-    private static String firstText(String first, String second, String third) {
+    private static String firstTemplateText(String first, String second, String third) {
         if (hasText(first)) {
-            return first.trim();
+            return ReservationShareTemplateTextNormalizer.normalize(first);
         }
         if (hasText(second)) {
-            return second.trim();
+            return ReservationShareTemplateTextNormalizer.normalize(second);
         }
-        return clean(third);
+        return ReservationShareTemplateTextNormalizer.normalize(third);
     }
 
     private static String clean(String value) {

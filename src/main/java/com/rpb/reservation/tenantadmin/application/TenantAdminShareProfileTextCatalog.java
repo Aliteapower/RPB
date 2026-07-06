@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.i18n.application.I18nCatalogStoredMessage;
 import com.rpb.reservation.i18n.application.port.out.I18nCatalogRepository;
 import com.rpb.reservation.i18n.application.port.out.I18nRuntimeMessageRepository;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateTextNormalizer;
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateSeedService;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -49,12 +50,12 @@ final class TenantAdminShareProfileTextCatalog {
         ResolvedMessage arrivalNote = resolveMessage(platform, tenant, store, ARRIVAL_NOTE_KEY, normalizedLocale, true);
         ResolvedMessage template = resolveMessage(platform, tenant, store, TEMPLATE_KEY, normalizedLocale, true);
         ResolvedMessage defaultTemplate = resolveMessage(platform, tenant, store, TEMPLATE_KEY, normalizedLocale, false);
-        String defaultTemplateText = firstText(message(defaultTemplate), templateSeedService.defaultTemplate());
+        String defaultTemplateText = firstTemplateText(message(defaultTemplate), templateSeedService.defaultTemplate());
 
         return new ResolvedShareText(
             normalizedLocale,
             firstText(message(arrivalNote), legacyArrivalNote),
-            firstText(message(template), legacyTemplate, defaultTemplateText),
+            firstTemplateText(message(template), legacyTemplate, defaultTemplateText),
             defaultTemplateText,
             usesDefaultTemplate(template, legacyTemplate, defaultTemplateText)
         );
@@ -146,7 +147,7 @@ final class TenantAdminShareProfileTextCatalog {
         if (template != null) {
             return !"store".equals(template.source());
         }
-        return !hasText(legacyTemplate) || legacyTemplate.trim().equals(defaultTemplate);
+        return !hasText(legacyTemplate) || ReservationShareTemplateTextNormalizer.normalize(legacyTemplate).equals(defaultTemplate);
     }
 
     private static String message(ResolvedMessage message) {
@@ -160,14 +161,21 @@ final class TenantAdminShareProfileTextCatalog {
         return clean(second);
     }
 
-    private static String firstText(String first, String second, String third) {
+    private static String firstTemplateText(String first, String second) {
         if (hasText(first)) {
-            return first.trim();
+            return ReservationShareTemplateTextNormalizer.normalize(first);
+        }
+        return ReservationShareTemplateTextNormalizer.normalize(second);
+    }
+
+    private static String firstTemplateText(String first, String second, String third) {
+        if (hasText(first)) {
+            return ReservationShareTemplateTextNormalizer.normalize(first);
         }
         if (hasText(second)) {
-            return second.trim();
+            return ReservationShareTemplateTextNormalizer.normalize(second);
         }
-        return clean(third);
+        return ReservationShareTemplateTextNormalizer.normalize(third);
     }
 
     private static String clean(String value) {

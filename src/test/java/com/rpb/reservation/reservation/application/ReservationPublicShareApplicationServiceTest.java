@@ -149,6 +149,22 @@ class ReservationPublicShareApplicationServiceTest {
             .doesNotContain("先生/女士");
     }
 
+    @Test
+    void normalizesEscapedTemplateNewlinesBeforeRenderingPublicShare() {
+        Scenario scenario = Scenario.ready();
+        scenario.i18nResolver.messages.put(
+            "reservation.share.restaurant_reservation_confirmation_v1",
+            "Dear {{contactName}},\\n\\nBooking no.: {{reservationNo}}\\nTable: {{tableCode}}"
+        );
+
+        ReservationPublicShareResult result = scenario.service.getPublicShare("share-token-1", "en-SG");
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.share().shareText())
+            .isEqualTo("Dear Ada Guest,\n\nBooking no.: R-PUBLIC-0007\nTable: A01")
+            .doesNotContain("\\n");
+    }
+
     private static ReservationPublicShareRow row(String status, Instant expiresAt, String tableCode) {
         return rowWithTemplate(
             status,

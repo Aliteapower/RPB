@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.reservation.application.service.PhoneMaskingPolicy;
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateCatalog;
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateRenderer;
+import com.rpb.reservation.reservation.application.service.ReservationShareTemplateTextNormalizer;
 import com.rpb.reservation.tenantadmin.persistence.TenantAdminShareProfileRepository;
 import com.rpb.reservation.tenantadmin.application.TenantAdminShareProfileTextCatalog.ResolvedShareText;
 import java.util.LinkedHashMap;
@@ -113,7 +114,7 @@ public class TenantAdminShareProfileService {
 
     @Transactional
     public TenantAdminShareProfile updateTemplate(StoreScope scope, String reservationShareTemplate, String locale) {
-        String normalizedTemplate = optionalText(reservationShareTemplate);
+        String normalizedTemplate = optionalTemplateText(reservationShareTemplate);
         assertKnownTemplateVariables(normalizedTemplate);
         if (textCatalog.isFallbackLocale(locale) && !repository.updateTemplate(scope, normalizedTemplate)) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
@@ -149,7 +150,7 @@ public class TenantAdminShareProfileService {
             optionalEmail(command.shareEmail()),
             optionalE164(command.whatsappBusinessPhoneE164()),
             optionalText(command.reservationShareNote()),
-            optionalText(command.reservationShareTemplate())
+            optionalTemplateText(command.reservationShareTemplate())
         );
     }
 
@@ -200,6 +201,10 @@ public class TenantAdminShareProfileService {
 
     private static String optionalText(String value) {
         return hasText(value) ? value.trim() : null;
+    }
+
+    private static String optionalTemplateText(String value) {
+        return ReservationShareTemplateTextNormalizer.optional(value);
     }
 
     private static String optionalE164(String value) {

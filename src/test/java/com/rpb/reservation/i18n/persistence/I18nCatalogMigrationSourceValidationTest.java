@@ -37,4 +37,20 @@ class I18nCatalogMigrationSourceValidationTest {
             .contains("where existing.tenant_id is null")
             .contains("where not exists");
     }
+
+    @Test
+    void catalogEscapedNewlineMigrationNormalizesTemplateMessagesOnly() throws Exception {
+        String migration = Files.readString(Path.of(
+            "src", "main", "resources", "db", "migration", "V029__normalize_i18n_template_escaped_newlines.sql"
+        ));
+
+        assertThat(migration)
+            .contains("join i18n_message_key_registry registry")
+            .contains("registry.text_kind = 'template'")
+            .contains("chr(92) || 'r' || chr(92) || 'n'")
+            .contains("chr(92) || 'n'")
+            .contains("chr(92) || 'r'")
+            .contains("version = catalog.version + 1")
+            .contains("catalog.message is distinct from normalized.normalized_message");
+    }
 }

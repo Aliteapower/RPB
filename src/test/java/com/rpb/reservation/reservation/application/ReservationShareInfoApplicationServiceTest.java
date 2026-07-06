@@ -158,6 +158,23 @@ class ReservationShareInfoApplicationServiceTest {
     }
 
     @Test
+    void normalizesEscapedTemplateNewlinesBeforeRenderingStaffShareText() {
+        Scenario scenario = Scenario.ready();
+        scenario.i18nResolver.messages.put(
+            "reservation.share.restaurant_reservation_confirmation_v1",
+            "Dear {{contactName}},\\n\\nBooking no.: {{reservationNo}}\\nTable: {{tableCode}}"
+        );
+
+        ReservationShareInfoResult result = scenario.service.getShareInfo(query("en-SG"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.shareInfo().shareText())
+            .isEqualTo("Dear Ada Guest,\n\nBooking no.: R-20300620-0007\nTable: A01")
+            .doesNotContain("\\n");
+        assertThat(result.shareInfo().wechatShareText()).doesNotContain("\\n");
+    }
+
+    @Test
     void emptyCustomerPhoneReturnsEmptyMaskedPhoneAndUnavailableFlag() {
         Scenario scenario = Scenario.ready();
         scenario.readPort.row = rowWithoutPhone();

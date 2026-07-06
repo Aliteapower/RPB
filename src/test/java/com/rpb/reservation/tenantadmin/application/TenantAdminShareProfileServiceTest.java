@@ -85,6 +85,23 @@ class TenantAdminShareProfileServiceTest {
     }
 
     @Test
+    void normalizesEscapedTemplateNewlinesForTenantAdminEditor() {
+        Scenario scenario = Scenario.ready();
+        scenario.i18n.upsertPlatform(
+            TenantAdminShareProfileTextCatalog.TEMPLATE_KEY,
+            "en-SG",
+            "Dear {{contactName}},\\n\\nBooking no.: {{reservationNo}}\\nTable: {{tableCode}}"
+        );
+
+        TenantAdminShareProfile profile = scenario.service.getProfile(SCOPE, "en-SG");
+
+        assertThat(profile.reservationShareTemplate())
+            .isEqualTo("Dear {{contactName}},\n\nBooking no.: {{reservationNo}}\nTable: {{tableCode}}")
+            .doesNotContain("\\n");
+        assertThat(profile.defaultReservationShareTemplate()).isEqualTo(profile.reservationShareTemplate());
+    }
+
+    @Test
     void updatesEnglishShareTextAsStoreI18nOverrideWithoutOverwritingLegacyChineseColumns() {
         Scenario scenario = Scenario.ready();
         scenario.i18n.upsertPlatform(
@@ -119,6 +136,28 @@ class TenantAdminShareProfileServiceTest {
         assertThat(scenario.repository.row.shareDisplayName()).isEqualTo("English Booking Desk");
         assertThat(scenario.repository.updateContactSettingsCalls).isEqualTo(1);
         assertThat(scenario.repository.updateCalls).isZero();
+    }
+
+    @Test
+    void savesEscapedTemplateNewlinesAsActualNewlines() {
+        Scenario scenario = Scenario.ready();
+
+        scenario.service.updateProfile(
+            SCOPE,
+            new TenantAdminShareProfileCommand(
+                "English Booking Desk",
+                "https://maps.example/en",
+                "booking-en@example.test",
+                "+6588880001",
+                "Please arrive on time.",
+                "Dear {{contactName}},\\n\\nBooking no.: {{reservationNo}}"
+            ),
+            "en-SG"
+        );
+
+        assertThat(scenario.i18n.message(SCOPE, TenantAdminShareProfileTextCatalog.TEMPLATE_KEY, "en-SG"))
+            .isEqualTo("Dear {{contactName}},\n\nBooking no.: {{reservationNo}}")
+            .doesNotContain("\\n");
     }
 
     @Test
