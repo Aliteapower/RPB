@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import {
@@ -24,6 +25,7 @@ import type {
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const { locale } = useI18n({ useScope: 'global' })
 
 interface TenantProfileForm {
   tenantCode: string
@@ -59,6 +61,7 @@ const logoFileInput = ref<HTMLInputElement | null>(null)
 const localLogoPreviewUrl = ref('')
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 const logoPreviewUrl = computed(() => localLogoPreviewUrl.value || form.logoMediaUrl)
 
 const form = reactive<TenantProfileForm>({
@@ -87,6 +90,10 @@ onMounted(() => {
   void loadProfile()
 })
 
+watch(activeLocale, () => {
+  void loadProfile()
+})
+
 onUnmounted(() => {
   revokeLocalLogoPreview()
 })
@@ -98,7 +105,7 @@ async function loadProfile(): Promise<void> {
   try {
     const [profileResponse, shareProfileResponse] = await Promise.all([
       getTenantProfile(storeId.value),
-      getTenantAdminShareProfile(storeId.value)
+      getTenantAdminShareProfile(storeId.value, activeLocale.value)
     ])
     applyProfile(profileResponse.profile)
     applyShareProfile(shareProfileResponse.shareProfile)
@@ -120,7 +127,7 @@ async function submitProfile(): Promise<void> {
   try {
     const [profileResponse, shareProfileResponse] = await Promise.all([
       updateTenantProfile(storeId.value, toPayload()),
-      updateTenantAdminShareProfile(storeId.value, toSharePayload())
+      updateTenantAdminShareProfile(storeId.value, toSharePayload(), activeLocale.value)
     ])
     applyProfile(profileResponse.profile)
     applyShareProfile(shareProfileResponse.shareProfile)

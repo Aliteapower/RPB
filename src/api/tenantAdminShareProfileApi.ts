@@ -10,43 +10,108 @@ import type {
 } from '../types/tenantAdminShareProfile'
 
 type TenantAdminFetcher = typeof fetch
+interface TenantAdminRequestArgs {
+  locale?: string
+  fetcher?: TenantAdminFetcher
+}
 
 export async function getTenantAdminShareProfile(
   storeId: string,
   fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function getTenantAdminShareProfile(
+  storeId: string,
+  locale?: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function getTenantAdminShareProfile(
+  storeId: string,
+  localeOrFetcher?: string | TenantAdminFetcher,
+  fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminShareProfileResponse> {
-  return requestJson(shareProfileEndpoint(storeId), { method: 'GET', fetcher })
+  const args = requestArgs(localeOrFetcher, fetcher)
+  return requestJson(shareProfileEndpoint(storeId, args.locale), { method: 'GET', fetcher: args.fetcher })
 }
 
 export async function updateTenantAdminShareProfile(
   storeId: string,
   request: TenantAdminShareProfileMutation,
   fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function updateTenantAdminShareProfile(
+  storeId: string,
+  request: TenantAdminShareProfileMutation,
+  locale?: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function updateTenantAdminShareProfile(
+  storeId: string,
+  request: TenantAdminShareProfileMutation,
+  localeOrFetcher?: string | TenantAdminFetcher,
+  fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminShareProfileResponse> {
-  return requestJson(shareProfileEndpoint(storeId), { method: 'PATCH', body: request, fetcher })
+  const args = requestArgs(localeOrFetcher, fetcher)
+  return requestJson(shareProfileEndpoint(storeId, args.locale), { method: 'PATCH', body: request, fetcher: args.fetcher })
 }
 
 export async function updateTenantAdminShareProfileTemplate(
   storeId: string,
   request: TenantAdminShareTemplateMutation,
   fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function updateTenantAdminShareProfileTemplate(
+  storeId: string,
+  request: TenantAdminShareTemplateMutation,
+  locale?: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function updateTenantAdminShareProfileTemplate(
+  storeId: string,
+  request: TenantAdminShareTemplateMutation,
+  localeOrFetcher?: string | TenantAdminFetcher,
+  fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminShareProfileResponse> {
-  return requestJson(`${shareProfileEndpoint(storeId)}/template`, { method: 'PATCH', body: request, fetcher })
+  const args = requestArgs(localeOrFetcher, fetcher)
+  return requestJson(shareProfileEndpoint(storeId, args.locale, '/template'), { method: 'PATCH', body: request, fetcher: args.fetcher })
 }
 
 export async function previewTenantAdminShareProfile(
   storeId: string,
   request: TenantAdminShareProfileMutation,
   fetcher?: TenantAdminFetcher
+): Promise<TenantAdminSharePreviewResponse>
+export async function previewTenantAdminShareProfile(
+  storeId: string,
+  request: TenantAdminShareProfileMutation,
+  locale?: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminSharePreviewResponse>
+export async function previewTenantAdminShareProfile(
+  storeId: string,
+  request: TenantAdminShareProfileMutation,
+  localeOrFetcher?: string | TenantAdminFetcher,
+  fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminSharePreviewResponse> {
-  return requestJson(`${shareProfileEndpoint(storeId)}/preview`, { method: 'POST', body: request, fetcher })
+  const args = requestArgs(localeOrFetcher, fetcher)
+  return requestJson(shareProfileEndpoint(storeId, args.locale, '/preview'), { method: 'POST', body: request, fetcher: args.fetcher })
 }
 
 export async function resetTenantAdminShareProfileTemplate(
   storeId: string,
   fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function resetTenantAdminShareProfileTemplate(
+  storeId: string,
+  locale?: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminShareProfileResponse>
+export async function resetTenantAdminShareProfileTemplate(
+  storeId: string,
+  localeOrFetcher?: string | TenantAdminFetcher,
+  fetcher?: TenantAdminFetcher
 ): Promise<TenantAdminShareProfileResponse> {
-  return requestJson(`${shareProfileEndpoint(storeId)}/default-template`, { method: 'POST', fetcher })
+  const args = requestArgs(localeOrFetcher, fetcher)
+  return requestJson(shareProfileEndpoint(storeId, args.locale, '/default-template'), { method: 'POST', fetcher: args.fetcher })
 }
 
 async function requestJson<T>(
@@ -84,8 +149,20 @@ async function requestJson<T>(
   return payload as T
 }
 
-function shareProfileEndpoint(storeId: string): string {
-  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/share-profile`
+function requestArgs(localeOrFetcher?: string | TenantAdminFetcher, fetcher?: TenantAdminFetcher): TenantAdminRequestArgs {
+  if (typeof localeOrFetcher === 'function') {
+    return { fetcher: localeOrFetcher }
+  }
+  return { locale: localeOrFetcher, fetcher }
+}
+
+function shareProfileEndpoint(storeId: string, locale?: string, pathSuffix = ''): string {
+  const searchParams = new URLSearchParams()
+  if (locale?.trim()) {
+    searchParams.set('locale', locale.trim())
+  }
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : ''
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/share-profile${pathSuffix}${suffix}`
 }
 
 async function readJson(response: Response): Promise<unknown> {

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -31,43 +32,52 @@ public class TenantAdminShareProfileController {
     }
 
     @GetMapping
-    public ResponseEntity<TenantAdminShareProfileResponse> getShareProfile(@PathVariable UUID storeId) {
+    public ResponseEntity<TenantAdminShareProfileResponse> getShareProfile(
+        @PathVariable UUID storeId,
+        @RequestParam(required = false) String locale
+    ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.getProfile(scope)));
+        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.getProfile(scope, locale)));
     }
 
     @PatchMapping
     public ResponseEntity<TenantAdminShareProfileResponse> updateShareProfile(
         @PathVariable UUID storeId,
+        @RequestParam(required = false) String locale,
         @RequestBody(required = false) TenantAdminShareProfileRequest request
     ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.updateProfile(scope, toCommand(request))));
+        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.updateProfile(scope, toCommand(request), locale)));
     }
 
     @PostMapping("/preview")
     public ResponseEntity<TenantAdminSharePreviewResponse> previewShareProfile(
         @PathVariable UUID storeId,
+        @RequestParam(required = false) String locale,
         @RequestBody(required = false) TenantAdminShareProfileRequest request
     ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminSharePreviewResponse.from(service.preview(scope, toCommand(request))));
+        return ResponseEntity.ok(TenantAdminSharePreviewResponse.from(service.preview(scope, toCommand(request), locale)));
     }
 
     @PatchMapping("/template")
     public ResponseEntity<TenantAdminShareProfileResponse> updateShareTemplate(
         @PathVariable UUID storeId,
+        @RequestParam(required = false) String locale,
         @RequestBody(required = false) TenantAdminShareTemplateRequest request
     ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
         String template = request == null ? null : request.reservationShareTemplate();
-        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.updateTemplate(scope, template)));
+        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.updateTemplate(scope, template, locale)));
     }
 
     @PostMapping("/default-template")
-    public ResponseEntity<TenantAdminShareProfileResponse> restoreDefaultTemplate(@PathVariable UUID storeId) {
+    public ResponseEntity<TenantAdminShareProfileResponse> restoreDefaultTemplate(
+        @PathVariable UUID storeId,
+        @RequestParam(required = false) String locale
+    ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.restoreDefaultTemplate(scope)));
+        return ResponseEntity.ok(TenantAdminShareProfileResponse.from(service.restoreDefaultTemplate(scope, locale)));
     }
 
     @ExceptionHandler(TenantAdminApiException.class)

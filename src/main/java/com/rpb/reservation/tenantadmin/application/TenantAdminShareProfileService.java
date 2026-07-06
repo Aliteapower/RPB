@@ -4,8 +4,8 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.reservation.application.service.PhoneMaskingPolicy;
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateCatalog;
 import com.rpb.reservation.reservation.application.service.ReservationShareTemplateRenderer;
-import com.rpb.reservation.reservation.application.service.ReservationShareTemplateSeedService;
 import com.rpb.reservation.tenantadmin.persistence.TenantAdminShareProfileRepository;
+import com.rpb.reservation.tenantadmin.application.TenantAdminShareProfileTextCatalog.ResolvedShareText;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -21,49 +21,67 @@ public class TenantAdminShareProfileService {
 
     private final TenantAdminShareProfileRepository repository;
     private final ReservationShareTemplateRenderer templateRenderer;
-    private final ReservationShareTemplateSeedService templateSeedService;
+    private final TenantAdminShareProfileTextCatalog textCatalog;
     private final PhoneMaskingPolicy phoneMaskingPolicy;
 
     public TenantAdminShareProfileService(
         TenantAdminShareProfileRepository repository,
         ReservationShareTemplateRenderer templateRenderer,
-        ReservationShareTemplateSeedService templateSeedService,
+        TenantAdminShareProfileTextCatalog textCatalog,
         PhoneMaskingPolicy phoneMaskingPolicy
     ) {
         this.repository = repository;
         this.templateRenderer = templateRenderer;
-        this.templateSeedService = templateSeedService;
+        this.textCatalog = textCatalog;
         this.phoneMaskingPolicy = phoneMaskingPolicy;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public TenantAdminShareProfile getProfile(StoreScope scope) {
+        return getProfile(scope, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TenantAdminShareProfile getProfile(StoreScope scope, String locale) {
         TenantAdminShareProfileRepository.Row row = repository.find(scope)
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID));
-        String defaultTemplate = templateSeedService.defaultTemplate();
-        if (!hasText(row.reservationShareTemplate())) {
-            if (!repository.updateTemplate(scope, defaultTemplate)) {
-                throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
-            }
-            row = repository.find(scope)
-                .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID));
-        }
-        return toProfile(row, defaultTemplate);
+        ResolvedShareText resolvedText = textCatalog.resolve(
+            scope,
+            locale,
+            row.reservationShareNote(),
+            row.reservationShareTemplate()
+        );
+        return toProfile(row, resolvedText);
     }
 
     @Transactional
     public TenantAdminShareProfile updateProfile(StoreScope scope, TenantAdminShareProfileCommand command) {
+        return updateProfile(scope, command, null);
+    }
+
+    @Transactional
+    public TenantAdminShareProfile updateProfile(StoreScope scope, TenantAdminShareProfileCommand command, String locale) {
         TenantAdminShareProfileUpdate input = normalize(command);
         assertKnownTemplateVariables(input.reservationShareTemplate());
-        if (!repository.update(scope, input)) {
+        boolean updated = textCatalog.isFallbackLocale(locale)
+            ? repository.update(scope, input)
+            : repository.updateContactSettings(scope, input);
+        if (!updated) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
-        return getProfile(scope);
+        textCatalog.saveStoreOverride(scope, locale, TenantAdminShareProfileTextCatalog.ARRIVAL_NOTE_KEY, input.reservationShareNote());
+        textCatalog.saveStoreOverride(scope, locale, TenantAdminShareProfileTextCatalog.TEMPLATE_KEY, input.reservationShareTemplate());
+        return getProfile(scope, locale);
     }
 
     @Transactional
     public TenantAdminSharePreview preview(StoreScope scope, TenantAdminShareProfileCommand command) {
-        TenantAdminShareProfile current = getProfile(scope);
+        return preview(scope, command, null);
+    }
+
+    @Transactional
+    public TenantAdminSharePreview preview(StoreScope scope, TenantAdminShareProfileCommand command, String locale) {
+        TenantAdminShareProfile current = getProfile(scope, locale);
         TenantAdminShareProfileUpdate input = normalize(command);
         String template = hasText(input.reservationShareTemplate())
             ? input.reservationShareTemplate()
@@ -75,25 +93,36 @@ public class TenantAdminShareProfileService {
 
     @Transactional
     public TenantAdminShareProfile restoreDefaultTemplate(StoreScope scope) {
-        if (!repository.updateTemplate(scope, templateSeedService.defaultTemplate())) {
+        return restoreDefaultTemplate(scope, null);
+    }
+
+    @Transactional
+    public TenantAdminShareProfile restoreDefaultTemplate(StoreScope scope, String locale) {
+        textCatalog.clearStoreOverride(scope, locale, TenantAdminShareProfileTextCatalog.TEMPLATE_KEY);
+        ResolvedShareText defaultText = textCatalog.resolve(scope, locale, null, null);
+        if (textCatalog.isFallbackLocale(locale) && !repository.updateTemplate(scope, defaultText.defaultTemplate())) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
-        return getProfile(scope);
+        return getProfile(scope, locale);
     }
 
     @Transactional
     public TenantAdminShareProfile updateTemplate(StoreScope scope, String reservationShareTemplate) {
-        String normalizedTemplate = optionalText(reservationShareTemplate);
-        assertKnownTemplateVariables(normalizedTemplate);
-        if (!repository.updateTemplate(scope, normalizedTemplate)) {
-            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
-        }
-        return getProfile(scope);
+        return updateTemplate(scope, reservationShareTemplate, null);
     }
 
-    private TenantAdminShareProfile toProfile(TenantAdminShareProfileRepository.Row row, String defaultTemplate) {
-        boolean usesDefaultTemplate = !hasText(row.reservationShareTemplate())
-            || row.reservationShareTemplate().trim().equals(defaultTemplate);
+    @Transactional
+    public TenantAdminShareProfile updateTemplate(StoreScope scope, String reservationShareTemplate, String locale) {
+        String normalizedTemplate = optionalText(reservationShareTemplate);
+        assertKnownTemplateVariables(normalizedTemplate);
+        if (textCatalog.isFallbackLocale(locale) && !repository.updateTemplate(scope, normalizedTemplate)) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        textCatalog.saveStoreOverride(scope, locale, TenantAdminShareProfileTextCatalog.TEMPLATE_KEY, normalizedTemplate);
+        return getProfile(scope, locale);
+    }
+
+    private TenantAdminShareProfile toProfile(TenantAdminShareProfileRepository.Row row, ResolvedShareText resolvedText) {
         return new TenantAdminShareProfile(
             clean(row.storeDisplayName()),
             clean(row.shareDisplayName()),
@@ -102,11 +131,11 @@ public class TenantAdminShareProfileService {
             clean(row.shareContactPhone()),
             clean(row.shareEmail()),
             clean(row.whatsappBusinessPhoneE164()),
-            clean(row.reservationShareNote()),
-            usesDefaultTemplate ? defaultTemplate : row.reservationShareTemplate().trim(),
-            defaultTemplate,
+            clean(resolvedText.arrivalNote()),
+            clean(resolvedText.template()),
+            clean(resolvedText.defaultTemplate()),
             ReservationShareTemplateCatalog.supportedVariables(),
-            usesDefaultTemplate
+            resolvedText.usesDefaultTemplate()
         );
     }
 

@@ -67,6 +67,30 @@ public class TenantAdminShareProfileRepository {
         return updated > 0;
     }
 
+    public boolean updateContactSettings(StoreScope scope, TenantAdminShareProfileUpdate input) {
+        int updated = jdbc.update(
+            """
+            update stores
+            set share_display_name = ?,
+                google_map_url = ?,
+                share_email = ?,
+                whatsapp_business_phone_e164 = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and id = ?
+              and deleted_at is null
+            """,
+            input.shareDisplayName(),
+            input.googleMapUrl(),
+            input.shareEmail(),
+            input.whatsappBusinessPhoneE164(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        );
+        return updated > 0;
+    }
+
     public boolean updateTemplate(StoreScope scope, String reservationShareTemplate) {
         int updated = jdbc.update(
             """

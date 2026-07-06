@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import { TenantAdminApiError } from '../api/tenantAdminApi'
@@ -18,6 +19,7 @@ import type {
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const { locale } = useI18n({ useScope: 'global' })
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -31,6 +33,7 @@ const previewText = ref('')
 const availableVariables = ref<string[]>([])
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 
 const form = reactive({
   storeDisplayName: '',
@@ -46,6 +49,10 @@ onMounted(() => {
   void loadShareProfile()
 })
 
+watch(activeLocale, () => {
+  void loadShareProfile()
+})
+
 async function loadShareProfile(): Promise<void> {
   loading.value = true
   errorText.value = ''
@@ -53,7 +60,7 @@ async function loadShareProfile(): Promise<void> {
   previewText.value = ''
 
   try {
-    const response = await getTenantAdminShareProfile(storeId.value)
+    const response = await getTenantAdminShareProfile(storeId.value, activeLocale.value)
     applyShareProfile(response.shareProfile)
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -72,7 +79,7 @@ async function submitShareProfile(): Promise<void> {
   savedText.value = ''
 
   try {
-    const response = await updateTenantAdminShareProfile(storeId.value, toShareMutation())
+    const response = await updateTenantAdminShareProfile(storeId.value, toShareMutation(), activeLocale.value)
     applyShareProfile(response.shareProfile)
     savedText.value = gt('generated.tenant-admin-reservation-share.024')
   } catch (error) {
@@ -92,7 +99,7 @@ async function previewShareProfile(): Promise<void> {
   previewText.value = ''
 
   try {
-    const response = await previewTenantAdminShareProfile(storeId.value, toShareMutation())
+    const response = await previewTenantAdminShareProfile(storeId.value, toShareMutation(), activeLocale.value)
     previewText.value = response.preview.shareText
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -111,7 +118,7 @@ async function restoreDefaultTemplate(): Promise<void> {
   savedText.value = ''
 
   try {
-    const response = await resetTenantAdminShareProfileTemplate(storeId.value)
+    const response = await resetTenantAdminShareProfileTemplate(storeId.value, activeLocale.value)
     applyShareProfile(response.shareProfile)
     savedText.value = gt('generated.tenant-admin-reservation-share.025')
   } catch (error) {
