@@ -3,6 +3,7 @@ package com.rpb.reservation.queuedisplay.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.i18n.application.I18nMessageResolver;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.store.domain.StorePolicy;
@@ -15,6 +16,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,13 +36,15 @@ class QueueDisplayApplicationServiceTest {
 
     private FakeStoreRepository storeRepository;
     private FakeQueueDisplayRepository repository;
+    private FakeI18nMessageResolver i18nResolver;
     private QueueDisplayApplicationService service;
 
     @BeforeEach
     void setUp() {
         storeRepository = new FakeStoreRepository();
         repository = new FakeQueueDisplayRepository();
-        service = new QueueDisplayApplicationService(storeRepository, repository, CLOCK);
+        i18nResolver = new FakeI18nMessageResolver();
+        service = new QueueDisplayApplicationService(storeRepository, repository, i18nResolver, CLOCK);
     }
 
     @Test
@@ -90,6 +96,38 @@ class QueueDisplayApplicationServiceTest {
         assertThat(result.ads().slideDurationSeconds()).isEqualTo(8);
         assertThat(result.ads().statePollSeconds()).isEqualTo(4);
         assertThat(result.ads().slides()).extracting(QueueDisplayAdSlide::title).containsExactly("自定义");
+    }
+
+    @Test
+    void resolvesConfiguredTextAdsFromPersistedI18nCatalogForRequestedLocale() {
+        repository.currentCall = Optional.empty();
+        repository.ads = new QueueDisplayAds("text", 8, 4, List.of(
+            QueueDisplayAdSlide.text(
+                "slide-1",
+                "今日推荐",
+                "招牌炭烤牛排",
+                "精选澳洲谷饲牛肉 · 现点现烤",
+                "call_screen.seed.restaurant_default.slide_2.title",
+                "call_screen.seed.restaurant_default.slide_2.subtitle",
+                "call_screen.seed.restaurant_default.slide_2.tagline"
+            )
+        ));
+        i18nResolver.messages.put("call_screen.seed.restaurant_default.slide_2.title", "Today special");
+        i18nResolver.messages.put("call_screen.seed.restaurant_default.slide_2.subtitle", "Charcoal-grilled steak");
+        i18nResolver.messages.put("call_screen.seed.restaurant_default.slide_2.tagline", "Grain-fed beef grilled to order");
+
+        QueueDisplayResult result = service.getState(new QueueDisplayQuery(TENANT_ID, STORE_ID, ACTOR_ID, "staff", "en-SG"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.ads().slides()).extracting(QueueDisplayAdSlide::title).containsExactly("Today special");
+        assertThat(result.ads().slides()).extracting(QueueDisplayAdSlide::subtitle).containsExactly("Charcoal-grilled steak");
+        assertThat(result.ads().slides()).extracting(QueueDisplayAdSlide::tagline).containsExactly("Grain-fed beef grilled to order");
+        assertThat(i18nResolver.lastLocale).isEqualTo("en-SG");
+        assertThat(i18nResolver.lastKeys).containsExactlyInAnyOrder(
+            "call_screen.seed.restaurant_default.slide_2.title",
+            "call_screen.seed.restaurant_default.slide_2.subtitle",
+            "call_screen.seed.restaurant_default.slide_2.tagline"
+        );
     }
 
     @Test
@@ -214,6 +252,25 @@ class QueueDisplayApplicationServiceTest {
         @Override
         public Optional<UUID> findTenantLogoMediaAssetId(StoreScope scope) {
             return tenantLogoMediaAssetId;
+        }
+    }
+
+    private static final class FakeI18nMessageResolver implements I18nMessageResolver {
+        private final Map<String, String> messages = new LinkedHashMap<>();
+        private List<String> lastKeys = List.of();
+        private String lastLocale;
+
+        @Override
+        public Map<String, String> resolve(StoreScope scope, Collection<String> i18nKeys, String locale) {
+            this.lastKeys = List.copyOf(i18nKeys);
+            this.lastLocale = locale;
+            Map<String, String> resolved = new LinkedHashMap<>();
+            for (String key : i18nKeys) {
+                if (messages.containsKey(key)) {
+                    resolved.put(key, messages.get(key));
+                }
+            }
+            return resolved;
         }
     }
 }

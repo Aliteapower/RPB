@@ -3,11 +3,15 @@ package com.rpb.reservation.i18n.persistence;
 import com.rpb.reservation.i18n.application.I18nCatalogKey;
 import com.rpb.reservation.i18n.application.I18nCatalogStoredMessage;
 import com.rpb.reservation.i18n.application.port.out.I18nCatalogRepository;
+import com.rpb.reservation.i18n.application.port.out.I18nRuntimeMessageRepository;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class JdbcI18nCatalogRepository implements I18nCatalogRepository {
+public class JdbcI18nCatalogRepository implements I18nCatalogRepository, I18nRuntimeMessageRepository {
     private final JdbcTemplate jdbc;
 
     public JdbcI18nCatalogRepository(JdbcTemplate jdbc) {
@@ -45,6 +49,31 @@ public class JdbcI18nCatalogRepository implements I18nCatalogRepository {
             """.formatted(scope.predicate()),
             (rs, rowNum) -> message(rs),
             scope.args()
+        );
+    }
+
+    @Override
+    public List<I18nCatalogStoredMessage> findMessages(UUID tenantId, UUID storeId, Collection<String> i18nKeys) {
+        List<String> keys = normalizeKeys(i18nKeys);
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+
+        ScopeQuery scope = ScopeQuery.of(tenantId, storeId);
+        List<Object> args = new ArrayList<>(scope.argList());
+        args.addAll(keys);
+        String placeholders = String.join(", ", Collections.nCopies(keys.size(), "?"));
+        return jdbc.query(
+            """
+            select id, i18n_key, locale, message, status, version
+            from i18n_message_catalog
+            where %s
+              and i18n_key in (%s)
+              and deleted_at is null
+            order by i18n_key asc, locale asc
+            """.formatted(scope.predicate(), placeholders),
+            (rs, rowNum) -> message(rs),
+            args.toArray()
         );
     }
 
@@ -207,6 +236,19 @@ public class JdbcI18nCatalogRepository implements I18nCatalogRepository {
 
     private static boolean versionMismatch(int currentVersion, Integer expectedVersion) {
         return expectedVersion != null && expectedVersion != currentVersion;
+    }
+
+    private static List<String> normalizeKeys(Collection<String> i18nKeys) {
+        if (i18nKeys == null || i18nKeys.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        for (String key : i18nKeys) {
+            if (key != null && !key.isBlank()) {
+                keys.add(key.trim());
+            }
+        }
+        return List.copyOf(keys);
     }
 
     private record ScopeQuery(String predicate, List<Object> argList) {

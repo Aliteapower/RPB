@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { QueueDisplayApiError, fetchQueueDisplayState } from '../api/queueDisplayApi'
@@ -13,6 +14,7 @@ import type {
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const { locale } = useI18n({ useScope: 'global' })
 
 const POLL_INTERVAL_SECONDS = 3
 const SLIDE_DURATION_SECONDS = 5
@@ -54,6 +56,7 @@ const fullscreenControlsTimer = ref<number | null>(null)
 const tenantLogoFailed = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 const hasCurrentCall = computed(() => !!state.value?.currentCall)
 const isMediaMode = computed(() => state.value?.ads.mode === 'media' || state.value?.ads.mode === 'image')
 const textSlides = computed<QueueDisplayTextAdSlide[]>(() =>
@@ -131,7 +134,7 @@ async function loadState(): Promise<void> {
   }
 
   try {
-    const nextState = await fetchQueueDisplayState(storeId.value)
+    const nextState = await fetchQueueDisplayState(storeId.value, activeLocale.value)
     state.value = nextState
     syncServerClock(nextState.serverNow)
     apiError.value = null
@@ -477,6 +480,14 @@ watch(
     isGraceExpired.value = false
     activeSlideIndex.value = 0
     clearErrorGraceTimer()
+    void loadState().then(startPolling)
+  }
+)
+
+watch(
+  () => activeLocale.value,
+  () => {
+    activeSlideIndex.value = 0
     void loadState().then(startPolling)
   }
 )

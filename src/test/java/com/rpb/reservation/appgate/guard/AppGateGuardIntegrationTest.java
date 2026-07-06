@@ -82,7 +82,7 @@ class AppGateGuardIntegrationTest {
             "queue.view"
         );
         assertAnnotation(
-            QueueDisplayController.class.getMethod("getState", UUID.class),
+            QueueDisplayController.class.getMethod("getState", UUID.class, String.class),
             "queue.display.view"
         );
         assertAnnotation(

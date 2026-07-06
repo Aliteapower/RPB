@@ -126,6 +126,8 @@ class FrontendI18nFoundationValidationTest {
             .contains("Do not move all static UI labels into `i18n_message_catalog`")
             .contains("`i18n_message_key_registry` defines which keys are maintainable")
             .contains("store override -> tenant override -> platform default -> frontend fallback")
+            .contains("Runtime consumers of configurable copy must use the backend i18n resolver")
+            .contains("store override -> tenant override -> platform default -> zh-CN fallback")
             .contains("/api/v1/platform/i18n/catalog")
             .contains("/api/v1/stores/{storeId}/tenant-admin/i18n/catalog");
     }

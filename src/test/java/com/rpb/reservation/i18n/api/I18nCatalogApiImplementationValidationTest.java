@@ -21,6 +21,18 @@ class I18nCatalogApiImplementationValidationTest {
         String repository = Files.readString(Path.of(
             "src", "main", "java", "com", "rpb", "reservation", "i18n", "persistence", "JdbcI18nCatalogRepository.java"
         ));
+        String runtimeResolver = Files.readString(Path.of(
+            "src", "main", "java", "com", "rpb", "reservation", "i18n", "application", "CatalogI18nMessageResolver.java"
+        ));
+        String runtimeRepositoryPort = Files.readString(Path.of(
+            "src", "main", "java", "com", "rpb", "reservation", "i18n", "application", "port", "out", "I18nRuntimeMessageRepository.java"
+        ));
+        String queueDisplayService = Files.readString(Path.of(
+            "src", "main", "java", "com", "rpb", "reservation", "queuedisplay", "application", "QueueDisplayApplicationService.java"
+        ));
+        String queueDisplayRepository = Files.readString(Path.of(
+            "src", "main", "java", "com", "rpb", "reservation", "queuedisplay", "persistence", "QueueDisplayRepository.java"
+        ));
         String localSecurity = Files.readString(Path.of(
             "src", "main", "java", "com", "rpb", "reservation", "walkin", "auth", "LocalRuntimeSecurityConfiguration.java"
         ));
@@ -53,9 +65,27 @@ class I18nCatalogApiImplementationValidationTest {
         assertThat(repository)
             .contains("i18n_message_key_registry")
             .contains("i18n_message_catalog")
+            .contains("I18nRuntimeMessageRepository")
+            .contains("findMessages(UUID tenantId, UUID storeId, Collection<String> i18nKeys)")
             .contains("tenant_id = ? and store_id = ?")
             .contains("tenant_id is null and store_id is null")
             .contains("version = version + 1");
+
+        assertThat(runtimeResolver)
+            .contains("I18nRuntimeMessageRepository")
+            .contains("storeMessages")
+            .contains("tenantMessages")
+            .contains("platformMessages")
+            .contains("FALLBACK_LOCALE = \"zh-CN\"");
+        assertThat(runtimeRepositoryPort)
+            .contains("findMessages(UUID tenantId, UUID storeId, Collection<String> i18nKeys)");
+        assertThat(queueDisplayService)
+            .contains("I18nMessageResolver")
+            .contains("localizeTextAds")
+            .contains("query.locale()");
+        assertThat(queueDisplayRepository)
+            .contains("callScreenSeedKey")
+            .doesNotContain("i18n_message_catalog");
 
         assertThat(localSecurity)
             .contains("/api/v1/platform/i18n/catalog")

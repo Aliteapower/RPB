@@ -67,7 +67,7 @@ class QueueDisplayControllerTest {
     void mapsSuccessfulDisplayState() throws Exception {
         when(service.getState(any())).thenReturn(success());
 
-        mockMvc.perform(get(ENDPOINT, STORE_ID))
+        mockMvc.perform(get(ENDPOINT, STORE_ID).param("locale", "en-SG"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.storeTime.timezone").value("Asia/Singapore"))
@@ -84,6 +84,7 @@ class QueueDisplayControllerTest {
         assertThat(captor.getValue().tenantId()).isEqualTo(TENANT_ID);
         assertThat(captor.getValue().storeId()).isEqualTo(STORE_ID);
         assertThat(captor.getValue().actorId()).isEqualTo(ACTOR_ID);
+        assertThat(captor.getValue().locale()).isEqualTo("en-SG");
     }
 
     @Test
@@ -116,7 +117,7 @@ class QueueDisplayControllerTest {
 
     @Test
     void endpointDeclaresQueueDisplayViewAppGatePermission() throws Exception {
-        Method method = QueueDisplayController.class.getMethod("getState", UUID.class);
+        Method method = QueueDisplayController.class.getMethod("getState", UUID.class, String.class);
 
         RequireAppGate annotation = method.getAnnotation(RequireAppGate.class);
         assertThat(annotation).isNotNull();

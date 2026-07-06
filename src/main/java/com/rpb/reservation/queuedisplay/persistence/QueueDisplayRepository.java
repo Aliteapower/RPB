@@ -207,15 +207,32 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
     private List<QueueDisplayAdSlide> findTenantTextSlides(StoreScope scope, UUID adSetId) {
         return jdbc.query(
             """
-            select id, title, subtitle, tagline
-            from tenant_call_screen_text_slides
-            where tenant_id = ?
-              and ad_set_id = ?
-              and status = 'active'
-              and deleted_at is null
-            order by sort_order asc
+            select slide.id,
+                   slide.title,
+                   slide.subtitle,
+                   slide.tagline,
+                   platform_seed.seed_key as source_seed_key,
+                   platform_slide.sort_order as source_seed_sort_order
+            from tenant_call_screen_text_slides slide
+            left join platform_call_screen_ad_seed_slides platform_slide on platform_slide.id = slide.source_seed_slide_id
+             and platform_slide.deleted_at is null
+            left join platform_call_screen_ad_seed_sets platform_seed on platform_seed.id = platform_slide.seed_set_id
+             and platform_seed.ad_type = 'text'
+             and platform_seed.deleted_at is null
+            where slide.tenant_id = ?
+              and slide.ad_set_id = ?
+              and slide.status = 'active'
+              and slide.deleted_at is null
+            order by slide.sort_order asc
             """,
-            (rs, rowNum) -> new QueueDisplayAdSlide(rs.getString("id"), rs.getString("title"), rs.getString("subtitle"), rs.getString("tagline")),
+            (rs, rowNum) -> textSlide(
+                rs.getString("id"),
+                rs.getString("title"),
+                rs.getString("subtitle"),
+                rs.getString("tagline"),
+                rs.getString("source_seed_key"),
+                rs.getInt("source_seed_sort_order")
+            ),
             scope.tenantId().value(),
             adSetId
         );
@@ -257,7 +274,7 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
     private List<QueueDisplayAdSlide> findPlatformSeedSlides() {
         return jdbc.query(
             """
-            select slide.id, slide.title, slide.subtitle, slide.tagline
+            select slide.id, slide.title, slide.subtitle, slide.tagline, seed.seed_key, slide.sort_order
             from platform_call_screen_ad_seed_sets seed
             join platform_call_screen_ad_seed_slides slide on slide.seed_set_id = seed.id
              and slide.status = 'active'
@@ -268,8 +285,41 @@ class JdbcQueueDisplayRepository implements QueueDisplayRepository {
               and seed.deleted_at is null
             order by slide.sort_order asc
             """,
-            (rs, rowNum) -> new QueueDisplayAdSlide(rs.getString("id"), rs.getString("title"), rs.getString("subtitle"), rs.getString("tagline"))
+            (rs, rowNum) -> textSlide(
+                rs.getString("id"),
+                rs.getString("title"),
+                rs.getString("subtitle"),
+                rs.getString("tagline"),
+                rs.getString("seed_key"),
+                rs.getInt("sort_order")
+            )
         );
+    }
+
+    private static QueueDisplayAdSlide textSlide(
+        String id,
+        String title,
+        String subtitle,
+        String tagline,
+        String seedKey,
+        int sortOrder
+    ) {
+        if (seedKey == null || seedKey.isBlank() || sortOrder <= 0) {
+            return new QueueDisplayAdSlide(id, title, subtitle, tagline);
+        }
+        return QueueDisplayAdSlide.text(
+            id,
+            title,
+            subtitle,
+            tagline,
+            callScreenSeedKey(seedKey, sortOrder, "title"),
+            callScreenSeedKey(seedKey, sortOrder, "subtitle"),
+            callScreenSeedKey(seedKey, sortOrder, "tagline")
+        );
+    }
+
+    private static String callScreenSeedKey(String seedKey, int sortOrder, String field) {
+        return "call_screen.seed." + seedKey.trim() + ".slide_" + sortOrder + "." + field;
     }
 
     private static String normalizeAdType(String adType) {

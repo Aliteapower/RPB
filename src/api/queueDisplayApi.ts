@@ -25,9 +25,15 @@ export class QueueDisplayApiError extends Error {
 
 export async function fetchQueueDisplayState(
   storeId: string,
+  locale?: string,
   fetcher: typeof fetch = fetch
 ): Promise<QueueDisplayStateResponse> {
-  const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/queue-display/state`
+  const searchParams = new URLSearchParams()
+  if (locale) {
+    searchParams.set('locale', locale)
+  }
+  const query = searchParams.toString()
+  const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/queue-display/state${query ? `?${query}` : ''}`
   let response: Response
 
   try {

@@ -34,6 +34,8 @@ The catalog administration round adds a controlled backend registry for platform
 - Tenant admin can maintain only registry-authorized tenant/store override messages through `/api/v1/stores/{storeId}/tenant-admin/i18n/catalog`.
 - Static product UI copy, login copy, navigation, permission errors, route names, API paths, and generated page dictionaries remain source-controlled frontend locale data unless a specific key is deliberately promoted into the backend registry.
 
+Runtime consumers of configurable copy must use the backend i18n resolver instead of translating locally in Vue pages or querying `i18n_message_catalog` directly from their own module. The resolver supports `store override -> tenant override -> platform default -> zh-CN fallback`; frontend dictionaries remain the fallback for static product UI only.
+
 The backend catalog migration also imports configurable business copy from existing data sources without changing their runtime ownership in the same release:
 
 - Platform reservation share template seeds become platform catalog defaults.

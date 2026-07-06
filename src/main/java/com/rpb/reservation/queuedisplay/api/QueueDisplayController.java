@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -50,7 +51,7 @@ public class QueueDisplayController {
 
     @GetMapping("/state")
     @RequireAppGate(appKey = "reservation_queue", permission = VIEW_PERMISSION)
-    public ResponseEntity<?> getState(@PathVariable UUID storeId) {
+    public ResponseEntity<?> getState(@PathVariable UUID storeId, @RequestParam(required = false) String locale) {
         Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
         if (currentActor.isEmpty()) {
             return errorMapper.toResponse(QueueDisplayApiErrorCode.FORBIDDEN);
@@ -63,7 +64,7 @@ public class QueueDisplayController {
             return errorMapper.toResponse(QueueDisplayApiErrorCode.STORE_SCOPE_MISMATCH);
         }
 
-        QueueDisplayResult result = service.getState(new QueueDisplayQuery(actor.tenantId(), storeId, actor.actorId(), actor.actorType()));
+        QueueDisplayResult result = service.getState(new QueueDisplayQuery(actor.tenantId(), storeId, actor.actorId(), actor.actorType(), locale));
         if (!result.success()) {
             return errorMapper.toResponse(result);
         }

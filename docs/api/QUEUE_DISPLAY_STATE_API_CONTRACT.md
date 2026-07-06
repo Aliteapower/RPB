@@ -8,6 +8,12 @@ GET /api/v1/stores/{storeId}/queue-display/state
 
 This endpoint returns the read-only terminal projection for a store queue display. It must not call, skip, seat, cancel, or otherwise mutate queue state.
 
+Optional query parameters:
+
+| Name | Values | Purpose |
+| --- | --- | --- |
+| `locale` | `zh-CN`, `en-SG` | Resolve configurable display copy from the persisted i18n catalog. Unsupported or missing values fall back to `zh-CN`. |
+
 ## Permission
 
 ```text
@@ -65,6 +71,8 @@ The authenticated actor must be tenant/store scoped to `{storeId}`. Phase 1 does
 ```
 
 `currentCall` is nullable. When it is null, the terminal enters advertising state and uses the returned text slides.
+
+Text slide `title`, `subtitle`, and `tagline` values are resolved at runtime from `i18n_message_catalog` when the slide is linked to an authorized i18n key. Resolution follows store override, tenant override, platform default, then `zh-CN` fallback. Legacy slide table text remains the final fallback for rows that are not linked to a catalog key.
 
 ## Media Addendum
 

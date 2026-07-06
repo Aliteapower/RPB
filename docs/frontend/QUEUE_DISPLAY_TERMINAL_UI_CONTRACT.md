@@ -9,10 +9,10 @@
 The terminal calls:
 
 ```http
-GET /api/v1/stores/{storeId}/queue-display/state
+GET /api/v1/stores/{storeId}/queue-display/state?locale={frontendLocale}
 ```
 
-The API requires `queue.display.view`.
+The API requires `queue.display.view`. The terminal sends the active frontend locale so tenant-configurable copy can be resolved from the persisted i18n catalog by the backend.
 
 ## States
 
@@ -31,6 +31,8 @@ Calling state must emphasize `displayNumber`, `customerDisplayName`, `partySizeG
 Advertising state must render text slides with `title`, `subtitle`, and `tagline`, or media slides with image/video playback and safe fallback text. It uses `slideDurationSeconds` from the state response.
 
 Polling uses `statePollSeconds` from configuration when provided by the API response contract. Default expected value is 3 seconds.
+
+Changing the global locale must trigger a fresh state read. The page must not translate tenant-configurable advertising copy locally; returned slide text is already resolved through `i18n_message_catalog`.
 
 ## Media Scope
 
