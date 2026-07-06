@@ -21,9 +21,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rpb.reservation.common.scope.TenantScope;
+import com.rpb.reservation.customer.application.CustomerManagementApplicationService;
+import com.rpb.reservation.customer.application.CustomerManagementListResult;
 import com.rpb.reservation.reservation.api.CreateReservationRequest;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,6 +70,9 @@ class ReservationCreateApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private CustomerManagementApplicationService customerManagementService;
 
     @Autowired
     private TestCurrentActorProvider actorProvider;
@@ -146,6 +153,51 @@ class ReservationCreateApiIntegrationTest {
         assertThat(fixture.countWhere("select count(*) from customers where phone_e164 = '+6591234567'")).isEqualTo(1);
         assertThat(fixture.count("reservations")).isEqualTo(1);
         assertBoundaryTablesRemainEmpty();
+    }
+
+    @Test
+    void reservationCreatedCustomerIsVisibleInTenantAdminCustomerManagementList() throws Exception {
+        MvcResult created = mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "reservation-customer-management-list")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 2,
+                      "reservedStartAt": "%s",
+                      "reservedEndAt": "%s",
+                      "customerId": null,
+                      "customerName": "Management List Guest",
+                      "customerNickname": "先生",
+                      "customerEmail": "management-list-guest@example.test",
+                      "phoneE164": "+6591234599",
+                      "note": null
+                    }
+                    """.formatted(START_AT, END_AT)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.customer.phoneE164").value("+6591234599"))
+            .andReturn();
+        UUID customerId = UUID.fromString(objectMapper.readTree(created.getResponse().getContentAsString())
+            .path("customer")
+            .path("id")
+            .asText());
+
+        CustomerManagementListResult result = customerManagementService.list(
+            new TenantScope(new TenantId(TENANT_ID)),
+            "Management List Guest",
+            10,
+            0
+        );
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.customers()).singleElement().satisfies(customer -> {
+            assertThat(customer.id()).isEqualTo(customerId);
+            assertThat(customer.displayName()).isEqualTo("Management List Guest");
+            assertThat(customer.nickname()).isEqualTo("先生");
+            assertThat(customer.phoneE164()).isEqualTo("+6591234599");
+            assertThat(customer.email()).isEqualTo("management-list-guest@example.test");
+            assertThat(customer.status()).isEqualTo("active");
+        });
     }
 
     @Test

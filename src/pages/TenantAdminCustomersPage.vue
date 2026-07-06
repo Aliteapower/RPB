@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
@@ -58,6 +58,13 @@ const actionDisabled = computed(() => loading.value || saving.value || archiving
 
 onMounted(() => {
   void loadCustomers()
+  window.addEventListener('focus', refreshVisibleCustomers)
+  document.addEventListener('visibilitychange', refreshVisibleCustomers)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('focus', refreshVisibleCustomers)
+  document.removeEventListener('visibilitychange', refreshVisibleCustomers)
 })
 
 async function loadCustomers(nextOffset = offset.value): Promise<void> {
@@ -88,6 +95,13 @@ function resetFilters(): void {
   keyword.value = ''
   offset.value = 0
   void loadCustomers(0)
+}
+
+function refreshVisibleCustomers(): void {
+  if (document.visibilityState !== 'visible' || editorOpen.value || actionDisabled.value) {
+    return
+  }
+  void loadCustomers()
 }
 
 function openCreateEditor(): void {

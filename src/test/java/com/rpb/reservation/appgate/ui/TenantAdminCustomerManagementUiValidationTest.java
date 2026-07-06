@@ -26,7 +26,9 @@ class TenantAdminCustomerManagementUiValidationTest {
             .contains("phoneE164")
             .contains("displayName")
             .contains("nickname")
-            .contains("email");
+            .contains("email")
+            .contains("refreshVisibleCustomers")
+            .contains("visibilitychange");
 
         assertThat(api)
             .contains("TenantAdminCustomer")
