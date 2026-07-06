@@ -97,6 +97,7 @@ function toApiBody(request: CreateReservationRequest): CreateReservationRequest 
     customerId: request.customerId ?? null,
     customerName: request.customerName ?? null,
     customerNickname: request.customerNickname ?? null,
+    customerEmail: request.customerEmail ?? null,
     phoneE164: request.phoneE164 ?? null,
     note: request.note ?? null,
     tableId: request.tableId ?? null,

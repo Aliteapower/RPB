@@ -60,13 +60,16 @@ public class PublicBookingController {
         HttpServletRequest servletRequest
     ) {
         PublicBookingCreateRequest nonNullRequest = request == null
-            ? new PublicBookingCreateRequest(null, null, null, null, null)
+            ? new PublicBookingCreateRequest(null, null, null, null, null, null, null, null)
             : request;
         PublicBookingCreateResult result = service.createBooking(new PublicBookingCreateCommand(
             storeId,
             nonNullRequest.partySize(),
             nonNullRequest.reservedStartAt(),
             nonNullRequest.businessDate(),
+            nonNullRequest.customerName(),
+            nonNullRequest.customerNickname(),
+            nonNullRequest.customerEmail(),
             nonNullRequest.phoneE164(),
             nonNullRequest.note(),
             idempotencyKey,
@@ -94,9 +97,21 @@ public class PublicBookingController {
         Integer partySize,
         Instant reservedStartAt,
         LocalDate businessDate,
+        String customerName,
+        String customerNickname,
+        String customerEmail,
         String phoneE164,
         String note
     ) {
+        public PublicBookingCreateRequest(
+            Integer partySize,
+            Instant reservedStartAt,
+            LocalDate businessDate,
+            String phoneE164,
+            String note
+        ) {
+            this(partySize, reservedStartAt, businessDate, null, null, null, phoneE164, note);
+        }
     }
 
     public record PublicBookingContextResponse(

@@ -15,6 +15,7 @@ export interface CreateReservationRequest {
   customerId?: string | null
   customerName?: string | null
   customerNickname?: string | null
+  customerEmail?: string | null
   phoneE164?: string | null
   note?: string | null
   tableId?: string | null

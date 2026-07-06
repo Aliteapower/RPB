@@ -124,6 +124,7 @@ class ReservationControllerTest {
                       "customerId": null,
                       "customerName": " Guest ",
                       "customerNickname": " VIP friend ",
+                      "customerEmail": " guest@example.test ",
                       "phoneE164": "+6591234567",
                       "note": " Window seat ",
                       "tableId": "%s",
@@ -160,6 +161,7 @@ class ReservationControllerTest {
         assertThat(command.customerId()).isNull();
         assertThat(command.customerName()).isEqualTo("Guest");
         assertThat(command.customerNickname()).isEqualTo("VIP friend");
+        assertThat(command.customerEmail()).isEqualTo("guest@example.test");
         assertThat(command.phoneE164()).isEqualTo("+6591234567");
         assertThat(command.note()).isEqualTo("Window seat");
         assertThat(command.idempotencyKey()).isEqualTo("idem-create");
@@ -344,6 +346,7 @@ class ReservationControllerTest {
                 "customerId",
                 "customerName",
                 "customerNickname",
+                "customerEmail",
                 "phoneE164",
                 "note",
                 "tableId",

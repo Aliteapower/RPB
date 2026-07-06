@@ -28,6 +28,25 @@ export interface TenantAdminStaffMutation {
   password?: string | null
 }
 
+export interface TenantAdminCustomer {
+  id: string
+  customerCode: string
+  displayName: string | null
+  nickname: string | null
+  phoneE164: string | null
+  email: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TenantAdminCustomerMutation {
+  displayName?: string | null
+  nickname?: string | null
+  phoneE164?: string | null
+  email?: string | null
+}
+
 export interface TenantAdminTable {
   id: string
   areaId: string
@@ -100,6 +119,21 @@ export interface TenantAdminStaffListResponse {
 export interface TenantAdminStaffResponse {
   success: true
   staff: TenantAdminStaff
+}
+
+export interface TenantAdminCustomerListResponse {
+  success: true
+  customers: TenantAdminCustomer[]
+  page: TenantAdminPage
+}
+
+export interface TenantAdminCustomerResponse {
+  success: true
+  customer: TenantAdminCustomer
+}
+
+export interface TenantAdminCustomerArchiveResponse {
+  success: true
 }
 
 export interface TenantAdminTableListResponse {
@@ -217,6 +251,57 @@ export async function updateCurrentTenantAdminStaff(
   return requestJson(`${baseEndpoint(storeId)}/staff/me`, {
     method: 'PATCH',
     body: request,
+    fetcher
+  })
+}
+
+export async function listCustomers(
+  storeId: string,
+  query: TenantAdminListQuery = {},
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminCustomerListResponse> {
+  return requestJson(buildListEndpoint(storeId, '/tenant-admin/customers', query), { method: 'GET', fetcher })
+}
+
+export async function getCustomer(
+  storeId: string,
+  customerId: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminCustomerResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/customers/${encodeURIComponent(customerId)}`, {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function createCustomer(
+  storeId: string,
+  request: TenantAdminCustomerMutation,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminCustomerResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/customers`, { method: 'POST', body: request, fetcher })
+}
+
+export async function updateCustomer(
+  storeId: string,
+  customerId: string,
+  request: TenantAdminCustomerMutation,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminCustomerResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/customers/${encodeURIComponent(customerId)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function archiveCustomer(
+  storeId: string,
+  customerId: string,
+  fetcher?: TenantAdminFetcher
+): Promise<TenantAdminCustomerArchiveResponse> {
+  return requestJson(`${baseEndpoint(storeId)}/customers/${encodeURIComponent(customerId)}/archive`, {
+    method: 'POST',
     fetcher
   })
 }

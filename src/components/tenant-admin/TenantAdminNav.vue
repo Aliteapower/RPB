@@ -15,6 +15,7 @@ const storeId = computed(() => String(route.params.storeId || auth.user?.default
 const navItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/profile`, labelKey: 'nav.tenant.profile' },
   { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },
+  { to: `/stores/${storeId.value}/admin/customers`, labelKey: 'nav.tenant.customers' },
   { to: `/stores/${storeId.value}/admin/tables`, labelKey: 'nav.tenant.tables' },
   { to: `/stores/${storeId.value}/admin/settings`, labelKey: 'nav.tenant.settings' },
   { to: `/stores/${storeId.value}/admin/i18n-catalog`, labelKey: 'nav.tenant.i18nCatalog' },

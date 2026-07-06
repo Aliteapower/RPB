@@ -67,6 +67,9 @@ const authForm = reactive({
 
 const bookingForm = reactive({
   partySize: 2,
+  customerName: '',
+  customerNickname: '',
+  customerEmail: '',
   phoneE164: '',
   note: ''
 })
@@ -162,6 +165,18 @@ watch(maxBookingDate, () => {
   const clampedDate = clampBookingDate(selectedDate.value)
   if (clampedDate !== selectedDate.value) {
     selectedDate.value = clampedDate
+  }
+})
+
+watch(customer, principal => {
+  if (!principal) {
+    return
+  }
+  if (!bookingForm.customerEmail.trim()) {
+    bookingForm.customerEmail = principal.email || ''
+  }
+  if (!bookingForm.customerName.trim() && principal.displayName) {
+    bookingForm.customerName = principal.displayName
   }
 })
 
@@ -336,6 +351,9 @@ async function submitBooking(): Promise<void> {
         partySize: Number(bookingForm.partySize),
         reservedStartAt: selectedSlot.value.startAt,
         businessDate: selectedDate.value,
+        customerName: nullableText(bookingForm.customerName),
+        customerNickname: nullableText(bookingForm.customerNickname),
+        customerEmail: nullableText(bookingForm.customerEmail),
         phoneE164: nullableText(bookingForm.phoneE164),
         note: nullableText(bookingForm.note)
       }
@@ -659,6 +677,27 @@ function clampBookingDate(isoDate: string): string {
           <strong>{{ gt('generated.public-booking.036') }}</strong>
         </div>
 
+        <div class="form-grid">
+          <label>
+            <span>{{ gt('generated.public-booking.078') }}</span>
+            <input v-model.trim="bookingForm.customerName" autocomplete="name" name="customerName" />
+          </label>
+
+          <label>
+            <span>{{ gt('generated.public-booking.079') }}</span>
+            <select v-model="bookingForm.customerNickname" name="customerNickname">
+              <option value="">{{ gt('generated.public-booking.083') }}</option>
+              <option value="先生">{{ gt('generated.public-booking.081') }}</option>
+              <option value="女士">{{ gt('generated.public-booking.082') }}</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>{{ gt('generated.public-booking.080') }}</span>
+          <input v-model.trim="bookingForm.customerEmail" autocomplete="email" name="customerEmail" type="email" />
+        </label>
+
         <label>
           <span>{{ gt('generated.public-booking.037') }}</span>
           <input v-model="bookingForm.phoneE164" inputmode="tel" placeholder="+6591234567" />
@@ -800,6 +839,7 @@ label {
 
 input,
 textarea,
+select,
 button {
   border-radius: 6px;
   box-sizing: border-box;
@@ -807,7 +847,8 @@ button {
 }
 
 input,
-textarea {
+textarea,
+select {
   background: #ffffff;
   border: 1px solid #cbd5e1;
   color: #0f172a;

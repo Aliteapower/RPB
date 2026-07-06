@@ -75,6 +75,7 @@ const form = reactive({
   customerId: '',
   customerName: '',
   customerSalutation: '',
+  customerEmail: '',
   phoneLocal: '',
   businessDate: props.selectedDate,
   selectedStartAt: '',
@@ -330,6 +331,7 @@ function toRequest(): CreateReservationRequest {
     customerId: optionalValue(form.customerId),
     customerName: optionalValue(form.customerName),
     customerNickname: optionalValue(form.customerSalutation),
+    customerEmail: optionalValue(form.customerEmail),
     phoneE164: toSingaporePhoneE164(form.phoneLocal),
     tableId: resource && resource.resourceType === 'dining_table' ? resource.resourceId : null,
     tableGroupId: resource && resource.resourceType === 'table_group' ? resource.resourceId : null
@@ -819,6 +821,7 @@ function resetAfterSuccess(): void {
   form.customerId = ''
   form.customerName = ''
   form.customerSalutation = ''
+  form.customerEmail = ''
   form.phoneLocal = ''
   form.partySize = 2
   form.tablePreference = 'unassigned'
@@ -912,6 +915,11 @@ function reservationShareUrl(info: ReservationShareInfo): string {
           v-model:phone-local="form.phoneLocal"
           :disabled="isSubmitting"
         />
+
+        <label>
+          <span>{{ $t('reservationWorkbench.createDialog.customerEmail') }}</span>
+          <input v-model.trim="form.customerEmail" autocomplete="email" name="customerEmail" type="email" />
+        </label>
 
         <label>
           <span>{{ $t('reservationWorkbench.createDialog.date') }}</span>

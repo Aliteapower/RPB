@@ -27,6 +27,7 @@ public class ReservationApiMapper {
             request.customerId(),
             trimToNull(request.customerName()),
             trimToNull(request.customerNickname()),
+            trimToNull(request.customerEmail()),
             trimToNull(request.phoneE164()),
             trimToNull(request.note()),
             idempotencyKey.trim(),

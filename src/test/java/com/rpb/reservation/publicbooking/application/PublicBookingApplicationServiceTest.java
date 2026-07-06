@@ -1,6 +1,9 @@
 package com.rpb.reservation.publicbooking.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
@@ -8,8 +11,11 @@ import com.rpb.reservation.customerauth.application.port.out.CustomerEmailSettin
 import com.rpb.reservation.customerauth.application.port.out.CustomerOAuthSettingsRepositoryPort;
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingSettingsRepositoryPort;
 import com.rpb.reservation.publicbooking.application.port.out.PublicBookingStoreRepositoryPort;
+import com.rpb.reservation.reservation.application.ReservationCreateResult;
 import com.rpb.reservation.reservation.application.ReservationMealPeriod;
+import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
+import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,6 +26,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 class PublicBookingApplicationServiceTest {
 
@@ -57,6 +65,56 @@ class PublicBookingApplicationServiceTest {
             .allSatisfy(slot -> assertThat(slot.selectable()).isTrue());
     }
 
+    @Test
+    void publicBookingPassesOptionalCustomerProfileToReservationCreate() {
+        FakeSettingsRepository settings = new FakeSettingsRepository();
+        settings.settings = Optional.of(new PublicBookingSettings(
+            true,
+            false,
+            PublicBookingSettings.MODE_PERCENTAGE,
+            100,
+            null,
+            null,
+            0,
+            30
+        ));
+        ReservationCreateApplicationService reservationService = Mockito.mock(ReservationCreateApplicationService.class);
+        when(reservationService.createReservation(any())).thenReturn(reservationSuccess());
+        PublicBookingApplicationService service = new PublicBookingApplicationService(
+            new FakeStoreRepository(),
+            settings,
+            noOAuthSettings(),
+            noEmailSettings(),
+            null,
+            reservationService,
+            new FakeMealPeriodRepository(),
+            Clock.fixed(Instant.parse("2026-06-30T00:00:00Z"), ZoneOffset.UTC)
+        );
+
+        PublicBookingCreateResult result = service.createBooking(new PublicBookingCreateCommand(
+            SCOPE.storeId().value(),
+            3,
+            Instant.parse("2026-07-01T11:00:00Z"),
+            WEDNESDAY,
+            "Public Guest",
+            "先生",
+            "public-guest@example.test",
+            "+6591234567",
+            "Window seat",
+            "idem-public-profile",
+            null
+        ));
+
+        assertThat(result.success()).isTrue();
+        ArgumentCaptor<CreateReservationCommand> commandCaptor = ArgumentCaptor.forClass(CreateReservationCommand.class);
+        verify(reservationService).createReservation(commandCaptor.capture());
+        CreateReservationCommand command = commandCaptor.getValue();
+        assertThat(command.customerName()).isEqualTo("Public Guest");
+        assertThat(command.customerNickname()).isEqualTo("先生");
+        assertThat(command.customerEmail()).isEqualTo("public-guest@example.test");
+        assertThat(command.phoneE164()).isEqualTo("+6591234567");
+    }
+
     private static PublicBookingAvailabilityRule weeklyRule(String periodKey, String quotaMode) {
         return new PublicBookingAvailabilityRule(
             null,
@@ -77,6 +135,24 @@ class PublicBookingApplicationServiceTest {
 
     private static CustomerEmailSettingsRepositoryPort noEmailSettings() {
         return (tenantId, storeId) -> Optional.empty();
+    }
+
+    private static ReservationCreateResult reservationSuccess() {
+        return ReservationCreateResult.success(
+            UUID.fromString("40000000-0000-0000-0000-000000000001"),
+            UUID.fromString("50000000-0000-0000-0000-000000000001"),
+            "R-20260701-0001",
+            3,
+            WEDNESDAY,
+            Instant.parse("2026-07-01T11:00:00Z"),
+            Instant.parse("2026-07-01T12:30:00Z"),
+            Instant.parse("2026-07-01T11:15:00Z"),
+            "confirmed",
+            "completed",
+            List.of(),
+            List.of(),
+            UUID.fromString("60000000-0000-0000-0000-000000000001")
+        );
     }
 
     private static final class FakeStoreRepository implements PublicBookingStoreRepositoryPort {

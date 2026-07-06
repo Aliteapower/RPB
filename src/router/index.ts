@@ -26,6 +26,7 @@ const SeatingFromCalledQueuePage = () => import('../pages/SeatingFromCalledQueue
 const StoreStaffHomePage = () => import('../pages/StoreStaffHomePage.vue')
 const TableResourceListPage = () => import('../pages/TableResourceListPage.vue')
 const TenantAdminCallScreenPage = () => import('../pages/TenantAdminCallScreenPage.vue')
+const TenantAdminCustomersPage = () => import('../pages/TenantAdminCustomersPage.vue')
 const TenantAdminI18nCatalogPage = () => import('../pages/TenantAdminI18nCatalogPage.vue')
 const TenantAdminProfilePage = () => import('../pages/TenantAdminProfilePage.vue')
 const TenantAdminPublicBookingPage = () => import('../pages/TenantAdminPublicBookingPage.vue')
@@ -175,6 +176,12 @@ export const router = createRouter({
       path: '/stores/:storeId/admin/staff/:staffId/edit',
       name: 'tenant-admin-staff-edit',
       component: TenantAdminStaffFormPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/customers',
+      name: 'tenant-admin-customers',
+      component: TenantAdminCustomersPage,
       meta: { requiresTenantAdmin: true }
     },
     {

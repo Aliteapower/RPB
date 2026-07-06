@@ -126,6 +126,21 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void createsCustomerWithOptionalEmailFromReservationProfile() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithCustomerEmail());
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.customerRepository.saved).hasSize(1);
+        Customer saved = scenario.customerRepository.saved.getFirst();
+        assertThat(saved.displayName()).isEqualTo("Email Guest");
+        assertThat(saved.nickname()).isEqualTo("女士");
+        assertThat(saved.phone().value()).isEqualTo("+6591234568");
+        assertThat(saved.email()).isEqualTo("email-guest@example.test");
+    }
+
+    @Test
     void derivesReservedEndAtFromStorePolicyExpectedDiningDurationWhenMissing() {
         Scenario scenario = Scenario.ready();
 
@@ -731,6 +746,28 @@ class ReservationCreateApplicationServiceTest {
                 phoneE164,
                 null,
                 "idem-phone-" + phoneE164,
+                actorId,
+                "staff",
+                null,
+                "staff",
+                null
+            );
+        }
+
+        CreateReservationCommand commandWithCustomerEmail() {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                2,
+                startAt,
+                endAt,
+                null,
+                "Email Guest",
+                "女士",
+                "email-guest@example.test",
+                "+6591234568",
+                null,
+                "idem-email-profile",
                 actorId,
                 "staff",
                 null,

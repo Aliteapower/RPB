@@ -16,7 +16,8 @@ public record Customer(
     E164Phone phone,
     String status,
     String displayName,
-    String nickname
+    String nickname,
+    String email
 ) {
 
     public Customer {
@@ -28,10 +29,24 @@ public record Customer(
         requireText(status, "customer_status_required");
         displayName = blankToNull(displayName);
         nickname = blankToNull(nickname);
+        email = blankToNull(email);
+    }
+
+    public Customer(
+        CustomerId id,
+        TenantScope scope,
+        String customerCode,
+        String customerType,
+        E164Phone phone,
+        String status,
+        String displayName,
+        String nickname
+    ) {
+        this(id, scope, customerCode, customerType, phone, status, displayName, nickname, null);
     }
 
     public Customer(CustomerId id, TenantScope scope, String customerCode, String customerType, E164Phone phone, String status) {
-        this(id, scope, customerCode, customerType, phone, status, null, null);
+        this(id, scope, customerCode, customerType, phone, status, null, null, null);
     }
 
     public String mergeIntent() {
@@ -43,6 +58,10 @@ public record Customer(
     }
 
     public Customer refreshProfile(E164Phone updatedPhone, String updatedDisplayName, String updatedNickname) {
+        return refreshProfile(updatedPhone, updatedDisplayName, updatedNickname, null);
+    }
+
+    public Customer refreshProfile(E164Phone updatedPhone, String updatedDisplayName, String updatedNickname, String updatedEmail) {
         E164Phone nextPhone = updatedPhone != null && updatedPhone.isPresent() ? updatedPhone : phone;
         return new Customer(
             id,
@@ -52,7 +71,8 @@ public record Customer(
             nextPhone,
             status,
             coalesceProfileValue(updatedDisplayName, displayName),
-            coalesceProfileValue(updatedNickname, nickname)
+            coalesceProfileValue(updatedNickname, nickname),
+            coalesceProfileValue(updatedEmail, email)
         );
     }
 

@@ -74,6 +74,16 @@ class TenantAdminApiIntegrationTest {
         jdbc.update("delete from dining_tables where table_code like 'CX%'");
         jdbc.update("delete from store_areas where area_code like 'CX%' or display_name like 'Codex%'");
         jdbc.update("""
+            delete from customers
+            where tenant_id = ?
+              and (
+                  customer_code like 'C-CODEX-%'
+                  or display_name like 'Codex%'
+                  or phone_e164 like '+659888%'
+                  or email like 'codex-customer-%@example.test'
+              )
+            """, VALIDATION_TENANT_ID);
+        jdbc.update("""
             update stores
             set share_display_name = null,
                 share_address = null,
@@ -847,6 +857,103 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.error.code").value("TABLE_CODE_CONFLICT"));
     }
 
+    @Test
+    void tenantAdminMaintainsCustomersWithOptionalPhoneAndArchive() throws Exception {
+        Cookie session = login("20000000");
+
+        MvcResult created = mockMvc.perform(post(basePath() + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"Codex 王小明",
+                      "nickname":"先生",
+                      "email":"codex-customer-001@example.test"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.customer.displayName").value("Codex 王小明"))
+            .andExpect(jsonPath("$.customer.nickname").value("先生"))
+            .andExpect(jsonPath("$.customer.phoneE164").doesNotExist())
+            .andExpect(jsonPath("$.customer.email").value("codex-customer-001@example.test"))
+            .andReturn();
+        UUID customerId = UUID.fromString(objectMapper.readTree(created.getResponse().getContentAsString())
+            .path("customer")
+            .path("id")
+            .asText());
+
+        mockMvc.perform(get(basePath() + "/customers")
+                .param("keyword", "王小明")
+                .param("limit", "10")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.customers[0].id").value(customerId.toString()))
+            .andExpect(jsonPath("$.customers[0].nickname").value("先生"))
+            .andExpect(jsonPath("$.page.total").value(1));
+
+        mockMvc.perform(get(basePath() + "/customers/{customerId}", customerId).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.customer.id").value(customerId.toString()));
+
+        mockMvc.perform(patch(basePath() + "/customers/{customerId}", customerId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"Codex 王小明",
+                      "nickname":"先生",
+                      "phoneE164":"+6598880001",
+                      "email":"codex-customer-001-updated@example.test"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.customer.phoneE164").value("+6598880001"))
+            .andExpect(jsonPath("$.customer.email").value("codex-customer-001-updated@example.test"));
+
+        mockMvc.perform(post(basePath() + "/customers/{customerId}/archive", customerId).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(get(basePath() + "/customers")
+                .param("keyword", "王小明")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.customers").isEmpty())
+            .andExpect(jsonPath("$.page.total").value(0));
+
+        assertThat(countWhere("""
+            select count(*)
+            from customers
+            where id = ?
+              and tenant_id = ?
+              and status = 'archived'
+              and deleted_at is not null
+            """, customerId, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminRejectsDuplicateActiveCustomerPhone() throws Exception {
+        Cookie session = login("20000000");
+        createCustomer(session, "Codex 重复顾客", "女士", "+6598880002", "codex-customer-002@example.test");
+
+        mockMvc.perform(post(basePath() + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"Codex 另一位顾客",
+                      "nickname":"先生",
+                      "phoneE164":"+6598880002",
+                      "email":"codex-customer-003@example.test"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("CUSTOMER_PHONE_CONFLICT"));
+    }
+
     private UUID createStaff(Cookie session, String employeeNo, String name) throws Exception {
         MvcResult result = mockMvc.perform(post(basePath() + "/staff")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -865,6 +972,31 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.staff.employeeNo").value(employeeNo))
             .andReturn();
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).path("staff").path("id").asText());
+    }
+
+    private UUID createCustomer(
+        Cookie session,
+        String displayName,
+        String nickname,
+        String phoneE164,
+        String email
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(post(basePath() + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"%s",
+                      "nickname":"%s",
+                      "phoneE164":"%s",
+                      "email":"%s"
+                    }
+                    """.formatted(displayName, nickname, phoneE164, email))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.customer.displayName").value(displayName))
+            .andReturn();
+        return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).path("customer").path("id").asText());
     }
 
     private UUID createTable(Cookie session) throws Exception {

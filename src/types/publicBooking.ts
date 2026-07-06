@@ -79,6 +79,9 @@ export interface PublicBookingCreateMutation {
   partySize: number
   reservedStartAt: string
   businessDate: string
+  customerName: string | null
+  customerNickname: string | null
+  customerEmail: string | null
   phoneE164: string | null
   note: string | null
 }

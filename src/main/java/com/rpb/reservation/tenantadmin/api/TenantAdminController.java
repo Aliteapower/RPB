@@ -1,6 +1,10 @@
 package com.rpb.reservation.tenantadmin.api;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.customer.application.CustomerManagementApplicationService;
+import com.rpb.reservation.customer.application.CustomerManagementCommand;
+import com.rpb.reservation.customer.application.CustomerManagementError;
+import com.rpb.reservation.customer.application.CustomerManagementException;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
@@ -52,6 +56,7 @@ public class TenantAdminController {
     private final TenantAdminSettingsService settingsService;
     private final TenantAdminProfileService profileService;
     private final ReservationMealPeriodManagementService mealPeriodService;
+    private final CustomerManagementApplicationService customerManagementService;
     private final TenantAdminScopeResolver scopeResolver;
 
     public TenantAdminController(
@@ -60,6 +65,7 @@ public class TenantAdminController {
         TenantAdminSettingsService settingsService,
         TenantAdminProfileService profileService,
         ReservationMealPeriodManagementService mealPeriodService,
+        CustomerManagementApplicationService customerManagementService,
         TenantAdminScopeResolver scopeResolver
     ) {
         this.staffService = staffService;
@@ -67,6 +73,7 @@ public class TenantAdminController {
         this.settingsService = settingsService;
         this.profileService = profileService;
         this.mealPeriodService = mealPeriodService;
+        this.customerManagementService = customerManagementService;
         this.scopeResolver = scopeResolver;
     }
 
@@ -171,6 +178,68 @@ public class TenantAdminController {
         return ResponseEntity.ok(TenantAdminStaffResponse.from(
             staffService.updateStaff(scope, staffId, toCommand(request))
         ));
+    }
+
+    @GetMapping("/customers")
+    public ResponseEntity<TenantAdminCustomerListResponse> listCustomers(
+        @PathVariable UUID storeId,
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "limit", required = false) String limit,
+        @RequestParam(value = "offset", required = false) String offset
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminCustomerListResponse.from(
+            customerManagementService.list(
+                scope.tenantScope(),
+                keyword,
+                optionalInteger(limit),
+                optionalInteger(offset)
+            )
+        ));
+    }
+
+    @PostMapping("/customers")
+    public ResponseEntity<TenantAdminCustomerResponse> createCustomer(
+        @PathVariable UUID storeId,
+        @RequestBody(required = false) TenantAdminCustomerMutationRequest request
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.status(201).body(TenantAdminCustomerResponse.from(
+            customerManagementService.create(scope.tenantScope(), toCommand(request))
+        ));
+    }
+
+    @GetMapping("/customers/{customerId}")
+    public ResponseEntity<TenantAdminCustomerResponse> getCustomer(
+        @PathVariable UUID storeId,
+        @PathVariable UUID customerId
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminCustomerResponse.from(
+            customerManagementService.get(scope.tenantScope(), customerId)
+        ));
+    }
+
+    @PatchMapping("/customers/{customerId}")
+    public ResponseEntity<TenantAdminCustomerResponse> updateCustomer(
+        @PathVariable UUID storeId,
+        @PathVariable UUID customerId,
+        @RequestBody(required = false) TenantAdminCustomerMutationRequest request
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminCustomerResponse.from(
+            customerManagementService.update(scope.tenantScope(), customerId, toCommand(request))
+        ));
+    }
+
+    @PostMapping("/customers/{customerId}/archive")
+    public ResponseEntity<TenantAdminCustomerArchiveResponse> archiveCustomer(
+        @PathVariable UUID storeId,
+        @PathVariable UUID customerId
+    ) {
+        StoreScope scope = requireTenantAdminScope(storeId);
+        customerManagementService.archive(scope.tenantScope(), customerId);
+        return ResponseEntity.ok(TenantAdminCustomerArchiveResponse.ok());
     }
 
     @GetMapping("/tables")
@@ -290,6 +359,13 @@ public class TenantAdminController {
         return apiError(TenantAdminApiErrorCode.valueOf(exception.code().name()));
     }
 
+    @ExceptionHandler(CustomerManagementException.class)
+    public ResponseEntity<TenantAdminApiErrorResponse> handleCustomerManagementException(
+        CustomerManagementException exception
+    ) {
+        return apiError(toApiError(exception.code()));
+    }
+
     @ExceptionHandler(CallScreenMediaServiceException.class)
     public ResponseEntity<TenantAdminApiErrorResponse> handleMediaServiceException(
         CallScreenMediaServiceException exception
@@ -355,6 +431,15 @@ public class TenantAdminController {
         };
     }
 
+    private static TenantAdminApiErrorCode toApiError(CustomerManagementError code) {
+        return switch (code) {
+            case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
+            case CUSTOMER_NOT_FOUND -> TenantAdminApiErrorCode.CUSTOMER_NOT_FOUND;
+            case CUSTOMER_PHONE_CONFLICT -> TenantAdminApiErrorCode.CUSTOMER_PHONE_CONFLICT;
+            case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
+        };
+    }
+
     private static TenantAdminProfileCommand toCommand(TenantAdminProfileRequest request) {
         if (request == null) {
             return null;
@@ -379,6 +464,18 @@ public class TenantAdminController {
             request.email(),
             request.status(),
             request.password()
+        );
+    }
+
+    private static CustomerManagementCommand toCommand(TenantAdminCustomerMutationRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new CustomerManagementCommand(
+            request.displayName(),
+            request.nickname(),
+            request.phoneE164(),
+            request.email()
         );
     }
 
@@ -411,5 +508,16 @@ public class TenantAdminController {
             request.queueCallHoldMinutes(),
             request.expectedDiningMinutes()
         );
+    }
+
+    private static Integer optionalInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException exception) {
+            throw new CustomerManagementException(CustomerManagementError.REQUEST_INVALID);
+        }
     }
 }

@@ -22,7 +22,8 @@ public class DefaultCustomerMapper implements CustomerMapper {
             new E164Phone(entity.getPhoneE164()),
             entity.getStatus(),
             entity.getDisplayName(),
-            entity.getNickname()
+            entity.getNickname(),
+            entity.getEmail()
         );
     }
 
@@ -37,7 +38,7 @@ public class DefaultCustomerMapper implements CustomerMapper {
             displayName(domain),
             domain.nickname(),
             domain.phone().value(),
-            null,
+            domain.email(),
             null,
             domain.status(),
             null,

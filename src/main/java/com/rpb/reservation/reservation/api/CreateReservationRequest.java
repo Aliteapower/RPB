@@ -14,6 +14,7 @@ public record CreateReservationRequest(
     UUID customerId,
     String customerName,
     String customerNickname,
+    String customerEmail,
     String phoneE164,
     String note,
     UUID tableId,
@@ -41,6 +42,7 @@ public record CreateReservationRequest(
             customerId,
             customerName,
             customerNickname,
+            null,
             phoneE164,
             note,
             tableId,
@@ -58,7 +60,20 @@ public record CreateReservationRequest(
         String phoneE164,
         String note
     ) {
-        this(partySize, reservedStartAt, reservedEndAt, null, customerId, customerName, customerNickname, phoneE164, note, null, null);
+        this(
+            partySize,
+            reservedStartAt,
+            reservedEndAt,
+            null,
+            customerId,
+            customerName,
+            customerNickname,
+            null,
+            phoneE164,
+            note,
+            null,
+            null
+        );
     }
 
     public Optional<ReservationApiErrorCode> validateContract() {

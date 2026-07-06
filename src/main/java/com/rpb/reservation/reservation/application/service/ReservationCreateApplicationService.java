@@ -12,16 +12,17 @@ import com.rpb.reservation.audit.rule.DefaultStateTransitionRule;
 import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
-import com.rpb.reservation.common.scope.TenantScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
-import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
 import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.customer.application.CustomerManagementError;
+import com.rpb.reservation.customer.application.CustomerManagementException;
+import com.rpb.reservation.customer.application.CustomerProfileCommand;
+import com.rpb.reservation.customer.application.CustomerProfileResolver;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
-import com.rpb.reservation.customer.value.CustomerId;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -89,7 +90,7 @@ public class ReservationCreateApplicationService {
 
     private final StoreRepositoryPort storeRepository;
     private final StorePolicyRepositoryPort storePolicyRepository;
-    private final CustomerRepositoryPort customerRepository;
+    private final CustomerProfileResolver customerProfileResolver;
     private final ReservationRepositoryPort reservationRepository;
     private final ReservationPreassignmentRepositoryPort preassignmentRepository;
     private final DiningTableRepositoryPort diningTableRepository;
@@ -117,6 +118,7 @@ public class ReservationCreateApplicationService {
         StoreRepositoryPort storeRepository,
         StorePolicyRepositoryPort storePolicyRepository,
         CustomerRepositoryPort customerRepository,
+        CustomerProfileResolver customerProfileResolver,
         ReservationRepositoryPort reservationRepository,
         ReservationPreassignmentRepositoryPort preassignmentRepository,
         DiningTableRepositoryPort diningTableRepository,
@@ -132,7 +134,7 @@ public class ReservationCreateApplicationService {
         this(
             storeRepository,
             storePolicyRepository,
-            customerRepository,
+            customerProfileResolver,
             reservationRepository,
             preassignmentRepository,
             diningTableRepository,
@@ -166,7 +168,7 @@ public class ReservationCreateApplicationService {
         this(
             storeRepository,
             storePolicyRepository,
-            customerRepository,
+            new CustomerProfileResolver(customerRepository),
             reservationRepository,
             preassignmentRepository,
             diningTableRepository,
@@ -201,7 +203,7 @@ public class ReservationCreateApplicationService {
         this(
             storeRepository,
             storePolicyRepository,
-            customerRepository,
+            new CustomerProfileResolver(customerRepository),
             reservationRepository,
             preassignmentRepository,
             diningTableRepository,
@@ -220,7 +222,7 @@ public class ReservationCreateApplicationService {
     private ReservationCreateApplicationService(
         StoreRepositoryPort storeRepository,
         StorePolicyRepositoryPort storePolicyRepository,
-        CustomerRepositoryPort customerRepository,
+        CustomerProfileResolver customerProfileResolver,
         ReservationRepositoryPort reservationRepository,
         ReservationPreassignmentRepositoryPort preassignmentRepository,
         DiningTableRepositoryPort diningTableRepository,
@@ -236,7 +238,7 @@ public class ReservationCreateApplicationService {
     ) {
         this.storeRepository = storeRepository;
         this.storePolicyRepository = storePolicyRepository;
-        this.customerRepository = customerRepository;
+        this.customerProfileResolver = customerProfileResolver;
         this.reservationRepository = reservationRepository;
         this.preassignmentRepository = preassignmentRepository;
         this.diningTableRepository = diningTableRepository;
@@ -309,6 +311,7 @@ public class ReservationCreateApplicationService {
             value(command.customerId()),
             normalize(command.customerName()),
             normalize(command.customerNickname()),
+            normalize(command.customerEmail()),
             normalize(command.phoneE164()),
             normalize(command.note()),
             normalize(command.actorType()),
@@ -355,7 +358,7 @@ public class ReservationCreateApplicationService {
         );
         TimeRange timeRange = new TimeRange(reservedStartAt, reservedEndAt);
         Instant holdUntilAt = reservationHoldPolicy.holdUntilAt(reservedStartAt, policy);
-        Customer customer = resolveCustomer(command, scope.tenantScope());
+        Customer customer = resolveCustomer(command, scope);
 
         boolean duplicateActive = reservationRepository.existsActiveDuplicate(scope, customer.id(), timeRange);
         if (!reservationDuplicateRule.allows(duplicateActive)) {
@@ -437,49 +440,26 @@ public class ReservationCreateApplicationService {
         return selectedSlot.map(ReservationTimeSlot::periodKey).orElse("");
     }
 
-    private Customer resolveCustomer(CreateReservationCommand command, TenantScope tenantScope) {
-        E164Phone phone = parsePhone(command.phoneE164());
-        if (command.customerId() != null) {
-            Customer customer = customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
-                .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.CUSTOMER_NOT_FOUND));
-            return refreshCustomerProfile(tenantScope, customer, command, phone);
-        }
-        if (phone.isPresent()) {
-            Optional<Customer> existing = customerRepository.findByPhone(tenantScope, phone);
-            if (existing.isPresent()) {
-                return refreshCustomerProfile(tenantScope, existing.get(), command, phone);
+    private Customer resolveCustomer(CreateReservationCommand command, StoreScope scope) {
+        try {
+            return customerProfileResolver.resolve(
+                scope.tenantScope(),
+                new CustomerProfileCommand(
+                    command.customerId(),
+                    blankToNull(command.customerName()),
+                    blankToNull(command.customerNickname()),
+                    blankToNull(command.phoneE164()),
+                    blankToNull(command.customerEmail())
+                )
+            );
+        } catch (CustomerManagementException exception) {
+            if (exception.code() == CustomerManagementError.CUSTOMER_NOT_FOUND) {
+                throw new ApplicationFailure(ReservationCreateError.CUSTOMER_NOT_FOUND);
             }
+            throw new ApplicationFailure(ReservationCreateError.INVALID_COMMAND);
+        } catch (IllegalArgumentException exception) {
+            throw new ApplicationFailure(ReservationCreateError.INVALID_PHONE_E164);
         }
-        return customerRepository.save(
-            tenantScope,
-            new Customer(
-                new CustomerId(UUID.randomUUID()),
-                tenantScope,
-                "C-" + UUID.randomUUID().toString().substring(0, 8),
-                "temporary",
-                phone,
-                "active",
-                blankToNull(command.customerName()),
-                blankToNull(command.customerNickname())
-            )
-        );
-    }
-
-    private Customer refreshCustomerProfile(
-        TenantScope tenantScope,
-        Customer customer,
-        CreateReservationCommand command,
-        E164Phone phone
-    ) {
-        Customer refreshed = customer.refreshProfile(
-            phone,
-            blankToNull(command.customerName()),
-            blankToNull(command.customerNickname())
-        );
-        if (refreshed.equals(customer)) {
-            return customer;
-        }
-        return customerRepository.save(tenantScope, refreshed);
     }
 
     private ReservationCode resolveReservationCode(CreateReservationCommand command, BusinessDate businessDate, StoreScope scope) {
@@ -832,14 +812,6 @@ public class ReservationCreateApplicationService {
             return ReservationCreateError.RESOURCE_SELECTION_CONFLICT;
         }
         return null;
-    }
-
-    private static E164Phone parsePhone(String phoneE164) {
-        try {
-            return hasText(phoneE164) ? new E164Phone(phoneE164.trim()) : E164Phone.empty();
-        } catch (IllegalArgumentException exception) {
-            throw new ApplicationFailure(ReservationCreateError.INVALID_PHONE_E164);
-        }
     }
 
     private static BusinessDate businessDate(Store store, Instant reservedStartAt) {

@@ -211,8 +211,9 @@ public class PublicBookingApplicationService {
             null,
             businessDate,
             principal == null ? null : principal.customerId(),
-            principal == null ? null : principal.displayName(),
-            null,
+            firstText(command.customerName(), principal == null ? null : principal.displayName()),
+            command.customerNickname(),
+            firstText(command.customerEmail(), principal == null ? null : principal.email()),
             trimToNull(command.phoneE164()),
             trimToNull(command.note()),
             command.idempotencyKey().trim(),
@@ -265,6 +266,11 @@ public class PublicBookingApplicationService {
 
     private static String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static String firstText(String first, String fallback) {
+        String normalizedFirst = trimToNull(first);
+        return normalizedFirst == null ? trimToNull(fallback) : normalizedFirst;
     }
 
     private static boolean hasText(String value) {
