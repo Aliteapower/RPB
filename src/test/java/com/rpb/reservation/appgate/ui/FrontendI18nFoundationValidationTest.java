@@ -107,6 +107,19 @@ class FrontendI18nFoundationValidationTest {
     }
 
     @Test
+    void mobileLocaleSwitcherAvoidsTopbarActionControls() throws Exception {
+        Path switcherPath = Path.of("src", "components", "common", "FrontendLocaleSwitcher.vue");
+
+        String switcherSource = FrontendSourceSupport.readString(switcherPath);
+
+        assertThat(switcherSource)
+            .contains("@media (max-width: 520px)")
+            .contains("top: auto")
+            .contains("bottom: max(86px, calc(78px + env(safe-area-inset-bottom)))")
+            .contains("right: max(8px, env(safe-area-inset-right))");
+    }
+
+    @Test
     void defaultLocaleStrategyAndCatalogBoundaryAreDocumented() throws Exception {
         Path architecturePath = Path.of("docs", "architecture", "ARCHITECTURE.md");
         Path frontendDocPath = Path.of("docs", "frontend", "I18N_FRONTEND_FOUNDATION.md");

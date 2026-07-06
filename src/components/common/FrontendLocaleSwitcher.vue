@@ -79,8 +79,15 @@ function switchLocale(nextLocale: FrontendLocale): void {
 
 @media (max-width: 520px) {
   .frontend-locale-switcher {
-    top: max(8px, env(safe-area-inset-top));
+    top: auto;
     right: max(8px, env(safe-area-inset-right));
+    bottom: max(86px, calc(78px + env(safe-area-inset-bottom)));
+    grid-template-columns: repeat(2, minmax(40px, 1fr));
+  }
+
+  .frontend-locale-switcher__button {
+    min-width: 40px;
+    padding: 0 8px;
   }
 }
 
