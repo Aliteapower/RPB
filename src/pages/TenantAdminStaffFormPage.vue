@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -18,12 +19,15 @@ import {
   type TenantAdminStaff,
   type TenantAdminStaffMutation
 } from '../api/tenantAdminApi'
+import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
+import type { AuthStoreAccess } from '../types/auth'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const { t } = useI18n()
 
 interface TenantProfileForm {
   tenantCode: string
@@ -44,6 +48,7 @@ const saving = ref(false)
 const logoSaving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
+const storeAccessLoading = ref(false)
 const logoFile = ref<File | null>(null)
 const logoFileInput = ref<HTMLInputElement | null>(null)
 const localLogoPreviewUrl = ref('')
@@ -64,6 +69,39 @@ const statusFieldVisible = computed(() => mode.value !== 'self')
 const storeId = computed(() => String(route.params.storeId || ''))
 const staffId = computed(() => String(route.params.staffId || ''))
 const logoPreviewUrl = computed(() => localLogoPreviewUrl.value || tenantProfileForm.logoMediaUrl)
+const storeAccessVisible = computed(() => mode.value !== 'self')
+const assignableStores = computed<AuthStoreAccess[]>(() => {
+  if (auth.authorizedStores.length > 0) {
+    return auth.authorizedStores
+  }
+  return (auth.user?.storeIds ?? []).map(storeId => ({
+    storeId,
+    storeCode: '',
+    storeName: storeFallbackLabel(storeId),
+    status: 'active',
+    locale: '',
+    defaultStore: storeId === auth.user?.defaultStoreId
+  }))
+})
+const storeChoices = computed<AuthStoreAccess[]>(() => {
+  const byId = new Map(assignableStores.value.map(store => [store.storeId, store]))
+  selectedStoreIds.value.forEach(storeId => {
+    if (!byId.has(storeId)) {
+      byId.set(storeId, {
+        storeId,
+        storeCode: storeId.slice(0, 8),
+        storeName: storeFallbackLabel(storeId),
+        status: 'active',
+        locale: '',
+        defaultStore: storeId === defaultStoreId.value
+      })
+    }
+  })
+  return Array.from(byId.values())
+})
+const selectedStoreOptions = computed(() =>
+  storeChoices.value.filter(store => selectedStoreIds.value.includes(store.storeId))
+)
 
 const tenantProfileForm = reactive<TenantProfileForm>({
   tenantCode: '',
@@ -84,10 +122,17 @@ const form = reactive({
   status: 'active' as TenantAdminStaffMutation['status'],
   password: ''
 })
+const selectedStoreIds = ref<string[]>([])
+const defaultStoreId = ref('')
 
 onMounted(() => {
+  if (storeAccessVisible.value) {
+    void loadAssignableStores()
+  }
   if (mode.value !== 'create') {
     void loadStaff()
+  } else {
+    initializeCreateStoreAccess()
   }
 })
 
@@ -119,11 +164,26 @@ async function loadStaff(): Promise<void> {
   }
 }
 
+async function loadAssignableStores(): Promise<void> {
+  storeAccessLoading.value = true
+  try {
+    await auth.ensureAuthorizedStores()
+    if (mode.value === 'create') {
+      initializeCreateStoreAccess()
+    }
+  } finally {
+    storeAccessLoading.value = false
+  }
+}
+
 async function submitStaff(): Promise<void> {
   if (saving.value) {
     return
   }
   if (mode.value === 'self' && !validateSelfForm()) {
+    return
+  }
+  if (mode.value !== 'self' && !validateStoreAccessForm()) {
     return
   }
 
@@ -252,6 +312,10 @@ function applyAdminAccount(staff: TenantAdminStaff): void {
     status: staff.status,
     password: ''
   })
+  selectedStoreIds.value = normalizeSelectedStoreIds(staff.storeIds.length > 0 ? staff.storeIds : [storeId.value])
+  defaultStoreId.value = staff.defaultStoreId && selectedStoreIds.value.includes(staff.defaultStoreId)
+    ? staff.defaultStoreId
+    : selectedStoreIds.value[0] || ''
 }
 
 function tenantProfilePayload(): TenantAdminProfileMutation {
@@ -286,6 +350,20 @@ function validateSelfForm(): boolean {
   return true
 }
 
+function validateStoreAccessForm(): boolean {
+  errorText.value = ''
+  savedText.value = ''
+  if (selectedStoreIds.value.length === 0 || !defaultStoreId.value) {
+    errorText.value = t('tenant.staffForm.errors.storeRequired')
+    return false
+  }
+  if (!selectedStoreIds.value.includes(defaultStoreId.value)) {
+    errorText.value = t('tenant.staffForm.errors.defaultStoreRequired')
+    return false
+  }
+  return true
+}
+
 function toPayload(): TenantAdminStaffMutation {
   return {
     employeeNo: mode.value === 'create' ? form.employeeNo.trim() : undefined,
@@ -293,8 +371,57 @@ function toPayload(): TenantAdminStaffMutation {
     phone: optionalValue(form.phone),
     email: optionalValue(form.email),
     status: form.status,
-    password: mode.value === 'create' ? form.password.trim() : optionalValue(form.password)
+    password: mode.value === 'create' ? form.password.trim() : optionalValue(form.password),
+    storeIds: selectedStoreIds.value,
+    defaultStoreId: defaultStoreId.value || null
   }
+}
+
+function toggleStore(storeId: string, checked: boolean): void {
+  const current = new Set(selectedStoreIds.value)
+  if (checked) {
+    current.add(storeId)
+  } else {
+    current.delete(storeId)
+  }
+  selectedStoreIds.value = normalizeSelectedStoreIds(Array.from(current))
+  if (!defaultStoreId.value || !selectedStoreIds.value.includes(defaultStoreId.value)) {
+    defaultStoreId.value = selectedStoreIds.value[0] || ''
+  }
+}
+
+function toggleStoreFromEvent(storeId: string, event: Event): void {
+  toggleStore(storeId, (event.target as HTMLInputElement).checked)
+}
+
+function initializeCreateStoreAccess(): void {
+  if (selectedStoreIds.value.length > 0) {
+    return
+  }
+  const candidate =
+    currentStoreAllowed(storeId.value)
+      ? storeId.value
+      : auth.user?.defaultStoreId && currentStoreAllowed(auth.user.defaultStoreId)
+        ? auth.user.defaultStoreId
+        : assignableStores.value[0]?.storeId
+  selectedStoreIds.value = candidate ? [candidate] : []
+  defaultStoreId.value = selectedStoreIds.value[0] || ''
+}
+
+function normalizeSelectedStoreIds(storeIds: string[]): string[] {
+  return Array.from(new Set(storeIds)).filter(candidate => candidate.trim())
+}
+
+function currentStoreAllowed(candidate: string): boolean {
+  return assignableStores.value.some(store => store.storeId === candidate)
+}
+
+function storeDisplayName(store: AuthStoreAccess): string {
+  return store.storeName || store.storeCode || storeFallbackLabel(store.storeId)
+}
+
+function storeFallbackLabel(storeId: string): string {
+  return t('staffHome.store.label', { shortId: storeId.slice(0, 8) })
 }
 
 function optionalValue(value: string): string | null {
@@ -387,10 +514,11 @@ function apiErrorText(error: unknown): string {
                 <span>{{ gt('generated.tenant-admin-staff-form.009') }}</span>
                 <input v-model.trim="tenantProfileForm.principalName" />
               </label>
-              <label>
-                <span>{{ gt('generated.tenant-admin-staff-form.010') }}</span>
-                <input v-model.trim="tenantProfileForm.contactPhone" inputmode="tel" />
-              </label>
+              <CountryPhoneField
+                v-model="tenantProfileForm.contactPhone"
+                :label="gt('generated.tenant-admin-staff-form.010')"
+                model-format="e164"
+              />
               <label class="wide-field">
                 <span>{{ gt('generated.tenant-admin-staff-form.011') }}</span>
                 <input v-model.trim="tenantProfileForm.address" />
@@ -464,10 +592,11 @@ function apiErrorText(error: unknown): string {
             <span>{{ gt('generated.tenant-admin-staff-form.025') }}</span>
             <input v-model.trim="form.name" required />
           </label>
-          <label>
-            <span>{{ gt('generated.tenant-admin-staff-form.026') }}</span>
-            <input v-model.trim="form.phone" inputmode="tel" />
-          </label>
+          <CountryPhoneField
+            v-model="form.phone"
+            :label="gt('generated.tenant-admin-staff-form.026')"
+            model-format="e164"
+          />
           <label>
             <span>{{ gt('generated.tenant-admin-staff-form.027') }}</span>
             <input v-model.trim="form.email" type="email" />
@@ -490,6 +619,33 @@ function apiErrorText(error: unknown): string {
             />
             <small>{{ gt('generated.tenant-admin-staff-form.034') }}</small>
           </label>
+          <div class="store-access-fields wide-field">
+            <div class="section-heading compact-heading">
+              <h2>{{ t('tenant.staffForm.storeAccess.title') }}</h2>
+            </div>
+            <p v-if="storeAccessLoading" class="loading-line">{{ t('common.actions.loading') }}</p>
+            <div v-else class="store-option-grid">
+              <label v-for="store in storeChoices" :key="store.storeId" class="store-option">
+                <input
+                  type="checkbox"
+                  :checked="selectedStoreIds.includes(store.storeId)"
+                  @change="toggleStoreFromEvent(store.storeId, $event)"
+                />
+                <span>
+                  <strong>{{ storeDisplayName(store) }}</strong>
+                  <small>{{ store.storeCode || store.storeId.slice(0, 8) }}</small>
+                </span>
+              </label>
+            </div>
+            <label class="wide-field">
+              <span>{{ t('tenant.staffForm.storeAccess.defaultStore') }}</span>
+              <select v-model="defaultStoreId" :disabled="selectedStoreOptions.length === 0" required>
+                <option v-for="store in selectedStoreOptions" :key="store.storeId" :value="store.storeId">
+                  {{ storeDisplayName(store) }}
+                </option>
+              </select>
+            </label>
+          </div>
         </template>
 
         <div class="form-actions">
@@ -685,6 +841,47 @@ small {
   grid-column: 1 / -1;
 }
 
+.store-access-fields {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.store-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.store-option {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.store-option input {
+  width: 18px;
+  min-height: 18px;
+  padding: 0;
+}
+
+.store-option span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.store-option strong,
+.store-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .logo-panel {
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
@@ -748,6 +945,7 @@ small {
   .page-heading,
   .form-panel,
   .field-grid,
+  .store-option-grid,
   .logo-panel {
     display: grid;
     grid-template-columns: 1fr;

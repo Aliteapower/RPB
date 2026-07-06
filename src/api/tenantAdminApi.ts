@@ -11,6 +11,8 @@ export interface TenantAdminStaff {
   phone: string | null
   email: string | null
   status: 'active' | 'disabled' | 'locked'
+  defaultStoreId: string | null
+  storeIds: string[]
   accountType: 'staff' | 'tenant_admin'
   self: boolean
   editable: boolean
@@ -26,6 +28,8 @@ export interface TenantAdminStaffMutation {
   email?: string | null
   status?: 'active' | 'disabled' | 'locked'
   password?: string | null
+  storeIds?: string[]
+  defaultStoreId?: string | null
 }
 
 export interface TenantAdminCustomer {

@@ -463,7 +463,9 @@ public class TenantAdminController {
             request.phone(),
             request.email(),
             request.status(),
-            request.password()
+            request.password(),
+            request.storeIds(),
+            request.defaultStoreId()
         );
     }
 

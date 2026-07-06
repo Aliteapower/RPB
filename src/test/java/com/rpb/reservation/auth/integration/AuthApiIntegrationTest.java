@@ -46,6 +46,7 @@ class AuthApiIntegrationTest {
     private static final AuthPostgresTestDatabase DATABASE = AuthPostgresTestDatabase.startWithValidationStore();
     private static final UUID AREA_ID = UUID.fromString("60000000-0000-0000-0000-000000000983");
     private static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000000983");
+    private static final UUID AUTH_SECONDARY_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000984");
     private static final String PASSWORD_393930_HASH = "$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy";
 
     @Autowired
@@ -88,10 +89,15 @@ class AuthApiIntegrationTest {
         jdbc.update("delete from business_events where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, VALIDATION_STORE_ID);
         jdbc.update("delete from state_transition_logs where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, VALIDATION_STORE_ID);
         jdbc.update("delete from customers where tenant_id = ? and customer_code like 'C-PUB-%'", VALIDATION_TENANT_ID);
+        jdbc.update("delete from auth_account_store_access where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, AUTH_SECONDARY_STORE_ID);
         jdbc.update("update tenants set tenant_code = '20000000' where id = ?", VALIDATION_TENANT_ID);
         jdbc.update(
             "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
             PASSWORD_393930_HASH
+        );
+        jdbc.update(
+            "update auth_accounts set default_store_id = ? where username in ('sysadmin', '20000000', '1000')",
+            VALIDATION_STORE_ID
         );
         jdbc.update("delete from store_public_booking_settings where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, VALIDATION_STORE_ID);
         jdbc.update("delete from store_customer_email_settings where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, VALIDATION_STORE_ID);
@@ -161,6 +167,51 @@ class AuthApiIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/me").cookie(sessionCookie))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    void currentUserStoresReturnsAuthorizedActiveStoresWithDefaultFlag() throws Exception {
+        upsertAuthSecondaryStore();
+        grantStoreAccess("1000", AUTH_SECONDARY_STORE_ID);
+
+        MvcResult login = login("1000", "393930")
+            .andExpect(status().isOk())
+            .andReturn();
+        Cookie sessionCookie = login.getResponse().getCookie("RPB_SESSION");
+
+        MvcResult result = mockMvc.perform(get("/api/v1/me/stores").cookie(sessionCookie))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+
+        JsonNode stores = objectMapper.readTree(result.getResponse().getContentAsString()).path("stores");
+        assertThat(stores).hasSize(2);
+        JsonNode defaultStore = storeById(stores, VALIDATION_STORE_ID);
+        assertThat(defaultStore.path("storeCode").asText()).isNotBlank();
+        assertThat(defaultStore.path("storeName").asText()).isNotBlank();
+        assertThat(defaultStore.path("status").asText()).isEqualTo("active");
+        assertThat(defaultStore.path("locale").asText()).isNotBlank();
+        assertThat(defaultStore.path("defaultStore").asBoolean()).isTrue();
+
+        JsonNode secondaryStore = storeById(stores, AUTH_SECONDARY_STORE_ID);
+        assertThat(secondaryStore.path("storeCode").asText()).isEqualTo("auth-secondary");
+        assertThat(secondaryStore.path("storeName").asText()).isEqualTo("认证二店");
+        assertThat(secondaryStore.path("status").asText()).isEqualTo("active");
+        assertThat(secondaryStore.path("locale").asText()).isEqualTo("en-SG");
+        assertThat(secondaryStore.path("defaultStore").asBoolean()).isFalse();
+    }
+
+    @Test
+    void platformAdminCurrentStoresDoesNotExposeTenantStoreSwitchTargets() throws Exception {
+        MvcResult login = login("sysadmin", "393930")
+            .andExpect(status().isOk())
+            .andReturn();
+        Cookie sessionCookie = login.getResponse().getCookie("RPB_SESSION");
+
+        mockMvc.perform(get("/api/v1/me/stores").cookie(sessionCookie))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.stores").isEmpty());
     }
 
     @Test
@@ -405,6 +456,57 @@ class AuthApiIntegrationTest {
 
     private ResultActions login(String username, String password) throws Exception {
         return login(null, null, null, null, username, password);
+    }
+
+    private void upsertAuthSecondaryStore() {
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'auth-secondary', '认证二店', 'active',
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            on conflict (id) do update
+            set store_code = excluded.store_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                locale = excluded.locale,
+                deleted_at = null,
+                updated_at = now(),
+                version = stores.version + 1
+            """,
+            AUTH_SECONDARY_STORE_ID,
+            VALIDATION_TENANT_ID
+        );
+    }
+
+    private void grantStoreAccess(String username, UUID storeId) {
+        jdbc.update(
+            """
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            select id, tenant_id, ?
+            from auth_accounts
+            where username = ?
+              and tenant_id = ?
+              and deleted_at is null
+            on conflict (account_id, tenant_id, store_id)
+            where deleted_at is null
+            do nothing
+            """,
+            storeId,
+            username,
+            VALIDATION_TENANT_ID
+        );
+    }
+
+    private JsonNode storeById(JsonNode stores, UUID storeId) {
+        for (JsonNode store : stores) {
+            if (storeId.toString().equals(store.path("storeId").asText())) {
+                return store;
+            }
+        }
+        throw new AssertionError("Missing store " + storeId);
     }
 
     private ResultActions login(

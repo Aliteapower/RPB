@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import StoreSwitcher from '../store/StoreSwitcher.vue'
 import { useAuthSessionStore } from '../../stores/authSession'
 
 const route = useRoute()
@@ -46,6 +47,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
         <span class="brand-mark">RPB</span>
         <strong>{{ t('nav.tenant.title') }}</strong>
         <small>{{ t('nav.tenant.storePrefix') }} {{ auth.user?.username || '20000000' }}</small>
+        <StoreSwitcher class="tenant-store-switcher" surface="tenant-admin" />
       </div>
       <nav class="nav-list">
         <RouterLink
@@ -88,7 +90,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
 }
 
 .brand-block {
-  gap: 5px;
+  gap: 7px;
 }
 
 .brand-mark {
@@ -109,6 +111,10 @@ async function logoutFromTenantAdmin(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tenant-store-switcher {
+  margin-top: 4px;
 }
 
 .nav-list {

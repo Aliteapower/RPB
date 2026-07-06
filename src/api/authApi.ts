@@ -3,6 +3,7 @@ import type {
   AuthLoginResponse,
   AuthLogoutResponse,
   AuthMeResponse,
+  AuthStoreAccessResponse,
   LoginRequest,
   SliderCaptchaResponse
 } from '../types/auth'
@@ -45,6 +46,13 @@ export async function login(request: LoginRequest, fetcher?: AuthFetcher): Promi
 
 export async function fetchCurrentUser(fetcher?: AuthFetcher): Promise<AuthMeResponse> {
   return requestJson('/api/v1/auth/me', {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function fetchCurrentStores(fetcher?: AuthFetcher): Promise<AuthStoreAccessResponse> {
+  return requestJson('/api/v1/me/stores', {
     method: 'GET',
     fetcher
   })

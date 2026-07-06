@@ -1,15 +1,20 @@
+import {
+  isValidCountryLocalPhone,
+  sanitizeCountryLocalPhone,
+  toCountryPhoneE164
+} from '../../utils/countryPhone'
+
 export const SINGAPORE_PHONE_PREFIX = '+65'
 export const LOCAL_SINGAPORE_PHONE_PATTERN = /^[0-9]{8}$/
 
 export function sanitizeSingaporeLocalPhone(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 8)
+  return sanitizeCountryLocalPhone(value, 'SG')
 }
 
 export function isValidSingaporeLocalPhone(value: string): boolean {
-  return LOCAL_SINGAPORE_PHONE_PATTERN.test(value.trim())
+  return isValidCountryLocalPhone(value, 'SG')
 }
 
 export function toSingaporePhoneE164(value: string): string | null {
-  const phoneLocal = value.trim()
-  return phoneLocal ? `${SINGAPORE_PHONE_PREFIX}${phoneLocal}` : null
+  return toCountryPhoneE164(value, 'SG')
 }

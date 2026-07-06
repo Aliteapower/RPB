@@ -17,11 +17,8 @@ import type {
   PublicBookingContextResponse,
   PublicBookingTimeSlot
 } from '../types/publicBooking'
-import {
-  isValidSingaporeLocalPhone,
-  sanitizeSingaporeLocalPhone,
-  toSingaporePhoneE164
-} from '../components/staff/staffGuestContact'
+import CountryPhoneField from '../components/common/CountryPhoneField.vue'
+import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../components/staff/staffGuestContact'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
@@ -444,10 +441,6 @@ async function submitBooking(): Promise<void> {
   }
 }
 
-function updatePhoneLocal(event: Event): void {
-  bookingForm.phoneLocal = sanitizeSingaporeLocalPhone((event.target as HTMLInputElement).value)
-}
-
 function closeBookingPage(): void {
   closePageFallbackText.value = ''
   window.close()
@@ -815,22 +808,11 @@ function clampBookingDate(isoDate: string): string {
           <input v-model.trim="bookingForm.customerEmail" autocomplete="email" name="customerEmail" type="email" />
         </label>
 
-        <label>
-          <span>{{ gt('generated.public-booking.037') }}</span>
-          <div class="public-booking-phone-field">
-            <span class="public-booking-phone-field__prefix" aria-hidden="true">+65</span>
-            <input
-              :value="bookingForm.phoneLocal"
-              autocomplete="tel-national"
-              inputmode="numeric"
-              maxlength="8"
-              pattern="[0-9]*"
-              placeholder="91234567"
-              type="tel"
-              @input="updatePhoneLocal"
-            />
-          </div>
-        </label>
+        <CountryPhoneField
+          v-model="bookingForm.phoneLocal"
+          :label="gt('generated.public-booking.037')"
+          model-format="local"
+        />
 
         <label>
           <span>{{ gt('generated.public-booking.038') }}</span>
@@ -1019,40 +1001,6 @@ select {
 
 textarea {
   resize: vertical;
-}
-
-.public-booking-phone-field {
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  min-height: 40px;
-  overflow: hidden;
-}
-
-.public-booking-phone-field__prefix {
-  align-items: center;
-  align-self: stretch;
-  background: #f8fafc;
-  border-right: 1px solid #cbd5e1;
-  color: #0f172a;
-  display: flex;
-  font-weight: 900;
-  justify-content: center;
-  min-width: 54px;
-  padding: 0 10px;
-}
-
-.public-booking-phone-field input {
-  border: 0;
-  min-height: 38px;
-}
-
-.public-booking-phone-field:focus-within {
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
 }
 
 .field-error {

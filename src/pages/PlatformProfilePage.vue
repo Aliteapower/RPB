@@ -16,6 +16,7 @@ import {
   type PlatformProfile,
   type PlatformSocialLink
 } from '../api/platformProfileApi'
+import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 
@@ -334,10 +335,11 @@ function apiErrorText(error: unknown): string {
               <span>{{ $t('platform.profile.fields.address') }}</span>
               <input v-model.trim="profileForm.address" maxlength="240" autocomplete="off" />
             </label>
-            <label>
-              <span>{{ $t('platform.profile.fields.phone') }}</span>
-              <input v-model.trim="profileForm.phone" maxlength="40" autocomplete="off" />
-            </label>
+            <CountryPhoneField
+              v-model="profileForm.phone"
+              :label="$t('platform.profile.fields.phone')"
+              model-format="e164"
+            />
             <label>
               <span>{{ $t('platform.profile.fields.email') }}</span>
               <input v-model.trim="profileForm.email" maxlength="120" autocomplete="off" />

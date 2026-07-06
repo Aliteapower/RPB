@@ -60,6 +60,14 @@ public class AuthController {
         return new AuthMeResponse(true, AuthUserResponse.from(principal));
     }
 
+    @GetMapping("/api/v1/me/stores")
+    public AuthStoreAccessResponse stores(HttpServletRequest request) {
+        String token = cookieService.readSessionToken(request).orElseThrow(() ->
+            new AuthApiException(AuthApiErrorCode.UNAUTHENTICATED)
+        );
+        return AuthStoreAccessResponse.from(authService.currentStores(token));
+    }
+
     @PostMapping("/api/v1/auth/logout")
     public AuthLogoutResponse logout(HttpServletRequest request, HttpServletResponse response) {
         cookieService.readSessionToken(request).ifPresent(authService::logout);

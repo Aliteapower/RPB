@@ -12,6 +12,7 @@ import {
   type TenantAdminPage,
   updateCustomer
 } from '../api/tenantAdminApi'
+import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import ErpPagination from '../components/erp/ErpPagination.vue'
 import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
@@ -365,10 +366,12 @@ function apiErrorText(error: unknown): string {
               </select>
             </label>
 
-            <label>
-              <span>{{ gt('generated.tenant-admin-customers.011') }} <small>{{ gt('generated.tenant-admin-customers.023') }}</small></span>
-              <input v-model.trim="form.phoneE164" name="phoneE164" type="tel" inputmode="tel" placeholder="+6591234567" />
-            </label>
+            <CountryPhoneField
+              v-model="form.phoneE164"
+              :label="gt('generated.tenant-admin-customers.011')"
+              name="phoneE164"
+              model-format="e164"
+            />
 
             <label>
               <span>{{ gt('generated.tenant-admin-customers.012') }} <small>{{ gt('generated.tenant-admin-customers.023') }}</small></span>

@@ -16,6 +16,7 @@ import {
   getTenantAdminShareProfile,
   updateTenantAdminShareProfile
 } from '../api/tenantAdminShareProfileApi'
+import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
@@ -348,10 +349,11 @@ function apiErrorText(error: unknown): string {
               <span>{{ gt('generated.tenant-admin-profile.009') }}</span>
               <input v-model.trim="form.principalName" />
             </label>
-            <label>
-              <span>{{ gt('generated.tenant-admin-profile.010') }}</span>
-              <input v-model.trim="form.contactPhone" />
-            </label>
+            <CountryPhoneField
+              v-model="form.contactPhone"
+              :label="gt('generated.tenant-admin-profile.010')"
+              model-format="e164"
+            />
             <label class="wide-field">
               <span>{{ gt('generated.tenant-admin-profile.011') }}</span>
               <input v-model.trim="form.address" />
@@ -381,10 +383,11 @@ function apiErrorText(error: unknown): string {
               <span>{{ gt('generated.tenant-admin-profile.016') }}</span>
               <input v-model.trim="shareForm.shareEmail" type="email" placeholder="booking@example.com" />
             </label>
-            <label>
-              <span>{{ gt('generated.tenant-admin-profile.017') }}</span>
-              <input v-model.trim="shareForm.whatsappBusinessPhoneE164" placeholder="+6588880000" />
-            </label>
+            <CountryPhoneField
+              v-model="shareForm.whatsappBusinessPhoneE164"
+              :label="gt('generated.tenant-admin-profile.017')"
+              model-format="e164"
+            />
             <label class="wide-field">
               <span>{{ gt('generated.tenant-admin-profile.018') }}</span>
               <input v-model.trim="shareForm.reservationShareNote" />

@@ -2,6 +2,7 @@
 import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import CountryPhoneField from '../common/CountryPhoneField.vue'
 import PasswordInput from '../common/PasswordInput.vue'
 import type { PlatformTenantFormModel, TenantStatusOption } from './platformTenantUi'
 
@@ -115,10 +116,11 @@ function clearLogo(): void {
         <input v-model.trim="localForm.principalName" maxlength="80" autocomplete="off" />
       </label>
 
-      <label>
-        <span>{{ $t('platform.tenants.form.phone') }}</span>
-        <input v-model.trim="localForm.contactPhone" maxlength="40" autocomplete="off" />
-      </label>
+      <CountryPhoneField
+        v-model="localForm.contactPhone"
+        :label="$t('platform.tenants.form.phone')"
+        model-format="e164"
+      />
 
       <label class="span-2">
         <span>{{ $t('platform.tenants.form.address') }}</span>

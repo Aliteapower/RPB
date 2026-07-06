@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -172,6 +173,12 @@ public class AuthApplicationService {
         return authenticateSession(sessionToken)
             .map(AuthSessionAuthentication::principal)
             .orElseThrow(() -> new AuthApiException(AuthApiErrorCode.UNAUTHENTICATED));
+    }
+
+    @Transactional
+    public List<AuthStoreAccess> currentStores(String sessionToken) {
+        AuthPrincipal principal = currentUser(sessionToken);
+        return repository.authorizedStores(principal);
     }
 
     @Transactional

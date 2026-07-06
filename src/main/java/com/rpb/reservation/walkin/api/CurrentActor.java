@@ -41,6 +41,6 @@ public record CurrentActor(
     }
 
     public boolean canAccessStore(UUID storeId) {
-        return roles.contains(TENANT_ADMIN) || storeIds.contains(storeId);
+        return storeId != null && storeIds.contains(storeId);
     }
 }

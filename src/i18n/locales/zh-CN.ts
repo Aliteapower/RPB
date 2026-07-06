@@ -214,6 +214,10 @@ export const zhCN = {
       }
     }
   },
+  storeSwitcher: {
+    label: '切换店面',
+    unknown: '当前门店'
+  },
   reservationCreate: {
     errors: {
       startInPast: '预约开始时间不能早于当前时间，请选择稍后的时间。',
@@ -791,6 +795,16 @@ export const zhCN = {
         versionConflict: '字典已被其他操作更新，请刷新后重试',
         placeholderUnknown: '模板包含未授权占位符',
         keyNotAllowed: '该文案不允许租户维护'
+      }
+    },
+    staffForm: {
+      storeAccess: {
+        title: '授权门店',
+        defaultStore: '默认门店'
+      },
+      errors: {
+        storeRequired: '请至少选择一个授权门店',
+        defaultStoreRequired: '默认门店必须在授权门店内'
       }
     }
   },

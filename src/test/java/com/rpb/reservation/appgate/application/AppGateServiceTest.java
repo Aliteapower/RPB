@@ -111,6 +111,13 @@ class AppGateServiceTest {
     }
 
     @Test
+    void tenantAdminWithoutExplicitStoreAccessDeniesWithStoreAccessDenied() {
+        AppGateDecision decision = service.evaluate(request(tenantAdmin(Set.of(), Set.of(PERMISSION))));
+
+        assertDenied(decision, AppGateDenyReason.STORE_ACCESS_DENIED, "appgate.store_access_denied");
+    }
+
+    @Test
     void actorWithoutPermissionDeniesWithPermissionDenied() {
         AppGateDecision decision = service.evaluate(request(actor(Set.of(STORE_ID), Set.of("cleaning.complete"))));
 
@@ -288,6 +295,17 @@ class AppGateServiceTest {
             ACTOR_ID,
             "staff",
             Set.of("store_staff"),
+            permissions,
+            storeIds
+        );
+    }
+
+    private static CurrentActor tenantAdmin(Set<UUID> storeIds, Set<String> permissions) {
+        return CurrentActor.storeStaff(
+            TENANT_ID,
+            ACTOR_ID,
+            "tenant_admin",
+            Set.of("tenant_admin"),
             permissions,
             storeIds
         );

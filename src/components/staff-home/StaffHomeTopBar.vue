@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import StoreSwitcher from '../store/StoreSwitcher.vue'
+
 const props = defineProps<{
   appStatusLabel: string
   businessDate?: string | null
@@ -32,7 +34,7 @@ const displayAppStatus = computed(() => {
         <slot name="utility" />
       </div>
       <div class="topbar-row topbar-row--store">
-        <span class="store-pill">{{ storeLabel }}</span>
+        <StoreSwitcher :fallback-label="storeLabel" surface="staff" />
         <span v-if="displayAppStatus" class="app-pill">{{ displayAppStatus }}</span>
         <slot name="action" />
       </div>
@@ -114,7 +116,6 @@ h1 {
 }
 
 .time-pill,
-.store-pill,
 .app-pill {
   border-radius: 999px;
   font-size: 0.74rem;
@@ -130,11 +131,6 @@ h1 {
 .time-pill {
   background: #e2e8f0;
   color: #64748b;
-}
-
-.store-pill {
-  background: #eef2ff;
-  color: #4338ca;
 }
 
 .app-pill {
@@ -166,10 +162,6 @@ h1 {
 
   .topbar-row {
     gap: 5px;
-  }
-
-  .store-pill {
-    max-width: 86px;
   }
 
   .app-pill {

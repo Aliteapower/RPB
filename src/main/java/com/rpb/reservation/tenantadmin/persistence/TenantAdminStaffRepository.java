@@ -7,8 +7,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -55,7 +57,7 @@ public class TenantAdminStaffRepository {
         args.add(criteria.offset());
         return jdbc.query(
             """
-            select account.id, account.username, account.display_name, account.status,
+            select account.id, account.username, account.display_name, account.status, account.default_store_id,
                    account.contact_phone, account.email, account.created_at, account.updated_at
             from auth_accounts account
             join auth_account_store_access access on access.account_id = account.id
@@ -63,7 +65,7 @@ public class TenantAdminStaffRepository {
             order by account.username
             limit ? offset ?
             """.formatted(where.sql()),
-            (rs, rowNum) -> staff(rs),
+            this::staff,
             args.toArray()
         );
     }
@@ -86,7 +88,7 @@ public class TenantAdminStaffRepository {
     public Optional<TenantAdminStaff> findById(StoreScope scope, UUID staffId) {
         return jdbc.query(
             """
-            select account.id, account.username, account.display_name, account.status,
+            select account.id, account.username, account.display_name, account.status, account.default_store_id,
                    account.contact_phone, account.email, account.created_at, account.updated_at
             from auth_accounts account
             join auth_account_store_access access on access.account_id = account.id
@@ -98,7 +100,7 @@ public class TenantAdminStaffRepository {
               and access.store_id = ?
               and access.deleted_at is null
             """,
-            (rs, rowNum) -> staff(rs),
+            this::staff,
             staffId,
             scope.tenantId().value(),
             scope.tenantId().value(),
@@ -106,10 +108,27 @@ public class TenantAdminStaffRepository {
         ).stream().findFirst();
     }
 
+    private Optional<TenantAdminStaff> findByIdInTenant(StoreScope scope, UUID staffId) {
+        return jdbc.query(
+            """
+            select account.id, account.username, account.display_name, account.status, account.default_store_id,
+                   account.contact_phone, account.email, account.created_at, account.updated_at
+            from auth_accounts account
+            where account.id = ?
+              and account.tenant_id = ?
+              and account.actor_type = 'staff'
+              and account.deleted_at is null
+            """,
+            this::staff,
+            staffId,
+            scope.tenantId().value()
+        ).stream().findFirst();
+    }
+
     public Optional<TenantAdminStaff> findTenantAdminById(StoreScope scope, UUID accountId) {
         return jdbc.query(
             """
-            select account.id, account.username, account.display_name, account.status,
+            select account.id, account.username, account.display_name, account.status, account.default_store_id,
                    account.contact_phone, account.email, account.created_at, account.updated_at
             from auth_accounts account
             join auth_account_store_access access on access.account_id = account.id
@@ -121,12 +140,34 @@ public class TenantAdminStaffRepository {
               and access.store_id = ?
               and access.deleted_at is null
             """,
-            (rs, rowNum) -> tenantAdminSelf(rs),
+            this::tenantAdminSelf,
             accountId,
             scope.tenantId().value(),
             scope.tenantId().value(),
             scope.storeId().value()
         ).stream().findFirst();
+    }
+
+    public Set<UUID> activeStoreIds(UUID tenantId, List<UUID> storeIds) {
+        if (storeIds == null || storeIds.isEmpty()) {
+            return Set.of();
+        }
+        String placeholders = String.join(", ", storeIds.stream().map(storeId -> "?").toList());
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        args.addAll(storeIds);
+        return new LinkedHashSet<>(jdbc.queryForList(
+            """
+            select id
+            from stores
+            where tenant_id = ?
+              and id in (%s)
+              and status = 'active'
+              and deleted_at is null
+            """.formatted(placeholders),
+            UUID.class,
+            args.toArray()
+        ));
     }
 
     public TenantAdminStaff insert(
@@ -136,7 +177,9 @@ public class TenantAdminStaffRepository {
         String name,
         String phone,
         String email,
-        String passwordHash
+        String passwordHash,
+        UUID defaultStoreId,
+        List<UUID> storeIds
     ) {
         jdbc.update(
             """
@@ -151,14 +194,14 @@ public class TenantAdminStaffRepository {
             employeeNo,
             name,
             passwordHash,
-            scope.storeId().value(),
+            defaultStoreId,
             phone,
             email
         );
         ensureRole(staffId, STORE_STAFF_ROLE);
         STAFF_PERMISSIONS.forEach(permission -> ensurePermission(staffId, permission));
-        ensureStoreAccess(scope, staffId);
-        return findById(scope, staffId).orElseThrow();
+        storeIds.forEach(storeId -> ensureStoreAccess(staffId, scope.tenantId().value(), storeId));
+        return findByIdInTenant(scope, staffId).orElseThrow();
     }
 
     public Optional<TenantAdminStaff> update(
@@ -168,7 +211,10 @@ public class TenantAdminStaffRepository {
         String phone,
         String email,
         String status,
-        String passwordHash
+        String passwordHash,
+        UUID defaultStoreId,
+        List<UUID> storeIds,
+        boolean replaceStoreAccess
     ) {
         if (passwordHash == null) {
             jdbc.update(
@@ -178,6 +224,7 @@ public class TenantAdminStaffRepository {
                     contact_phone = ?,
                     email = ?,
                     status = ?,
+                    default_store_id = ?,
                     updated_at = now(),
                     version = version + 1
                 where id = ?
@@ -189,10 +236,14 @@ public class TenantAdminStaffRepository {
                 phone,
                 email,
                 status,
+                defaultStoreId,
                 staffId,
                 scope.tenantId().value()
             );
-            return findById(scope, staffId);
+            if (replaceStoreAccess) {
+                replaceStoreAccess(staffId, scope.tenantId().value(), storeIds);
+            }
+            return findByIdInTenant(scope, staffId);
         }
 
         jdbc.update(
@@ -202,6 +253,7 @@ public class TenantAdminStaffRepository {
                 contact_phone = ?,
                 email = ?,
                 status = ?,
+                default_store_id = ?,
                 password_hash = ?,
                 password_algo = 'bcrypt-lowercase-v1',
                 failed_login_count = 0,
@@ -217,11 +269,15 @@ public class TenantAdminStaffRepository {
             phone,
             email,
             status,
+            defaultStoreId,
             passwordHash,
             staffId,
             scope.tenantId().value()
         );
-        return findById(scope, staffId);
+        if (replaceStoreAccess) {
+            replaceStoreAccess(staffId, scope.tenantId().value(), storeIds);
+        }
+        return findByIdInTenant(scope, staffId);
     }
 
     public Optional<TenantAdminStaff> updateTenantAdminSelf(
@@ -342,7 +398,22 @@ public class TenantAdminStaffRepository {
         );
     }
 
-    private void ensureStoreAccess(StoreScope scope, UUID accountId) {
+    private void replaceStoreAccess(UUID accountId, UUID tenantId, List<UUID> storeIds) {
+        jdbc.update(
+            """
+            update auth_account_store_access
+            set deleted_at = now()
+            where account_id = ?
+              and tenant_id = ?
+              and deleted_at is null
+            """,
+            accountId,
+            tenantId
+        );
+        storeIds.forEach(storeId -> ensureStoreAccess(accountId, tenantId, storeId));
+    }
+
+    private void ensureStoreAccess(UUID accountId, UUID tenantId, UUID storeId) {
         jdbc.update(
             """
             insert into auth_account_store_access (account_id, tenant_id, store_id)
@@ -357,11 +428,30 @@ public class TenantAdminStaffRepository {
             )
             """,
             accountId,
-            scope.tenantId().value(),
-            scope.storeId().value(),
+            tenantId,
+            storeId,
             accountId,
-            scope.tenantId().value(),
-            scope.storeId().value()
+            tenantId,
+            storeId
+        );
+    }
+
+    private List<UUID> storeIds(UUID accountId) {
+        return jdbc.queryForList(
+            """
+            select access.store_id
+            from auth_account_store_access access
+            join stores store
+              on store.id = access.store_id
+             and store.tenant_id = access.tenant_id
+             and store.deleted_at is null
+             and store.status = 'active'
+            where access.account_id = ?
+              and access.deleted_at is null
+            order by access.store_id
+            """,
+            UUID.class,
+            accountId
         );
     }
 
@@ -396,7 +486,7 @@ public class TenantAdminStaffRepository {
         return new WhereClause(sql.toString(), args);
     }
 
-    private static TenantAdminStaff staff(ResultSet rs) throws SQLException {
+    private TenantAdminStaff staff(ResultSet rs, int rowNum) throws SQLException {
         return new TenantAdminStaff(
             rs.getObject("id", UUID.class),
             rs.getString("username"),
@@ -404,6 +494,8 @@ public class TenantAdminStaffRepository {
             rs.getString("contact_phone"),
             rs.getString("email"),
             rs.getString("status"),
+            rs.getObject("default_store_id", UUID.class),
+            storeIds(rs.getObject("id", UUID.class)),
             STAFF_ACCOUNT_TYPE,
             false,
             true,
@@ -413,7 +505,7 @@ public class TenantAdminStaffRepository {
         );
     }
 
-    private static TenantAdminStaff tenantAdminSelf(ResultSet rs) throws SQLException {
+    private TenantAdminStaff tenantAdminSelf(ResultSet rs, int rowNum) throws SQLException {
         return new TenantAdminStaff(
             rs.getObject("id", UUID.class),
             rs.getString("username"),
@@ -421,6 +513,8 @@ public class TenantAdminStaffRepository {
             rs.getString("contact_phone"),
             rs.getString("email"),
             rs.getString("status"),
+            rs.getObject("default_store_id", UUID.class),
+            storeIds(rs.getObject("id", UUID.class)),
             TENANT_ADMIN,
             true,
             true,

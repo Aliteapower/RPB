@@ -1,6 +1,7 @@
 package com.rpb.reservation.auth.persistence;
 
 import com.rpb.reservation.auth.application.AuthPrincipal;
+import com.rpb.reservation.auth.application.AuthStoreAccess;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -286,6 +287,47 @@ public class AuthRepository {
             storeIds(account.id()),
             strings("auth_account_roles", "role_code", account.id()),
             strings("auth_account_permissions", "permission_code", account.id())
+        );
+    }
+
+    public List<AuthStoreAccess> authorizedStores(AuthPrincipal principal) {
+        if (principal == null || principal.tenantId() == null || "platform_admin".equals(principal.actorType())) {
+            return List.of();
+        }
+        return jdbc.query(
+            """
+            select
+                store.id as store_id,
+                store.store_code,
+                store.display_name,
+                store.status,
+                store.locale,
+                account.default_store_id = store.id as default_store
+            from auth_accounts account
+            join auth_account_store_access access
+              on access.account_id = account.id
+             and access.tenant_id = account.tenant_id
+             and access.deleted_at is null
+            join stores store
+              on store.id = access.store_id
+             and store.tenant_id = access.tenant_id
+             and store.deleted_at is null
+             and store.status = 'active'
+            where account.id = ?
+              and account.tenant_id = ?
+              and account.deleted_at is null
+            order by default_store desc, lower(store.display_name), lower(store.store_code), store.id
+            """,
+            (rs, rowNum) -> new AuthStoreAccess(
+                rs.getObject("store_id", UUID.class),
+                rs.getString("store_code"),
+                rs.getString("display_name"),
+                rs.getString("status"),
+                rs.getString("locale"),
+                rs.getBoolean("default_store")
+            ),
+            principal.accountId(),
+            principal.tenantId()
         );
     }
 

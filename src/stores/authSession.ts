@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 
-import { AuthApiError, fetchCurrentUser, login, logout } from '../api/authApi'
-import type { AuthUser, LoginRequest } from '../types/auth'
+import { AuthApiError, fetchCurrentStores, fetchCurrentUser, login, logout } from '../api/authApi'
+import type { AuthStoreAccess, AuthUser, LoginRequest } from '../types/auth'
 
 const missingStoreScopeRoute = '/login?storeScope=missing'
 
 export const useAuthSessionStore = defineStore('authSession', {
   state: () => ({
     user: null as AuthUser | null,
+    authorizedStores: [] as AuthStoreAccess[],
+    storesLoaded: false,
+    storesLoading: false,
     loaded: false,
     loading: false
   }),
@@ -49,6 +52,8 @@ export const useAuthSessionStore = defineStore('authSession', {
         } else {
           this.user = null
         }
+        this.authorizedStores = []
+        this.storesLoaded = false
       } finally {
         this.loaded = true
         this.loading = false
@@ -56,10 +61,36 @@ export const useAuthSessionStore = defineStore('authSession', {
 
       return this.user
     },
+    async ensureAuthorizedStores(force = false): Promise<AuthStoreAccess[]> {
+      if (!this.user || this.isPlatformAdmin) {
+        this.authorizedStores = []
+        this.storesLoaded = true
+        return this.authorizedStores
+      }
+      if (this.storesLoaded && !force) {
+        return this.authorizedStores
+      }
+
+      this.storesLoading = true
+      try {
+        const response = await fetchCurrentStores()
+        this.authorizedStores = response.stores
+        this.storesLoaded = true
+      } catch {
+        this.authorizedStores = []
+        this.storesLoaded = true
+      } finally {
+        this.storesLoading = false
+      }
+
+      return this.authorizedStores
+    },
     async loginWithPassword(request: LoginRequest): Promise<AuthUser> {
       const response = await login(request)
       this.user = response.user
       this.loaded = true
+      this.authorizedStores = []
+      this.storesLoaded = false
       return response.user
     },
     async logoutCurrentUser(): Promise<void> {
@@ -67,11 +98,15 @@ export const useAuthSessionStore = defineStore('authSession', {
         await logout()
       } finally {
         this.user = null
+        this.authorizedStores = []
+        this.storesLoaded = false
         this.loaded = true
       }
     },
     clear(): void {
       this.user = null
+      this.authorizedStores = []
+      this.storesLoaded = false
       this.loaded = true
     }
   }

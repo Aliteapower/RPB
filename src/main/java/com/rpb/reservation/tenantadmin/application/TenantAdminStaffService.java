@@ -2,6 +2,8 @@ package com.rpb.reservation.tenantadmin.application;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.tenantadmin.persistence.TenantAdminStaffRepository;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -52,7 +54,8 @@ public class TenantAdminStaffService {
 
     @Transactional
     public TenantAdminStaff createStaff(StoreScope scope, TenantAdminStaffMutationCommand command) {
-        NormalizedStaffInput input = normalizeCreate(command);
+        NormalizedStaffInput input = normalizeCreate(scope, command);
+        validateStoreAccess(scope, input.storeIds(), input.defaultStoreId());
         try {
             return repository.insert(
                 scope,
@@ -61,7 +64,9 @@ public class TenantAdminStaffService {
                 input.name(),
                 input.phone(),
                 input.email(),
-                passwordHash(input.password())
+                passwordHash(input.password()),
+                input.defaultStoreId(),
+                input.storeIds()
             );
         } catch (DataIntegrityViolationException exception) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_CODE_CONFLICT);
@@ -73,6 +78,7 @@ public class TenantAdminStaffService {
         TenantAdminStaff existing = repository.findById(scope, staffId)
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
         NormalizedStaffInput input = normalizeUpdate(existing, command);
+        validateStoreAccess(scope, input.storeIds(), input.defaultStoreId());
         return repository.update(
                 scope,
                 staffId,
@@ -80,7 +86,10 @@ public class TenantAdminStaffService {
                 input.phone(),
                 input.email(),
                 input.status(),
-                input.password() == null ? null : passwordHash(input.password())
+                input.password() == null ? null : passwordHash(input.password()),
+                input.defaultStoreId(),
+                input.storeIds(),
+                input.replaceStoreAccess()
             )
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
     }
@@ -107,17 +116,22 @@ public class TenantAdminStaffService {
         return updated;
     }
 
-    private static NormalizedStaffInput normalizeCreate(TenantAdminStaffMutationCommand command) {
+    private static NormalizedStaffInput normalizeCreate(StoreScope scope, TenantAdminStaffMutationCommand command) {
         if (command == null) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
+        List<UUID> storeIds = normalizeStoreIds(command.storeIds(), List.of(scope.storeId().value()));
+        UUID defaultStoreId = normalizeDefaultStoreId(command.defaultStoreId(), storeIds, scope.storeId().value());
         return new NormalizedStaffInput(
             requiredText(command.employeeNo()),
             requiredText(command.name()),
             optionalText(command.phone()),
             optionalText(command.email()),
             normalizeStatus(firstText(command.status(), "active")),
-            requiredPassword(command.password())
+            requiredPassword(command.password()),
+            defaultStoreId,
+            storeIds,
+            true
         );
     }
 
@@ -132,13 +146,19 @@ public class TenantAdminStaffService {
         if (requestedEmployeeNo != null && !requestedEmployeeNo.equals(existing.employeeNo())) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
+        boolean replaceStoreAccess = command.storeIds() != null;
+        List<UUID> storeIds = normalizeStoreIds(command.storeIds(), existing.storeIds());
+        UUID defaultStoreId = normalizeDefaultStoreId(command.defaultStoreId(), storeIds, existing.defaultStoreId());
         return new NormalizedStaffInput(
             existing.employeeNo(),
             firstText(command.name(), existing.name()),
             optionalTextOrExisting(command.phone(), existing.phone()),
             optionalTextOrExisting(command.email(), existing.email()),
             normalizeStatus(firstText(command.status(), existing.status())),
-            optionalPassword(command.password())
+            optionalPassword(command.password()),
+            defaultStoreId,
+            storeIds,
+            replaceStoreAccess
         );
     }
 
@@ -149,7 +169,12 @@ public class TenantAdminStaffService {
         if (command == null) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
-        if (optionalText(command.employeeNo()) != null || optionalText(command.status()) != null) {
+        if (
+            optionalText(command.employeeNo()) != null
+                || optionalText(command.status()) != null
+                || command.storeIds() != null
+                || command.defaultStoreId() != null
+        ) {
             throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
         }
         return new NormalizedStaffInput(
@@ -158,8 +183,49 @@ public class TenantAdminStaffService {
             optionalTextOrExisting(command.phone(), existing.phone()),
             optionalTextOrExisting(command.email(), existing.email()),
             existing.status(),
-            optionalPassword(command.password())
+            optionalPassword(command.password()),
+            existing.defaultStoreId(),
+            existing.storeIds(),
+            false
         );
+    }
+
+    private void validateStoreAccess(StoreScope scope, List<UUID> storeIds, UUID defaultStoreId) {
+        if (storeIds.isEmpty() || defaultStoreId == null || !storeIds.contains(defaultStoreId)) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        Set<UUID> activeStoreIds = repository.activeStoreIds(scope.tenantId().value(), storeIds);
+        if (activeStoreIds.size() != storeIds.size()) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private static List<UUID> normalizeStoreIds(List<UUID> requestedStoreIds, List<UUID> fallbackStoreIds) {
+        List<UUID> source = requestedStoreIds == null ? fallbackStoreIds : requestedStoreIds;
+        if (source == null || source.isEmpty()) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        LinkedHashSet<UUID> unique = new LinkedHashSet<>();
+        for (UUID storeId : source) {
+            if (storeId == null) {
+                throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+            }
+            unique.add(storeId);
+        }
+        return List.copyOf(unique);
+    }
+
+    private static UUID normalizeDefaultStoreId(UUID requestedDefaultStoreId, List<UUID> storeIds, UUID fallbackDefaultStoreId) {
+        UUID defaultStoreId = requestedDefaultStoreId;
+        if (defaultStoreId == null) {
+            defaultStoreId = fallbackDefaultStoreId != null && storeIds.contains(fallbackDefaultStoreId)
+                ? fallbackDefaultStoreId
+                : storeIds.get(0);
+        }
+        if (!storeIds.contains(defaultStoreId)) {
+            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
+        }
+        return defaultStoreId;
     }
 
     private static String normalizeStatus(String status) {
@@ -224,7 +290,13 @@ public class TenantAdminStaffService {
         String phone,
         String email,
         String status,
-        String password
+        String password,
+        UUID defaultStoreId,
+        List<UUID> storeIds,
+        boolean replaceStoreAccess
     ) {
+        private NormalizedStaffInput {
+            storeIds = storeIds == null ? List.of() : List.copyOf(storeIds);
+        }
     }
 }

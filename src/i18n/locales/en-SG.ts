@@ -214,6 +214,10 @@ export const enSG = {
       }
     }
   },
+  storeSwitcher: {
+    label: 'Switch store',
+    unknown: 'Current store'
+  },
   reservationCreate: {
     errors: {
       startInPast: 'Reservation start time cannot be earlier than now. Choose a later time.',
@@ -791,6 +795,16 @@ export const enSG = {
         versionConflict: 'The catalog was updated elsewhere. Refresh and try again.',
         placeholderUnknown: 'The template contains an unsupported placeholder.',
         keyNotAllowed: 'This message cannot be maintained by tenants.'
+      }
+    },
+    staffForm: {
+      storeAccess: {
+        title: 'Authorised stores',
+        defaultStore: 'Default store'
+      },
+      errors: {
+        storeRequired: 'Choose at least one authorised store.',
+        defaultStoreRequired: 'Default store must be one of the authorised stores.'
       }
     }
   },

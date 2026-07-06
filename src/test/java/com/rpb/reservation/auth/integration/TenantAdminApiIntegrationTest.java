@@ -12,9 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -40,6 +43,8 @@ class TenantAdminApiIntegrationTest {
     private static final AuthPostgresTestDatabase DATABASE = AuthPostgresTestDatabase.startWithValidationStore();
     private static final String PASSWORD_393930_HASH = "$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy";
     private static final UUID SECONDARY_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000984");
+    private static final UUID FOREIGN_TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000009984");
+    private static final UUID FOREIGN_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000009984");
 
     @Autowired
     private MockMvc mockMvc;
@@ -100,6 +105,7 @@ class TenantAdminApiIntegrationTest {
             """
             update auth_accounts
             set password_hash = ?,
+                default_store_id = ?,
                 display_name = case username
                     when '20000000' then '租户管理员'
                     when '1000' then '租户员工'
@@ -114,7 +120,8 @@ class TenantAdminApiIntegrationTest {
                 version = version + 1
             where username in ('sysadmin', '20000000', '1000')
             """,
-            PASSWORD_393930_HASH
+            PASSWORD_393930_HASH,
+            VALIDATION_STORE_ID
         );
         jdbc.update("""
             update stores
@@ -247,6 +254,99 @@ class TenantAdminApiIntegrationTest {
               and policy.effective_to_at is null
               and policy.deleted_at is null
             """, VALIDATION_STORE_ID, VALIDATION_TENANT_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantAdminMaintainsStaffAuthorizedStoresAndDefaultStore() throws Exception {
+        upsertSecondaryStoreForStaffAuthorization();
+        Cookie session = login("20000000");
+
+        MvcResult created = mockMvc.perform(post(basePath() + "/staff")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "employeeNo":"codex-multistore",
+                      "name":"Codex 多店员工",
+                      "phone":"13800001088",
+                      "email":"codex-multistore@example.test",
+                      "password":"abc123",
+                      "storeIds":["%s","%s"],
+                      "defaultStoreId":"%s"
+                    }
+                    """.formatted(VALIDATION_STORE_ID, SECONDARY_STORE_ID, SECONDARY_STORE_ID))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.staff.employeeNo").value("codex-multistore"))
+            .andExpect(jsonPath("$.staff.defaultStoreId").value(SECONDARY_STORE_ID.toString()))
+            .andReturn();
+
+        JsonNode createdStaff = objectMapper.readTree(created.getResponse().getContentAsString()).path("staff");
+        UUID staffId = UUID.fromString(createdStaff.path("id").asText());
+        assertThat(strings(createdStaff.path("storeIds")))
+            .containsExactlyInAnyOrder(VALIDATION_STORE_ID.toString(), SECONDARY_STORE_ID.toString());
+
+        Cookie staffSession = login("codex-multistore", "abc123");
+        MvcResult staffStoresResult = mockMvc.perform(get("/api/v1/me/stores").cookie(staffSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode staffStores = objectMapper.readTree(staffStoresResult.getResponse().getContentAsString()).path("stores");
+        assertThat(stringsByField(staffStores, "storeId"))
+            .containsExactlyInAnyOrder(VALIDATION_STORE_ID.toString(), SECONDARY_STORE_ID.toString());
+        assertThat(storeById(staffStores, SECONDARY_STORE_ID).path("defaultStore").asBoolean()).isTrue();
+
+        MvcResult updated = mockMvc.perform(patch(basePath() + "/staff/{staffId}", staffId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name":"Codex 单店员工",
+                      "phone":"13800001088",
+                      "email":"codex-multistore@example.test",
+                      "status":"active",
+                      "storeIds":["%s"],
+                      "defaultStoreId":"%s"
+                    }
+                    """.formatted(VALIDATION_STORE_ID, VALIDATION_STORE_ID))
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.staff.defaultStoreId").value(VALIDATION_STORE_ID.toString()))
+            .andReturn();
+
+        JsonNode updatedStaff = objectMapper.readTree(updated.getResponse().getContentAsString()).path("staff");
+        assertThat(strings(updatedStaff.path("storeIds"))).containsExactly(VALIDATION_STORE_ID.toString());
+
+        Cookie updatedStaffSession = login("codex-multistore", "abc123");
+        MvcResult meResult = mockMvc.perform(get("/api/v1/auth/me").cookie(updatedStaffSession))
+            .andExpect(status().isOk())
+            .andReturn();
+        JsonNode user = objectMapper.readTree(meResult.getResponse().getContentAsString()).path("user");
+        assertThat(user.path("defaultStoreId").asText()).isEqualTo(VALIDATION_STORE_ID.toString());
+        assertThat(strings(user.path("storeIds"))).containsExactly(VALIDATION_STORE_ID.toString());
+    }
+
+    @Test
+    void tenantAdminRejectsStaffAuthorizedStoresOutsideTenant() throws Exception {
+        upsertForeignTenantStore();
+        Cookie session = login("20000000");
+
+        mockMvc.perform(post(basePath() + "/staff")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "employeeNo":"codex-foreign-store",
+                      "name":"Codex 跨租户员工",
+                      "phone":"13800001089",
+                      "email":"codex-foreign-store@example.test",
+                      "password":"abc123",
+                      "storeIds":["%s","%s"],
+                      "defaultStoreId":"%s"
+                    }
+                    """.formatted(VALIDATION_STORE_ID, FOREIGN_STORE_ID, VALIDATION_STORE_ID))
+                .cookie(session))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
     }
 
     @Test
@@ -1094,6 +1194,91 @@ class TenantAdminApiIntegrationTest {
             SECONDARY_STORE_ID,
             VALIDATION_TENANT_ID
         );
+    }
+
+    private void upsertSecondaryStoreForStaffAuthorization() {
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'staff-auth-store', '员工授权二店', 'active',
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            on conflict (id) do update
+            set store_code = excluded.store_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                locale = excluded.locale,
+                deleted_at = null,
+                updated_at = now(),
+                version = stores.version + 1
+            """,
+            SECONDARY_STORE_ID,
+            VALIDATION_TENANT_ID
+        );
+    }
+
+    private void upsertForeignTenantStore() {
+        jdbc.update(
+            """
+            insert into tenants (id, tenant_code, display_name, status, default_locale)
+            values (?, 'codex-foreign', 'Codex 外部租户', 'active', 'zh-CN')
+            on conflict (id) do update
+            set tenant_code = excluded.tenant_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                deleted_at = null,
+                updated_at = now(),
+                version = tenants.version + 1
+            """,
+            FOREIGN_TENANT_ID
+        );
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'foreign-store', '外部租户门店', 'active',
+                    'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            on conflict (id) do update
+            set tenant_id = excluded.tenant_id,
+                store_code = excluded.store_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                deleted_at = null,
+                updated_at = now(),
+                version = stores.version + 1
+            """,
+            FOREIGN_STORE_ID,
+            FOREIGN_TENANT_ID
+        );
+    }
+
+    private static List<String> strings(JsonNode array) {
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : array) {
+            values.add(item.asText());
+        }
+        return values;
+    }
+
+    private static List<String> stringsByField(JsonNode array, String fieldName) {
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : array) {
+            values.add(item.path(fieldName).asText());
+        }
+        return values;
+    }
+
+    private static JsonNode storeById(JsonNode stores, UUID storeId) {
+        for (JsonNode store : stores) {
+            if (storeId.toString().equals(store.path("storeId").asText())) {
+                return store;
+            }
+        }
+        throw new AssertionError("Missing store " + storeId);
     }
 
     private byte[] tableImportWorkbook() throws Exception {

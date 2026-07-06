@@ -28,6 +28,20 @@ export interface AuthUser {
   permissions: string[]
 }
 
+export interface AuthStoreAccess {
+  storeId: string
+  storeCode: string
+  storeName: string
+  status: string
+  locale: string
+  defaultStore: boolean
+}
+
+export interface AuthStoreAccessResponse {
+  success: true
+  stores: AuthStoreAccess[]
+}
+
 export type AuthLoginEntry = 'platform_admin' | 'tenant_admin' | 'staff'
 
 export interface LoginRequest {

@@ -10,6 +10,7 @@ import {
   resetTenantAdminShareProfileTemplate,
   updateTenantAdminShareProfile
 } from '../api/tenantAdminShareProfileApi'
+import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
@@ -225,10 +226,11 @@ function apiErrorText(error: unknown): string {
               <span>{{ gt('generated.tenant-admin-reservation-share.009') }}</span>
               <input v-model.trim="form.shareEmail" type="email" placeholder="booking@example.com" />
             </label>
-            <label>
-              <span>{{ gt('generated.tenant-admin-reservation-share.010') }}</span>
-              <input v-model.trim="form.whatsappBusinessPhoneE164" placeholder="+6588880000" />
-            </label>
+            <CountryPhoneField
+              v-model="form.whatsappBusinessPhoneE164"
+              :label="gt('generated.tenant-admin-reservation-share.010')"
+              model-format="e164"
+            />
             <label class="wide-field">
               <span>{{ gt('generated.tenant-admin-reservation-share.011') }}</span>
               <input v-model.trim="form.reservationShareNote" />

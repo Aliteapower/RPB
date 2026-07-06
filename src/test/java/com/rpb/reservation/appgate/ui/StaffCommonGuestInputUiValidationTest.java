@@ -14,12 +14,14 @@ class StaffCommonGuestInputUiValidationTest {
         Path guestContactLookupPath = Path.of("src", "components", "staff", "StaffGuestContactLookup.vue");
         Path guestNamePath = Path.of("src", "components", "staff", "StaffGuestNameField.vue");
         Path singaporePhonePath = Path.of("src", "components", "staff", "StaffSingaporePhoneField.vue");
+        Path countryPhonePath = Path.of("src", "components", "common", "CountryPhoneField.vue");
         Path contactHelperPath = Path.of("src", "components", "staff", "staffGuestContact.ts");
 
         assertThat(Files.exists(createDialogPath)).isTrue();
         assertThat(Files.exists(guestContactLookupPath)).isTrue();
         assertThat(Files.exists(guestNamePath)).isTrue();
         assertThat(Files.exists(singaporePhonePath)).isTrue();
+        assertThat(Files.exists(countryPhonePath)).isTrue();
         assertThat(Files.exists(contactHelperPath)).isTrue();
 
         String createDialogSource = FrontendSourceSupport.readString(createDialogPath);
@@ -52,11 +54,15 @@ class StaffCommonGuestInputUiValidationTest {
             .contains("toSingaporePhoneE164");
 
         assertThat(contactHelperSource)
+            .contains("from '../../utils/countryPhone'")
             .contains("SINGAPORE_PHONE_PREFIX = '+65'")
             .contains("LOCAL_SINGAPORE_PHONE_PATTERN = /^[0-9]{8}$/")
             .contains("function isValidSingaporeLocalPhone")
             .contains("function toSingaporePhoneE164")
-            .contains("function sanitizeSingaporeLocalPhone");
+            .contains("function sanitizeSingaporeLocalPhone")
+            .contains("sanitizeCountryLocalPhone(value, 'SG')")
+            .contains("isValidCountryLocalPhone(value, 'SG')")
+            .contains("toCountryPhoneE164(value, 'SG')");
     }
 
     @Test
@@ -87,12 +93,9 @@ class StaffCommonGuestInputUiValidationTest {
             .contains("defineProps")
             .contains("defineEmits")
             .contains("update:modelValue")
-            .contains("sanitizeSingaporeLocalPhone")
-            .contains("+65")
-            .contains("maxlength=\"8\"")
-            .contains("inputmode=\"numeric\"")
-            .contains("pattern=\"[0-9]*\"")
-            .contains("autocomplete=\"tel-national\"")
+            .contains("CountryPhoneField")
+            .contains("model-format=\"local\"")
+            .contains(":label=\"t('staffControls.guest.phoneLabel')\"")
             .contains("staffControls.guest.phoneLabel");
 
         assertThat(zhSource)
