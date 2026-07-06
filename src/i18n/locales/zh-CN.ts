@@ -292,6 +292,7 @@ export const zhCN = {
       noForwardLink: '暂无可转发链接',
       copied: '链接已复制',
       nativeOpened: '已打开系统转发',
+      systemFallbackCopied: '系统转发不可用，链接已复制',
       manualShare: '当前浏览器限制转发，请手动复制下方链接',
       phoneUnavailable: '顾客手机号暂不可用于 WhatsApp',
       phoneMissing: '顾客未填写可用手机号',

@@ -9,6 +9,30 @@ import org.junit.jupiter.api.Test;
 class ReservationShareInfoUiValidationTest {
 
     @Test
+    void systemShareFallbackUsesDistinctCopiedFeedbackFromExplicitCopyAction() throws Exception {
+        Path createDialogPath = Path.of("src", "components", "reservation-workbench", "CreateReservationDialog.vue");
+        Path todayItemPath = Path.of("src", "components", "reservation-workbench", "ReservationTodayListItem.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
+        Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
+
+        String createDialogSource = FrontendSourceSupport.readString(createDialogPath);
+        String todayItemSource = FrontendSourceSupport.readString(todayItemPath);
+        String zhSource = FrontendSourceSupport.readString(zhPath);
+        String enSource = FrontendSourceSupport.readString(enPath);
+
+        assertThat(zhSource)
+            .contains("systemFallbackCopied: '系统转发不可用，链接已复制'");
+        assertThat(enSource)
+            .contains("systemFallbackCopied: 'System share unavailable. Link copied.'");
+        assertThat(todayItemSource)
+            .contains("t('reservationWorkbench.share.systemFallbackCopied')")
+            .contains("shareInfoStatusText.value = t('reservationWorkbench.share.copied')");
+        assertThat(createDialogSource)
+            .contains("t('reservationWorkbench.share.systemFallbackCopied')")
+            .contains("createdShareStatusText.value = t('reservationWorkbench.share.copied')");
+    }
+
+    @Test
     void tenantAdminRouteAndWorkbenchUseBackendGeneratedManualCopyShareText() throws Exception {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path navPath = Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue");

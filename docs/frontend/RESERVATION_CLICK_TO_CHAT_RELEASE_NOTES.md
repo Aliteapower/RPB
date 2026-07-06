@@ -23,6 +23,7 @@ Reservation Click-to-Chat Phase 1 / 2026-06-29
 
 - The existing `whatsappLink` behavior is now active instead of being a dead response field.
 - Staff sharing no longer depends only on generic system share/copy fallback when a valid customer phone exists.
+- System share fallback now tells staff that system sharing is unavailable and the link was copied, instead of looking identical to the explicit copy action.
 
 ## Migration
 

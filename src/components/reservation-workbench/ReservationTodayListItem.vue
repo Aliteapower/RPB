@@ -210,7 +210,7 @@ async function systemShareReservationLink(): Promise<void> {
     await recordShareIntent(result === 'copied' ? 'copy_link' : 'system_share')
     shareInfoShared.value = true
     shareInfoStatusText.value = result === 'copied'
-      ? t('reservationWorkbench.share.copied')
+      ? t('reservationWorkbench.share.systemFallbackCopied')
       : t('reservationWorkbench.share.nativeOpened')
     return
   }

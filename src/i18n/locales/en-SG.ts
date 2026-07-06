@@ -292,6 +292,7 @@ export const enSG = {
       noForwardLink: 'No forwarding link available',
       copied: 'Link copied',
       nativeOpened: 'System share opened',
+      systemFallbackCopied: 'System share unavailable. Link copied.',
       manualShare: 'Browser blocked sharing. Copy the link below manually.',
       phoneUnavailable: 'Guest mobile number is not available for WhatsApp',
       phoneMissing: 'Guest did not provide an available mobile number',
