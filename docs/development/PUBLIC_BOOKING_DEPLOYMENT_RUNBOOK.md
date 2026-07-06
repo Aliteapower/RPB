@@ -10,6 +10,10 @@ This captures the 2026-07-04 deployment lessons so the next deployment does not 
 
 - Public site: `https://booking.yumstone.sg`
 - Public login page: `https://booking.yumstone.sg/login`
+- Platform admin login page: `https://platform.booking.yumstone.sg/login`
+- Tenant login page example: `https://20000000.booking.yumstone.sg/login`
+- Alphanumeric tenant login page example: `https://lsc106.booking.yumstone.sg/login`
+- Tenant public booking entry example: `https://20000000.booking.yumstone.sg/book`
 - Public backend health smoke target: `https://booking.yumstone.sg/api/v1/auth/me`
 - Server: `43.134.69.75`
 - SSH user: `ubuntu`
@@ -21,6 +25,7 @@ This captures the 2026-07-04 deployment lessons so the next deployment does not 
 - Backend app port behind nginx: `127.0.0.1:8080`
 - Nginx public listeners observed on 2026-07-05: ports `80` and `443`
 - TLS certificate path: `/etc/letsencrypt/live/booking.yumstone.sg/fullchain.pem`
+- Host-prefix login and tenant `/book` require wildcard DNS and TLS for `*.booking.yumstone.sg`.
 - HTTP requests redirect to HTTPS.
 - HTTPS responses include `Strict-Transport-Security: max-age=31536000`.
 
@@ -88,6 +93,51 @@ Useful known paths:
 
 The nginx config observed on 2026-07-04 served `/opt/rpb/frontend` and proxied `/api` to `http://127.0.0.1:8080`.
 
+## Wildcard Host Prefix Requirements
+
+The application treats the first DNS label as runtime context. The production domain must remain a deployment/runtime setting; do not hard-code `booking.yumstone.sg` in business code.
+
+Required DNS and TLS shape:
+
+```text
+booking.yumstone.sg          A/AAAA -> public load balancer or VM
+*.booking.yumstone.sg        A/AAAA -> same target
+```
+
+Nginx should accept both the root host and wildcard hosts, then pass the original host to Spring Boot:
+
+```nginx
+server_name booking.yumstone.sg *.booking.yumstone.sg;
+
+location /api/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Expected host-prefix behavior:
+
+- `platform.<deployment-domain>/login` exposes only the platform admin login entry.
+- `<tenantCode>.<deployment-domain>/login` exposes tenant admin and staff login entries, hides the platform entry, and does not require typing or displaying the tenant code.
+- DNS-safe alphanumeric prefixes such as `lsc106` are tenant prefixes. The root deployment host must remain the legacy compatibility entry.
+- `<tenantCode>.<deployment-domain>/book` resolves the tenant's single enabled public booking store.
+- Root domain and localhost keep the legacy login tabs and `/book/:storeId` compatibility path.
+
+For deployment roots where label depth alone cannot distinguish the root host from a tenant host, set the backend runtime property through the service environment:
+
+```text
+RPB_HOST_PREFIX_BASE_HOST=booking.yumstone.sg
+```
+
+The frontend resolver also supports the same deployment-root value via build-time or runtime configuration:
+
+```text
+VITE_RPB_HOST_PREFIX_BASE_HOST=booking.yumstone.sg
+window.__RPB_HOST_PREFIX_BASE_HOST__ = 'booking.yumstone.sg'
+```
+
 ## Clean Build Rule
 
 Always build deploy artifacts from a clean detached worktree at the commit being deployed. Do not build from `D:\RPB` when it has unrelated local changes.
@@ -116,7 +166,7 @@ Before uploading a backend jar, check that Flyway and all expected migrations ar
 cd D:\RPB\target\deploy-worktree-<sha>
 
 jar tf target\reservation-platform-0.0.1-SNAPSHOT.jar |
-  Select-String -Pattern 'flyway-database-postgresql|V021__store_share_email|V022__tenant_onboarding|V023__tenant_subscription'
+  Select-String -Pattern 'flyway-database-postgresql|V021__store_share_email|V022__tenant_onboarding|V023__tenant_subscription|V030__auth_account_scoped_username'
 ```
 
 Expected entries for the 2026-07-04 fix:
@@ -125,6 +175,7 @@ Expected entries for the 2026-07-04 fix:
 BOOT-INF/classes/db/migration/V021__store_share_email.sql
 BOOT-INF/classes/db/migration/V022__tenant_onboarding_default_store_backfill.sql
 BOOT-INF/classes/db/migration/V023__tenant_subscription_zero_amount_price_backfill.sql
+BOOT-INF/classes/db/migration/V030__auth_account_scoped_username.sql
 BOOT-INF/lib/flyway-database-postgresql-11.7.2.jar
 ```
 
@@ -302,6 +353,16 @@ Expected:
 active
 401
 ```
+
+Host-prefix smoke targets after deploying the login entry change:
+
+```powershell
+curl.exe -sS -o NUL -w "%{http_code}" https://platform.booking.yumstone.sg/login
+curl.exe -sS -o NUL -w "%{http_code}" https://20000000.booking.yumstone.sg/login
+curl.exe -sS -o NUL -w "%{http_code}" https://20000000.booking.yumstone.sg/book
+```
+
+Expected frontend status is `200`. The tenant `/book` page will call `/api/v1/public/booking-entry`; if the tenant has multiple enabled public booking stores, it should fail explicitly instead of guessing a store.
 
 For tenant login validation, use a user-provided test account without writing the password to docs or logs. The key assertion for a tenant admin is that the login response contains a non-null `defaultStoreId` and a non-empty `storeIds` array.
 

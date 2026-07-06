@@ -66,6 +66,31 @@ class PublicBookingApplicationServiceTest {
     }
 
     @Test
+    void tenantPublicBookingEntryResolvesOnlyWhenExactlyOneEnabledStoreExists() {
+        FakeStoreRepository storeRepository = new FakeStoreRepository();
+        PublicBookingEntryApplicationService service = new PublicBookingEntryApplicationService(storeRepository);
+
+        PublicBookingEntryResult result = service.resolveTenantEntry("20000000");
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.store()).isEqualTo(storeRepository.profile);
+        assertThat(result.error()).isNull();
+    }
+
+    @Test
+    void tenantPublicBookingEntryRejectsMultipleEnabledStoresWithoutGuessing() {
+        FakeStoreRepository storeRepository = new FakeStoreRepository();
+        storeRepository.tenantEntryProfiles = List.of(storeRepository.profile, storeRepository.secondProfile);
+        PublicBookingEntryApplicationService service = new PublicBookingEntryApplicationService(storeRepository);
+
+        PublicBookingEntryResult result = service.resolveTenantEntry("20000000");
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.store()).isNull();
+        assertThat(result.error()).isEqualTo(PublicBookingEntryError.MULTIPLE_ENABLED_STORES);
+    }
+
+    @Test
     void publicBookingPassesOptionalCustomerProfileToReservationCreate() {
         FakeSettingsRepository settings = new FakeSettingsRepository();
         settings.settings = Optional.of(new PublicBookingSettings(
@@ -166,6 +191,20 @@ class PublicBookingApplicationServiceTest {
             null,
             null
         );
+        private final PublicBookingStoreProfile secondProfile = new PublicBookingStoreProfile(
+            new StoreScope(
+                SCOPE.tenantId(),
+                UUID.fromString("20000000-0000-0000-0000-000000000984")
+            ),
+            "Second Store",
+            "UTC",
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+        private List<PublicBookingStoreProfile> tenantEntryProfiles = List.of(profile);
 
         @Override
         public Optional<PublicBookingStoreProfile> findActiveStoreProfileByStoreId(UUID storeId) {
@@ -175,6 +214,11 @@ class PublicBookingApplicationServiceTest {
         @Override
         public Optional<PublicBookingStoreProfile> findActiveStoreProfile(StoreScope scope) {
             return SCOPE.equals(scope) ? Optional.of(profile) : Optional.empty();
+        }
+
+        @Override
+        public List<PublicBookingStoreProfile> findEnabledPublicBookingStoreProfilesByTenantCode(String tenantCode) {
+            return "20000000".equals(tenantCode) ? tenantEntryProfiles : List.of();
         }
     }
 

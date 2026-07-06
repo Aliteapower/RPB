@@ -4,6 +4,8 @@ public record LoginRequest(
     String username,
     String password,
     String captchaId,
-    Integer captchaX
+    Integer captchaX,
+    String loginEntry,
+    String tenantCode
 ) {
 }

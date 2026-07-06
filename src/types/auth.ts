@@ -28,11 +28,15 @@ export interface AuthUser {
   permissions: string[]
 }
 
+export type AuthLoginEntry = 'platform_admin' | 'tenant_admin' | 'staff'
+
 export interface LoginRequest {
   username: string
   password: string
   captchaId: string
   captchaX: number
+  loginEntry?: AuthLoginEntry
+  tenantCode?: string | null
 }
 
 export interface AuthLoginResponse {

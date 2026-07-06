@@ -2,9 +2,11 @@ package com.rpb.reservation.auth.integration;
 
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_STORE_ID;
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_TENANT_ID;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.rpb.reservation.appgate.domain.AppGateRequiredPermission;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -99,14 +101,71 @@ class AuthMigrationTest {
               and permission.permission_code = 'platform.reservation_share_template.manage'
               and permission.deleted_at is null
             """)).isEqualTo(1);
+
+        assertThat(countWhere("""
+            select count(*)
+            from i18n_message_catalog
+            where tenant_id is null
+              and store_id is null
+              and i18n_key = 'reservation.share.restaurant_reservation_confirmation_v1'
+              and locale = 'zh-CN'
+              and status = 'active'
+              and message like '%感谢您选择 {{storeName}}%'
+              and deleted_at is null
+            """)).isEqualTo(1);
     }
 
     @Test
-    void enforcesActiveAccountUsernameUniquenessAndSessionHashUniqueness() {
+    void enforcesScopedAccountUsernameUniquenessAndSessionHashUniqueness() {
         assertThat(countWhere("""
             select count(*)
             from pg_indexes
-            where indexname in ('ux_auth_accounts_username_active', 'ux_auth_user_sessions_session_hash')
+            where indexname in (
+                'ux_auth_accounts_platform_username_active',
+                'ux_auth_accounts_tenant_username_active',
+                'ux_auth_user_sessions_session_hash'
+            )
+            """)).isEqualTo(3);
+        assertThat(indexExists("ux_auth_accounts_username_active")).isFalse();
+    }
+
+    @Test
+    void allowsSameEmployeeUsernameInDifferentTenants() {
+        UUID secondTenantId = UUID.fromString("10000000-0000-0000-0000-000000000984");
+        UUID secondStoreId = UUID.fromString("20000000-0000-0000-0000-000000000984");
+        UUID secondAccountId = UUID.fromString("30000000-0000-0000-0000-000000000984");
+
+        JDBC.update("""
+            insert into tenants (id, tenant_code, display_name, status, default_locale)
+            values (?, '99999999', 'Second Tenant', 'active', 'zh-CN')
+            """, secondTenantId);
+        JDBC.update("""
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'second-store', 'Second Store', 'active', 'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            """, secondStoreId, secondTenantId);
+
+        assertThatCode(() -> JDBC.update("""
+            insert into auth_accounts (
+                id, tenant_id, username, display_name, actor_type, status,
+                password_hash, password_algo, default_store_id
+            )
+            values (
+                ?, ?, '1000', 'Second Tenant Staff', 'staff', 'active',
+                '$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy',
+                'bcrypt-lowercase-v1',
+                ?
+            )
+            """, secondAccountId, secondTenantId, secondStoreId)).doesNotThrowAnyException();
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts
+            where lower(username) = lower('1000')
+              and actor_type = 'staff'
+              and deleted_at is null
             """)).isEqualTo(2);
     }
 
@@ -135,6 +194,15 @@ class AuthMigrationTest {
               and table_name = ?
               and column_name = ?
             """, tableName, columnName) == 1;
+    }
+
+    private static boolean indexExists(String indexName) {
+        return countWhere("""
+            select count(*)
+            from pg_indexes
+            where schemaname = 'public'
+              and indexname = ?
+            """, indexName) == 1;
     }
 
     private static int countWhere(String sql, Object... args) {

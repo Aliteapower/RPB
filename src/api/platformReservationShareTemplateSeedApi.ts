@@ -27,9 +27,10 @@ interface TextResponse {
 const endpoint = '/api/v1/platform/reservation/share-template-seed'
 
 export async function getPlatformReservationShareTemplateSeed(
+  locale?: string,
   fetcher?: PlatformReservationShareTemplateSeedFetcher
 ): Promise<PlatformReservationShareTemplateSeedResponse> {
-  return requestJson(endpoint, { method: 'GET', fetcher })
+  return requestJson(withLocaleQuery(endpoint, locale), { method: 'GET', fetcher })
 }
 
 export async function updatePlatformReservationShareTemplateSeed(
@@ -37,6 +38,15 @@ export async function updatePlatformReservationShareTemplateSeed(
   fetcher?: PlatformReservationShareTemplateSeedFetcher
 ): Promise<PlatformReservationShareTemplateSeedResponse> {
   return requestJson(endpoint, { method: 'PATCH', body: request, fetcher })
+}
+
+function withLocaleQuery(requestEndpoint: string, locale?: string): string {
+  const normalizedLocale = locale?.trim()
+  if (!normalizedLocale) {
+    return requestEndpoint
+  }
+  const params = new URLSearchParams({ locale: normalizedLocale })
+  return `${requestEndpoint}?${params.toString()}`
 }
 
 async function requestJson<T>(

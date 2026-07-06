@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -104,7 +105,7 @@ public class AuthRepository {
     }
 
     public Optional<AuthAccountRecord> findActiveAccountByUsername(String username) {
-        return jdbc.query(
+        List<AuthAccountRecord> accounts = jdbc.query(
             """
             select id, tenant_id, username, display_name, actor_type, status,
                    password_hash, default_store_id
@@ -113,6 +114,47 @@ public class AuthRepository {
               and deleted_at is null
             """,
             (rs, rowNum) -> account(rs),
+            username
+        );
+        return accounts.size() == 1 ? Optional.of(accounts.get(0)) : Optional.empty();
+    }
+
+    public Optional<AuthAccountRecord> findActivePlatformAccountByUsername(String username) {
+        return jdbc.query(
+            """
+            select id, tenant_id, username, display_name, actor_type, status,
+                   password_hash, default_store_id
+            from auth_accounts
+            where actor_type = 'platform_admin'
+              and lower(username) = lower(?)
+              and deleted_at is null
+            """,
+            (rs, rowNum) -> account(rs),
+            username
+        ).stream().findFirst();
+    }
+
+    public Optional<AuthAccountRecord> findActiveTenantAccountByTenantCodeAndUsername(
+        String tenantCode,
+        String actorType,
+        String username
+    ) {
+        return jdbc.query(
+            """
+            select account.id, account.tenant_id, account.username, account.display_name,
+                   account.actor_type, account.status, account.password_hash, account.default_store_id
+            from auth_accounts account
+            join tenants tenant on tenant.id = account.tenant_id
+            where lower(tenant.tenant_code) = lower(?)
+              and account.actor_type = ?
+              and lower(account.username) = lower(?)
+              and tenant.deleted_at is null
+              and tenant.status = 'active'
+              and account.deleted_at is null
+            """,
+            (rs, rowNum) -> account(rs),
+            tenantCode,
+            actorType,
             username
         ).stream().findFirst();
     }

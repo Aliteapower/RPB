@@ -33,6 +33,7 @@ import type {
   TenantAdminPublicBookingSettingsMutation
 } from '../types/publicBooking'
 import { useGeneratedText } from '../i18n/generatedText'
+import { publicBookingUrlForTenant } from '../utils/hostContext'
 
 const { gt } = useGeneratedText()
 
@@ -49,6 +50,7 @@ const emailSecretConfigured = ref(false)
 const googleSecretConfigured = ref(false)
 const facebookSecretConfigured = ref(false)
 const tenantLogoUrl = ref('')
+const tenantCode = ref('')
 const mealPeriods = ref<ReservationMealPeriod[]>([])
 const availabilityRules = ref<TenantAdminPublicBookingAvailabilityRule[]>([])
 
@@ -113,8 +115,8 @@ const facebookForm = reactive<TenantAdminCustomerOAuthProviderSettingsMutation>(
   clientSecret: ''
 })
 
-const publicBookingUrl = computed(() => `${window.location.origin}/book/${storeId.value}`)
-const publicBookingQrFileName = computed(() => `public-booking-${storeId.value}.png`)
+const publicBookingUrl = computed(() => publicBookingUrlForTenant(tenantCode.value, storeId.value))
+const publicBookingQrFileName = computed(() => `public-booking-${tenantCode.value || storeId.value}.png`)
 const activeMealPeriods = computed(() => mealPeriods.value.filter(period => period.status === 'active'))
 const emailSmtpCredentialComplete = computed(() => (
   !hasText(emailForm.smtpUsername) ||
@@ -197,6 +199,7 @@ async function loadSettings(): Promise<void> {
     })
     facebookSecretConfigured.value = facebook.secretConfigured
     tenantLogoUrl.value = tenantProfileResponse?.profile.logoMediaUrl || ''
+    tenantCode.value = tenantProfileResponse?.profile.tenantCode || ''
     mealPeriods.value = mealPeriodResponse.effectivePeriods
     availabilityRules.value = [...rulesResponse.rules].sort(compareAvailabilityRules)
     hydrateWeeklySelectionFromSavedRules()

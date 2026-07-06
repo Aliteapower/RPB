@@ -4,6 +4,7 @@ import com.rpb.reservation.auth.application.AuthApplicationService;
 import com.rpb.reservation.auth.application.AuthLoginResult;
 import com.rpb.reservation.auth.application.AuthPrincipal;
 import com.rpb.reservation.auth.security.AuthCookieService;
+import com.rpb.reservation.common.web.HostPrefixContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
@@ -17,10 +18,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
     private final AuthApplicationService authService;
     private final AuthCookieService cookieService;
+    private final HostPrefixContextResolver hostPrefixContextResolver;
 
-    public AuthController(AuthApplicationService authService, AuthCookieService cookieService) {
+    public AuthController(
+        AuthApplicationService authService,
+        AuthCookieService cookieService,
+        HostPrefixContextResolver hostPrefixContextResolver
+    ) {
         this.authService = authService;
         this.cookieService = cookieService;
+        this.hostPrefixContextResolver = hostPrefixContextResolver;
     }
 
     @PostMapping("/api/v1/auth/captcha/slider")
@@ -34,7 +41,12 @@ public class AuthController {
         HttpServletRequest httpRequest,
         HttpServletResponse response
     ) {
-        AuthLoginResult result = authService.login(request, remoteAddr(httpRequest), userAgent(httpRequest));
+        AuthLoginResult result = authService.login(
+            request,
+            hostPrefixContextResolver.resolve(httpRequest),
+            remoteAddr(httpRequest),
+            userAgent(httpRequest)
+        );
         cookieService.writeSessionCookie(response, result.sessionToken(), result.expiresAt());
         return new AuthLoginResponse(true, AuthUserResponse.from(result.principal()), result.expiresAt());
     }

@@ -5,6 +5,7 @@ import type {
   PublicBookingContextResponse,
   PublicBookingCreateMutation,
   PublicBookingCreateResponse,
+  PublicBookingEntryResponse,
   PublicBookingErrorResponse,
   TenantAdminCustomerEmailSettingsMutation,
   TenantAdminCustomerEmailSettingsResponse,
@@ -44,6 +45,15 @@ export async function getPublicBookingContext(
   }
   const query = params.toString()
   return requestJson(publicBookingEndpoint(storeId, `/context${query ? `?${query}` : ''}`), {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function resolveTenantPublicBookingEntry(
+  fetcher?: PublicBookingFetcher
+): Promise<PublicBookingEntryResponse> {
+  return requestJson('/api/v1/public/booking-entry', {
     method: 'GET',
     fetcher
   })

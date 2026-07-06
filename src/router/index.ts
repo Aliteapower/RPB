@@ -58,6 +58,12 @@ export const router = createRouter({
       meta: { public: true }
     },
     {
+      path: '/book',
+      name: 'public-booking-entry',
+      component: PublicBookingPage,
+      meta: { public: true }
+    },
+    {
       path: '/book/:storeId',
       name: 'public-booking',
       component: PublicBookingPage,

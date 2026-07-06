@@ -116,4 +116,26 @@ class PublicBookingMigrationTest {
             .contains("select tenant_id, store_id, 'date_exception', business_date, null, period_key, quota_mode")
             .contains("from store_public_booking_quota_overrides");
     }
+
+    @Test
+    void migrationAllowsPublicBookingAsOperationSourceForReservationWrites() throws Exception {
+        String migration = Files.readString(Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V034__allow_public_booking_operation_source.sql"
+        ));
+
+        assertThat(migration)
+            .contains("drop constraint if exists ck_reservations_source_channel")
+            .contains("source_channel in ('staff', 'customer', 'public_booking', 'integration', 'system')")
+            .contains("drop constraint if exists ck_idempotency_records_source")
+            .contains("source in ('staff', 'customer', 'public_booking', 'integration', 'system')")
+            .contains("drop constraint if exists ck_audit_logs_source")
+            .contains("drop constraint if exists ck_business_events_source")
+            .contains("drop constraint if exists ck_state_transition_logs_triggered_by")
+            .contains("triggered_by in ('staff', 'customer', 'public_booking', 'integration', 'system')");
+    }
 }

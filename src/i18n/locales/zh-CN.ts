@@ -139,6 +139,9 @@ export const zhCN = {
       employeeUsername: '员工账号',
       password: '密码'
     },
+    remember: {
+      account: '记住账号'
+    },
     captcha: {
       aria: '滑块校验',
       refresh: '换一张',
@@ -162,7 +165,7 @@ export const zhCN = {
       tenantStaff: {
         tab: '员工',
         title: '租户员工',
-        description: '按租户代码进入已授权店面，可为多店切换预留。',
+        description: '进入已授权店面，租户子域下无需再输入租户代码。',
         accountLabel: '员工账号',
         targetHint: '租户 {tenantCode} / 员工 {employeeUsername}'
       }

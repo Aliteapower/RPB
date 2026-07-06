@@ -94,9 +94,14 @@ class AuthLoginUiValidationTest {
     @Test
     void loginPageSeparatesPlatformTenantAndStaffEntrancesWithFutureStoreSelection() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        Path authTypePath = Path.of("src", "types", "auth.ts");
+        Path hostContextPath = Path.of("src", "utils", "hostContext.ts");
         String pageSource = FrontendSourceSupport.readString(pagePath);
+        String source = pageSource
+            + FrontendSourceSupport.readString(authTypePath)
+            + FrontendSourceSupport.readString(hostContextPath);
 
-        assertThat(pageSource)
+        assertThat(source)
             .contains("platform-admin")
             .contains("tenant-admin")
             .contains("tenant-staff")
@@ -106,7 +111,6 @@ class AuthLoginUiValidationTest {
             .contains("tenantCode")
             .contains("employeeUsername")
             .contains("loginUsername: '1000'")
-            .contains("presetPassword: '393930'")
             .contains("20000000")
             .contains("1000")
             .contains("pendingStoreSelection")
@@ -114,7 +118,51 @@ class AuthLoginUiValidationTest {
             .contains("login.store.authorized")
             .contains("login.store.switch")
             .contains("selectStoreAndContinue")
-            .contains("loginPayloadUsername");
+            .contains("loginPayloadUsername")
+            .contains("export type AuthLoginEntry = 'platform_admin' | 'tenant_admin' | 'staff'")
+            .contains("loginEntry?: AuthLoginEntry")
+            .contains("tenantCode?: string | null")
+            .contains("resolveLoginHostContext")
+            .contains("availableLoginEntries")
+            .contains("hostContext.kind === 'platform'")
+            .contains("hostContext.kind === 'tenant'")
+            .contains("tenantCodeVisible")
+            .contains("authLoginEntry")
+            .contains("rememberAccount")
+            .contains("rememberAccountStorageKey")
+            .contains("login.remember.account")
+            .doesNotContain("presetPassword: '393930'")
+            .doesNotContain("password = ref('393930')");
+    }
+
+    @Test
+    void tenantSubdomainLoginHidesPlatformEntryTenantCodeAndSeedAccounts() throws Exception {
+        Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        Path hostContextPath = Path.of("src", "utils", "hostContext.ts");
+        String pageSource = FrontendSourceSupport.readString(pagePath);
+        String hostContextSource = FrontendSourceSupport.readString(hostContextPath);
+
+        assertThat(hostContextSource)
+            .contains("NUMERIC_TENANT_PREFIX_PATTERN")
+            .contains("TENANT_PREFIX_PATTERN")
+            .contains("__RPB_HOST_PREFIX_BASE_HOST__")
+            .contains("VITE_RPB_HOST_PREFIX_BASE_HOST")
+            .contains("resolveConfiguredBaseHost")
+            .contains("labels.length > 3")
+            .contains("return { kind: 'tenant', tenantCode: prefix");
+
+        assertThat(pageSource)
+            .contains("availableLoginEntries.value.find")
+            .contains("entry.id === 'tenant-admin' || entry.id === 'tenant-staff'")
+            .contains("entryTargetVisible")
+            .contains("v-if=\"entryTargetVisible\"")
+            .contains("tenantCodeFieldVisible")
+            .contains("hostContext.kind !== 'tenant'")
+            .contains("function defaultLoginUsername")
+            .contains("function defaultEmployeeUsername")
+            .contains("hostContext.kind === 'legacy' ? entry.loginUsername : ''")
+            .doesNotContain("const username = ref(initialEntry.loginUsername)")
+            .doesNotContain("const employeeUsername = ref(initialEntry.employeeUsername ?? initialEntry.loginUsername)");
     }
 
     @Test

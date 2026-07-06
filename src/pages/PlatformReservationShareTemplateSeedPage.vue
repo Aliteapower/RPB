@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   PlatformReservationShareTemplateSeedApiError,
@@ -22,6 +23,7 @@ import {
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const { locale } = useI18n({ useScope: 'global' })
 
 const auth = useAuthSessionStore()
 const loading = ref(false)
@@ -30,6 +32,7 @@ const errorText = ref('')
 const savedText = ref('')
 const availableVariables = ref<string[]>(['guestSalutation', 'tableCode', 'holdMinutes'])
 const previewVariables = ref(buildReservationShareTemplatePreviewVariables())
+const activeLocale = computed(() => String(locale.value || 'zh-CN'))
 
 const form = reactive({
   seedKey: '',
@@ -46,15 +49,23 @@ onMounted(() => {
   void loadSeed()
 })
 
+watch(activeLocale, () => {
+  void loadSeed()
+})
+
 async function loadSeed(): Promise<void> {
+  const requestedLocale = activeLocale.value
   loading.value = true
   errorText.value = ''
   savedText.value = ''
   try {
     const [seedResponse, profileResponse] = await Promise.all([
-      getPlatformReservationShareTemplateSeed(),
+      getPlatformReservationShareTemplateSeed(requestedLocale),
       getPlatformProfile().catch(() => null)
     ])
+    if (requestedLocale !== activeLocale.value) {
+      return
+    }
     applySeed(seedResponse.seed)
     if (profileResponse) {
       applyPlatformProfilePreviewSource(profileResponse.profile)
@@ -107,7 +118,7 @@ function applyPlatformProfilePreviewSource(profile: PlatformProfile): void {
 function toMutation(): PlatformReservationShareTemplateSeedMutation {
   return {
     displayName: form.displayName.trim(),
-    locale: form.locale.trim(),
+    locale: activeLocale.value,
     templateText: form.templateText,
     status: form.status,
     version: form.version
@@ -188,7 +199,7 @@ function platformMapUrl(profile: PlatformProfile): string | null {
           </label>
           <label>
             <span>{{ gt('generated.platform-reservation-share-template-seed.011') }}</span>
-            <input v-model.trim="form.locale" required maxlength="20" autocomplete="off" />
+            <input v-model.trim="form.locale" disabled required maxlength="20" autocomplete="off" />
           </label>
           <label>
             <span>{{ gt('generated.platform-reservation-share-template-seed.012') }}</span>

@@ -51,32 +51,53 @@ class PlatformReservationShareTemplateSeedControllerTest {
 
     @Test
     void mapsGetAndPatchDefaultReservationShareTemplateSeed() throws Exception {
-        when(service.getDefaultSeed()).thenReturn(seed());
-        when(service.updateDefaultSeed(any())).thenReturn(seed("预约确认模板", 2));
+        when(service.getDefaultSeed("en-SG")).thenReturn(seed("Restaurant reservation confirmation template V1", "en-SG", 1));
+        when(service.updateDefaultSeed(any())).thenReturn(seed("Reservation confirmation template", 2));
 
-        mockMvc.perform(get(ENDPOINT))
+        mockMvc.perform(get(ENDPOINT).param("locale", "en-SG"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.seed.seedKey").value(ReservationShareTemplateCatalog.defaultSeedKey()))
+            .andExpect(jsonPath("$.seed.locale").value("en-SG"))
             .andExpect(jsonPath("$.seed.templateText").value(org.hamcrest.Matchers.containsString("{{guestSalutation}}")))
             .andExpect(jsonPath("$.seed.allowedVariables").isArray());
 
         mockMvc.perform(patch(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(new PlatformReservationShareTemplateSeedRequest(
-                    "预约确认模板",
-                    "zh-CN",
-                    "编号：{{reservationNo}}\\n桌位：{{tableCode}}",
+                    "Reservation confirmation template",
+                    "en-SG",
+                    "Booking no.: {{reservationNo}}\\nTable: {{tableCode}}",
                     "active",
                     1
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.seed.displayName").value("预约确认模板"))
+            .andExpect(jsonPath("$.seed.displayName").value("Reservation confirmation template"))
             .andExpect(jsonPath("$.seed.version").value(2));
 
-        verify(service).getDefaultSeed();
+        verify(service).getDefaultSeed("en-SG");
         verify(service).updateDefaultSeed(any());
+    }
+
+    @Test
+    void mapsGetDefaultReservationShareTemplateSeedForChineseLocale() throws Exception {
+        when(service.getDefaultSeed("zh-CN")).thenReturn(seed(
+            "餐厅预约确认模板 V1",
+            "zh-CN",
+            "感谢选择 {{storeName}}",
+            4
+        ));
+
+        mockMvc.perform(get(ENDPOINT).param("locale", "zh-CN"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.seed.displayName").value("餐厅预约确认模板 V1"))
+            .andExpect(jsonPath("$.seed.locale").value("zh-CN"))
+            .andExpect(jsonPath("$.seed.templateText").value(org.hamcrest.Matchers.containsString("感谢选择")))
+            .andExpect(jsonPath("$.seed.version").value(4));
+
+        verify(service).getDefaultSeed("zh-CN");
     }
 
     @Test
@@ -151,7 +172,7 @@ class PlatformReservationShareTemplateSeedControllerTest {
 
     @Test
     void mapsPersistenceErrorsToStableCode() throws Exception {
-        when(service.getDefaultSeed()).thenThrow(new DataAccessResourceFailureException("db_down"));
+        when(service.getDefaultSeed(null)).thenThrow(new DataAccessResourceFailureException("db_down"));
 
         mockMvc.perform(get(ENDPOINT))
             .andExpect(status().isInternalServerError())
@@ -159,15 +180,23 @@ class PlatformReservationShareTemplateSeedControllerTest {
     }
 
     private static PlatformReservationShareTemplateSeed seed() {
-        return seed("餐厅预约确认模板 V1", 1);
+        return seed("Restaurant reservation confirmation template V1", "en-SG", 1);
     }
 
     private static PlatformReservationShareTemplateSeed seed(String displayName, int version) {
+        return seed(displayName, "en-SG", version);
+    }
+
+    private static PlatformReservationShareTemplateSeed seed(String displayName, String locale, int version) {
+        return seed(displayName, locale, ReservationShareTemplateCatalog.defaultTemplate(), version);
+    }
+
+    private static PlatformReservationShareTemplateSeed seed(String displayName, String locale, String templateText, int version) {
         return new PlatformReservationShareTemplateSeed(
             ReservationShareTemplateCatalog.defaultSeedKey(),
             displayName,
-            "zh-CN",
-            ReservationShareTemplateCatalog.defaultTemplate(),
+            locale,
+            templateText,
             "active",
             version,
             ReservationShareTemplateCatalog.allowedVariables()

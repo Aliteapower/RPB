@@ -55,7 +55,7 @@ class PlatformReservationShareTemplateSeedLocalRuntimeSecurityTest {
 
     @Test
     void localRuntimeAllowsPlatformReservationShareTemplateSeedApiWhenConfiguredActorHasManagePermission() throws Exception {
-        when(service.getDefaultSeed()).thenReturn(seed());
+        when(service.getDefaultSeed(null)).thenReturn(seed());
 
         mockMvc.perform(get("/api/v1/platform/reservation/share-template-seed"))
             .andExpect(status().isOk())
@@ -88,8 +88,8 @@ class PlatformReservationShareTemplateSeedLocalRuntimeSecurityTest {
     private static PlatformReservationShareTemplateSeed seed() {
         return new PlatformReservationShareTemplateSeed(
             ReservationShareTemplateCatalog.defaultSeedKey(),
-            "餐厅预约确认模板 V1",
-            "zh-CN",
+            "Restaurant reservation confirmation template V1",
+            "en-SG",
             ReservationShareTemplateCatalog.defaultTemplate(),
             "active",
             0,

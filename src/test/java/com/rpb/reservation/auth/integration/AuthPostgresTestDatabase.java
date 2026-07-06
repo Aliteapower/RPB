@@ -62,6 +62,14 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
             database.applyMigration("src/main/resources/db/migration/V024__public_booking_customer_auth.sql");
             database.applyMigration("src/main/resources/db/migration/V025__customer_auth_integration_settings.sql");
             database.applyMigration("src/main/resources/db/migration/V026__public_booking_availability_rules.sql");
+            database.applyMigration("src/main/resources/db/migration/V027__refresh_legacy_reservation_share_defaults.sql");
+            database.applyMigration("src/main/resources/db/migration/V028__i18n_message_catalog_registry.sql");
+            database.applyMigration("src/main/resources/db/migration/V029__normalize_i18n_template_escaped_newlines.sql");
+            database.applyMigration("src/main/resources/db/migration/V030__auth_account_scoped_username.sql");
+            database.applyMigration("src/main/resources/db/migration/V031__english_reservation_share_default_template.sql");
+            database.applyMigration("src/main/resources/db/migration/V032__catch_up_english_reservation_share_seed.sql");
+            database.applyMigration("src/main/resources/db/migration/V033__ensure_chinese_reservation_share_platform_template.sql");
+            database.applyMigration("src/main/resources/db/migration/V034__allow_public_booking_operation_source.sql");
             Runtime.getRuntime().addShutdownHook(new Thread(database::closeQuietly));
             return database;
         } catch (IOException exception) {

@@ -6,53 +6,59 @@ import { useRoute, useRouter } from 'vue-router'
 import { AuthApiError, createSliderCaptcha } from '../api/authApi'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuthSessionStore } from '../stores/authSession'
-import type { AuthUser, SliderCaptchaChallenge } from '../types/auth'
+import type { AuthLoginEntry, AuthUser, SliderCaptchaChallenge } from '../types/auth'
+import { resolveLoginHostContext } from '../utils/hostContext'
 
 type LoginEntryId = 'platform-admin' | 'tenant-admin' | 'tenant-staff'
 
 interface LoginEntry {
   id: LoginEntryId
+  loginEntry: AuthLoginEntry
   labelKey: string
   titleKey: string
   descriptionKey: string
   accountLabelKey: string
   loginUsername: string
-  presetPassword: string
   tenantCode?: string
   employeeUsername?: string
   targetHintKey: string
 }
 
+interface RememberedLoginAccount {
+  username: string
+  tenantCode?: string
+}
+
 const loginEntries: LoginEntry[] = [
   {
     id: 'platform-admin',
+    loginEntry: 'platform_admin',
     labelKey: 'login.entries.platformAdmin.tab',
     titleKey: 'login.entries.platformAdmin.title',
     descriptionKey: 'login.entries.platformAdmin.description',
     accountLabelKey: 'login.entries.platformAdmin.accountLabel',
     loginUsername: 'sysadmin',
-    presetPassword: '393930',
     targetHintKey: 'login.entries.platformAdmin.targetHint'
   },
   {
     id: 'tenant-admin',
+    loginEntry: 'tenant_admin',
     labelKey: 'login.entries.tenantAdmin.tab',
     titleKey: 'login.entries.tenantAdmin.title',
     descriptionKey: 'login.entries.tenantAdmin.description',
     accountLabelKey: 'login.entries.tenantAdmin.accountLabel',
     loginUsername: '20000000',
-    presetPassword: '393930',
     tenantCode: '20000000',
     targetHintKey: 'login.entries.tenantAdmin.targetHint'
   },
   {
     id: 'tenant-staff',
+    loginEntry: 'staff',
     labelKey: 'login.entries.tenantStaff.tab',
     titleKey: 'login.entries.tenantStaff.title',
     descriptionKey: 'login.entries.tenantStaff.description',
     accountLabelKey: 'login.entries.tenantStaff.accountLabel',
     loginUsername: '1000',
-    presetPassword: '393930',
     tenantCode: '20000000',
     employeeUsername: '1000',
     targetHintKey: 'login.entries.tenantStaff.targetHint'
@@ -64,12 +70,14 @@ const router = useRouter()
 const auth = useAuthSessionStore()
 const { t } = useI18n()
 const missingStoreScopeText = computed(() => t('login.errors.missingStoreScope'))
+const hostContext = resolveLoginHostContext()
+const initialEntry = loginEntries.find(entry => entry.id === initialLoginEntryId()) ?? loginEntries[0]
 
-const selectedEntryId = ref<LoginEntryId>('tenant-staff')
-const username = ref('1000')
-const employeeUsername = ref('1000')
-const tenantCode = ref('20000000')
-const password = ref('393930')
+const selectedEntryId = ref<LoginEntryId>(initialEntry.id)
+const username = ref(defaultLoginUsername(initialEntry))
+const employeeUsername = ref(defaultEmployeeUsername(initialEntry))
+const tenantCode = ref(hostContext.kind === 'tenant' ? hostContext.tenantCode : (initialEntry.tenantCode ?? '20000000'))
+const password = ref('')
 const captcha = ref<SliderCaptchaChallenge | null>(null)
 const captchaX = ref(0)
 const sliderCanvas = ref<HTMLElement | null>(null)
@@ -80,16 +88,34 @@ const draggingSlider = ref(false)
 const errorText = ref('')
 const pendingStoreSelection = ref(false)
 const selectedStoreId = ref('')
+const rememberAccount = ref(false)
 let sliderResizeObserver: ResizeObserver | null = null
 let activeSliderPointerId: number | null = null
 let sliderDragOffsetX = 0
 
-const selectedEntry = computed(() => loginEntries.find(entry => entry.id === selectedEntryId.value) ?? loginEntries[0])
+const availableLoginEntries = computed(() => {
+  if (hostContext.kind === 'platform') {
+    return loginEntries.filter(entry => entry.id === 'platform-admin')
+  }
+  if (hostContext.kind === 'tenant') {
+    return loginEntries.filter(entry => entry.id === 'tenant-admin' || entry.id === 'tenant-staff')
+  }
+  return loginEntries
+})
+const selectedEntry = computed(() =>
+  availableLoginEntries.value.find(entry => entry.id === selectedEntryId.value) ?? availableLoginEntries.value[0] ?? loginEntries[0]
+)
+const resolvedTenantCode = computed(() => (
+  hostContext.kind === 'tenant' ? hostContext.tenantCode : tenantCode.value.trim()
+))
 const selectedEntryTargetParams = computed(() => ({
-  tenantCode: selectedEntry.value.tenantCode ?? tenantCode.value,
+  tenantCode: resolvedTenantCode.value || selectedEntry.value.tenantCode || tenantCode.value,
   employeeUsername: selectedEntry.value.employeeUsername ?? employeeUsername.value
 }))
 const isStaffEntry = computed(() => selectedEntry.value.id === 'tenant-staff')
+const entryTargetVisible = computed(() => hostContext.kind !== 'tenant')
+const tenantCodeVisible = computed(() => isStaffEntry.value && hostContext.kind !== 'tenant')
+const tenantCodeFieldVisible = computed(() => selectedEntry.value.id !== 'platform-admin' && hostContext.kind !== 'tenant')
 const loginPayloadUsername = computed(() =>
   isStaffEntry.value ? employeeUsername.value.trim() : username.value.trim()
 )
@@ -118,6 +144,7 @@ const pieceStyle = computed(() => ({
 
 onMounted(() => {
   observeSliderCanvas()
+  applyRememberedAccount(selectedEntry.value)
   void refreshSlider().then(showRouteStoreScopeMessage)
 })
 
@@ -127,13 +154,14 @@ onBeforeUnmount(() => {
 
 function selectEntry(entry: LoginEntry): void {
   selectedEntryId.value = entry.id
-  username.value = entry.loginUsername
-  employeeUsername.value = entry.employeeUsername ?? entry.loginUsername
-  tenantCode.value = entry.tenantCode ?? ''
-  password.value = entry.presetPassword
+  username.value = defaultLoginUsername(entry)
+  employeeUsername.value = defaultEmployeeUsername(entry)
+  tenantCode.value = hostContext.kind === 'tenant' ? hostContext.tenantCode : (entry.tenantCode ?? '')
+  password.value = ''
   pendingStoreSelection.value = false
   selectedStoreId.value = ''
   errorText.value = ''
+  applyRememberedAccount(entry)
 }
 
 async function refreshSlider(): Promise<void> {
@@ -272,8 +300,11 @@ async function submitLogin(): Promise<void> {
       username: loginPayloadUsername.value,
       password: password.value,
       captchaId: captcha.value.challengeId,
-      captchaX: Math.round(captchaX.value)
+      captchaX: Math.round(captchaX.value),
+      loginEntry: authLoginEntry(selectedEntry.value),
+      tenantCode: selectedEntry.value.id === 'platform-admin' ? null : (resolvedTenantCode.value || null)
     })
+    persistRememberedAccount()
     await continueAfterLogin(user)
   } catch (error) {
     errorText.value = loginErrorText(error)
@@ -337,6 +368,80 @@ function storeRoute(storeId: string): string {
   return `/stores/${storeId}/staff`
 }
 
+function initialLoginEntryId(): LoginEntryId {
+  if (hostContext.kind === 'platform') {
+    return 'platform-admin'
+  }
+  if (hostContext.kind === 'tenant') {
+    return 'tenant-admin'
+  }
+  return 'tenant-staff'
+}
+
+function defaultLoginUsername(entry: LoginEntry): string {
+  return hostContext.kind === 'legacy' ? entry.loginUsername : ''
+}
+
+function defaultEmployeeUsername(entry: LoginEntry): string {
+  return hostContext.kind === 'legacy' ? (entry.employeeUsername ?? entry.loginUsername) : ''
+}
+
+function authLoginEntry(entry: LoginEntry): AuthLoginEntry {
+  return entry.loginEntry
+}
+
+function rememberAccountStorageKey(entryId = selectedEntryId.value): string {
+  return `rpb.login.account.v1:${hostContext.storageScope}:${entryId}`
+}
+
+function applyRememberedAccount(entry: LoginEntry): void {
+  const remembered = readRememberedAccount(entry.id)
+  rememberAccount.value = remembered !== null
+  if (!remembered) {
+    return
+  }
+  if (entry.id === 'tenant-staff') {
+    employeeUsername.value = remembered.username
+  } else {
+    username.value = remembered.username
+  }
+  if (hostContext.kind !== 'tenant' && remembered.tenantCode) {
+    tenantCode.value = remembered.tenantCode
+  }
+}
+
+function persistRememberedAccount(): void {
+  const key = rememberAccountStorageKey()
+  try {
+    if (!rememberAccount.value) {
+      window.localStorage.removeItem(key)
+      return
+    }
+    const remembered: RememberedLoginAccount = {
+      username: loginPayloadUsername.value,
+      tenantCode: selectedEntry.value.id === 'platform-admin' ? undefined : (resolvedTenantCode.value || undefined)
+    }
+    window.localStorage.setItem(key, JSON.stringify(remembered))
+  } catch {
+    // Login should not fail when local storage is unavailable.
+  }
+}
+
+function readRememberedAccount(entryId: LoginEntryId): RememberedLoginAccount | null {
+  try {
+    const raw = window.localStorage.getItem(rememberAccountStorageKey(entryId))
+    if (!raw) {
+      return null
+    }
+    const parsed = JSON.parse(raw) as Partial<RememberedLoginAccount>
+    return typeof parsed.username === 'string' && parsed.username.trim()
+      ? { username: parsed.username.trim(), tenantCode: parsed.tenantCode?.trim() }
+      : null
+  } catch {
+    return null
+  }
+}
+
 function loginErrorText(error: unknown): string {
   if (!(error instanceof AuthApiError)) {
     return t('login.errors.loginFailed')
@@ -364,9 +469,9 @@ function loginErrorText(error: unknown): string {
         <h1>{{ t('login.heading') }}</h1>
       </div>
 
-      <div class="entry-tabs" role="tablist" :aria-label="t('login.entryTabAria')">
+      <div v-if="availableLoginEntries.length > 1" class="entry-tabs" role="tablist" :aria-label="t('login.entryTabAria')">
         <button
-          v-for="entry in loginEntries"
+          v-for="entry in availableLoginEntries"
           :key="entry.id"
           type="button"
           class="entry-tab"
@@ -382,12 +487,12 @@ function loginErrorText(error: unknown): string {
       <div class="entry-summary" :data-entry="selectedEntry.id">
         <p class="entry-title">{{ t(selectedEntry.titleKey) }}</p>
         <p class="entry-description">{{ t(selectedEntry.descriptionKey) }}</p>
-        <p class="entry-target">{{ t(selectedEntry.targetHintKey, selectedEntryTargetParams) }}</p>
+        <p v-if="entryTargetVisible" class="entry-target">{{ t(selectedEntry.targetHintKey, selectedEntryTargetParams) }}</p>
       </div>
 
       <form class="login-form" @submit.prevent="submitLogin">
-        <div v-if="isStaffEntry" class="field-grid field-grid--split">
-          <label class="login-field">
+        <div v-if="isStaffEntry" class="field-grid" :class="{ 'field-grid--split': tenantCodeVisible }">
+          <label v-if="tenantCodeVisible" class="login-field">
             <span>{{ t('login.fields.tenantCode') }}</span>
             <input v-model.trim="tenantCode" name="tenantCode" autocomplete="organization" inputmode="numeric" required />
           </label>
@@ -395,6 +500,18 @@ function loginErrorText(error: unknown): string {
           <label class="login-field">
             <span>{{ t('login.fields.employeeUsername') }}</span>
             <input v-model.trim="employeeUsername" name="employeeUsername" autocomplete="username" inputmode="text" required />
+          </label>
+        </div>
+
+        <div v-else-if="tenantCodeFieldVisible" class="field-grid field-grid--split">
+          <label class="login-field">
+            <span>{{ t('login.fields.tenantCode') }}</span>
+            <input v-model.trim="tenantCode" name="tenantCode" autocomplete="organization" inputmode="numeric" required />
+          </label>
+
+          <label class="login-field">
+            <span>{{ t(selectedEntry.accountLabelKey) }}</span>
+            <input v-model.trim="username" name="username" autocomplete="username" inputmode="text" required />
           </label>
         </div>
 
@@ -413,6 +530,11 @@ function loginErrorText(error: unknown): string {
             required
           />
           <small>{{ t('login.passwordPolicy') }}</small>
+        </label>
+
+        <label class="remember-row">
+          <input v-model="rememberAccount" type="checkbox" />
+          <span>{{ t('login.remember.account') }}</span>
         </label>
 
         <div v-if="isStaffEntry" class="store-preview">
@@ -517,7 +639,7 @@ function loginErrorText(error: unknown): string {
 
 .entry-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
   margin-bottom: 12px;
@@ -621,6 +743,19 @@ function loginErrorText(error: unknown): string {
   color: #64748b;
   font-size: 12px;
   font-weight: 500;
+}
+
+.remember-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.remember-row input {
+  margin: 0;
 }
 
 .store-preview {

@@ -50,6 +50,12 @@ export interface PublicBookingContextResponse {
   authProviders: PublicBookingAuthProvider[]
 }
 
+export interface PublicBookingEntryResponse {
+  success: true
+  tenantCode: string
+  storeId: string
+}
+
 export interface CustomerAuthEmailCodeResponse {
   success: true
   email: string

@@ -145,6 +145,31 @@ public class PublicBookingPersistenceAdapter implements
     }
 
     @Override
+    public List<PublicBookingStoreProfile> findEnabledPublicBookingStoreProfilesByTenantCode(String tenantCode) {
+        return jdbc.query(
+            """
+            select store.id, store.tenant_id, store.display_name, store.timezone,
+                   store.share_address, store.google_map_url, store.share_contact_phone,
+                   store.share_email, store.whatsapp_business_phone_e164
+            from tenants tenant
+            join stores store on store.tenant_id = tenant.id
+            join store_public_booking_settings settings on settings.tenant_id = store.tenant_id
+                and settings.store_id = store.id
+                and settings.deleted_at is null
+            where lower(tenant.tenant_code) = lower(?)
+              and tenant.status = 'active'
+              and tenant.deleted_at is null
+              and store.status = 'active'
+              and store.deleted_at is null
+              and settings.enabled = true
+            order by store.store_code, store.display_name
+            """,
+            (rs, rowNum) -> storeProfile(rs),
+            tenantCode
+        );
+    }
+
+    @Override
     public PublicBookingSettings saveSettings(StoreScope scope, PublicBookingSettings settings) {
         jdbc.update(
             """

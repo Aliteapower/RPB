@@ -139,6 +139,9 @@ export const enSG = {
       employeeUsername: 'Staff account',
       password: 'Password'
     },
+    remember: {
+      account: 'Remember account'
+    },
     captcha: {
       aria: 'Slider captcha',
       refresh: 'New image',
@@ -162,7 +165,7 @@ export const enSG = {
       tenantStaff: {
         tab: 'Staff',
         title: 'Tenant staff',
-        description: 'Enter authorised stores by tenant code, with multi-store switching reserved.',
+        description: 'Enter authorised stores. Tenant subdomains no longer require typing the tenant code.',
         accountLabel: 'Staff account',
         targetHint: 'Tenant {tenantCode} / Staff {employeeUsername}'
       }

@@ -36,34 +36,34 @@ public final class ReservationShareTemplateCatalog {
     private static final List<String> SUPPORTED_VARIABLES = supportedVariableList();
 
     private static final String DEFAULT_TEMPLATE = """
-        尊敬的 {{contactName}} {{guestSalutation}}，
+        Dear {{contactName}} {{guestSalutation}},
 
-        感谢您选择 {{storeName}}。我们很荣幸地确认您的预订安排，具体信息如下：
+        Thank you for choosing {{storeName}}. We are pleased to confirm your booking details below:
 
-        预订编号：{{reservationNo}}
+        Booking no.: {{reservationNo}}
 
-        日期：{{reservationDate}}
+        Date: {{reservationDate}}
 
-        时间：{{reservationTime}}
+        Time: {{reservationTime}}
 
-        人数：{{partySize}}位成人
+        Party size: {{partySize}} pax
 
-        桌位：{{tableCode}} (已预留)
+        Table: {{tableCode}} (reserved)
 
-        预留时间：为保证所有宾客的用餐体验，我们将为您保留座位 {{holdMinutes}}分钟。若超过保留时间，座位可能被取消，敬请谅解。
+        Hold time: To protect every guest's dining experience, we will hold your table for {{holdMinutes}} minutes. If you arrive after the hold time, the table may be released.
 
-        到店提示：{{arrivalNote}}
+        Arrival note: {{arrivalNote}}
 
-        门店地址：{{storeAddress}}
+        Store address: {{storeAddress}}
 
-        联系电话：{{storePhone}}
+        Contact phone: {{storePhone}}
 
-        如需修改或取消，请至少提前 2 小时联系门店。
+        To change or cancel, please contact the store at least 2 hours ahead.
 
-        期待为您奉上一场味蕾盛宴！
+        We look forward to serving you.
 
-        顺颂时祺，
-        {{storeName}} 预订部
+        Best regards,
+        {{storeName}} Reservations
         """;
 
     private ReservationShareTemplateCatalog() {

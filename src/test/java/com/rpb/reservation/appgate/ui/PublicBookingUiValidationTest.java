@@ -13,7 +13,7 @@ class PublicBookingUiValidationTest {
         String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
 
         assertThat(publicBookingPageSource)
-            .contains("type BookingStep = 1 | 2 | 3")
+            .contains("type BookingStep = 1 | 2 | 3 | 'complete'")
             .contains("const currentStep = ref<BookingStep>(1)")
             .contains("const canProceedToAuth")
             .contains("const canProceedToContact")
@@ -21,7 +21,7 @@ class PublicBookingUiValidationTest {
             .contains("function goToContactStep")
             .contains("function goBackToTimeStep")
             .contains("function goBackToAuthStep")
-            .contains("<section v-if=\"currentStep === 1\" class=\"booking-panel\" aria-label=\"预约时间\">")
+            .contains("<section v-else-if=\"currentStep === 1\" class=\"booking-panel\" aria-label=\"预约时间\">")
             .contains("<strong>选择日期、餐段与人数</strong>")
             .contains("<input v-model.number=\"bookingForm.partySize\" min=\"1\" max=\"20\" type=\"number\" />")
             .contains("下一步：登录")
@@ -37,12 +37,64 @@ class PublicBookingUiValidationTest {
             .contains("Google 登录")
             .contains("Facebook 登录")
             .contains("下一步：填写手机号")
-            .contains("<form v-else class=\"booking-panel\" aria-label=\"提交预约\" @submit.prevent=\"submitBooking\">")
+            .contains("<form v-else-if=\"currentStep === 3\" class=\"booking-panel\" aria-label=\"提交预约\" @submit.prevent=\"submitBooking\">")
             .contains("<strong>填写手机号并提交</strong>")
-            .contains("<input v-model=\"bookingForm.phoneE164\" inputmode=\"tel\" placeholder=\"+6591234567\" />")
-            .contains("!!bookingForm.phoneE164.trim()")
+            .contains("phoneLocal: ''")
+            .contains("!!isValidSingaporeLocalPhone(bookingForm.phoneLocal)")
+            .contains("phoneE164: toSingaporePhoneE164(bookingForm.phoneLocal)")
+            .contains("function updatePhoneLocal")
+            .contains("sanitizeSingaporeLocalPhone")
+            .contains("<div class=\"public-booking-phone-field\">")
+            .contains("<span class=\"public-booking-phone-field__prefix\" aria-hidden=\"true\">+65</span>")
+            .contains(":value=\"bookingForm.phoneLocal\"")
+            .contains("autocomplete=\"tel-national\"")
+            .contains("inputmode=\"numeric\"")
+            .contains("maxlength=\"8\"")
+            .contains("placeholder=\"91234567\"")
+            .contains("@input=\"updatePhoneLocal\"")
             .contains("<textarea v-model=\"bookingForm.note\" rows=\"3\"></textarea>")
+            .doesNotContain("v-model=\"bookingForm.phoneE164\"")
+            .doesNotContain("placeholder=\"+6591234567\"")
             .doesNotContain("Gmail / Google");
+    }
+
+    @Test
+    void publicBookingPageEndsOnCloseOnlyCompletionStateAfterSuccessfulSubmit() throws Exception {
+        String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
+
+        assertThat(publicBookingPageSource)
+            .contains("const completedReservationCode = ref('')")
+            .contains("const closePageFallbackText = ref('')")
+            .contains("currentStep.value = 'complete'")
+            .contains("completedReservationCode.value = response.reservationCode")
+            .contains("function closeBookingPage")
+            .contains("window.close()")
+            .contains("closePageFallbackText.value = gt('generated.public-booking.077')")
+            .contains("<section v-if=\"currentStep === 'complete'\" class=\"booking-panel booking-complete-panel\"")
+            .contains("<strong>{{ gt('generated.public-booking.073') }}</strong>")
+            .contains("{{ gt('generated.public-booking.074') }}")
+            .contains("{{ gt('generated.public-booking.075') }}")
+            .contains("{{ completedReservationCode }}")
+            .contains("@click=\"closeBookingPage\"")
+            .contains("{{ gt('generated.public-booking.076') }}")
+            .doesNotContain("<form v-else class=\"booking-panel\" aria-label=\"提交预约\" @submit.prevent=\"submitBooking\">");
+    }
+
+    @Test
+    void publicBookingPageRendersGoogleIdentityButtonInsteadOfRepeatedPrompt() throws Exception {
+        String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
+
+        assertThat(publicBookingPageSource)
+            .contains("renderButton: (parent: HTMLElement")
+            .contains("const googleSignInButton = ref<HTMLElement | null>(null)")
+            .contains("const googleIdentityClientId = ref('')")
+            .contains("function handleGoogleCredential")
+            .contains("async function renderGoogleSignInButton")
+            .contains("googleIdentityClientId.value !== clientId")
+            .contains("window.google?.accounts.id.renderButton")
+            .contains("ref=\"googleSignInButton\"")
+            .doesNotContain("@click=\"startOAuthLogin('google')\"")
+            .doesNotContain("window.google?.accounts.id.prompt()");
     }
 
     @Test
@@ -169,6 +221,60 @@ class PublicBookingUiValidationTest {
     }
 
     @Test
+    void publicBookingSupportsTenantSubdomainEntryWithoutStoreIdInPath() throws Exception {
+        String routerSource = FrontendSourceSupport.readString(Path.of("src", "router", "index.ts"));
+        String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
+        String publicBookingApiSource = FrontendSourceSupport.readString(Path.of("src", "api", "publicBookingApi.ts"));
+        String publicBookingTypeSource = FrontendSourceSupport.readString(Path.of("src", "types", "publicBooking.ts"));
+        String publicBookingEntryControllerSource = FrontendSourceSupport.readString(Path.of(
+            "src",
+            "main",
+            "java",
+            "com",
+            "rpb",
+            "reservation",
+            "publicbooking",
+            "api",
+            "PublicBookingEntryController.java"
+        ));
+        String publicBookingEntryServiceSource = FrontendSourceSupport.readString(Path.of(
+            "src",
+            "main",
+            "java",
+            "com",
+            "rpb",
+            "reservation",
+            "publicbooking",
+            "application",
+            "PublicBookingEntryApplicationService.java"
+        ));
+
+        assertThat(routerSource)
+            .contains("path: '/book'")
+            .contains("name: 'public-booking-entry'")
+            .contains("path: '/book/:storeId'")
+            .contains("name: 'public-booking'");
+
+        assertThat(publicBookingPageSource + publicBookingApiSource + publicBookingTypeSource)
+            .contains("resolveTenantPublicBookingEntry")
+            .contains("PublicBookingEntryResponse")
+            .contains("routeStoreId")
+            .contains("resolvedStoreId")
+            .contains("const storeId = computed(() => routeStoreId.value || resolvedStoreId.value)")
+            .contains("await resolvePublicBookingEntry()")
+            .contains("tenant_context_required")
+            .contains("multiple_enabled_stores")
+            .contains("/api/v1/public/booking-entry");
+
+        assertThat(publicBookingEntryControllerSource + publicBookingEntryServiceSource)
+            .contains("HostPrefixContextResolver")
+            .contains("resolveTenantEntry")
+            .contains("MULTIPLE_ENABLED_STORES")
+            .contains("tenant_context_required")
+            .contains("multiple_enabled_stores");
+    }
+
+    @Test
     void tenantAdminPublicBookingPageUsesProjectOperationPanelsForConfiguration() throws Exception {
         String tenantAdminPublicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPublicBookingPage.vue"));
         String publicBookingTypeSource = FrontendSourceSupport.readString(Path.of("src", "types", "publicBooking.ts"));
@@ -188,13 +294,15 @@ class PublicBookingUiValidationTest {
 
         assertThat(tenantAdminPublicBookingPageSource)
             .contains("import DownloadableQrCode from '../components/common/DownloadableQrCode.vue'")
+            .contains("publicBookingUrlForTenant")
             .contains("getTenantProfile")
             .contains("type PublicBookingPanel = 'settings' | 'email' | 'google' | 'facebook' | 'rules'")
             .contains("const activePanel = ref<PublicBookingPanel>('settings')")
             .contains("const tenantLogoUrl = ref('')")
+            .contains("const tenantCode = ref('')")
             .contains("function openPanel(panel: PublicBookingPanel)")
-            .contains("const publicBookingUrl = computed(() => `${window.location.origin}/book/${storeId.value}`)")
-            .contains("const publicBookingQrFileName = computed(() => `public-booking-${storeId.value}.png`)")
+            .contains("const publicBookingUrl = computed(() => publicBookingUrlForTenant(tenantCode.value, storeId.value))")
+            .contains("const publicBookingQrFileName = computed(() => `public-booking-${tenantCode.value || storeId.value}.png`)")
             .contains("function fallbackCopyText(text: string): boolean")
             .contains("document.execCommand('copy')")
             .contains("复制公网预约入口")
@@ -202,6 +310,7 @@ class PublicBookingUiValidationTest {
             .contains("公网预约入口复制失败")
             .contains("getTenantProfile(storeId.value).catch(() => null)")
             .contains("tenantLogoUrl.value = tenantProfileResponse?.profile.logoMediaUrl || ''")
+            .contains("tenantCode.value = tenantProfileResponse?.profile.tenantCode || ''")
             .contains("<DownloadableQrCode")
             .contains(":value=\"publicBookingUrl\"")
             .contains(":logo-url=\"tenantLogoUrl\"")

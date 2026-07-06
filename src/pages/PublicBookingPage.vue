@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
@@ -9,6 +9,7 @@ import {
   loginCustomerWithEmail,
   loginCustomerWithOAuth,
   requestCustomerEmailCode,
+  resolveTenantPublicBookingEntry,
   PublicBookingApiError
 } from '../api/publicBookingApi'
 import type {
@@ -16,6 +17,11 @@ import type {
   PublicBookingContextResponse,
   PublicBookingTimeSlot
 } from '../types/publicBooking'
+import {
+  isValidSingaporeLocalPhone,
+  sanitizeSingaporeLocalPhone,
+  toSingaporePhoneE164
+} from '../components/staff/staffGuestContact'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
@@ -26,7 +32,14 @@ declare global {
       accounts: {
         id: {
           initialize: (options: { client_id: string; callback: (response: { credential?: string }) => void }) => void
-          prompt: () => void
+          renderButton: (parent: HTMLElement, options: {
+            shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+            size?: 'large' | 'medium' | 'small'
+            text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
+            theme?: 'outline' | 'filled_blue' | 'filled_black'
+            type?: 'standard' | 'icon'
+            width?: number
+          }) => void
         }
       }
     }
@@ -41,7 +54,7 @@ declare global {
   }
 }
 
-type BookingStep = 1 | 2 | 3
+type BookingStep = 1 | 2 | 3 | 'complete'
 
 const route = useRoute()
 const loading = ref(false)
@@ -49,6 +62,8 @@ const submitting = ref(false)
 const authBusy = ref(false)
 const errorText = ref('')
 const statusText = ref('')
+const completedReservationCode = ref('')
+const closePageFallbackText = ref('')
 const currentStep = ref<BookingStep>(1)
 const context = ref<PublicBookingContextResponse | null>(null)
 const minBookingDate = todayDate()
@@ -57,6 +72,10 @@ const selectedStartAt = ref('')
 const selectedPeriodKey = ref('all')
 const dateInputErrorText = ref('')
 const customer = ref<CustomerAuthPrincipal | null>(null)
+const googleSignInButton = ref<HTMLElement | null>(null)
+const googleIdentityClientId = ref('')
+const googleButtonRenderedClientId = ref('')
+const googleButtonRenderedTarget = ref<HTMLElement | null>(null)
 
 const authForm = reactive({
   email: '',
@@ -70,13 +89,15 @@ const bookingForm = reactive({
   customerName: '',
   customerNickname: '',
   customerEmail: '',
-  phoneE164: '',
+  phoneLocal: '',
   note: ''
 })
 
 const ALL_PERIOD_KEY = 'all'
 const DEFAULT_MAX_ADVANCE_DAYS = 30
-const storeId = computed(() => String(route.params.storeId || '').trim())
+const routeStoreId = computed(() => String(route.params.storeId || '').trim())
+const resolvedStoreId = ref('')
+const storeId = computed(() => routeStoreId.value || resolvedStoreId.value)
 const maxBookingDate = computed(() => {
   const maxAdvanceDays = context.value?.settings.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS
   return addDays(minBookingDate, maxAdvanceDays)
@@ -132,7 +153,7 @@ const canSubmit = computed(() => (
   !!customer.value &&
   !!selectedSlot.value &&
   hasValidPartySize.value &&
-  !!bookingForm.phoneE164.trim() &&
+  !!isValidSingaporeLocalPhone(bookingForm.phoneLocal) &&
   !submitting.value &&
   !dateInputErrorText.value
 ))
@@ -190,6 +211,14 @@ watch(slotsByPeriod, () => {
   }
 })
 
+watch(
+  () => [currentStep.value, providerClientId('google'), customer.value?.customerId || ''],
+  () => {
+    void renderGoogleSignInButton()
+  },
+  { flush: 'post' }
+)
+
 async function loadCustomer(): Promise<void> {
   try {
     const response = await getCustomerMe()
@@ -200,14 +229,13 @@ async function loadCustomer(): Promise<void> {
 }
 
 async function loadContext(): Promise<void> {
-  if (!storeId.value) {
-    errorText.value = gt('generated.public-booking.046')
-    return
-  }
   loading.value = true
   errorText.value = ''
   statusText.value = ''
   try {
+    if (!(await resolvePublicBookingEntry())) {
+      return
+    }
     context.value = await getPublicBookingContext(storeId.value, selectedDate.value)
     if (!context.value.settings.enabled) {
       errorText.value = gt('generated.public-booking.047')
@@ -220,8 +248,23 @@ async function loadContext(): Promise<void> {
   }
 }
 
+async function resolvePublicBookingEntry(): Promise<boolean> {
+  if (routeStoreId.value || resolvedStoreId.value) {
+    return true
+  }
+  try {
+    const response = await resolveTenantPublicBookingEntry()
+    resolvedStoreId.value = response.storeId
+    return true
+  } catch (error) {
+    context.value = null
+    errorText.value = publicBookingErrorText(error)
+    return false
+  }
+}
+
 async function sendEmailCode(): Promise<void> {
-  if (authBusy.value || !emailAuthEnabled.value || !authForm.email.trim()) {
+  if (authBusy.value || !storeId.value || !emailAuthEnabled.value || !authForm.email.trim()) {
     return
   }
   authBusy.value = true
@@ -240,7 +283,7 @@ async function sendEmailCode(): Promise<void> {
 }
 
 async function loginWithEmail(): Promise<void> {
-  if (authBusy.value || !emailAuthEnabled.value || !authForm.email.trim() || !authForm.code.trim()) {
+  if (authBusy.value || !storeId.value || !emailAuthEnabled.value || !authForm.email.trim() || !authForm.code.trim()) {
     return
   }
   authBusy.value = true
@@ -272,32 +315,62 @@ async function startOAuthLogin(provider: 'google' | 'facebook'): Promise<void> {
     return
   }
   if (provider === 'google') {
-    await startGoogleLogin(clientId)
+    await renderGoogleSignInButton()
   } else {
     await startFacebookLogin(clientId)
   }
 }
 
-async function startGoogleLogin(clientId: string): Promise<void> {
-  authBusy.value = true
-  errorText.value = ''
+function handleGoogleCredential(response: { credential?: string }): void {
+  if (!response.credential) {
+    errorText.value = gt('generated.public-booking.052')
+    return
+  }
+  void completeOAuthLogin('google', response.credential)
+}
+
+async function renderGoogleSignInButton(): Promise<void> {
+  const clientId = providerClientId('google')
+  if (currentStep.value !== 2 || customer.value || !clientId) {
+    return
+  }
+  await nextTick()
+  const target = googleSignInButton.value
+  if (!target) {
+    return
+  }
   try {
     await loadScript('google-identity-services', 'https://accounts.google.com/gsi/client')
-    window.google?.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        if (!response.credential) {
-          errorText.value = gt('generated.public-booking.052')
-          return
-        }
-        void completeOAuthLogin('google', response.credential)
-      }
+    const googleIdentity = window.google?.accounts.id
+    if (!googleIdentity) {
+      throw new Error('google_identity_unavailable')
+    }
+    if (googleIdentityClientId.value !== clientId) {
+      googleIdentity.initialize({ client_id: clientId, callback: handleGoogleCredential })
+      googleIdentityClientId.value = clientId
+      googleButtonRenderedClientId.value = ''
+      googleButtonRenderedTarget.value = null
+    }
+    if (
+      googleButtonRenderedClientId.value === clientId &&
+      googleButtonRenderedTarget.value === target &&
+      target.childElementCount > 0
+    ) {
+      return
+    }
+    target.replaceChildren()
+    window.google?.accounts.id.renderButton(target, {
+      shape: 'rectangular',
+      size: 'large',
+      text: 'signin_with',
+      theme: 'outline',
+      type: 'standard',
+      width: 280
     })
-    window.google?.accounts.id.prompt()
+    googleButtonRenderedClientId.value = clientId
+    googleButtonRenderedTarget.value = target
   } catch {
     errorText.value = gt('generated.public-booking.053')
-  } finally {
-    authBusy.value = false
   }
 }
 
@@ -325,6 +398,9 @@ async function completeOAuthLogin(provider: 'google' | 'facebook', token: string
   authBusy.value = true
   errorText.value = ''
   try {
+    if (!storeId.value) {
+      return
+    }
     const response = await loginCustomerWithOAuth(storeId.value, provider, token)
     customer.value = response.principal
     statusText.value = gt('generated.public-booking.056')
@@ -337,12 +413,13 @@ async function completeOAuthLogin(provider: 'google' | 'facebook', token: string
 }
 
 async function submitBooking(): Promise<void> {
-  if (!canSubmit.value || !selectedSlot.value) {
+  if (!canSubmit.value || !selectedSlot.value || !storeId.value) {
     return
   }
   submitting.value = true
   errorText.value = ''
   statusText.value = ''
+  closePageFallbackText.value = ''
   try {
     const response = await createPublicBooking(
       storeId.value,
@@ -354,16 +431,31 @@ async function submitBooking(): Promise<void> {
         customerName: nullableText(bookingForm.customerName),
         customerNickname: nullableText(bookingForm.customerNickname),
         customerEmail: nullableText(bookingForm.customerEmail),
-        phoneE164: nullableText(bookingForm.phoneE164),
+        phoneE164: toSingaporePhoneE164(bookingForm.phoneLocal),
         note: nullableText(bookingForm.note)
       }
     )
-    statusText.value = `${gt('generated.public-booking.044')}${response.reservationCode}`
+    completedReservationCode.value = response.reservationCode
+    currentStep.value = 'complete'
   } catch (error) {
     errorText.value = publicBookingErrorText(error)
   } finally {
     submitting.value = false
   }
+}
+
+function updatePhoneLocal(event: Event): void {
+  bookingForm.phoneLocal = sanitizeSingaporeLocalPhone((event.target as HTMLInputElement).value)
+}
+
+function closeBookingPage(): void {
+  closePageFallbackText.value = ''
+  window.close()
+  window.setTimeout(() => {
+    if (!window.closed) {
+      closePageFallbackText.value = gt('generated.public-booking.077')
+    }
+  }, 120)
 }
 
 function selectPeriod(periodKey: string): void {
@@ -408,6 +500,12 @@ function publicBookingErrorText(error: unknown): string {
       return gt('generated.public-booking.059')
     case 'invalid_booking_window':
       return gt('generated.public-booking.060')
+    case 'tenant_context_required':
+      return gt('generated.public-booking.071')
+    case 'multiple_enabled_stores':
+      return gt('generated.public-booking.072')
+    case 'store_not_found':
+      return gt('generated.public-booking.046')
     case 'reservation_rejected':
       return gt('generated.public-booking.061')
     case 'code_mismatch':
@@ -545,7 +643,26 @@ function clampBookingDate(isoDate: string): string {
       <p v-if="errorText" class="alert alert--error" role="alert">{{ errorText }}</p>
       <p v-if="statusText" class="alert alert--success" role="status">{{ statusText }}</p>
 
-      <section v-if="currentStep === 1" class="booking-panel" :aria-label="gt('generated.public-booking.006')">
+      <section v-if="currentStep === 'complete'" class="booking-panel booking-complete-panel" :aria-label="gt('generated.public-booking.073')">
+        <div class="panel-title">
+          <span>3</span>
+          <strong>{{ gt('generated.public-booking.073') }}</strong>
+        </div>
+
+        <p class="completion-message">{{ gt('generated.public-booking.074') }}</p>
+
+        <div v-if="completedReservationCode" class="completion-code">
+          <span>{{ gt('generated.public-booking.075') }}</span>
+          <strong>{{ completedReservationCode }}</strong>
+        </div>
+
+        <button class="submit-button" type="button" @click="closeBookingPage">
+          {{ gt('generated.public-booking.076') }}
+        </button>
+        <p v-if="closePageFallbackText" class="quiet-line">{{ closePageFallbackText }}</p>
+      </section>
+
+      <section v-else-if="currentStep === 1" class="booking-panel" :aria-label="gt('generated.public-booking.006')">
         <div class="panel-title">
           <span>1</span>
           <strong>{{ gt('generated.public-booking.007') }}</strong>
@@ -650,12 +767,12 @@ function clampBookingDate(isoDate: string): string {
           </section>
 
           <div v-if="enabledAuthProviders.length" class="auth-actions" :aria-label="gt('generated.public-booking.030')">
-            <button
+            <div
               v-if="providerClientId('google')"
-              type="button"
-              :disabled="authBusy"
-              @click="startOAuthLogin('google')"
-            > {{ gt('generated.public-booking.031') }} </button>
+              ref="googleSignInButton"
+              class="google-sign-in-button"
+              :aria-label="gt('generated.public-booking.031')"
+            ></div>
             <button
               v-if="providerClientId('facebook')"
               type="button"
@@ -671,7 +788,7 @@ function clampBookingDate(isoDate: string): string {
         </div>
       </section>
 
-      <form v-else class="booking-panel" :aria-label="gt('generated.public-booking.035')" @submit.prevent="submitBooking">
+      <form v-else-if="currentStep === 3" class="booking-panel" :aria-label="gt('generated.public-booking.035')" @submit.prevent="submitBooking">
         <div class="panel-title">
           <span>3</span>
           <strong>{{ gt('generated.public-booking.036') }}</strong>
@@ -700,7 +817,19 @@ function clampBookingDate(isoDate: string): string {
 
         <label>
           <span>{{ gt('generated.public-booking.037') }}</span>
-          <input v-model="bookingForm.phoneE164" inputmode="tel" placeholder="+6591234567" />
+          <div class="public-booking-phone-field">
+            <span class="public-booking-phone-field__prefix" aria-hidden="true">+65</span>
+            <input
+              :value="bookingForm.phoneLocal"
+              autocomplete="tel-national"
+              inputmode="numeric"
+              maxlength="8"
+              pattern="[0-9]*"
+              placeholder="91234567"
+              type="tel"
+              @input="updatePhoneLocal"
+            />
+          </div>
         </label>
 
         <label>
@@ -811,6 +940,37 @@ label span,
   color: #166534;
 }
 
+.booking-complete-panel {
+  gap: 16px;
+}
+
+.completion-message {
+  color: #334155;
+  font-weight: 800;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.completion-code {
+  border-bottom: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.completion-code span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.completion-code strong {
+  color: #0f766e;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
 .panel-title {
   align-items: center;
   display: flex;
@@ -859,6 +1019,40 @@ select {
 
 textarea {
   resize: vertical;
+}
+
+.public-booking-phone-field {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 40px;
+  overflow: hidden;
+}
+
+.public-booking-phone-field__prefix {
+  align-items: center;
+  align-self: stretch;
+  background: #f8fafc;
+  border-right: 1px solid #cbd5e1;
+  color: #0f172a;
+  display: flex;
+  font-weight: 900;
+  justify-content: center;
+  min-width: 54px;
+  padding: 0 10px;
+}
+
+.public-booking-phone-field input {
+  border: 0;
+  min-height: 38px;
+}
+
+.public-booking-phone-field:focus-within {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
 }
 
 .field-error {
@@ -1002,6 +1196,12 @@ textarea {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.google-sign-in-button {
+  align-items: center;
+  display: flex;
+  min-height: 40px;
 }
 
 .auth-method-panel {

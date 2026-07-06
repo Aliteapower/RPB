@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,9 +34,11 @@ public class PlatformReservationShareTemplateSeedController {
     }
 
     @GetMapping
-    public ResponseEntity<PlatformReservationShareTemplateSeedResponse> getDefaultSeed() {
+    public ResponseEntity<PlatformReservationShareTemplateSeedResponse> getDefaultSeed(
+        @RequestParam(required = false) String locale
+    ) {
         requirePlatformTemplateManager();
-        return ResponseEntity.ok(PlatformReservationShareTemplateSeedResponse.from(service.getDefaultSeed()));
+        return ResponseEntity.ok(PlatformReservationShareTemplateSeedResponse.from(service.getDefaultSeed(locale)));
     }
 
     @PatchMapping

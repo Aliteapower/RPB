@@ -8,6 +8,7 @@ import com.rpb.reservation.auth.persistence.AuthRepository;
 import com.rpb.reservation.auth.persistence.AuthRepository.AuthAccountRecord;
 import com.rpb.reservation.auth.persistence.AuthRepository.AuthSessionRecord;
 import com.rpb.reservation.auth.persistence.AuthRepository.SliderChallengeRecord;
+import com.rpb.reservation.common.web.HostPrefixContext;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -33,6 +34,9 @@ public class AuthApplicationService {
     private static final Duration CAPTCHA_TTL = Duration.ofMinutes(5);
     private static final Duration SESSION_TTL = Duration.ofHours(8);
     private static final String PASSWORD_PATTERN = "^[A-Za-z0-9]{6}$";
+    private static final String ENTRY_PLATFORM_ADMIN = "platform_admin";
+    private static final String ENTRY_TENANT_ADMIN = "tenant_admin";
+    private static final String ENTRY_STAFF = "staff";
 
     private final AuthRepository repository;
     private final PasswordEncoder passwordEncoder;
@@ -83,7 +87,12 @@ public class AuthApplicationService {
     }
 
     @Transactional
-    public AuthLoginResult login(LoginRequest request, String remoteAddr, String userAgent) {
+    public AuthLoginResult login(
+        LoginRequest request,
+        HostPrefixContext hostPrefixContext,
+        String remoteAddr,
+        String userAgent
+    ) {
         if (request == null) {
             throw new AuthApiException(AuthApiErrorCode.REQUEST_INVALID);
         }
@@ -92,7 +101,7 @@ public class AuthApplicationService {
         verifyPasswordShape(password);
         verifyCaptcha(request.captchaId(), request.captchaX());
 
-        AuthAccountRecord account = repository.findActiveAccountByUsername(username)
+        AuthAccountRecord account = resolveLoginAccount(request, hostPrefixContext, username)
             .orElseThrow(() -> new AuthApiException(AuthApiErrorCode.INVALID_CREDENTIALS));
         if (!"active".equals(account.status())) {
             throw new AuthApiException(AuthApiErrorCode.ACCOUNT_DISABLED);
@@ -114,6 +123,48 @@ public class AuthApplicationService {
             userAgent
         );
         return new AuthLoginResult(repository.principalFor(account), sessionToken, expiresAt);
+    }
+
+    private Optional<AuthAccountRecord> resolveLoginAccount(
+        LoginRequest request,
+        HostPrefixContext hostPrefixContext,
+        String username
+    ) {
+        HostPrefixContext context = hostPrefixContext == null ? HostPrefixContext.none() : hostPrefixContext;
+        String requestedEntry = normalizedEntry(request.loginEntry());
+        String requestedTenantCode = trimToNull(request.tenantCode());
+
+        if (context.isPlatform()) {
+            if (requestedEntry != null && !ENTRY_PLATFORM_ADMIN.equals(requestedEntry)) {
+                return Optional.empty();
+            }
+            return repository.findActivePlatformAccountByUsername(username);
+        }
+
+        if (context.isTenant()) {
+            if (requestedTenantCode != null && !requestedTenantCode.equals(context.tenantCode())) {
+                return Optional.empty();
+            }
+            String entry = requestedEntry == null ? ENTRY_TENANT_ADMIN : requestedEntry;
+            if (!ENTRY_TENANT_ADMIN.equals(entry) && !ENTRY_STAFF.equals(entry)) {
+                return Optional.empty();
+            }
+            return repository.findActiveTenantAccountByTenantCodeAndUsername(context.tenantCode(), entry, username);
+        }
+
+        if (requestedEntry == null) {
+            return repository.findActiveAccountByUsername(username);
+        }
+        if (ENTRY_PLATFORM_ADMIN.equals(requestedEntry)) {
+            return repository.findActivePlatformAccountByUsername(username);
+        }
+        if (ENTRY_TENANT_ADMIN.equals(requestedEntry) || ENTRY_STAFF.equals(requestedEntry)) {
+            if (requestedTenantCode == null) {
+                return Optional.empty();
+            }
+            return repository.findActiveTenantAccountByTenantCodeAndUsername(requestedTenantCode, requestedEntry, username);
+        }
+        return Optional.empty();
     }
 
     @Transactional
@@ -189,6 +240,22 @@ public class AuthApplicationService {
             throw new AuthApiException(code);
         }
         return value.trim();
+    }
+
+    private static String normalizedEntry(String value) {
+        String entry = trimToNull(value);
+        if (entry == null) {
+            return null;
+        }
+        entry = entry.toLowerCase(Locale.ROOT);
+        return switch (entry) {
+            case ENTRY_PLATFORM_ADMIN, ENTRY_TENANT_ADMIN, ENTRY_STAFF -> entry;
+            default -> "invalid";
+        };
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static void verifyPasswordShape(String password) {
