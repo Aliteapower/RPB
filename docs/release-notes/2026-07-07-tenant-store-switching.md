@@ -37,13 +37,14 @@
 - Platform tenant admin store authorization rejects invalid, inactive, deleted, null, or cross-tenant store ids.
 
 ## Production Deployment
-- Deployed commit: `e1baed31`.
-- Backend backup: `/opt/rpb/backups/20260707-0844-e1baed31/reservation-platform.jar`.
-- Frontend backup: `/opt/rpb/backups/20260707-0844-e1baed31/frontend`.
-- Live entry asset: `/assets/index-B3rJy0hq.js`.
-- Live staff assets: `/assets/TenantAdminStaffFormPage-iPktj4Kn.js` and `/assets/TenantAdminStaffPage-Bh45LtvM.js`.
-- Smoke checks: `rpb-backend` active, `/login` returned 200, `/stores/20000000-0000-0000-0000-000000000983/admin/staff` returned 200, unauthenticated `/api/v1/auth/me` returned 401, and unauthenticated `/api/v1/me/stores` returned 401.
-- Logged-in Chrome verification confirmed the staff list shows authorized/default store summaries and the staff edit page shows the editable store authorization panel.
+- Deployed commit: `1a26389e`.
+- Backend backup: `/opt/rpb/backups/20260707-0908-1a26389e/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260707-0908-1a26389e-frontend/frontend`.
+- Live entry asset: `/assets/index-Dof32dpv.js`.
+- Live platform tenant edit asset: `/assets/PlatformTenantFormPage-NZHJpr6d.js`.
+- Smoke checks: `rpb-backend` active, unauthenticated `/api/v1/auth/me` returned 401, `/login` returned 200, `platform.booking.yumstone.sg/login` returned 200, `20000000.booking.yumstone.sg/login` returned 200, and `20000000.booking.yumstone.sg/book` returned 200.
+- Production Flyway history remained at v034; no migration was applied for this release.
+- Logged-in Chrome verification before this deployment confirmed the tenant staff list shows authorized/default store summaries and the staff edit page shows the editable store authorization panel.
 
 ## Rollback Notes
 - Revert the backend auth/store-access changes and the frontend switcher/staff-form changes together.
