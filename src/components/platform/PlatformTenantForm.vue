@@ -42,7 +42,11 @@ const localForm = reactive<PlatformTenantFormModel>({
 
 const passwordLabel = computed(() => (
   props.mode === 'create'
-    ? t('platform.tenants.form.initialPassword')
+    ? (
+        localForm.onboardingMode === 'group_multi_store'
+          ? t('platform.tenants.form.groupInitialPassword')
+          : t('platform.tenants.form.initialPassword')
+      )
     : t('platform.tenants.form.password')
 ))
 const passwordPlaceholder = computed(() => (

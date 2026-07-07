@@ -640,7 +640,8 @@ export const zhCN = {
         principal: '负责人',
         phone: '电话',
         address: '地址',
-        initialPassword: '初始密码',
+        initialPassword: '租户管理员初始密码',
+        groupInitialPassword: '集团管理员初始密码',
         password: '修改密码',
         initialPasswordPlaceholder: '6 位数字或英文字母',
         passwordPlaceholder: '留空则不修改',
@@ -714,6 +715,9 @@ export const zhCN = {
           timeFormat: '时间格式',
           supplementalInfo: '补充资料',
           operationDefaults: '运营默认值',
+          branchAdminAccount: '分店管理员账号',
+          branchAdminUsername: '分店管理员登录账号',
+          branchAdminPassword: '分店管理员密码',
           unassigned: '未分配经营主体'
         },
         status: {

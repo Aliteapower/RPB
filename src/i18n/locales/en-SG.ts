@@ -640,7 +640,8 @@ export const enSG = {
         principal: 'Principal',
         phone: 'Phone',
         address: 'Address',
-        initialPassword: 'Initial password',
+        initialPassword: 'Tenant admin initial password',
+        groupInitialPassword: 'Group admin initial password',
         password: 'Change password',
         initialPasswordPlaceholder: '6 digits or letters',
         passwordPlaceholder: 'Leave blank to keep unchanged',
@@ -714,6 +715,9 @@ export const enSG = {
           timeFormat: 'Time format',
           supplementalInfo: 'Supplemental details',
           operationDefaults: 'Operating defaults',
+          branchAdminAccount: 'Branch admin account',
+          branchAdminUsername: 'Branch admin username',
+          branchAdminPassword: 'Branch admin password',
           unassigned: 'No operating entity'
         },
         status: {

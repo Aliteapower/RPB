@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { PlatformOperatingEntity, PlatformStore } from '../../api/platformApi'
+import PasswordInput from '../common/PasswordInput.vue'
 import type {
   PlatformOperatingEntityFormModel,
   PlatformStoreFormModel
@@ -85,7 +86,9 @@ function emptyStoreForm(): PlatformStoreFormModel {
     locale: 'zh-CN',
     dateFormat: 'DD-MM-YYYY',
     timeFormat: 'HH:mm',
-    currency: 'SGD'
+    currency: 'SGD',
+    adminUsername: '',
+    adminPassword: ''
   }
 }
 
@@ -136,7 +139,9 @@ function editStore(store: PlatformStore): void {
     locale: store.locale || 'zh-CN',
     dateFormat: store.dateFormat || 'DD-MM-YYYY',
     timeFormat: store.timeFormat || 'HH:mm',
-    currency: store.currency || 'SGD'
+    currency: store.currency || 'SGD',
+    adminUsername: '',
+    adminPassword: ''
   } satisfies PlatformStoreFormModel)
 }
 
@@ -397,6 +402,30 @@ function storeEntityName(store: PlatformStore): string {
               </option>
             </select>
           </label>
+          <details class="advanced-fields span-2" open>
+            <summary>{{ $t('platform.tenants.structure.fields.branchAdminAccount') }}</summary>
+            <div class="advanced-grid">
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.branchAdminUsername') }}</span>
+                <input
+                  v-model.trim="storeForm.adminUsername"
+                  :required="!storeForm.id"
+                  maxlength="64"
+                  autocomplete="off"
+                />
+              </label>
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.branchAdminPassword') }}</span>
+                <PasswordInput
+                  v-model.trim="storeForm.adminPassword"
+                  :required="!storeForm.id"
+                  maxlength="6"
+                  :placeholder="$t('platform.tenants.form.passwordPlaceholder')"
+                  autocomplete="new-password"
+                />
+              </label>
+            </div>
+          </details>
           <details class="advanced-fields span-2">
             <summary>{{ $t('platform.tenants.structure.fields.operationDefaults') }}</summary>
             <div class="advanced-grid">

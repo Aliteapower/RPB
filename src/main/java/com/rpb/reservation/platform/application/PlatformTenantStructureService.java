@@ -2,11 +2,13 @@ package com.rpb.reservation.platform.application;
 
 import com.rpb.reservation.platform.persistence.PlatformTenantRepository;
 import com.rpb.reservation.platform.persistence.PlatformTenantStructureRepository;
+import com.rpb.reservation.platform.persistence.PlatformStoreAdminAccountRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,20 +22,27 @@ public class PlatformTenantStructureService {
     private static final String DEFAULT_DATE_FORMAT = "DD-MM-YYYY";
     private static final String DEFAULT_TIME_FORMAT = "HH:mm";
     private static final String DEFAULT_CURRENCY = "SGD";
+    private static final String PASSWORD_PATTERN = "^[A-Za-z0-9]{6}$";
 
     private final PlatformTenantRepository tenantRepository;
     private final PlatformTenantStructureRepository structureRepository;
+    private final PlatformStoreAdminAccountRepository storeAdminAccountRepository;
+    private final PasswordEncoder passwordEncoder;
     private final PlatformTenantAuditService auditService;
     private final PublicHostBindingService publicHostBindingService;
 
     public PlatformTenantStructureService(
         PlatformTenantRepository tenantRepository,
         PlatformTenantStructureRepository structureRepository,
+        PlatformStoreAdminAccountRepository storeAdminAccountRepository,
+        PasswordEncoder passwordEncoder,
         PlatformTenantAuditService auditService,
         PublicHostBindingService publicHostBindingService
     ) {
         this.tenantRepository = tenantRepository;
         this.structureRepository = structureRepository;
+        this.storeAdminAccountRepository = storeAdminAccountRepository;
+        this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.publicHostBindingService = publicHostBindingService;
     }
@@ -126,6 +135,7 @@ public class PlatformTenantStructureService {
                 input.timeFormat(),
                 input.currency()
             );
+            upsertStoreAdminIfRequested(tenantId, store.id(), input);
             UUID hostAliasId = structureRepository.upsertStoreHostAlias(
                 tenantId,
                 store.id(),
@@ -172,6 +182,7 @@ public class PlatformTenantStructureService {
                     input.currency()
                 )
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.STORE_NOT_FOUND));
+            upsertStoreAdminIfRequested(tenantId, store.id(), input);
             UUID hostAliasId = structureRepository.upsertStoreHostAlias(
                 tenantId,
                 store.id(),
@@ -247,7 +258,9 @@ public class PlatformTenantStructureService {
             firstText(request.locale(), DEFAULT_LOCALE),
             firstText(request.dateFormat(), DEFAULT_DATE_FORMAT),
             firstText(request.timeFormat(), DEFAULT_TIME_FORMAT),
-            firstText(request.currency(), DEFAULT_CURRENCY)
+            firstText(request.currency(), DEFAULT_CURRENCY),
+            normalizeCreateAdminUsername(request.adminUsername(), request.adminPassword(), request.storeCode()),
+            optionalPassword(request.adminPassword())
         );
     }
 
@@ -275,8 +288,27 @@ public class PlatformTenantStructureService {
             firstText(request.locale(), existing.locale()),
             firstText(request.dateFormat(), existing.dateFormat()),
             firstText(request.timeFormat(), existing.timeFormat()),
-            firstText(request.currency(), existing.currency())
+            firstText(request.currency(), existing.currency()),
+            optionalText(request.adminUsername()),
+            optionalPassword(request.adminPassword())
         );
+    }
+
+    private void upsertStoreAdminIfRequested(UUID tenantId, UUID storeId, NormalizedStoreInput input) {
+        if (input.adminUsername() == null && input.adminPassword() == null) {
+            return;
+        }
+        if (
+            !storeAdminAccountRepository.upsertStoreManager(
+                tenantId,
+                storeId,
+                input.adminUsername(),
+                storeAdminDisplayName(input.storeName()),
+                input.adminPassword() == null ? null : passwordHash(input.adminPassword())
+            )
+        ) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
     }
 
     private void validateOperatingEntity(UUID tenantId, UUID operatingEntityId) {
@@ -299,6 +331,37 @@ public class PlatformTenantStructureService {
             throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
         }
         return normalized;
+    }
+
+    private static String normalizeCreateAdminUsername(String adminUsername, String adminPassword, String storeCode) {
+        String username = optionalText(adminUsername);
+        String password = optionalText(adminPassword);
+        if (username == null && password == null) {
+            return null;
+        }
+        if (password == null) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
+        return username == null ? requiredText(storeCode) : username;
+    }
+
+    private static String optionalPassword(String password) {
+        String normalized = optionalText(password);
+        if (normalized == null) {
+            return null;
+        }
+        if (!normalized.matches(PASSWORD_PATTERN)) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
+        return normalized;
+    }
+
+    private String passwordHash(String password) {
+        return passwordEncoder.encode(password.toLowerCase(Locale.ROOT));
+    }
+
+    private static String storeAdminDisplayName(String storeName) {
+        return requiredText(storeName) + " Manager";
     }
 
     private static String firstText(String first, String fallback) {
@@ -346,7 +409,9 @@ public class PlatformTenantStructureService {
         String locale,
         String dateFormat,
         String timeFormat,
-        String currency
+        String currency,
+        String adminUsername,
+        String adminPassword
     ) {
     }
 }

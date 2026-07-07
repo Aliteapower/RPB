@@ -299,7 +299,9 @@ function storePayload(submittedForm: PlatformStoreFormModel): PlatformStoreMutat
     locale: optionalValue(submittedForm.locale),
     dateFormat: optionalValue(submittedForm.dateFormat),
     timeFormat: optionalValue(submittedForm.timeFormat),
-    currency: optionalValue(submittedForm.currency)
+    currency: optionalValue(submittedForm.currency),
+    adminUsername: optionalValue(submittedForm.adminUsername),
+    adminPassword: optionalValue(submittedForm.adminPassword)
   }
 }
 

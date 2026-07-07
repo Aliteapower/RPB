@@ -69,11 +69,17 @@ class PlatformGroupTenantOnboardingUiValidationTest {
     void platformTenantManagementMobileUiFocusesOnBusinessStructure() throws Exception {
         Path tablePath = Path.of("src", "components", "platform", "PlatformTenantTable.vue");
         Path structurePath = Path.of("src", "components", "platform", "PlatformTenantStructurePanel.vue");
+        Path pagePath = Path.of("src", "pages", "PlatformTenantFormPage.vue");
+        Path apiPath = Path.of("src", "api", "platformApi.ts");
+        Path uiModelPath = Path.of("src", "components", "platform", "platformTenantUi.ts");
         Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
         Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
 
         String table = FrontendSourceSupport.readString(tablePath);
         String structure = FrontendSourceSupport.readString(structurePath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String api = FrontendSourceSupport.readString(apiPath);
+        String uiModel = FrontendSourceSupport.readString(uiModelPath);
         String zh = FrontendSourceSupport.readString(zhPath);
         String en = FrontendSourceSupport.readString(enPath);
 
@@ -95,7 +101,22 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("platform.tenants.structure.guide.noEntities")
             .contains("v-if=\"entityFormOpen\"")
             .contains("v-if=\"storeFormOpen\"")
-            .contains("advanced-fields");
+            .contains("advanced-fields")
+            .contains("storeForm.adminUsername")
+            .contains("storeForm.adminPassword")
+            .contains("platform.tenants.structure.fields.branchAdminAccount")
+            .contains("platform.tenants.structure.fields.branchAdminUsername")
+            .contains("platform.tenants.structure.fields.branchAdminPassword");
+
+        assertThat(api)
+            .contains("adminUsername?: string | null")
+            .contains("adminPassword?: string | null");
+        assertThat(uiModel)
+            .contains("adminUsername: string")
+            .contains("adminPassword: string");
+        assertThat(page)
+            .contains("adminUsername: optionalValue(submittedForm.adminUsername)")
+            .contains("adminPassword: optionalValue(submittedForm.adminPassword)");
 
         assertThat(zh)
             .contains("structure: '门店结构'")
@@ -104,7 +125,10 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("noEntities: '集团会自动准备默认经营主体，请继续新增分店。'")
             .contains("newStore: '新增分店'")
             .contains("supplementalInfo: '补充资料'")
-            .contains("operationDefaults: '运营默认值'");
+            .contains("operationDefaults: '运营默认值'")
+            .contains("branchAdminAccount: '分店管理员账号'")
+            .contains("branchAdminUsername: '分店管理员登录账号'")
+            .contains("branchAdminPassword: '分店管理员密码'");
         assertThat(en)
             .contains("structure: 'Store structure'")
             .contains("operatingEntities: 'Operating entities'")
@@ -112,6 +136,9 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("noEntities: 'The group prepares a default operating entity automatically. Add a branch next.'")
             .contains("newStore: 'Add branch'")
             .contains("supplementalInfo: 'Supplemental details'")
-            .contains("operationDefaults: 'Operating defaults'");
+            .contains("operationDefaults: 'Operating defaults'")
+            .contains("branchAdminAccount: 'Branch admin account'")
+            .contains("branchAdminUsername: 'Branch admin username'")
+            .contains("branchAdminPassword: 'Branch admin password'");
     }
 }

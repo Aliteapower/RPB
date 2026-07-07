@@ -11,6 +11,8 @@ public record PlatformStoreMutationRequest(
     String locale,
     String dateFormat,
     String timeFormat,
-    String currency
+    String currency,
+    String adminUsername,
+    String adminPassword
 ) {
 }

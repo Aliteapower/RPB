@@ -87,6 +87,8 @@ export interface PlatformStoreMutation {
   dateFormat?: string | null
   timeFormat?: string | null
   currency?: string | null
+  adminUsername?: string | null
+  adminPassword?: string | null
 }
 
 export interface PlatformTenantMutation {

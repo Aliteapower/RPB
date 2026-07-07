@@ -478,6 +478,155 @@ class PlatformTenantApiIntegrationTest {
               and tls_status = 'pending'
               and deleted_at is null
             """, tenantId)).isEqualTo(1);
+
+        login("codex-group", "abc123");
+    }
+
+    @Test
+    void platformAdminCreatesBranchStoreManagerWithSeparatePassword() throws Exception {
+        Cookie session = login("sysadmin");
+
+        UUID tenantId = createGroupTenant(session, "codex-branch-admin", "Codex 分店账号集团", "abc123");
+        UUID operatingEntityId = jdbc.queryForObject(
+            """
+            select id
+            from operating_entities
+            where tenant_id = ?
+              and entity_code = 'codex-branch-admin'
+              and deleted_at is null
+            """,
+            UUID.class,
+            tenantId
+        );
+
+        MvcResult storeResult = mockMvc.perform(post(
+                    "/api/v1/platform/tenants/{tenantId}/stores",
+                    tenantId
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "operatingEntityId":"%s",
+                      "storeCode":"codex-branch-a",
+                      "storeName":"Codex 分店 A",
+                      "status":"active",
+                      "timezone":"Asia/Singapore",
+                      "locale":"zh-CN",
+                      "dateFormat":"DD-MM-YYYY",
+                      "timeFormat":"HH:mm",
+                      "currency":"SGD",
+                      "adminUsername":"codex-branch-a-admin",
+                      "adminPassword":"DEF456"
+                    }
+                    """.formatted(operatingEntityId))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.storeCode").value("codex-branch-a"))
+            .andReturn();
+
+        UUID storeId = UUID.fromString(objectMapper
+            .readTree(storeResult.getResponse().getContentAsString())
+            .path("store")
+            .path("id")
+            .asText());
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_roles role on role.account_id = account.id
+            join auth_account_store_access access on access.account_id = account.id
+            where account.tenant_id = ?
+              and account.username = 'codex-branch-a-admin'
+              and account.actor_type = 'staff'
+              and account.status = 'active'
+              and account.default_store_id = ?
+              and role.role_code = 'store_manager'
+              and access.tenant_id = ?
+              and access.store_id = ?
+              and account.deleted_at is null
+              and role.deleted_at is null
+              and access.deleted_at is null
+            """, tenantId, storeId, tenantId, storeId)).isEqualTo(1);
+
+        login("codex-branch-admin", "abc123");
+        expectLoginRejected("codex-branch-a-admin", "abc123");
+        Cookie branchAdminSession = login("codex-branch-a-admin", "def456");
+
+        MvcResult storesResult = mockMvc.perform(get("/api/v1/me/stores").cookie(branchAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode stores = objectMapper.readTree(storesResult.getResponse().getContentAsString()).path("stores");
+        assertThat(stringsByField(stores, "storeId")).containsExactly(storeId.toString());
+        assertThat(storeById(stores, storeId).path("defaultStore").asBoolean()).isTrue();
+
+        mockMvc.perform(patch("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, storeId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "adminPassword":"GHI789"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_roles role on role.account_id = account.id
+            where account.tenant_id = ?
+              and account.username = 'codex-branch-a-admin'
+              and account.actor_type = 'staff'
+              and role.role_code = 'store_manager'
+              and account.deleted_at is null
+              and role.deleted_at is null
+            """, tenantId)).isEqualTo(1);
+        expectLoginRejected("codex-branch-a-admin", "def456");
+        login("codex-branch-a-admin", "ghi789");
+    }
+
+    @Test
+    void platformAdminCannotCreateBranchStoreManagerWithInvalidPassword() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(session, "codex-branch-invalid", "Codex 分店密码校验集团", "abc123");
+        UUID operatingEntityId = jdbc.queryForObject(
+            """
+            select id
+            from operating_entities
+            where tenant_id = ?
+              and entity_code = 'codex-branch-invalid'
+              and deleted_at is null
+            """,
+            UUID.class,
+            tenantId
+        );
+
+        mockMvc.perform(post(
+                    "/api/v1/platform/tenants/{tenantId}/stores",
+                    tenantId
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "operatingEntityId":"%s",
+                      "storeCode":"codex-branch-b",
+                      "storeName":"Codex 分店 B",
+                      "status":"active",
+                      "timezone":"Asia/Singapore",
+                      "locale":"zh-CN",
+                      "dateFormat":"DD-MM-YYYY",
+                      "timeFormat":"HH:mm",
+                      "currency":"SGD",
+                      "adminUsername":"codex-branch-b-admin",
+                      "adminPassword":"TOO-LONG"
+                    }
+                    """.formatted(operatingEntityId))
+                .cookie(session))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
     }
 
     @Test
@@ -995,6 +1144,37 @@ class PlatformTenantApiIntegrationTest {
         return UUID.fromString(id);
     }
 
+    private UUID createGroupTenant(
+        Cookie session,
+        String tenantCode,
+        String displayName,
+        String initialPassword
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/platform/tenants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"%s",
+                      "displayName":"%s",
+                      "status":"active",
+                      "defaultLocale":"zh-CN",
+                      "contactPhone":"+6590000999",
+                      "address":"集团地址 999",
+                      "principalName":"集团负责人",
+                      "initialPassword":"%s",
+                      "onboardingMode":"group_multi_store"
+                    }
+                    """.formatted(tenantCode, displayName, initialPassword))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tenant.tenantCode").value(tenantCode))
+            .andReturn();
+
+        String id = objectMapper.readTree(result.getResponse().getContentAsString()).path("tenant").path("id").asText();
+        return UUID.fromString(id);
+    }
+
     private Cookie login(String username) throws Exception {
         return login(username, "393930");
     }
@@ -1010,6 +1190,18 @@ class PlatformTenantApiIntegrationTest {
             .andExpect(cookie().exists("RPB_SESSION"))
             .andReturn();
         return login.getResponse().getCookie("RPB_SESSION");
+    }
+
+    private void expectLoginRejected(String username, String password) throws Exception {
+        SliderTarget target = createSliderTarget();
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"username":"%s","password":"%s","captchaId":"%s","captchaX":%d}
+                    """.formatted(username, password, target.challengeId(), target.targetX())))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
     }
 
     private SliderTarget createSliderTarget() throws Exception {

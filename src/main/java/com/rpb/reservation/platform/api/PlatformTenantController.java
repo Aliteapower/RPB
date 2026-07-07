@@ -297,7 +297,9 @@ public class PlatformTenantController {
             request.locale(),
             request.dateFormat(),
             request.timeFormat(),
-            request.currency()
+            request.currency(),
+            request.adminUsername(),
+            request.adminPassword()
         );
     }
 

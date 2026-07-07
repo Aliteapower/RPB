@@ -52,4 +52,6 @@ export interface PlatformStoreFormModel {
   dateFormat: string
   timeFormat: string
   currency: string
+  adminUsername: string
+  adminPassword: string
 }
