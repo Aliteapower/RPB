@@ -319,14 +319,14 @@ class AuthLoginUiValidationTest {
         assertThat(zh)
             .contains("title: '授权门店'")
             .contains("defaultStore: '默认门店'")
-            .contains("structure: '门店'")
+            .contains("structure: '门店结构'")
             .contains("title: '经营主体与门店'")
             .contains("newEntity: '新增经营主体'")
             .contains("newStore: '新增门店'");
         assertThat(en)
             .contains("title: 'Authorised stores'")
             .contains("defaultStore: 'Default store'")
-            .contains("structure: 'Stores'")
+            .contains("structure: 'Store structure'")
             .contains("title: 'Operating entities and stores'")
             .contains("newEntity: 'Add entity'")
             .contains("newStore: 'Add store'");

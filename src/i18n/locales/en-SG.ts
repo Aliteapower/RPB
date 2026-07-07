@@ -617,7 +617,7 @@ export const enSG = {
           actions: 'Actions'
         },
         empty: 'No tenants',
-        structure: 'Stores',
+        structure: 'Store structure',
         billingShort: 'Billing',
         billingFull: 'Subscription/billing'
       },
@@ -663,17 +663,37 @@ export const enSG = {
       structure: {
         kicker: 'Tenant structure',
         title: 'Operating entities and stores',
+        summary: {
+          aria: 'Operating entity and store summary',
+          operatingEntities: 'Operating entities',
+          stores: 'Stores',
+          activeStores: 'Active stores'
+        },
+        tabs: {
+          aria: 'Operating entity and store switcher'
+        },
+        guide: {
+          noEntities: 'Create an operating entity first, then add stores to it.',
+          noStores: 'Operating entities are ready. Add stores next.',
+          noActiveEntities: 'Enable an operating entity before adding stores.'
+        },
         actions: {
           newEntity: 'Add entity',
           newStore: 'Add store'
         },
+        formTitles: {
+          editEntity: 'Edit entity',
+          editStore: 'Edit store'
+        },
         operatingEntities: {
           title: 'Operating entities',
-          empty: 'No operating entities'
+          empty: 'No operating entities',
+          hint: 'Manage store ownership, contacts, and addresses by entity'
         },
         stores: {
           title: 'Stores',
-          empty: 'No stores'
+          empty: 'No stores',
+          hint: 'Store code is used for login subdomains and store routes'
         },
         fields: {
           entityCode: 'Entity code',
@@ -692,6 +712,8 @@ export const enSG = {
           currency: 'Currency',
           dateFormat: 'Date format',
           timeFormat: 'Time format',
+          supplementalInfo: 'Supplemental details',
+          operationDefaults: 'Operating defaults',
           unassigned: 'No operating entity'
         },
         status: {

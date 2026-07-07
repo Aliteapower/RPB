@@ -64,4 +64,52 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("singleStore: 'Single-store quick setup'")
             .contains("groupMultiStore: 'Group multi-store setup'");
     }
+
+    @Test
+    void platformTenantManagementMobileUiFocusesOnBusinessStructure() throws Exception {
+        Path tablePath = Path.of("src", "components", "platform", "PlatformTenantTable.vue");
+        Path structurePath = Path.of("src", "components", "platform", "PlatformTenantStructurePanel.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
+        Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
+
+        String table = FrontendSourceSupport.readString(tablePath);
+        String structure = FrontendSourceSupport.readString(structurePath);
+        String zh = FrontendSourceSupport.readString(zhPath);
+        String en = FrontendSourceSupport.readString(enPath);
+
+        assertThat(table)
+            .contains("tenant-card-list")
+            .contains("tenant-card__primary")
+            .contains("formatTenantUpdatedAt")
+            .contains("@click=\"emit('structure', tenant)\"")
+            .contains("@media (max-width: 760px)")
+            .contains("platform.tenants.table.structure");
+
+        assertThat(structure)
+            .contains("activePanel")
+            .contains("entityFormOpen")
+            .contains("storeFormOpen")
+            .contains("structure-summary")
+            .contains("structure-tabs")
+            .contains("platform.tenants.structure.summary.operatingEntities")
+            .contains("platform.tenants.structure.guide.noEntities")
+            .contains("v-if=\"entityFormOpen\"")
+            .contains("v-if=\"storeFormOpen\"")
+            .contains("advanced-fields");
+
+        assertThat(zh)
+            .contains("structure: '门店结构'")
+            .contains("operatingEntities: '经营主体'")
+            .contains("activeStores: '启用门店'")
+            .contains("noEntities: '先新增经营主体，再为它添加门店。'")
+            .contains("supplementalInfo: '补充资料'")
+            .contains("operationDefaults: '运营默认值'");
+        assertThat(en)
+            .contains("structure: 'Store structure'")
+            .contains("operatingEntities: 'Operating entities'")
+            .contains("activeStores: 'Active stores'")
+            .contains("noEntities: 'Create an operating entity first, then add stores to it.'")
+            .contains("supplementalInfo: 'Supplemental details'")
+            .contains("operationDefaults: 'Operating defaults'");
+    }
 }

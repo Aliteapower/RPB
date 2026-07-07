@@ -617,7 +617,7 @@ export const zhCN = {
           actions: '操作'
         },
         empty: '暂无租户',
-        structure: '门店',
+        structure: '门店结构',
         billingShort: '计费',
         billingFull: '订阅/计费'
       },
@@ -663,17 +663,37 @@ export const zhCN = {
       structure: {
         kicker: '租户结构',
         title: '经营主体与门店',
+        summary: {
+          aria: '经营主体与门店概览',
+          operatingEntities: '经营主体',
+          stores: '门店',
+          activeStores: '启用门店'
+        },
+        tabs: {
+          aria: '经营主体与门店切换'
+        },
+        guide: {
+          noEntities: '先新增经营主体，再为它添加门店。',
+          noStores: '已有经营主体，可以继续新增门店。',
+          noActiveEntities: '需要先启用经营主体，才能新增门店。'
+        },
         actions: {
           newEntity: '新增经营主体',
           newStore: '新增门店'
         },
+        formTitles: {
+          editEntity: '编辑经营主体',
+          editStore: '编辑门店'
+        },
         operatingEntities: {
           title: '经营主体',
-          empty: '暂无经营主体'
+          empty: '暂无经营主体',
+          hint: '按经营主体管理门店归属、联系人和地址'
         },
         stores: {
           title: '门店',
-          empty: '暂无门店'
+          empty: '暂无门店',
+          hint: '门店代码会用于登录子域名和门店路由'
         },
         fields: {
           entityCode: '经营主体代码',
@@ -692,6 +712,8 @@ export const zhCN = {
           currency: '币种',
           dateFormat: '日期格式',
           timeFormat: '时间格式',
+          supplementalInfo: '补充资料',
+          operationDefaults: '运营默认值',
           unassigned: '未分配经营主体'
         },
         status: {

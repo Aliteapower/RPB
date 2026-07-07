@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { PlatformOperatingEntity, PlatformStore } from '../../api/platformApi'
@@ -21,11 +21,26 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+type StructurePanel = 'entities' | 'stores'
+
 const entityForm = reactive<PlatformOperatingEntityFormModel>(emptyEntityForm())
 const storeForm = reactive<PlatformStoreFormModel>(emptyStoreForm())
+const activePanel = ref<StructurePanel>('entities')
+const entityFormOpen = ref(false)
+const storeFormOpen = ref(false)
 
 const activeOperatingEntities = computed(() => props.operatingEntities.filter(entity => entity.status === 'active'))
 const entityById = computed(() => new Map(props.operatingEntities.map(entity => [entity.id, entity])))
+const activeStoreCount = computed(() => props.stores.filter(store => store.status === 'active').length)
+const structureGuideKey = computed(() => {
+  if (props.operatingEntities.length === 0) {
+    return 'platform.tenants.structure.guide.noEntities'
+  }
+  if (props.stores.length === 0) {
+    return 'platform.tenants.structure.guide.noStores'
+  }
+  return ''
+})
 const entityStatusOptions = [
   { value: 'active', labelKey: 'platform.tenants.structure.status.active' },
   { value: 'inactive', labelKey: 'platform.tenants.structure.status.inactive' }
@@ -75,6 +90,8 @@ function emptyStoreForm(): PlatformStoreFormModel {
 }
 
 function editEntity(entity: PlatformOperatingEntity): void {
+  activePanel.value = 'entities'
+  entityFormOpen.value = true
   Object.assign(entityForm, {
     id: entity.id,
     entityCode: entity.entityCode,
@@ -91,11 +108,24 @@ function resetEntityForm(): void {
   Object.assign(entityForm, emptyEntityForm())
 }
 
+function openEntityForm(): void {
+  activePanel.value = 'entities'
+  entityFormOpen.value = true
+  resetEntityForm()
+}
+
+function closeEntityForm(): void {
+  entityFormOpen.value = false
+  resetEntityForm()
+}
+
 function submitEntity(): void {
   emit('saveOperatingEntity', { ...entityForm })
 }
 
 function editStore(store: PlatformStore): void {
+  activePanel.value = 'stores'
+  storeFormOpen.value = true
   Object.assign(storeForm, {
     id: store.id,
     operatingEntityId: store.operatingEntityId || activeOperatingEntities.value[0]?.id || '',
@@ -117,8 +147,23 @@ function resetStoreForm(): void {
   } satisfies PlatformStoreFormModel)
 }
 
+function openStoreForm(): void {
+  activePanel.value = 'stores'
+  storeFormOpen.value = true
+  resetStoreForm()
+}
+
+function closeStoreForm(): void {
+  storeFormOpen.value = false
+  resetStoreForm()
+}
+
 function submitStore(): void {
   emit('saveStore', { ...storeForm })
+}
+
+function showPanel(panel: StructurePanel): void {
+  activePanel.value = panel
 }
 
 function operatingEntityLabel(entity: PlatformOperatingEntity): string {
@@ -145,17 +190,72 @@ function storeEntityName(store: PlatformStore): string {
       </div>
     </div>
 
+    <div class="structure-summary" :aria-label="$t('platform.tenants.structure.summary.aria')">
+      <div>
+        <span>{{ $t('platform.tenants.structure.summary.operatingEntities') }}</span>
+        <strong>{{ operatingEntities.length }}</strong>
+      </div>
+      <div>
+        <span>{{ $t('platform.tenants.structure.summary.stores') }}</span>
+        <strong>{{ stores.length }}</strong>
+      </div>
+      <div>
+        <span>{{ $t('platform.tenants.structure.summary.activeStores') }}</span>
+        <strong>{{ activeStoreCount }}</strong>
+      </div>
+    </div>
+
+    <div v-if="structureGuideKey" class="structure-guide">
+      <p>{{ $t(structureGuideKey) }}</p>
+      <button
+        v-if="operatingEntities.length === 0"
+        class="primary-button"
+        type="button"
+        @click="openEntityForm"
+      >
+        {{ $t('platform.tenants.structure.actions.newEntity') }}
+      </button>
+      <button
+        v-else
+        class="primary-button"
+        type="button"
+        :disabled="activeOperatingEntities.length === 0"
+        @click="openStoreForm"
+      >
+        {{ $t('platform.tenants.structure.actions.newStore') }}
+      </button>
+    </div>
+
+    <div class="structure-tabs" role="tablist" :aria-label="$t('platform.tenants.structure.tabs.aria')">
+      <button type="button" :class="{ active: activePanel === 'entities' }" @click="showPanel('entities')">
+        {{ $t('platform.tenants.structure.operatingEntities.title') }}
+        <strong>{{ operatingEntities.length }}</strong>
+      </button>
+      <button type="button" :class="{ active: activePanel === 'stores' }" @click="showPanel('stores')">
+        {{ $t('platform.tenants.structure.stores.title') }}
+        <strong>{{ stores.length }}</strong>
+      </button>
+    </div>
+
     <div class="structure-grid">
-      <section class="structure-section" :aria-label="$t('platform.tenants.structure.operatingEntities.title')">
+      <section
+        class="structure-section"
+        :class="{ active: activePanel === 'entities' }"
+        :aria-label="$t('platform.tenants.structure.operatingEntities.title')"
+      >
         <div class="section-heading">
-          <h3>{{ $t('platform.tenants.structure.operatingEntities.title') }}</h3>
-          <button class="secondary-button" type="button" @click="resetEntityForm">
+          <div>
+            <h3>{{ $t('platform.tenants.structure.operatingEntities.title') }}</h3>
+            <span>{{ $t('platform.tenants.structure.operatingEntities.hint') }}</span>
+          </div>
+          <button class="secondary-button" type="button" @click="openEntityForm">
             {{ $t('platform.tenants.structure.actions.newEntity') }}
           </button>
         </div>
 
-        <div v-if="operatingEntities.length === 0" class="empty-line">
-          {{ $t('platform.tenants.structure.operatingEntities.empty') }}
+        <div v-if="operatingEntities.length === 0" class="empty-state">
+          <strong>{{ $t('platform.tenants.structure.operatingEntities.empty') }}</strong>
+          <span>{{ $t('platform.tenants.structure.guide.noEntities') }}</span>
         </div>
         <div v-else class="data-list">
           <article v-for="entity in operatingEntities" :key="entity.id" class="data-row">
@@ -169,7 +269,15 @@ function storeEntityName(store: PlatformStore): string {
           </article>
         </div>
 
-        <form class="inline-form" @submit.prevent="submitEntity">
+        <form v-if="entityFormOpen" class="inline-form" @submit.prevent="submitEntity">
+          <div class="form-subheading span-2">
+            <strong>
+              {{ entityForm.id ? $t('platform.tenants.structure.formTitles.editEntity') : $t('platform.tenants.structure.actions.newEntity') }}
+            </strong>
+            <button class="text-button" type="button" @click="closeEntityForm">
+              {{ $t('common.actions.cancel') }}
+            </button>
+          </div>
           <label>
             <span>{{ $t('platform.tenants.structure.fields.entityCode') }}</span>
             <input v-model.trim="entityForm.entityCode" required maxlength="64" autocomplete="off" />
@@ -190,18 +298,23 @@ function storeEntityName(store: PlatformStore): string {
             <span>{{ $t('platform.tenants.structure.fields.defaultLocale') }}</span>
             <input v-model.trim="entityForm.defaultLocale" maxlength="20" autocomplete="off" />
           </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.principal') }}</span>
-            <input v-model.trim="entityForm.principalName" maxlength="80" autocomplete="off" />
-          </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.phone') }}</span>
-            <input v-model.trim="entityForm.contactPhone" maxlength="40" autocomplete="off" />
-          </label>
-          <label class="span-2">
-            <span>{{ $t('platform.tenants.structure.fields.address') }}</span>
-            <input v-model.trim="entityForm.address" maxlength="240" autocomplete="off" />
-          </label>
+          <details class="advanced-fields span-2">
+            <summary>{{ $t('platform.tenants.structure.fields.supplementalInfo') }}</summary>
+            <div class="advanced-grid">
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.principal') }}</span>
+                <input v-model.trim="entityForm.principalName" maxlength="80" autocomplete="off" />
+              </label>
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.phone') }}</span>
+                <input v-model.trim="entityForm.contactPhone" maxlength="40" autocomplete="off" />
+              </label>
+              <label class="span-2">
+                <span>{{ $t('platform.tenants.structure.fields.address') }}</span>
+                <input v-model.trim="entityForm.address" maxlength="240" autocomplete="off" />
+              </label>
+            </div>
+          </details>
           <div class="form-actions span-2">
             <button class="primary-button" type="submit" :disabled="saving">
               {{ saving ? $t('common.actions.saving') : $t('common.actions.save') }}
@@ -210,16 +323,33 @@ function storeEntityName(store: PlatformStore): string {
         </form>
       </section>
 
-      <section class="structure-section" :aria-label="$t('platform.tenants.structure.stores.title')">
+      <section
+        class="structure-section"
+        :class="{ active: activePanel === 'stores' }"
+        :aria-label="$t('platform.tenants.structure.stores.title')"
+      >
         <div class="section-heading">
-          <h3>{{ $t('platform.tenants.structure.stores.title') }}</h3>
-          <button class="secondary-button" type="button" @click="resetStoreForm">
+          <div>
+            <h3>{{ $t('platform.tenants.structure.stores.title') }}</h3>
+            <span>{{ $t('platform.tenants.structure.stores.hint') }}</span>
+          </div>
+          <button
+            class="secondary-button"
+            type="button"
+            :disabled="activeOperatingEntities.length === 0"
+            @click="openStoreForm"
+          >
             {{ $t('platform.tenants.structure.actions.newStore') }}
           </button>
         </div>
 
-        <div v-if="stores.length === 0" class="empty-line">
-          {{ $t('platform.tenants.structure.stores.empty') }}
+        <div v-if="stores.length === 0" class="empty-state">
+          <strong>{{ $t('platform.tenants.structure.stores.empty') }}</strong>
+          <span>
+            {{ activeOperatingEntities.length === 0
+              ? $t('platform.tenants.structure.guide.noActiveEntities')
+              : $t('platform.tenants.structure.guide.noStores') }}
+          </span>
         </div>
         <div v-else class="data-list">
           <article v-for="store in stores" :key="store.id" class="data-row">
@@ -233,7 +363,15 @@ function storeEntityName(store: PlatformStore): string {
           </article>
         </div>
 
-        <form class="inline-form" @submit.prevent="submitStore">
+        <form v-if="storeFormOpen" class="inline-form" @submit.prevent="submitStore">
+          <div class="form-subheading span-2">
+            <strong>
+              {{ storeForm.id ? $t('platform.tenants.structure.formTitles.editStore') : $t('platform.tenants.structure.actions.newStore') }}
+            </strong>
+            <button class="text-button" type="button" @click="closeStoreForm">
+              {{ $t('common.actions.cancel') }}
+            </button>
+          </div>
           <label class="span-2">
             <span>{{ $t('platform.tenants.structure.fields.operatingEntity') }}</span>
             <select v-model="storeForm.operatingEntityId" required>
@@ -251,7 +389,7 @@ function storeEntityName(store: PlatformStore): string {
             <span>{{ $t('platform.tenants.structure.fields.storeName') }}</span>
             <input v-model.trim="storeForm.storeName" required maxlength="120" autocomplete="off" />
           </label>
-          <label>
+          <label class="span-2">
             <span>{{ $t('platform.tenants.structure.fields.status') }}</span>
             <select v-model="storeForm.status">
               <option v-for="option in storeStatusOptions" :key="option.value" :value="option.value">
@@ -259,26 +397,31 @@ function storeEntityName(store: PlatformStore): string {
               </option>
             </select>
           </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.locale') }}</span>
-            <input v-model.trim="storeForm.locale" maxlength="20" autocomplete="off" />
-          </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.timezone') }}</span>
-            <input v-model.trim="storeForm.timezone" required maxlength="64" autocomplete="off" />
-          </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.currency') }}</span>
-            <input v-model.trim="storeForm.currency" required maxlength="8" autocomplete="off" />
-          </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.dateFormat') }}</span>
-            <input v-model.trim="storeForm.dateFormat" required maxlength="30" autocomplete="off" />
-          </label>
-          <label>
-            <span>{{ $t('platform.tenants.structure.fields.timeFormat') }}</span>
-            <input v-model.trim="storeForm.timeFormat" required maxlength="30" autocomplete="off" />
-          </label>
+          <details class="advanced-fields span-2">
+            <summary>{{ $t('platform.tenants.structure.fields.operationDefaults') }}</summary>
+            <div class="advanced-grid">
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.locale') }}</span>
+                <input v-model.trim="storeForm.locale" maxlength="20" autocomplete="off" />
+              </label>
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.timezone') }}</span>
+                <input v-model.trim="storeForm.timezone" required maxlength="64" autocomplete="off" />
+              </label>
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.currency') }}</span>
+                <input v-model.trim="storeForm.currency" required maxlength="8" autocomplete="off" />
+              </label>
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.dateFormat') }}</span>
+                <input v-model.trim="storeForm.dateFormat" required maxlength="30" autocomplete="off" />
+              </label>
+              <label>
+                <span>{{ $t('platform.tenants.structure.fields.timeFormat') }}</span>
+                <input v-model.trim="storeForm.timeFormat" required maxlength="30" autocomplete="off" />
+              </label>
+            </div>
+          </details>
           <div class="form-actions span-2">
             <button class="primary-button" type="submit" :disabled="saving || activeOperatingEntities.length === 0">
               {{ saving ? $t('common.actions.saving') : $t('common.actions.save') }}
@@ -321,6 +464,56 @@ function storeEntityName(store: PlatformStore): string {
   font-size: 20px;
 }
 
+.structure-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.structure-summary div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.structure-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.structure-summary strong {
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.structure-guide {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.structure-guide p {
+  margin: 0;
+  color: #1e3a5f;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.structure-tabs {
+  display: none;
+}
+
 .structure-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -343,10 +536,36 @@ function storeEntityName(store: PlatformStore): string {
   gap: 10px;
 }
 
+.section-heading div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
 .section-heading h3 {
   margin: 0;
   color: #0f172a;
   font-size: 16px;
+}
+
+.section-heading span,
+.empty-state span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.empty-state {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.empty-state strong {
+  color: #0f172a;
 }
 
 .data-list {
@@ -394,6 +613,19 @@ function storeEntityName(store: PlatformStore): string {
   padding-top: 2px;
 }
 
+.form-subheading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid #edf2f7;
+}
+
+.form-subheading strong {
+  color: #0f172a;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -404,6 +636,29 @@ label {
 
 .span-2 {
   grid-column: span 2;
+}
+
+.advanced-fields {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.advanced-fields summary {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 10px;
 }
 
 input,
@@ -466,7 +721,69 @@ select {
 }
 
 @media (max-width: 640px) {
+  .structure-summary {
+    gap: 8px;
+  }
+
+  .structure-summary div {
+    padding: 10px;
+  }
+
+  .structure-summary strong {
+    font-size: 20px;
+  }
+
+  .structure-guide {
+    display: grid;
+  }
+
+  .structure-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .structure-tabs button {
+    min-width: 0;
+    min-height: 38px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0 10px;
+    color: #334155;
+    background: #ffffff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .structure-tabs button.active {
+    color: #ffffff;
+    border-color: #0f766e;
+    background: #0f766e;
+  }
+
+  .structure-tabs strong {
+    margin-left: 4px;
+  }
+
+  .structure-grid {
+    display: block;
+  }
+
+  .structure-section {
+    display: none;
+  }
+
+  .structure-section.active {
+    display: grid;
+  }
+
   .inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-grid {
     grid-template-columns: 1fr;
   }
 
