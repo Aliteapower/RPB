@@ -14,6 +14,8 @@ Rules:
 - `single_store` creates the tenant, a default operating entity, a default store, the tenant admin account, and the tenant admin's default store authorization.
 - `group_multi_store` creates the tenant, a default operating entity, and the tenant admin account, but does not create a store. Platform admins continue in the tenant structure panel and add branches under the default operating entity.
 - `V038__tenant_default_operating_entity_backfill.sql` backfills the same default operating entity for existing non-deleted tenants that have no non-deleted operating entity. It does not create stores.
+- New tenant creation persists the tenant code as a `tenant_host_aliases` row with `alias_type = tenant`, `default_store_id = null`, and status derived from the tenant status.
+- `V039__tenant_host_alias_backfill.sql` backfills tenant-code host aliases for existing non-deleted tenants when no active alias already uses the same prefix.
 
 ## Operating Entities
 
@@ -157,4 +159,4 @@ Rules:
 - Invalid, inactive, deleted, null, or cross-tenant store ids return `REQUEST_INVALID` with HTTP 400.
 
 ## Compatibility
-Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. `V038` is data-only and only inserts a default operating entity for tenants without one.
+Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills.

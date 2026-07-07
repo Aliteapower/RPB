@@ -82,6 +82,7 @@ public class PlatformTenantService {
                 input.address(),
                 input.principalName()
             );
+            repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
             UUID defaultStoreId = null;
             if (ONBOARDING_SINGLE_STORE.equals(input.onboardingMode())
                 || ONBOARDING_GROUP_MULTI_STORE.equals(input.onboardingMode())) {
@@ -138,6 +139,7 @@ public class PlatformTenantService {
                     input.principalName()
                 )
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+            repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
             accountRepository.upsertTenantAdminAccount(
                 tenant.id(),
                 tenant.tenantCode(),
@@ -165,6 +167,7 @@ public class PlatformTenantService {
     public PlatformTenant deleteTenant(UUID tenantId, PlatformOperator operator) {
         PlatformTenant tenant = repository.softDelete(tenantId)
             .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        repository.archiveTenantHostAlias(tenant.id());
         auditService.recordDeleted(tenant, operator);
         return tenant;
     }
@@ -174,6 +177,7 @@ public class PlatformTenantService {
         try {
             PlatformTenant tenant = repository.restore(tenantId)
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+            repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
             auditService.recordRestored(tenant, operator);
             return tenant;
         } catch (DataIntegrityViolationException exception) {

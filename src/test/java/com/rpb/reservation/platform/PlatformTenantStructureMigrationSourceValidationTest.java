@@ -91,4 +91,31 @@ class PlatformTenantStructureMigrationSourceValidationTest {
             .contains("on conflict do nothing")
             .doesNotContain("insert into stores");
     }
+
+    @Test
+    void migrationBackfillsTenantCodeHostAliases() throws Exception {
+        Path migrationPath = Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V039__tenant_host_alias_backfill.sql"
+        );
+
+        assertThat(migrationPath).exists();
+
+        String migration = Files.readString(migrationPath);
+
+        assertThat(migration)
+            .contains("insert into tenant_host_aliases")
+            .contains("tenant_id, alias_code, alias_type, default_store_id, status")
+            .contains("from tenants tenant")
+            .contains("'tenant'")
+            .contains("tenant.deleted_at is null")
+            .contains("not exists")
+            .contains("lower(alias.alias_code) = lower(tenant.tenant_code)")
+            .contains("on conflict do nothing")
+            .doesNotContain("'store'");
+    }
 }

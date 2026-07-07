@@ -139,18 +139,45 @@ class PlatformTenantApiIntegrationTest {
             .andExpect(jsonPath("$.tenant.principalName").value("张店长"));
 
         UUID createdTenantId = createTenant(session, "codex-tenant", "Codex 新租户");
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-tenant'
+              and alias_type = 'tenant'
+              and status = 'active'
+              and deleted_at is null
+            """, createdTenantId)).isEqualTo(1);
 
         mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}", createdTenantId).cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.tenant.deleted").value(true));
         assertThat(countWhere("select count(*) from tenants where id = ? and deleted_at is not null", createdTenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-tenant'
+              and alias_type = 'tenant'
+              and status = 'archived'
+              and deleted_at is not null
+            """, createdTenantId)).isEqualTo(1);
 
         mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/restore", createdTenantId).cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.tenant.deleted").value(false));
         assertThat(countWhere("select count(*) from tenants where id = ? and deleted_at is null", createdTenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-tenant'
+              and alias_type = 'tenant'
+              and status = 'active'
+              and deleted_at is null
+            """, createdTenantId)).isEqualTo(1);
     }
 
     @Test
@@ -310,6 +337,16 @@ class PlatformTenantApiIntegrationTest {
               and account.deleted_at is null
               and access.deleted_at is null
             """, tenantId, storeId, tenantId, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-login'
+              and alias_type = 'tenant'
+              and default_store_id is null
+              and status = 'active'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
 
         login("codex-login", "abc123");
     }
@@ -372,6 +409,16 @@ class PlatformTenantApiIntegrationTest {
               and account.deleted_at is null
               and access.id is null
             """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-group'
+              and alias_type = 'tenant'
+              and default_store_id is null
+              and status = 'active'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
     }
 
     @Test
@@ -409,6 +456,44 @@ class PlatformTenantApiIntegrationTest {
               and deleted_at is null
             """, tenantId)).isEqualTo(1);
         assertThat(countWhere("select count(*) from stores where tenant_id = ?", tenantId)).isZero();
+    }
+
+    @Test
+    void tenantHostAliasBackfillPersistsExistingTenantCodesAsPrefixes() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        jdbc.update(
+            """
+            insert into tenants (
+                id, tenant_code, display_name, status,
+                default_locale, contact_phone, address, principal_name
+            )
+            values (?, 'codex-prefix-tenant', 'Codex 前缀租户', 'active',
+                    'zh-CN', '+6590000222', '前缀地址 222', '前缀管理员')
+            """,
+            tenantId
+        );
+
+        assertThat(countWhere("select count(*) from tenant_host_aliases where tenant_id = ?", tenantId)).isZero();
+
+        replayTenantHostAliasBackfillMigration();
+        replayTenantHostAliasBackfillMigration();
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-prefix-tenant'
+              and alias_type = 'tenant'
+              and default_store_id is null
+              and status = 'active'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_type = 'store'
+            """, tenantId)).isZero();
     }
 
     @Test
@@ -969,6 +1054,13 @@ class PlatformTenantApiIntegrationTest {
     private void replayTenantStructureDefaultOperatingEntityBackfillMigration() throws Exception {
         jdbc.execute(Files.readString(
             Path.of("src/main/resources/db/migration/V038__tenant_default_operating_entity_backfill.sql"),
+            StandardCharsets.UTF_8
+        ));
+    }
+
+    private void replayTenantHostAliasBackfillMigration() throws Exception {
+        jdbc.execute(Files.readString(
+            Path.of("src/main/resources/db/migration/V039__tenant_host_alias_backfill.sql"),
             StandardCharsets.UTF_8
         ));
     }

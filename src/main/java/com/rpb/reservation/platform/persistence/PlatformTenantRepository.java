@@ -102,6 +102,55 @@ public class PlatformTenantRepository {
         );
     }
 
+    public void upsertTenantHostAlias(UUID tenantId, String tenantCode, String tenantStatus) {
+        String aliasStatus = tenantAliasStatus(tenantStatus);
+        int updated = jdbc.update(
+            """
+            update tenant_host_aliases
+            set alias_code = ?,
+                default_store_id = null,
+                status = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and alias_type = 'tenant'
+              and deleted_at is null
+            """,
+            tenantCode,
+            aliasStatus,
+            tenantId
+        );
+        if (updated == 0) {
+            jdbc.update(
+                """
+                insert into tenant_host_aliases (
+                    tenant_id, alias_code, alias_type, default_store_id, status
+                )
+                values (?, ?, 'tenant', null, ?)
+                """,
+                tenantId,
+                tenantCode,
+                aliasStatus
+            );
+        }
+    }
+
+    public void archiveTenantHostAlias(UUID tenantId) {
+        jdbc.update(
+            """
+            update tenant_host_aliases
+            set status = 'archived',
+                deleted_at = coalesce(deleted_at, now()),
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and alias_type = 'tenant'
+              and deleted_at is null
+            """,
+            tenantId
+        );
+    }
+
     public Optional<UUID> findDefaultStoreId(UUID tenantId) {
         return jdbc.query(
             """
@@ -366,6 +415,16 @@ public class PlatformTenantRepository {
             return "inactive";
         }
         return "active";
+    }
+
+    private static String tenantAliasStatus(String tenantStatus) {
+        if ("active".equals(tenantStatus)) {
+            return "active";
+        }
+        if ("closed".equals(tenantStatus)) {
+            return "archived";
+        }
+        return "inactive";
     }
 
     private static WhereClause whereClause(PlatformTenantSearchCriteria criteria) {
