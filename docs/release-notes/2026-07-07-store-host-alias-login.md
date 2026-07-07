@@ -38,3 +38,20 @@
 
 - Roll back the backend jar to the previous version and restore the pre-deploy database backup if V037 has already applied.
 - Without database restore, delete the newly backfilled `tenant_host_aliases` rows only after confirming no active production store depends on those host prefixes.
+
+## Validation
+
+- `mvn -q "-Dtest=AuthApiIntegrationTest#storeHostAliasResolvesToOwningTenantForLogin,PlatformTenantApiIntegrationTest#platformAdminCreatesOperatingEntityStoreAndAuthorizesTenantAdminAcrossStores,AuthMigrationTest#backfillsUniqueActiveStoreHostAliases,PlatformTenantStructureMigrationSourceValidationTest" test`
+- `mvn -q -DskipTests package`
+- Jar check confirmed `BOOT-INF/classes/db/migration/V037__tenant_store_host_alias_backfill.sql`.
+
+## Production Deployment
+
+- Deployed backend commit: `9ba007ab`.
+- Production backup directory: `/opt/rpb/backups/20260707-1249-9ba007ab`.
+- Backup contents: previous backend jar and `db-before-9ba007ab.dump`.
+- Flyway history reached `v037`; V036 and V037 were applied in one backend restart.
+- Expanded the Let's Encrypt SAN certificate for `booking.yumstone.sg` to include `lsc83.booking.yumstone.sg`.
+- Certificate domains after deployment: `booking.yumstone.sg`, `20000000.booking.yumstone.sg`, `lsc106.booking.yumstone.sg`, `lsc83.booking.yumstone.sg`, and `platform.booking.yumstone.sg`.
+- Smoke checks: `rpb-backend` active, local backend `/api/v1/auth/me` returned `401`, public `/api/v1/auth/me` returned `401`, `https://lsc83.booking.yumstone.sg/login` returned `200`, `https://lsc106.booking.yumstone.sg/login` returned `200`, and `https://platform.booking.yumstone.sg/login` returned `200`.
+- Production data check: `tenant_host_aliases` contains active store alias `lsc83` for tenant `lsc106` and store `lsc83`.

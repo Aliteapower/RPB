@@ -25,7 +25,8 @@ This captures the 2026-07-04 deployment lessons so the next deployment does not 
 - Backend app port behind nginx: `127.0.0.1:8080`
 - Nginx public listeners observed on 2026-07-05: ports `80` and `443`
 - TLS certificate path: `/etc/letsencrypt/live/booking.yumstone.sg/fullchain.pem`
-- Host-prefix login and tenant `/book` require wildcard DNS and TLS for `*.booking.yumstone.sg`.
+- Host-prefix login and tenant `/book` require wildcard DNS and TLS coverage for `*.booking.yumstone.sg`.
+- Current production certificate is a Let's Encrypt SAN certificate, not a wildcard certificate. Add every live host prefix to the SAN list, or replace it with a DNS-validated wildcard certificate before claiming a new store code URL works.
 - HTTP requests redirect to HTTPS.
 - HTTPS responses include `Strict-Transport-Security: max-age=31536000`.
 
@@ -102,6 +103,32 @@ Required DNS and TLS shape:
 ```text
 booking.yumstone.sg          A/AAAA -> public load balancer or VM
 *.booking.yumstone.sg        A/AAAA -> same target
+```
+
+If production still uses the SAN certificate at `/etc/letsencrypt/live/booking.yumstone.sg/fullchain.pem`, expand it when a new store prefix must be public. Keep all existing domains in the command:
+
+```powershell
+$remoteScript = @'
+set -euo pipefail
+sudo -n certbot --nginx --cert-name booking.yumstone.sg \
+  -d booking.yumstone.sg \
+  -d platform.booking.yumstone.sg \
+  -d 20000000.booking.yumstone.sg \
+  -d lsc106.booking.yumstone.sg \
+  -d lsc83.booking.yumstone.sg \
+  --expand --non-interactive
+sudo -n nginx -t
+sudo -n systemctl reload nginx
+sudo -n certbot certificates
+'@
+
+$remoteScript = $remoteScript -replace "`r", ""
+$remoteScript |
+  ssh -i "$env:USERPROFILE\.ssh\codex_tt_lighthouse_ed25519" `
+    -o BatchMode=yes `
+    -o IdentitiesOnly=yes `
+    -o ConnectTimeout=8 `
+    ubuntu@43.134.69.75 "bash -s"
 ```
 
 Nginx should accept both the root host and wildcard hosts, then pass the original host to Spring Boot:
