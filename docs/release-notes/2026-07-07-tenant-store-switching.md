@@ -31,6 +31,15 @@
 - Existing tenant admin seed/bootstrap data must include store access rows for every store the admin should enter.
 - Staff authorization changes are stricter: invalid, inactive, deleted, or cross-tenant store ids are rejected.
 
+## Production Deployment
+- Deployed commit: `e1baed31`.
+- Backend backup: `/opt/rpb/backups/20260707-0844-e1baed31/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260707-0844-e1baed31/frontend`.
+- Live entry asset: `/assets/index-B3rJy0hq.js`.
+- Live staff assets: `/assets/TenantAdminStaffFormPage-iPktj4Kn.js` and `/assets/TenantAdminStaffPage-Bh45LtvM.js`.
+- Smoke checks: `rpb-backend` active, `/login` returned 200, `/stores/20000000-0000-0000-0000-000000000983/admin/staff` returned 200, unauthenticated `/api/v1/auth/me` returned 401, and unauthenticated `/api/v1/me/stores` returned 401.
+- Logged-in Chrome verification confirmed the staff list shows authorized/default store summaries and the staff edit page shows the editable store authorization panel.
+
 ## Rollback Notes
 - Revert the backend auth/store-access changes and the frontend switcher/staff-form changes together.
 - If only the frontend is rolled back, the new API and stricter backend access remain safe but unused.
