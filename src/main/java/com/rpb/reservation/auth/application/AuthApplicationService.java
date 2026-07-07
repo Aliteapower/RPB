@@ -150,7 +150,7 @@ public class AuthApplicationService {
             if (!ENTRY_TENANT_ADMIN.equals(entry) && !ENTRY_STAFF.equals(entry)) {
                 return Optional.empty();
             }
-            return repository.findActiveTenantAccountByTenantCodeAndUsername(context.tenantCode(), entry, username);
+            return repository.findActiveTenantAccountByLoginCodeAndUsername(context.tenantCode(), entry, username);
         }
 
         if (requestedEntry == null) {
@@ -163,7 +163,7 @@ public class AuthApplicationService {
             if (requestedTenantCode == null) {
                 return Optional.empty();
             }
-            return repository.findActiveTenantAccountByTenantCodeAndUsername(requestedTenantCode, requestedEntry, username);
+            return repository.findActiveTenantAccountByLoginCodeAndUsername(requestedTenantCode, requestedEntry, username);
         }
         return Optional.empty();
     }

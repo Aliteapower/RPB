@@ -135,26 +135,52 @@ public class AuthRepository {
         ).stream().findFirst();
     }
 
-    public Optional<AuthAccountRecord> findActiveTenantAccountByTenantCodeAndUsername(
-        String tenantCode,
+    public Optional<AuthAccountRecord> findActiveTenantAccountByLoginCodeAndUsername(
+        String loginCode,
         String actorType,
         String username
     ) {
         return jdbc.query(
             """
+            with resolved_tenant as (
+                select tenant.id
+                from tenants tenant
+                where lower(tenant.tenant_code) = lower(?)
+                  and tenant.deleted_at is null
+                  and tenant.status = 'active'
+                union
+                select alias.tenant_id
+                from tenant_host_aliases alias
+                join tenants tenant
+                  on tenant.id = alias.tenant_id
+                 and tenant.deleted_at is null
+                 and tenant.status = 'active'
+                left join stores store
+                  on store.id = alias.default_store_id
+                 and store.tenant_id = alias.tenant_id
+                where lower(alias.alias_code) = lower(?)
+                  and alias.status = 'active'
+                  and alias.deleted_at is null
+                  and (
+                      alias.alias_type = 'tenant'
+                      or (
+                          alias.alias_type = 'store'
+                          and store.status = 'active'
+                          and store.deleted_at is null
+                      )
+                  )
+            )
             select account.id, account.tenant_id, account.username, account.display_name,
                    account.actor_type, account.status, account.password_hash, account.default_store_id
             from auth_accounts account
-            join tenants tenant on tenant.id = account.tenant_id
-            where lower(tenant.tenant_code) = lower(?)
-              and account.actor_type = ?
+            join resolved_tenant tenant_scope on tenant_scope.id = account.tenant_id
+            where account.actor_type = ?
               and lower(account.username) = lower(?)
-              and tenant.deleted_at is null
-              and tenant.status = 'active'
               and account.deleted_at is null
             """,
             (rs, rowNum) -> account(rs),
-            tenantCode,
+            loginCode,
+            loginCode,
             actorType,
             username
         ).stream().findFirst();

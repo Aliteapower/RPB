@@ -3,6 +3,7 @@ package com.rpb.reservation.auth.integration;
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_STORE_ID;
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -89,6 +90,11 @@ class AuthApiIntegrationTest {
         jdbc.update("delete from business_events where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, VALIDATION_STORE_ID);
         jdbc.update("delete from state_transition_logs where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, VALIDATION_STORE_ID);
         jdbc.update("delete from customers where tenant_id = ? and customer_code like 'C-PUB-%'", VALIDATION_TENANT_ID);
+        jdbc.update(
+            "delete from tenant_host_aliases where tenant_id = ? and (alias_code = 'lsc83' or default_store_id = ?)",
+            VALIDATION_TENANT_ID,
+            AUTH_SECONDARY_STORE_ID
+        );
         jdbc.update("delete from auth_account_store_access where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, AUTH_SECONDARY_STORE_ID);
         jdbc.update("update tenants set tenant_code = '20000000' where id = ?", VALIDATION_TENANT_ID);
         jdbc.update(
@@ -264,6 +270,25 @@ class AuthApiIntegrationTest {
         login("lsc106.booking.yumstone.sg", null, "platform_admin", null, "sysadmin", "393930")
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void storeHostAliasResolvesToOwningTenantForLogin() throws Exception {
+        upsertAuthSecondaryStore("lsc83", "LSC83 门店");
+        grantStoreAccess("20000000", AUTH_SECONDARY_STORE_ID);
+        jdbc.update("""
+            insert into tenant_host_aliases (
+                tenant_id, alias_code, alias_type, default_store_id, status
+            )
+            values (?, 'lsc83', 'store', ?, 'active')
+            """, VALIDATION_TENANT_ID, AUTH_SECONDARY_STORE_ID);
+
+        login("lsc83.booking.yumstone.sg", null, "tenant_admin", "lsc83", "20000000", "393930")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.user.username").value("20000000"))
+            .andExpect(jsonPath("$.user.roles[0]").value("tenant_admin"))
+            .andExpect(jsonPath("$.user.storeIds").value(hasItem(AUTH_SECONDARY_STORE_ID.toString())));
     }
 
     @Test
@@ -459,13 +484,17 @@ class AuthApiIntegrationTest {
     }
 
     private void upsertAuthSecondaryStore() {
+        upsertAuthSecondaryStore("auth-secondary", "认证二店");
+    }
+
+    private void upsertAuthSecondaryStore(String storeCode, String displayName) {
         jdbc.update(
             """
             insert into stores (
                 id, tenant_id, store_code, display_name, status,
                 timezone, locale, date_format, time_format, currency
             )
-            values (?, ?, 'auth-secondary', '认证二店', 'active',
+            values (?, ?, ?, ?, 'active',
                     'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             on conflict (id) do update
             set store_code = excluded.store_code,
@@ -477,7 +506,9 @@ class AuthApiIntegrationTest {
                 version = stores.version + 1
             """,
             AUTH_SECONDARY_STORE_ID,
-            VALIDATION_TENANT_ID
+            VALIDATION_TENANT_ID,
+            storeCode,
+            displayName
         );
     }
 

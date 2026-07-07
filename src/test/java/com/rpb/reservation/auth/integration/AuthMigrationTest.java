@@ -130,6 +130,23 @@ class AuthMigrationTest {
     }
 
     @Test
+    void backfillsUniqueActiveStoreHostAliases() {
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases alias
+            join stores store
+              on store.id = alias.default_store_id
+             and store.tenant_id = alias.tenant_id
+            where alias.tenant_id = ?
+              and alias.alias_code = store.store_code
+              and alias.alias_type = 'store'
+              and alias.status = 'active'
+              and alias.deleted_at is null
+              and store.id = ?
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID)).isEqualTo(1);
+    }
+
+    @Test
     void allowsSameEmployeeUsernameInDifferentTenants() {
         UUID secondTenantId = UUID.fromString("10000000-0000-0000-0000-000000000984");
         UUID secondStoreId = UUID.fromString("20000000-0000-0000-0000-000000000984");

@@ -39,4 +39,30 @@ class PlatformTenantStructureMigrationSourceValidationTest {
             .contains("create unique index ux_tenant_host_aliases_code_active")
             .contains("on tenant_host_aliases (lower(alias_code))");
     }
+
+    @Test
+    void migrationBackfillsOnlyUnambiguousStoreHostAliases() throws Exception {
+        Path migrationPath = Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V037__tenant_store_host_alias_backfill.sql"
+        );
+
+        assertThat(migrationPath).exists();
+
+        String migration = Files.readString(migrationPath);
+
+        assertThat(migration)
+            .contains("globally_unique_active_store_codes")
+            .contains("having count(*) = 1")
+            .contains("tenant_host_aliases")
+            .contains("alias_type")
+            .contains("'store'")
+            .contains("default_store_id")
+            .contains("not exists")
+            .contains("tenant_code");
+    }
 }

@@ -123,6 +123,12 @@ public class PlatformTenantStructureService {
                 input.timeFormat(),
                 input.currency()
             );
+            structureRepository.upsertStoreHostAlias(
+                tenantId,
+                store.id(),
+                store.storeCode(),
+                store.status()
+            );
             auditService.recordStoreCreated(store, operator);
             return store;
         } catch (DataIntegrityViolationException exception) {
@@ -156,6 +162,12 @@ public class PlatformTenantStructureService {
                     input.currency()
                 )
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.STORE_NOT_FOUND));
+            structureRepository.upsertStoreHostAlias(
+                tenantId,
+                store.id(),
+                store.storeCode(),
+                store.status()
+            );
             auditService.recordStoreUpdated(existing, store, operator);
             return store;
         } catch (DataIntegrityViolationException exception) {

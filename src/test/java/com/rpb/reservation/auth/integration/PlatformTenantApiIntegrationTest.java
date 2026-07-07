@@ -508,6 +508,16 @@ class PlatformTenantApiIntegrationTest {
             .path("store")
             .path("id")
             .asText());
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-lsc106'
+              and alias_type = 'store'
+              and default_store_id = ?
+              and status = 'active'
+              and deleted_at is null
+            """, AuthPostgresTestDatabase.VALIDATION_TENANT_ID, storeId)).isEqualTo(1);
 
         MvcResult accessResult = mockMvc.perform(get(
                     "/api/v1/platform/tenants/{tenantId}/admin-store-access",

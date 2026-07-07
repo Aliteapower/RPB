@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -260,6 +261,61 @@ public class PlatformTenantStructureRepository {
             tenantId,
             storeId
         ).stream().findFirst();
+    }
+
+    public void upsertStoreHostAlias(UUID tenantId, UUID storeId, String storeCode, String storeStatus) {
+        if (activeTenantCodeConflictExists(tenantId, storeCode)) {
+            throw new DataIntegrityViolationException("tenant_host_alias_conflicts_with_tenant_code");
+        }
+        String aliasStatus = "active".equals(storeStatus) ? "active" : "inactive";
+        int updated = jdbc.update(
+            """
+            update tenant_host_aliases
+            set alias_code = ?,
+                status = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and default_store_id = ?
+              and alias_type = 'store'
+              and deleted_at is null
+            """,
+            storeCode,
+            aliasStatus,
+            tenantId,
+            storeId
+        );
+        if (updated == 0) {
+            jdbc.update(
+                """
+                insert into tenant_host_aliases (
+                    tenant_id, alias_code, alias_type, default_store_id, status
+                )
+                values (?, ?, 'store', ?, ?)
+                """,
+                tenantId,
+                storeCode,
+                storeId,
+                aliasStatus
+            );
+        }
+    }
+
+    private boolean activeTenantCodeConflictExists(UUID tenantId, String aliasCode) {
+        Integer count = jdbc.queryForObject(
+            """
+            select count(*)
+            from tenants
+            where lower(tenant_code) = lower(?)
+              and id <> ?
+              and status = 'active'
+              and deleted_at is null
+            """,
+            Integer.class,
+            aliasCode,
+            tenantId
+        );
+        return count != null && count > 0;
     }
 
     private static String storeSelect(String tailSql) {
