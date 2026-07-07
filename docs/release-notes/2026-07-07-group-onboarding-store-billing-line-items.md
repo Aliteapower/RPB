@@ -59,3 +59,12 @@
 - `mvn -q "-Dtest=ProductSubscriptionServiceTest,SubscriptionQuoteServiceTest,PlatformTenantProductSubscriptionControllerTest,PlatformBillingMigrationTest,PlatformTenantApiIntegrationTest" test`
 - `mvn -q "-Dtest=PlatformBillingBoundaryValidationTest" test`
 - `npm run build`
+
+## Frontend Redeployment
+
+- Redeployed frontend bundle from commit `411f02e2` to `booking.yumstone.sg` on 2026-07-07.
+- Production frontend backup: `/opt/rpb/backups/20260707-121200-411f02e2-frontend`.
+- Live entry asset after redeploy: `/assets/index-DLal4Rx6.js`.
+- Live i18n asset contains the group onboarding copy for `新增集团` / `新增单店`.
+- Smoke checks: `/platform/tenants` returned `200`, `/login` returned `200`, `platform.booking.yumstone.sg/login` returned `200`, `20000000.booking.yumstone.sg/login` returned `200`, `20000000.booking.yumstone.sg/book` returned `200`, and unauthenticated `/api/v1/auth/me` returned `401`.
+- Backend jar and Flyway were not redeployed in this frontend-only pass.
