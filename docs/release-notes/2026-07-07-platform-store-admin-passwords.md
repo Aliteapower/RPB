@@ -34,6 +34,17 @@
 - `auth_accounts.username` remains globally unique, so branch administrator usernames can conflict with existing accounts.
 - Existing clients that omit `adminUsername` and `adminPassword` keep the current store-only behavior.
 
+## Production Deployment
+
+- Deployed backend and frontend commit: `5c63c21e`.
+- Production server: `booking.yumstone.sg` on `43.134.69.75`.
+- Production backup directory: `/opt/rpb/backups/20260708-052304-5c63c21e`.
+- Live frontend entry asset: `/assets/index-Donso0DW.js`.
+- Live platform tenant edit asset: `/assets/PlatformTenantFormPage-BmnqHe6X.js`.
+- Backend jar contains `PlatformStoreAdminAccountRepository`.
+- Smoke checks: `rpb-backend` active, local `/api/v1/auth/me` returned `401`, public `https://booking.yumstone.sg/api/v1/auth/me` returned `401`, `/login` returned `200`, `/platform/tenants/{tenantId}/edit` returned `200`, `platform.booking.yumstone.sg/login` returned `200`, `20000000.booking.yumstone.sg/login` returned `200`, and `20000000.booking.yumstone.sg/book` returned `200`.
+- Public platform tenant edit bundle contains `adminUsername`, `adminPassword`, and `branchAdminAccount`.
+
 ## Rollback Notes
 
 - Revert the platform store request field additions, store admin account repository/service calls, UI fields, API contract, tests, and this release note.
