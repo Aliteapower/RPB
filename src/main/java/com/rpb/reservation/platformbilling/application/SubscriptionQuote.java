@@ -5,7 +5,9 @@ import java.math.BigDecimal;
 public record SubscriptionQuote(
     int durationCount,
     String durationUnit,
+    int storeCount,
     BigDecimal unitAmount,
+    BigDecimal storeUnitAmount,
     BigDecimal defaultAmount,
     BigDecimal finalAmount,
     String currency,
@@ -16,7 +18,9 @@ public record SubscriptionQuote(
             {
               "durationCount": %d,
               "durationUnit": "%s",
+              "storeCount": %d,
               "unitAmount": "%s",
+              "storeUnitAmount": "%s",
               "defaultAmount": "%s",
               "finalAmount": "%s",
               "currency": "%s",
@@ -26,7 +30,9 @@ public record SubscriptionQuote(
             """.formatted(
             durationCount,
             json(durationUnit),
+            storeCount,
             amount(unitAmount),
+            amount(storeUnitAmount),
             amount(defaultAmount),
             amount(finalAmount),
             json(currency),

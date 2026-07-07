@@ -1,15 +1,18 @@
 package com.rpb.reservation.platformbilling.application;
 
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionEventRepository;
+import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionItemRepository;
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionRepository;
 import com.rpb.reservation.platformbilling.persistence.TenantProductEntitlementSyncGateway;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +27,7 @@ public class ProductSubscriptionService {
 
     private final ProductSubscriptionRepository subscriptions;
     private final ProductSubscriptionEventRepository events;
+    private final ProductSubscriptionItemRepository items;
     private final TenantProductEntitlementSyncGateway entitlements;
     private final SubscriptionQuoteService quoteService;
     private final BillingPeriodCalculator periodCalculator;
@@ -32,6 +36,7 @@ public class ProductSubscriptionService {
     public ProductSubscriptionService(
         ProductSubscriptionRepository subscriptions,
         ProductSubscriptionEventRepository events,
+        ProductSubscriptionItemRepository items,
         TenantProductEntitlementSyncGateway entitlements,
         SubscriptionQuoteService quoteService,
         BillingPeriodCalculator periodCalculator,
@@ -39,6 +44,7 @@ public class ProductSubscriptionService {
     ) {
         this.subscriptions = subscriptions;
         this.events = events;
+        this.items = items;
         this.entitlements = entitlements;
         this.quoteService = quoteService;
         this.periodCalculator = periodCalculator;
@@ -47,7 +53,7 @@ public class ProductSubscriptionService {
 
     public List<ProductSubscription> listSubscriptions(UUID tenantId) {
         ensureTenant(tenantId);
-        return subscriptions.listByTenantId(tenantId).stream()
+        return attachItems(tenantId, subscriptions.listByTenantId(tenantId)).stream()
             .map(ProductSubscriptionService::withEffectiveStatus)
             .toList();
     }
@@ -73,7 +79,7 @@ public class ProductSubscriptionService {
         if (subscriptions.findByTenantIdAndAppKey(tenantId, normalized.appKey()).isPresent()) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_CONFLICT);
         }
-        PreparedMutation prepared = prepareMutation("purchase", null, normalized);
+        PreparedMutation prepared = prepareMutation(tenantId, "purchase", null, normalized);
 
         ProductSubscription created = subscriptions.create(new ProductSubscriptionDraft(
             tenantId,
@@ -87,6 +93,7 @@ public class ProductSubscriptionService {
             prepared.command().paymentNote(),
             operator.userId()
         ));
+        ProductSubscription createdWithItems = replaceStoreItems(created, prepared);
         appendEvent(created, "purchase", normalized.idempotencyKey(), operator.userId(), prepared.quote());
         entitlements.enableTenantApp(
             tenantId,
@@ -95,7 +102,7 @@ public class ProductSubscriptionService {
             created.currentPeriodEnd(),
             operator.userId()
         );
-        return new ProductSubscriptionMutationResult(false, afterEnabledSync(created), prepared.quote());
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(createdWithItems), prepared.quote());
     }
 
     @Transactional
@@ -120,7 +127,7 @@ public class ProductSubscriptionService {
             && !normalized.currentPeriodEnd().isAfter(current.currentPeriodEnd())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_CONFLICT);
         }
-        PreparedMutation prepared = prepareMutation("renew", current, normalized);
+        PreparedMutation prepared = prepareMutation(tenantId, "renew", current, normalized);
 
         ProductSubscription updated = subscriptions.update(new ProductSubscriptionUpdate(
             tenantId,
@@ -135,9 +142,10 @@ public class ProductSubscriptionService {
             operator.userId(),
             current.version()
         ));
+        ProductSubscription updatedWithItems = replaceStoreItems(updated, prepared);
         appendEvent(updated, "renew", normalized.idempotencyKey(), operator.userId(), prepared.quote());
         entitlements.enableTenantApp(tenantId, updated.appKey(), updated.currentPeriodStart(), updated.currentPeriodEnd(), operator.userId());
-        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updated), prepared.quote());
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updatedWithItems), prepared.quote());
     }
 
     @Transactional
@@ -185,7 +193,7 @@ public class ProductSubscriptionService {
             return replay.get();
         }
         checkVersion(current, normalized.version());
-        PreparedMutation prepared = prepareMutation("convert_from_legacy", current, normalized);
+        PreparedMutation prepared = prepareMutation(tenantId, "convert_from_legacy", current, normalized);
         ProductSubscription updated = subscriptions.update(new ProductSubscriptionUpdate(
             tenantId,
             subscriptionId,
@@ -199,9 +207,10 @@ public class ProductSubscriptionService {
             operator.userId(),
             current.version()
         ));
+        ProductSubscription updatedWithItems = replaceStoreItems(updated, prepared);
         appendEvent(updated, "convert_from_legacy", normalized.idempotencyKey(), operator.userId(), prepared.quote());
         entitlements.enableTenantApp(tenantId, updated.appKey(), updated.currentPeriodStart(), updated.currentPeriodEnd(), operator.userId());
-        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updated), prepared.quote());
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(updatedWithItems), prepared.quote());
     }
 
     private ProductSubscriptionMutationResult updateStatus(
@@ -232,6 +241,8 @@ public class ProductSubscriptionService {
             operator.userId(),
             current.version()
         ));
+        items.updateStatus(tenantId, subscriptionId, nextStatus);
+        ProductSubscription updatedWithItems = withItems(updated);
         appendEvent(updated, eventType, normalized.idempotencyKey(), operator.userId(), null);
         if (SUSPENDED.equals(nextStatus)) {
             entitlements.suspendTenantApp(tenantId, updated.appKey(), operator.userId());
@@ -240,7 +251,7 @@ public class ProductSubscriptionService {
         }
         String entitlementStatus = SUSPENDED.equals(nextStatus) ? "suspended" : "disabled";
         return new ProductSubscriptionMutationResult(false, withEffectiveStatus(
-            updated.withEntitlementState(entitlementStatus, updated.entitlementValidUntil())
+            updatedWithItems.withEntitlementState(entitlementStatus, updated.entitlementValidUntil())
         ));
     }
 
@@ -252,7 +263,7 @@ public class ProductSubscriptionService {
     ) {
         return events.findSubscriptionIdByIdempotencyKey(tenantId, appKey, eventType, idempotencyKey)
             .flatMap(subscriptionId -> subscriptions.findByTenantIdAndId(tenantId, subscriptionId))
-            .map(subscription -> new ProductSubscriptionMutationResult(true, withEffectiveStatus(subscription)));
+            .map(subscription -> new ProductSubscriptionMutationResult(true, withEffectiveStatus(withItems(subscription))));
     }
 
     private ProductSubscription currentSubscription(UUID tenantId, UUID subscriptionId) {
@@ -339,9 +350,18 @@ public class ProductSubscriptionService {
         }
     }
 
-    private PreparedMutation prepareMutation(String operation, ProductSubscription current, ProductSubscriptionCommand command) {
+    private PreparedMutation prepareMutation(
+        UUID tenantId,
+        String operation,
+        ProductSubscription current,
+        ProductSubscriptionCommand command
+    ) {
         if (command.durationCount() == null) {
-            return new PreparedMutation(command, null);
+            return new PreparedMutation(command, null, List.of());
+        }
+        List<BillableStore> billableStores = items.listActiveStores(tenantId);
+        if (billableStores.isEmpty()) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
         BillingDuration duration = new BillingDuration(command.billingCycle(), command.durationCount());
         BillingPeriodCalculation period = periodCalculator.calculate(
@@ -350,7 +370,13 @@ public class ProductSubscriptionService {
             duration,
             OffsetDateTime.now(clock)
         );
-        SubscriptionQuote quote = quoteService.quote(command.appKey(), duration, command.amount(), command.currency());
+        SubscriptionQuote quote = quoteService.quote(
+            command.appKey(),
+            duration,
+            billableStores.size(),
+            command.amount(),
+            command.currency()
+        );
         ProductSubscriptionCommand prepared = new ProductSubscriptionCommand(
             command.idempotencyKey(),
             command.appKey(),
@@ -363,7 +389,27 @@ public class ProductSubscriptionService {
             command.durationCount(),
             command.version()
         );
-        return new PreparedMutation(prepared, quote);
+        return new PreparedMutation(prepared, quote, billableStores);
+    }
+
+    private ProductSubscription replaceStoreItems(ProductSubscription subscription, PreparedMutation prepared) {
+        items.replaceStoreItems(subscription, prepared.billableStores(), prepared.quote());
+        return withItems(subscription);
+    }
+
+    private ProductSubscription withItems(ProductSubscription subscription) {
+        List<ProductSubscriptionItem> subscriptionItems = items.listByTenantId(subscription.tenantId()).stream()
+            .filter(item -> item.subscriptionId().equals(subscription.id()))
+            .toList();
+        return subscription.withItems(subscriptionItems);
+    }
+
+    private List<ProductSubscription> attachItems(UUID tenantId, List<ProductSubscription> subscriptions) {
+        Map<UUID, List<ProductSubscriptionItem>> bySubscriptionId = items.listByTenantId(tenantId).stream()
+            .collect(Collectors.groupingBy(ProductSubscriptionItem::subscriptionId));
+        return subscriptions.stream()
+            .map(subscription -> subscription.withItems(bySubscriptionId.getOrDefault(subscription.id(), List.of())))
+            .toList();
     }
 
     private void appendEvent(
@@ -391,7 +437,11 @@ public class ProductSubscriptionService {
         ));
     }
 
-    private record PreparedMutation(ProductSubscriptionCommand command, SubscriptionQuote quote) {
+    private record PreparedMutation(
+        ProductSubscriptionCommand command,
+        SubscriptionQuote quote,
+        List<BillableStore> billableStores
+    ) {
     }
 
     private static ProductSubscription withEffectiveStatus(ProductSubscription subscription) {

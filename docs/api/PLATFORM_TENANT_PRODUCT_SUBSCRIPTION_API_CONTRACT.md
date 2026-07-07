@@ -1,12 +1,14 @@
 # Platform Tenant Product Subscription API Contract
 
-Status: Phase 1 implemented, Phase 1.1 duration billing implemented
+Status: Phase 1 implemented, Phase 1.1 duration billing implemented, Phase 1.2 store billing line items implemented
 
 ## Scope
 
 This API supports lightweight manual billing. It does not integrate payment gateways, auto-renewal, invoices, webhooks, or tenant self-service payment.
 
 Billing state is synchronized into App Gate entitlements. Business APIs continue to be protected by App Gate.
+
+Store billing line items are commercial detail only. They do not grant or revoke product access per store in this phase.
 
 ## Permissions
 
@@ -19,7 +21,7 @@ All endpoints require a platform admin actor and one of:
 
 ### `GET /api/v1/platform/tenants/{tenantId}/product-subscriptions`
 
-Returns tenant subscriptions, including legacy grants.
+Returns tenant subscriptions, including legacy grants, with store billing line items when they exist.
 
 ### `POST /api/v1/platform/tenants/{tenantId}/product-subscriptions/purchase`
 
@@ -101,18 +103,45 @@ If `amount` is present, it is stored as the final manual amount. The subscriptio
     "paymentNote": "manual transfer",
     "entitlementStatus": "enabled",
     "entitlementValidUntil": "2026-07-31T23:59:59Z",
-    "version": 0
+    "version": 0,
+    "items": [
+      {
+        "id": "50000000-0000-0000-0000-000000009301",
+        "scopeType": "store",
+        "storeId": "20000000-0000-0000-0000-000000009301",
+        "storeCode": "lsc106",
+        "storeName": "LSC106",
+        "operatingEntityId": "60000000-0000-0000-0000-000000009301",
+        "operatingEntityName": "LSC Operating Entity",
+        "quantity": 1,
+        "unitAmount": 128.00,
+        "amount": 384.00,
+        "currency": "SGD",
+        "status": "active"
+      }
+    ]
   },
   "quote": {
     "durationCount": 3,
     "durationUnit": "month",
+    "storeCount": 2,
     "unitAmount": 128.00,
-    "defaultAmount": 384.00,
-    "finalAmount": 384.00,
+    "storeUnitAmount": 384.00,
+    "defaultAmount": 768.00,
+    "finalAmount": 768.00,
     "currency": "SGD"
   }
 }
 ```
+
+For monthly and yearly duration commands, product-line price is treated as the per-store unit price. The backend calculates:
+
+```text
+storeUnitAmount = productLinePrice * durationCount
+defaultAmount = storeUnitAmount * active billable store count
+```
+
+If no active stores exist, purchase, renewal, and legacy conversion requests that use duration billing are rejected with `REQUEST_INVALID`.
 
 ## Error Codes
 

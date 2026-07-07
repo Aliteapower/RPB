@@ -15,17 +15,29 @@ class SubscriptionQuoteServiceTest {
 
     @Test
     void defaultsAmountFromPriceTimesDuration() {
-        SubscriptionQuote quote = service.quote("reservation_queue", new BillingDuration("monthly", 3), null, null);
+        SubscriptionQuote quote = service.quote("reservation_queue", new BillingDuration("monthly", 3), 1, null, null);
 
         assertThat(quote.unitAmount()).isEqualByComparingTo("128.00");
+        assertThat(quote.storeCount()).isEqualTo(1);
+        assertThat(quote.storeUnitAmount()).isEqualByComparingTo("384.00");
         assertThat(quote.defaultAmount()).isEqualByComparingTo("384.00");
         assertThat(quote.finalAmount()).isEqualByComparingTo("384.00");
         assertThat(quote.currency()).isEqualTo("SGD");
     }
 
     @Test
+    void defaultsAmountFromPriceTimesDurationAndStoreCount() {
+        SubscriptionQuote quote = service.quote("reservation_queue", new BillingDuration("monthly", 3), 2, null, null);
+
+        assertThat(quote.storeCount()).isEqualTo(2);
+        assertThat(quote.storeUnitAmount()).isEqualByComparingTo("384.00");
+        assertThat(quote.defaultAmount()).isEqualByComparingTo("768.00");
+        assertThat(quote.finalAmount()).isEqualByComparingTo("768.00");
+    }
+
+    @Test
     void manualAmountOverrideKeepsDefaultSnapshot() {
-        SubscriptionQuote quote = service.quote("reservation_queue", new BillingDuration("yearly", 2), new BigDecimal("1999.00"), "sgd");
+        SubscriptionQuote quote = service.quote("reservation_queue", new BillingDuration("yearly", 2), 1, new BigDecimal("1999.00"), "sgd");
 
         assertThat(quote.defaultAmount()).isEqualByComparingTo("2400.00");
         assertThat(quote.finalAmount()).isEqualByComparingTo("1999.00");
@@ -34,7 +46,7 @@ class SubscriptionQuoteServiceTest {
 
     @Test
     void rejectsMissingActivePrice() {
-        assertThatThrownBy(() -> service.quote("missing_app", new BillingDuration("monthly", 1), null, null))
+        assertThatThrownBy(() -> service.quote("missing_app", new BillingDuration("monthly", 1), 1, null, null))
             .isInstanceOf(PlatformBillingServiceException.class)
             .hasMessageContaining(PlatformBillingServiceErrorCode.REQUEST_INVALID.name());
     }

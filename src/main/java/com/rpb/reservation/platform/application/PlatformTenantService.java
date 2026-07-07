@@ -23,6 +23,8 @@ public class PlatformTenantService {
     private static final int MAX_LIMIT = 100;
     private static final int DEFAULT_OFFSET = 0;
     private static final String PASSWORD_PATTERN = "^[A-Za-z0-9]{6}$";
+    private static final String ONBOARDING_SINGLE_STORE = "single_store";
+    private static final String ONBOARDING_GROUP_MULTI_STORE = "group_multi_store";
 
     private final PlatformTenantRepository repository;
     private final PlatformTenantAdminAccountRepository accountRepository;
@@ -80,13 +82,27 @@ public class PlatformTenantService {
                 input.address(),
                 input.principalName()
             );
-            UUID defaultStoreId = repository.ensureDefaultStore(
-                tenant.id(),
-                tenant.tenantCode(),
-                tenant.displayName(),
-                tenant.status(),
-                tenant.defaultLocale()
-            );
+            UUID defaultStoreId = null;
+            if (ONBOARDING_SINGLE_STORE.equals(input.onboardingMode())) {
+                UUID defaultOperatingEntityId = repository.ensureDefaultOperatingEntity(
+                    tenant.id(),
+                    tenant.tenantCode(),
+                    tenant.displayName(),
+                    tenant.status(),
+                    tenant.defaultLocale(),
+                    tenant.contactPhone(),
+                    tenant.address(),
+                    tenant.principalName()
+                );
+                defaultStoreId = repository.ensureDefaultStore(
+                    tenant.id(),
+                    tenant.tenantCode(),
+                    tenant.displayName(),
+                    tenant.status(),
+                    tenant.defaultLocale(),
+                    defaultOperatingEntityId
+                );
+            }
             accountRepository.upsertTenantAdminAccount(
                 tenant.id(),
                 tenant.tenantCode(),
@@ -208,6 +224,7 @@ public class PlatformTenantService {
             optionalText(request.principalName()),
             initialPassword,
             null,
+            normalizeOnboardingMode(request.onboardingMode()),
             null,
             null
         );
@@ -238,6 +255,7 @@ public class PlatformTenantService {
             optionalTextOrExisting(request.principalName(), existing.principalName()),
             null,
             optionalPassword(request.password()),
+            null,
             adminStoreIds,
             defaultAdminStoreId
         );
@@ -282,6 +300,18 @@ public class PlatformTenantService {
     private static String normalizeStatus(String status) {
         String normalized = requiredText(status).toLowerCase(Locale.ROOT);
         if (!STATUSES.contains(normalized)) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
+        return normalized;
+    }
+
+    private static String normalizeOnboardingMode(String onboardingMode) {
+        String normalized = optionalText(onboardingMode);
+        if (normalized == null) {
+            return ONBOARDING_SINGLE_STORE;
+        }
+        normalized = normalized.toLowerCase(Locale.ROOT);
+        if (!ONBOARDING_SINGLE_STORE.equals(normalized) && !ONBOARDING_GROUP_MULTI_STORE.equals(normalized)) {
             throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
         }
         return normalized;
@@ -395,6 +425,7 @@ public class PlatformTenantService {
         String principalName,
         String initialPassword,
         String password,
+        String onboardingMode,
         List<UUID> adminStoreIds,
         UUID defaultAdminStoreId
     ) {

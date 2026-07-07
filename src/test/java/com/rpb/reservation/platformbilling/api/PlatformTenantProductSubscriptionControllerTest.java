@@ -14,6 +14,7 @@ import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.platformbilling.application.PlatformBillingOperator;
 import com.rpb.reservation.platformbilling.application.ProductSubscription;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionCommand;
+import com.rpb.reservation.platformbilling.application.ProductSubscriptionItem;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionMutationResult;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionService;
 import com.rpb.reservation.walkin.auth.LocalAuthProperties;
@@ -76,6 +77,8 @@ class PlatformTenantProductSubscriptionControllerTest {
             .andExpect(jsonPath("$.subscriptions[0].appKey").value("reservation_queue"))
             .andExpect(jsonPath("$.subscriptions[0].billingCycle").value("legacy_grant"))
             .andExpect(jsonPath("$.subscriptions[0].status").value("active"))
+            .andExpect(jsonPath("$.subscriptions[0].items[0].storeCode").value("store-main"))
+            .andExpect(jsonPath("$.subscriptions[0].items[0].amount").value(128.00))
             .andExpect(jsonPath("$.subscriptions[0].currentPeriodEnd").isEmpty());
     }
 
@@ -97,7 +100,8 @@ class PlatformTenantProductSubscriptionControllerTest {
                 .content(mutationJson("purchase-001", "monthly", "2026-07-01T00:00:00Z", "2026-07-31T23:59:59Z", null)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.replayed").value(false));
+            .andExpect(jsonPath("$.replayed").value(false))
+            .andExpect(jsonPath("$.subscription.items[0].storeName").value("Main Store"));
 
         mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/renew", TENANT_ID, SUBSCRIPTION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -156,7 +160,27 @@ class PlatformTenantProductSubscriptionControllerTest {
             periodEnd,
             OffsetDateTime.parse("2026-06-26T00:00:00Z"),
             OffsetDateTime.parse("2026-06-26T00:00:00Z"),
-            0
+            0,
+            List.of(new ProductSubscriptionItem(
+                UUID.fromString("50000000-0000-0000-0000-000000009301"),
+                SUBSCRIPTION_ID,
+                TENANT_ID,
+                "reservation_queue",
+                "store",
+                UUID.fromString("20000000-0000-0000-0000-000000009301"),
+                "store-main",
+                "Main Store",
+                null,
+                null,
+                1,
+                new BigDecimal("128.00"),
+                new BigDecimal("128.00"),
+                "SGD",
+                status,
+                OffsetDateTime.parse("2026-06-26T00:00:00Z"),
+                OffsetDateTime.parse("2026-06-26T00:00:00Z"),
+                0
+            ))
         );
     }
 

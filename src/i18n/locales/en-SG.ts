@@ -645,6 +645,13 @@ export const enSG = {
         chooseImage: 'Choose image',
         uploadLogo: 'Upload logo',
         clearLogo: 'Clear logo',
+        onboardingMode: {
+          title: 'Onboarding mode',
+          singleStore: 'Single-store quick setup',
+          singleStoreHint: 'Creates the default operating entity and store automatically',
+          groupMultiStore: 'Group multi-store setup',
+          groupMultiStoreHint: 'Create the management tenant first, then configure entities and stores'
+        },
         adminStoreAccess: {
           title: 'Authorised stores',
           defaultStore: 'Default store',
@@ -760,9 +767,16 @@ export const enSG = {
         billingCycle: 'Billing cycle',
         duration: 'Quantity',
         unitPrice: 'Standard unit price',
+        storeCount: 'Billable stores',
+        storeUnitAmount: 'Per-store amount',
         amount: 'This amount',
         currency: 'Currency',
-        paymentNote: 'Note'
+        paymentNote: 'Note',
+        noBillableStores: 'Create and enable stores in tenant structure before opening or renewing products.'
+      },
+      storeItems: {
+        title: 'Store billing details',
+        empty: 'No store billing details'
       }
     },
     profile: {

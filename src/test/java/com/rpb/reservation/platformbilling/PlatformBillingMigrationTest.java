@@ -22,6 +22,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 class PlatformBillingMigrationTest {
     private static final UUID VALIDATION_TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000983");
     private static final UUID VALIDATION_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000983");
+    private static final UUID VALIDATION_SECOND_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000986");
     private static final UUID OTHER_TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000984");
     private static final UUID OTHER_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000984");
     private static final UUID LEGACY_OPERATOR_ID = UUID.fromString("30000000-0000-0000-0000-000000009984");
@@ -37,6 +38,7 @@ class PlatformBillingMigrationTest {
     void createsManualBillingTablesBackfillsLegacyGrantsAndDoesNotExpireExistingEntitlements() {
         DATABASE.applyMigration("src/main/resources/db/migration/V001__reservation_platform_bootstrap.sql");
         insertTenantAndStore(VALIDATION_TENANT_ID, VALIDATION_STORE_ID, "20000000", "1000", "SGD");
+        insertStore(VALIDATION_TENANT_ID, VALIDATION_SECOND_STORE_ID, "1001", "SGD");
         insertTenantAndStore(OTHER_TENANT_ID, OTHER_STORE_ID, "tenant-other", "store-other", "cny");
         DATABASE.applyMigration("src/main/resources/db/migration/V002__app_gate_foundation.sql");
         JDBC.update(
@@ -185,6 +187,45 @@ class PlatformBillingMigrationTest {
         int priceCountBeforeReplay = countWhere("select count(*) from platform_product_line_prices");
         DATABASE.applyMigration("src/main/resources/db/migration/V010__platform_product_line_prices.sql");
         assertThat(countWhere("select count(*) from platform_product_line_prices")).isEqualTo(priceCountBeforeReplay);
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V036__tenant_subscription_store_billing_items.sql");
+
+        assertThat(tableExists("tenant_product_subscription_items")).isTrue();
+        assertThat(indexExists("ux_tenant_product_subscription_items_store_scope")).isTrue();
+        assertThat(constraintExists("ck_tenant_product_subscription_items_scope")).isTrue();
+        assertThat(constraintExists("ck_tenant_product_subscription_items_store_required")).isTrue();
+        assertThat(constraintExists("fk_tenant_product_subscription_items_store_scope")).isTrue();
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_product_subscription_items item
+            join tenant_product_subscriptions subscription
+              on subscription.id = item.subscription_id
+            where subscription.tenant_id = ?
+              and item.scope_type = 'store'
+              and item.store_id in (?, ?)
+              and item.status = 'active'
+              and item.amount = 0
+              and item.currency = 'SGD'
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID, VALIDATION_SECOND_STORE_ID)).isEqualTo(2);
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            insert into tenant_product_subscription_items (
+                subscription_id, tenant_id, app_key, scope_type, store_id,
+                quantity, unit_amount, amount, currency, status
+            )
+            select id, tenant_id, app_key, 'store', null, 1, 0, 0, 'SGD', 'active'
+            from tenant_product_subscriptions
+            where tenant_id = ?
+            limit 1
+            """,
+            VALIDATION_TENANT_ID
+        )).hasMessageContaining("ck_tenant_product_subscription_items_store_required");
+
+        int itemCountBeforeReplay = countWhere("select count(*) from tenant_product_subscription_items");
+        DATABASE.applyMigration("src/main/resources/db/migration/V036__tenant_subscription_store_billing_items.sql");
+        assertThat(countWhere("select count(*) from tenant_product_subscription_items")).isEqualTo(itemCountBeforeReplay);
     }
 
     private static void insertTenantAndStore(UUID tenantId, UUID storeId, String tenantCode, String storeCode, String currency) {
@@ -203,6 +244,23 @@ class PlatformBillingMigrationTest {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, ?, '食刻门店', 'active',
+                'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', ?)
+            """,
+            storeId,
+            tenantId,
+            storeCode,
+            currency
+        );
+    }
+
+    private static void insertStore(UUID tenantId, UUID storeId, String storeCode, String currency) {
+        JDBC.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, ?, '食刻分店', 'active',
                 'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', ?)
             """,
             storeId,

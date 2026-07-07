@@ -14,10 +14,18 @@ public class SubscriptionQuoteService {
         this.prices = prices;
     }
 
-    public SubscriptionQuote quote(String appKey, BillingDuration duration, BigDecimal requestedAmount, String requestedCurrency) {
+    public SubscriptionQuote quote(
+        String appKey,
+        BillingDuration duration,
+        int storeCount,
+        BigDecimal requestedAmount,
+        String requestedCurrency
+    ) {
         PlatformProductLinePrice price = prices.findActivePrice(appKey, duration.billingCycle())
             .orElseThrow(() -> new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID));
-        BigDecimal defaultAmount = price.amount().multiply(BigDecimal.valueOf(duration.durationCount()));
+        int safeStoreCount = Math.max(0, storeCount);
+        BigDecimal storeUnitAmount = price.amount().multiply(BigDecimal.valueOf(duration.durationCount()));
+        BigDecimal defaultAmount = storeUnitAmount.multiply(BigDecimal.valueOf(safeStoreCount));
         BigDecimal finalAmount = requestedAmount == null ? defaultAmount : requestedAmount;
         if (finalAmount.signum() < 0) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
@@ -31,7 +39,9 @@ public class SubscriptionQuoteService {
         return new SubscriptionQuote(
             duration.durationCount(),
             duration.durationUnit(),
+            safeStoreCount,
             price.amount(),
+            storeUnitAmount,
             defaultAmount,
             finalAmount,
             currency,

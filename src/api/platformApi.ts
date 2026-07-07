@@ -27,6 +27,7 @@ export interface PlatformTenantStoreAccessStore {
 
 export type TenantStatus = 'created' | 'active' | 'suspended' | 'closed'
 export type TenantListStatus = 'all' | 'active' | 'deleted'
+export type PlatformTenantOnboardingMode = 'single_store' | 'group_multi_store'
 export type PlatformOperatingEntityStatus = 'active' | 'inactive'
 export type PlatformStoreStatus = 'created' | 'active' | 'inactive'
 
@@ -98,6 +99,7 @@ export interface PlatformTenantMutation {
   principalName?: string | null
   initialPassword?: string | null
   password?: string | null
+  onboardingMode?: PlatformTenantOnboardingMode
   adminStoreIds?: string[]
   defaultAdminStoreId?: string | null
 }

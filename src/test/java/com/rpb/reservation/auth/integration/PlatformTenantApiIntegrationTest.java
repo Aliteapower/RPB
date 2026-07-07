@@ -71,6 +71,15 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where store_id in (select id from stores where store_code like 'codex-%')");
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
+        jdbc.update("""
+            update auth_accounts
+            set default_store_id = null
+            where default_store_id in (
+                select id
+                from stores
+                where store_code like 'codex-%'
+            )
+            """);
         jdbc.update("delete from tenant_product_subscriptions where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from tenant_host_aliases where alias_code like 'codex-%'");
         jdbc.update("delete from tenant_host_aliases where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
@@ -276,6 +285,20 @@ class PlatformTenantApiIntegrationTest {
         assertThat(storeId).isNotNull();
         assertThat(countWhere("""
             select count(*)
+            from operating_entities entity
+            join stores store
+              on store.operating_entity_id = entity.id
+             and store.tenant_id = entity.tenant_id
+            where entity.tenant_id = ?
+              and entity.entity_code = 'codex-login'
+              and entity.display_name = 'Codex 登录租户'
+              and entity.status = 'active'
+              and entity.deleted_at is null
+              and store.id = ?
+              and store.deleted_at is null
+            """, tenantId, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
             from auth_accounts account
             join auth_account_store_access access on access.account_id = account.id
             where account.tenant_id = ?
@@ -289,6 +312,54 @@ class PlatformTenantApiIntegrationTest {
             """, tenantId, storeId, tenantId, storeId)).isEqualTo(1);
 
         login("codex-login", "abc123");
+    }
+
+    @Test
+    void creatingGroupTenantDoesNotBootstrapStoresUntilStructureIsConfigured() throws Exception {
+        Cookie session = login("sysadmin");
+
+        MvcResult result = mockMvc.perform(post("/api/v1/platform/tenants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"codex-group",
+                      "displayName":"Codex 集团租户",
+                      "status":"active",
+                      "defaultLocale":"zh-CN",
+                      "contactPhone":"+6590000001",
+                      "address":"集团总部地址",
+                      "principalName":"集团负责人",
+                      "initialPassword":"abc123",
+                      "onboardingMode":"group_multi_store"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tenant.tenantCode").value("codex-group"))
+            .andReturn();
+
+        UUID tenantId = UUID.fromString(objectMapper
+            .readTree(result.getResponse().getContentAsString())
+            .path("tenant")
+            .path("id")
+            .asText());
+
+        assertThat(countWhere("select count(*) from operating_entities where tenant_id = ?", tenantId)).isZero();
+        assertThat(countWhere("select count(*) from stores where tenant_id = ?", tenantId)).isZero();
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            left join auth_account_store_access access
+              on access.account_id = account.id
+             and access.deleted_at is null
+            where account.tenant_id = ?
+              and account.username = 'codex-group'
+              and account.actor_type = 'tenant_admin'
+              and account.default_store_id is null
+              and account.deleted_at is null
+              and access.id is null
+            """, tenantId)).isEqualTo(1);
     }
 
     @Test

@@ -645,6 +645,13 @@ export const zhCN = {
         chooseImage: '选择图片',
         uploadLogo: '上传 LOGO',
         clearLogo: '清空 LOGO',
+        onboardingMode: {
+          title: '开户模式',
+          singleStore: '单店快速开户',
+          singleStoreHint: '自动创建默认经营主体和默认门店',
+          groupMultiStore: '集团多店开户',
+          groupMultiStoreHint: '先创建管理租户，再配置经营主体和分店'
+        },
         adminStoreAccess: {
           title: '授权门店',
           defaultStore: '默认门店',
@@ -760,9 +767,16 @@ export const zhCN = {
         billingCycle: '计费周期',
         duration: '购买数量',
         unitPrice: '标准单价',
+        storeCount: '计费门店数',
+        storeUnitAmount: '单店金额',
         amount: '本次金额',
         currency: '币种',
-        paymentNote: '备注'
+        paymentNote: '备注',
+        noBillableStores: '请先在租户结构中创建并启用门店，再开通或续费产品。'
+      },
+      storeItems: {
+        title: '门店计费明细',
+        empty: '暂无门店计费明细'
       }
     },
     profile: {

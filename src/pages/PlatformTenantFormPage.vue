@@ -74,6 +74,7 @@ const form = reactive<PlatformTenantFormModel>({
   principalName: '',
   logoMediaUrl: '',
   logoFile: null,
+  onboardingMode: 'single_store',
   initialPassword: '',
   password: '',
   adminStoreIds: [],
@@ -107,6 +108,7 @@ async function loadTenant(): Promise<void> {
       principalName: response.tenant.principalName || '',
       logoMediaUrl: response.tenant.logoMediaUrl || '',
       logoFile: null,
+      onboardingMode: 'single_store',
       initialPassword: '',
       password: '',
       adminStoreIds: storeAccess.storeIds,
@@ -155,7 +157,11 @@ async function submitTenantForm(submittedForm: PlatformTenantFormModel): Promise
   try {
     const payload = toPayload(submittedForm)
     if (mode.value === 'create') {
-      await createTenant(payload)
+      const response = await createTenant(payload)
+      if (submittedForm.onboardingMode === 'group_multi_store') {
+        await router.push({ name: 'platform-tenant-edit', params: { tenantId: response.tenant.id }, hash: '#tenant-structure' })
+        return
+      }
     } else {
       await updateTenant(submittedForm.id, payload)
     }
@@ -214,6 +220,7 @@ function toPayload(submittedForm: PlatformTenantFormModel): PlatformTenantMutati
     principalName: optionalValue(submittedForm.principalName),
     initialPassword: mode.value === 'create' ? submittedForm.initialPassword.trim() : null,
     password: mode.value === 'edit' ? optionalValue(submittedForm.password) : null,
+    onboardingMode: submittedForm.onboardingMode,
     adminStoreIds: mode.value === 'edit' ? [...submittedForm.adminStoreIds] : undefined,
     defaultAdminStoreId: mode.value === 'edit' ? optionalValue(submittedForm.defaultAdminStoreId) : undefined
   }

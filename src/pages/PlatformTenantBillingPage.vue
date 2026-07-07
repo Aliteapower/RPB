@@ -13,6 +13,7 @@ import {
   renewProductSubscription,
   suspendProductSubscription
 } from '../api/platformProductLineBillingApi'
+import { listTenantStores, type PlatformStore } from '../api/platformApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import type {
   PlatformProductLine,
@@ -27,6 +28,7 @@ const auth = useAuthSessionStore()
 const tenantId = computed(() => String(route.params.tenantId || ''))
 const productLines = ref<PlatformProductLine[]>([])
 const subscriptions = ref<TenantProductSubscription[]>([])
+const tenantStores = ref<PlatformStore[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const errorText = ref('')
@@ -54,7 +56,11 @@ const selectedPrice = computed(() => selectedProductLine.value?.prices.find(pric
 const selectedUnitPrice = computed(() => selectedPrice.value?.amount ?? 0)
 const selectedCurrency = computed(() => selectedPrice.value?.currency ?? (form.currency.trim().toUpperCase() || 'SGD'))
 const safeDurationCount = computed(() => Math.max(1, Number(form.durationCount) || 1))
-const calculatedAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
+const activeBillableStoreCount = computed(() => tenantStores.value.filter(store => store.status === 'active').length)
+const billingDisabled = computed(() => activeBillableStoreCount.value <= 0)
+const storeUnitAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
+const calculatedAmount = computed(() => storeUnitAmount.value * activeBillableStoreCount.value)
+const storeItemRows = computed(() => billingItemsForSubscription(selectedSubscription.value))
 const durationUnitLabel = computed(() => (
   form.billingCycle === 'yearly'
     ? t('platform.billing.units.year')
@@ -85,12 +91,14 @@ async function loadBilling(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const [lineResponse, subscriptionResponse] = await Promise.all([
+    const [lineResponse, subscriptionResponse, storesResponse] = await Promise.all([
       listProductLines(),
-      listTenantProductSubscriptions(tenantId.value)
+      listTenantProductSubscriptions(tenantId.value),
+      listTenantStores(tenantId.value)
     ])
     productLines.value = lineResponse.productLines
     subscriptions.value = subscriptionResponse.subscriptions
+    tenantStores.value = storesResponse.stores
     const firstLine = lineResponse.productLines.find(item => item.appKey === 'reservation_queue') ?? lineResponse.productLines[0]
     if (firstLine) {
       form.appKey = firstLine.appKey
@@ -284,6 +292,15 @@ function formatAmount(value: number): string {
   return Number(value || 0).toFixed(2)
 }
 
+function storeItemName(item: TenantProductSubscription['items'][number]): string {
+  const name = item.storeName || item.storeCode || item.storeId?.slice(0, 8) || '-'
+  return item.operatingEntityName ? `${name} / ${item.operatingEntityName}` : name
+}
+
+function billingItemsForSubscription(subscription: TenantProductSubscription | null): TenantProductSubscription['items'] {
+  return subscription ? subscription.items : []
+}
+
 function isProductLineChecked(row: BillingRow): boolean {
   return row.subscription?.status === 'active' && row.subscription.effectiveStatus !== 'expired'
 }
@@ -405,7 +422,7 @@ function apiErrorText(error: unknown): string {
                       v-if="!row.subscription"
                       type="button"
                       class="text-action"
-                      :disabled="saving"
+                      :disabled="saving || billingDisabled"
                       @click="purchaseBillingRow(row)"
                     >
                       {{ $t('platform.billing.actions.open') }}
@@ -414,7 +431,7 @@ function apiErrorText(error: unknown): string {
                       v-if="row.subscription && canRenew(row.subscription)"
                       type="button"
                       class="text-action"
-                      :disabled="saving"
+                      :disabled="saving || billingDisabled"
                       @click="renewBillingRow(row)"
                     >
                       {{ renewalActionLabel(row.subscription) }}
@@ -423,7 +440,7 @@ function apiErrorText(error: unknown): string {
                       v-if="row.subscription && canConvertLegacy(row.subscription)"
                       type="button"
                       class="text-action"
-                      :disabled="saving"
+                      :disabled="saving || billingDisabled"
                       @click="convertLegacyBillingRow(row)"
                     >
                       {{ $t('platform.billing.actions.convert') }}
@@ -482,6 +499,15 @@ function apiErrorText(error: unknown): string {
             <strong>{{ formatAmount(selectedUnitPrice) }} {{ selectedCurrency }} / {{ durationUnitLabel }}</strong>
           </div>
           <div class="quote-summary">
+            <span>{{ $t('platform.billing.form.storeCount') }}</span>
+            <strong>{{ activeBillableStoreCount }}</strong>
+          </div>
+          <p v-if="billingDisabled" class="warning-text">{{ $t('platform.billing.form.noBillableStores') }}</p>
+          <div class="quote-summary">
+            <span>{{ $t('platform.billing.form.storeUnitAmount') }}</span>
+            <strong>{{ formatAmount(storeUnitAmount) }} {{ selectedCurrency }}</strong>
+          </div>
+          <div class="quote-summary">
             <span>{{ $t('platform.billing.form.amount') }}</span>
             <strong>{{ formatAmount(calculatedAmount) }} {{ selectedCurrency }}</strong>
           </div>
@@ -493,9 +519,23 @@ function apiErrorText(error: unknown): string {
             <span>{{ $t('platform.billing.form.paymentNote') }}</span>
             <textarea v-model.trim="form.paymentNote" rows="4" />
           </label>
-          <button class="primary-button" type="submit" :disabled="saving || loading">
+          <button class="primary-button" type="submit" :disabled="saving || loading || billingDisabled">
             {{ saving ? $t('common.actions.saving') : primaryActionLabel }}
           </button>
+
+          <section class="store-items" :aria-label="$t('platform.billing.storeItems.title')">
+            <h3>{{ $t('platform.billing.storeItems.title') }}</h3>
+            <p v-if="storeItemRows.length === 0" class="muted-text">{{ $t('platform.billing.storeItems.empty') }}</p>
+            <div v-else class="store-item-list">
+              <article v-for="item in storeItemRows" :key="item.id" class="store-item-row">
+                <div>
+                  <strong>{{ storeItemName(item) }}</strong>
+                  <small>{{ item.storeCode || '-' }} / {{ item.status }}</small>
+                </div>
+                <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
+              </article>
+            </div>
+          </section>
         </form>
       </div>
     </section>
@@ -547,6 +587,12 @@ function apiErrorText(error: unknown): string {
 
 .edit-panel h2 {
   font-size: 18px;
+}
+
+.edit-panel h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
 }
 
 .workspace-grid {
@@ -650,6 +696,51 @@ function apiErrorText(error: unknown): string {
 
 .muted-text {
   color: #94a3b8;
+}
+
+.warning-text {
+  margin: 0;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.store-items,
+.store-item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.store-item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.store-item-row div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.store-item-row strong,
+.store-item-row small {
+  overflow-wrap: anywhere;
+}
+
+.store-item-row small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.store-item-row span {
+  white-space: nowrap;
+  color: #0f172a;
+  font-weight: 800;
 }
 
 .edit-panel {

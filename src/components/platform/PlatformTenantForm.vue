@@ -33,6 +33,7 @@ const localForm = reactive<PlatformTenantFormModel>({
   principalName: '',
   logoMediaUrl: '',
   logoFile: null,
+  onboardingMode: 'single_store',
   initialPassword: '',
   password: '',
   adminStoreIds: [],
@@ -121,6 +122,24 @@ function clearLogo(): void {
 <template>
   <form class="tenant-form" @submit.prevent="submitForm">
     <section class="form-section" :aria-label="$t('platform.tenants.form.basicInfo')">
+      <fieldset v-if="mode === 'create'" class="onboarding-mode span-2">
+        <legend>{{ $t('platform.tenants.form.onboardingMode.title') }}</legend>
+        <label class="mode-option">
+          <input v-model="localForm.onboardingMode" type="radio" value="single_store" />
+          <span>
+            <strong>{{ $t('platform.tenants.form.onboardingMode.singleStore') }}</strong>
+            <small>{{ $t('platform.tenants.form.onboardingMode.singleStoreHint') }}</small>
+          </span>
+        </label>
+        <label class="mode-option">
+          <input v-model="localForm.onboardingMode" type="radio" value="group_multi_store" />
+          <span>
+            <strong>{{ $t('platform.tenants.form.onboardingMode.groupMultiStore') }}</strong>
+            <small>{{ $t('platform.tenants.form.onboardingMode.groupMultiStoreHint') }}</small>
+          </span>
+        </label>
+      </fieldset>
+
       <label>
         <span>{{ $t('platform.tenants.form.tenantCode') }}</span>
         <input
@@ -330,6 +349,52 @@ label {
   background: #f8fafc;
 }
 
+.onboarding-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.onboarding-mode legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mode-option {
+  min-height: 72px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.mode-option input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+}
+
+.mode-option span {
+  display: grid;
+  gap: 3px;
+}
+
+.mode-option small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .admin-store-option input {
   width: 18px;
   height: 18px;
@@ -454,6 +519,10 @@ input.readonly {
   }
 
   .admin-store-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-mode {
     grid-template-columns: 1fr;
   }
 }

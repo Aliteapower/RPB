@@ -1,6 +1,6 @@
 # Platform Product Line Billing Schema Design
 
-Status: Phase 1 implemented, Phase 1.1 pricing implemented
+Status: Phase 1 implemented, Phase 1.1 pricing implemented, Phase 1.2 store billing line items planned
 
 ## Migration
 
@@ -11,6 +11,10 @@ Phase 1 schema is owned by:
 Phase 1.1 pricing schema is owned by:
 
 - `src/main/resources/db/migration/V010__platform_product_line_prices.sql`
+
+Phase 1.2 store billing line item schema is owned by:
+
+- `src/main/resources/db/migration/V036__tenant_subscription_store_billing_items.sql`
 
 ## Tables
 
@@ -35,6 +39,15 @@ Phase 1.1 pricing schema is owned by:
 - Stores default amount, currency, status, timestamps, and optimistic `version`.
 - Enforces unique `(app_key, billing_cycle)`.
 - Seeds `reservation_queue` monthly and yearly rows with `0.00 SGD` for platform-admin configuration.
+
+`tenant_product_subscription_items`
+
+- One current commercial detail row per `(subscription_id, store_id)` for store-scoped billing.
+- Keeps `tenant_id`, `app_key`, and `(store_id, tenant_id)` FK for tenant-safe joins and cross-tenant protection.
+- Supports `scope_type = store` in this slice; `tenant` is reserved for future tenant-level fixed fees.
+- Stores quantity, per-store unit amount, line amount, currency, status, timestamps, and optimistic `version`.
+- Backfills existing tenant subscriptions against active, undeleted stores.
+- Does not replace `tenant_app_entitlements`; App Gate remains tenant scoped.
 
 ## Product Line Source
 
@@ -87,3 +100,16 @@ The backend calculates:
 - App Gate `valid_from` and `valid_until`
 
 The frontend may preview values, but the backend result is authoritative.
+
+## Phase 1.2 Store Billing Item Boundary
+
+For duration-based monthly and yearly commands, product-line price is interpreted as a per-store unit price.
+
+The billing service calculates:
+
+```text
+storeUnitAmount = unitAmount * durationCount
+defaultAmount = storeUnitAmount * active billable store count
+```
+
+Purchase, renewal, and legacy conversion replace the subscription's store item rows using active stores in the tenant. Suspend and cancel update the item status with the subscription status. No reservation, queue, queue display, cleaning, walk-in, or App Gate table reads these item rows.

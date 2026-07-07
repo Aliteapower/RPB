@@ -65,6 +65,25 @@ export interface TenantProductSubscription {
   createdAt: string
   updatedAt: string
   version: number
+  items: TenantProductSubscriptionItem[]
+}
+
+export interface TenantProductSubscriptionItem {
+  id: string
+  scopeType: 'tenant' | 'store'
+  storeId: string | null
+  storeCode: string | null
+  storeName: string | null
+  operatingEntityId: string | null
+  operatingEntityName: string | null
+  quantity: number
+  unitAmount: number
+  amount: number
+  currency: string
+  status: ProductSubscriptionStatus
+  createdAt: string
+  updatedAt: string
+  version: number
 }
 
 export interface ProductSubscriptionMutation {
@@ -125,7 +144,9 @@ export interface TenantProductSubscriptionResponse {
 export interface ProductSubscriptionQuote {
   durationCount: number
   durationUnit: string
+  storeCount: number
   unitAmount: number
+  storeUnitAmount: number
   defaultAmount: number
   finalAmount: number
   currency: string

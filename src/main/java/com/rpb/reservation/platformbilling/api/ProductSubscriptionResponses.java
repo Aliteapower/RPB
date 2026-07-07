@@ -10,12 +10,12 @@ import java.util.UUID;
 
 record ProductSubscriptionListResponse(
     boolean success,
-    List<ProductSubscriptionItemResponse> subscriptions
+    List<ProductSubscriptionSummaryResponse> subscriptions
 ) {
     static ProductSubscriptionListResponse from(List<ProductSubscription> subscriptions) {
         return new ProductSubscriptionListResponse(
             true,
-            subscriptions.stream().map(ProductSubscriptionItemResponse::from).toList()
+            subscriptions.stream().map(ProductSubscriptionSummaryResponse::from).toList()
         );
     }
 }
@@ -23,14 +23,14 @@ record ProductSubscriptionListResponse(
 record ProductSubscriptionResponse(
     boolean success,
     boolean replayed,
-    ProductSubscriptionItemResponse subscription,
+    ProductSubscriptionSummaryResponse subscription,
     ProductSubscriptionQuoteResponse quote
 ) {
     static ProductSubscriptionResponse from(ProductSubscriptionMutationResult result) {
         return new ProductSubscriptionResponse(
             true,
             result.replayed(),
-            ProductSubscriptionItemResponse.from(result.subscription()),
+            ProductSubscriptionSummaryResponse.from(result.subscription()),
             ProductSubscriptionQuoteResponse.from(result.quote())
         );
     }
@@ -39,7 +39,9 @@ record ProductSubscriptionResponse(
 record ProductSubscriptionQuoteResponse(
     Integer durationCount,
     String durationUnit,
+    Integer storeCount,
     BigDecimal unitAmount,
+    BigDecimal storeUnitAmount,
     BigDecimal defaultAmount,
     BigDecimal finalAmount,
     String currency
@@ -51,7 +53,9 @@ record ProductSubscriptionQuoteResponse(
         return new ProductSubscriptionQuoteResponse(
             quote.durationCount(),
             quote.durationUnit(),
+            quote.storeCount(),
             quote.unitAmount(),
+            quote.storeUnitAmount(),
             quote.defaultAmount(),
             quote.finalAmount(),
             quote.currency()
@@ -59,7 +63,7 @@ record ProductSubscriptionQuoteResponse(
     }
 }
 
-record ProductSubscriptionItemResponse(
+record ProductSubscriptionSummaryResponse(
     UUID id,
     UUID tenantId,
     String appKey,
@@ -76,10 +80,11 @@ record ProductSubscriptionItemResponse(
     OffsetDateTime entitlementValidUntil,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
-    int version
+    int version,
+    List<ProductSubscriptionBillingItemResponse> items
 ) {
-    static ProductSubscriptionItemResponse from(ProductSubscription subscription) {
-        return new ProductSubscriptionItemResponse(
+    static ProductSubscriptionSummaryResponse from(ProductSubscription subscription) {
+        return new ProductSubscriptionSummaryResponse(
             subscription.id(),
             subscription.tenantId(),
             subscription.appKey(),
@@ -96,7 +101,46 @@ record ProductSubscriptionItemResponse(
             subscription.entitlementValidUntil(),
             subscription.createdAt(),
             subscription.updatedAt(),
-            subscription.version()
+            subscription.version(),
+            subscription.items().stream().map(ProductSubscriptionBillingItemResponse::from).toList()
+        );
+    }
+}
+
+record ProductSubscriptionBillingItemResponse(
+    UUID id,
+    String scopeType,
+    UUID storeId,
+    String storeCode,
+    String storeName,
+    UUID operatingEntityId,
+    String operatingEntityName,
+    int quantity,
+    BigDecimal unitAmount,
+    BigDecimal amount,
+    String currency,
+    String status,
+    OffsetDateTime createdAt,
+    OffsetDateTime updatedAt,
+    int version
+) {
+    static ProductSubscriptionBillingItemResponse from(com.rpb.reservation.platformbilling.application.ProductSubscriptionItem item) {
+        return new ProductSubscriptionBillingItemResponse(
+            item.id(),
+            item.scopeType(),
+            item.storeId(),
+            item.storeCode(),
+            item.storeName(),
+            item.operatingEntityId(),
+            item.operatingEntityName(),
+            item.quantity(),
+            item.unitAmount(),
+            item.amount(),
+            item.currency(),
+            item.status(),
+            item.createdAt(),
+            item.updatedAt(),
+            item.version()
         );
     }
 }

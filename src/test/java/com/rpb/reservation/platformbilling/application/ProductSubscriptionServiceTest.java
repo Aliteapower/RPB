@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionEventRepository;
+import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionItemRepository;
 import com.rpb.reservation.platformbilling.persistence.ProductSubscriptionRepository;
 import com.rpb.reservation.platformbilling.persistence.PlatformProductLinePriceRepository;
 import com.rpb.reservation.platformbilling.persistence.TenantProductEntitlementSyncGateway;
@@ -33,6 +34,7 @@ class ProductSubscriptionServiceTest {
 
     private FakeProductSubscriptionRepository subscriptions;
     private FakeProductSubscriptionEventRepository events;
+    private FakeProductSubscriptionItemRepository items;
     private FakeProductLinePriceRepository prices;
     private FakeEntitlementSyncGateway syncGateway;
     private ProductSubscriptionService service;
@@ -41,11 +43,13 @@ class ProductSubscriptionServiceTest {
     void setUp() {
         subscriptions = new FakeProductSubscriptionRepository();
         events = new FakeProductSubscriptionEventRepository();
+        items = new FakeProductSubscriptionItemRepository();
         prices = new FakeProductLinePriceRepository();
         syncGateway = new FakeEntitlementSyncGateway();
         service = new ProductSubscriptionService(
             subscriptions,
             events,
+            items,
             syncGateway,
             new SubscriptionQuoteService(prices),
             new BillingPeriodCalculator(),
@@ -100,11 +104,54 @@ class ProductSubscriptionServiceTest {
         assertThat(result.subscription().currentPeriodEnd()).isEqualTo(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
         assertThat(result.subscription().amount()).isEqualByComparingTo("384.00");
         assertThat(result.quote().durationCount()).isEqualTo(3);
+        assertThat(result.quote().storeCount()).isEqualTo(1);
         assertThat(result.quote().unitAmount()).isEqualByComparingTo("128.00");
+        assertThat(result.quote().storeUnitAmount()).isEqualByComparingTo("384.00");
         assertThat(result.quote().defaultAmount()).isEqualByComparingTo("384.00");
+        assertThat(items.itemsBySubscription.get(result.subscription().id()))
+            .extracting(ProductSubscriptionItem::storeCode)
+            .containsExactly("store-main");
         assertThat(events.payloads).singleElement().satisfies(payload -> assertThat(payload)
             .contains("\"durationCount\": 3")
+            .contains("\"storeCount\": 1")
             .contains("\"priceSource\": \"platform_product_line_prices\""));
+    }
+
+    @Test
+    void purchaseWithDurationCreatesStoreScopedBillingItemsAndTotalsByActiveStoreCount() {
+        items.addStore(new BillableStore(
+            UUID.fromString("20000000-0000-0000-0000-000000009202"),
+            "store-branch",
+            "Branch Store"
+        ));
+        ProductSubscriptionCommand command = durationCommand("purchase-store-items", "monthly", 3, null, null);
+
+        ProductSubscriptionMutationResult result = service.purchase(TENANT_ID, command, OPERATOR);
+
+        assertThat(result.subscription().amount()).isEqualByComparingTo("768.00");
+        assertThat(result.quote().storeCount()).isEqualTo(2);
+        assertThat(result.quote().storeUnitAmount()).isEqualByComparingTo("384.00");
+        assertThat(result.quote().defaultAmount()).isEqualByComparingTo("768.00");
+        assertThat(items.itemsBySubscription.get(result.subscription().id()))
+            .extracting(ProductSubscriptionItem::storeCode, ProductSubscriptionItem::amount)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("store-main", new BigDecimal("384.00")),
+                org.assertj.core.groups.Tuple.tuple("store-branch", new BigDecimal("384.00"))
+            );
+    }
+
+    @Test
+    void purchaseWithDurationRejectsTenantsWithoutActiveBillableStores() {
+        items.clearStores();
+        ProductSubscriptionCommand command = durationCommand("purchase-no-store", "monthly", 1, null, null);
+
+        assertThatThrownBy(() -> service.purchase(TENANT_ID, command, OPERATOR))
+            .isInstanceOf(PlatformBillingServiceException.class)
+            .hasMessageContaining(PlatformBillingServiceErrorCode.REQUEST_INVALID.name());
+
+        assertThat(subscriptions.listByTenantId(TENANT_ID)).isEmpty();
+        assertThat(events.events).isEmpty();
+        assertThat(syncGateway.actions).isEmpty();
     }
 
     @Test
@@ -150,6 +197,7 @@ class ProductSubscriptionServiceTest {
             "suspended:reservation_queue",
             "disabled:reservation_queue"
         );
+        assertThat(items.statusUpdates).containsExactly("suspended", "cancelled");
     }
 
     @Test
@@ -383,6 +431,71 @@ class ProductSubscriptionServiceTest {
             events.add(draft.eventType() + ":" + draft.idempotencyKey());
             payloads.add(draft.eventPayloadJson());
             idempotency.put(draft.eventType() + ":" + draft.idempotencyKey(), draft.subscriptionId());
+        }
+    }
+
+    private static final class FakeProductSubscriptionItemRepository implements ProductSubscriptionItemRepository {
+        private final List<BillableStore> stores = new ArrayList<>();
+        private final Map<UUID, List<ProductSubscriptionItem>> itemsBySubscription = new LinkedHashMap<>();
+        private final List<String> statusUpdates = new ArrayList<>();
+
+        private FakeProductSubscriptionItemRepository() {
+            addStore(new BillableStore(
+                UUID.fromString("20000000-0000-0000-0000-000000009201"),
+                "store-main",
+                "Main Store"
+            ));
+        }
+
+        @Override
+        public List<BillableStore> listActiveStores(UUID tenantId) {
+            return TENANT_ID.equals(tenantId) ? List.copyOf(stores) : List.of();
+        }
+
+        @Override
+        public List<ProductSubscriptionItem> listByTenantId(UUID tenantId) {
+            return itemsBySubscription.values().stream().flatMap(Collection::stream).toList();
+        }
+
+        @Override
+        public void replaceStoreItems(ProductSubscription subscription, List<BillableStore> billableStores, SubscriptionQuote quote) {
+            List<ProductSubscriptionItem> nextItems = new ArrayList<>();
+            for (BillableStore store : billableStores) {
+                nextItems.add(new ProductSubscriptionItem(
+                    UUID.randomUUID(),
+                    subscription.id(),
+                    subscription.tenantId(),
+                    subscription.appKey(),
+                    "store",
+                    store.storeId(),
+                    store.storeCode(),
+                    store.storeName(),
+                    null,
+                    null,
+                    1,
+                    quote.unitAmount(),
+                    quote.storeUnitAmount(),
+                    quote.currency(),
+                    subscription.status(),
+                    OffsetDateTime.parse("2026-06-26T00:00:00Z"),
+                    OffsetDateTime.parse("2026-06-26T00:00:00Z"),
+                    0
+                ));
+            }
+            itemsBySubscription.put(subscription.id(), nextItems);
+        }
+
+        @Override
+        public void updateStatus(UUID tenantId, UUID subscriptionId, String status) {
+            statusUpdates.add(status);
+        }
+
+        void addStore(BillableStore store) {
+            stores.add(store);
+        }
+
+        void clearStores() {
+            stores.clear();
         }
     }
 

@@ -13,6 +13,7 @@ public record PlatformTenantMutationCommand(
     String principalName,
     String initialPassword,
     String password,
+    String onboardingMode,
     List<UUID> adminStoreIds,
     UUID defaultAdminStoreId
 ) {

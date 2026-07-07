@@ -263,6 +263,7 @@ public class PlatformTenantController {
             request.principalName(),
             request.initialPassword(),
             request.password(),
+            request.onboardingMode(),
             request.adminStoreIds(),
             request.defaultAdminStoreId()
         );

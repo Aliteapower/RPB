@@ -122,11 +122,13 @@ public class PlatformTenantRepository {
         String tenantCode,
         String displayName,
         String tenantStatus,
-        String defaultLocale
+        String defaultLocale,
+        UUID operatingEntityId
     ) {
         return findDefaultStoreId(tenantId)
             .orElseGet(() -> insertDefaultStore(
                 tenantId,
+                operatingEntityId,
                 tenantCode,
                 displayName,
                 storeStatus(tenantStatus),
@@ -134,8 +136,78 @@ public class PlatformTenantRepository {
             ));
     }
 
+    public UUID ensureDefaultOperatingEntity(
+        UUID tenantId,
+        String tenantCode,
+        String displayName,
+        String tenantStatus,
+        String defaultLocale,
+        String contactPhone,
+        String address,
+        String principalName
+    ) {
+        return findDefaultOperatingEntityId(tenantId)
+            .orElseGet(() -> insertDefaultOperatingEntity(
+                tenantId,
+                tenantCode,
+                displayName,
+                operatingEntityStatus(tenantStatus),
+                defaultLocale,
+                contactPhone,
+                address,
+                principalName
+            ));
+    }
+
+    private Optional<UUID> findDefaultOperatingEntityId(UUID tenantId) {
+        return jdbc.query(
+            """
+            select id
+            from operating_entities
+            where tenant_id = ?
+              and deleted_at is null
+            order by created_at, id
+            limit 1
+            """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            tenantId
+        ).stream().findFirst();
+    }
+
+    private UUID insertDefaultOperatingEntity(
+        UUID tenantId,
+        String entityCode,
+        String displayName,
+        String status,
+        String defaultLocale,
+        String contactPhone,
+        String address,
+        String principalName
+    ) {
+        return jdbc.queryForObject(
+            """
+            insert into operating_entities (
+                tenant_id, entity_code, display_name, status,
+                default_locale, contact_phone, address, principal_name
+            )
+            values (?, ?, ?, ?, ?, ?, ?, ?)
+            returning id
+            """,
+            UUID.class,
+            tenantId,
+            entityCode,
+            displayName,
+            status,
+            defaultLocale,
+            contactPhone,
+            address,
+            principalName
+        );
+    }
+
     private UUID insertDefaultStore(
         UUID tenantId,
+        UUID operatingEntityId,
         String storeCode,
         String displayName,
         String status,
@@ -144,14 +216,15 @@ public class PlatformTenantRepository {
         return jdbc.queryForObject(
             """
             insert into stores (
-                tenant_id, store_code, display_name, status,
+                tenant_id, operating_entity_id, store_code, display_name, status,
                 timezone, locale, date_format, time_format, currency
             )
-            values (?, ?, ?, ?, 'Asia/Singapore', ?, 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            values (?, ?, ?, ?, ?, 'Asia/Singapore', ?, 'DD-MM-YYYY', 'HH:mm', 'SGD')
             returning id
             """,
             UUID.class,
             tenantId,
+            operatingEntityId,
             storeCode,
             displayName,
             status,
@@ -283,6 +356,16 @@ public class PlatformTenantRepository {
             return "inactive";
         }
         return "created";
+    }
+
+    private static String operatingEntityStatus(String tenantStatus) {
+        if ("closed".equals(tenantStatus)) {
+            return "archived";
+        }
+        if ("suspended".equals(tenantStatus)) {
+            return "inactive";
+        }
+        return "active";
     }
 
     private static WhereClause whereClause(PlatformTenantSearchCriteria criteria) {

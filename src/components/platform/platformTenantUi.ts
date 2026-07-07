@@ -1,6 +1,7 @@
 import type {
   PlatformOperatingEntityStatus,
   PlatformStoreStatus,
+  PlatformTenantOnboardingMode,
   TenantStatus
 } from '../../api/platformApi'
 
@@ -22,6 +23,7 @@ export interface PlatformTenantFormModel {
   principalName: string
   logoMediaUrl: string
   logoFile: File | null
+  onboardingMode: PlatformTenantOnboardingMode
   initialPassword: string
   password: string
   adminStoreIds: string[]
