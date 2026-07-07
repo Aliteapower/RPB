@@ -14,6 +14,15 @@ export interface PlatformTenant {
   deletedAt: string | null
 }
 
+export interface PlatformTenantStoreAccessStore {
+  storeId: string
+  storeCode: string
+  storeName: string
+  status: string
+  locale: string | null
+  defaultStore: boolean
+}
+
 export type TenantStatus = 'created' | 'active' | 'suspended' | 'closed'
 export type TenantListStatus = 'all' | 'active' | 'deleted'
 
@@ -27,6 +36,8 @@ export interface PlatformTenantMutation {
   principalName?: string | null
   initialPassword?: string | null
   password?: string | null
+  adminStoreIds?: string[]
+  defaultAdminStoreId?: string | null
 }
 
 export interface PlatformTenantListQuery {
@@ -52,6 +63,13 @@ export interface PlatformTenantListResponse {
 export interface PlatformTenantResponse {
   success: true
   tenant: PlatformTenant
+}
+
+export interface PlatformTenantAdminStoreAccessResponse {
+  success: true
+  stores: PlatformTenantStoreAccessStore[]
+  storeIds: string[]
+  defaultStoreId: string | null
 }
 
 export interface PlatformApiErrorResponse {
@@ -98,6 +116,16 @@ export async function getTenant(
   fetcher?: PlatformFetcher
 ): Promise<PlatformTenantResponse> {
   return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}`, {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function getTenantAdminStoreAccess(
+  tenantId: string,
+  fetcher?: PlatformFetcher
+): Promise<PlatformTenantAdminStoreAccessResponse> {
+  return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/admin-store-access`, {
     method: 'GET',
     fetcher
   })

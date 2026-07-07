@@ -20,4 +20,6 @@ export interface PlatformTenantFormModel {
   logoFile: File | null
   initialPassword: string
   password: string
+  adminStoreIds: string[]
+  defaultAdminStoreId: string
 }

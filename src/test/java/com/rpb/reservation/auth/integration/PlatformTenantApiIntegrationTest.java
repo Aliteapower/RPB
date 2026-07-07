@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,9 @@ import org.springframework.test.web.servlet.MockMvc;
 class PlatformTenantApiIntegrationTest {
     private static final AuthPostgresTestDatabase DATABASE = AuthPostgresTestDatabase.startWithValidationStore();
     private static final String PASSWORD_393930_HASH = "$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy";
+    private static final UUID SECONDARY_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000984");
+    private static final UUID FOREIGN_TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000985");
+    private static final UUID FOREIGN_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000985");
 
     @Autowired
     private MockMvc mockMvc;
@@ -282,6 +286,111 @@ class PlatformTenantApiIntegrationTest {
     }
 
     @Test
+    void platformAdminMaintainsTenantAdminAuthorizedStores() throws Exception {
+        upsertSecondaryStoreForTenantAdminAuthorization();
+        Cookie session = login("sysadmin");
+
+        MvcResult currentAccess = mockMvc.perform(get(
+                "/api/v1/platform/tenants/{tenantId}/admin-store-access",
+                AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+            ).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.stores.length()").value(2))
+            .andExpect(jsonPath("$.defaultStoreId").value(AuthPostgresTestDatabase.VALIDATION_STORE_ID.toString()))
+            .andReturn();
+        JsonNode currentAccessBody = objectMapper.readTree(currentAccess.getResponse().getContentAsString());
+        assertThat(stringsByField(currentAccessBody.path("stores"), "storeId"))
+            .containsExactlyInAnyOrder(
+                AuthPostgresTestDatabase.VALIDATION_STORE_ID.toString(),
+                SECONDARY_STORE_ID.toString()
+            );
+
+        mockMvc.perform(patch("/api/v1/platform/tenants/{tenantId}", AuthPostgresTestDatabase.VALIDATION_TENANT_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"20000000",
+                      "displayName":"食刻租户",
+                      "status":"active",
+                      "defaultLocale":"zh-CN",
+                      "contactPhone":"021-393930",
+                      "address":"上海市徐汇区示例路 1 号",
+                      "principalName":"张店长",
+                      "adminStoreIds":["%s","%s"],
+                      "defaultAdminStoreId":"%s"
+                    }
+                    """.formatted(
+                        AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+                        SECONDARY_STORE_ID,
+                        SECONDARY_STORE_ID
+                    ))
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_store_access access on access.account_id = account.id
+            where account.tenant_id = ?
+              and account.username = '20000000'
+              and account.actor_type = 'tenant_admin'
+              and account.default_store_id = ?
+              and access.tenant_id = ?
+              and access.store_id in (?, ?)
+              and account.deleted_at is null
+              and access.deleted_at is null
+            """,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            SECONDARY_STORE_ID,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+            SECONDARY_STORE_ID
+        )).isEqualTo(2);
+
+        Cookie tenantAdminSession = login("20000000");
+        MvcResult storesResult = mockMvc.perform(get("/api/v1/me/stores").cookie(tenantAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode stores = objectMapper.readTree(storesResult.getResponse().getContentAsString()).path("stores");
+        assertThat(stringsByField(stores, "storeId"))
+            .containsExactlyInAnyOrder(
+                AuthPostgresTestDatabase.VALIDATION_STORE_ID.toString(),
+                SECONDARY_STORE_ID.toString()
+            );
+        assertThat(storeById(stores, SECONDARY_STORE_ID).path("defaultStore").asBoolean()).isTrue();
+    }
+
+    @Test
+    void platformAdminCannotGrantTenantAdminForeignStoreAccess() throws Exception {
+        upsertForeignTenantStore();
+        Cookie session = login("sysadmin");
+
+        mockMvc.perform(patch("/api/v1/platform/tenants/{tenantId}", AuthPostgresTestDatabase.VALIDATION_TENANT_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"20000000",
+                      "displayName":"食刻租户",
+                      "status":"active",
+                      "defaultLocale":"zh-CN",
+                      "adminStoreIds":["%s","%s"],
+                      "defaultAdminStoreId":"%s"
+                    }
+                    """.formatted(
+                        AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+                        FOREIGN_STORE_ID,
+                        AuthPostgresTestDatabase.VALIDATION_STORE_ID
+                    ))
+                .cookie(session))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
+    }
+
+    @Test
     void tenantOnboardingBackfillMigrationRepairsExistingTenantAdminWithoutStoreScope() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
@@ -513,6 +622,80 @@ class PlatformTenantApiIntegrationTest {
 
     private int countWhere(String sql, Object... args) {
         return jdbc.queryForObject(sql, Integer.class, args);
+    }
+
+    private JsonNode storeById(JsonNode stores, UUID storeId) {
+        for (JsonNode store : stores) {
+            if (storeId.toString().equals(store.path("storeId").asText())) {
+                return store;
+            }
+        }
+        throw new AssertionError("store not found: " + storeId);
+    }
+
+    private static java.util.List<String> stringsByField(JsonNode array, String fieldName) {
+        return java.util.stream.StreamSupport.stream(array.spliterator(), false)
+            .map(node -> node.path(fieldName).asText())
+            .toList();
+    }
+
+    private void upsertSecondaryStoreForTenantAdminAuthorization() {
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'lsc106', 'LSC106 门店', 'active',
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            on conflict (id) do update
+            set store_code = excluded.store_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                locale = excluded.locale,
+                deleted_at = null,
+                updated_at = now(),
+                version = stores.version + 1
+            """,
+            SECONDARY_STORE_ID,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+        );
+    }
+
+    private void upsertForeignTenantStore() {
+        jdbc.update(
+            """
+            insert into tenants (id, tenant_code, display_name, status, default_locale)
+            values (?, 'codex-foreign', 'Codex 外部租户', 'active', 'zh-CN')
+            on conflict (id) do update
+            set tenant_code = excluded.tenant_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                deleted_at = null,
+                updated_at = now(),
+                version = tenants.version + 1
+            """,
+            FOREIGN_TENANT_ID
+        );
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'foreign-store', '外部租户门店', 'active',
+                    'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            on conflict (id) do update
+            set store_code = excluded.store_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                deleted_at = null,
+                updated_at = now(),
+                version = stores.version + 1
+            """,
+            FOREIGN_STORE_ID,
+            FOREIGN_TENANT_ID
+        );
     }
 
     private void replayTenantOnboardingBackfillMigration() throws Exception {

@@ -5,6 +5,8 @@ import com.rpb.reservation.platform.persistence.PlatformTenantRepository;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaAsset;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -57,6 +59,13 @@ public class PlatformTenantService {
             .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
+    public PlatformTenantAdminStoreAccess getTenantAdminStoreAccess(UUID tenantId) {
+        repository.findById(tenantId, true)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
+        return accountRepository.tenantAdminStoreAccess(tenantId);
+    }
+
     @Transactional
     public PlatformTenant createTenant(PlatformTenantMutationCommand request, PlatformOperator operator) {
         NormalizedTenantInput input = normalizeCreate(request);
@@ -97,6 +106,7 @@ public class PlatformTenantService {
         PlatformTenant existing = repository.findById(tenantId, true)
             .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
         NormalizedTenantInput input = normalizeUpdate(existing, request);
+        validateTenantAdminStoreAccess(tenantId, input.adminStoreIds(), input.defaultAdminStoreId());
         try {
             PlatformTenant tenant = repository.update(
                     tenantId,
@@ -114,8 +124,17 @@ public class PlatformTenantService {
                 tenant.tenantCode(),
                 tenantAdminDisplayName(tenant),
                 input.password() == null ? null : passwordHash(input.password()),
-                repository.findDefaultStoreId(tenant.id()).orElse(null)
+                input.defaultAdminStoreId() == null
+                    ? repository.findDefaultStoreId(tenant.id()).orElse(null)
+                    : input.defaultAdminStoreId()
             );
+            if (input.adminStoreIds() != null && !accountRepository.replaceTenantAdminStoreAccess(
+                tenant.id(),
+                input.adminStoreIds(),
+                input.defaultAdminStoreId()
+            )) {
+                throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+            }
             auditService.recordUpdated(existing, tenant, operator, input.password() != null);
             return tenant;
         } catch (DataIntegrityViolationException exception) {
@@ -188,6 +207,8 @@ public class PlatformTenantService {
             optionalText(request.address()),
             optionalText(request.principalName()),
             initialPassword,
+            null,
+            null,
             null
         );
     }
@@ -202,6 +223,11 @@ public class PlatformTenantService {
         }
         String displayName = firstText(request.displayName(), existing.displayName());
         String status = normalizeStatus(firstText(request.status(), existing.status()));
+        List<UUID> adminStoreIds = normalizeStoreIds(request.adminStoreIds());
+        UUID defaultAdminStoreId = request.defaultAdminStoreId();
+        if (adminStoreIds == null && defaultAdminStoreId != null) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
         return new NormalizedTenantInput(
             existing.tenantCode(),
             displayName,
@@ -211,8 +237,23 @@ public class PlatformTenantService {
             optionalTextOrExisting(request.address(), existing.address()),
             optionalTextOrExisting(request.principalName(), existing.principalName()),
             null,
-            optionalPassword(request.password())
+            optionalPassword(request.password()),
+            adminStoreIds,
+            defaultAdminStoreId
         );
+    }
+
+    private void validateTenantAdminStoreAccess(UUID tenantId, List<UUID> storeIds, UUID defaultStoreId) {
+        if (storeIds == null) {
+            return;
+        }
+        if (storeIds.isEmpty() || defaultStoreId == null || !storeIds.contains(defaultStoreId)) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
+        Set<UUID> activeStoreIds = accountRepository.activeTenantStoreIds(tenantId, storeIds);
+        if (activeStoreIds.size() != storeIds.size()) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
     }
 
     private static PlatformTenantSearchCriteria normalizeSearch(PlatformTenantSearchCommand command) {
@@ -307,6 +348,20 @@ public class PlatformTenantService {
         return normalized;
     }
 
+    private static List<UUID> normalizeStoreIds(List<UUID> storeIds) {
+        if (storeIds == null) {
+            return null;
+        }
+        LinkedHashSet<UUID> normalized = new LinkedHashSet<>();
+        for (UUID storeId : storeIds) {
+            if (storeId == null) {
+                throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+            }
+            normalized.add(storeId);
+        }
+        return List.copyOf(normalized);
+    }
+
     private String passwordHash(String password) {
         return passwordEncoder.encode(password.toLowerCase(Locale.ROOT));
     }
@@ -339,7 +394,9 @@ public class PlatformTenantService {
         String address,
         String principalName,
         String initialPassword,
-        String password
+        String password,
+        List<UUID> adminStoreIds,
+        UUID defaultAdminStoreId
     ) {
     }
 }

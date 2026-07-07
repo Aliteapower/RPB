@@ -643,7 +643,12 @@ export const enSG = {
         passwordPlaceholder: 'Leave blank to keep unchanged',
         chooseImage: 'Choose image',
         uploadLogo: 'Upload logo',
-        clearLogo: 'Clear logo'
+        clearLogo: 'Clear logo',
+        adminStoreAccess: {
+          title: 'Authorised stores',
+          defaultStore: 'Default store',
+          empty: 'No stores are available for authorisation'
+        }
       }
     },
     billing: {

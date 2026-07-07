@@ -1,6 +1,13 @@
 package com.rpb.reservation.platform.persistence;
 
+import com.rpb.reservation.platform.application.PlatformTenantAdminStoreAccess;
+import com.rpb.reservation.platform.application.PlatformTenantStoreOption;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -37,6 +44,74 @@ public class PlatformTenantAdminAccountRepository {
         }
     }
 
+    public PlatformTenantAdminStoreAccess tenantAdminStoreAccess(UUID tenantId) {
+        Optional<UUID> accountId = findTenantAdminAccountId(tenantId);
+        UUID defaultStoreId = accountId.flatMap(this::defaultStoreId).orElse(null);
+        return new PlatformTenantAdminStoreAccess(
+            activeTenantStores(tenantId, defaultStoreId),
+            accountId.map(id -> storeIds(tenantId, id)).orElse(List.of()),
+            defaultStoreId
+        );
+    }
+
+    public Set<UUID> activeTenantStoreIds(UUID tenantId, List<UUID> storeIds) {
+        if (storeIds == null || storeIds.isEmpty()) {
+            return Set.of();
+        }
+        String placeholders = String.join(", ", storeIds.stream().map(storeId -> "?").toList());
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        args.addAll(storeIds);
+        return new LinkedHashSet<>(jdbc.queryForList(
+            """
+            select id
+            from stores
+            where tenant_id = ?
+              and id in (%s)
+              and status = 'active'
+              and deleted_at is null
+            """.formatted(placeholders),
+            UUID.class,
+            args.toArray()
+        ));
+    }
+
+    public boolean replaceTenantAdminStoreAccess(UUID tenantId, List<UUID> storeIds, UUID defaultStoreId) {
+        Optional<UUID> existingAccountId = findTenantAdminAccountId(tenantId);
+        if (existingAccountId.isEmpty()) {
+            return false;
+        }
+        UUID accountId = existingAccountId.get();
+        jdbc.update(
+            """
+            update auth_accounts
+            set default_store_id = ?,
+                updated_at = now(),
+                version = version + 1
+            where id = ?
+              and tenant_id = ?
+              and actor_type = 'tenant_admin'
+              and deleted_at is null
+            """,
+            defaultStoreId,
+            accountId,
+            tenantId
+        );
+        jdbc.update(
+            """
+            update auth_account_store_access
+            set deleted_at = now()
+            where account_id = ?
+              and tenant_id = ?
+              and deleted_at is null
+            """,
+            accountId,
+            tenantId
+        );
+        storeIds.forEach(storeId -> ensureStoreAccess(accountId, tenantId, storeId));
+        return true;
+    }
+
     private Optional<UUID> findTenantAdminAccountId(UUID tenantId) {
         return jdbc.query(
             """
@@ -51,6 +126,62 @@ public class PlatformTenantAdminAccountRepository {
             (rs, rowNum) -> rs.getObject("id", UUID.class),
             tenantId
         ).stream().findFirst();
+    }
+
+    private List<PlatformTenantStoreOption> activeTenantStores(UUID tenantId, UUID defaultStoreId) {
+        return jdbc.query(
+            """
+            select id, store_code, display_name, status, locale
+            from stores
+            where tenant_id = ?
+              and status = 'active'
+              and deleted_at is null
+            order by store_code, created_at, id
+            """,
+            (rs, rowNum) -> new PlatformTenantStoreOption(
+                rs.getObject("id", UUID.class),
+                rs.getString("store_code"),
+                rs.getString("display_name"),
+                rs.getString("status"),
+                rs.getString("locale"),
+                defaultStoreId != null && defaultStoreId.equals(rs.getObject("id", UUID.class))
+            ),
+            tenantId
+        );
+    }
+
+    private Optional<UUID> defaultStoreId(UUID accountId) {
+        return jdbc.query(
+            """
+            select default_store_id
+            from auth_accounts
+            where id = ?
+              and deleted_at is null
+            """,
+            (rs, rowNum) -> rs.getObject("default_store_id", UUID.class),
+            accountId
+        ).stream().filter(Objects::nonNull).findFirst();
+    }
+
+    private List<UUID> storeIds(UUID tenantId, UUID accountId) {
+        return jdbc.queryForList(
+            """
+            select access.store_id
+            from auth_account_store_access access
+            join stores store
+              on store.id = access.store_id
+             and store.tenant_id = access.tenant_id
+             and store.status = 'active'
+             and store.deleted_at is null
+            where access.account_id = ?
+              and access.tenant_id = ?
+              and access.deleted_at is null
+            order by store.store_code, access.store_id
+            """,
+            UUID.class,
+            accountId,
+            tenantId
+        );
     }
 
     private void insertTenantAdminAccount(

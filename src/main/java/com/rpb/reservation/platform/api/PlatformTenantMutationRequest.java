@@ -1,5 +1,8 @@
 package com.rpb.reservation.platform.api;
 
+import java.util.List;
+import java.util.UUID;
+
 public record PlatformTenantMutationRequest(
     String tenantCode,
     String displayName,
@@ -9,6 +12,8 @@ public record PlatformTenantMutationRequest(
     String address,
     String principalName,
     String initialPassword,
-    String password
+    String password,
+    List<UUID> adminStoreIds,
+    UUID defaultAdminStoreId
 ) {
 }

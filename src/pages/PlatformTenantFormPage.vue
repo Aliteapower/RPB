@@ -8,9 +8,11 @@ import {
   clearTenantLogo,
   createTenant,
   getTenant,
+  getTenantAdminStoreAccess,
   uploadTenantLogo,
   updateTenant,
-  type PlatformTenantMutation
+  type PlatformTenantMutation,
+  type PlatformTenantStoreAccessStore
 } from '../api/platformApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import PlatformTenantForm from '../components/platform/PlatformTenantForm.vue'
@@ -25,6 +27,7 @@ const auth = useAuthSessionStore()
 const loading = ref(false)
 const saving = ref(false)
 const errorText = ref('')
+const adminStoreOptions = ref<PlatformTenantStoreAccessStore[]>([])
 
 const mode = computed<'create' | 'edit'>(() => (route.name === 'platform-tenant-create' ? 'create' : 'edit'))
 const tenantId = computed(() => String(route.params.tenantId || ''))
@@ -53,7 +56,9 @@ const form = reactive<PlatformTenantFormModel>({
   logoMediaUrl: '',
   logoFile: null,
   initialPassword: '',
-  password: ''
+  password: '',
+  adminStoreIds: [],
+  defaultAdminStoreId: ''
 })
 
 onMounted(() => {
@@ -66,7 +71,11 @@ async function loadTenant(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const response = await getTenant(tenantId.value)
+    const [response, storeAccess] = await Promise.all([
+      getTenant(tenantId.value),
+      getTenantAdminStoreAccess(tenantId.value)
+    ])
+    adminStoreOptions.value = storeAccess.stores
     Object.assign(form, {
       id: response.tenant.id,
       tenantCode: response.tenant.tenantCode,
@@ -79,7 +88,9 @@ async function loadTenant(): Promise<void> {
       logoMediaUrl: response.tenant.logoMediaUrl || '',
       logoFile: null,
       initialPassword: '',
-      password: ''
+      password: '',
+      adminStoreIds: storeAccess.storeIds,
+      defaultAdminStoreId: storeAccess.defaultStoreId || ''
     } satisfies PlatformTenantFormModel)
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -156,7 +167,9 @@ function toPayload(submittedForm: PlatformTenantFormModel): PlatformTenantMutati
     address: optionalValue(submittedForm.address),
     principalName: optionalValue(submittedForm.principalName),
     initialPassword: mode.value === 'create' ? submittedForm.initialPassword.trim() : null,
-    password: mode.value === 'edit' ? optionalValue(submittedForm.password) : null
+    password: mode.value === 'edit' ? optionalValue(submittedForm.password) : null,
+    adminStoreIds: mode.value === 'edit' ? [...submittedForm.adminStoreIds] : undefined,
+    defaultAdminStoreId: mode.value === 'edit' ? optionalValue(submittedForm.defaultAdminStoreId) : undefined
   }
 }
 
@@ -211,6 +224,7 @@ function apiErrorText(error: unknown): string {
         v-else
         :mode="mode"
         :form="form"
+        :admin-store-options="adminStoreOptions"
         :status-options="statusOptions"
         :saving="saving"
         @submit="submitTenantForm"

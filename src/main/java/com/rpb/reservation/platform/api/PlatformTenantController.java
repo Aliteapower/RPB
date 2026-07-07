@@ -65,6 +65,16 @@ public class PlatformTenantController {
         return ResponseEntity.ok(PlatformTenantResponse.from(tenantService.getTenant(tenantId)));
     }
 
+    @GetMapping("/{tenantId}/admin-store-access")
+    public ResponseEntity<PlatformTenantAdminStoreAccessResponse> getTenantAdminStoreAccess(
+        @PathVariable UUID tenantId
+    ) {
+        requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformTenantAdminStoreAccessResponse.from(
+            tenantService.getTenantAdminStoreAccess(tenantId)
+        ));
+    }
+
     @PostMapping
     public ResponseEntity<PlatformTenantResponse> createTenant(
         @RequestBody(required = false) PlatformTenantMutationRequest request
@@ -182,7 +192,9 @@ public class PlatformTenantController {
             request.address(),
             request.principalName(),
             request.initialPassword(),
-            request.password()
+            request.password(),
+            request.adminStoreIds(),
+            request.defaultAdminStoreId()
         );
     }
 

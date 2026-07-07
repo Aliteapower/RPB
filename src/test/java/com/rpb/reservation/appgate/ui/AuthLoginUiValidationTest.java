@@ -262,6 +262,42 @@ class AuthLoginUiValidationTest {
     }
 
     @Test
+    void platformTenantEditFormMaintainsTenantAdminStoreAccess() throws Exception {
+        Path formPagePath = Path.of("src", "pages", "PlatformTenantFormPage.vue");
+        Path formPath = Path.of("src", "components", "platform", "PlatformTenantForm.vue");
+        Path apiPath = Path.of("src", "api", "platformApi.ts");
+        Path uiPath = Path.of("src", "components", "platform", "platformTenantUi.ts");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
+        Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
+
+        String source = FrontendSourceSupport.readString(formPagePath)
+            + FrontendSourceSupport.readString(formPath)
+            + FrontendSourceSupport.readString(apiPath)
+            + FrontendSourceSupport.readString(uiPath);
+        String zh = FrontendSourceSupport.readString(zhPath);
+        String en = FrontendSourceSupport.readString(enPath);
+
+        assertThat(source)
+            .contains("getTenantAdminStoreAccess")
+            .contains("/admin-store-access")
+            .contains("adminStoreOptions")
+            .contains("adminStoreIds")
+            .contains("defaultAdminStoreId")
+            .contains("admin-store-access-panel")
+            .contains("toggleAdminStoreFromEvent")
+            .contains("selectedAdminStoreOptions")
+            .contains("platform.tenants.form.adminStoreAccess.title")
+            .contains("platform.tenants.form.adminStoreAccess.defaultStore");
+
+        assertThat(zh)
+            .contains("title: '授权门店'")
+            .contains("defaultStore: '默认门店'");
+        assertThat(en)
+            .contains("title: 'Authorised stores'")
+            .contains("defaultStore: 'Default store'");
+    }
+
+    @Test
     void tenantAdminErpUsesScopedStaffTableAndSettingsPages() throws Exception {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path storePath = Path.of("src", "stores", "authSession.ts");

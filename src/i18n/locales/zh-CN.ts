@@ -643,7 +643,12 @@ export const zhCN = {
         passwordPlaceholder: '留空则不修改',
         chooseImage: '选择图片',
         uploadLogo: '上传 LOGO',
-        clearLogo: '清空 LOGO'
+        clearLogo: '清空 LOGO',
+        adminStoreAccess: {
+          title: '授权门店',
+          defaultStore: '默认门店',
+          empty: '暂无可授权门店'
+        }
       }
     },
     billing: {

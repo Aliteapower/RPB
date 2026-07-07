@@ -13,10 +13,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.rpb.reservation.appgate.api.AppGateApiErrorMapper;
 import com.rpb.reservation.appgate.application.AppGateDenialAuditService;
 import com.rpb.reservation.appgate.application.AppGateService;
+import com.rpb.reservation.platform.application.PlatformTenantAdminStoreAccess;
 import com.rpb.reservation.platform.application.PlatformTenantListResult;
 import com.rpb.reservation.platform.application.PlatformTenantPage;
 import com.rpb.reservation.platform.application.PlatformTenant;
 import com.rpb.reservation.platform.application.PlatformTenantService;
+import com.rpb.reservation.platform.application.PlatformTenantStoreOption;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.walkin.auth.LocalAuthProperties;
 import com.rpb.reservation.walkin.auth.LocalRuntimeCurrentActorProvider;
@@ -55,6 +57,7 @@ import org.springframework.web.multipart.MultipartFile;
 })
 class PlatformTenantLocalRuntimeSecurityTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000983");
+    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000983");
     private static final UUID LOGO_MEDIA_ASSET_ID = UUID.fromString("91000000-0000-0000-0000-000000000983");
 
     @Autowired
@@ -80,6 +83,29 @@ class PlatformTenantLocalRuntimeSecurityTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.tenants[0].tenantCode").value("20000000"));
+    }
+
+    @Test
+    void localRuntimeAllowsTenantAdminStoreAccessReadWhenConfiguredActorIsPlatformAdmin() throws Exception {
+        when(tenantService.getTenantAdminStoreAccess(TENANT_ID)).thenReturn(new PlatformTenantAdminStoreAccess(
+            List.of(new PlatformTenantStoreOption(
+                STORE_ID,
+                "local-validation-store",
+                "Local Validation Store",
+                "active",
+                "zh-CN",
+                true
+            )),
+            List.of(STORE_ID),
+            STORE_ID
+        ));
+
+        mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/admin-store-access", TENANT_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.stores[0].storeId").value(STORE_ID.toString()))
+            .andExpect(jsonPath("$.storeIds[0]").value(STORE_ID.toString()))
+            .andExpect(jsonPath("$.defaultStoreId").value(STORE_ID.toString()));
     }
 
     @Test

@@ -2,6 +2,7 @@
 import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import type { PlatformTenantStoreAccessStore } from '../../api/platformApi'
 import CountryPhoneField from '../common/CountryPhoneField.vue'
 import PasswordInput from '../common/PasswordInput.vue'
 import type { PlatformTenantFormModel, TenantStatusOption } from './platformTenantUi'
@@ -9,6 +10,7 @@ import type { PlatformTenantFormModel, TenantStatusOption } from './platformTena
 const props = defineProps<{
   mode: 'create' | 'edit'
   form: PlatformTenantFormModel
+  adminStoreOptions: PlatformTenantStoreAccessStore[]
   statusOptions: TenantStatusOption[]
   saving: boolean
 }>()
@@ -32,7 +34,9 @@ const localForm = reactive<PlatformTenantFormModel>({
   logoMediaUrl: '',
   logoFile: null,
   initialPassword: '',
-  password: ''
+  password: '',
+  adminStoreIds: [],
+  defaultAdminStoreId: ''
 })
 
 const passwordLabel = computed(() => (
@@ -45,17 +49,55 @@ const passwordPlaceholder = computed(() => (
     ? t('platform.tenants.form.initialPasswordPlaceholder')
     : t('platform.tenants.form.passwordPlaceholder')
 ))
+const selectedAdminStoreOptions = computed(() => {
+  const selected = new Set(localForm.adminStoreIds)
+  return props.adminStoreOptions.filter(store => selected.has(store.storeId))
+})
 
 watch(
   () => props.form,
   value => {
     Object.assign(localForm, value)
+    ensureDefaultAdminStore()
   },
   { deep: true, immediate: true }
 )
 
+watch(
+  () => props.adminStoreOptions,
+  () => ensureDefaultAdminStore(),
+  { deep: true }
+)
+
 function submitForm(): void {
   emit('submit', { ...localForm })
+}
+
+function toggleAdminStoreFromEvent(storeId: string, event: Event): void {
+  const checked = (event.target as HTMLInputElement | null)?.checked === true
+  const selected = new Set(localForm.adminStoreIds)
+  if (checked) {
+    selected.add(storeId)
+  } else {
+    selected.delete(storeId)
+  }
+  localForm.adminStoreIds = Array.from(selected)
+  ensureDefaultAdminStore()
+}
+
+function ensureDefaultAdminStore(): void {
+  if (props.mode !== 'edit') {
+    return
+  }
+  if (localForm.defaultAdminStoreId && localForm.adminStoreIds.includes(localForm.defaultAdminStoreId)) {
+    return
+  }
+  localForm.defaultAdminStoreId = localForm.adminStoreIds[0] || ''
+}
+
+function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
+  const name = store.storeName || store.storeCode || store.storeId.slice(0, 8)
+  return store.storeCode ? `${name} (${store.storeCode})` : name
 }
 
 function handleLogoFileChange(event: Event): void {
@@ -147,6 +189,40 @@ function clearLogo(): void {
           autocomplete="new-password"
         />
       </label>
+
+      <div v-if="mode === 'edit'" class="admin-store-access-panel span-2">
+        <div class="section-heading">
+          <h2>{{ $t('platform.tenants.form.adminStoreAccess.title') }}</h2>
+        </div>
+        <p v-if="adminStoreOptions.length === 0" class="helper-line">
+          {{ $t('platform.tenants.form.adminStoreAccess.empty') }}
+        </p>
+        <div v-else class="admin-store-grid">
+          <label v-for="store in adminStoreOptions" :key="store.storeId" class="admin-store-option">
+            <input
+              type="checkbox"
+              :checked="localForm.adminStoreIds.includes(store.storeId)"
+              @change="toggleAdminStoreFromEvent(store.storeId, $event)"
+            />
+            <span>
+              <strong>{{ adminStoreDisplayName(store) }}</strong>
+              <small>{{ store.locale || '-' }}</small>
+            </span>
+          </label>
+        </div>
+        <label>
+          <span>{{ $t('platform.tenants.form.adminStoreAccess.defaultStore') }}</span>
+          <select
+            v-model="localForm.defaultAdminStoreId"
+            :disabled="selectedAdminStoreOptions.length === 0"
+            required
+          >
+            <option v-for="store in selectedAdminStoreOptions" :key="store.storeId" :value="store.storeId">
+              {{ adminStoreDisplayName(store) }}
+            </option>
+          </select>
+        </label>
+      </div>
     </section>
 
     <section v-if="mode === 'edit'" class="form-section form-section--logo" :aria-label="$t('platform.tenants.form.tenantLogo')">
@@ -215,6 +291,65 @@ label {
 .form-section--logo {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+}
+
+.admin-store-access-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.helper-line {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-store-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-store-option {
+  min-height: 58px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.admin-store-option input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+}
+
+.admin-store-option span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.admin-store-option strong {
+  overflow-wrap: anywhere;
+  color: #0f172a;
+}
+
+.admin-store-option small {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .logo-preview {
@@ -314,6 +449,10 @@ input.readonly {
   }
 
   .form-section--logo {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-store-grid {
     grid-template-columns: 1fr;
   }
 }
