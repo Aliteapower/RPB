@@ -10,6 +10,7 @@ import {
   restoreTenant,
   type PlatformPage,
   type PlatformTenant,
+  type PlatformTenantOnboardingMode,
   type TenantListStatus
 } from '../api/platformApi'
 import ErpPagination from '../components/erp/ErpPagination.vue'
@@ -96,8 +97,8 @@ function resetFilters(): void {
   void loadTenants(0)
 }
 
-function openCreatePage(): void {
-  void router.push({ name: 'platform-tenant-create' })
+function openCreatePage(onboardingMode: PlatformTenantOnboardingMode): void {
+  void router.push({ name: 'platform-tenant-create', query: { onboardingMode } })
 }
 
 function openEditPage(tenant: PlatformTenant): void {
@@ -198,9 +199,14 @@ function apiErrorText(error: unknown): string {
           </div>
         </template>
         <template #actions>
-          <button v-if="!billingIndexMode" class="primary-button" type="button" @click="openCreatePage">
-            {{ $t('platform.tenants.list.create') }}
-          </button>
+          <div v-if="!billingIndexMode" class="create-actions">
+            <button class="primary-button" type="button" @click="openCreatePage('group_multi_store')">
+              {{ $t('platform.tenants.list.createGroup') }}
+            </button>
+            <button class="secondary-button" type="button" @click="openCreatePage('single_store')">
+              {{ $t('platform.tenants.list.createSingle') }}
+            </button>
+          </div>
         </template>
       </ErpQueryToolbar>
 
@@ -290,16 +296,32 @@ function apiErrorText(error: unknown): string {
   background: #334155;
 }
 
-.primary-button {
+.create-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.primary-button,
+.secondary-button {
   min-height: 36px;
-  border: 0;
   border-radius: 6px;
   padding: 0 14px;
-  color: #ffffff;
-  background: #0f766e;
   font: inherit;
   font-weight: 800;
   cursor: pointer;
+}
+
+.primary-button {
+  border: 0;
+  color: #ffffff;
+  background: #0f766e;
+}
+
+.secondary-button {
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  background: #ffffff;
 }
 
 .error-banner {
@@ -324,12 +346,17 @@ function apiErrorText(error: unknown): string {
   }
 
   .segmented-control,
-  .primary-button {
+  .create-actions {
     width: 100%;
   }
 
   .segmented-control button {
     flex: 1;
+  }
+
+  .create-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

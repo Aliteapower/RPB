@@ -594,14 +594,15 @@ export const zhCN = {
       list: {
         kickerPlatform: '平台',
         kickerBilling: '计费',
-        title: '租户管理',
+        title: '集团 / 租户管理',
         billingTitle: '租户计费',
         keywordPlaceholder: '代码 / 名称 / 电话 / 地址',
         statusFilterAria: '租户状态筛选',
         allFilter: '全部 {count}',
         activeFilter: '正常 {count}',
         deletedFilter: '已删除 {count}',
-        create: '新增租户',
+        createGroup: '新增集团',
+        createSingle: '新增单店',
         confirmDelete: '删除租户 {tenantCode}？'
       },
       table: {
@@ -621,7 +622,8 @@ export const zhCN = {
         billingFull: '订阅/计费'
       },
       formPage: {
-        createTitle: '新增租户',
+        createGroupTitle: '新增集团',
+        createSingleTitle: '新增单店',
         editTitle: '编辑租户',
         kicker: '平台',
         backToList: '返回列表'

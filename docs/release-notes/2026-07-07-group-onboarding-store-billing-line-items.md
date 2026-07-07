@@ -7,6 +7,7 @@
 ## New
 
 - Added a platform tenant onboarding mode for group multi-store tenants. Platform admins can now create a management tenant without bootstrapping a default store, then configure operating entities and stores in the tenant structure panel.
+- Added separate platform tenant list entry buttons for group onboarding and single-store onboarding.
 - Added default operating-entity creation for the existing single-store onboarding path so newly created single-store tenants are immediately compatible with the operating-entity submodel.
 - Added per-store product subscription billing line items. Each active billable store receives a persisted subscription item with store, operating entity, amount, currency, billing cycle, period, status, idempotency key, and source action metadata.
 - Added platform billing UI display for billable store count, per-store period amount, total amount, and subscription store item details.
@@ -14,6 +15,7 @@
 ## Changed
 
 - `POST /api/v1/platform/tenants` accepts optional `onboardingMode` with `single_store` as the compatibility default and `group_multi_store` for group tenants.
+- Platform tenant list copy is now "Group / tenant management" and routes `Add group` / `Add single store` into the matching onboarding mode.
 - Product subscription quote responses now include `storeCount` and `storeUnitAmount`.
 - Tenant product subscription list and mutation responses now include `subscription.items`.
 - Manual product subscription purchase, renew, and legacy conversion now price by active tenant stores instead of assuming one tenant equals one billable store.

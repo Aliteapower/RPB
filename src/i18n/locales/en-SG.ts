@@ -594,14 +594,15 @@ export const enSG = {
       list: {
         kickerPlatform: 'Platform',
         kickerBilling: 'Billing',
-        title: 'Tenant management',
+        title: 'Group / tenant management',
         billingTitle: 'Tenant billing',
         keywordPlaceholder: 'Code / name / phone / address',
         statusFilterAria: 'Tenant status filter',
         allFilter: 'All {count}',
         activeFilter: 'Active {count}',
         deletedFilter: 'Deleted {count}',
-        create: 'Add tenant',
+        createGroup: 'Add group',
+        createSingle: 'Add single store',
         confirmDelete: 'Delete tenant {tenantCode}?'
       },
       table: {
@@ -621,7 +622,8 @@ export const enSG = {
         billingFull: 'Subscription/billing'
       },
       formPage: {
-        createTitle: 'Add tenant',
+        createGroupTitle: 'Add group',
+        createSingleTitle: 'Add single store',
         editTitle: 'Edit tenant',
         kicker: 'Platform',
         backToList: 'Back to list'

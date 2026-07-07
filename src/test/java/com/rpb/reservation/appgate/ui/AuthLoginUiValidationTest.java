@@ -203,7 +203,8 @@ class AuthLoginUiValidationTest {
             .contains("deleteTenant")
             .contains("restoreTenant")
             .contains("platform.tenants.list.title")
-            .contains("platform.tenants.list.create")
+            .contains("platform.tenants.list.createGroup")
+            .contains("platform.tenants.list.createSingle")
             .contains("common.actions.restore")
             .contains("platform.tenants.status.deleted");
     }
@@ -251,7 +252,7 @@ class AuthLoginUiValidationTest {
             .contains("principalName")
             .contains("initialPassword")
             .contains("password")
-            .contains("router.push({ name: 'platform-tenant-create' })")
+            .contains("router.push({ name: 'platform-tenant-create', query: { onboardingMode } })")
             .contains("router.push({ name: 'platform-tenant-edit'")
             .contains("common.actions.logout")
             .contains("logoutCurrentUser")

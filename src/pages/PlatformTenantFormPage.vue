@@ -20,6 +20,7 @@ import {
   type PlatformOperatingEntity,
   type PlatformOperatingEntityMutation,
   type PlatformTenantMutation,
+  type PlatformTenantOnboardingMode,
   type PlatformTenantStoreAccessStore,
   type PlatformStore,
   type PlatformStoreMutation
@@ -50,11 +51,6 @@ const tenantStores = ref<PlatformStore[]>([])
 
 const mode = computed<'create' | 'edit'>(() => (route.name === 'platform-tenant-create' ? 'create' : 'edit'))
 const tenantId = computed(() => String(route.params.tenantId || ''))
-const pageTitle = computed(() => (
-  mode.value === 'create'
-    ? t('platform.tenants.formPage.createTitle')
-    : t('platform.tenants.formPage.editTitle')
-))
 
 const statusOptions: TenantStatusOption[] = [
   { value: 'created', labelKey: 'platform.tenants.status.created' },
@@ -74,12 +70,23 @@ const form = reactive<PlatformTenantFormModel>({
   principalName: '',
   logoMediaUrl: '',
   logoFile: null,
-  onboardingMode: 'single_store',
+  onboardingMode: normalizeCreateOnboardingMode(route.query.onboardingMode),
   initialPassword: '',
   password: '',
   adminStoreIds: [],
   defaultAdminStoreId: ''
 })
+
+const createPageTitle = computed(() => (
+  form.onboardingMode === 'group_multi_store'
+    ? t('platform.tenants.formPage.createGroupTitle')
+    : t('platform.tenants.formPage.createSingleTitle')
+))
+const pageTitle = computed(() => (
+  mode.value === 'create'
+    ? createPageTitle.value
+    : t('platform.tenants.formPage.editTitle')
+))
 
 onMounted(() => {
   if (mode.value === 'edit') {
@@ -299,6 +306,10 @@ function storePayload(submittedForm: PlatformStoreFormModel): PlatformStoreMutat
 function optionalValue(value: string): string | null {
   const normalized = value.trim()
   return normalized ? normalized : null
+}
+
+function normalizeCreateOnboardingMode(value: unknown): PlatformTenantOnboardingMode {
+  return value === 'group_multi_store' ? 'group_multi_store' : 'single_store'
 }
 
 function apiErrorText(error: unknown): string {
