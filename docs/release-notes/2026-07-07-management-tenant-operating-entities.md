@@ -11,6 +11,7 @@
 - Added `tenant_host_aliases` schema foundation for later mapping legacy prefixes such as `lsc106` and `20000000` to a management tenant and default store.
 - Added platform APIs to list, create, and update tenant operating entities and stores.
 - Added platform tenant edit UI panels for operating entities and stores, with zh-CN and en-SG copy.
+- Added a platform tenant list row action that jumps directly to the operating-entity and store management panel.
 
 ## Changed
 

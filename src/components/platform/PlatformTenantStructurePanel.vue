@@ -137,7 +137,7 @@ function storeEntityName(store: PlatformStore): string {
 </script>
 
 <template>
-  <section class="structure-panel" :aria-label="$t('platform.tenants.structure.title')">
+  <section id="tenant-structure" class="structure-panel" :aria-label="$t('platform.tenants.structure.title')">
     <div class="panel-heading">
       <div>
         <span>{{ $t('platform.tenants.structure.kicker') }}</span>

@@ -263,6 +263,8 @@ class AuthLoginUiValidationTest {
 
     @Test
     void platformTenantEditFormMaintainsTenantAdminStoreAccess() throws Exception {
+        Path listPagePath = Path.of("src", "pages", "PlatformTenantsPage.vue");
+        Path tablePath = Path.of("src", "components", "platform", "PlatformTenantTable.vue");
         Path formPagePath = Path.of("src", "pages", "PlatformTenantFormPage.vue");
         Path formPath = Path.of("src", "components", "platform", "PlatformTenantForm.vue");
         Path structurePath = Path.of("src", "components", "platform", "PlatformTenantStructurePanel.vue");
@@ -271,7 +273,9 @@ class AuthLoginUiValidationTest {
         Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
         Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
 
-        String source = FrontendSourceSupport.readString(formPagePath)
+        String source = FrontendSourceSupport.readString(listPagePath)
+            + FrontendSourceSupport.readString(tablePath)
+            + FrontendSourceSupport.readString(formPagePath)
             + FrontendSourceSupport.readString(formPath)
             + FrontendSourceSupport.readString(structurePath)
             + FrontendSourceSupport.readString(apiPath)
@@ -290,7 +294,14 @@ class AuthLoginUiValidationTest {
             .contains("selectedAdminStoreOptions")
             .contains("platform.tenants.form.adminStoreAccess.title")
             .contains("platform.tenants.form.adminStoreAccess.defaultStore")
+            .contains("openStructurePage")
+            .contains("hash: '#tenant-structure'")
+            .contains("@structure=\"openStructurePage\"")
+            .contains("emit('structure', tenant)")
+            .contains("platform.tenants.table.structure")
             .contains("PlatformTenantStructurePanel")
+            .contains("id=\"tenant-structure\"")
+            .contains("scrollToStructurePanelIfRequested")
             .contains("listOperatingEntities")
             .contains("createOperatingEntity")
             .contains("updateOperatingEntity")
@@ -307,12 +318,14 @@ class AuthLoginUiValidationTest {
         assertThat(zh)
             .contains("title: '授权门店'")
             .contains("defaultStore: '默认门店'")
+            .contains("structure: '门店'")
             .contains("title: '经营主体与门店'")
             .contains("newEntity: '新增经营主体'")
             .contains("newStore: '新增门店'");
         assertThat(en)
             .contains("title: 'Authorised stores'")
             .contains("defaultStore: 'Default store'")
+            .contains("structure: 'Stores'")
             .contains("title: 'Operating entities and stores'")
             .contains("newEntity: 'Add entity'")
             .contains("newStore: 'Add store'");

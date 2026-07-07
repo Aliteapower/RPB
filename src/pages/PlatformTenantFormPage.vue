@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -116,7 +116,16 @@ async function loadTenant(): Promise<void> {
     errorText.value = apiErrorText(error)
   } finally {
     loading.value = false
+    void scrollToStructurePanelIfRequested()
   }
+}
+
+async function scrollToStructurePanelIfRequested(): Promise<void> {
+  if (mode.value !== 'edit' || route.hash !== '#tenant-structure') {
+    return
+  }
+  await nextTick()
+  document.getElementById('tenant-structure')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function loadTenantStructure(): Promise<void> {

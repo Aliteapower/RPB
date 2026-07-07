@@ -616,6 +616,7 @@ export const zhCN = {
           actions: '操作'
         },
         empty: '暂无租户',
+        structure: '门店',
         billingShort: '计费',
         billingFull: '订阅/计费'
       },

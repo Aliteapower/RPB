@@ -616,6 +616,7 @@ export const enSG = {
           actions: 'Actions'
         },
         empty: 'No tenants',
+        structure: 'Stores',
         billingShort: 'Billing',
         billingFull: 'Subscription/billing'
       },

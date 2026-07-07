@@ -104,6 +104,14 @@ function openEditPage(tenant: PlatformTenant): void {
   void router.push({ name: 'platform-tenant-edit', params: { tenantId: tenant.id } })
 }
 
+function openStructurePage(tenant: PlatformTenant): void {
+  void router.push({
+    name: 'platform-tenant-edit',
+    params: { tenantId: tenant.id },
+    hash: '#tenant-structure'
+  })
+}
+
 function openBillingPage(tenant: PlatformTenant): void {
   void router.push({ name: 'platform-tenant-billing', params: { tenantId: tenant.id } })
 }
@@ -205,6 +213,7 @@ function apiErrorText(error: unknown): string {
         :status-options="statusOptions"
         :billing-only="billingIndexMode"
         @edit="openEditPage"
+        @structure="openStructurePage"
         @billing="openBillingPage"
         @delete="deleteSelectedTenant"
         @restore="restoreSelectedTenant"

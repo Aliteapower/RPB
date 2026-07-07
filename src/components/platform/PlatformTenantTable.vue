@@ -14,6 +14,7 @@ defineProps<{
 
 const emit = defineEmits<{
   edit: [tenant: PlatformTenant]
+  structure: [tenant: PlatformTenant]
   billing: [tenant: PlatformTenant]
   delete: [tenant: PlatformTenant]
   restore: [tenant: PlatformTenant]
@@ -68,6 +69,9 @@ function statusLabel(status: TenantStatus, statusOptions: TenantStatusOption[]):
               <div class="row-actions">
                 <button v-if="!billingOnly" type="button" class="text-action" @click="emit('edit', tenant)">
                   {{ $t('common.actions.edit') }}
+                </button>
+                <button v-if="!billingOnly" type="button" class="text-action" @click="emit('structure', tenant)">
+                  {{ $t('platform.tenants.table.structure') }}
                 </button>
                 <button type="button" class="text-action" @click="emit('billing', tenant)">
                   {{ billingOnly ? $t('platform.tenants.table.billingFull') : $t('platform.tenants.table.billingShort') }}
