@@ -797,6 +797,12 @@ export const enSG = {
         keyNotAllowed: 'This message cannot be maintained by tenants.'
       }
     },
+    staffList: {
+      storeAccess: {
+        authorized: 'Authorised stores',
+        defaultStore: 'Default store'
+      }
+    },
     staffForm: {
       storeAccess: {
         title: 'Authorised stores',

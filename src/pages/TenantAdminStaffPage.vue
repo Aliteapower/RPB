@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -15,8 +16,10 @@ import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import { useGeneratedText } from '../i18n/generatedText'
+import type { AuthStoreAccess } from '../types/auth'
 
 const { gt } = useGeneratedText()
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -45,6 +48,20 @@ const safePage = computed<TenantAdminPage>(() => page.value ?? {
   offset: offset.value,
   total: staff.value.length
 })
+const storeDirectory = computed(() => {
+  const stores: AuthStoreAccess[] = auth.authorizedStores.length > 0
+    ? auth.authorizedStores
+    : (auth.user?.storeIds ?? []).map(storeId => ({
+        storeId,
+        storeCode: '',
+        storeName: '',
+        status: 'active',
+        locale: '',
+        defaultStore: storeId === auth.user?.defaultStoreId
+      }))
+
+  return new Map(stores.map(store => [store.storeId, store]))
+})
 
 onMounted(() => {
   void loadStaff()
@@ -54,7 +71,8 @@ async function loadStaff(nextOffset = offset.value): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    const [selfResponse, profileResponse, response] = await Promise.all([
+    const [, selfResponse, profileResponse, response] = await Promise.all([
+      auth.ensureAuthorizedStores(),
       getCurrentTenantAdminStaff(storeId.value),
       getTenantProfile(storeId.value),
       listStaff(storeId.value, {
@@ -113,6 +131,28 @@ function displayStaffPhone(item: TenantAdminStaff): string {
     ? tenantContactPhone.value || item.phone
     : item.phone
   return phone || '-'
+}
+
+function storeAccessSummary(item: TenantAdminStaff): string {
+  const storeIds = item.storeIds.length > 0
+    ? item.storeIds
+    : item.defaultStoreId
+      ? [item.defaultStoreId]
+      : []
+  const labels = storeIds.map(storeAccessLabel)
+  return labels.length > 0 ? labels.join(' / ') : '-'
+}
+
+function defaultStoreSummary(item: TenantAdminStaff): string {
+  return item.defaultStoreId ? storeAccessLabel(item.defaultStoreId) : '-'
+}
+
+function storeAccessLabel(storeId: string): string {
+  const store = storeDirectory.value.get(storeId)
+  if (store?.storeName && store.storeCode) {
+    return `${store.storeName} (${store.storeCode})`
+  }
+  return store?.storeName || store?.storeCode || t('staffHome.store.label', { shortId: storeId.slice(0, 8) })
 }
 
 function apiErrorText(error: unknown): string {
@@ -191,10 +231,22 @@ function apiErrorText(error: unknown): string {
             <tr v-for="item in visibleStaff" v-else :key="item.id" :class="{ 'protected-row': item.accountType === 'tenant_admin' }">
               <td><strong>{{ item.employeeNo }}</strong></td>
               <td>
-                <span class="name-cell">
-                  {{ item.name }}
-                  <span v-if="item.accountType === 'tenant_admin'" class="role-badge">{{ gt('generated.tenant-admin-staff.017') }}</span>
-                </span>
+                <div class="staff-identity-cell">
+                  <span class="name-cell">
+                    {{ item.name }}
+                    <span v-if="item.accountType === 'tenant_admin'" class="role-badge">{{ gt('generated.tenant-admin-staff.017') }}</span>
+                  </span>
+                  <span class="store-access-cell">
+                    <span>
+                      <strong>{{ t('tenant.staffList.storeAccess.authorized') }}</strong>
+                      {{ storeAccessSummary(item) }}
+                    </span>
+                    <span>
+                      <strong>{{ t('tenant.staffList.storeAccess.defaultStore') }}</strong>
+                      {{ defaultStoreSummary(item) }}
+                    </span>
+                  </span>
+                </div>
               </td>
               <td>{{ displayStaffPhone(item) }}</td>
               <td>{{ item.email || '-' }}</td>
@@ -359,6 +411,34 @@ tr:last-child td {
   display: inline-flex;
   gap: 8px;
   align-items: center;
+}
+
+.staff-identity-cell {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.store-access-cell {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.store-access-cell span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-access-cell strong {
+  margin-right: 6px;
+  color: #334155;
+  font-weight: 800;
 }
 
 .role-badge {

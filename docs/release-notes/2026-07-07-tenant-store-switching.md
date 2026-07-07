@@ -15,6 +15,7 @@
 
 ## Fixed
 - Closed the App Gate path where a tenant admin could access a store without an explicit store grant.
+- Tenant admin staff management now shows each staff member's authorized stores and default store directly in the staff list.
 
 ## Migration
 - No database migration required. Existing `auth_accounts.default_store_id` and `auth_account_store_access` are reused.

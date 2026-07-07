@@ -797,6 +797,12 @@ export const zhCN = {
         keyNotAllowed: '该文案不允许租户维护'
       }
     },
+    staffList: {
+      storeAccess: {
+        authorized: '授权门店',
+        defaultStore: '默认门店'
+      }
+    },
     staffForm: {
       storeAccess: {
         title: '授权门店',

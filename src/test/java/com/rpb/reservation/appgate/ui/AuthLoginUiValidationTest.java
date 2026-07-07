@@ -405,4 +405,36 @@ class AuthLoginUiValidationTest {
             .contains("item.accountType === 'tenant_admin'")
             .contains("{{ displayStaffPhone(item) }}");
     }
+
+    @Test
+    void tenantAdminStaffListShowsStoreAuthorizationSummary() throws Exception {
+        Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
+        Path enPath = Path.of("src", "i18n", "locales", "en-SG.ts");
+
+        String staffPageSource = FrontendSourceSupport.readString(staffPagePath);
+        String zhSource = FrontendSourceSupport.readString(zhPath);
+        String enSource = FrontendSourceSupport.readString(enPath);
+
+        assertThat(staffPageSource)
+            .contains("useI18n")
+            .contains("auth.ensureAuthorizedStores()")
+            .contains("storeAccessSummary(item)")
+            .contains("defaultStoreSummary(item)")
+            .contains("tenant.staffList.storeAccess.authorized")
+            .contains("tenant.staffList.storeAccess.defaultStore")
+            .contains("class=\"store-access-cell\"")
+            .contains("item.storeIds")
+            .contains("item.defaultStoreId");
+
+        assertThat(zhSource)
+            .contains("staffList")
+            .contains("authorized: '授权门店'")
+            .contains("defaultStore: '默认门店'");
+
+        assertThat(enSource)
+            .contains("staffList")
+            .contains("authorized: 'Authorised stores'")
+            .contains("defaultStore: 'Default store'");
+    }
 }
