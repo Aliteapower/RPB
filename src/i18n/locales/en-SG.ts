@@ -806,7 +806,8 @@ export const enSG = {
     staffForm: {
       storeAccess: {
         title: 'Authorised stores',
-        defaultStore: 'Default store'
+        defaultStore: 'Default store',
+        empty: 'No stores are available to authorise. Check that this account has store access first.'
       },
       errors: {
         storeRequired: 'Choose at least one authorised store.',

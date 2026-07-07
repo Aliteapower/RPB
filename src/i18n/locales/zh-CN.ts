@@ -806,7 +806,8 @@ export const zhCN = {
     staffForm: {
       storeAccess: {
         title: '授权门店',
-        defaultStore: '默认门店'
+        defaultStore: '默认门店',
+        empty: '暂无可授权门店，请先确认当前账号已获得门店授权。'
       },
       errors: {
         storeRequired: '请至少选择一个授权门店',

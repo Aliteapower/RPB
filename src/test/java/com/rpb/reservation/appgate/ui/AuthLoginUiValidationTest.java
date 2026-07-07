@@ -392,6 +392,29 @@ class AuthLoginUiValidationTest {
     }
 
     @Test
+    void tenantAdminSelfMaintenanceShowsReadonlyStoreAuthorization() throws Exception {
+        Path staffFormPath = Path.of("src", "pages", "TenantAdminStaffFormPage.vue");
+
+        String staffFormSource = FrontendSourceSupport.readString(staffFormPath);
+
+        assertThat(staffFormSource)
+            .contains("void loadAssignableStores()")
+            .contains("readonlyStoreAccessSummary")
+            .contains("readonlyDefaultStoreSummary")
+            .contains("class=\"store-access-edit-panel wide-field\"")
+            .contains("store-access-readonly-panel")
+            .contains("class=\"readonly-store-access\"")
+            .contains("tenant.staffForm.storeAccess.empty")
+            .contains("tenant.staffForm.storeAccess.title")
+            .contains("tenant.staffForm.storeAccess.defaultStore")
+            .contains("toggleStoreFromEvent(store.storeId, $event)")
+            .contains("v-model=\"defaultStoreId\"")
+            .contains("mode.value !== 'self' && !validateStoreAccessForm()")
+            .contains("adminAccountPayload()")
+            .doesNotContain("if (storeAccessVisible.value)");
+    }
+
+    @Test
     void tenantAdminStaffListShowsTenantProfilePhoneForProtectedAdmin() throws Exception {
         Path staffPagePath = Path.of("src", "pages", "TenantAdminStaffPage.vue");
 

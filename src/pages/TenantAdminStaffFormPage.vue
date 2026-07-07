@@ -69,7 +69,6 @@ const statusFieldVisible = computed(() => mode.value !== 'self')
 const storeId = computed(() => String(route.params.storeId || ''))
 const staffId = computed(() => String(route.params.staffId || ''))
 const logoPreviewUrl = computed(() => localLogoPreviewUrl.value || tenantProfileForm.logoMediaUrl)
-const storeAccessVisible = computed(() => mode.value !== 'self')
 const assignableStores = computed<AuthStoreAccess[]>(() => {
   if (auth.authorizedStores.length > 0) {
     return auth.authorizedStores
@@ -102,6 +101,13 @@ const storeChoices = computed<AuthStoreAccess[]>(() => {
 const selectedStoreOptions = computed(() =>
   storeChoices.value.filter(store => selectedStoreIds.value.includes(store.storeId))
 )
+const readonlyStoreAccessSummary = computed(() => {
+  const labels = selectedStoreIds.value.map(storeDisplayNameById)
+  return labels.length > 0 ? labels.join(' / ') : '-'
+})
+const readonlyDefaultStoreSummary = computed(() =>
+  defaultStoreId.value ? storeDisplayNameById(defaultStoreId.value) : '-'
+)
 
 const tenantProfileForm = reactive<TenantProfileForm>({
   tenantCode: '',
@@ -126,9 +132,7 @@ const selectedStoreIds = ref<string[]>([])
 const defaultStoreId = ref('')
 
 onMounted(() => {
-  if (storeAccessVisible.value) {
-    void loadAssignableStores()
-  }
+  void loadAssignableStores()
   if (mode.value !== 'create') {
     void loadStaff()
   } else {
@@ -420,6 +424,11 @@ function storeDisplayName(store: AuthStoreAccess): string {
   return store.storeName || store.storeCode || storeFallbackLabel(store.storeId)
 }
 
+function storeDisplayNameById(storeId: string): string {
+  const store = storeChoices.value.find(candidate => candidate.storeId === storeId)
+  return store ? storeDisplayName(store) : storeFallbackLabel(storeId)
+}
+
 function storeFallbackLabel(storeId: string): string {
   return t('staffHome.store.label', { shortId: storeId.slice(0, 8) })
 }
@@ -581,6 +590,23 @@ function apiErrorText(error: unknown): string {
               </label>
             </div>
           </section>
+
+          <section class="section-panel store-access-readonly-panel">
+            <div class="section-heading">
+              <h2>{{ t('tenant.staffForm.storeAccess.title') }}</h2>
+            </div>
+            <p v-if="storeAccessLoading" class="loading-line">{{ t('common.actions.loading') }}</p>
+            <div v-else class="readonly-store-access">
+              <div>
+                <span>{{ t('tenant.staffForm.storeAccess.title') }}</span>
+                <strong>{{ readonlyStoreAccessSummary }}</strong>
+              </div>
+              <div>
+                <span>{{ t('tenant.staffForm.storeAccess.defaultStore') }}</span>
+                <strong>{{ readonlyDefaultStoreSummary }}</strong>
+              </div>
+            </div>
+          </section>
         </template>
 
         <template v-else>
@@ -619,11 +645,12 @@ function apiErrorText(error: unknown): string {
             />
             <small>{{ gt('generated.tenant-admin-staff-form.034') }}</small>
           </label>
-          <div class="store-access-fields wide-field">
+          <div class="store-access-edit-panel wide-field">
             <div class="section-heading compact-heading">
               <h2>{{ t('tenant.staffForm.storeAccess.title') }}</h2>
             </div>
             <p v-if="storeAccessLoading" class="loading-line">{{ t('common.actions.loading') }}</p>
+            <p v-else-if="storeChoices.length === 0" class="loading-line">{{ t('tenant.staffForm.storeAccess.empty') }}</p>
             <div v-else class="store-option-grid">
               <label v-for="store in storeChoices" :key="store.storeId" class="store-option">
                 <input
@@ -841,10 +868,51 @@ small {
   grid-column: 1 / -1;
 }
 
-.store-access-fields {
+.store-access-edit-panel,
+.store-access-readonly-panel {
   display: grid;
   gap: 12px;
-  padding-top: 4px;
+}
+
+.store-access-edit-panel {
+  padding: 14px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.store-access-readonly-panel {
+  align-content: start;
+}
+
+.readonly-store-access {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.readonly-store-access div {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.readonly-store-access span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.readonly-store-access strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .store-option-grid {
@@ -946,6 +1014,7 @@ small {
   .form-panel,
   .field-grid,
   .store-option-grid,
+  .readonly-store-access,
   .logo-panel {
     display: grid;
     grid-template-columns: 1fr;
