@@ -55,3 +55,13 @@
 - `mvn -q "-Dtest=PlatformTenantStructureMigrationSourceValidationTest,PlatformTenantLocalRuntimeSecurityTest,AuthLoginUiValidationTest" test`
 - `mvn -q "-Dtest=PlatformTenantApiIntegrationTest#platformAdminCreatesOperatingEntityStoreAndAuthorizesTenantAdminAcrossStores" test`
 - `npm run build`
+
+## Production Deployment
+
+- Deployed commit: `ce1576dc`.
+- Production backup directory: `/opt/rpb/backups/20260707-1104-ce1576dc`.
+- Backup contents: previous backend jar, previous frontend bundle, and `db-before-ce1576dc.dump`.
+- Flyway history reached `v035` with `tenant operating entities and store structure`.
+- Live frontend entry asset: `/assets/index-CJQX8N0Q.js`.
+- Smoke checks: `rpb-backend` active, local backend `/api/v1/auth/me` returned `401`, public `https://booking.yumstone.sg/api/v1/auth/me` returned `401`, `/login` returned `200`, `/platform/tenants` returned `200`, `platform.booking.yumstone.sg/login` returned `200`, `20000000.booking.yumstone.sg/login` returned `200`, and `20000000.booking.yumstone.sg/book` returned `200`.
+- Production static assets contain the `tenant-structure` anchor and platform tenant list store-management action.
