@@ -13,11 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.rpb.reservation.appgate.api.AppGateApiErrorMapper;
 import com.rpb.reservation.appgate.application.AppGateDenialAuditService;
 import com.rpb.reservation.appgate.application.AppGateService;
+import com.rpb.reservation.platform.application.PlatformOperatingEntity;
+import com.rpb.reservation.platform.application.PlatformStore;
 import com.rpb.reservation.platform.application.PlatformTenantAdminStoreAccess;
 import com.rpb.reservation.platform.application.PlatformTenantListResult;
 import com.rpb.reservation.platform.application.PlatformTenantPage;
 import com.rpb.reservation.platform.application.PlatformTenant;
 import com.rpb.reservation.platform.application.PlatformTenantService;
+import com.rpb.reservation.platform.application.PlatformTenantStructureService;
 import com.rpb.reservation.platform.application.PlatformTenantStoreOption;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.walkin.auth.LocalAuthProperties;
@@ -58,6 +61,7 @@ import org.springframework.web.multipart.MultipartFile;
 class PlatformTenantLocalRuntimeSecurityTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000983");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000983");
+    private static final UUID OPERATING_ENTITY_ID = UUID.fromString("50000000-0000-0000-0000-000000000983");
     private static final UUID LOGO_MEDIA_ASSET_ID = UUID.fromString("91000000-0000-0000-0000-000000000983");
 
     @Autowired
@@ -65,6 +69,9 @@ class PlatformTenantLocalRuntimeSecurityTest {
 
     @MockBean
     private PlatformTenantService tenantService;
+
+    @MockBean
+    private PlatformTenantStructureService structureService;
 
     @MockBean
     private AppGateService appGateService;
@@ -90,6 +97,8 @@ class PlatformTenantLocalRuntimeSecurityTest {
         when(tenantService.getTenantAdminStoreAccess(TENANT_ID)).thenReturn(new PlatformTenantAdminStoreAccess(
             List.of(new PlatformTenantStoreOption(
                 STORE_ID,
+                OPERATING_ENTITY_ID,
+                "Local Operating Entity",
                 "local-validation-store",
                 "Local Validation Store",
                 "active",
@@ -104,8 +113,27 @@ class PlatformTenantLocalRuntimeSecurityTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.stores[0].storeId").value(STORE_ID.toString()))
+            .andExpect(jsonPath("$.stores[0].operatingEntityId").value(OPERATING_ENTITY_ID.toString()))
+            .andExpect(jsonPath("$.stores[0].operatingEntityName").value("Local Operating Entity"))
             .andExpect(jsonPath("$.storeIds[0]").value(STORE_ID.toString()))
             .andExpect(jsonPath("$.defaultStoreId").value(STORE_ID.toString()));
+    }
+
+    @Test
+    void localRuntimeAllowsTenantStructureApisWhenConfiguredActorIsPlatformAdmin() throws Exception {
+        when(structureService.listOperatingEntities(TENANT_ID)).thenReturn(List.of(operatingEntity()));
+        when(structureService.listStores(TENANT_ID)).thenReturn(List.of(store()));
+
+        mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/operating-entities", TENANT_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.operatingEntities[0].entityCode").value("local-entity"));
+
+        mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/stores", TENANT_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.stores[0].storeCode").value("local-validation-store"))
+            .andExpect(jsonPath("$.stores[0].operatingEntityName").value("Local Operating Entity"));
     }
 
     @Test
@@ -183,6 +211,44 @@ class PlatformTenantLocalRuntimeSecurityTest {
             "上海市徐汇区示例路 1 号",
             "张店长",
             logoMediaAssetId,
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            null
+        );
+    }
+
+    private static PlatformOperatingEntity operatingEntity() {
+        return new PlatformOperatingEntity(
+            OPERATING_ENTITY_ID,
+            TENANT_ID,
+            "local-entity",
+            "Local Operating Entity",
+            "active",
+            "zh-CN",
+            "+6590000000",
+            "1 Local Street",
+            "Local Manager",
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            null
+        );
+    }
+
+    private static PlatformStore store() {
+        return new PlatformStore(
+            STORE_ID,
+            TENANT_ID,
+            OPERATING_ENTITY_ID,
+            "local-entity",
+            "Local Operating Entity",
+            "local-validation-store",
+            "Local Validation Store",
+            "active",
+            "Asia/Singapore",
+            "zh-CN",
+            "DD-MM-YYYY",
+            "HH:mm",
+            "SGD",
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             null

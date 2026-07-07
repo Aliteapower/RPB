@@ -6,17 +6,33 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   PlatformApiError,
   clearTenantLogo,
+  createOperatingEntity,
   createTenant,
+  createTenantStore,
   getTenant,
   getTenantAdminStoreAccess,
+  listOperatingEntities,
+  listTenantStores,
   uploadTenantLogo,
+  updateOperatingEntity,
   updateTenant,
+  updateTenantStore,
+  type PlatformOperatingEntity,
+  type PlatformOperatingEntityMutation,
   type PlatformTenantMutation,
-  type PlatformTenantStoreAccessStore
+  type PlatformTenantStoreAccessStore,
+  type PlatformStore,
+  type PlatformStoreMutation
 } from '../api/platformApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import PlatformTenantForm from '../components/platform/PlatformTenantForm.vue'
-import type { PlatformTenantFormModel, TenantStatusOption } from '../components/platform/platformTenantUi'
+import PlatformTenantStructurePanel from '../components/platform/PlatformTenantStructurePanel.vue'
+import type {
+  PlatformOperatingEntityFormModel,
+  PlatformStoreFormModel,
+  PlatformTenantFormModel,
+  TenantStatusOption
+} from '../components/platform/platformTenantUi'
 import { useAuthSessionStore } from '../stores/authSession'
 
 const route = useRoute()
@@ -26,8 +42,11 @@ const auth = useAuthSessionStore()
 
 const loading = ref(false)
 const saving = ref(false)
+const structureSaving = ref(false)
 const errorText = ref('')
 const adminStoreOptions = ref<PlatformTenantStoreAccessStore[]>([])
+const operatingEntities = ref<PlatformOperatingEntity[]>([])
+const tenantStores = ref<PlatformStore[]>([])
 
 const mode = computed<'create' | 'edit'>(() => (route.name === 'platform-tenant-create' ? 'create' : 'edit'))
 const tenantId = computed(() => String(route.params.tenantId || ''))
@@ -76,6 +95,7 @@ async function loadTenant(): Promise<void> {
       getTenantAdminStoreAccess(tenantId.value)
     ])
     adminStoreOptions.value = storeAccess.stores
+    await loadTenantStructure()
     Object.assign(form, {
       id: response.tenant.id,
       tenantCode: response.tenant.tenantCode,
@@ -97,6 +117,23 @@ async function loadTenant(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+async function loadTenantStructure(): Promise<void> {
+  const [entitiesResponse, storesResponse] = await Promise.all([
+    listOperatingEntities(tenantId.value),
+    listTenantStores(tenantId.value)
+  ])
+  operatingEntities.value = entitiesResponse.operatingEntities
+  tenantStores.value = storesResponse.stores
+}
+
+async function reloadStructureAndAccess(): Promise<void> {
+  const [storeAccess] = await Promise.all([
+    getTenantAdminStoreAccess(tenantId.value),
+    loadTenantStructure()
+  ])
+  adminStoreOptions.value = storeAccess.stores
 }
 
 async function submitTenantForm(submittedForm: PlatformTenantFormModel): Promise<void> {
@@ -173,6 +210,76 @@ function toPayload(submittedForm: PlatformTenantFormModel): PlatformTenantMutati
   }
 }
 
+async function saveOperatingEntity(submittedForm: PlatformOperatingEntityFormModel): Promise<void> {
+  if (structureSaving.value || mode.value !== 'edit') {
+    return
+  }
+
+  structureSaving.value = true
+  errorText.value = ''
+  try {
+    const payload = operatingEntityPayload(submittedForm)
+    if (submittedForm.id) {
+      await updateOperatingEntity(tenantId.value, submittedForm.id, payload)
+    } else {
+      await createOperatingEntity(tenantId.value, payload)
+    }
+    await reloadStructureAndAccess()
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    structureSaving.value = false
+  }
+}
+
+async function saveStore(submittedForm: PlatformStoreFormModel): Promise<void> {
+  if (structureSaving.value || mode.value !== 'edit') {
+    return
+  }
+
+  structureSaving.value = true
+  errorText.value = ''
+  try {
+    const payload = storePayload(submittedForm)
+    if (submittedForm.id) {
+      await updateTenantStore(tenantId.value, submittedForm.id, payload)
+    } else {
+      await createTenantStore(tenantId.value, payload)
+    }
+    await reloadStructureAndAccess()
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    structureSaving.value = false
+  }
+}
+
+function operatingEntityPayload(submittedForm: PlatformOperatingEntityFormModel): PlatformOperatingEntityMutation {
+  return {
+    entityCode: submittedForm.entityCode.trim(),
+    displayName: submittedForm.displayName.trim(),
+    status: submittedForm.status,
+    defaultLocale: optionalValue(submittedForm.defaultLocale),
+    contactPhone: optionalValue(submittedForm.contactPhone),
+    address: optionalValue(submittedForm.address),
+    principalName: optionalValue(submittedForm.principalName)
+  }
+}
+
+function storePayload(submittedForm: PlatformStoreFormModel): PlatformStoreMutation {
+  return {
+    operatingEntityId: submittedForm.operatingEntityId,
+    storeCode: submittedForm.storeCode.trim(),
+    storeName: submittedForm.storeName.trim(),
+    status: submittedForm.status,
+    timezone: optionalValue(submittedForm.timezone),
+    locale: optionalValue(submittedForm.locale),
+    dateFormat: optionalValue(submittedForm.dateFormat),
+    timeFormat: optionalValue(submittedForm.timeFormat),
+    currency: optionalValue(submittedForm.currency)
+  }
+}
+
 function optionalValue(value: string): string | null {
   const normalized = value.trim()
   return normalized ? normalized : null
@@ -230,6 +337,15 @@ function apiErrorText(error: unknown): string {
         @submit="submitTenantForm"
         @upload-logo="submitTenantLogo"
         @clear-logo="removeTenantLogo"
+      />
+
+      <PlatformTenantStructurePanel
+        v-if="!loading && mode === 'edit'"
+        :operating-entities="operatingEntities"
+        :stores="tenantStores"
+        :saving="structureSaving"
+        @save-operating-entity="saveOperatingEntity"
+        @save-store="saveStore"
       />
     </section>
   </main>

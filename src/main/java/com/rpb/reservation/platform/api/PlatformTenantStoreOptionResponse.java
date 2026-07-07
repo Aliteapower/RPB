@@ -5,6 +5,8 @@ import java.util.UUID;
 
 public record PlatformTenantStoreOptionResponse(
     UUID storeId,
+    UUID operatingEntityId,
+    String operatingEntityName,
     String storeCode,
     String storeName,
     String status,
@@ -14,6 +16,8 @@ public record PlatformTenantStoreOptionResponse(
     public static PlatformTenantStoreOptionResponse from(PlatformTenantStoreOption store) {
         return new PlatformTenantStoreOptionResponse(
             store.storeId(),
+            store.operatingEntityId(),
+            store.operatingEntityName(),
             store.storeCode(),
             store.storeName(),
             store.status(),

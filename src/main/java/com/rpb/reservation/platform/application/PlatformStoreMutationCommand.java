@@ -2,14 +2,15 @@ package com.rpb.reservation.platform.application;
 
 import java.util.UUID;
 
-public record PlatformTenantStoreOption(
-    UUID storeId,
+public record PlatformStoreMutationCommand(
     UUID operatingEntityId,
-    String operatingEntityName,
     String storeCode,
     String storeName,
     String status,
+    String timezone,
     String locale,
-    boolean defaultStore
+    String dateFormat,
+    String timeFormat,
+    String currency
 ) {
 }

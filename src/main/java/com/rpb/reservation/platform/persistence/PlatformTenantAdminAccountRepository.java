@@ -131,15 +131,28 @@ public class PlatformTenantAdminAccountRepository {
     private List<PlatformTenantStoreOption> activeTenantStores(UUID tenantId, UUID defaultStoreId) {
         return jdbc.query(
             """
-            select id, store_code, display_name, status, locale
-            from stores
-            where tenant_id = ?
-              and status = 'active'
-              and deleted_at is null
-            order by store_code, created_at, id
+            select
+                store.id,
+                store.operating_entity_id,
+                entity.display_name as operating_entity_name,
+                store.store_code,
+                store.display_name,
+                store.status,
+                store.locale
+            from stores store
+            left join operating_entities entity
+              on entity.id = store.operating_entity_id
+             and entity.tenant_id = store.tenant_id
+             and entity.deleted_at is null
+            where store.tenant_id = ?
+              and store.status = 'active'
+              and store.deleted_at is null
+            order by store.store_code, store.created_at, store.id
             """,
             (rs, rowNum) -> new PlatformTenantStoreOption(
                 rs.getObject("id", UUID.class),
+                rs.getObject("operating_entity_id", UUID.class),
+                rs.getString("operating_entity_name"),
                 rs.getString("store_code"),
                 rs.getString("display_name"),
                 rs.getString("status"),

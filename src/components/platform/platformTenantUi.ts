@@ -1,4 +1,8 @@
-import type { TenantStatus } from '../../api/platformApi'
+import type {
+  PlatformOperatingEntityStatus,
+  PlatformStoreStatus,
+  TenantStatus
+} from '../../api/platformApi'
 
 export type TenantFilter = 'all' | 'active' | 'deleted'
 
@@ -22,4 +26,28 @@ export interface PlatformTenantFormModel {
   password: string
   adminStoreIds: string[]
   defaultAdminStoreId: string
+}
+
+export interface PlatformOperatingEntityFormModel {
+  id: string
+  entityCode: string
+  displayName: string
+  status: PlatformOperatingEntityStatus
+  defaultLocale: string
+  contactPhone: string
+  address: string
+  principalName: string
+}
+
+export interface PlatformStoreFormModel {
+  id: string
+  operatingEntityId: string
+  storeCode: string
+  storeName: string
+  status: PlatformStoreStatus
+  timezone: string
+  locale: string
+  dateFormat: string
+  timeFormat: string
+  currency: string
 }

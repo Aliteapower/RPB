@@ -3,6 +3,93 @@
 ## Scope
 Platform tenant management is owned by the platform back office and is guarded by the `platform_admin` role plus `platform.tenant.manage`.
 
+## Operating Entities
+
+Operating entities model separate business operators inside one management tenant. They are platform-managed; tenant admins cannot create or edit them.
+
+### `GET /api/v1/platform/tenants/{tenantId}/operating-entities`
+
+Returns active, non-deleted operating entities in the tenant.
+
+Response:
+
+```json
+{
+  "success": true,
+  "operatingEntities": [
+    {
+      "id": "50000000-0000-0000-0000-000000000983",
+      "tenantId": "10000000-0000-0000-0000-000000000983",
+      "entityCode": "lsc106-entity",
+      "displayName": "LSC106 经营主体",
+      "status": "active",
+      "defaultLocale": "en-SG",
+      "contactPhone": "+6590000106",
+      "address": "106 Orchard Road",
+      "principalName": "LSC106 Manager",
+      "deleted": false
+    }
+  ]
+}
+```
+
+### `POST /api/v1/platform/tenants/{tenantId}/operating-entities`
+### `PATCH /api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}`
+
+Request:
+
+```json
+{
+  "entityCode": "lsc106-entity",
+  "displayName": "LSC106 经营主体",
+  "status": "active",
+  "defaultLocale": "en-SG",
+  "contactPhone": "+6590000106",
+  "address": "106 Orchard Road",
+  "principalName": "LSC106 Manager"
+}
+```
+
+Rules:
+- `entityCode` and `displayName` are required on create.
+- First slice allows `status = active|inactive`; archive is not exposed as an API command.
+- `entityCode` is unique per tenant among non-deleted operating entities.
+- Invalid tenant ids return `TENANT_NOT_FOUND`; invalid request payloads return `REQUEST_INVALID`; duplicate codes return `OPERATING_ENTITY_CODE_CONFLICT`.
+
+## Tenant Stores
+
+Stores remain tenant-scoped operational units. New stores created through the platform API must point to an active operating entity in the same tenant.
+
+### `GET /api/v1/platform/tenants/{tenantId}/stores`
+
+Returns non-deleted tenant stores with their operating entity summary when assigned.
+
+### `POST /api/v1/platform/tenants/{tenantId}/stores`
+### `PATCH /api/v1/platform/tenants/{tenantId}/stores/{storeId}`
+
+Request:
+
+```json
+{
+  "operatingEntityId": "50000000-0000-0000-0000-000000000983",
+  "storeCode": "lsc106",
+  "storeName": "LSC106 门店",
+  "status": "active",
+  "timezone": "Asia/Singapore",
+  "locale": "en-SG",
+  "dateFormat": "DD-MM-YYYY",
+  "timeFormat": "HH:mm",
+  "currency": "SGD"
+}
+```
+
+Rules:
+- `operatingEntityId`, `storeCode`, and `storeName` are required on create.
+- First slice allows `status = created|active|inactive`; store archive is intentionally not exposed.
+- `operatingEntityId` must reference an active, non-deleted operating entity in the same tenant.
+- `storeCode` is unique per tenant among non-deleted stores.
+- Invalid tenant ids return `TENANT_NOT_FOUND`; invalid store ids return `STORE_NOT_FOUND`; invalid operating entity ids return `REQUEST_INVALID`; duplicate store codes return `STORE_CODE_CONFLICT`.
+
 ## Tenant Admin Store Access
 
 ### `GET /api/v1/platform/tenants/{tenantId}/admin-store-access`

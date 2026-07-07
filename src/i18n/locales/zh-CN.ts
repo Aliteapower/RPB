@@ -649,6 +649,46 @@ export const zhCN = {
           defaultStore: '默认门店',
           empty: '暂无可授权门店'
         }
+      },
+      structure: {
+        kicker: '租户结构',
+        title: '经营主体与门店',
+        actions: {
+          newEntity: '新增经营主体',
+          newStore: '新增门店'
+        },
+        operatingEntities: {
+          title: '经营主体',
+          empty: '暂无经营主体'
+        },
+        stores: {
+          title: '门店',
+          empty: '暂无门店'
+        },
+        fields: {
+          entityCode: '经营主体代码',
+          displayName: '名称',
+          status: '状态',
+          defaultLocale: '默认语言',
+          principal: '负责人',
+          phone: '电话',
+          address: '地址',
+          operatingEntity: '经营主体',
+          chooseOperatingEntity: '请选择经营主体',
+          storeCode: '门店代码',
+          storeName: '门店名称',
+          locale: '语言',
+          timezone: '时区',
+          currency: '币种',
+          dateFormat: '日期格式',
+          timeFormat: '时间格式',
+          unassigned: '未分配经营主体'
+        },
+        status: {
+          created: '已创建',
+          active: '启用',
+          inactive: '停用'
+        }
       }
     },
     billing: {

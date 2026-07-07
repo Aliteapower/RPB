@@ -15,6 +15,10 @@ public record AuthStoreAccessResponse(
     }
 
     public record AuthStoreAccessItemResponse(
+        String tenantId,
+        String tenantCode,
+        String operatingEntityId,
+        String operatingEntityName,
         String storeId,
         String storeCode,
         String storeName,
@@ -24,6 +28,10 @@ public record AuthStoreAccessResponse(
     ) {
         static AuthStoreAccessItemResponse from(AuthStoreAccess store) {
             return new AuthStoreAccessItemResponse(
+                store.tenantId().toString(),
+                store.tenantCode(),
+                store.operatingEntityId() == null ? null : store.operatingEntityId().toString(),
+                store.operatingEntityName(),
                 store.storeId().toString(),
                 store.storeCode(),
                 store.storeName(),

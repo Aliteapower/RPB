@@ -22,6 +22,10 @@ const stores = computed(() => {
     return auth.authorizedStores
   }
   return (auth.user?.storeIds ?? []).map(storeId => ({
+    tenantId: auth.user?.tenantId || '',
+    tenantCode: '',
+    operatingEntityId: null,
+    operatingEntityName: null,
     storeId,
     storeCode: '',
     storeName: fallbackStoreLabel(storeId),
@@ -76,7 +80,8 @@ function rewriteStorePath(nextStoreId: string): string {
 }
 
 function storeLabel(store: AuthStoreAccess): string {
-  return store.storeName || store.storeCode || fallbackStoreLabel(store.storeId)
+  const storeName = store.storeName || store.storeCode || fallbackStoreLabel(store.storeId)
+  return store.operatingEntityName ? `${storeName} / ${store.operatingEntityName}` : storeName
 }
 
 function fallbackStoreLabel(storeId: string): string {

@@ -97,7 +97,8 @@ function ensureDefaultAdminStore(): void {
 
 function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
   const name = store.storeName || store.storeCode || store.storeId.slice(0, 8)
-  return store.storeCode ? `${name} (${store.storeCode})` : name
+  const storeName = store.storeCode ? `${name} (${store.storeCode})` : name
+  return store.operatingEntityName ? `${storeName} / ${store.operatingEntityName}` : storeName
 }
 
 function handleLogoFileChange(event: Event): void {

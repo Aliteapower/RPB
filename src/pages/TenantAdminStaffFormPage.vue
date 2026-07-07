@@ -74,6 +74,10 @@ const assignableStores = computed<AuthStoreAccess[]>(() => {
     return auth.authorizedStores
   }
   return (auth.user?.storeIds ?? []).map(storeId => ({
+    tenantId: auth.user?.tenantId || '',
+    tenantCode: '',
+    operatingEntityId: null,
+    operatingEntityName: null,
     storeId,
     storeCode: '',
     storeName: storeFallbackLabel(storeId),
@@ -87,6 +91,10 @@ const storeChoices = computed<AuthStoreAccess[]>(() => {
   selectedStoreIds.value.forEach(storeId => {
     if (!byId.has(storeId)) {
       byId.set(storeId, {
+        tenantId: auth.user?.tenantId || '',
+        tenantCode: '',
+        operatingEntityId: null,
+        operatingEntityName: null,
         storeId,
         storeCode: storeId.slice(0, 8),
         storeName: storeFallbackLabel(storeId),
@@ -421,7 +429,8 @@ function currentStoreAllowed(candidate: string): boolean {
 }
 
 function storeDisplayName(store: AuthStoreAccess): string {
-  return store.storeName || store.storeCode || storeFallbackLabel(store.storeId)
+  const storeName = store.storeName || store.storeCode || storeFallbackLabel(store.storeId)
+  return store.operatingEntityName ? `${storeName} / ${store.operatingEntityName}` : storeName
 }
 
 function storeDisplayNameById(storeId: string): string {

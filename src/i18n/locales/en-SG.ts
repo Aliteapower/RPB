@@ -649,6 +649,46 @@ export const enSG = {
           defaultStore: 'Default store',
           empty: 'No stores are available for authorisation'
         }
+      },
+      structure: {
+        kicker: 'Tenant structure',
+        title: 'Operating entities and stores',
+        actions: {
+          newEntity: 'Add entity',
+          newStore: 'Add store'
+        },
+        operatingEntities: {
+          title: 'Operating entities',
+          empty: 'No operating entities'
+        },
+        stores: {
+          title: 'Stores',
+          empty: 'No stores'
+        },
+        fields: {
+          entityCode: 'Entity code',
+          displayName: 'Name',
+          status: 'Status',
+          defaultLocale: 'Default language',
+          principal: 'Principal',
+          phone: 'Phone',
+          address: 'Address',
+          operatingEntity: 'Operating entity',
+          chooseOperatingEntity: 'Choose an operating entity',
+          storeCode: 'Store code',
+          storeName: 'Store name',
+          locale: 'Language',
+          timezone: 'Timezone',
+          currency: 'Currency',
+          dateFormat: 'Date format',
+          timeFormat: 'Time format',
+          unassigned: 'No operating entity'
+        },
+        status: {
+          created: 'Created',
+          active: 'Enabled',
+          inactive: 'Disabled'
+        }
       }
     },
     billing: {

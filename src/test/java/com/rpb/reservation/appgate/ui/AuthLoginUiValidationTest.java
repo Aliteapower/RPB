@@ -265,6 +265,7 @@ class AuthLoginUiValidationTest {
     void platformTenantEditFormMaintainsTenantAdminStoreAccess() throws Exception {
         Path formPagePath = Path.of("src", "pages", "PlatformTenantFormPage.vue");
         Path formPath = Path.of("src", "components", "platform", "PlatformTenantForm.vue");
+        Path structurePath = Path.of("src", "components", "platform", "PlatformTenantStructurePanel.vue");
         Path apiPath = Path.of("src", "api", "platformApi.ts");
         Path uiPath = Path.of("src", "components", "platform", "platformTenantUi.ts");
         Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
@@ -272,6 +273,7 @@ class AuthLoginUiValidationTest {
 
         String source = FrontendSourceSupport.readString(formPagePath)
             + FrontendSourceSupport.readString(formPath)
+            + FrontendSourceSupport.readString(structurePath)
             + FrontendSourceSupport.readString(apiPath)
             + FrontendSourceSupport.readString(uiPath);
         String zh = FrontendSourceSupport.readString(zhPath);
@@ -287,14 +289,33 @@ class AuthLoginUiValidationTest {
             .contains("toggleAdminStoreFromEvent")
             .contains("selectedAdminStoreOptions")
             .contains("platform.tenants.form.adminStoreAccess.title")
-            .contains("platform.tenants.form.adminStoreAccess.defaultStore");
+            .contains("platform.tenants.form.adminStoreAccess.defaultStore")
+            .contains("PlatformTenantStructurePanel")
+            .contains("listOperatingEntities")
+            .contains("createOperatingEntity")
+            .contains("updateOperatingEntity")
+            .contains("listTenantStores")
+            .contains("createTenantStore")
+            .contains("updateTenantStore")
+            .contains("saveOperatingEntity")
+            .contains("saveStore")
+            .contains("platform.tenants.structure.operatingEntities.title")
+            .contains("platform.tenants.structure.stores.title")
+            .contains("PlatformOperatingEntityFormModel")
+            .contains("PlatformStoreFormModel");
 
         assertThat(zh)
             .contains("title: '授权门店'")
-            .contains("defaultStore: '默认门店'");
+            .contains("defaultStore: '默认门店'")
+            .contains("title: '经营主体与门店'")
+            .contains("newEntity: '新增经营主体'")
+            .contains("newStore: '新增门店'");
         assertThat(en)
             .contains("title: 'Authorised stores'")
-            .contains("defaultStore: 'Default store'");
+            .contains("defaultStore: 'Default store'")
+            .contains("title: 'Operating entities and stores'")
+            .contains("newEntity: 'Add entity'")
+            .contains("newStore: 'Add store'");
     }
 
     @Test

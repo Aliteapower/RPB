@@ -1,11 +1,16 @@
 package com.rpb.reservation.platform.api;
 
 import com.rpb.reservation.platform.application.PlatformTenant;
+import com.rpb.reservation.platform.application.PlatformOperatingEntity;
+import com.rpb.reservation.platform.application.PlatformOperatingEntityMutationCommand;
 import com.rpb.reservation.platform.application.PlatformTenantMutationCommand;
 import com.rpb.reservation.platform.application.PlatformOperator;
+import com.rpb.reservation.platform.application.PlatformStore;
+import com.rpb.reservation.platform.application.PlatformStoreMutationCommand;
 import com.rpb.reservation.platform.application.PlatformTenantSearchCommand;
 import com.rpb.reservation.platform.application.PlatformTenantService;
 import com.rpb.reservation.platform.application.PlatformTenantServiceException;
+import com.rpb.reservation.platform.application.PlatformTenantStructureService;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceErrorCode;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaServiceException;
@@ -35,13 +40,16 @@ public class PlatformTenantController {
     private static final String TENANT_MANAGE_PERMISSION = "platform.tenant.manage";
 
     private final PlatformTenantService tenantService;
+    private final PlatformTenantStructureService structureService;
     private final CurrentActorProvider currentActorProvider;
 
     public PlatformTenantController(
         PlatformTenantService tenantService,
+        PlatformTenantStructureService structureService,
         CurrentActorProvider currentActorProvider
     ) {
         this.tenantService = tenantService;
+        this.structureService = structureService;
         this.currentActorProvider = currentActorProvider;
     }
 
@@ -72,6 +80,68 @@ public class PlatformTenantController {
         requirePlatformAdmin();
         return ResponseEntity.ok(PlatformTenantAdminStoreAccessResponse.from(
             tenantService.getTenantAdminStoreAccess(tenantId)
+        ));
+    }
+
+    @GetMapping("/{tenantId}/operating-entities")
+    public ResponseEntity<PlatformOperatingEntityListResponse> listOperatingEntities(@PathVariable UUID tenantId) {
+        requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformOperatingEntityListResponse.from(
+            structureService.listOperatingEntities(tenantId)
+        ));
+    }
+
+    @PostMapping("/{tenantId}/operating-entities")
+    public ResponseEntity<PlatformOperatingEntityResponse> createOperatingEntity(
+        @PathVariable UUID tenantId,
+        @RequestBody(required = false) PlatformOperatingEntityMutationRequest request
+    ) {
+        CurrentActor actor = requirePlatformAdmin();
+        PlatformOperatingEntity entity = structureService.createOperatingEntity(
+            tenantId,
+            toCommand(request),
+            toOperator(actor)
+        );
+        return ResponseEntity.status(201).body(PlatformOperatingEntityResponse.from(entity));
+    }
+
+    @PatchMapping("/{tenantId}/operating-entities/{operatingEntityId}")
+    public ResponseEntity<PlatformOperatingEntityResponse> updateOperatingEntity(
+        @PathVariable UUID tenantId,
+        @PathVariable UUID operatingEntityId,
+        @RequestBody(required = false) PlatformOperatingEntityMutationRequest request
+    ) {
+        CurrentActor actor = requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformOperatingEntityResponse.from(
+            structureService.updateOperatingEntity(tenantId, operatingEntityId, toCommand(request), toOperator(actor))
+        ));
+    }
+
+    @GetMapping("/{tenantId}/stores")
+    public ResponseEntity<PlatformStoreListResponse> listStores(@PathVariable UUID tenantId) {
+        requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformStoreListResponse.from(structureService.listStores(tenantId)));
+    }
+
+    @PostMapping("/{tenantId}/stores")
+    public ResponseEntity<PlatformStoreResponse> createStore(
+        @PathVariable UUID tenantId,
+        @RequestBody(required = false) PlatformStoreMutationRequest request
+    ) {
+        CurrentActor actor = requirePlatformAdmin();
+        PlatformStore store = structureService.createStore(tenantId, toCommand(request), toOperator(actor));
+        return ResponseEntity.status(201).body(PlatformStoreResponse.from(store));
+    }
+
+    @PatchMapping("/{tenantId}/stores/{storeId}")
+    public ResponseEntity<PlatformStoreResponse> updateStore(
+        @PathVariable UUID tenantId,
+        @PathVariable UUID storeId,
+        @RequestBody(required = false) PlatformStoreMutationRequest request
+    ) {
+        CurrentActor actor = requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformStoreResponse.from(
+            structureService.updateStore(tenantId, storeId, toCommand(request), toOperator(actor))
         ));
     }
 
@@ -195,6 +265,38 @@ public class PlatformTenantController {
             request.password(),
             request.adminStoreIds(),
             request.defaultAdminStoreId()
+        );
+    }
+
+    private static PlatformOperatingEntityMutationCommand toCommand(PlatformOperatingEntityMutationRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new PlatformOperatingEntityMutationCommand(
+            request.entityCode(),
+            request.displayName(),
+            request.status(),
+            request.defaultLocale(),
+            request.contactPhone(),
+            request.address(),
+            request.principalName()
+        );
+    }
+
+    private static PlatformStoreMutationCommand toCommand(PlatformStoreMutationRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new PlatformStoreMutationCommand(
+            request.operatingEntityId(),
+            request.storeCode(),
+            request.storeName(),
+            request.status(),
+            request.timezone(),
+            request.locale(),
+            request.dateFormat(),
+            request.timeFormat(),
+            request.currency()
         );
     }
 

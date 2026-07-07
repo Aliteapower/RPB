@@ -69,9 +69,15 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_account_roles where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_permissions where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
+        jdbc.update("delete from auth_account_store_access where store_id in (select id from stores where store_code like 'codex-%')");
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
         jdbc.update("delete from tenant_product_subscriptions where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("delete from tenant_host_aliases where alias_code like 'codex-%'");
+        jdbc.update("delete from tenant_host_aliases where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("delete from stores where store_code like 'codex-%'");
         jdbc.update("delete from stores where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("delete from operating_entities where entity_code like 'codex-%'");
+        jdbc.update("delete from operating_entities where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from tenants where tenant_code like 'codex-%'");
         jdbc.update("""
             update tenants
@@ -361,6 +367,124 @@ class PlatformTenantApiIntegrationTest {
                 SECONDARY_STORE_ID.toString()
             );
         assertThat(storeById(stores, SECONDARY_STORE_ID).path("defaultStore").asBoolean()).isTrue();
+    }
+
+    @Test
+    void platformAdminCreatesOperatingEntityStoreAndAuthorizesTenantAdminAcrossStores() throws Exception {
+        Cookie session = login("sysadmin");
+
+        MvcResult entityResult = mockMvc.perform(post(
+                    "/api/v1/platform/tenants/{tenantId}/operating-entities",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "entityCode":"codex-lsc106-entity",
+                      "displayName":"LSC106 经营主体",
+                      "status":"active",
+                      "defaultLocale":"en-SG",
+                      "contactPhone":"+6590000106",
+                      "address":"106 Orchard Road",
+                      "principalName":"LSC106 Manager"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.operatingEntity.entityCode").value("codex-lsc106-entity"))
+            .andReturn();
+        UUID operatingEntityId = UUID.fromString(objectMapper
+            .readTree(entityResult.getResponse().getContentAsString())
+            .path("operatingEntity")
+            .path("id")
+            .asText());
+
+        mockMvc.perform(get(
+                    "/api/v1/platform/tenants/{tenantId}/operating-entities",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+                )
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.operatingEntities[0].entityCode").value("codex-lsc106-entity"));
+
+        MvcResult storeResult = mockMvc.perform(post(
+                    "/api/v1/platform/tenants/{tenantId}/stores",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "operatingEntityId":"%s",
+                      "storeCode":"codex-lsc106",
+                      "storeName":"LSC106 门店",
+                      "status":"active",
+                      "timezone":"Asia/Singapore",
+                      "locale":"en-SG",
+                      "dateFormat":"DD-MM-YYYY",
+                      "timeFormat":"HH:mm",
+                      "currency":"SGD"
+                    }
+                    """.formatted(operatingEntityId))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.storeCode").value("codex-lsc106"))
+            .andExpect(jsonPath("$.store.operatingEntityName").value("LSC106 经营主体"))
+            .andReturn();
+        UUID storeId = UUID.fromString(objectMapper
+            .readTree(storeResult.getResponse().getContentAsString())
+            .path("store")
+            .path("id")
+            .asText());
+
+        MvcResult accessResult = mockMvc.perform(get(
+                    "/api/v1/platform/tenants/{tenantId}/admin-store-access",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+                )
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode accessStores = objectMapper
+            .readTree(accessResult.getResponse().getContentAsString())
+            .path("stores");
+        assertThat(storeById(accessStores, storeId).path("operatingEntityName").asText())
+            .isEqualTo("LSC106 经营主体");
+
+        mockMvc.perform(patch("/api/v1/platform/tenants/{tenantId}", AuthPostgresTestDatabase.VALIDATION_TENANT_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"20000000",
+                      "displayName":"食刻租户",
+                      "status":"active",
+                      "defaultLocale":"zh-CN",
+                      "adminStoreIds":["%s","%s"],
+                      "defaultAdminStoreId":"%s"
+                    }
+                    """.formatted(
+                        AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+                        storeId,
+                        storeId
+                    ))
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        Cookie tenantAdminSession = login("20000000");
+        MvcResult storesResult = mockMvc.perform(get("/api/v1/me/stores").cookie(tenantAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode stores = objectMapper.readTree(storesResult.getResponse().getContentAsString()).path("stores");
+        assertThat(stringsByField(stores, "storeId"))
+            .contains(AuthPostgresTestDatabase.VALIDATION_STORE_ID.toString(), storeId.toString());
+        JsonNode createdStore = storeById(stores, storeId);
+        assertThat(createdStore.path("tenantCode").asText()).isEqualTo("20000000");
+        assertThat(createdStore.path("operatingEntityId").asText()).isEqualTo(operatingEntityId.toString());
+        assertThat(createdStore.path("operatingEntityName").asText()).isEqualTo("LSC106 经营主体");
+        assertThat(createdStore.path("defaultStore").asBoolean()).isTrue();
     }
 
     @Test

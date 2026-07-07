@@ -16,6 +16,8 @@ export interface PlatformTenant {
 
 export interface PlatformTenantStoreAccessStore {
   storeId: string
+  operatingEntityId: string | null
+  operatingEntityName: string | null
   storeCode: string
   storeName: string
   status: string
@@ -25,6 +27,66 @@ export interface PlatformTenantStoreAccessStore {
 
 export type TenantStatus = 'created' | 'active' | 'suspended' | 'closed'
 export type TenantListStatus = 'all' | 'active' | 'deleted'
+export type PlatformOperatingEntityStatus = 'active' | 'inactive'
+export type PlatformStoreStatus = 'created' | 'active' | 'inactive'
+
+export interface PlatformOperatingEntity {
+  id: string
+  tenantId: string
+  entityCode: string
+  displayName: string
+  status: PlatformOperatingEntityStatus
+  defaultLocale: string | null
+  contactPhone: string | null
+  address: string | null
+  principalName: string | null
+  deleted: boolean
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+export interface PlatformOperatingEntityMutation {
+  entityCode: string
+  displayName: string
+  status: PlatformOperatingEntityStatus
+  defaultLocale?: string | null
+  contactPhone?: string | null
+  address?: string | null
+  principalName?: string | null
+}
+
+export interface PlatformStore {
+  id: string
+  tenantId: string
+  operatingEntityId: string | null
+  operatingEntityCode: string | null
+  operatingEntityName: string | null
+  storeCode: string
+  storeName: string
+  status: PlatformStoreStatus
+  timezone: string
+  locale: string
+  dateFormat: string
+  timeFormat: string
+  currency: string
+  deleted: boolean
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+export interface PlatformStoreMutation {
+  operatingEntityId: string
+  storeCode: string
+  storeName: string
+  status: PlatformStoreStatus
+  timezone?: string | null
+  locale?: string | null
+  dateFormat?: string | null
+  timeFormat?: string | null
+  currency?: string | null
+}
 
 export interface PlatformTenantMutation {
   tenantCode?: string
@@ -70,6 +132,26 @@ export interface PlatformTenantAdminStoreAccessResponse {
   stores: PlatformTenantStoreAccessStore[]
   storeIds: string[]
   defaultStoreId: string | null
+}
+
+export interface PlatformOperatingEntityListResponse {
+  success: true
+  operatingEntities: PlatformOperatingEntity[]
+}
+
+export interface PlatformOperatingEntityResponse {
+  success: true
+  operatingEntity: PlatformOperatingEntity
+}
+
+export interface PlatformStoreListResponse {
+  success: true
+  stores: PlatformStore[]
+}
+
+export interface PlatformStoreResponse {
+  success: true
+  store: PlatformStore
 }
 
 export interface PlatformApiErrorResponse {
@@ -129,6 +211,82 @@ export async function getTenantAdminStoreAccess(
     method: 'GET',
     fetcher
   })
+}
+
+export async function listOperatingEntities(
+  tenantId: string,
+  fetcher?: PlatformFetcher
+): Promise<PlatformOperatingEntityListResponse> {
+  return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/operating-entities`, {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function createOperatingEntity(
+  tenantId: string,
+  request: PlatformOperatingEntityMutation,
+  fetcher?: PlatformFetcher
+): Promise<PlatformOperatingEntityResponse> {
+  return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/operating-entities`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function updateOperatingEntity(
+  tenantId: string,
+  operatingEntityId: string,
+  request: PlatformOperatingEntityMutation,
+  fetcher?: PlatformFetcher
+): Promise<PlatformOperatingEntityResponse> {
+  return requestJson(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/operating-entities/${encodeURIComponent(operatingEntityId)}`,
+    {
+      method: 'PATCH',
+      body: request,
+      fetcher
+    }
+  )
+}
+
+export async function listTenantStores(
+  tenantId: string,
+  fetcher?: PlatformFetcher
+): Promise<PlatformStoreListResponse> {
+  return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/stores`, {
+    method: 'GET',
+    fetcher
+  })
+}
+
+export async function createTenantStore(
+  tenantId: string,
+  request: PlatformStoreMutation,
+  fetcher?: PlatformFetcher
+): Promise<PlatformStoreResponse> {
+  return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/stores`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function updateTenantStore(
+  tenantId: string,
+  storeId: string,
+  request: PlatformStoreMutation,
+  fetcher?: PlatformFetcher
+): Promise<PlatformStoreResponse> {
+  return requestJson(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/stores/${encodeURIComponent(storeId)}`,
+    {
+      method: 'PATCH',
+      body: request,
+      fetcher
+    }
+  )
 }
 
 export async function createTenant(

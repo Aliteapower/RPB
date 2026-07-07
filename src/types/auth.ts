@@ -29,6 +29,10 @@ export interface AuthUser {
 }
 
 export interface AuthStoreAccess {
+  tenantId: string
+  tenantCode: string
+  operatingEntityId: string | null
+  operatingEntityName: string | null
   storeId: string
   storeCode: string
   storeName: string

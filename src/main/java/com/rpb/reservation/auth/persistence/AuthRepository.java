@@ -297,6 +297,10 @@ public class AuthRepository {
         return jdbc.query(
             """
             select
+                tenant.id as tenant_id,
+                tenant.tenant_code,
+                entity.id as operating_entity_id,
+                entity.display_name as operating_entity_name,
                 store.id as store_id,
                 store.store_code,
                 store.display_name,
@@ -308,17 +312,29 @@ public class AuthRepository {
               on access.account_id = account.id
              and access.tenant_id = account.tenant_id
              and access.deleted_at is null
+            join tenants tenant
+              on tenant.id = access.tenant_id
+             and tenant.deleted_at is null
+             and tenant.status = 'active'
             join stores store
               on store.id = access.store_id
              and store.tenant_id = access.tenant_id
              and store.deleted_at is null
              and store.status = 'active'
+            left join operating_entities entity
+              on entity.id = store.operating_entity_id
+             and entity.tenant_id = store.tenant_id
+             and entity.deleted_at is null
             where account.id = ?
               and account.tenant_id = ?
               and account.deleted_at is null
             order by default_store desc, lower(store.display_name), lower(store.store_code), store.id
             """,
             (rs, rowNum) -> new AuthStoreAccess(
+                rs.getObject("tenant_id", UUID.class),
+                rs.getString("tenant_code"),
+                rs.getObject("operating_entity_id", UUID.class),
+                rs.getString("operating_entity_name"),
                 rs.getObject("store_id", UUID.class),
                 rs.getString("store_code"),
                 rs.getString("display_name"),

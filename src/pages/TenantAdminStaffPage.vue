@@ -52,6 +52,10 @@ const storeDirectory = computed(() => {
   const stores: AuthStoreAccess[] = auth.authorizedStores.length > 0
     ? auth.authorizedStores
     : (auth.user?.storeIds ?? []).map(storeId => ({
+        tenantId: auth.user?.tenantId || '',
+        tenantCode: '',
+        operatingEntityId: null,
+        operatingEntityName: null,
         storeId,
         storeCode: '',
         storeName: '',
@@ -149,10 +153,11 @@ function defaultStoreSummary(item: TenantAdminStaff): string {
 
 function storeAccessLabel(storeId: string): string {
   const store = storeDirectory.value.get(storeId)
+  const operatingEntity = store?.operatingEntityName ? ` / ${store.operatingEntityName}` : ''
   if (store?.storeName && store.storeCode) {
-    return `${store.storeName} (${store.storeCode})`
+    return `${store.storeName} (${store.storeCode})${operatingEntity}`
   }
-  return store?.storeName || store?.storeCode || t('staffHome.store.label', { shortId: storeId.slice(0, 8) })
+  return `${store?.storeName || store?.storeCode || t('staffHome.store.label', { shortId: storeId.slice(0, 8) })}${operatingEntity}`
 }
 
 function apiErrorText(error: unknown): string {
