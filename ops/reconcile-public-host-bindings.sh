@@ -44,7 +44,7 @@ psql_cmd=(
 
 mark_failed() {
   local error_message="$1"
-  "${psql_cmd[@]}" -v last_error="$error_message" -c "
+  "${psql_cmd[@]}" -v last_error="$error_message" <<'SQL' >/dev/null
     update public_host_bindings
     set tls_status = 'failed',
         last_checked_at = now(),
@@ -53,10 +53,10 @@ mark_failed() {
         version = version + 1
     where tls_status in ('pending', 'failed')
       and deleted_at is null;
-  " >/dev/null
+SQL
 }
 
-"${psql_cmd[@]}" -v base_host="$base_host" -c "
+"${psql_cmd[@]}" -v base_host="$base_host" <<'SQL' >/dev/null
   insert into public_host_bindings (
       host_alias_id, tenant_id, host_prefix, host_type, hostname, tls_status
   )
@@ -78,15 +78,16 @@ mark_failed() {
           and binding.deleted_at is null
     )
   on conflict (host_alias_id) where deleted_at is null do nothing;
-" >/dev/null
+SQL
 
-mapfile -t pending_hosts < <("${psql_cmd[@]}" -c "
+mapfile -t pending_hosts < <("${psql_cmd[@]}" <<'SQL'
   select hostname
   from public_host_bindings
   where tls_status in ('pending', 'failed')
     and deleted_at is null
   order by hostname;
-")
+SQL
+)
 
 if [ "${#pending_hosts[@]}" -eq 0 ]; then
   echo "public_host_bindings_pending=0"
@@ -150,7 +151,7 @@ if ! systemctl reload nginx; then
   exit 1
 fi
 
-"${psql_cmd[@]}" -v cert_name="$cert_name" -c "
+"${psql_cmd[@]}" -v cert_name="$cert_name" <<'SQL' >/dev/null
   update public_host_bindings
   set tls_status = 'covered',
       certificate_name = :'cert_name',
@@ -161,6 +162,6 @@ fi
       version = version + 1
   where tls_status in ('pending', 'failed')
     and deleted_at is null;
-" >/dev/null
+SQL
 
 echo "public_host_bindings_covered=${#pending_hosts[@]}"

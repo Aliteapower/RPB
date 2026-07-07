@@ -27,6 +27,7 @@ class PublicHostBindingAutomationScriptValidationTest {
             .contains("tls_status = 'covered'")
             .contains("tls_status = 'failed'")
             .contains("RPB_HOST_PREFIX_BASE_HOST")
-            .contains("RPB_PUBLIC_HOST_CERT_NAME");
+            .contains("RPB_PUBLIC_HOST_CERT_NAME")
+            .contains("<<'SQL'");
     }
 }
