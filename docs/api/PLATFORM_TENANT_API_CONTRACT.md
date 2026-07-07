@@ -16,6 +16,8 @@ Rules:
 - `V038__tenant_default_operating_entity_backfill.sql` backfills the same default operating entity for existing non-deleted tenants that have no non-deleted operating entity. It does not create stores.
 - New tenant creation persists the tenant code as a `tenant_host_aliases` row with `alias_type = tenant`, `default_store_id = null`, and status derived from the tenant status.
 - `V039__tenant_host_alias_backfill.sql` backfills tenant-code host aliases for existing non-deleted tenants when no active alias already uses the same prefix.
+- When `rpb.host-prefix.base-host` is configured, active tenant and store host aliases also persist a `public_host_bindings` row with the full hostname and `tls_status = pending`. Inactive, archived, or deleted aliases archive their public host binding.
+- `V040__public_host_bindings.sql` creates the public hostname / TLS coverage status table used by the SAN certificate automation. The application stores status only; certificate files and private keys remain outside the business database.
 
 ## Operating Entities
 
@@ -159,4 +161,4 @@ Rules:
 - Invalid, inactive, deleted, null, or cross-tenant store ids return `REQUEST_INVALID` with HTTP 400.
 
 ## Compatibility
-Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills.
+Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills. `V040` is additive and does not change existing tenant, store, or login API responses.

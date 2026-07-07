@@ -118,4 +118,37 @@ class PlatformTenantStructureMigrationSourceValidationTest {
             .contains("on conflict do nothing")
             .doesNotContain("'store'");
     }
+
+    @Test
+    void migrationAddsPublicHostBindingsForCertificateAutomation() throws Exception {
+        Path migrationPath = Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V040__public_host_bindings.sql"
+        );
+
+        assertThat(migrationPath).exists();
+
+        String migration = Files.readString(migrationPath);
+
+        assertThat(migration)
+            .contains("create table public_host_bindings")
+            .contains("host_alias_id uuid not null")
+            .contains("tenant_id uuid not null references tenants(id)")
+            .contains("host_prefix text not null")
+            .contains("hostname text not null")
+            .contains("host_type text not null")
+            .contains("tls_status text not null")
+            .contains("certificate_name text null")
+            .contains("last_error text null")
+            .contains("foreign key (host_alias_id, tenant_id) references tenant_host_aliases(id, tenant_id)")
+            .contains("host_type in ('tenant', 'store')")
+            .contains("tls_status in ('pending', 'covered', 'failed', 'archived')")
+            .contains("create unique index ux_public_host_bindings_alias_active")
+            .contains("create unique index ux_public_host_bindings_hostname_active")
+            .contains("create index ix_public_host_bindings_tls_status");
+    }
 }

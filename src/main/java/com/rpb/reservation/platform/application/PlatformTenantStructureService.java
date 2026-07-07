@@ -24,15 +24,18 @@ public class PlatformTenantStructureService {
     private final PlatformTenantRepository tenantRepository;
     private final PlatformTenantStructureRepository structureRepository;
     private final PlatformTenantAuditService auditService;
+    private final PublicHostBindingService publicHostBindingService;
 
     public PlatformTenantStructureService(
         PlatformTenantRepository tenantRepository,
         PlatformTenantStructureRepository structureRepository,
-        PlatformTenantAuditService auditService
+        PlatformTenantAuditService auditService,
+        PublicHostBindingService publicHostBindingService
     ) {
         this.tenantRepository = tenantRepository;
         this.structureRepository = structureRepository;
         this.auditService = auditService;
+        this.publicHostBindingService = publicHostBindingService;
     }
 
     @Transactional(readOnly = true)
@@ -123,10 +126,17 @@ public class PlatformTenantStructureService {
                 input.timeFormat(),
                 input.currency()
             );
-            structureRepository.upsertStoreHostAlias(
+            UUID hostAliasId = structureRepository.upsertStoreHostAlias(
                 tenantId,
                 store.id(),
                 store.storeCode(),
+                store.status()
+            );
+            publicHostBindingService.syncBinding(
+                hostAliasId,
+                tenantId,
+                store.storeCode(),
+                "store",
                 store.status()
             );
             auditService.recordStoreCreated(store, operator);
@@ -162,10 +172,17 @@ public class PlatformTenantStructureService {
                     input.currency()
                 )
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.STORE_NOT_FOUND));
-            structureRepository.upsertStoreHostAlias(
+            UUID hostAliasId = structureRepository.upsertStoreHostAlias(
                 tenantId,
                 store.id(),
                 store.storeCode(),
+                store.status()
+            );
+            publicHostBindingService.syncBinding(
+                hostAliasId,
+                tenantId,
+                store.storeCode(),
+                "store",
                 store.status()
             );
             auditService.recordStoreUpdated(existing, store, operator);

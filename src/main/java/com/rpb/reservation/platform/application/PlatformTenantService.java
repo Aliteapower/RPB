@@ -31,19 +31,22 @@ public class PlatformTenantService {
     private final PasswordEncoder passwordEncoder;
     private final PlatformTenantAuditService auditService;
     private final CallScreenMediaService mediaService;
+    private final PublicHostBindingService publicHostBindingService;
 
     public PlatformTenantService(
         PlatformTenantRepository repository,
         PlatformTenantAdminAccountRepository accountRepository,
         PasswordEncoder passwordEncoder,
         PlatformTenantAuditService auditService,
-        CallScreenMediaService mediaService
+        CallScreenMediaService mediaService,
+        PublicHostBindingService publicHostBindingService
     ) {
         this.repository = repository;
         this.accountRepository = accountRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.mediaService = mediaService;
+        this.publicHostBindingService = publicHostBindingService;
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +85,14 @@ public class PlatformTenantService {
                 input.address(),
                 input.principalName()
             );
-            repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
+            UUID hostAliasId = repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
+            publicHostBindingService.syncBinding(
+                hostAliasId,
+                tenant.id(),
+                tenant.tenantCode(),
+                "tenant",
+                tenant.status()
+            );
             UUID defaultStoreId = null;
             if (ONBOARDING_SINGLE_STORE.equals(input.onboardingMode())
                 || ONBOARDING_GROUP_MULTI_STORE.equals(input.onboardingMode())) {
@@ -139,7 +149,14 @@ public class PlatformTenantService {
                     input.principalName()
                 )
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
-            repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
+            UUID hostAliasId = repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
+            publicHostBindingService.syncBinding(
+                hostAliasId,
+                tenant.id(),
+                tenant.tenantCode(),
+                "tenant",
+                tenant.status()
+            );
             accountRepository.upsertTenantAdminAccount(
                 tenant.id(),
                 tenant.tenantCode(),
@@ -167,7 +184,7 @@ public class PlatformTenantService {
     public PlatformTenant deleteTenant(UUID tenantId, PlatformOperator operator) {
         PlatformTenant tenant = repository.softDelete(tenantId)
             .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
-        repository.archiveTenantHostAlias(tenant.id());
+        repository.archiveTenantHostAlias(tenant.id()).ifPresent(publicHostBindingService::archiveBinding);
         auditService.recordDeleted(tenant, operator);
         return tenant;
     }
@@ -177,7 +194,14 @@ public class PlatformTenantService {
         try {
             PlatformTenant tenant = repository.restore(tenantId)
                 .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.TENANT_NOT_FOUND));
-            repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
+            UUID hostAliasId = repository.upsertTenantHostAlias(tenant.id(), tenant.tenantCode(), tenant.status());
+            publicHostBindingService.syncBinding(
+                hostAliasId,
+                tenant.id(),
+                tenant.tenantCode(),
+                "tenant",
+                tenant.status()
+            );
             auditService.recordRestored(tenant, operator);
             return tenant;
         } catch (DataIntegrityViolationException exception) {

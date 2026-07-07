@@ -144,6 +144,34 @@ location /api/ {
 }
 ```
 
+### SAN Certificate Automation Without Wildcard
+
+The application persists active host prefixes into `public_host_bindings` when `RPB_HOST_PREFIX_BASE_HOST=booking.yumstone.sg` is configured. New tenant or store prefixes become rows with `tls_status = pending`.
+
+Production can reconcile those pending rows without moving to a wildcard certificate by running:
+
+```bash
+sudo -n /opt/rpb/ops/reconcile-public-host-bindings.sh
+```
+
+The script:
+
+- reads database settings from `/etc/rpb/rpb-backend.env`;
+- bootstraps missing rows from active `tenant_host_aliases`;
+- builds the SAN list from the existing certificate plus pending hostnames;
+- runs `certbot --nginx --cert-name booking.yumstone.sg --expand --non-interactive`;
+- runs `nginx -t` and `systemctl reload nginx`;
+- marks rows `covered` on success or `failed` with `last_error` on failure.
+
+Required environment:
+
+```text
+RPB_HOST_PREFIX_BASE_HOST=booking.yumstone.sg
+RPB_PUBLIC_HOST_CERT_NAME=booking.yumstone.sg
+```
+
+The script must run as a user with permission to run certbot and reload nginx. The business database stores only hostnames and TLS coverage status; certificate files and private keys stay in `/etc/letsencrypt` or the platform certificate store.
+
 Expected host-prefix behavior:
 
 - `platform.<deployment-domain>/login` exposes only the platform admin login entry.

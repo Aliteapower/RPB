@@ -263,12 +263,12 @@ public class PlatformTenantStructureRepository {
         ).stream().findFirst();
     }
 
-    public void upsertStoreHostAlias(UUID tenantId, UUID storeId, String storeCode, String storeStatus) {
+    public UUID upsertStoreHostAlias(UUID tenantId, UUID storeId, String storeCode, String storeStatus) {
         if (activeTenantCodeConflictExists(tenantId, storeCode)) {
             throw new DataIntegrityViolationException("tenant_host_alias_conflicts_with_tenant_code");
         }
         String aliasStatus = "active".equals(storeStatus) ? "active" : "inactive";
-        int updated = jdbc.update(
+        List<UUID> updated = jdbc.query(
             """
             update tenant_host_aliases
             set alias_code = ?,
@@ -279,26 +279,31 @@ public class PlatformTenantStructureRepository {
               and default_store_id = ?
               and alias_type = 'store'
               and deleted_at is null
+            returning id
             """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
             storeCode,
             aliasStatus,
             tenantId,
             storeId
         );
-        if (updated == 0) {
-            jdbc.update(
-                """
-                insert into tenant_host_aliases (
-                    tenant_id, alias_code, alias_type, default_store_id, status
-                )
-                values (?, ?, 'store', ?, ?)
-                """,
-                tenantId,
-                storeCode,
-                storeId,
-                aliasStatus
-            );
+        if (!updated.isEmpty()) {
+            return updated.getFirst();
         }
+        return jdbc.queryForObject(
+            """
+            insert into tenant_host_aliases (
+                tenant_id, alias_code, alias_type, default_store_id, status
+            )
+            values (?, ?, 'store', ?, ?)
+            returning id
+            """,
+            UUID.class,
+            tenantId,
+            storeCode,
+            storeId,
+            aliasStatus
+        );
     }
 
     private boolean activeTenantCodeConflictExists(UUID tenantId, String aliasCode) {

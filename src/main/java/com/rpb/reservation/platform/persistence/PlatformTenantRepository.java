@@ -102,9 +102,9 @@ public class PlatformTenantRepository {
         );
     }
 
-    public void upsertTenantHostAlias(UUID tenantId, String tenantCode, String tenantStatus) {
+    public UUID upsertTenantHostAlias(UUID tenantId, String tenantCode, String tenantStatus) {
         String aliasStatus = tenantAliasStatus(tenantStatus);
-        int updated = jdbc.update(
+        List<UUID> updated = jdbc.query(
             """
             update tenant_host_aliases
             set alias_code = ?,
@@ -115,28 +115,33 @@ public class PlatformTenantRepository {
             where tenant_id = ?
               and alias_type = 'tenant'
               and deleted_at is null
+            returning id
             """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
             tenantCode,
             aliasStatus,
             tenantId
         );
-        if (updated == 0) {
-            jdbc.update(
-                """
-                insert into tenant_host_aliases (
-                    tenant_id, alias_code, alias_type, default_store_id, status
-                )
-                values (?, ?, 'tenant', null, ?)
-                """,
-                tenantId,
-                tenantCode,
-                aliasStatus
-            );
+        if (!updated.isEmpty()) {
+            return updated.getFirst();
         }
+        return jdbc.queryForObject(
+            """
+            insert into tenant_host_aliases (
+                tenant_id, alias_code, alias_type, default_store_id, status
+            )
+            values (?, ?, 'tenant', null, ?)
+            returning id
+            """,
+            UUID.class,
+            tenantId,
+            tenantCode,
+            aliasStatus
+        );
     }
 
-    public void archiveTenantHostAlias(UUID tenantId) {
-        jdbc.update(
+    public Optional<UUID> archiveTenantHostAlias(UUID tenantId) {
+        return jdbc.query(
             """
             update tenant_host_aliases
             set status = 'archived',
@@ -146,9 +151,11 @@ public class PlatformTenantRepository {
             where tenant_id = ?
               and alias_type = 'tenant'
               and deleted_at is null
+            returning id
             """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
             tenantId
-        );
+        ).stream().findFirst();
     }
 
     public Optional<UUID> findDefaultStoreId(UUID tenantId) {

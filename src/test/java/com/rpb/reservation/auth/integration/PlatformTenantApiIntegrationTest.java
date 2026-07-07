@@ -54,6 +54,7 @@ class PlatformTenantApiIntegrationTest {
         registry.add("spring.datasource.url", DATABASE::jdbcUrl);
         registry.add("spring.datasource.username", DATABASE::username);
         registry.add("spring.datasource.password", DATABASE::password);
+        registry.add("rpb.host-prefix.base-host", () -> "booking.yumstone.sg");
     }
 
     @AfterAll
@@ -81,6 +82,16 @@ class PlatformTenantApiIntegrationTest {
             )
             """);
         jdbc.update("delete from tenant_product_subscriptions where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("delete from public_host_bindings where hostname like 'codex-%.booking.yumstone.sg'");
+        jdbc.update("""
+            delete from public_host_bindings
+            where host_alias_id in (
+                select id
+                from tenant_host_aliases
+                where alias_code like 'codex-%'
+                   or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            )
+            """);
         jdbc.update("delete from tenant_host_aliases where alias_code like 'codex-%'");
         jdbc.update("delete from tenant_host_aliases where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from stores where store_code like 'codex-%'");
@@ -148,6 +159,18 @@ class PlatformTenantApiIntegrationTest {
               and status = 'active'
               and deleted_at is null
             """, createdTenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings binding
+            join tenant_host_aliases alias on alias.id = binding.host_alias_id
+            where binding.tenant_id = ?
+              and binding.hostname = 'codex-tenant.booking.yumstone.sg'
+              and binding.host_type = 'tenant'
+              and binding.tls_status = 'pending'
+              and binding.deleted_at is null
+              and alias.alias_code = 'codex-tenant'
+              and alias.alias_type = 'tenant'
+            """, createdTenantId)).isEqualTo(1);
 
         mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}", createdTenantId).cookie(session))
             .andExpect(status().isOk())
@@ -163,6 +186,14 @@ class PlatformTenantApiIntegrationTest {
               and status = 'archived'
               and deleted_at is not null
             """, createdTenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings
+            where tenant_id = ?
+              and hostname = 'codex-tenant.booking.yumstone.sg'
+              and tls_status = 'archived'
+              and deleted_at is not null
+            """, createdTenantId)).isEqualTo(1);
 
         mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/restore", createdTenantId).cookie(session))
             .andExpect(status().isOk())
@@ -176,6 +207,14 @@ class PlatformTenantApiIntegrationTest {
               and alias_code = 'codex-tenant'
               and alias_type = 'tenant'
               and status = 'active'
+              and deleted_at is null
+            """, createdTenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings
+            where tenant_id = ?
+              and hostname = 'codex-tenant.booking.yumstone.sg'
+              and tls_status = 'pending'
               and deleted_at is null
             """, createdTenantId)).isEqualTo(1);
     }
@@ -347,6 +386,16 @@ class PlatformTenantApiIntegrationTest {
               and status = 'active'
               and deleted_at is null
             """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings
+            where tenant_id = ?
+              and hostname = 'codex-login.booking.yumstone.sg'
+              and host_prefix = 'codex-login'
+              and host_type = 'tenant'
+              and tls_status = 'pending'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
 
         login("codex-login", "abc123");
     }
@@ -417,6 +466,16 @@ class PlatformTenantApiIntegrationTest {
               and alias_type = 'tenant'
               and default_store_id is null
               and status = 'active'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings
+            where tenant_id = ?
+              and hostname = 'codex-group.booking.yumstone.sg'
+              and host_prefix = 'codex-group'
+              and host_type = 'tenant'
+              and tls_status = 'pending'
               and deleted_at is null
             """, tenantId)).isEqualTo(1);
     }
@@ -651,6 +710,18 @@ class PlatformTenantApiIntegrationTest {
               and default_store_id = ?
               and status = 'active'
               and deleted_at is null
+            """, AuthPostgresTestDatabase.VALIDATION_TENANT_ID, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings binding
+            join tenant_host_aliases alias on alias.id = binding.host_alias_id
+            where binding.tenant_id = ?
+              and binding.hostname = 'codex-lsc106.booking.yumstone.sg'
+              and binding.host_prefix = 'codex-lsc106'
+              and binding.host_type = 'store'
+              and binding.tls_status = 'pending'
+              and binding.deleted_at is null
+              and alias.default_store_id = ?
             """, AuthPostgresTestDatabase.VALIDATION_TENANT_ID, storeId)).isEqualTo(1);
 
         MvcResult accessResult = mockMvc.perform(get(
