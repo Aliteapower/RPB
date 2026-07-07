@@ -65,4 +65,30 @@ class PlatformTenantStructureMigrationSourceValidationTest {
             .contains("not exists")
             .contains("tenant_code");
     }
+
+    @Test
+    void migrationBackfillsDefaultOperatingEntityForTenantsWithoutStructure() throws Exception {
+        Path migrationPath = Path.of(
+            "src",
+            "main",
+            "resources",
+            "db",
+            "migration",
+            "V038__tenant_default_operating_entity_backfill.sql"
+        );
+
+        assertThat(migrationPath).exists();
+
+        String migration = Files.readString(migrationPath);
+
+        assertThat(migration)
+            .contains("insert into operating_entities")
+            .contains("tenant_id, entity_code, display_name, status")
+            .contains("from tenants tenant")
+            .contains("not exists")
+            .contains("existing.tenant_id = tenant.id")
+            .contains("tenant.deleted_at is null")
+            .contains("on conflict do nothing")
+            .doesNotContain("insert into stores");
+    }
 }

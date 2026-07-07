@@ -83,7 +83,8 @@ public class PlatformTenantService {
                 input.principalName()
             );
             UUID defaultStoreId = null;
-            if (ONBOARDING_SINGLE_STORE.equals(input.onboardingMode())) {
+            if (ONBOARDING_SINGLE_STORE.equals(input.onboardingMode())
+                || ONBOARDING_GROUP_MULTI_STORE.equals(input.onboardingMode())) {
                 UUID defaultOperatingEntityId = repository.ensureDefaultOperatingEntity(
                     tenant.id(),
                     tenant.tenantCode(),
@@ -94,14 +95,16 @@ public class PlatformTenantService {
                     tenant.address(),
                     tenant.principalName()
                 );
-                defaultStoreId = repository.ensureDefaultStore(
-                    tenant.id(),
-                    tenant.tenantCode(),
-                    tenant.displayName(),
-                    tenant.status(),
-                    tenant.defaultLocale(),
-                    defaultOperatingEntityId
-                );
+                if (ONBOARDING_SINGLE_STORE.equals(input.onboardingMode())) {
+                    defaultStoreId = repository.ensureDefaultStore(
+                        tenant.id(),
+                        tenant.tenantCode(),
+                        tenant.displayName(),
+                        tenant.status(),
+                        tenant.defaultLocale(),
+                        defaultOperatingEntityId
+                    );
+                }
             }
             accountRepository.upsertTenantAdminAccount(
                 tenant.id(),

@@ -101,14 +101,16 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("structure: '门店结构'")
             .contains("operatingEntities: '经营主体'")
             .contains("activeStores: '启用门店'")
-            .contains("noEntities: '先新增经营主体，再为它添加门店。'")
+            .contains("noEntities: '集团会自动准备默认经营主体，请继续新增分店。'")
+            .contains("newStore: '新增分店'")
             .contains("supplementalInfo: '补充资料'")
             .contains("operationDefaults: '运营默认值'");
         assertThat(en)
             .contains("structure: 'Store structure'")
             .contains("operatingEntities: 'Operating entities'")
             .contains("activeStores: 'Active stores'")
-            .contains("noEntities: 'Create an operating entity first, then add stores to it.'")
+            .contains("noEntities: 'The group prepares a default operating entity automatically. Add a branch next.'")
+            .contains("newStore: 'Add branch'")
             .contains("supplementalInfo: 'Supplemental details'")
             .contains("operationDefaults: 'Operating defaults'");
     }

@@ -6,7 +6,7 @@
 
 ## New
 
-- Added a platform tenant onboarding mode for group multi-store tenants. Platform admins can now create a management tenant without bootstrapping a default store, then configure operating entities and stores in the tenant structure panel.
+- Added a platform tenant onboarding mode for group multi-store tenants. Platform admins can now create a management tenant with a default operating entity and without bootstrapping a default store, then add branches in the tenant structure panel.
 - Added separate platform tenant list entry buttons for group onboarding and single-store onboarding.
 - Added default operating-entity creation for the existing single-store onboarding path so newly created single-store tenants are immediately compatible with the operating-entity submodel.
 - Added per-store product subscription billing line items. Each active billable store receives a persisted subscription item with store, operating entity, amount, currency, billing cycle, period, status, idempotency key, and source action metadata.
@@ -43,7 +43,7 @@
 
 - Medium database risk because a new billing detail table and backfill are introduced.
 - Billing totals now multiply the product-line price by active store count. Tenants with multiple active stores will produce higher subscription totals than the previous tenant-level assumption.
-- Group tenant creation intentionally leaves `defaultStoreId` null until platform users configure stores; downstream flows and billing actions that require a store must use the tenant structure panel first.
+- Group tenant creation intentionally leaves `defaultStoreId` null until platform users configure stores; downstream flows and billing actions that require a store must use the tenant structure panel first. The default operating entity is still created so the next business action is adding branches.
 - Existing API clients remain compatible if they ignore the new response fields and omit `onboardingMode`.
 
 ## Rollback Notes

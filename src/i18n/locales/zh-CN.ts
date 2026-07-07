@@ -673,13 +673,13 @@ export const zhCN = {
           aria: '经营主体与门店切换'
         },
         guide: {
-          noEntities: '先新增经营主体，再为它添加门店。',
-          noStores: '已有经营主体，可以继续新增门店。',
-          noActiveEntities: '需要先启用经营主体，才能新增门店。'
+          noEntities: '集团会自动准备默认经营主体，请继续新增分店。',
+          noStores: '默认经营主体已就绪，可以继续新增分店。',
+          noActiveEntities: '需要先启用默认经营主体，才能新增分店。'
         },
         actions: {
           newEntity: '新增经营主体',
-          newStore: '新增门店'
+          newStore: '新增分店'
         },
         formTitles: {
           editEntity: '编辑经营主体',

@@ -322,14 +322,14 @@ class AuthLoginUiValidationTest {
             .contains("structure: '门店结构'")
             .contains("title: '经营主体与门店'")
             .contains("newEntity: '新增经营主体'")
-            .contains("newStore: '新增门店'");
+            .contains("newStore: '新增分店'");
         assertThat(en)
             .contains("title: 'Authorised stores'")
             .contains("defaultStore: 'Default store'")
             .contains("structure: 'Store structure'")
             .contains("title: 'Operating entities and stores'")
             .contains("newEntity: 'Add entity'")
-            .contains("newStore: 'Add store'");
+            .contains("newStore: 'Add branch'");
     }
 
     @Test

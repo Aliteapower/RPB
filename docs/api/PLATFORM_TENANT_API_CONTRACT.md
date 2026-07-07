@@ -3,6 +3,18 @@
 ## Scope
 Platform tenant management is owned by the platform back office and is guarded by the `platform_admin` role plus `platform.tenant.manage`.
 
+## Tenant Onboarding
+
+### `POST /api/v1/platform/tenants`
+
+The tenant create request accepts `onboardingMode`.
+
+Rules:
+- Omitted `onboardingMode` defaults to `single_store` for backward compatibility.
+- `single_store` creates the tenant, a default operating entity, a default store, the tenant admin account, and the tenant admin's default store authorization.
+- `group_multi_store` creates the tenant, a default operating entity, and the tenant admin account, but does not create a store. Platform admins continue in the tenant structure panel and add branches under the default operating entity.
+- `V038__tenant_default_operating_entity_backfill.sql` backfills the same default operating entity for existing non-deleted tenants that have no non-deleted operating entity. It does not create stores.
+
 ## Operating Entities
 
 Operating entities model separate business operators inside one management tenant. They are platform-managed; tenant admins cannot create or edit them.
@@ -145,4 +157,4 @@ Rules:
 - Invalid, inactive, deleted, null, or cross-tenant store ids return `REQUEST_INVALID` with HTTP 400.
 
 ## Compatibility
-Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. No database migration is required.
+Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. `V038` is data-only and only inserts a default operating entity for tenants without one.

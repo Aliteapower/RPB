@@ -673,13 +673,13 @@ export const enSG = {
           aria: 'Operating entity and store switcher'
         },
         guide: {
-          noEntities: 'Create an operating entity first, then add stores to it.',
-          noStores: 'Operating entities are ready. Add stores next.',
-          noActiveEntities: 'Enable an operating entity before adding stores.'
+          noEntities: 'The group prepares a default operating entity automatically. Add a branch next.',
+          noStores: 'The default operating entity is ready. Add a branch next.',
+          noActiveEntities: 'Enable the default operating entity before adding branches.'
         },
         actions: {
           newEntity: 'Add entity',
-          newStore: 'Add store'
+          newStore: 'Add branch'
         },
         formTitles: {
           editEntity: 'Edit entity',

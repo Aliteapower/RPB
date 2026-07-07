@@ -315,7 +315,7 @@ class PlatformTenantApiIntegrationTest {
     }
 
     @Test
-    void creatingGroupTenantDoesNotBootstrapStoresUntilStructureIsConfigured() throws Exception {
+    void creatingGroupTenantBootstrapsDefaultOperatingEntityWithoutStore() throws Exception {
         Cookie session = login("sysadmin");
 
         MvcResult result = mockMvc.perform(post("/api/v1/platform/tenants")
@@ -345,7 +345,19 @@ class PlatformTenantApiIntegrationTest {
             .path("id")
             .asText());
 
-        assertThat(countWhere("select count(*) from operating_entities where tenant_id = ?", tenantId)).isZero();
+        assertThat(countWhere("""
+            select count(*)
+            from operating_entities
+            where tenant_id = ?
+              and entity_code = 'codex-group'
+              and display_name = 'Codex 集团租户'
+              and status = 'active'
+              and default_locale = 'zh-CN'
+              and contact_phone = '+6590000001'
+              and address = '集团总部地址'
+              and principal_name = '集团负责人'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
         assertThat(countWhere("select count(*) from stores where tenant_id = ?", tenantId)).isZero();
         assertThat(countWhere("""
             select count(*)
@@ -360,6 +372,43 @@ class PlatformTenantApiIntegrationTest {
               and account.deleted_at is null
               and access.id is null
             """, tenantId)).isEqualTo(1);
+    }
+
+    @Test
+    void tenantStructureBackfillCreatesDefaultOperatingEntityForExistingGroupTenant() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        jdbc.update(
+            """
+            insert into tenants (
+                id, tenant_code, display_name, status,
+                default_locale, contact_phone, address, principal_name
+            )
+            values (?, 'codex-branch-group', 'Codex 分店集团', 'active',
+                    'zh-CN', '+6590000111', '集团地址 111', '集团管理员')
+            """,
+            tenantId
+        );
+
+        assertThat(countWhere("select count(*) from operating_entities where tenant_id = ?", tenantId)).isZero();
+        assertThat(countWhere("select count(*) from stores where tenant_id = ?", tenantId)).isZero();
+
+        replayTenantStructureDefaultOperatingEntityBackfillMigration();
+        replayTenantStructureDefaultOperatingEntityBackfillMigration();
+
+        assertThat(countWhere("""
+            select count(*)
+            from operating_entities
+            where tenant_id = ?
+              and entity_code = 'codex-branch-group'
+              and display_name = 'Codex 分店集团'
+              and status = 'active'
+              and default_locale = 'zh-CN'
+              and contact_phone = '+6590000111'
+              and address = '集团地址 111'
+              and principal_name = '集团管理员'
+              and deleted_at is null
+            """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("select count(*) from stores where tenant_id = ?", tenantId)).isZero();
     }
 
     @Test
@@ -913,6 +962,13 @@ class PlatformTenantApiIntegrationTest {
     private void replayTenantSubscriptionZeroAmountBackfillMigration() throws Exception {
         jdbc.execute(Files.readString(
             Path.of("src/main/resources/db/migration/V023__tenant_subscription_zero_amount_price_backfill.sql"),
+            StandardCharsets.UTF_8
+        ));
+    }
+
+    private void replayTenantStructureDefaultOperatingEntityBackfillMigration() throws Exception {
+        jdbc.execute(Files.readString(
+            Path.of("src/main/resources/db/migration/V038__tenant_default_operating_entity_backfill.sql"),
             StandardCharsets.UTF_8
         ));
     }

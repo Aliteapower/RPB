@@ -17,7 +17,7 @@
 ## Fixed
 
 - Mobile tenant row actions no longer rely on a wide desktop table that can clip or overlap on phones.
-- New group setup empty states now guide the platform admin to create an operating entity before adding stores.
+- New group setup empty states now guide the platform admin to add branches under the default operating entity.
 
 ## Migration
 

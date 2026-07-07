@@ -4,7 +4,7 @@
 
 **Goal:** Add a group multi-store tenant onboarding mode and persist store-level billing line items under the existing tenant product subscription.
 
-**Architecture:** Keep tenant subscriptions and App Gate entitlement at tenant scope. Add store-scoped commercial line items inside `platformbilling`, and add platform tenant onboarding modes so single-store tenants still bootstrap a default entity/store while group tenants start with an empty structure.
+**Architecture:** Keep tenant subscriptions and App Gate entitlement at tenant scope. Add store-scoped commercial line items inside `platformbilling`, and add platform tenant onboarding modes so single-store tenants still bootstrap a default entity/store while group tenants bootstrap a default operating entity and start without stores.
 
 **Tech Stack:** Java 21, Spring Boot 3, PostgreSQL/Flyway, JdbcTemplate, Vue 3, TypeScript, vue-i18n, JUnit/MockMvc.
 
