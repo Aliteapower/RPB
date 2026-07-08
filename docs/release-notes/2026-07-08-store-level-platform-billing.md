@@ -43,3 +43,18 @@
 - Frontend rollback restores the previous tenant-level renewal UI.
 - Backend rollback should leave the added nullable item columns in place unless a full database rollback is being performed.
 - If needed, platform admins can continue using the tenant-level renew endpoint as a bulk operation.
+
+## Deployment
+
+- Deployed commit `febeb969` to `booking.yumstone.sg` on 2026-07-08.
+- Production server: `43.134.69.75`.
+- Backend backup: `/opt/rpb/backups/20260708-1017-febeb969/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260708-1017-febeb969-frontend/frontend`.
+- Backend service: `rpb-backend` active.
+- Flyway: `041|store level subscription item periods|t`.
+- Public smoke checks:
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `https://booking.yumstone.sg/platform/tenants/fb8e092d-aa34-42eb-bb55-5229044c3885/billing` returned `200`.
+  - `https://booking.yumstone.sg/assets/PlatformTenantBillingPage-DfW6Xr-C.js` returned `200`.
+  - Shared API chunk contains the new `/items/{itemId}/renew` path.
