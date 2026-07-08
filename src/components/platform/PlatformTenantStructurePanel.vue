@@ -29,10 +29,20 @@ const storeForm = reactive<PlatformStoreFormModel>(emptyStoreForm())
 const activePanel = ref<StructurePanel>('entities')
 const entityFormOpen = ref(false)
 const storeFormOpen = ref(false)
+const selectedOperatingEntityId = ref('')
 
 const activeOperatingEntities = computed(() => props.operatingEntities.filter(entity => entity.status === 'active'))
 const entityById = computed(() => new Map(props.operatingEntities.map(entity => [entity.id, entity])))
-const activeStoreCount = computed(() => props.stores.filter(store => store.status === 'active').length)
+const selectedOperatingEntity = computed(() =>
+  props.operatingEntities.find(entity => entity.id === selectedOperatingEntityId.value)
+)
+const selectedOperatingEntityIsActive = computed(() => selectedOperatingEntity.value?.status === 'active')
+const visibleStores = computed(() => {
+  if (!selectedOperatingEntityId.value) {
+    return props.stores
+  }
+  return props.stores.filter(store => store.operatingEntityId === selectedOperatingEntityId.value)
+})
 const structureGuideKey = computed(() => {
   if (props.operatingEntities.length === 0) {
     return 'platform.tenants.structure.guide.noEntities'
@@ -55,8 +65,15 @@ const storeStatusOptions = [
 watch(
   () => props.operatingEntities,
   () => {
+    if (
+      selectedOperatingEntityId.value &&
+      props.operatingEntities.some(entity => entity.id === selectedOperatingEntityId.value)
+    ) {
+      return
+    }
+    selectedOperatingEntityId.value = activeOperatingEntities.value[0]?.id || props.operatingEntities[0]?.id || ''
     if (!storeForm.operatingEntityId) {
-      storeForm.operatingEntityId = activeOperatingEntities.value[0]?.id || ''
+      storeForm.operatingEntityId = selectedOperatingEntityId.value || activeOperatingEntities.value[0]?.id || ''
     }
   },
   { deep: true, immediate: true }
@@ -94,6 +111,7 @@ function emptyStoreForm(): PlatformStoreFormModel {
 
 function editEntity(entity: PlatformOperatingEntity): void {
   activePanel.value = 'entities'
+  selectOperatingEntity(entity.id)
   entityFormOpen.value = true
   Object.assign(entityForm, {
     id: entity.id,
@@ -128,6 +146,9 @@ function submitEntity(): void {
 
 function editStore(store: PlatformStore): void {
   activePanel.value = 'stores'
+  if (store.operatingEntityId) {
+    selectOperatingEntity(store.operatingEntityId)
+  }
   storeFormOpen.value = true
   Object.assign(storeForm, {
     id: store.id,
@@ -148,7 +169,10 @@ function editStore(store: PlatformStore): void {
 function resetStoreForm(): void {
   Object.assign(storeForm, {
     ...emptyStoreForm(),
-    operatingEntityId: activeOperatingEntities.value[0]?.id || ''
+    operatingEntityId:
+      selectedOperatingEntityIsActive.value
+        ? selectedOperatingEntityId.value
+        : activeOperatingEntities.value[0]?.id || ''
   } satisfies PlatformStoreFormModel)
 }
 
@@ -169,6 +193,15 @@ function submitStore(): void {
 
 function showPanel(panel: StructurePanel): void {
   activePanel.value = panel
+}
+
+function selectOperatingEntity(entityId: string): void {
+  selectedOperatingEntityId.value = entityId
+  if (storeFormOpen.value && !storeForm.id) {
+    storeForm.operatingEntityId = selectedOperatingEntityIsActive.value
+      ? entityId
+      : activeOperatingEntities.value[0]?.id || ''
+  }
 }
 
 function operatingEntityLabel(entity: PlatformOperatingEntity): string {
@@ -205,8 +238,8 @@ function storeEntityName(store: PlatformStore): string {
         <strong>{{ stores.length }}</strong>
       </div>
       <div>
-        <span>{{ $t('platform.tenants.structure.summary.activeStores') }}</span>
-        <strong>{{ activeStoreCount }}</strong>
+        <span>{{ $t('platform.tenants.structure.summary.selectedStores') }}</span>
+        <strong>{{ visibleStores.length }}</strong>
       </div>
     </div>
 
@@ -263,11 +296,16 @@ function storeEntityName(store: PlatformStore): string {
           <span>{{ $t('platform.tenants.structure.guide.noEntities') }}</span>
         </div>
         <div v-else class="data-list">
-          <article v-for="entity in operatingEntities" :key="entity.id" class="data-row">
-            <div>
+          <article v-for="entity in operatingEntities" :key="entity.id" class="data-row structure-entity-row">
+            <button
+              class="structure-entity-button"
+              :class="{ 'structure-entity-button--active': entity.id === selectedOperatingEntityId }"
+              type="button"
+              @click="selectOperatingEntity(entity.id)"
+            >
               <strong>{{ operatingEntityLabel(entity) }}</strong>
               <small>{{ entity.entityCode }} · {{ $t(`platform.tenants.structure.status.${entity.status}`) }}</small>
-            </div>
+            </button>
             <button class="text-button" type="button" @click="editEntity(entity)">
               {{ $t('common.actions.edit') }}
             </button>
@@ -341,23 +379,25 @@ function storeEntityName(store: PlatformStore): string {
           <button
             class="secondary-button"
             type="button"
-            :disabled="activeOperatingEntities.length === 0"
+            :disabled="!selectedOperatingEntityIsActive"
             @click="openStoreForm"
           >
             {{ $t('platform.tenants.structure.actions.newStore') }}
           </button>
         </div>
 
-        <div v-if="stores.length === 0" class="empty-state">
+        <div v-if="visibleStores.length === 0" class="empty-state">
           <strong>{{ $t('platform.tenants.structure.stores.empty') }}</strong>
           <span>
             {{ activeOperatingEntities.length === 0
               ? $t('platform.tenants.structure.guide.noActiveEntities')
-              : $t('platform.tenants.structure.guide.noStores') }}
+              : stores.length === 0
+                ? $t('platform.tenants.structure.guide.noStores')
+                : $t('platform.tenants.structure.guide.noStoresForEntity') }}
           </span>
         </div>
         <div v-else class="data-list">
-          <article v-for="store in stores" :key="store.id" class="data-row">
+          <article v-for="store in visibleStores" :key="store.id" class="data-row">
             <div>
               <strong>{{ store.storeName }}</strong>
               <small>{{ store.storeCode }} · {{ storeEntityName(store) }} · {{ $t(`platform.tenants.structure.status.${store.status}`) }}</small>
@@ -610,6 +650,31 @@ function storeEntityName(store: PlatformStore): string {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.structure-entity-row {
+  padding: 4px 10px 4px 4px;
+}
+
+.structure-entity-button {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.structure-entity-button--active {
+  background: #e6fffb;
+  box-shadow: inset 3px 0 0 #0f766e;
 }
 
 .data-row div {

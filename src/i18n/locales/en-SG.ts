@@ -668,7 +668,8 @@ export const enSG = {
           aria: 'Operating entity and store summary',
           operatingEntities: 'Operating entities',
           stores: 'Stores',
-          activeStores: 'Active stores'
+          activeStores: 'Active stores',
+          selectedStores: 'Selected entity stores'
         },
         tabs: {
           aria: 'Operating entity and store switcher'
@@ -676,7 +677,8 @@ export const enSG = {
         guide: {
           noEntities: 'The group prepares a default operating entity automatically. Add a branch next.',
           noStores: 'The default operating entity is ready. Add a branch next.',
-          noActiveEntities: 'Enable the default operating entity before adding branches.'
+          noActiveEntities: 'Enable the default operating entity before adding branches.',
+          noStoresForEntity: 'This operating entity has no branches yet.'
         },
         actions: {
           newEntity: 'Add entity',

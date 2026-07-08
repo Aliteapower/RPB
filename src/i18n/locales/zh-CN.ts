@@ -668,7 +668,8 @@ export const zhCN = {
           aria: '经营主体与门店概览',
           operatingEntities: '经营主体',
           stores: '门店',
-          activeStores: '启用门店'
+          activeStores: '启用门店',
+          selectedStores: '当前主体门店'
         },
         tabs: {
           aria: '经营主体与门店切换'
@@ -676,7 +677,8 @@ export const zhCN = {
         guide: {
           noEntities: '集团会自动准备默认经营主体，请继续新增分店。',
           noStores: '默认经营主体已就绪，可以继续新增分店。',
-          noActiveEntities: '需要先启用默认经营主体，才能新增分店。'
+          noActiveEntities: '需要先启用默认经营主体，才能新增分店。',
+          noStoresForEntity: '当前经营主体还没有分店。'
         },
         actions: {
           newEntity: '新增经营主体',
