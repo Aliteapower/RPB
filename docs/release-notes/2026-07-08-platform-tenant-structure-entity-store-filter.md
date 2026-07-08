@@ -35,6 +35,16 @@
 - Frontend-only workflow change. Existing operating entity and branch records are unchanged.
 - Inactive operating entities can still be selected for review, but adding a branch remains limited to active operating entities.
 
+## Production Deployment
+
+- Deployed frontend commit: `914b9295`.
+- Production server: `booking.yumstone.sg` on `43.134.69.75`.
+- Production frontend backup: `/opt/rpb/backups/20260708-084059-914b9295-frontend`.
+- Live frontend entry asset: `/assets/index-25s7IuEX.js`.
+- Live platform tenant edit asset: `/assets/PlatformTenantFormPage-BrSfTxDq.js`.
+- Smoke checks: `rpb-backend` active, public `https://booking.yumstone.sg/api/v1/auth/me` returned `401`, `/login` returned `200`, `/platform/tenants/{tenantId}/edit` returned `200`, `platform.booking.yumstone.sg/login` returned `200`, `20000000.booking.yumstone.sg/login` returned `200`, and `20000000.booking.yumstone.sg/book` returned `200`.
+- Public platform tenant edit bundle contains the selected entity button styling and selected-entity empty state.
+
 ## Rollback Notes
 
 - Roll back by redeploying the previous frontend bundle under `/opt/rpb/frontend`.
