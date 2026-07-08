@@ -762,6 +762,7 @@ export const zhCN = {
         convert: '转付费',
         reactivate: '重新开通',
         resumeRenew: '恢复并续费',
+        renewStore: '续费当前门店',
         renew: '续费',
         suspend: '暂停',
         cancel: '取消'

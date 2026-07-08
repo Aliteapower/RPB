@@ -268,6 +268,47 @@ class PlatformBillingMigrationTest {
             """,
             VALIDATION_TENANT_ID
         )).hasMessageContaining("ck_tenant_product_subscription_items_period");
+
+        UUID subscriptionId = uuidValue("""
+            select id
+            from tenant_product_subscriptions
+            where tenant_id = ?
+              and app_key = 'reservation_queue'
+            """, VALIDATION_TENANT_ID);
+
+        assertThatThrownBy(() -> insertSubscriptionEvent(
+            subscriptionId,
+            VALIDATION_TENANT_ID,
+            "renew_item",
+            "renew-item-before-v042"
+        )).hasMessageContaining("ck_tenant_product_subscription_events_type");
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V042__allow_store_item_subscription_events.sql");
+
+        insertSubscriptionEvent(
+            subscriptionId,
+            VALIDATION_TENANT_ID,
+            "renew_item",
+            "renew-item-after-v042"
+        );
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_product_subscription_events
+            where tenant_id = ?
+              and app_key = 'reservation_queue'
+              and event_type = 'renew_item'
+            """, VALIDATION_TENANT_ID)).isEqualTo(1);
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V042__allow_store_item_subscription_events.sql");
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_product_subscription_events
+            where tenant_id = ?
+              and app_key = 'reservation_queue'
+              and event_type = 'renew_item'
+            """, VALIDATION_TENANT_ID)).isEqualTo(1);
     }
 
     private static void insertTenantAndStore(UUID tenantId, UUID storeId, String tenantCode, String storeCode, String currency) {
@@ -362,6 +403,34 @@ class PlatformBillingMigrationTest {
 
     private static UUID uuidValue(String sql, Object... args) {
         return JDBC.queryForObject(sql, UUID.class, args);
+    }
+
+    private static void insertSubscriptionEvent(
+        UUID subscriptionId,
+        UUID tenantId,
+        String eventType,
+        String idempotencyKey
+    ) {
+        JDBC.update(
+            """
+            insert into tenant_product_subscription_events (
+                subscription_id,
+                tenant_id,
+                app_key,
+                event_type,
+                billing_cycle,
+                status,
+                amount,
+                currency,
+                idempotency_key
+            )
+            values (?, ?, 'reservation_queue', ?, 'monthly', 'active', 10, 'SGD', ?)
+            """,
+            subscriptionId,
+            tenantId,
+            eventType,
+            idempotencyKey
+        );
     }
 
     private static int countWhere(String sql, Object... args) {

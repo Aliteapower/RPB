@@ -19,6 +19,7 @@ Phase 1.2 store billing line item schema is owned by:
 Phase 1.3 store item period schema is owned by:
 
 - `src/main/resources/db/migration/V041__store_level_subscription_item_periods.sql`
+- `src/main/resources/db/migration/V042__allow_store_item_subscription_events.sql`
 
 ## Tables
 
@@ -32,7 +33,7 @@ Phase 1.3 store item period schema is owned by:
 `tenant_product_subscription_events`
 
 - Append-only event history for manual billing actions.
-- Supports `purchase`, `renew`, `suspend`, `cancel`, `convert_from_legacy`, `manual_adjust`.
+- Supports `purchase`, `renew`, `renew_item`, `suspend`, `cancel`, `convert_from_legacy`, `manual_adjust`.
 - Enforces idempotency by `(tenant_id, app_key, event_type, idempotency_key)`.
 - Stores quote snapshots in `event_payload` for duration-based purchase, renew, and legacy conversion.
 

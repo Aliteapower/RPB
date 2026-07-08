@@ -5,13 +5,11 @@ import { useRoute } from 'vue-router'
 
 import {
   PlatformBillingApiError,
-  cancelProductSubscription,
   convertLegacyProductSubscription,
   listProductLines,
   listTenantProductSubscriptions,
   purchaseProductSubscription,
-  renewProductSubscriptionItem,
-  suspendProductSubscription
+  renewProductSubscriptionItem
 } from '../api/platformProductLineBillingApi'
 import { listTenantStores, type PlatformStore } from '../api/platformApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
@@ -93,6 +91,9 @@ const primaryActionLabel = computed(() => {
   if (subscription.status === 'suspended') {
     return t('platform.billing.actions.resumeRenew')
   }
+  if (singleStoreRenewalMode.value) {
+    return t('platform.billing.actions.renewStore')
+  }
   return t('platform.billing.actions.renew')
 })
 
@@ -145,55 +146,6 @@ async function submitSelectedProductMutation(): Promise<void> {
   await renewSelectedProduct(subscription)
 }
 
-async function purchaseBillingRow(row: BillingRow): Promise<void> {
-  selectBillingRow(row)
-  await purchaseSelectedProduct()
-}
-
-async function renewBillingRow(row: BillingRow): Promise<void> {
-  if (!row.subscription) {
-    return
-  }
-  selectBillingRow(row)
-  await renewSelectedProduct(row.subscription)
-}
-
-async function convertLegacyBillingRow(row: BillingRow): Promise<void> {
-  if (!row.subscription) {
-    return
-  }
-  selectBillingRow(row)
-  await convertLegacyProduct(row.subscription)
-}
-
-async function suspendBillingRow(row: BillingRow): Promise<void> {
-  if (!row.subscription) {
-    return
-  }
-  selectBillingRow(row)
-  await suspendSelectedProduct(row.subscription)
-}
-
-async function cancelBillingRow(row: BillingRow): Promise<void> {
-  if (!row.subscription) {
-    return
-  }
-  selectBillingRow(row)
-  await cancelSelectedProduct(row.subscription)
-}
-
-async function toggleProductLine(row: BillingRow, event: Event): Promise<void> {
-  selectBillingRow(row)
-  const checked = event.target instanceof HTMLInputElement && event.target.checked
-  if (checked) {
-    await submitSelectedProductMutation()
-    return
-  }
-  if (row.subscription && canCancel(row.subscription)) {
-    await cancelSelectedProduct(row.subscription)
-  }
-}
-
 async function renewSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
   const item = selectedStoreItem.value
   if (!item) {
@@ -216,22 +168,6 @@ async function convertLegacyProduct(subscription: TenantProductSubscription): Pr
     return
   }
   await saveMutation(() => convertLegacyProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
-}
-
-async function suspendSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
-  await saveMutation(() => suspendProductSubscription(
-    tenantId.value,
-    subscription.id,
-    statusPayload(subscription.version, t('platform.billing.notes.manualSuspend'))
-  ))
-}
-
-async function cancelSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
-  await saveMutation(() => cancelProductSubscription(
-    tenantId.value,
-    subscription.id,
-    statusPayload(subscription.version, t('platform.billing.notes.manualCancel'))
-  ))
 }
 
 async function saveMutation(action: () => Promise<unknown>): Promise<void> {
@@ -264,25 +200,8 @@ function mutationPayload(version?: number, appKey = form.appKey) {
   }
 }
 
-function statusPayload(version: number, fallbackNote: string) {
-  return {
-    idempotencyKey: newIdempotencyKey(),
-    paymentNote: form.paymentNote.trim() || fallbackNote,
-    version
-  }
-}
-
 function newIdempotencyKey(): string {
   return `manual-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-function selectBillingRow(row: BillingRow): void {
-  const changingProductLine = form.appKey !== row.productLine.appKey
-  form.appKey = row.productLine.appKey
-  if (changingProductLine && (row.subscription?.billingCycle === 'monthly' || row.subscription?.billingCycle === 'yearly')) {
-    form.billingCycle = row.subscription.billingCycle
-  }
-  ensureSelectedStoreItem(row.subscription ?? null)
 }
 
 function selectStoreItem(item: TenantProductSubscriptionItem): void {
@@ -346,40 +265,6 @@ function billingItemsForSubscription(subscription: TenantProductSubscription | n
   return subscription ? subscription.items : []
 }
 
-function isProductLineChecked(row: BillingRow): boolean {
-  return row.subscription?.status === 'active' && row.subscription.effectiveStatus !== 'expired'
-}
-
-function canRenew(subscription: TenantProductSubscription): boolean {
-  return subscription.billingCycle !== 'legacy_grant'
-}
-
-function canSuspend(subscription: TenantProductSubscription): boolean {
-  return subscription.status === 'active'
-}
-
-function canCancel(subscription: TenantProductSubscription): boolean {
-  return subscription.status !== 'cancelled'
-}
-
-function canConvertLegacy(subscription: TenantProductSubscription): boolean {
-  return subscription.billingCycle === 'legacy_grant' && subscription.status === 'active'
-}
-
-function canReactivate(subscription: TenantProductSubscription): boolean {
-  return subscription.status === 'cancelled'
-}
-
-function renewalActionLabel(subscription: TenantProductSubscription): string {
-  if (canReactivate(subscription)) {
-    return t('platform.billing.actions.reactivate')
-  }
-  if (subscription.status === 'suspended') {
-    return t('platform.billing.actions.resumeRenew')
-  }
-  return t('platform.billing.actions.renew')
-}
-
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PlatformBillingApiError)) {
     return t('platform.billing.errors.operationFailed')
@@ -432,27 +317,18 @@ function apiErrorText(error: unknown): string {
                 <th>{{ $t('platform.billing.table.columns.amount') }}</th>
                 <th>{{ $t('platform.billing.table.columns.currency') }}</th>
                 <th>{{ $t('platform.billing.table.columns.entitlement') }}</th>
-                <th>{{ $t('platform.billing.table.columns.actions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="9" class="table-empty">{{ $t('common.actions.loading') }}</td>
+                <td colspan="8" class="table-empty">{{ $t('common.actions.loading') }}</td>
               </tr>
               <tr v-else-if="billingRows.length === 0">
-                <td colspan="9" class="table-empty">{{ $t('platform.billing.table.empty') }}</td>
+                <td colspan="8" class="table-empty">{{ $t('platform.billing.table.empty') }}</td>
               </tr>
               <tr v-for="row in billingRows" v-else :key="row.productLine.appKey">
                 <td>
-                  <label class="product-line-check">
-                    <input
-                      type="checkbox"
-                      :checked="isProductLineChecked(row)"
-                      :disabled="saving"
-                      @change="toggleProductLine(row, $event)"
-                    >
-                    <span>{{ row.productLine.displayName }}</span>
-                  </label>
+                  <strong class="product-line-name">{{ row.productLine.displayName }}</strong>
                 </td>
                 <td>{{ row.subscription ? billingCycleLabel(row.subscription.billingCycle) : '-' }}</td>
                 <td>{{ row.subscription ? statusLabel(row.subscription) : $t('platform.billing.status.notOpened') }}</td>
@@ -461,55 +337,6 @@ function apiErrorText(error: unknown): string {
                 <td>{{ row.subscription ? formatAmount(row.subscription.amount) : '-' }}</td>
                 <td>{{ row.subscription?.currency ?? row.productLine.prices[0]?.currency ?? '-' }}</td>
                 <td>{{ row.subscription?.entitlementStatus ?? '-' }}</td>
-                <td>
-                  <div class="row-actions">
-                    <button
-                      v-if="!row.subscription"
-                      type="button"
-                      class="text-action"
-                      :disabled="saving || billingDisabled"
-                      @click="purchaseBillingRow(row)"
-                    >
-                      {{ $t('platform.billing.actions.open') }}
-                    </button>
-                    <button
-                      v-if="row.subscription && canRenew(row.subscription)"
-                      type="button"
-                      class="text-action"
-                      :disabled="saving || row.subscription.items.length === 0"
-                      @click="renewBillingRow(row)"
-                    >
-                      {{ renewalActionLabel(row.subscription) }}
-                    </button>
-                    <button
-                      v-if="row.subscription && canConvertLegacy(row.subscription)"
-                      type="button"
-                      class="text-action"
-                      :disabled="saving || billingDisabled"
-                      @click="convertLegacyBillingRow(row)"
-                    >
-                      {{ $t('platform.billing.actions.convert') }}
-                    </button>
-                    <button
-                      v-if="row.subscription && canSuspend(row.subscription)"
-                      type="button"
-                      class="text-action"
-                      :disabled="saving"
-                      @click="suspendBillingRow(row)"
-                    >
-                      {{ $t('platform.billing.actions.suspend') }}
-                    </button>
-                    <button
-                      v-if="row.subscription && canCancel(row.subscription)"
-                      type="button"
-                      class="text-action danger"
-                      :disabled="saving"
-                      @click="cancelBillingRow(row)"
-                    >
-                      {{ $t('platform.billing.actions.cancel') }}
-                    </button>
-                  </div>
-                </td>
               </tr>
             </tbody>
           </table>
@@ -525,6 +352,26 @@ function apiErrorText(error: unknown): string {
               </option>
             </select>
           </label>
+          <section v-if="singleStoreRenewalMode" class="store-items" :aria-label="$t('platform.billing.storeItems.title')">
+            <h3>{{ $t('platform.billing.storeItems.title') }}</h3>
+            <p v-if="storeItemRows.length === 0" class="muted-text">{{ $t('platform.billing.storeItems.empty') }}</p>
+            <div v-else class="store-item-list">
+              <button
+                v-for="item in storeItemRows"
+                :key="item.id"
+                type="button"
+                class="store-item-row"
+                :class="{ selected: selectedStoreItem?.id === item.id }"
+                @click="selectStoreItem(item)"
+              >
+                <div>
+                  <strong>{{ storeItemName(item) }}</strong>
+                  <small>{{ item.storeCode || '-' }} / {{ item.status }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
+                </div>
+                <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
+              </button>
+            </div>
+          </section>
           <label>
             <span>{{ $t('platform.billing.form.billingCycle') }}</span>
             <select v-model="form.billingCycle">
@@ -567,27 +414,6 @@ function apiErrorText(error: unknown): string {
           <button class="primary-button" type="submit" :disabled="saving || loading || billingDisabled">
             {{ saving ? $t('common.actions.saving') : primaryActionLabel }}
           </button>
-
-          <section class="store-items" :aria-label="$t('platform.billing.storeItems.title')">
-            <h3>{{ $t('platform.billing.storeItems.title') }}</h3>
-            <p v-if="storeItemRows.length === 0" class="muted-text">{{ $t('platform.billing.storeItems.empty') }}</p>
-            <div v-else class="store-item-list">
-              <button
-                v-for="item in storeItemRows"
-                :key="item.id"
-                type="button"
-                class="store-item-row"
-                :class="{ selected: selectedStoreItem?.id === item.id }"
-                @click="selectStoreItem(item)"
-              >
-                <div>
-                  <strong>{{ storeItemName(item) }}</strong>
-                  <small>{{ item.storeCode || '-' }} / {{ item.status }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
-                </div>
-                <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
-              </button>
-            </div>
-          </section>
         </form>
       </div>
     </section>
@@ -665,7 +491,7 @@ function apiErrorText(error: unknown): string {
 
 .data-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 900px;
   border-collapse: collapse;
 }
 
@@ -688,23 +514,16 @@ function apiErrorText(error: unknown): string {
   text-align: center;
 }
 
-.row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.product-line-name {
+  color: #0f172a;
+  font-weight: 800;
 }
 
-.product-line-check,
 .duration-row,
 .quote-summary {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.product-line-check input {
-  width: 16px;
-  height: 16px;
 }
 
 .duration-row input {
@@ -725,25 +544,6 @@ function apiErrorText(error: unknown): string {
 
 .quote-summary strong {
   color: #0f172a;
-}
-
-.text-action {
-  border: 0;
-  padding: 0;
-  color: #0f766e;
-  background: transparent;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.text-action.danger {
-  color: #b91c1c;
-}
-
-.text-action:disabled {
-  opacity: 0.55;
-  cursor: default;
 }
 
 .muted-text {

@@ -762,6 +762,7 @@ export const enSG = {
         convert: 'Convert to paid',
         reactivate: 'Reactivate',
         resumeRenew: 'Resume and renew',
+        renewStore: 'Renew selected store',
         renew: 'Renew',
         suspend: 'Suspend',
         cancel: 'Cancel'

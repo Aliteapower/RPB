@@ -13,6 +13,7 @@
   - `current_period_start`
   - `current_period_end`
   - `payment_note`
+- Allows `renew_item` subscription events for single-store renewal audit records.
 - Tenant billing page now lets platform admins select one store billing item and renew that store only.
 
 ## Changed
@@ -21,12 +22,15 @@
 - Store item renewal quotes `storeCount = 1`.
 - After store item renewal, aggregate subscription amount and period are recomputed from active store items.
 - Existing tenant-level renew endpoint remains available as a compatibility bulk renewal path.
+- Tenant billing page shows product lines as read-only billing summaries. Renewal is submitted only from the selected store billing item panel to reduce accidental bulk or destructive actions.
 
 ## Migration
 
 - New Flyway migration:
   - `V041__store_level_subscription_item_periods.sql`
+  - `V042__allow_store_item_subscription_events.sql`
 - Existing item rows are backfilled from their parent subscription billing cycle and period.
+- `tenant_product_subscription_events` now permits `event_type = renew_item`.
 
 ## Permission
 
