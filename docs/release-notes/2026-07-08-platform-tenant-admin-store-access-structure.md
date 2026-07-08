@@ -37,6 +37,16 @@
 - Backend tenant/store isolation remains enforced by existing tenant-scoped store validation before replacing tenant admin store access.
 - The tenant admin default store is still a single global default for the tenant admin account, not a per-operating-entity default.
 
+## Production Deployment
+
+- Deployed frontend commit: `98de314f`.
+- Production server: `booking.yumstone.sg` on `43.134.69.75`.
+- Production frontend backup: `/opt/rpb/backups/20260708-091305-98de314f-frontend`.
+- Live frontend entry asset: `/assets/index-Baj5x29H.js`.
+- Live platform tenant edit asset: `/assets/PlatformTenantFormPage-DUU2QFRR.js`.
+- Smoke checks: public `https://booking.yumstone.sg/api/v1/auth/me` returned `401`, `/login` returned `200`, `/platform/tenants/{tenantId}/edit` returned `200`, `platform.booking.yumstone.sg/login` returned `200`, `20000000.booking.yumstone.sg/login` returned `200`, and `20000000.booking.yumstone.sg/book` returned `200`.
+- Live bundle check: platform tenant edit bundle contains `admin-store-access-panel`, `structure.adminStoreAccess`, and `defaultStoreElsewhere`.
+
 ## Rollback Notes
 
 - Roll back by redeploying the previous frontend bundle under `/opt/rpb/frontend`.
