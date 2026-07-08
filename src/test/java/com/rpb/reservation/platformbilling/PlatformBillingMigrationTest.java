@@ -226,6 +226,48 @@ class PlatformBillingMigrationTest {
         int itemCountBeforeReplay = countWhere("select count(*) from tenant_product_subscription_items");
         DATABASE.applyMigration("src/main/resources/db/migration/V036__tenant_subscription_store_billing_items.sql");
         assertThat(countWhere("select count(*) from tenant_product_subscription_items")).isEqualTo(itemCountBeforeReplay);
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V041__store_level_subscription_item_periods.sql");
+
+        assertThat(columnExists("tenant_product_subscription_items", "billing_cycle")).isTrue();
+        assertThat(columnExists("tenant_product_subscription_items", "current_period_start")).isTrue();
+        assertThat(columnExists("tenant_product_subscription_items", "current_period_end")).isTrue();
+        assertThat(columnExists("tenant_product_subscription_items", "payment_note")).isTrue();
+        assertThat(constraintExists("ck_tenant_product_subscription_items_cycle")).isTrue();
+        assertThat(constraintExists("ck_tenant_product_subscription_items_period")).isTrue();
+        assertThat(indexExists("ix_tenant_product_subscription_items_store_app")).isTrue();
+        assertThat(indexExists("ix_tenant_product_subscription_items_period_end")).isTrue();
+
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_product_subscription_items item
+            join tenant_product_subscriptions subscription
+              on subscription.id = item.subscription_id
+            where item.billing_cycle = subscription.billing_cycle
+              and (
+                    item.current_period_start is not distinct from subscription.current_period_start
+                and item.current_period_end is not distinct from subscription.current_period_end
+              )
+            """)).isEqualTo(itemCountBeforeReplay);
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            update tenant_product_subscription_items
+            set billing_cycle = 'weekly'
+            where tenant_id = ?
+            """,
+            VALIDATION_TENANT_ID
+        )).hasMessageContaining("ck_tenant_product_subscription_items_cycle");
+
+        assertThatThrownBy(() -> JDBC.update(
+            """
+            update tenant_product_subscription_items
+            set current_period_start = now(),
+                current_period_end = now() - interval '1 day'
+            where tenant_id = ?
+            """,
+            VALIDATION_TENANT_ID
+        )).hasMessageContaining("ck_tenant_product_subscription_items_period");
     }
 
     private static void insertTenantAndStore(UUID tenantId, UUID storeId, String tenantCode, String storeCode, String currency) {
@@ -302,6 +344,16 @@ class PlatformBillingMigrationTest {
             from pg_constraint
             where conname = ?
             """, constraintName) == 1;
+    }
+
+    private static boolean columnExists(String tableName, String columnName) {
+        return countWhere("""
+            select count(*)
+            from information_schema.columns
+            where table_schema = 'public'
+              and table_name = ?
+              and column_name = ?
+            """, tableName, columnName) == 1;
     }
 
     private static String stringValue(String sql, Object... args) {

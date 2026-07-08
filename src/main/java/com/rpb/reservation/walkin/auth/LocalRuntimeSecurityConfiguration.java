@@ -109,6 +109,7 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.GET, "/api/v1/platform/tenants/*/product-subscriptions").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/purchase").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/renew").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/items/*/renew").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/suspend").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/cancel").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/platform/tenants/*/product-subscriptions/*/convert-from-legacy").permitAll()

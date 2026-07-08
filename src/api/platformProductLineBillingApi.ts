@@ -115,6 +115,23 @@ export async function renewProductSubscription(
   )
 }
 
+export async function renewProductSubscriptionItem(
+  tenantId: string,
+  subscriptionId: string,
+  itemId: string,
+  request: ProductSubscriptionMutation,
+  fetcher?: PlatformBillingFetcher
+): Promise<TenantProductSubscriptionResponse> {
+  return requestJson(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/${encodeURIComponent(subscriptionId)}/items/${encodeURIComponent(itemId)}/renew`,
+    {
+      method: 'POST',
+      body: request,
+      fetcher
+    }
+  )
+}
+
 export async function suspendProductSubscription(
   tenantId: string,
   subscriptionId: string,

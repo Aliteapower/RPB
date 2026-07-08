@@ -1,6 +1,6 @@
 # Platform Product Line Billing Schema Design
 
-Status: Phase 1 implemented, Phase 1.1 pricing implemented, Phase 1.2 store billing line items planned
+Status: Phase 1 implemented, Phase 1.1 pricing implemented, Phase 1.2 store billing line items implemented, Phase 1.3 store item renewal implemented
 
 ## Migration
 
@@ -15,6 +15,10 @@ Phase 1.1 pricing schema is owned by:
 Phase 1.2 store billing line item schema is owned by:
 
 - `src/main/resources/db/migration/V036__tenant_subscription_store_billing_items.sql`
+
+Phase 1.3 store item period schema is owned by:
+
+- `src/main/resources/db/migration/V041__store_level_subscription_item_periods.sql`
 
 ## Tables
 
@@ -45,7 +49,7 @@ Phase 1.2 store billing line item schema is owned by:
 - One current commercial detail row per `(subscription_id, store_id)` for store-scoped billing.
 - Keeps `tenant_id`, `app_key`, and `(store_id, tenant_id)` FK for tenant-safe joins and cross-tenant protection.
 - Supports `scope_type = store` in this slice; `tenant` is reserved for future tenant-level fixed fees.
-- Stores quantity, per-store unit amount, line amount, currency, status, timestamps, and optimistic `version`.
+- Stores billing cycle, current period, quantity, per-store unit amount, line amount, currency, status, payment note, timestamps, and optimistic `version`.
 - Backfills existing tenant subscriptions against active, undeleted stores.
 - Does not replace `tenant_app_entitlements`; App Gate remains tenant scoped.
 
@@ -112,4 +116,6 @@ storeUnitAmount = unitAmount * durationCount
 defaultAmount = storeUnitAmount * active billable store count
 ```
 
-Purchase, renewal, and legacy conversion replace the subscription's store item rows using active stores in the tenant. Suspend and cancel update the item status with the subscription status. No reservation, queue, queue display, cleaning, walk-in, or App Gate table reads these item rows.
+Purchase, bulk renewal, and legacy conversion replace the subscription's store item rows using active stores in the tenant. Suspend and cancel update the item status with the subscription status. Single-store item renewal updates only the selected store item and recomputes the aggregate tenant subscription from active item rows.
+
+No reservation, queue, queue display, cleaning, walk-in, or App Gate table reads these item rows.

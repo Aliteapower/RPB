@@ -10,6 +10,7 @@ public enum PlatformBillingApiErrorCode {
     PRODUCT_LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.billing.product_line_not_found"),
     PRODUCT_LINE_CONFLICT(HttpStatus.CONFLICT, "platform.billing.product_line_conflict"),
     SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.billing.subscription_not_found"),
+    SUBSCRIPTION_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.billing.subscription_item_not_found"),
     SUBSCRIPTION_CONFLICT(HttpStatus.CONFLICT, "platform.billing.subscription_conflict"),
     VERSION_CONFLICT(HttpStatus.CONFLICT, "platform.billing.version_conflict"),
     PERSISTENCE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "platform.billing.persistence_error");

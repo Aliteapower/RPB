@@ -54,6 +54,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class PlatformTenantProductSubscriptionControllerTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000009301");
     private static final UUID SUBSCRIPTION_ID = UUID.fromString("40000000-0000-0000-0000-000000009301");
+    private static final UUID ITEM_ID = UUID.fromString("50000000-0000-0000-0000-000000009301");
 
     @Autowired
     private MockMvc mockMvc;
@@ -88,6 +89,8 @@ class PlatformTenantProductSubscriptionControllerTest {
             .thenReturn(new ProductSubscriptionMutationResult(false, subscription("monthly", "active", OffsetDateTime.parse("2026-07-31T23:59:59Z"))));
         when(subscriptionService.renew(eq(TENANT_ID), eq(SUBSCRIPTION_ID), any(ProductSubscriptionCommand.class), any(PlatformBillingOperator.class)))
             .thenReturn(new ProductSubscriptionMutationResult(true, subscription("monthly", "active", OffsetDateTime.parse("2026-08-31T23:59:59Z"))));
+        when(subscriptionService.renewItem(eq(TENANT_ID), eq(SUBSCRIPTION_ID), eq(ITEM_ID), any(ProductSubscriptionCommand.class), any(PlatformBillingOperator.class)))
+            .thenReturn(new ProductSubscriptionMutationResult(false, subscription("monthly", "active", OffsetDateTime.parse("2026-09-30T23:59:59Z"))));
         when(subscriptionService.suspend(eq(TENANT_ID), eq(SUBSCRIPTION_ID), any(), any(PlatformBillingOperator.class)))
             .thenReturn(new ProductSubscriptionMutationResult(false, subscription("monthly", "suspended", OffsetDateTime.parse("2026-08-31T23:59:59Z"))));
         when(subscriptionService.cancel(eq(TENANT_ID), eq(SUBSCRIPTION_ID), any(), any(PlatformBillingOperator.class)))
@@ -108,6 +111,14 @@ class PlatformTenantProductSubscriptionControllerTest {
                 .content(mutationJson("renew-001", "monthly", "2026-08-01T00:00:00Z", "2026-08-31T23:59:59Z", 0)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.replayed").value(true));
+
+        mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/items/{itemId}/renew", TENANT_ID, SUBSCRIPTION_ID, ITEM_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(durationMutationJson("renew-item-001", "monthly", 1, 0)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.subscription.items[0].billingCycle").value("monthly"))
+            .andExpect(jsonPath("$.subscription.items[0].currentPeriodEnd").value("2026-09-30T23:59:59Z"));
 
         mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/suspend", TENANT_ID, SUBSCRIPTION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -162,7 +173,7 @@ class PlatformTenantProductSubscriptionControllerTest {
             OffsetDateTime.parse("2026-06-26T00:00:00Z"),
             0,
             List.of(new ProductSubscriptionItem(
-                UUID.fromString("50000000-0000-0000-0000-000000009301"),
+                ITEM_ID,
                 SUBSCRIPTION_ID,
                 TENANT_ID,
                 "reservation_queue",
@@ -172,11 +183,15 @@ class PlatformTenantProductSubscriptionControllerTest {
                 "Main Store",
                 null,
                 null,
+                billingCycle,
+                OffsetDateTime.parse("2026-07-01T00:00:00Z"),
+                periodEnd,
                 1,
                 new BigDecimal("128.00"),
                 new BigDecimal("128.00"),
                 "SGD",
                 status,
+                "manual payment",
                 OffsetDateTime.parse("2026-06-26T00:00:00Z"),
                 OffsetDateTime.parse("2026-06-26T00:00:00Z"),
                 0
@@ -210,5 +225,19 @@ class PlatformTenantProductSubscriptionControllerTest {
         return """
             {"idempotencyKey":"%s","paymentNote":"%s","version":%d}
             """.formatted(idempotencyKey, paymentNote, version);
+    }
+
+    private static String durationMutationJson(String idempotencyKey, String billingCycle, int durationCount, int version) {
+        return """
+            {
+              "idempotencyKey":"%s",
+              "appKey":"reservation_queue",
+              "billingCycle":"%s",
+              "durationCount":%d,
+              "currency":"SGD",
+              "paymentNote":"single store renewal",
+              "version":%d
+            }
+            """.formatted(idempotencyKey, billingCycle, durationCount, version);
     }
 }

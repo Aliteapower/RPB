@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
@@ -10,7 +10,7 @@ import {
   listProductLines,
   listTenantProductSubscriptions,
   purchaseProductSubscription,
-  renewProductSubscription,
+  renewProductSubscriptionItem,
   suspendProductSubscription
 } from '../api/platformProductLineBillingApi'
 import { listTenantStores, type PlatformStore } from '../api/platformApi'
@@ -18,7 +18,8 @@ import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import type {
   PlatformProductLine,
   ProductBillingCycle,
-  TenantProductSubscription
+  TenantProductSubscription,
+  TenantProductSubscriptionItem
 } from '../types/platformProductLineBilling'
 import { useAuthSessionStore } from '../stores/authSession'
 
@@ -33,6 +34,7 @@ const loading = ref(false)
 const saving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
+const selectedStoreItemId = ref<string | null>(null)
 const form = reactive({
   appKey: 'reservation_queue',
   billingCycle: 'monthly' as ProductBillingCycle,
@@ -57,10 +59,21 @@ const selectedUnitPrice = computed(() => selectedPrice.value?.amount ?? 0)
 const selectedCurrency = computed(() => selectedPrice.value?.currency ?? (form.currency.trim().toUpperCase() || 'SGD'))
 const safeDurationCount = computed(() => Math.max(1, Number(form.durationCount) || 1))
 const activeBillableStoreCount = computed(() => tenantStores.value.filter(store => store.status === 'active').length)
-const billingDisabled = computed(() => activeBillableStoreCount.value <= 0)
-const storeUnitAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
-const calculatedAmount = computed(() => storeUnitAmount.value * activeBillableStoreCount.value)
 const storeItemRows = computed(() => billingItemsForSubscription(selectedSubscription.value))
+const selectedStoreItem = computed(() => {
+  if (storeItemRows.value.length === 0) {
+    return null
+  }
+  return storeItemRows.value.find(item => item.id === selectedStoreItemId.value) ?? storeItemRows.value[0]
+})
+const singleStoreRenewalMode = computed(() => (
+  selectedSubscription.value !== null &&
+  selectedSubscription.value.billingCycle !== 'legacy_grant'
+))
+const quoteStoreCount = computed(() => (singleStoreRenewalMode.value ? (selectedStoreItem.value ? 1 : 0) : activeBillableStoreCount.value))
+const billingDisabled = computed(() => (singleStoreRenewalMode.value ? selectedStoreItem.value === null : activeBillableStoreCount.value <= 0))
+const storeUnitAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
+const calculatedAmount = computed(() => storeUnitAmount.value * quoteStoreCount.value)
 const durationUnitLabel = computed(() => (
   form.billingCycle === 'yearly'
     ? t('platform.billing.units.year')
@@ -87,6 +100,10 @@ onMounted(() => {
   void loadBilling()
 })
 
+watch(() => form.appKey, () => {
+  ensureSelectedStoreItem()
+})
+
 async function loadBilling(): Promise<void> {
   loading.value = true
   errorText.value = ''
@@ -103,6 +120,7 @@ async function loadBilling(): Promise<void> {
     if (firstLine) {
       form.appKey = firstLine.appKey
     }
+    ensureSelectedStoreItem()
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
@@ -177,7 +195,18 @@ async function toggleProductLine(row: BillingRow, event: Event): Promise<void> {
 }
 
 async function renewSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
-  await saveMutation(() => renewProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
+  const item = selectedStoreItem.value
+  if (!item) {
+    savedText.value = ''
+    errorText.value = t('platform.billing.storeItems.empty')
+    return
+  }
+  await saveMutation(() => renewProductSubscriptionItem(
+    tenantId.value,
+    subscription.id,
+    item.id,
+    mutationPayload(item.version, subscription.appKey)
+  ))
 }
 
 async function convertLegacyProduct(subscription: TenantProductSubscription): Promise<void> {
@@ -253,6 +282,22 @@ function selectBillingRow(row: BillingRow): void {
   if (changingProductLine && (row.subscription?.billingCycle === 'monthly' || row.subscription?.billingCycle === 'yearly')) {
     form.billingCycle = row.subscription.billingCycle
   }
+  ensureSelectedStoreItem(row.subscription ?? null)
+}
+
+function selectStoreItem(item: TenantProductSubscriptionItem): void {
+  selectedStoreItemId.value = item.id
+}
+
+function ensureSelectedStoreItem(subscription = selectedSubscription.value): void {
+  const rows = billingItemsForSubscription(subscription)
+  if (rows.length === 0) {
+    selectedStoreItemId.value = null
+    return
+  }
+  if (!rows.some(item => item.id === selectedStoreItemId.value)) {
+    selectedStoreItemId.value = rows[0].id
+  }
 }
 
 function billingCycleLabel(cycle: ProductBillingCycle): string {
@@ -292,7 +337,7 @@ function formatAmount(value: number): string {
   return Number(value || 0).toFixed(2)
 }
 
-function storeItemName(item: TenantProductSubscription['items'][number]): string {
+function storeItemName(item: TenantProductSubscriptionItem): string {
   const name = item.storeName || item.storeCode || item.storeId?.slice(0, 8) || '-'
   return item.operatingEntityName ? `${name} / ${item.operatingEntityName}` : name
 }
@@ -431,7 +476,7 @@ function apiErrorText(error: unknown): string {
                       v-if="row.subscription && canRenew(row.subscription)"
                       type="button"
                       class="text-action"
-                      :disabled="saving || billingDisabled"
+                      :disabled="saving || row.subscription.items.length === 0"
                       @click="renewBillingRow(row)"
                     >
                       {{ renewalActionLabel(row.subscription) }}
@@ -500,7 +545,7 @@ function apiErrorText(error: unknown): string {
           </div>
           <div class="quote-summary">
             <span>{{ $t('platform.billing.form.storeCount') }}</span>
-            <strong>{{ activeBillableStoreCount }}</strong>
+            <strong>{{ quoteStoreCount }}</strong>
           </div>
           <p v-if="billingDisabled" class="warning-text">{{ $t('platform.billing.form.noBillableStores') }}</p>
           <div class="quote-summary">
@@ -527,13 +572,20 @@ function apiErrorText(error: unknown): string {
             <h3>{{ $t('platform.billing.storeItems.title') }}</h3>
             <p v-if="storeItemRows.length === 0" class="muted-text">{{ $t('platform.billing.storeItems.empty') }}</p>
             <div v-else class="store-item-list">
-              <article v-for="item in storeItemRows" :key="item.id" class="store-item-row">
+              <button
+                v-for="item in storeItemRows"
+                :key="item.id"
+                type="button"
+                class="store-item-row"
+                :class="{ selected: selectedStoreItem?.id === item.id }"
+                @click="selectStoreItem(item)"
+              >
                 <div>
                   <strong>{{ storeItemName(item) }}</strong>
-                  <small>{{ item.storeCode || '-' }} / {{ item.status }}</small>
+                  <small>{{ item.storeCode || '-' }} / {{ item.status }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
                 </div>
                 <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
-              </article>
+              </button>
             </div>
           </section>
         </form>
@@ -715,10 +767,21 @@ function apiErrorText(error: unknown): string {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  width: 100%;
   padding: 10px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
+  color: inherit;
   background: #f8fafc;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-item-row.selected {
+  border-color: #0f766e;
+  background: #ecfdf5;
+  box-shadow: inset 3px 0 0 #0f766e;
 }
 
 .store-item-row div {

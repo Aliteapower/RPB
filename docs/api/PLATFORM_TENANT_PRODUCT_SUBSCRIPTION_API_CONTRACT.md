@@ -1,6 +1,6 @@
 # Platform Tenant Product Subscription API Contract
 
-Status: Phase 1 implemented, Phase 1.1 duration billing implemented, Phase 1.2 store billing line items implemented
+Status: Phase 1 implemented, Phase 1.1 duration billing implemented, Phase 1.2 store billing line items implemented, Phase 1.3 store item renewal implemented
 
 ## Scope
 
@@ -9,6 +9,8 @@ This API supports lightweight manual billing. It does not integrate payment gate
 Billing state is synchronized into App Gate entitlements. Business APIs continue to be protected by App Gate.
 
 Store billing line items are commercial detail only. They do not grant or revoke product access per store in this phase.
+
+Store item renewal is supported for platform-admin billing operations. App Gate remains tenant-scoped; the aggregate tenant entitlement is enabled while the aggregate subscription remains active.
 
 ## Permissions
 
@@ -29,7 +31,21 @@ Creates one subscription per `(tenantId, appKey)`, records a `purchase` event, a
 
 ### `POST /api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/renew`
 
-Extends the commercial period, records a `renew` event, and syncs App Gate entitlement to `enabled` with the new `valid_until`.
+Compatibility bulk renewal endpoint. Extends the aggregate commercial period, replaces active store item rows, records a `renew` event, and syncs App Gate entitlement to `enabled` with the new `valid_until`.
+
+### `POST /api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/items/{itemId}/renew`
+
+Renews one store billing item only.
+
+Behavior:
+
+- validates that `tenantId` owns the subscription
+- validates that `itemId` belongs to the subscription and tenant
+- calculates quote with `storeCount = 1`
+- updates only the selected item
+- recomputes aggregate subscription amount and period from active store items
+- records a `renew_item` event
+- syncs tenant-level App Gate entitlement from the aggregate subscription
 
 ### `POST /api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/suspend`
 
@@ -70,7 +86,7 @@ unit price * durationCount
 
 If `amount` is present, it is stored as the final manual amount. The subscription event payload records unit price, default amount, final amount, duration, currency, and price source.
 
-`version` is required for optimistic protection on renew, suspend, cancel, and convert.
+`version` is required for optimistic protection on renew, suspend, cancel, convert, and item renew. For item renew, `version` is the selected item version.
 
 ## Status Request
 
@@ -113,11 +129,16 @@ If `amount` is present, it is stored as the final manual amount. The subscriptio
         "storeName": "LSC106",
         "operatingEntityId": "60000000-0000-0000-0000-000000009301",
         "operatingEntityName": "LSC Operating Entity",
+        "billingCycle": "monthly",
+        "currentPeriodStart": "2026-07-01T00:00:00Z",
+        "currentPeriodEnd": "2026-07-31T23:59:59Z",
         "quantity": 1,
         "unitAmount": 128.00,
         "amount": 384.00,
         "currency": "SGD",
-        "status": "active"
+        "status": "active",
+        "paymentNote": "manual transfer",
+        "version": 0
       }
     ]
   },
@@ -141,7 +162,14 @@ storeUnitAmount = productLinePrice * durationCount
 defaultAmount = storeUnitAmount * active billable store count
 ```
 
-If no active stores exist, purchase, renewal, and legacy conversion requests that use duration billing are rejected with `REQUEST_INVALID`.
+For item renewal, the backend calculates:
+
+```text
+storeUnitAmount = productLinePrice * durationCount
+defaultAmount = storeUnitAmount * 1
+```
+
+If no active stores exist, purchase, bulk renewal, and legacy conversion requests that use duration billing are rejected with `REQUEST_INVALID`.
 
 ## Error Codes
 
@@ -151,6 +179,7 @@ If no active stores exist, purchase, renewal, and legacy conversion requests tha
 - `TENANT_NOT_FOUND`
 - `PRODUCT_LINE_NOT_FOUND`
 - `SUBSCRIPTION_NOT_FOUND`
+- `SUBSCRIPTION_ITEM_NOT_FOUND`
 - `SUBSCRIPTION_CONFLICT`
 - `VERSION_CONFLICT`
 - `PERSISTENCE_ERROR`

@@ -76,11 +76,15 @@ export interface TenantProductSubscriptionItem {
   storeName: string | null
   operatingEntityId: string | null
   operatingEntityName: string | null
+  billingCycle: ProductBillingCycle | null
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
   quantity: number
   unitAmount: number
   amount: number
   currency: string
   status: ProductSubscriptionStatus
+  paymentNote: string | null
   createdAt: string
   updatedAt: string
   version: number

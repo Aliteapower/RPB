@@ -173,6 +173,95 @@ class ProductSubscriptionServiceTest {
     }
 
     @Test
+    void renewItemUpdatesOnlySelectedStoreItemAndRecomputesAggregate() {
+        items.addStore(new BillableStore(
+            UUID.fromString("20000000-0000-0000-0000-000000009202"),
+            "store-branch",
+            "Branch Store"
+        ));
+        ProductSubscription purchased = service.purchase(
+            TENANT_ID,
+            durationCommand("purchase-before-item-renew", "monthly", 1, null, null),
+            OPERATOR
+        ).subscription();
+        ProductSubscriptionItem mainItem = purchased.items().stream()
+            .filter(item -> item.storeCode().equals("store-main"))
+            .findFirst()
+            .orElseThrow();
+        ProductSubscriptionItem branchItemBefore = purchased.items().stream()
+            .filter(item -> item.storeCode().equals("store-branch"))
+            .findFirst()
+            .orElseThrow();
+
+        ProductSubscriptionMutationResult result = service.renewItem(
+            TENANT_ID,
+            purchased.id(),
+            mainItem.id(),
+            durationCommand("renew-one-store", "monthly", 2, null, mainItem.version()),
+            OPERATOR
+        );
+
+        ProductSubscriptionItem renewedMain = result.subscription().items().stream()
+            .filter(item -> item.id().equals(mainItem.id()))
+            .findFirst()
+            .orElseThrow();
+        ProductSubscriptionItem untouchedBranch = result.subscription().items().stream()
+            .filter(item -> item.id().equals(branchItemBefore.id()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(result.quote().storeCount()).isEqualTo(1);
+        assertThat(result.quote().defaultAmount()).isEqualByComparingTo("256.00");
+        assertThat(result.subscription().amount()).isEqualByComparingTo("384.00");
+        assertThat(result.subscription().currentPeriodEnd()).isEqualTo(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        assertThat(renewedMain.amount()).isEqualByComparingTo("256.00");
+        assertThat(renewedMain.currentPeriodStart()).isEqualTo(OffsetDateTime.parse("2026-02-01T00:00:00Z"));
+        assertThat(renewedMain.currentPeriodEnd()).isEqualTo(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        assertThat(renewedMain.version()).isEqualTo(1);
+        assertThat(untouchedBranch.amount()).isEqualByComparingTo(branchItemBefore.amount());
+        assertThat(untouchedBranch.currentPeriodEnd()).isEqualTo(branchItemBefore.currentPeriodEnd());
+        assertThat(untouchedBranch.version()).isEqualTo(branchItemBefore.version());
+        assertThat(syncGateway.actions).containsExactly(
+            "enabled:reservation_queue:2026-02-01T00:00Z",
+            "enabled:reservation_queue:2026-04-01T00:00Z"
+        );
+        assertThat(events.events).containsExactly(
+            "purchase:purchase-before-item-renew",
+            "renew_item:renew-one-store"
+        );
+    }
+
+    @Test
+    void renewItemRejectsUnknownItemAndStaleItemVersion() {
+        ProductSubscription purchased = service.purchase(
+            TENANT_ID,
+            durationCommand("purchase-before-stale-item", "monthly", 1, null, null),
+            OPERATOR
+        ).subscription();
+        ProductSubscriptionItem item = purchased.items().get(0);
+
+        assertThatThrownBy(() -> service.renewItem(
+            TENANT_ID,
+            purchased.id(),
+            UUID.fromString("50000000-0000-0000-0000-000000009999"),
+            durationCommand("renew-missing-item", "monthly", 1, null, 0),
+            OPERATOR
+        ))
+            .isInstanceOf(PlatformBillingServiceException.class)
+            .hasMessageContaining(PlatformBillingServiceErrorCode.SUBSCRIPTION_ITEM_NOT_FOUND.name());
+
+        assertThatThrownBy(() -> service.renewItem(
+            TENANT_ID,
+            purchased.id(),
+            item.id(),
+            durationCommand("renew-stale-item", "monthly", 1, null, 99),
+            OPERATOR
+        ))
+            .isInstanceOf(PlatformBillingServiceException.class)
+            .hasMessageContaining(PlatformBillingServiceErrorCode.VERSION_CONFLICT.name());
+    }
+
+    @Test
     void suspendAndCancelOnlyChangeEntitlementStatusThroughAppGateSyncBoundary() {
         ProductSubscription existing = subscriptions.add(existingSubscription("monthly", "active", JAN_1, JAN_31, 0));
 
@@ -472,11 +561,15 @@ class ProductSubscriptionServiceTest {
                     store.storeName(),
                     null,
                     null,
+                    subscription.billingCycle(),
+                    subscription.currentPeriodStart(),
+                    subscription.currentPeriodEnd(),
                     1,
                     quote.unitAmount(),
                     quote.storeUnitAmount(),
                     quote.currency(),
                     subscription.status(),
+                    subscription.paymentNote(),
                     OffsetDateTime.parse("2026-06-26T00:00:00Z"),
                     OffsetDateTime.parse("2026-06-26T00:00:00Z"),
                     0
@@ -488,6 +581,52 @@ class ProductSubscriptionServiceTest {
         @Override
         public void updateStatus(UUID tenantId, UUID subscriptionId, String status) {
             statusUpdates.add(status);
+        }
+
+        @Override
+        public Optional<ProductSubscriptionItem> findByTenantSubscriptionAndId(UUID tenantId, UUID subscriptionId, UUID itemId) {
+            return itemsBySubscription.getOrDefault(subscriptionId, List.of()).stream()
+                .filter(item -> item.tenantId().equals(tenantId))
+                .filter(item -> item.id().equals(itemId))
+                .findFirst();
+        }
+
+        @Override
+        public ProductSubscriptionItem updateStoreItem(ProductSubscriptionItemUpdate update) {
+            List<ProductSubscriptionItem> currentItems = new ArrayList<>(itemsBySubscription.getOrDefault(update.subscriptionId(), List.of()));
+            for (int index = 0; index < currentItems.size(); index++) {
+                ProductSubscriptionItem current = currentItems.get(index);
+                if (current.id().equals(update.itemId()) && current.version() == update.expectedVersion()) {
+                    ProductSubscriptionItem next = new ProductSubscriptionItem(
+                        current.id(),
+                        current.subscriptionId(),
+                        current.tenantId(),
+                        current.appKey(),
+                        current.scopeType(),
+                        current.storeId(),
+                        current.storeCode(),
+                        current.storeName(),
+                        current.operatingEntityId(),
+                        current.operatingEntityName(),
+                        update.billingCycle(),
+                        update.currentPeriodStart(),
+                        update.currentPeriodEnd(),
+                        current.quantity(),
+                        update.unitAmount(),
+                        update.amount(),
+                        update.currency(),
+                        update.status(),
+                        update.paymentNote(),
+                        current.createdAt(),
+                        OffsetDateTime.parse("2026-07-08T00:00:00Z"),
+                        current.version() + 1
+                    );
+                    currentItems.set(index, next);
+                    itemsBySubscription.put(update.subscriptionId(), currentItems);
+                    return next;
+                }
+            }
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.VERSION_CONFLICT);
         }
 
         void addStore(BillableStore store) {

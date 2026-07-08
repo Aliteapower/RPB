@@ -63,6 +63,19 @@ public class PlatformTenantProductSubscriptionController {
         ));
     }
 
+    @PostMapping("/{subscriptionId}/items/{itemId}/renew")
+    public ResponseEntity<ProductSubscriptionResponse> renewItem(
+        @PathVariable UUID tenantId,
+        @PathVariable UUID subscriptionId,
+        @PathVariable UUID itemId,
+        @RequestBody(required = false) ProductSubscriptionMutationRequest request
+    ) {
+        PlatformBillingOperator operator = requireOperator();
+        return ResponseEntity.ok(ProductSubscriptionResponse.from(
+            subscriptionService.renewItem(tenantId, subscriptionId, itemId, toCommand(request), operator)
+        ));
+    }
+
     @PostMapping("/{subscriptionId}/suspend")
     public ResponseEntity<ProductSubscriptionResponse> suspend(
         @PathVariable UUID tenantId,

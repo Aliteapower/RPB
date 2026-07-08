@@ -1,8 +1,11 @@
 package com.rpb.reservation.platformbilling.persistence;
 
 import com.rpb.reservation.platformbilling.application.BillableStore;
+import com.rpb.reservation.platformbilling.application.PlatformBillingServiceErrorCode;
+import com.rpb.reservation.platformbilling.application.PlatformBillingServiceException;
 import com.rpb.reservation.platformbilling.application.ProductSubscription;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionItem;
+import com.rpb.reservation.platformbilling.application.ProductSubscriptionItemUpdate;
 import com.rpb.reservation.platformbilling.application.SubscriptionQuote;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,6 +14,7 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -58,11 +62,15 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
                 store.display_name as store_name,
                 store.operating_entity_id,
                 entity.display_name as operating_entity_name,
+                item.billing_cycle,
+                item.current_period_start,
+                item.current_period_end,
                 item.quantity,
                 item.unit_amount,
                 item.amount,
                 item.currency,
                 item.status,
+                item.payment_note,
                 item.created_at,
                 item.updated_at,
                 item.version
@@ -81,6 +89,54 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
             (rs, rowNum) -> item(rs),
             tenantId
         );
+    }
+
+    @Override
+    public Optional<ProductSubscriptionItem> findByTenantSubscriptionAndId(UUID tenantId, UUID subscriptionId, UUID itemId) {
+        return jdbc.query(
+            """
+            select
+                item.id,
+                item.subscription_id,
+                item.tenant_id,
+                item.app_key,
+                item.scope_type,
+                item.store_id,
+                store.store_code,
+                store.display_name as store_name,
+                store.operating_entity_id,
+                entity.display_name as operating_entity_name,
+                item.billing_cycle,
+                item.current_period_start,
+                item.current_period_end,
+                item.quantity,
+                item.unit_amount,
+                item.amount,
+                item.currency,
+                item.status,
+                item.payment_note,
+                item.created_at,
+                item.updated_at,
+                item.version
+            from tenant_product_subscription_items item
+            left join stores store
+              on store.id = item.store_id
+             and store.tenant_id = item.tenant_id
+             and store.deleted_at is null
+            left join operating_entities entity
+              on entity.id = store.operating_entity_id
+             and entity.tenant_id = store.tenant_id
+             and entity.deleted_at is null
+            where item.tenant_id = ?
+              and item.subscription_id = ?
+              and item.id = ?
+              and item.scope_type = 'store'
+            """,
+            (rs, rowNum) -> item(rs),
+            tenantId,
+            subscriptionId,
+            itemId
+        ).stream().findFirst();
     }
 
     @Override
@@ -103,23 +159,68 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
                 subscription.tenantId(),
                 subscription.appKey(),
                 store.storeId(),
+                subscription.billingCycle(),
+                subscription.currentPeriodStart(),
+                subscription.currentPeriodEnd(),
                 1,
                 quote.unitAmount(),
                 allocatedAmounts.get(index),
                 quote.currency(),
-                subscription.status()
+                subscription.status(),
+                subscription.paymentNote()
             });
         }
         jdbc.batchUpdate(
             """
             insert into tenant_product_subscription_items (
                 subscription_id, tenant_id, app_key, scope_type, store_id,
-                quantity, unit_amount, amount, currency, status
+                billing_cycle, current_period_start, current_period_end,
+                quantity, unit_amount, amount, currency, status, payment_note
             )
-            values (?, ?, ?, 'store', ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, 'store', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             batchArgs
         );
+    }
+
+    @Override
+    public ProductSubscriptionItem updateStoreItem(ProductSubscriptionItemUpdate update) {
+        int updatedRows = jdbc.update(
+            """
+            update tenant_product_subscription_items
+            set billing_cycle = ?,
+                status = ?,
+                current_period_start = ?,
+                current_period_end = ?,
+                unit_amount = ?,
+                amount = ?,
+                currency = ?,
+                payment_note = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and subscription_id = ?
+              and id = ?
+              and scope_type = 'store'
+              and version = ?
+            """,
+            update.billingCycle(),
+            update.status(),
+            update.currentPeriodStart(),
+            update.currentPeriodEnd(),
+            update.unitAmount(),
+            update.amount(),
+            update.currency(),
+            update.paymentNote(),
+            update.tenantId(),
+            update.subscriptionId(),
+            update.itemId(),
+            update.expectedVersion()
+        );
+        if (updatedRows != 1) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.VERSION_CONFLICT);
+        }
+        return findByTenantSubscriptionAndId(update.tenantId(), update.subscriptionId(), update.itemId()).orElseThrow();
     }
 
     @Override
@@ -167,11 +268,15 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
             rs.getString("store_name"),
             rs.getObject("operating_entity_id", UUID.class),
             rs.getString("operating_entity_name"),
+            rs.getString("billing_cycle"),
+            rs.getObject("current_period_start", OffsetDateTime.class),
+            rs.getObject("current_period_end", OffsetDateTime.class),
             rs.getInt("quantity"),
             rs.getBigDecimal("unit_amount"),
             rs.getBigDecimal("amount"),
             rs.getString("currency"),
             rs.getString("status"),
+            rs.getString("payment_note"),
             rs.getObject("created_at", OffsetDateTime.class),
             rs.getObject("updated_at", OffsetDateTime.class),
             rs.getInt("version")

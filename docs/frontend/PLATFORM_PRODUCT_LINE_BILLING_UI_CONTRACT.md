@@ -1,6 +1,6 @@
 # Platform Product Line Billing UI Contract
 
-Status: Phase 1 implemented, Phase 1.1 pricing and duration flow implemented, Phase 1.2 store billing line items implemented
+Status: Phase 1 implemented, Phase 1.1 pricing and duration flow implemented, Phase 1.2 store billing line items implemented, Phase 1.3 store item renewal implemented
 
 ## Pages
 
@@ -55,9 +55,11 @@ Responsibilities:
 - show period start, period end, amount, currency, and entitlement status
 - show unopened product lines as `未开通`
 - use `购买数量` in months or years instead of visible date inputs
-- default `本次金额` from product-line price times duration count times active store count
-- show `计费门店数`, `单店金额`, and store billing detail rows when the API returns line items
+- default purchase and legacy conversion amount from product-line price times duration count times active store count
+- default store renewal amount from product-line price times duration count times one selected store
+- show `计费门店数`, `单店金额`, and selectable store billing detail rows when the API returns line items
 - disable purchase, renewal, and conversion actions when the tenant has no active billable stores
+- use selected store item id and item version for normal paid renewals
 - manually purchase, renew, suspend, cancel, and convert legacy grant
 - generate idempotency keys client-side for manual operations
 - show loading, error, and saving states

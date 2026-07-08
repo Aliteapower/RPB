@@ -149,6 +149,73 @@ public class ProductSubscriptionService {
     }
 
     @Transactional
+    public ProductSubscriptionMutationResult renewItem(
+        UUID tenantId,
+        UUID subscriptionId,
+        UUID itemId,
+        ProductSubscriptionCommand command,
+        PlatformBillingOperator operator
+    ) {
+        ProductSubscription current = currentSubscription(tenantId, subscriptionId);
+        if (itemId == null) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
+        }
+        ProductSubscriptionCommand normalized = validateMutation(command, CONVERT_CYCLES, false);
+        if (!current.appKey().equals(normalized.appKey())) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
+        }
+        if (normalized.durationCount() == null) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
+        }
+        Optional<ProductSubscriptionMutationResult> replay = replay(
+            tenantId,
+            current.appKey(),
+            "renew_item",
+            normalized.idempotencyKey()
+        );
+        if (replay.isPresent()) {
+            return replay.get();
+        }
+        ProductSubscriptionItem item = items.findByTenantSubscriptionAndId(tenantId, subscriptionId, itemId)
+            .orElseThrow(() -> new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_ITEM_NOT_FOUND));
+        checkItemVersion(item, normalized.version());
+
+        BillingDuration duration = new BillingDuration(normalized.billingCycle(), normalized.durationCount());
+        BillingPeriodCalculation period = calculateItemPeriod(item, duration);
+        SubscriptionQuote quote = quoteService.quote(
+            current.appKey(),
+            duration,
+            1,
+            normalized.amount(),
+            normalized.currency()
+        );
+        ProductSubscriptionItem updatedItem = items.updateStoreItem(new ProductSubscriptionItemUpdate(
+            tenantId,
+            subscriptionId,
+            itemId,
+            normalized.billingCycle(),
+            ACTIVE,
+            period.periodStart(),
+            period.periodEnd(),
+            quote.unitAmount(),
+            quote.finalAmount(),
+            quote.currency(),
+            normalized.paymentNote(),
+            item.version()
+        ));
+        ProductSubscription updatedAggregate = updateAggregateFromItems(current, updatedItem, normalized.paymentNote(), operator.userId());
+        appendEvent(updatedAggregate, "renew_item", normalized.idempotencyKey(), operator.userId(), quote);
+        entitlements.enableTenantApp(
+            tenantId,
+            updatedAggregate.appKey(),
+            updatedAggregate.currentPeriodStart(),
+            updatedAggregate.currentPeriodEnd(),
+            operator.userId()
+        );
+        return new ProductSubscriptionMutationResult(false, afterEnabledSync(withItems(updatedAggregate)), quote);
+    }
+
+    @Transactional
     public ProductSubscriptionMutationResult suspend(
         UUID tenantId,
         UUID subscriptionId,
@@ -348,6 +415,61 @@ public class ProductSubscriptionService {
         if (version != null && subscription.version() != version) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.VERSION_CONFLICT);
         }
+    }
+
+    private static void checkItemVersion(ProductSubscriptionItem item, Integer version) {
+        if (version != null && item.version() != version) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.VERSION_CONFLICT);
+        }
+    }
+
+    private BillingPeriodCalculation calculateItemPeriod(ProductSubscriptionItem item, BillingDuration duration) {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        OffsetDateTime start = item.currentPeriodEnd() != null && item.currentPeriodEnd().isAfter(now)
+            ? item.currentPeriodEnd()
+            : now;
+        OffsetDateTime end = "monthly".equals(duration.billingCycle())
+            ? start.plusMonths(duration.durationCount())
+            : start.plusYears(duration.durationCount());
+        return new BillingPeriodCalculation(start, end);
+    }
+
+    private ProductSubscription updateAggregateFromItems(
+        ProductSubscription current,
+        ProductSubscriptionItem updatedItem,
+        String paymentNote,
+        UUID operatorUserId
+    ) {
+        List<ProductSubscriptionItem> activeItems = items.listByTenantId(current.tenantId()).stream()
+            .filter(item -> item.subscriptionId().equals(current.id()))
+            .filter(item -> ACTIVE.equals(item.status()))
+            .toList();
+        BigDecimal amount = activeItems.stream()
+            .map(ProductSubscriptionItem::amount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        OffsetDateTime periodStart = activeItems.stream()
+            .map(ProductSubscriptionItem::currentPeriodStart)
+            .filter(value -> value != null)
+            .min(OffsetDateTime::compareTo)
+            .orElse(updatedItem.currentPeriodStart());
+        OffsetDateTime periodEnd = activeItems.stream()
+            .map(ProductSubscriptionItem::currentPeriodEnd)
+            .filter(value -> value != null)
+            .max(OffsetDateTime::compareTo)
+            .orElse(updatedItem.currentPeriodEnd());
+        return subscriptions.update(new ProductSubscriptionUpdate(
+            current.tenantId(),
+            current.id(),
+            updatedItem.billingCycle(),
+            ACTIVE,
+            periodStart,
+            periodEnd,
+            amount,
+            updatedItem.currency(),
+            paymentNote,
+            operatorUserId,
+            current.version()
+        ));
     }
 
     private PreparedMutation prepareMutation(
