@@ -262,6 +262,51 @@ POST /api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/
 POST /api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/items/{itemId}/cancel
 ```
 
+Add a platform-wide store billing index endpoint for the page:
+
+```text
+GET /api/v1/platform/billing/store-subscriptions
+```
+
+This endpoint exists so `/platform/billing/subscriptions` can show store billing status across groups without doing one request per tenant.
+
+Query parameters:
+
+- `appKey`: product line filter, default first active product line.
+- `keyword`: searches tenant code/name, tenant phone/address, operating entity code/name, operating entity phone/address, and store code/name.
+- `billingStatus`: all, active, due_soon, expired, suspended, cancelled, not_opened.
+- `tenantStatus`: all, active, suspended, closed.
+- `dueBefore`: optional due-date filter.
+- `limit`
+- `offset`
+
+Default due-soon logic:
+
+```text
+currentPeriodEnd >= now(clock) and currentPeriodEnd <= now(clock) + 30 days
+```
+
+If `dueBefore` is provided, use `currentPeriodEnd <= dueBefore` instead of the default 30-day upper bound. Expired rows remain `expired`, not `due_soon`.
+
+Response rows should represent one tenant/product-line/store slot, including stores that do not have a billing item yet:
+
+- tenant id, code, name, status
+- operating entity id, code, name, status
+- store id, code, name, status
+- product line app key and display name
+- subscription id if present
+- subscription item id if present
+- item billing cycle if present
+- item status and effective status
+- current period start/end if present
+- amount, unit amount, currency if present
+- action state: openable, renewable, suspendable, cancellable
+- updated timestamp
+
+Pagination is by store slot row, not by tenant. A tenant with five stores can occupy five rows.
+
+The backend must build this response with tenant/store scoped joins. It must not allow a billing item from one tenant to appear under another tenant or operating entity.
+
 Open and renew requests should accept:
 
 - `billingCycle`
@@ -330,6 +375,78 @@ For future store self-payment:
 - Do not expose a tenant self-pay screen yet.
 - Keep the store item id, store id, event actor fields, and payment channel fields stable enough that a later store-admin checkout can reuse the same item mutation/event model.
 
+### Platform Billing Subscriptions Page
+
+`/platform/billing/subscriptions` must become a dedicated billing workbench, not the tenant management table in billing mode.
+
+Current route behavior:
+
+```text
+/platform/billing/subscriptions -> PlatformTenantsPage with billingOnly=true
+```
+
+Target route behavior:
+
+```text
+/platform/billing/subscriptions -> PlatformBillingSubscriptionsPage
+```
+
+The page should answer the platform admin's daily billing question:
+
+```text
+Which group, operating entity, and store needs billing action?
+```
+
+Recommended layout:
+
+1. Product line selector.
+2. Billing status segmented filters:
+   - all
+   - due soon
+   - expired
+   - not opened
+   - active
+   - suspended/cancelled
+3. Search box for group, operating entity, store, phone, or address.
+4. Store billing index grouped visually by group and operating entity.
+5. Row actions for the target store:
+   - open
+   - renew
+   - suspend
+   - cancel
+   - details
+
+Desktop table columns:
+
+- group tenant code/name
+- operating entity
+- store code/name
+- product line
+- billing status
+- period end
+- amount
+- latest update
+- actions
+
+Mobile cards should keep the same hierarchy:
+
+```text
+Group tenant
+Operating entity
+Store
+Billing status and action
+```
+
+The page should not show only tenant contact fields such as principal, phone, address, and tenant update time. Those are useful for tenant management, but they do not help platform admins renew a specific store.
+
+The primary action can open the same store billing operation panel used by the tenant billing detail page. A secondary details action can navigate to:
+
+```text
+/platform/tenants/{tenantId}/billing?appKey={appKey}&operatingEntityId={entityId}&storeId={storeId}
+```
+
+This keeps quick renewals available from the global list while preserving the full tenant billing detail page for deeper inspection.
+
 ## Isolation Rules
 
 Every store billing mutation must validate:
@@ -365,7 +482,19 @@ Frontend tests or build validation:
 3. Store operation panel targets the selected store only.
 4. Stores without billing items show open action instead of renew.
 5. Store amount preview uses one-store pricing.
-6. Production build succeeds.
+6. `/platform/billing/subscriptions` uses a dedicated billing subscriptions page instead of the tenant management table.
+7. Billing subscriptions page groups index rows by group tenant and operating entity.
+8. Billing subscriptions page shows store billing status, period, amount, and store action instead of tenant contact columns only.
+9. Production build succeeds.
+
+Store billing index API tests:
+
+1. The index returns active stores without billing items as `not_opened`.
+2. The index returns item status and effective status for stores with billing items.
+3. Keyword search can find tenant, operating entity, and store fields.
+4. Billing status filters return due soon, expired, not opened, and active rows correctly.
+5. Rows never join billing items across tenants.
+6. Pagination remains stable when a tenant has multiple stores.
 
 Manual smoke:
 
@@ -374,6 +503,8 @@ Manual smoke:
 3. Confirm sibling stores keep their previous period and amount.
 4. Confirm platform billing page does not mix stores from different operating entities in the active selection.
 5. Confirm product-line aggregate remains coherent after item mutation.
+6. Open `/platform/billing/subscriptions` and confirm it shows group, operating entity, store, billing status, due date, amount, and store actions.
+7. Filter the global billing page to due soon or not opened stores and renew/open one target store.
 
 ## Documentation Updates During Implementation
 
