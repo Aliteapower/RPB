@@ -62,3 +62,18 @@
   - `https://booking.yumstone.sg/platform/tenants/fb8e092d-aa34-42eb-bb55-5229044c3885/billing` returned `200`.
   - `https://booking.yumstone.sg/assets/PlatformTenantBillingPage-DfW6Xr-C.js` returned `200`.
   - Shared API chunk contains the new `/items/{itemId}/renew` path.
+
+## Follow-Up Fix Deployment
+
+- Deployed commit `c8843ee3` to `booking.yumstone.sg` on 2026-07-08.
+- Root cause fixed: production database event type constraint did not permit `renew_item`, so single-store renewal failed while writing the audit event.
+- Backup directory: `/opt/rpb/backups/20260708-1033-c8843ee3`.
+- Flyway: `042|allow store item subscription events|true`.
+- Production constraint now permits `renew_item` in `tenant_product_subscription_events`.
+- Backend service: `rpb-backend` active, `/api/v1/auth/me` returned `401`.
+- Public smoke checks:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `https://booking.yumstone.sg/platform/tenants/fb8e092d-aa34-42eb-bb55-5229044c3885/billing` returned `200`.
+  - `https://booking.yumstone.sg/assets/PlatformTenantBillingPage-CXk197nq.js` returned `200`.
+  - The deployed billing page asset contains `renewStore` and no `toggleProductLine`.
+  - Shared API chunk contains the `/items/` single-store renewal path.
