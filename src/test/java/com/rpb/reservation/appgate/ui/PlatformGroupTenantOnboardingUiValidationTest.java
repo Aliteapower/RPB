@@ -95,6 +95,8 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("activePanel")
             .contains("selectedOperatingEntityId")
             .contains("visibleStores")
+            .contains("visibleAdminStoreOptions")
+            .contains("currentEntitySelectedAdminStoreOptions")
             .contains("selectOperatingEntity(entity.id)")
             .contains("visibleStores.length")
             .contains("entityFormOpen")
@@ -107,9 +109,12 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("platform.tenants.structure.summary.selectedStores")
             .contains("platform.tenants.structure.guide.noEntities")
             .contains("platform.tenants.structure.guide.noStoresForEntity")
+            .contains("platform.tenants.structure.adminStoreAccess.title")
+            .contains("platform.tenants.structure.adminStoreAccess.defaultStore")
             .contains("v-if=\"entityFormOpen\"")
             .contains("v-if=\"storeFormOpen\"")
             .contains("v-for=\"store in visibleStores\"")
+            .contains("v-for=\"store in visibleAdminStoreOptions\"")
             .contains("advanced-fields")
             .contains("storeForm.adminUsername")
             .contains("storeForm.adminPassword")
@@ -139,7 +144,8 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("operationDefaults: '运营默认值'")
             .contains("branchAdminAccount: '分店管理员账号'")
             .contains("branchAdminUsername: '分店管理员登录账号'")
-            .contains("branchAdminPassword: '分店管理员密码'");
+            .contains("branchAdminPassword: '分店管理员密码'")
+            .contains("defaultStoreElsewhere: '默认门店在其他经营主体。'");
         assertThat(en)
             .contains("structure: 'Store structure'")
             .contains("operatingEntities: 'Operating entities'")
@@ -152,6 +158,7 @@ class PlatformGroupTenantOnboardingUiValidationTest {
             .contains("operationDefaults: 'Operating defaults'")
             .contains("branchAdminAccount: 'Branch admin account'")
             .contains("branchAdminUsername: 'Branch admin username'")
-            .contains("branchAdminPassword: 'Branch admin password'");
+            .contains("branchAdminPassword: 'Branch admin password'")
+            .contains("defaultStoreElsewhere: 'The default store is under another operating entity.'");
     }
 }

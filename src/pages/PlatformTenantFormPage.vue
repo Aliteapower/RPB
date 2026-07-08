@@ -29,6 +29,7 @@ import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import PlatformTenantForm from '../components/platform/PlatformTenantForm.vue'
 import PlatformTenantStructurePanel from '../components/platform/PlatformTenantStructurePanel.vue'
 import type {
+  PlatformTenantAdminStoreAccessFormModel,
   PlatformOperatingEntityFormModel,
   PlatformStoreFormModel,
   PlatformTenantFormModel,
@@ -152,6 +153,8 @@ async function reloadStructureAndAccess(): Promise<void> {
     loadTenantStructure()
   ])
   adminStoreOptions.value = storeAccess.stores
+  form.adminStoreIds = storeAccess.storeIds
+  form.defaultAdminStoreId = storeAccess.defaultStoreId || ''
 }
 
 async function submitTenantForm(submittedForm: PlatformTenantFormModel): Promise<void> {
@@ -227,9 +230,7 @@ function toPayload(submittedForm: PlatformTenantFormModel): PlatformTenantMutati
     principalName: optionalValue(submittedForm.principalName),
     initialPassword: mode.value === 'create' ? submittedForm.initialPassword.trim() : null,
     password: mode.value === 'edit' ? optionalValue(submittedForm.password) : null,
-    onboardingMode: submittedForm.onboardingMode,
-    adminStoreIds: mode.value === 'edit' ? [...submittedForm.adminStoreIds] : undefined,
-    defaultAdminStoreId: mode.value === 'edit' ? optionalValue(submittedForm.defaultAdminStoreId) : undefined
+    onboardingMode: submittedForm.onboardingMode
   }
 }
 
@@ -269,6 +270,26 @@ async function saveStore(submittedForm: PlatformStoreFormModel): Promise<void> {
     } else {
       await createTenantStore(tenantId.value, payload)
     }
+    await reloadStructureAndAccess()
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    structureSaving.value = false
+  }
+}
+
+async function saveAdminStoreAccess(submittedForm: PlatformTenantAdminStoreAccessFormModel): Promise<void> {
+  if (structureSaving.value || mode.value !== 'edit') {
+    return
+  }
+
+  structureSaving.value = true
+  errorText.value = ''
+  try {
+    await updateTenant(tenantId.value, {
+      adminStoreIds: [...submittedForm.adminStoreIds],
+      defaultAdminStoreId: optionalValue(submittedForm.defaultAdminStoreId)
+    })
     await reloadStructureAndAccess()
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -360,7 +381,6 @@ function apiErrorText(error: unknown): string {
         v-else
         :mode="mode"
         :form="form"
-        :admin-store-options="adminStoreOptions"
         :status-options="statusOptions"
         :saving="saving"
         @submit="submitTenantForm"
@@ -372,9 +392,13 @@ function apiErrorText(error: unknown): string {
         v-if="!loading && mode === 'edit'"
         :operating-entities="operatingEntities"
         :stores="tenantStores"
+        :admin-store-options="adminStoreOptions"
+        :admin-store-ids="form.adminStoreIds"
+        :default-admin-store-id="form.defaultAdminStoreId"
         :saving="structureSaving"
         @save-operating-entity="saveOperatingEntity"
         @save-store="saveStore"
+        @save-admin-store-access="saveAdminStoreAccess"
       />
     </section>
   </main>

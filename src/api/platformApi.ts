@@ -93,8 +93,8 @@ export interface PlatformStoreMutation {
 
 export interface PlatformTenantMutation {
   tenantCode?: string
-  displayName: string
-  status: TenantStatus
+  displayName?: string
+  status?: TenantStatus
   defaultLocale?: string | null
   contactPhone?: string | null
   address?: string | null

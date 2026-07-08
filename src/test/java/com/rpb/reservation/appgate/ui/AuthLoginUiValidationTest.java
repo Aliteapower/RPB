@@ -277,12 +277,44 @@ class AuthLoginUiValidationTest {
         String source = FrontendSourceSupport.readString(listPagePath)
             + FrontendSourceSupport.readString(tablePath)
             + FrontendSourceSupport.readString(formPagePath)
-            + FrontendSourceSupport.readString(formPath)
             + FrontendSourceSupport.readString(structurePath)
             + FrontendSourceSupport.readString(apiPath)
             + FrontendSourceSupport.readString(uiPath);
+        String formSource = FrontendSourceSupport.readString(formPath);
+        String formPageSource = FrontendSourceSupport.readString(formPagePath);
+        String structureSource = FrontendSourceSupport.readString(structurePath);
         String zh = FrontendSourceSupport.readString(zhPath);
         String en = FrontendSourceSupport.readString(enPath);
+
+        assertThat(formSource)
+            .doesNotContain("admin-store-access-panel")
+            .doesNotContain("toggleAdminStoreFromEvent")
+            .doesNotContain("platform.tenants.form.adminStoreAccess.title");
+
+        assertThat(formPageSource)
+            .contains(":admin-store-options=\"adminStoreOptions\"")
+            .contains(":admin-store-ids=\"form.adminStoreIds\"")
+            .contains(":default-admin-store-id=\"form.defaultAdminStoreId\"")
+            .contains("@save-admin-store-access=\"saveAdminStoreAccess\"")
+            .contains("async function saveAdminStoreAccess")
+            .contains("adminStoreIds: [...submittedForm.adminStoreIds]")
+            .contains("defaultAdminStoreId: optionalValue(submittedForm.defaultAdminStoreId)");
+
+        assertThat(structureSource)
+            .contains("adminStoreOptions")
+            .contains("adminStoreIds")
+            .contains("defaultAdminStoreId")
+            .contains("visibleAdminStoreOptions")
+            .contains("currentEntitySelectedAdminStoreOptions")
+            .contains("defaultAdminStoreOption")
+            .contains("saveAdminStoreAccess")
+            .contains("toggleAdminStoreFromEvent")
+            .contains("admin-store-access-panel")
+            .contains("v-for=\"store in visibleAdminStoreOptions\"")
+            .contains("v-if=\"defaultAdminStoreOption && !defaultStoreInSelectedEntity\"")
+            .contains("store.operatingEntityId === selectedOperatingEntityId")
+            .contains("platform.tenants.structure.adminStoreAccess.title")
+            .contains("platform.tenants.structure.adminStoreAccess.defaultStore");
 
         assertThat(source)
             .contains("getTenantAdminStoreAccess")
@@ -290,11 +322,6 @@ class AuthLoginUiValidationTest {
             .contains("adminStoreOptions")
             .contains("adminStoreIds")
             .contains("defaultAdminStoreId")
-            .contains("admin-store-access-panel")
-            .contains("toggleAdminStoreFromEvent")
-            .contains("selectedAdminStoreOptions")
-            .contains("platform.tenants.form.adminStoreAccess.title")
-            .contains("platform.tenants.form.adminStoreAccess.defaultStore")
             .contains("openStructurePage")
             .contains("hash: '#tenant-structure'")
             .contains("@structure=\"openStructurePage\"")
@@ -317,6 +344,7 @@ class AuthLoginUiValidationTest {
             .contains("PlatformStoreFormModel");
 
         assertThat(zh)
+            .contains("adminStoreAccess")
             .contains("title: '授权门店'")
             .contains("defaultStore: '默认门店'")
             .contains("structure: '门店结构'")
@@ -324,6 +352,7 @@ class AuthLoginUiValidationTest {
             .contains("newEntity: '新增经营主体'")
             .contains("newStore: '新增分店'");
         assertThat(en)
+            .contains("adminStoreAccess")
             .contains("title: 'Authorised stores'")
             .contains("defaultStore: 'Default store'")
             .contains("structure: 'Store structure'")

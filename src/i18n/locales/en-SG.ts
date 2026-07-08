@@ -698,6 +698,13 @@ export const enSG = {
           empty: 'No stores',
           hint: 'Store code is used for login subdomains and store routes'
         },
+        adminStoreAccess: {
+          title: 'Authorised stores',
+          defaultStore: 'Default store',
+          empty: 'This operating entity has no stores available for authorisation.',
+          save: 'Save access',
+          defaultStoreElsewhere: 'The default store is under another operating entity.'
+        },
         fields: {
           entityCode: 'Entity code',
           displayName: 'Name',

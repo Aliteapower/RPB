@@ -698,6 +698,13 @@ export const zhCN = {
           empty: '暂无门店',
           hint: '门店代码会用于登录子域名和门店路由'
         },
+        adminStoreAccess: {
+          title: '授权门店',
+          defaultStore: '默认门店',
+          empty: '当前经营主体暂无可授权门店。',
+          save: '保存授权',
+          defaultStoreElsewhere: '默认门店在其他经营主体。'
+        },
         fields: {
           entityCode: '经营主体代码',
           displayName: '名称',

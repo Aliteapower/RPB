@@ -30,6 +30,11 @@ export interface PlatformTenantFormModel {
   defaultAdminStoreId: string
 }
 
+export interface PlatformTenantAdminStoreAccessFormModel {
+  adminStoreIds: string[]
+  defaultAdminStoreId: string
+}
+
 export interface PlatformOperatingEntityFormModel {
   id: string
   entityCode: string

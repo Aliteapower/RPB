@@ -112,6 +112,38 @@ class PlatformTenantApiIntegrationTest {
             "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
             PASSWORD_393930_HASH
         );
+        jdbc.update(
+            """
+            update auth_accounts
+            set default_store_id = ?
+            where tenant_id = ?
+              and username in ('sysadmin', '20000000', '1000')
+              and deleted_at is null
+            """,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID
+        );
+        jdbc.update(
+            """
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            select account.id, account.tenant_id, ?
+            from auth_accounts account
+            where account.tenant_id = ?
+              and account.username in ('sysadmin', '20000000', '1000')
+              and account.deleted_at is null
+              and not exists (
+                  select 1
+                  from auth_account_store_access existing
+                  where existing.account_id = account.id
+                    and existing.tenant_id = account.tenant_id
+                    and existing.store_id = ?
+                    and existing.deleted_at is null
+              )
+            """,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID
+        );
     }
 
     @Test

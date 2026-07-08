@@ -2,9 +2,14 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { PlatformOperatingEntity, PlatformStore } from '../../api/platformApi'
+import type {
+  PlatformOperatingEntity,
+  PlatformStore,
+  PlatformTenantStoreAccessStore
+} from '../../api/platformApi'
 import PasswordInput from '../common/PasswordInput.vue'
 import type {
+  PlatformTenantAdminStoreAccessFormModel,
   PlatformOperatingEntityFormModel,
   PlatformStoreFormModel
 } from './platformTenantUi'
@@ -12,12 +17,16 @@ import type {
 const props = defineProps<{
   operatingEntities: PlatformOperatingEntity[]
   stores: PlatformStore[]
+  adminStoreOptions: PlatformTenantStoreAccessStore[]
+  adminStoreIds: string[]
+  defaultAdminStoreId: string
   saving: boolean
 }>()
 
 const emit = defineEmits<{
   saveOperatingEntity: [form: PlatformOperatingEntityFormModel]
   saveStore: [form: PlatformStoreFormModel]
+  saveAdminStoreAccess: [form: PlatformTenantAdminStoreAccessFormModel]
 }>()
 
 const { t } = useI18n()
@@ -26,6 +35,10 @@ type StructurePanel = 'entities' | 'stores'
 
 const entityForm = reactive<PlatformOperatingEntityFormModel>(emptyEntityForm())
 const storeForm = reactive<PlatformStoreFormModel>(emptyStoreForm())
+const adminAccessForm = reactive<PlatformTenantAdminStoreAccessFormModel>({
+  adminStoreIds: [],
+  defaultAdminStoreId: ''
+})
 const activePanel = ref<StructurePanel>('entities')
 const entityFormOpen = ref(false)
 const storeFormOpen = ref(false)
@@ -43,6 +56,26 @@ const visibleStores = computed(() => {
   }
   return props.stores.filter(store => store.operatingEntityId === selectedOperatingEntityId.value)
 })
+const visibleAdminStoreOptions = computed(() => {
+  if (!selectedOperatingEntityId.value) {
+    return []
+  }
+  return props.adminStoreOptions.filter(store => store.operatingEntityId === selectedOperatingEntityId.value)
+})
+const selectedAdminStoreOptions = computed(() => {
+  const selected = new Set(adminAccessForm.adminStoreIds)
+  return props.adminStoreOptions.filter(store => selected.has(store.storeId))
+})
+const currentEntitySelectedAdminStoreOptions = computed(() => {
+  const selected = new Set(adminAccessForm.adminStoreIds)
+  return visibleAdminStoreOptions.value.filter(store => selected.has(store.storeId))
+})
+const defaultAdminStoreOption = computed(() =>
+  props.adminStoreOptions.find(store => store.storeId === adminAccessForm.defaultAdminStoreId)
+)
+const defaultStoreInSelectedEntity = computed(() =>
+  currentEntitySelectedAdminStoreOptions.value.some(store => store.storeId === adminAccessForm.defaultAdminStoreId)
+)
 const structureGuideKey = computed(() => {
   if (props.operatingEntities.length === 0) {
     return 'platform.tenants.structure.guide.noEntities'
@@ -75,6 +108,16 @@ watch(
     if (!storeForm.operatingEntityId) {
       storeForm.operatingEntityId = selectedOperatingEntityId.value || activeOperatingEntities.value[0]?.id || ''
     }
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => [props.adminStoreIds, props.defaultAdminStoreId, props.adminStoreOptions] as const,
+  () => {
+    adminAccessForm.adminStoreIds = [...props.adminStoreIds]
+    adminAccessForm.defaultAdminStoreId = props.defaultAdminStoreId
+    ensureDefaultAdminStore()
   },
   { deep: true, immediate: true }
 )
@@ -191,6 +234,42 @@ function submitStore(): void {
   emit('saveStore', { ...storeForm })
 }
 
+function toggleAdminStoreFromEvent(storeId: string, event: Event): void {
+  const checked = (event.target as HTMLInputElement | null)?.checked === true
+  const selected = new Set(adminAccessForm.adminStoreIds)
+  if (checked) {
+    selected.add(storeId)
+  } else {
+    selected.delete(storeId)
+  }
+  adminAccessForm.adminStoreIds = Array.from(selected)
+  ensureDefaultAdminStore()
+}
+
+function ensureDefaultAdminStore(): void {
+  const selected = new Set(adminAccessForm.adminStoreIds)
+  const validSelectedStores = selectedAdminStoreOptions.value
+  if (
+    adminAccessForm.defaultAdminStoreId &&
+    selected.has(adminAccessForm.defaultAdminStoreId) &&
+    defaultAdminStoreOption.value
+  ) {
+    return
+  }
+
+  adminAccessForm.defaultAdminStoreId =
+    currentEntitySelectedAdminStoreOptions.value[0]?.storeId ||
+    validSelectedStores[0]?.storeId ||
+    ''
+}
+
+function saveAdminStoreAccess(): void {
+  emit('saveAdminStoreAccess', {
+    adminStoreIds: [...adminAccessForm.adminStoreIds],
+    defaultAdminStoreId: adminAccessForm.defaultAdminStoreId
+  })
+}
+
 function showPanel(panel: StructurePanel): void {
   activePanel.value = panel
 }
@@ -216,6 +295,11 @@ function storeEntityName(store: PlatformStore): string {
     return entityById.value.get(store.operatingEntityId)?.displayName || store.operatingEntityId.slice(0, 8)
   }
   return t('platform.tenants.structure.fields.unassigned')
+}
+
+function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
+  const name = store.storeName || store.storeCode || store.storeId.slice(0, 8)
+  return store.storeCode ? `${name} (${store.storeCode})` : name
 }
 </script>
 
@@ -407,6 +491,69 @@ function storeEntityName(store: PlatformStore): string {
             </button>
           </article>
         </div>
+
+        <form class="admin-store-access-panel" @submit.prevent="saveAdminStoreAccess">
+          <div class="form-subheading">
+            <strong>{{ $t('platform.tenants.structure.adminStoreAccess.title') }}</strong>
+          </div>
+          <p v-if="visibleAdminStoreOptions.length === 0" class="helper-line">
+            {{ $t('platform.tenants.structure.adminStoreAccess.empty') }}
+          </p>
+          <div v-else class="admin-store-grid">
+            <label
+              v-for="store in visibleAdminStoreOptions"
+              :key="store.storeId"
+              class="admin-store-option"
+            >
+              <input
+                type="checkbox"
+                :checked="adminAccessForm.adminStoreIds.includes(store.storeId)"
+                @change="toggleAdminStoreFromEvent(store.storeId, $event)"
+              />
+              <span>
+                <strong>{{ adminStoreDisplayName(store) }}</strong>
+                <small>{{ store.locale || '-' }}</small>
+              </span>
+            </label>
+          </div>
+          <label>
+            <span>{{ $t('platform.tenants.structure.adminStoreAccess.defaultStore') }}</span>
+            <select
+              v-model="adminAccessForm.defaultAdminStoreId"
+              :disabled="selectedAdminStoreOptions.length === 0"
+              required
+            >
+              <option
+                v-if="defaultAdminStoreOption && !defaultStoreInSelectedEntity"
+                :value="defaultAdminStoreOption.storeId"
+              >
+                {{ adminStoreDisplayName(defaultAdminStoreOption) }}
+              </option>
+              <option
+                v-for="store in currentEntitySelectedAdminStoreOptions"
+                :key="store.storeId"
+                :value="store.storeId"
+              >
+                {{ adminStoreDisplayName(store) }}
+              </option>
+            </select>
+          </label>
+          <p
+            v-if="adminAccessForm.defaultAdminStoreId && !defaultStoreInSelectedEntity"
+            class="helper-line"
+          >
+            {{ $t('platform.tenants.structure.adminStoreAccess.defaultStoreElsewhere') }}
+          </p>
+          <div class="form-actions">
+            <button
+              class="primary-button"
+              type="submit"
+              :disabled="saving || selectedAdminStoreOptions.length === 0 || !adminAccessForm.defaultAdminStoreId"
+            >
+              {{ saving ? $t('common.actions.saving') : $t('platform.tenants.structure.adminStoreAccess.save') }}
+            </button>
+          </div>
+        </form>
 
         <form v-if="storeFormOpen" class="inline-form" @submit.prevent="submitStore">
           <div class="form-subheading span-2">
@@ -694,10 +841,15 @@ function storeEntityName(store: PlatformStore): string {
 }
 
 .data-row small,
-.empty-line {
+.empty-line,
+.helper-line {
   color: #64748b;
   font-size: 13px;
   font-weight: 700;
+}
+
+.helper-line {
+  margin: 0;
 }
 
 .inline-form {
@@ -705,6 +857,52 @@ function storeEntityName(store: PlatformStore): string {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding-top: 2px;
+}
+
+.admin-store-access-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.admin-store-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-store-option {
+  min-height: 58px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.admin-store-option input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+}
+
+.admin-store-option span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.admin-store-option strong {
+  overflow-wrap: anywhere;
+  color: #0f172a;
+}
+
+.admin-store-option small {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .form-subheading {
@@ -874,6 +1072,10 @@ select {
   }
 
   .inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-store-grid {
     grid-template-columns: 1fr;
   }
 
