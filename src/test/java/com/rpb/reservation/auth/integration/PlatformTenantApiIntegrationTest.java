@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rpb.reservation.appgate.domain.AppGateRequiredPermission;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -415,6 +416,19 @@ class PlatformTenantApiIntegrationTest {
             """, tenantId, storeId, tenantId, storeId)).isEqualTo(1);
         assertThat(countWhere("""
             select count(*)
+            from auth_account_permissions permission
+            join auth_accounts account on account.id = permission.account_id
+            where account.tenant_id = ?
+              and account.username = 'codex-login'
+              and account.deleted_at is null
+              and permission.permission_code = ?
+              and permission.deleted_at is null
+            """,
+            tenantId,
+            AppGateRequiredPermission.RESERVATION_TODAY_VIEW
+        )).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
             from tenant_host_aliases
             where tenant_id = ?
               and alias_code = 'codex-login'
@@ -435,6 +449,11 @@ class PlatformTenantApiIntegrationTest {
             """, tenantId)).isEqualTo(1);
 
         login("codex-login", "abc123");
+        Cookie staffEntrySession = login("codex-login", "staff", "codex-login", "abc123");
+        mockMvc.perform(get("/api/v1/me/stores").cookie(staffEntrySession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.stores[0].storeId").value(storeId.toString()));
     }
 
     @Test
@@ -584,10 +603,25 @@ class PlatformTenantApiIntegrationTest {
               and role.deleted_at is null
               and access.deleted_at is null
             """, tenantId, storeId, tenantId, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_roles role on role.account_id = account.id
+            join auth_account_permissions permission on permission.account_id = account.id
+            where account.tenant_id = ?
+              and account.username = 'codex-branch-a-admin'
+              and account.status = 'active'
+              and role.role_code = 'tenant_admin'
+              and permission.permission_code = 'tenant.admin.manage'
+              and account.deleted_at is null
+              and role.deleted_at is null
+              and permission.deleted_at is null
+            """, tenantId)).isEqualTo(1);
 
         login("codex-branch-admin", "abc123");
         expectLoginRejected("codex-branch-a-admin", "abc123");
-        Cookie branchAdminSession = login("codex-branch-a-admin", "def456");
+        Cookie branchAdminSession = login("codex-branch-admin", "staff", "codex-branch-a-admin", "def456");
+        Cookie branchTenantAdminSession = login("codex-branch-admin", "tenant_admin", "codex-branch-a-admin", "def456");
 
         MvcResult storesResult = mockMvc.perform(get("/api/v1/me/stores").cookie(branchAdminSession))
             .andExpect(status().isOk())
@@ -596,6 +630,29 @@ class PlatformTenantApiIntegrationTest {
         JsonNode stores = objectMapper.readTree(storesResult.getResponse().getContentAsString()).path("stores");
         assertThat(stringsByField(stores, "storeId")).containsExactly(storeId.toString());
         assertThat(storeById(stores, storeId).path("defaultStore").asBoolean()).isTrue();
+        mockMvc.perform(get("/api/v1/stores/{storeId}/tenant-admin/profile", storeId)
+                .cookie(branchTenantAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.profile.storeId").value(storeId.toString()));
+        mockMvc.perform(get("/api/v1/stores/{storeId}/tenant-admin/staff/me", storeId)
+                .cookie(branchTenantAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.staff.employeeNo").value("codex-branch-a-admin"))
+            .andExpect(jsonPath("$.staff.accountType").value("tenant_admin"))
+            .andExpect(jsonPath("$.staff.self").value(true));
+        mockMvc.perform(patch("/api/v1/stores/{storeId}/tenant-admin/staff/me", storeId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name":"Codex Branch Admin Updated"
+                    }
+                    """)
+                .cookie(branchTenantAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.staff.name").value("Codex Branch Admin Updated"));
 
         mockMvc.perform(patch("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, storeId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -620,7 +677,9 @@ class PlatformTenantApiIntegrationTest {
               and role.deleted_at is null
             """, tenantId)).isEqualTo(1);
         expectLoginRejected("codex-branch-a-admin", "def456");
-        Cookie updatedBranchAdminSession = login("codex-branch-a-admin", "ghi789");
+        expectLoginRejected("codex-branch-admin", "tenant_admin", "codex-branch-a-admin", "def456");
+        Cookie updatedBranchAdminSession = login("codex-branch-admin", "staff", "codex-branch-a-admin", "ghi789");
+        login("codex-branch-admin", "tenant_admin", "codex-branch-a-admin", "ghi789");
 
         UUID alternateAliasId = UUID.randomUUID();
         jdbc.update(
@@ -1716,6 +1775,26 @@ class PlatformTenantApiIntegrationTest {
         return login.getResponse().getCookie("RPB_SESSION");
     }
 
+    private Cookie login(String tenantCode, String loginEntry, String username, String password) throws Exception {
+        SliderTarget target = createSliderTarget();
+        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"%s",
+                      "loginEntry":"%s",
+                      "username":"%s",
+                      "password":"%s",
+                      "captchaId":"%s",
+                      "captchaX":%d
+                    }
+                    """.formatted(tenantCode, loginEntry, username, password, target.challengeId(), target.targetX())))
+            .andExpect(status().isOk())
+            .andExpect(cookie().exists("RPB_SESSION"))
+            .andReturn();
+        return login.getResponse().getCookie("RPB_SESSION");
+    }
+
     private void expectLoginRejected(String username, String password) throws Exception {
         SliderTarget target = createSliderTarget();
         mockMvc.perform(post("/api/v1/auth/login")
@@ -1723,6 +1802,25 @@ class PlatformTenantApiIntegrationTest {
                 .content("""
                     {"username":"%s","password":"%s","captchaId":"%s","captchaX":%d}
                     """.formatted(username, password, target.challengeId(), target.targetX())))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+    }
+
+    private void expectLoginRejected(String tenantCode, String loginEntry, String username, String password) throws Exception {
+        SliderTarget target = createSliderTarget();
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode":"%s",
+                      "loginEntry":"%s",
+                      "username":"%s",
+                      "password":"%s",
+                      "captchaId":"%s",
+                      "captchaX":%d
+                    }
+                    """.formatted(tenantCode, loginEntry, username, password, target.challengeId(), target.targetX())))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));

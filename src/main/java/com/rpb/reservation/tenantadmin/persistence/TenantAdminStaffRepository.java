@@ -132,10 +132,29 @@ public class TenantAdminStaffRepository {
                    account.contact_phone, account.email, account.created_at, account.updated_at
             from auth_accounts account
             join auth_account_store_access access on access.account_id = account.id
+            join stores store
+              on store.id = access.store_id
+             and store.tenant_id = access.tenant_id
+             and store.status = 'active'
+             and store.deleted_at is null
             where account.id = ?
               and account.tenant_id = ?
-              and account.actor_type = 'tenant_admin'
+              and account.actor_type <> 'platform_admin'
               and account.deleted_at is null
+              and exists (
+                  select 1
+                  from auth_account_roles role
+                  where role.account_id = account.id
+                    and role.role_code = 'tenant_admin'
+                    and role.deleted_at is null
+              )
+              and exists (
+                  select 1
+                  from auth_account_permissions permission
+                  where permission.account_id = account.id
+                    and permission.permission_code = 'tenant.admin.manage'
+                    and permission.deleted_at is null
+              )
               and access.tenant_id = ?
               and access.store_id = ?
               and access.deleted_at is null
@@ -299,11 +318,30 @@ public class TenantAdminStaffRepository {
                     version = version + 1
                 where id = ?
                   and tenant_id = ?
-                  and actor_type = 'tenant_admin'
+                  and actor_type <> 'platform_admin'
                   and deleted_at is null
                   and exists (
                       select 1
+                      from auth_account_roles role
+                      where role.account_id = auth_accounts.id
+                        and role.role_code = 'tenant_admin'
+                        and role.deleted_at is null
+                  )
+                  and exists (
+                      select 1
+                      from auth_account_permissions permission
+                      where permission.account_id = auth_accounts.id
+                        and permission.permission_code = 'tenant.admin.manage'
+                        and permission.deleted_at is null
+                  )
+                  and exists (
+                      select 1
                       from auth_account_store_access access
+                      join stores store
+                        on store.id = access.store_id
+                       and store.tenant_id = access.tenant_id
+                       and store.status = 'active'
+                       and store.deleted_at is null
                       where access.account_id = auth_accounts.id
                         and access.tenant_id = ?
                         and access.store_id = ?
@@ -335,11 +373,30 @@ public class TenantAdminStaffRepository {
                 version = version + 1
             where id = ?
               and tenant_id = ?
-              and actor_type = 'tenant_admin'
+              and actor_type <> 'platform_admin'
               and deleted_at is null
               and exists (
                   select 1
+                  from auth_account_roles role
+                  where role.account_id = auth_accounts.id
+                    and role.role_code = 'tenant_admin'
+                    and role.deleted_at is null
+              )
+              and exists (
+                  select 1
+                  from auth_account_permissions permission
+                  where permission.account_id = auth_accounts.id
+                    and permission.permission_code = 'tenant.admin.manage'
+                    and permission.deleted_at is null
+              )
+              and exists (
+                  select 1
                   from auth_account_store_access access
+                  join stores store
+                    on store.id = access.store_id
+                   and store.tenant_id = access.tenant_id
+                   and store.status = 'active'
+                   and store.deleted_at is null
                   where access.account_id = auth_accounts.id
                     and access.tenant_id = ?
                     and access.store_id = ?

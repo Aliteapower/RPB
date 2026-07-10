@@ -208,6 +208,22 @@ class AuthApiIntegrationTest {
     }
 
     @Test
+    void loginPrincipalStoreIdsExcludeInactiveAuthorizedStores() throws Exception {
+        upsertAuthSecondaryStore();
+        grantStoreAccess("1000", AUTH_SECONDARY_STORE_ID);
+        jdbc.update("update stores set status = 'inactive' where id = ?", AUTH_SECONDARY_STORE_ID);
+
+        MvcResult login = login("1000", "393930")
+            .andExpect(status().isOk())
+            .andReturn();
+        JsonNode user = objectMapper.readTree(login.getResponse().getContentAsString()).path("user");
+
+        assertThat(strings(user.path("storeIds")))
+            .contains(VALIDATION_STORE_ID.toString())
+            .doesNotContain(AUTH_SECONDARY_STORE_ID.toString());
+    }
+
+    @Test
     void platformAdminCurrentStoresDoesNotExposeTenantStoreSwitchTargets() throws Exception {
         MvcResult login = login("sysadmin", "393930")
             .andExpect(status().isOk())

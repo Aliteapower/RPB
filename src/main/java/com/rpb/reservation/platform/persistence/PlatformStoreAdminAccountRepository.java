@@ -1,6 +1,6 @@
 package com.rpb.reservation.platform.persistence;
 
-import java.util.List;
+import com.rpb.reservation.appgate.domain.AppGateRequiredPermission;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,29 +9,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class PlatformStoreAdminAccountRepository {
     private static final String STORE_MANAGER_ROLE = "store_manager";
-    private static final List<String> STORE_MANAGER_PERMISSIONS = List.of(
-        "reservation.create",
-        "reservation.check_in",
-        "reservation.seat",
-        "reservation.today_view",
-        "reservation.queue",
-        "reservation.cancel",
-        "reservation.no_show",
-        "reservation.complete",
-        "queue.view",
-        "queue.call",
-        "queue.seat",
-        "queue.skip",
-        "queue.rejoin",
-        "queue.cancel",
-        "table.view",
-        "table.switch",
-        "customer.lookup",
-        "walkin.direct_seating.create",
-        "walkin.queue.create",
-        "cleaning.start",
-        "cleaning.complete"
-    );
+    private static final String TENANT_ADMIN_ROLE = "tenant_admin";
+    private static final String TENANT_ADMIN_MANAGE_PERMISSION = "tenant.admin.manage";
 
     private final JdbcTemplate jdbc;
 
@@ -56,8 +35,12 @@ public class PlatformStoreAdminAccountRepository {
         } else {
             insertStoreManager(accountId, tenantId, username, displayName, passwordHash, storeId);
         }
-        ensureRole(accountId);
-        STORE_MANAGER_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
+        ensureRole(accountId, STORE_MANAGER_ROLE);
+        ensureRole(accountId, TENANT_ADMIN_ROLE);
+        AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.forEach(
+            permission -> ensurePermission(accountId, permission)
+        );
+        ensurePermission(accountId, TENANT_ADMIN_MANAGE_PERMISSION);
         replaceStoreAccess(accountId, tenantId, storeId);
         return true;
     }
@@ -213,7 +196,7 @@ public class PlatformStoreAdminAccountRepository {
         );
     }
 
-    private void ensureRole(UUID accountId) {
+    private void ensureRole(UUID accountId, String roleCode) {
         jdbc.update(
             """
             insert into auth_account_roles (account_id, role_code)
@@ -227,9 +210,9 @@ public class PlatformStoreAdminAccountRepository {
             )
             """,
             accountId,
-            STORE_MANAGER_ROLE,
+            roleCode,
             accountId,
-            STORE_MANAGER_ROLE
+            roleCode
         );
     }
 

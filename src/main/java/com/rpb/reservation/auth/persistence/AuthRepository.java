@@ -176,9 +176,50 @@ public class AuthRepository {
                    account.actor_type, account.status, account.password_hash, account.default_store_id
             from auth_accounts account
             join resolved_login_context login_context on login_context.tenant_id = account.tenant_id
-            where account.actor_type = ?
-              and lower(account.username) = lower(?)
+            where lower(account.username) = lower(?)
+              and account.actor_type <> 'platform_admin'
               and account.deleted_at is null
+              and (
+                  (
+                      ? = 'tenant_admin'
+                      and exists (
+                          select 1
+                          from auth_account_roles role
+                          where role.account_id = account.id
+                            and role.role_code = 'tenant_admin'
+                            and role.deleted_at is null
+                      )
+                      and exists (
+                          select 1
+                          from auth_account_permissions permission
+                          where permission.account_id = account.id
+                            and permission.permission_code = 'tenant.admin.manage'
+                            and permission.deleted_at is null
+                      )
+                  )
+                  or (
+                      ? = 'staff'
+                      and exists (
+                          select 1
+                          from auth_account_roles role
+                          where role.account_id = account.id
+                            and role.role_code in ('tenant_admin', 'store_manager', 'store_staff')
+                            and role.deleted_at is null
+                      )
+                      and exists (
+                          select 1
+                          from auth_account_store_access access
+                          join stores store
+                            on store.id = access.store_id
+                           and store.tenant_id = access.tenant_id
+                           and store.status = 'active'
+                           and store.deleted_at is null
+                          where access.account_id = account.id
+                            and access.tenant_id = account.tenant_id
+                            and access.deleted_at is null
+                      )
+                  )
+              )
               and (
                   login_context.default_store_id is null
                   or exists (
@@ -190,12 +231,14 @@ public class AuthRepository {
                         and access.deleted_at is null
                   )
               )
+            order by account.created_at, account.id
             """,
             (rs, rowNum) -> account(rs),
             loginCode,
             loginCode,
+            username,
             actorType,
-            username
+            actorType
         ).stream().findFirst();
     }
 
@@ -403,11 +446,16 @@ public class AuthRepository {
     private Set<UUID> storeIds(UUID accountId) {
         return new LinkedHashSet<>(jdbc.queryForList(
             """
-            select store_id
-            from auth_account_store_access
-            where account_id = ?
-              and deleted_at is null
-            order by store_id
+            select access.store_id
+            from auth_account_store_access access
+            join stores store
+              on store.id = access.store_id
+             and store.tenant_id = access.tenant_id
+             and store.status = 'active'
+             and store.deleted_at is null
+            where access.account_id = ?
+              and access.deleted_at is null
+            order by access.store_id
             """,
             UUID.class,
             accountId

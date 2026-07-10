@@ -1,5 +1,6 @@
 package com.rpb.reservation.platform.persistence;
 
+import com.rpb.reservation.appgate.domain.AppGateRequiredPermission;
 import com.rpb.reservation.platform.application.PlatformTenantAdminStoreAccess;
 import com.rpb.reservation.platform.application.PlatformTenantStoreOption;
 import java.util.ArrayList;
@@ -39,6 +40,9 @@ public class PlatformTenantAdminAccountRepository {
         }
         ensureTenantAdminRole(accountId);
         ensurePermission(accountId, TENANT_ADMIN_MANAGE);
+        AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.forEach(
+            permission -> ensurePermission(accountId, permission)
+        );
         if (defaultStoreId != null) {
             ensureStoreAccess(accountId, tenantId, defaultStoreId);
         }
