@@ -47,7 +47,18 @@ The frontend did not load `/api/v1/me/stores` before rendering the H5 staff stor
 - `npm run build`
 
 ## Deployment
-- Pending.
+- Deployed backend/frontend code commit `5c713dc2` to `booking.yumstone.sg` on 2026-07-10.
+- Backend backup: `/opt/rpb/backups/20260710-1743-5c713dc2/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260710-1744-5c713dc2-frontend/frontend`.
+- Flyway history is successful through `044|sync active store subscription app settings|t`.
+- Smoke checks:
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - `https://booking.yumstone.sg/login`, `https://platform.booking.yumstone.sg/login`, `https://lsc106.booking.yumstone.sg/login`, and `https://lsc83.booking.yumstone.sg/login` returned `200`.
+  - `https://20000000.booking.yumstone.sg/book` returned `200`.
+  - Deployed login asset `https://booking.yumstone.sg/assets/LoginPage-B-5aSDW4.js` returned `200` and contains the multi-store authorized-store metadata flow.
+  - Production `lsc106` stores `lsc106` and `lsc83` now have `store_app_settings.is_enabled=true` and `entry_visible=true` for `reservation_queue`.
+  - `lsc106` staff-entry login returned two named stores and both store `staff-home/overview` calls returned `200`.
+  - `lsc83` staff-entry login returned its named store and `staff-home/overview` returned `200`.
 
 ## Risk
 - Low to moderate: this affects H5 login routing and App Gate data sync.
