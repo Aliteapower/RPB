@@ -309,6 +309,43 @@ class PlatformBillingMigrationTest {
               and app_key = 'reservation_queue'
               and event_type = 'renew_item'
             """, VALIDATION_TENANT_ID)).isEqualTo(1);
+
+        JDBC.update("""
+            delete from store_app_settings
+            where tenant_id = ?
+              and store_id in (?, ?)
+              and app_key = 'reservation_queue'
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID, VALIDATION_SECOND_STORE_ID);
+        JDBC.update("""
+            update tenant_product_subscription_items
+            set status = 'suspended'
+            where tenant_id = ?
+              and store_id = ?
+              and app_key = 'reservation_queue'
+            """, VALIDATION_TENANT_ID, VALIDATION_SECOND_STORE_ID);
+
+        DATABASE.applyMigration("src/main/resources/db/migration/V044__sync_active_store_subscription_app_settings.sql");
+
+        assertThat(countWhere("""
+            select count(*)
+            from store_app_settings
+            where tenant_id = ?
+              and store_id = ?
+              and app_key = 'reservation_queue'
+              and is_enabled = true
+              and entry_visible = true
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from store_app_settings
+            where tenant_id = ?
+              and store_id = ?
+              and app_key = 'reservation_queue'
+            """, VALIDATION_TENANT_ID, VALIDATION_SECOND_STORE_ID)).isZero();
+
+        int storeSettingsBeforeReplay = countWhere("select count(*) from store_app_settings");
+        DATABASE.applyMigration("src/main/resources/db/migration/V044__sync_active_store_subscription_app_settings.sql");
+        assertThat(countWhere("select count(*) from store_app_settings")).isEqualTo(storeSettingsBeforeReplay);
     }
 
     private static void insertTenantAndStore(UUID tenantId, UUID storeId, String tenantCode, String storeCode, String currency) {

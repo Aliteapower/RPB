@@ -136,6 +136,20 @@ class AuthLoginUiValidationTest {
     }
 
     @Test
+    void staffLoginStoreSelectionLoadsStoreNamesInsteadOfShowingRawStoreIds() throws Exception {
+        Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        String pageSource = FrontendSourceSupport.readString(pagePath);
+
+        assertThat(pageSource)
+            .contains("AuthStoreAccess")
+            .contains("authorizedStoreOptions")
+            .contains("await auth.ensureAuthorizedStores(true)")
+            .contains("storeOptionLabel(store)")
+            .contains("<option v-for=\"store in authorizedStoreOptions\"")
+            .doesNotContain("<option v-for=\"storeId in authorizedStoreIds\"");
+    }
+
+    @Test
     void tenantSubdomainLoginHidesPlatformEntryTenantCodeAndSeedAccounts() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
         Path hostContextPath = Path.of("src", "utils", "hostContext.ts");

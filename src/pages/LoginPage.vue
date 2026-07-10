@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { AuthApiError, createSliderCaptcha } from '../api/authApi'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuthSessionStore } from '../stores/authSession'
-import type { AuthLoginEntry, AuthUser, SliderCaptchaChallenge } from '../types/auth'
+import type { AuthLoginEntry, AuthStoreAccess, AuthUser, SliderCaptchaChallenge } from '../types/auth'
 import { resolveLoginHostContext } from '../utils/hostContext'
 
 type LoginEntryId = 'platform-admin' | 'tenant-admin' | 'tenant-staff'
@@ -119,8 +119,15 @@ const tenantCodeFieldVisible = computed(() => selectedEntry.value.id !== 'platfo
 const loginPayloadUsername = computed(() =>
   isStaffEntry.value ? employeeUsername.value.trim() : username.value.trim()
 )
-const authorizedStoreIds = computed(() => auth.user?.storeIds ?? [])
-const canChooseStore = computed(() => pendingStoreSelection.value && authorizedStoreIds.value.length > 0)
+const authorizedStoreOptions = computed<AuthStoreAccess[]>(() => {
+  const user = auth.user
+  if (!user) {
+    return []
+  }
+  const storesById = new Map(auth.authorizedStores.map(store => [store.storeId, store]))
+  return user.storeIds.map(storeId => storesById.get(storeId) ?? fallbackStoreAccess(storeId, user))
+})
+const canChooseStore = computed(() => pendingStoreSelection.value && authorizedStoreOptions.value.length > 0)
 
 const sliderMax = computed(() => {
   if (!captcha.value) {
@@ -336,7 +343,8 @@ async function continueAfterLogin(user: AuthUser): Promise<void> {
   }
 
   if (isStaffEntry.value && user.storeIds.length > 1) {
-    selectedStoreId.value = user.defaultStoreId || user.storeIds[0]
+    await auth.ensureAuthorizedStores(true)
+    selectedStoreId.value = preferredStoreId(user, authorizedStoreOptions.value.map(store => store.storeId))
     pendingStoreSelection.value = true
     return
   }
@@ -366,6 +374,39 @@ async function selectStoreAndContinue(): Promise<void> {
 
 function storeRoute(storeId: string): string {
   return `/stores/${storeId}/staff`
+}
+
+function preferredStoreId(user: AuthUser, storeIds: string[]): string {
+  return user.defaultStoreId && storeIds.includes(user.defaultStoreId)
+    ? user.defaultStoreId
+    : (storeIds[0] ?? '')
+}
+
+function storeOptionLabel(store: AuthStoreAccess): string {
+  const storeName = store.storeName || fallbackStoreLabel(store.storeId)
+  const baseLabel = store.storeCode && store.storeCode !== storeName
+    ? `${storeName} (${store.storeCode})`
+    : storeName
+  return store.operatingEntityName ? `${baseLabel} / ${store.operatingEntityName}` : baseLabel
+}
+
+function fallbackStoreAccess(storeId: string, user: AuthUser): AuthStoreAccess {
+  return {
+    tenantId: user.tenantId || '',
+    tenantCode: '',
+    operatingEntityId: null,
+    operatingEntityName: null,
+    storeId,
+    storeCode: '',
+    storeName: fallbackStoreLabel(storeId),
+    status: 'active',
+    locale: '',
+    defaultStore: storeId === user.defaultStoreId
+  }
+}
+
+function fallbackStoreLabel(storeId: string): string {
+  return t('staffHome.store.label', { shortId: storeId.slice(0, 8) })
 }
 
 function initialLoginEntryId(): LoginEntryId {
@@ -584,8 +625,8 @@ function loginErrorText(error: unknown): string {
         <label class="login-field">
           <span>{{ t('login.store.select') }}</span>
           <select v-model="selectedStoreId">
-            <option v-for="storeId in authorizedStoreIds" :key="storeId" :value="storeId">
-              {{ storeId }}
+            <option v-for="store in authorizedStoreOptions" :key="store.storeId" :value="store.storeId">
+              {{ storeOptionLabel(store) }}
             </option>
           </select>
         </label>
