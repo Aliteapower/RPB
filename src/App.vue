@@ -4,7 +4,7 @@ import FrontendLocaleSwitcher from './components/common/FrontendLocaleSwitcher.v
 
 <template>
   <FrontendLocaleSwitcher />
-  <RouterView />
+  <RouterView :key="$route.path" />
 </template>
 
 <style>
