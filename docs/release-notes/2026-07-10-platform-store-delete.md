@@ -24,6 +24,19 @@
 - No new permission. The endpoint uses the existing `platform_admin` role and `platform.tenant.manage` permission.
 - Local runtime allowlist now includes the new platform store delete route.
 
+## Deployment
+- Deployed commit `ab882bd5` to `booking.yumstone.sg` on 2026-07-10.
+- Backend backup: `/opt/rpb/backups/20260710-1509-ab882bd5/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260710-1509-ab882bd5-frontend/frontend`.
+- Smoke checks:
+  - `rpb-backend` active and local `/api/v1/auth/me` returned `401`.
+  - Public `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `https://booking.yumstone.sg/platform/tenants/fb8e092d-aa34-42eb-bb55-5229044c3885/edit` returned `200`.
+  - `https://platform.booking.yumstone.sg/login`, `https://20000000.booking.yumstone.sg/login`, and `https://20000000.booking.yumstone.sg/book` returned `200`.
+  - Deployed frontend assets include `PlatformTenantFormPage-jQL2RbfD.js`, `PlatformTenantBillingPage-DJZudNGl.js`, and `api-ByecbZKk.js`; the API asset contains the store `DELETE` call.
+- Flyway history remains successful through `042|allow store item subscription events|t`.
+
 ## Risk
 - Tenant admins whose default store is deleted are moved to another active authorised store when available; if none remain, their default store is cleared.
 - Cancelled historical store-scoped subscription items remain for audit, but they are excluded from future single-store renewal and aggregate amount/period recomputation.
