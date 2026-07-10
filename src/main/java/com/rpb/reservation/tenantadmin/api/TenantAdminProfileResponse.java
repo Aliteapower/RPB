@@ -16,6 +16,8 @@ public record TenantAdminProfileResponse(
     public record ProfileItemResponse(
         UUID tenantId,
         String tenantCode,
+        UUID storeId,
+        String storeCode,
         String displayName,
         String status,
         String defaultLocale,
@@ -30,6 +32,8 @@ public record TenantAdminProfileResponse(
             return new ProfileItemResponse(
                 profile.tenantId(),
                 profile.tenantCode(),
+                profile.storeId(),
+                profile.storeCode(),
                 profile.displayName(),
                 profile.status(),
                 profile.defaultLocale(),

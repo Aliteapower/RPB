@@ -75,6 +75,7 @@ class TenantAdminApiIntegrationTest {
         jdbc.update("delete from auth_account_roles where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_permissions where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
+        jdbc.update("delete from auth_account_store_access where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, SECONDARY_STORE_ID);
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
         jdbc.update("delete from dining_tables where table_code like 'CX%'");
         jdbc.update("delete from store_areas where area_code like 'CX%' or display_name like 'Codex%'");
@@ -621,55 +622,96 @@ class TenantAdminApiIntegrationTest {
     }
 
     @Test
-    void tenantAdminMaintainsOwnTenantProfileAndLogo() throws Exception {
+    void tenantAdminProfileReadsAndUpdatesOnlyCurrentStore() throws Exception {
         Cookie session = login("20000000");
         upsertSecondaryStoreForProfileSync();
+        grantStoreAccess("20000000", SECONDARY_STORE_ID);
 
         mockMvc.perform(get(basePath() + "/profile").cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.profile.tenantCode").value("20000000"))
+            .andExpect(jsonPath("$.profile.storeCode").value("local-validation-store"))
             .andExpect(jsonPath("$.profile.status").value("active"));
 
         mockMvc.perform(patch(basePath() + "/profile")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "displayName":"食刻租户",
+                      "displayName":"食刻主店资料",
                       "defaultLocale":"zh-CN",
                       "contactPhone":"021-393930",
-                      "address":"上海市徐汇区示例路 1 号",
-                      "principalName":"张店长"
+                      "address":"主店地址 1 号",
+                      "principalName":"主店负责人"
                     }
                     """)
                 .cookie(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.profile.displayName").value("食刻租户"))
+            .andExpect(jsonPath("$.profile.displayName").value("食刻主店资料"))
             .andExpect(jsonPath("$.profile.contactPhone").value("021-393930"))
-            .andExpect(jsonPath("$.profile.address").value("上海市徐汇区示例路 1 号"))
-            .andExpect(jsonPath("$.profile.principalName").value("张店长"));
+            .andExpect(jsonPath("$.profile.address").value("主店地址 1 号"));
+
+        mockMvc.perform(patch(basePath(SECONDARY_STORE_ID) + "/profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "displayName":"食刻二店资料",
+                      "defaultLocale":"en-SG",
+                      "contactPhone":"021-830000",
+                      "address":"二店地址 83 号",
+                      "principalName":"二店负责人"
+                    }
+                    """)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profile.displayName").value("食刻二店资料"))
+            .andExpect(jsonPath("$.profile.defaultLocale").value("en-SG"))
+            .andExpect(jsonPath("$.profile.contactPhone").value("021-830000"))
+            .andExpect(jsonPath("$.profile.address").value("二店地址 83 号"));
+
+        mockMvc.perform(get(basePath() + "/profile").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profile.displayName").value("食刻主店资料"))
+            .andExpect(jsonPath("$.profile.defaultLocale").value("zh-CN"))
+            .andExpect(jsonPath("$.profile.contactPhone").value("021-393930"))
+            .andExpect(jsonPath("$.profile.address").value("主店地址 1 号"));
+
+        mockMvc.perform(get(basePath(SECONDARY_STORE_ID) + "/profile").cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profile.storeCode").value("profile-sync-store"))
+            .andExpect(jsonPath("$.profile.displayName").value("食刻二店资料"))
+            .andExpect(jsonPath("$.profile.defaultLocale").value("en-SG"))
+            .andExpect(jsonPath("$.profile.contactPhone").value("021-830000"))
+            .andExpect(jsonPath("$.profile.address").value("二店地址 83 号"));
 
         assertThat(countWhere("""
             select count(*)
             from tenants
             where id = ?
-              and tenant_code = '20000000'
-              and status = 'active'
-              and display_name = '食刻租户'
-              and default_locale = 'zh-CN'
-              and contact_phone = '021-393930'
-              and address = '上海市徐汇区示例路 1 号'
-              and principal_name = '张店长'
-            """, VALIDATION_TENANT_ID)).isEqualTo(1);
+              and display_name in ('食刻主店资料', '食刻二店资料')
+            """, VALIDATION_TENANT_ID)).isZero();
 
         assertThat(countWhere("""
             select count(*)
             from stores
             where tenant_id = ?
-              and id in (?, ?)
-              and share_address = '上海市徐汇区示例路 1 号'
+              and id = ?
+              and display_name = '食刻主店资料'
+              and locale = 'zh-CN'
+              and share_address = '主店地址 1 号'
               and share_contact_phone = '021-393930'
-            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID, SECONDARY_STORE_ID)).isEqualTo(2);
+            """, VALIDATION_TENANT_ID, VALIDATION_STORE_ID)).isEqualTo(1);
+
+        assertThat(countWhere("""
+            select count(*)
+            from stores
+            where tenant_id = ?
+              and id = ?
+              and display_name = '食刻二店资料'
+              and locale = 'en-SG'
+              and share_address = '二店地址 83 号'
+              and share_contact_phone = '021-830000'
+            """, VALIDATION_TENANT_ID, SECONDARY_STORE_ID)).isEqualTo(1);
 
         MockMultipartFile logo = new MockMultipartFile(
             "file",
@@ -1185,7 +1227,11 @@ class TenantAdminApiIntegrationTest {
                     'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD',
                     '旧地址', '旧电话')
             on conflict (id) do update
-            set share_address = '旧地址',
+            set store_code = excluded.store_code,
+                display_name = excluded.display_name,
+                status = excluded.status,
+                locale = excluded.locale,
+                share_address = '旧地址',
                 share_contact_phone = '旧电话',
                 deleted_at = null,
                 updated_at = now(),
@@ -1379,7 +1425,30 @@ class TenantAdminApiIntegrationTest {
     }
 
     private String basePath() {
-        return "/api/v1/stores/" + VALIDATION_STORE_ID + "/tenant-admin";
+        return basePath(VALIDATION_STORE_ID);
+    }
+
+    private String basePath(UUID storeId) {
+        return "/api/v1/stores/" + storeId + "/tenant-admin";
+    }
+
+    private void grantStoreAccess(String username, UUID storeId) {
+        jdbc.update(
+            """
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            select id, tenant_id, ?
+            from auth_accounts
+            where username = ?
+              and tenant_id = ?
+              and deleted_at is null
+            on conflict (account_id, tenant_id, store_id)
+            where deleted_at is null
+            do nothing
+            """,
+            storeId,
+            username,
+            VALIDATION_TENANT_ID
+        );
     }
 
     private int countWhere(String sql, Object... args) {

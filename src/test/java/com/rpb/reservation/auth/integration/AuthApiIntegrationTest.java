@@ -292,6 +292,29 @@ class AuthApiIntegrationTest {
     }
 
     @Test
+    void storeHostAliasLoginRequiresAccountAccessToAliasedStore() throws Exception {
+        upsertAuthSecondaryStore("lsc83", "LSC83 门店");
+        jdbc.update("""
+            insert into tenant_host_aliases (
+                tenant_id, alias_code, alias_type, default_store_id, status
+            )
+            values (?, 'lsc83', 'store', ?, 'active')
+            """, VALIDATION_TENANT_ID, AUTH_SECONDARY_STORE_ID);
+
+        login("lsc83.booking.yumstone.sg", null, "staff", null, "1000", "393930")
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+
+        grantStoreAccess("1000", AUTH_SECONDARY_STORE_ID);
+
+        login("lsc83.booking.yumstone.sg", null, "staff", null, "1000", "393930")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.user.username").value("1000"))
+            .andExpect(jsonPath("$.user.storeIds").value(hasItem(AUTH_SECONDARY_STORE_ID.toString())));
+    }
+
+    @Test
     void forwardedHostIsUsedForLoginContextBehindReverseProxy() throws Exception {
         login("127.0.0.1:8080", "platform.booking.yumstone.sg", "staff", "20000000", "1000", "393930")
             .andExpect(status().isUnauthorized())

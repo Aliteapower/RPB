@@ -89,6 +89,8 @@ export interface TenantAdminSettings {
 export interface TenantAdminProfile {
   tenantId: string
   tenantCode: string
+  storeId: string
+  storeCode: string
   displayName: string
   status: string
   defaultLocale: string | null

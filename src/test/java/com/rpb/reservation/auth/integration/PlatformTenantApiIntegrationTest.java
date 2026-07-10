@@ -620,7 +620,7 @@ class PlatformTenantApiIntegrationTest {
               and role.deleted_at is null
             """, tenantId)).isEqualTo(1);
         expectLoginRejected("codex-branch-a-admin", "def456");
-        login("codex-branch-a-admin", "ghi789");
+        Cookie updatedBranchAdminSession = login("codex-branch-a-admin", "ghi789");
 
         UUID alternateAliasId = UUID.randomUUID();
         jdbc.update(
@@ -670,6 +670,40 @@ class PlatformTenantApiIntegrationTest {
             tenantId,
             storeId
         );
+        jdbc.update(
+            """
+            insert into tenant_app_entitlements (
+                tenant_id, app_key, status, valid_from, valid_until, config_json, enabled_at
+            )
+            values (?, 'reservation_queue', 'enabled', now(), null, '{}'::jsonb, now())
+            on conflict (tenant_id, app_key) do update
+            set status = 'enabled',
+                valid_until = null,
+                updated_at = now()
+            """,
+            tenantId
+        );
+        jdbc.update(
+            """
+            insert into store_app_settings (
+                tenant_id, store_id, app_key, is_enabled, entry_visible, config_json, enabled_at
+            )
+            values (?, ?, 'reservation_queue', true, true, '{}'::jsonb, now())
+            on conflict (tenant_id, store_id, app_key) do update
+            set is_enabled = true,
+                entry_visible = true,
+                updated_at = now()
+            """,
+            tenantId,
+            storeId
+        );
+
+        mockMvc.perform(get("/api/v1/stores/{storeId}/staff-home/overview", storeId)
+                .param("businessDate", "2026-07-10")
+                .cookie(updatedBranchAdminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.storeId").value(storeId.toString()));
 
         mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, storeId)
                 .cookie(session))

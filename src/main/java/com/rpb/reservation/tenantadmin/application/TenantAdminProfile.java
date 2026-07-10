@@ -6,6 +6,8 @@ import java.util.UUID;
 public record TenantAdminProfile(
     UUID tenantId,
     String tenantCode,
+    UUID storeId,
+    String storeCode,
     String displayName,
     String status,
     String defaultLocale,

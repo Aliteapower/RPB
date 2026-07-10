@@ -142,14 +142,16 @@ public class AuthRepository {
     ) {
         return jdbc.query(
             """
-            with resolved_tenant as (
-                select tenant.id
+            with resolved_login_context as (
+                select tenant.id as tenant_id,
+                       null::uuid as default_store_id
                 from tenants tenant
                 where lower(tenant.tenant_code) = lower(?)
                   and tenant.deleted_at is null
                   and tenant.status = 'active'
                 union
-                select alias.tenant_id
+                select alias.tenant_id,
+                       alias.default_store_id
                 from tenant_host_aliases alias
                 join tenants tenant
                   on tenant.id = alias.tenant_id
@@ -173,10 +175,21 @@ public class AuthRepository {
             select account.id, account.tenant_id, account.username, account.display_name,
                    account.actor_type, account.status, account.password_hash, account.default_store_id
             from auth_accounts account
-            join resolved_tenant tenant_scope on tenant_scope.id = account.tenant_id
+            join resolved_login_context login_context on login_context.tenant_id = account.tenant_id
             where account.actor_type = ?
               and lower(account.username) = lower(?)
               and account.deleted_at is null
+              and (
+                  login_context.default_store_id is null
+                  or exists (
+                      select 1
+                      from auth_account_store_access access
+                      where access.account_id = account.id
+                        and access.tenant_id = account.tenant_id
+                        and access.store_id = login_context.default_store_id
+                        and access.deleted_at is null
+                  )
+              )
             """,
             (rs, rowNum) -> account(rs),
             loginCode,

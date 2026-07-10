@@ -21,15 +21,33 @@ public class TenantAdminProfileRepository {
     public Optional<TenantAdminProfile> find(StoreScope scope) {
         return jdbc.query(
             """
-            select tenant.id, tenant.tenant_code, tenant.display_name, tenant.status,
-                   tenant.default_locale, tenant.contact_phone, tenant.address,
-                   tenant.principal_name, tenant.logo_media_asset_id,
-                   tenant.created_at, tenant.updated_at
+            select tenant.id,
+                   tenant.tenant_code,
+                   store.id as store_id,
+                   store.store_code,
+                   store.display_name,
+                   store.status,
+                   store.locale as default_locale,
+                   store.share_contact_phone as contact_phone,
+                   store.share_address as address,
+                   coalesce(entity.principal_name, tenant.principal_name) as principal_name,
+                   tenant.logo_media_asset_id,
+                   store.created_at,
+                   store.updated_at
             from tenants tenant
+            join stores store
+              on store.tenant_id = tenant.id
+             and store.id = ?
+             and store.deleted_at is null
+            left join operating_entities entity
+              on entity.id = store.operating_entity_id
+             and entity.tenant_id = store.tenant_id
+             and entity.deleted_at is null
             where tenant.id = ?
               and tenant.deleted_at is null
             """,
             (rs, rowNum) -> profile(rs),
+            scope.storeId().value(),
             scope.tenantId().value()
         ).stream().findFirst();
     }
@@ -42,52 +60,52 @@ public class TenantAdminProfileRepository {
         String address,
         String principalName
     ) {
-        return jdbc.query(
+        jdbc.update(
             """
-            update tenants
+            update operating_entities
+            set principal_name = ?,
+                updated_at = now(),
+                version = version + 1
+            where id = (
+                select store.operating_entity_id
+                from stores store
+                where store.id = ?
+                  and store.tenant_id = ?
+                  and store.deleted_at is null
+            )
+              and tenant_id = ?
+              and deleted_at is null
+            """,
+            principalName,
+            scope.storeId().value(),
+            scope.tenantId().value(),
+            scope.tenantId().value()
+        );
+        int updated = jdbc.update(
+            """
+            update stores
             set display_name = ?,
-                default_locale = ?,
-                contact_phone = ?,
-                address = ?,
-                principal_name = ?,
+                locale = ?,
+                share_contact_phone = ?,
+                share_address = ?,
                 updated_at = now(),
                 version = version + 1
             where id = ?
+              and tenant_id = ?
               and deleted_at is null
-            returning id, tenant_code, display_name, status, default_locale,
-                      contact_phone, address, principal_name, logo_media_asset_id,
-                      created_at, updated_at
             """,
-            (rs, rowNum) -> profile(rs),
             displayName,
             defaultLocale,
             contactPhone,
             address,
-            principalName,
-            scope.tenantId().value()
-        ).stream().findFirst();
-    }
-
-    public boolean syncStoreShareContact(StoreScope scope, String contactPhone, String address) {
-        int updated = jdbc.update(
-            """
-            update stores
-            set share_contact_phone = ?,
-                share_address = ?,
-                updated_at = now(),
-                version = version + 1
-            where tenant_id = ?
-              and deleted_at is null
-            """,
-            contactPhone,
-            address,
+            scope.storeId().value(),
             scope.tenantId().value()
         );
-        return updated > 0;
+        return updated > 0 ? find(scope) : Optional.empty();
     }
 
     public Optional<TenantAdminProfile> updateLogoMediaAsset(StoreScope scope, UUID logoMediaAssetId) {
-        return jdbc.query(
+        int updated = jdbc.update(
             """
             update tenants
             set logo_media_asset_id = ?,
@@ -95,20 +113,19 @@ public class TenantAdminProfileRepository {
                 version = version + 1
             where id = ?
               and deleted_at is null
-            returning id, tenant_code, display_name, status, default_locale,
-                      contact_phone, address, principal_name, logo_media_asset_id,
-                      created_at, updated_at
             """,
-            (rs, rowNum) -> profile(rs),
             logoMediaAssetId,
             scope.tenantId().value()
-        ).stream().findFirst();
+        );
+        return updated > 0 ? find(scope) : Optional.empty();
     }
 
     private static TenantAdminProfile profile(ResultSet rs) throws SQLException {
         return new TenantAdminProfile(
             rs.getObject("id", UUID.class),
             rs.getString("tenant_code"),
+            rs.getObject("store_id", UUID.class),
+            rs.getString("store_code"),
             rs.getString("display_name"),
             rs.getString("status"),
             rs.getString("default_locale"),

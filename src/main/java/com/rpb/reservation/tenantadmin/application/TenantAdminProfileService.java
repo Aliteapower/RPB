@@ -37,9 +37,6 @@ public class TenantAdminProfileService {
                 input.principalName()
             )
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.TENANT_PROFILE_NOT_FOUND));
-        if (!repository.syncStoreShareContact(scope, input.contactPhone(), input.address())) {
-            throw new TenantAdminServiceException(TenantAdminServiceErrorCode.REQUEST_INVALID);
-        }
         return profile;
     }
 

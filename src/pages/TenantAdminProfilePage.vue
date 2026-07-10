@@ -220,7 +220,7 @@ function revokeLocalLogoPreview(): void {
 
 function applyProfile(profile: TenantAdminProfile): void {
   Object.assign(form, {
-    tenantCode: profile.tenantCode,
+    tenantCode: profile.storeCode || profile.tenantCode,
     displayName: profile.displayName,
     status: profile.status,
     defaultLocale: profile.defaultLocale || 'zh-CN',
