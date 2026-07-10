@@ -9,6 +9,7 @@ import {
   createOperatingEntity,
   createTenant,
   createTenantStore,
+  deleteTenantStore,
   getTenant,
   getTenantAdminStoreAccess,
   listOperatingEntities,
@@ -278,6 +279,27 @@ async function saveStore(submittedForm: PlatformStoreFormModel): Promise<void> {
   }
 }
 
+async function deleteStore(store: PlatformStore): Promise<void> {
+  if (structureSaving.value || mode.value !== 'edit') {
+    return
+  }
+  const storeName = store.storeName || store.storeCode
+  if (!window.confirm(t('platform.tenants.structure.actions.confirmDeleteStore', { storeName }))) {
+    return
+  }
+
+  structureSaving.value = true
+  errorText.value = ''
+  try {
+    await deleteTenantStore(tenantId.value, store.id)
+    await reloadStructureAndAccess()
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    structureSaving.value = false
+  }
+}
+
 async function saveAdminStoreAccess(submittedForm: PlatformTenantAdminStoreAccessFormModel): Promise<void> {
   if (structureSaving.value || mode.value !== 'edit') {
     return
@@ -398,6 +420,7 @@ function apiErrorText(error: unknown): string {
         :saving="structureSaving"
         @save-operating-entity="saveOperatingEntity"
         @save-store="saveStore"
+        @delete-store="deleteStore"
         @save-admin-store-access="saveAdminStoreAccess"
       />
     </section>

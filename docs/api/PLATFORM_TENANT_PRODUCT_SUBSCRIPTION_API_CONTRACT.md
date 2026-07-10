@@ -41,6 +41,7 @@ Behavior:
 
 - validates that `tenantId` owns the subscription
 - validates that `itemId` belongs to the subscription and tenant
+- requires the item to be active or suspended, store-scoped, and attached to an active non-deleted store
 - calculates quote with `storeCount = 1`
 - updates only the selected item
 - recomputes aggregate subscription amount and period from active store items
@@ -183,3 +184,5 @@ If no active stores exist, purchase, bulk renewal, and legacy conversion request
 - `SUBSCRIPTION_CONFLICT`
 - `VERSION_CONFLICT`
 - `PERSISTENCE_ERROR`
+
+`SUBSCRIPTION_ITEM_NOT_FOUND` is also returned for direct item-renew requests when the item is cancelled, expired, attached to a deleted store, or attached to a store outside the tenant.

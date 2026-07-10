@@ -119,9 +119,10 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
                 item.updated_at,
                 item.version
             from tenant_product_subscription_items item
-            left join stores store
+            join stores store
               on store.id = item.store_id
              and store.tenant_id = item.tenant_id
+             and store.status = 'active'
              and store.deleted_at is null
             left join operating_entities entity
               on entity.id = store.operating_entity_id
@@ -131,6 +132,7 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
               and item.subscription_id = ?
               and item.id = ?
               and item.scope_type = 'store'
+              and item.status in ('active', 'suspended')
             """,
             (rs, rowNum) -> item(rs),
             tenantId,

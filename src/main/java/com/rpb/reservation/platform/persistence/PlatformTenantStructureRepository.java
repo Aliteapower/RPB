@@ -263,6 +263,28 @@ public class PlatformTenantStructureRepository {
         ).stream().findFirst();
     }
 
+    public Optional<PlatformStore> softDeleteStore(UUID tenantId, UUID storeId) {
+        return jdbc.query(
+            """
+            with deleted as (
+                update stores
+                set status = 'inactive',
+                    deleted_at = coalesce(deleted_at, now()),
+                    updated_at = now(),
+                    version = version + 1
+                where tenant_id = ?
+                  and id = ?
+                  and deleted_at is null
+                returning *
+            )
+            %s
+            """.formatted(storeSelectFrom("deleted")),
+            (rs, rowNum) -> store(rs),
+            tenantId,
+            storeId
+        ).stream().findFirst();
+    }
+
     public UUID upsertStoreHostAlias(UUID tenantId, UUID storeId, String storeCode, String storeStatus) {
         if (activeTenantCodeConflictExists(tenantId, storeCode)) {
             throw new DataIntegrityViolationException("tenant_host_alias_conflicts_with_tenant_code");
@@ -303,6 +325,134 @@ public class PlatformTenantStructureRepository {
             storeCode,
             storeId,
             aliasStatus
+        );
+    }
+
+    public List<UUID> archiveStoreHostAliases(UUID tenantId, UUID storeId) {
+        return jdbc.query(
+            """
+            update tenant_host_aliases
+            set status = 'archived',
+                deleted_at = coalesce(deleted_at, now()),
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and default_store_id = ?
+              and alias_type = 'store'
+              and deleted_at is null
+            returning id
+            """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            tenantId,
+            storeId
+        );
+    }
+
+    public void archiveStoreAccountAccess(UUID tenantId, UUID storeId) {
+        jdbc.update(
+            """
+            update auth_account_store_access
+            set deleted_at = coalesce(deleted_at, now())
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """,
+            tenantId,
+            storeId
+        );
+    }
+
+    public void refreshDefaultStoreReferences(UUID tenantId, UUID deletedStoreId) {
+        jdbc.update(
+            """
+            update auth_accounts account
+            set default_store_id = (
+                    select access.store_id
+                    from auth_account_store_access access
+                    join stores store
+                      on store.id = access.store_id
+                     and store.tenant_id = access.tenant_id
+                     and store.status = 'active'
+                     and store.deleted_at is null
+                    where access.account_id = account.id
+                      and access.tenant_id = account.tenant_id
+                      and access.deleted_at is null
+                    order by lower(store.display_name), lower(store.store_code), store.id
+                    limit 1
+                ),
+                updated_at = now(),
+                version = version + 1
+            where account.tenant_id = ?
+              and account.default_store_id = ?
+              and account.deleted_at is null
+            """,
+            tenantId,
+            deletedStoreId
+        );
+    }
+
+    public void cancelStoreSubscriptionItems(UUID tenantId, UUID storeId) {
+        jdbc.update(
+            """
+            update tenant_product_subscription_items
+            set status = 'cancelled',
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and scope_type = 'store'
+              and status in ('active', 'suspended')
+            """,
+            tenantId,
+            storeId
+        );
+    }
+
+    public void refreshStoreSubscriptionAggregates(UUID tenantId, UUID storeId) {
+        jdbc.update(
+            """
+            with affected as (
+                select distinct subscription_id
+                from tenant_product_subscription_items
+                where tenant_id = ?
+                  and store_id = ?
+                  and scope_type = 'store'
+            ),
+            active_totals as (
+                select
+                    affected.subscription_id,
+                    coalesce(sum(case when active_store.id is not null then item.amount else 0 end), 0) as amount,
+                    min(case when active_store.id is not null then item.current_period_start end) as current_period_start,
+                    max(case when active_store.id is not null then item.current_period_end end) as current_period_end,
+                    max(case when active_store.id is not null then item.currency end) as currency
+                from affected
+                left join tenant_product_subscription_items item
+                  on item.subscription_id = affected.subscription_id
+                 and item.tenant_id = ?
+                 and item.scope_type = 'store'
+                 and item.status = 'active'
+                left join stores active_store
+                  on active_store.id = item.store_id
+                 and active_store.tenant_id = item.tenant_id
+                 and active_store.status = 'active'
+                 and active_store.deleted_at is null
+                group by affected.subscription_id
+            )
+            update tenant_product_subscriptions subscription
+            set amount = active_totals.amount,
+                current_period_start = coalesce(active_totals.current_period_start, subscription.current_period_start),
+                current_period_end = coalesce(active_totals.current_period_end, subscription.current_period_end),
+                currency = coalesce(active_totals.currency, subscription.currency),
+                updated_at = now(),
+                version = subscription.version + 1
+            from active_totals
+            where subscription.tenant_id = ?
+              and subscription.id = active_totals.subscription_id
+            """,
+            tenantId,
+            storeId,
+            tenantId,
+            tenantId
         );
     }
 

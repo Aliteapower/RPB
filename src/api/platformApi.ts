@@ -293,6 +293,20 @@ export async function updateTenantStore(
   )
 }
 
+export async function deleteTenantStore(
+  tenantId: string,
+  storeId: string,
+  fetcher?: PlatformFetcher
+): Promise<PlatformStoreResponse> {
+  return requestJson(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/stores/${encodeURIComponent(storeId)}`,
+    {
+      method: 'DELETE',
+      fetcher
+    }
+  )
+}
+
 export async function createTenant(
   request: PlatformTenantMutation,
   fetcher?: PlatformFetcher

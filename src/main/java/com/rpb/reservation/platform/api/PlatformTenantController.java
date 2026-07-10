@@ -145,6 +145,17 @@ public class PlatformTenantController {
         ));
     }
 
+    @DeleteMapping("/{tenantId}/stores/{storeId}")
+    public ResponseEntity<PlatformStoreResponse> deleteStore(
+        @PathVariable UUID tenantId,
+        @PathVariable UUID storeId
+    ) {
+        CurrentActor actor = requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformStoreResponse.from(
+            structureService.deleteStore(tenantId, storeId, toOperator(actor))
+        ));
+    }
+
     @PostMapping
     public ResponseEntity<PlatformTenantResponse> createTenant(
         @RequestBody(required = false) PlatformTenantMutationRequest request

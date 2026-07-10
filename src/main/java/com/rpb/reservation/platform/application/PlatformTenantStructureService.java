@@ -203,6 +203,27 @@ public class PlatformTenantStructureService {
         }
     }
 
+    @Transactional
+    public PlatformStore deleteStore(UUID tenantId, UUID storeId, PlatformOperator operator) {
+        requireTenant(tenantId);
+        if (storeId == null) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
+        PlatformStore existing = structureRepository.findStore(tenantId, storeId)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.STORE_NOT_FOUND));
+        PlatformStore deleted = structureRepository.softDeleteStore(tenantId, storeId)
+            .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.STORE_NOT_FOUND));
+        structureRepository.archiveStoreHostAliases(tenantId, storeId)
+            .forEach(publicHostBindingService::archiveBinding);
+        storeAdminAccountRepository.archiveStoreManagers(tenantId, storeId);
+        structureRepository.archiveStoreAccountAccess(tenantId, storeId);
+        structureRepository.refreshDefaultStoreReferences(tenantId, storeId);
+        structureRepository.cancelStoreSubscriptionItems(tenantId, storeId);
+        structureRepository.refreshStoreSubscriptionAggregates(tenantId, storeId);
+        auditService.recordStoreDeleted(existing, deleted, operator);
+        return deleted;
+    }
+
     private void requireTenant(UUID tenantId) {
         if (tenantId == null) {
             throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);

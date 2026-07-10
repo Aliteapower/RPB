@@ -296,6 +296,10 @@ class AuthLoginUiValidationTest {
             .contains(":admin-store-ids=\"form.adminStoreIds\"")
             .contains(":default-admin-store-id=\"form.defaultAdminStoreId\"")
             .contains("@save-admin-store-access=\"saveAdminStoreAccess\"")
+            .contains("@delete-store=\"deleteStore\"")
+            .contains("deleteTenantStore")
+            .contains("async function deleteStore")
+            .contains("window.confirm(t('platform.tenants.structure.actions.confirmDeleteStore'")
             .contains("async function saveAdminStoreAccess")
             .contains("adminStoreIds: [...submittedForm.adminStoreIds]")
             .contains("defaultAdminStoreId: optionalValue(submittedForm.defaultAdminStoreId)");
@@ -313,6 +317,9 @@ class AuthLoginUiValidationTest {
             .contains("v-for=\"store in visibleAdminStoreOptions\"")
             .contains("v-if=\"defaultAdminStoreOption && !defaultStoreInSelectedEntity\"")
             .contains("store.operatingEntityId === selectedOperatingEntityId")
+            .contains("deleteStore: [store: PlatformStore]")
+            .contains("emit('deleteStore', store)")
+            .contains("platform.tenants.structure.actions.deleteStore")
             .contains("platform.tenants.structure.adminStoreAccess.title")
             .contains("platform.tenants.structure.adminStoreAccess.defaultStore");
 
@@ -336,6 +343,8 @@ class AuthLoginUiValidationTest {
             .contains("listTenantStores")
             .contains("createTenantStore")
             .contains("updateTenantStore")
+            .contains("deleteTenantStore")
+            .contains("method: 'DELETE'")
             .contains("saveOperatingEntity")
             .contains("saveStore")
             .contains("platform.tenants.structure.operatingEntities.title")
@@ -350,7 +359,9 @@ class AuthLoginUiValidationTest {
             .contains("structure: '门店结构'")
             .contains("title: '经营主体与门店'")
             .contains("newEntity: '新增经营主体'")
-            .contains("newStore: '新增分店'");
+            .contains("newStore: '新增分店'")
+            .contains("deleteStore: '删除'")
+            .contains("confirmDeleteStore: '删除门店 {storeName}？删除后该门店登录、授权、子域名入口和活跃计费项将停用。'");
         assertThat(en)
             .contains("adminStoreAccess")
             .contains("title: 'Authorised stores'")
@@ -358,7 +369,9 @@ class AuthLoginUiValidationTest {
             .contains("structure: 'Store structure'")
             .contains("title: 'Operating entities and stores'")
             .contains("newEntity: 'Add entity'")
-            .contains("newStore: 'Add branch'");
+            .contains("newStore: 'Add branch'")
+            .contains("deleteStore: 'Delete'")
+            .contains("confirmDeleteStore: 'Delete store {storeName}? Store login, access, subdomain entry and active billing items will be disabled.'");
     }
 
     @Test

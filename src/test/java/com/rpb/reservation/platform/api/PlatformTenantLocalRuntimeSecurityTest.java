@@ -123,6 +123,7 @@ class PlatformTenantLocalRuntimeSecurityTest {
     void localRuntimeAllowsTenantStructureApisWhenConfiguredActorIsPlatformAdmin() throws Exception {
         when(structureService.listOperatingEntities(TENANT_ID)).thenReturn(List.of(operatingEntity()));
         when(structureService.listStores(TENANT_ID)).thenReturn(List.of(store()));
+        when(structureService.deleteStore(eq(TENANT_ID), eq(STORE_ID), any())).thenReturn(deletedStore());
 
         mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/operating-entities", TENANT_ID))
             .andExpect(status().isOk())
@@ -134,6 +135,12 @@ class PlatformTenantLocalRuntimeSecurityTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.stores[0].storeCode").value("local-validation-store"))
             .andExpect(jsonPath("$.stores[0].operatingEntityName").value("Local Operating Entity"));
+
+        mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", TENANT_ID, STORE_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.id").value(STORE_ID.toString()))
+            .andExpect(jsonPath("$.store.deleted").value(true));
     }
 
     @Test
@@ -252,6 +259,27 @@ class PlatformTenantLocalRuntimeSecurityTest {
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             null
+        );
+    }
+
+    private static PlatformStore deletedStore() {
+        return new PlatformStore(
+            STORE_ID,
+            TENANT_ID,
+            OPERATING_ENTITY_ID,
+            "local-entity",
+            "Local Operating Entity",
+            "local-validation-store",
+            "Local Validation Store",
+            "inactive",
+            "Asia/Singapore",
+            "zh-CN",
+            "DD-MM-YYYY",
+            "HH:mm",
+            "SGD",
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            OffsetDateTime.parse("2026-06-26T00:00:00Z")
         );
     }
 }

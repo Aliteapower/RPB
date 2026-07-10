@@ -62,6 +62,52 @@ public class PlatformStoreAdminAccountRepository {
         return true;
     }
 
+    public void archiveStoreManagers(UUID tenantId, UUID storeId) {
+        jdbc.update(
+            """
+            update auth_accounts account
+            set status = 'disabled',
+                deleted_at = coalesce(account.deleted_at, now()),
+                updated_at = now(),
+                version = account.version + 1
+            where account.tenant_id = ?
+              and account.actor_type = 'staff'
+              and account.deleted_at is null
+              and exists (
+                  select 1
+                  from auth_account_roles role
+                  where role.account_id = account.id
+                    and role.role_code = 'store_manager'
+                    and role.deleted_at is null
+              )
+              and exists (
+                  select 1
+                  from auth_account_store_access access
+                  where access.account_id = account.id
+                    and access.tenant_id = account.tenant_id
+                    and access.store_id = ?
+                    and access.deleted_at is null
+              )
+              and not exists (
+                  select 1
+                  from auth_account_store_access other_access
+                  join stores other_store
+                    on other_store.id = other_access.store_id
+                   and other_store.tenant_id = other_access.tenant_id
+                   and other_store.status = 'active'
+                   and other_store.deleted_at is null
+                  where other_access.account_id = account.id
+                    and other_access.tenant_id = account.tenant_id
+                    and other_access.store_id <> ?
+                    and other_access.deleted_at is null
+              )
+            """,
+            tenantId,
+            storeId,
+            storeId
+        );
+    }
+
     private Optional<UUID> findStoreManagerAccountId(UUID tenantId, UUID storeId) {
         return jdbc.query(
             """

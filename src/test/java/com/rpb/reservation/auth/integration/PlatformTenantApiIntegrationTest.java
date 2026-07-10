@@ -72,6 +72,11 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where store_id in (select id from stores where store_code like 'codex-%')");
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
+        jdbc.update("delete from tenant_product_subscriptions where app_key like 'codex-%'");
+        jdbc.update("delete from tenant_app_entitlements where app_key like 'codex-%'");
+        jdbc.update("delete from store_app_settings where app_key like 'codex-%'");
+        jdbc.update("delete from platform_product_line_prices where app_key like 'codex-%'");
+        jdbc.update("delete from platform_apps where app_key like 'codex-%'");
         jdbc.update("""
             update auth_accounts
             set default_store_id = null
@@ -562,7 +567,6 @@ class PlatformTenantApiIntegrationTest {
             .path("store")
             .path("id")
             .asText());
-
         assertThat(countWhere("""
             select count(*)
             from auth_accounts account
@@ -617,6 +621,234 @@ class PlatformTenantApiIntegrationTest {
             """, tenantId)).isEqualTo(1);
         expectLoginRejected("codex-branch-a-admin", "def456");
         login("codex-branch-a-admin", "ghi789");
+
+        UUID alternateAliasId = UUID.randomUUID();
+        jdbc.update(
+            """
+            insert into tenant_host_aliases (
+                id, tenant_id, alias_code, alias_type, default_store_id, status
+            )
+            values (?, ?, 'codex-branch-a-alt', 'store', ?, 'active')
+            """,
+            alternateAliasId,
+            tenantId,
+            storeId
+        );
+        jdbc.update(
+            """
+            insert into public_host_bindings (
+                host_alias_id, tenant_id, host_prefix, hostname, host_type, tls_status
+            )
+            values (?, ?, 'codex-branch-a-alt', 'codex-branch-a-alt.booking.yumstone.sg', 'store', 'pending')
+            """,
+            alternateAliasId,
+            tenantId
+        );
+
+        UUID subscriptionId = UUID.randomUUID();
+        jdbc.update(
+            """
+            insert into tenant_product_subscriptions (
+                id, tenant_id, app_key, billing_cycle, status,
+                current_period_start, current_period_end, amount, currency
+            )
+            values (?, ?, 'reservation_queue', 'monthly', 'active',
+                    '2026-07-01T00:00:00Z', '2026-08-01T00:00:00Z', 10.00, 'SGD')
+            """,
+            subscriptionId,
+            tenantId
+        );
+        jdbc.update(
+            """
+            insert into tenant_product_subscription_items (
+                subscription_id, tenant_id, app_key, scope_type, store_id,
+                quantity, unit_amount, amount, currency, status
+            )
+            values (?, ?, 'reservation_queue', 'store', ?, 1, 10.00, 10.00, 'SGD', 'active')
+            """,
+            subscriptionId,
+            tenantId,
+            storeId
+        );
+
+        mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, storeId)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.id").value(storeId.toString()))
+            .andExpect(jsonPath("$.store.deleted").value(true))
+            .andExpect(jsonPath("$.store.status").value("inactive"));
+
+        assertThat(countWhere("""
+            select count(*)
+            from stores
+            where tenant_id = ?
+              and id = ?
+              and status = 'inactive'
+              and deleted_at is not null
+            """, tenantId, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts
+            where tenant_id = ?
+              and username = 'codex-branch-a-admin'
+              and actor_type = 'staff'
+              and status = 'disabled'
+              and deleted_at is not null
+            """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_account_store_access
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """, tenantId, storeId)).isZero();
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-branch-a'
+              and alias_type = 'store'
+              and default_store_id = ?
+              and status = 'archived'
+              and deleted_at is not null
+            """, tenantId, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and default_store_id = ?
+              and alias_type = 'store'
+              and status = 'archived'
+              and deleted_at is not null
+            """, tenantId, storeId)).isEqualTo(2);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings
+            where tenant_id = ?
+              and hostname in (
+                  'codex-branch-a.booking.yumstone.sg',
+                  'codex-branch-a-alt.booking.yumstone.sg'
+              )
+              and tls_status = 'archived'
+              and deleted_at is not null
+            """, tenantId)).isEqualTo(2);
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_product_subscription_items
+            where tenant_id = ?
+              and store_id = ?
+              and status = 'cancelled'
+            """, tenantId, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from audit_logs
+            where target_type = 'store'
+              and target_id = ?
+              and operation_code = 'platform.tenant.store.delete'
+            """, storeId)).isEqualTo(1);
+
+        mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/stores", tenantId).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.stores.length()").value(0));
+        expectLoginRejected("codex-branch-a-admin", "ghi789");
+    }
+
+    @Test
+    void deletingStoreKeepsStoreManagerAccountWhenOtherActiveStoreAccessRemains() throws Exception {
+        Cookie session = login("sysadmin");
+
+        UUID tenantId = createGroupTenant(session, "codex-manager-scope", "Codex 多门店管理员集团", "abc123");
+        UUID operatingEntityId = jdbc.queryForObject(
+            """
+            select id
+            from operating_entities
+            where tenant_id = ?
+              and entity_code = 'codex-manager-scope'
+              and deleted_at is null
+            """,
+            UUID.class,
+            tenantId
+        );
+        UUID firstStoreId = createStore(
+            session,
+            tenantId,
+            operatingEntityId,
+            "codex-manager-a",
+            "Codex 管理员 A 店",
+            "codex-manager-a-admin",
+            "DEF456"
+        );
+        UUID secondStoreId = createStore(
+            session,
+            tenantId,
+            operatingEntityId,
+            "codex-manager-b",
+            "Codex 管理员 B 店",
+            null,
+            null
+        );
+        UUID managerAccountId = jdbc.queryForObject(
+            """
+            select id
+            from auth_accounts
+            where tenant_id = ?
+              and username = 'codex-manager-a-admin'
+              and actor_type = 'staff'
+              and deleted_at is null
+            """,
+            UUID.class,
+            tenantId
+        );
+        jdbc.update(
+            """
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            values (?, ?, ?)
+            """,
+            managerAccountId,
+            tenantId,
+            secondStoreId
+        );
+
+        mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, firstStoreId)
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts
+            where id = ?
+              and status = 'active'
+              and default_store_id = ?
+              and deleted_at is null
+            """, managerAccountId, secondStoreId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_account_store_access
+            where account_id = ?
+              and tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """, managerAccountId, tenantId, secondStoreId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_account_store_access
+            where account_id = ?
+              and tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """, managerAccountId, tenantId, firstStoreId)).isZero();
+
+        Cookie managerSession = login("codex-manager-a-admin", "def456");
+        MvcResult storesResult = mockMvc.perform(get("/api/v1/me/stores").cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode stores = objectMapper.readTree(storesResult.getResponse().getContentAsString()).path("stores");
+        assertThat(stringsByField(stores, "storeId")).containsExactly(secondStoreId.toString());
+        assertThat(storeById(stores, secondStoreId).path("defaultStore").asBoolean()).isTrue();
     }
 
     @Test
@@ -952,6 +1184,152 @@ class PlatformTenantApiIntegrationTest {
         assertThat(createdStore.path("operatingEntityId").asText()).isEqualTo(operatingEntityId.toString());
         assertThat(createdStore.path("operatingEntityName").asText()).isEqualTo("LSC106 经营主体");
         assertThat(createdStore.path("defaultStore").asBoolean()).isTrue();
+
+        String appKey = "codex-store-delete-billing";
+        ensurePlatformApp(appKey);
+        UUID subscriptionId = UUID.randomUUID();
+        UUID defaultStoreItemId = UUID.randomUUID();
+        UUID deletedStoreItemId = UUID.randomUUID();
+        jdbc.update(
+            """
+            insert into tenant_product_subscriptions (
+                id, tenant_id, app_key, billing_cycle, status,
+                current_period_start, current_period_end, amount, currency
+            )
+            values (?, ?, ?, 'monthly', 'active',
+                    '2026-07-01T00:00:00Z', '2026-08-01T00:00:00Z', 20.00, 'SGD')
+            """,
+            subscriptionId,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            appKey
+        );
+        jdbc.update(
+            """
+            insert into tenant_product_subscription_items (
+                id, subscription_id, tenant_id, app_key, scope_type, store_id,
+                billing_cycle, current_period_start, current_period_end,
+                quantity, unit_amount, amount, currency, status
+            )
+            values
+                (?, ?, ?, ?, 'store', ?, 'monthly',
+                 '2026-07-01T00:00:00Z', '2026-08-01T00:00:00Z', 1, 10.00, 10.00, 'SGD', 'active'),
+                (?, ?, ?, ?, 'store', ?, 'monthly',
+                 '2026-07-01T00:00:00Z', '2026-08-01T00:00:00Z', 1, 10.00, 10.00, 'SGD', 'active')
+            """,
+            defaultStoreItemId,
+            subscriptionId,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            appKey,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+            deletedStoreItemId,
+            subscriptionId,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            appKey,
+            storeId
+        );
+
+        mockMvc.perform(delete(
+                    "/api/v1/platform/tenants/{tenantId}/stores/{storeId}",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+                    storeId
+                )
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.deleted").value(true));
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_product_subscription_items
+            where id = ?
+              and status = 'cancelled'
+            """, deletedStoreItemId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+            """
+            select amount
+            from tenant_product_subscriptions
+            where id = ?
+            """,
+            java.math.BigDecimal.class,
+            subscriptionId
+        )).isEqualByComparingTo("10.00");
+        mockMvc.perform(post(
+                    "/api/v1/platform/tenants/{tenantId}/product-subscriptions/{subscriptionId}/items/{itemId}/renew",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+                    subscriptionId,
+                    deletedStoreItemId
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "idempotencyKey":"renew-deleted-store-item",
+                      "appKey":"%s",
+                      "billingCycle":"monthly",
+                      "durationCount":1,
+                      "currency":"SGD",
+                      "paymentNote":"should be rejected",
+                      "version":1
+                    }
+                    """.formatted(appKey))
+                .cookie(session))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("SUBSCRIPTION_ITEM_NOT_FOUND"));
+        assertThat(countWhere("""
+            select count(*)
+            from auth_accounts account
+            join auth_account_store_access access on access.account_id = account.id
+            where account.tenant_id = ?
+              and account.username = '20000000'
+              and account.actor_type = 'tenant_admin'
+              and account.default_store_id = ?
+              and access.tenant_id = ?
+              and access.store_id = ?
+              and account.deleted_at is null
+              and access.deleted_at is null
+            """,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID,
+            AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+            AuthPostgresTestDatabase.VALIDATION_STORE_ID
+        )).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from auth_account_store_access
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            """, AuthPostgresTestDatabase.VALIDATION_TENANT_ID, storeId)).isZero();
+        assertThat(countWhere("""
+            select count(*)
+            from tenant_host_aliases
+            where tenant_id = ?
+              and alias_code = 'codex-lsc106'
+              and default_store_id = ?
+              and status = 'archived'
+              and deleted_at is not null
+            """, AuthPostgresTestDatabase.VALIDATION_TENANT_ID, storeId)).isEqualTo(1);
+        assertThat(countWhere("""
+            select count(*)
+            from public_host_bindings
+            where tenant_id = ?
+              and hostname = 'codex-lsc106.booking.yumstone.sg'
+              and tls_status = 'archived'
+              and deleted_at is not null
+            """, AuthPostgresTestDatabase.VALIDATION_TENANT_ID)).isEqualTo(1);
+
+        Cookie tenantAdminAfterDeleteSession = login("20000000");
+        MvcResult storesAfterDeleteResult = mockMvc.perform(get("/api/v1/me/stores").cookie(tenantAdminAfterDeleteSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+        JsonNode storesAfterDelete = objectMapper
+            .readTree(storesAfterDeleteResult.getResponse().getContentAsString())
+            .path("stores");
+        assertThat(stringsByField(storesAfterDelete, "storeId"))
+            .containsExactly(AuthPostgresTestDatabase.VALIDATION_STORE_ID.toString());
+        assertThat(storeById(storesAfterDelete, AuthPostgresTestDatabase.VALIDATION_STORE_ID)
+            .path("defaultStore")
+            .asBoolean()).isTrue();
     }
 
     @Test
@@ -979,6 +1357,24 @@ class PlatformTenantApiIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
+
+        mockMvc.perform(delete(
+                    "/api/v1/platform/tenants/{tenantId}/stores/{storeId}",
+                    AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
+                    FOREIGN_STORE_ID
+                )
+                .cookie(session))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("STORE_NOT_FOUND"));
+        assertThat(countWhere("""
+            select count(*)
+            from stores
+            where tenant_id = ?
+              and id = ?
+              and status = 'active'
+              and deleted_at is null
+            """, FOREIGN_TENANT_ID, FOREIGN_STORE_ID)).isEqualTo(1);
     }
 
     @Test
@@ -1205,6 +1601,68 @@ class PlatformTenantApiIntegrationTest {
 
         String id = objectMapper.readTree(result.getResponse().getContentAsString()).path("tenant").path("id").asText();
         return UUID.fromString(id);
+    }
+
+    private UUID createStore(
+        Cookie session,
+        UUID tenantId,
+        UUID operatingEntityId,
+        String storeCode,
+        String storeName,
+        String adminUsername,
+        String adminPassword
+    ) throws Exception {
+        String adminFields = adminPassword == null
+            ? ""
+            : """
+              ,
+              "adminUsername":"%s",
+              "adminPassword":"%s"
+            """.formatted(adminUsername, adminPassword);
+        MvcResult result = mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/stores", tenantId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "operatingEntityId":"%s",
+                      "storeCode":"%s",
+                      "storeName":"%s",
+                      "status":"active",
+                      "timezone":"Asia/Singapore",
+                      "locale":"zh-CN",
+                      "dateFormat":"DD-MM-YYYY",
+                      "timeFormat":"HH:mm",
+                      "currency":"SGD"%s
+                    }
+                    """.formatted(operatingEntityId, storeCode, storeName, adminFields))
+                .cookie(session))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.store.storeCode").value(storeCode))
+            .andReturn();
+        return UUID.fromString(objectMapper
+            .readTree(result.getResponse().getContentAsString())
+            .path("store")
+            .path("id")
+            .asText());
+    }
+
+    private void ensurePlatformApp(String appKey) {
+        jdbc.update(
+            """
+            insert into platform_apps (
+                app_key, app_name, status, default_entry_route, description, sort_order, config_json
+            )
+            values (?, ?, 'active', '/stores/:storeId/staff', 'Codex integration test app.', 990, '{}'::jsonb)
+            on conflict (app_key) do update
+            set app_name = excluded.app_name,
+                status = excluded.status,
+                default_entry_route = excluded.default_entry_route,
+                description = excluded.description,
+                updated_at = now()
+            """,
+            appKey,
+            appKey
+        );
     }
 
     private Cookie login(String username) throws Exception {

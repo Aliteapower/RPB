@@ -262,7 +262,9 @@ function storeItemName(item: TenantProductSubscriptionItem): string {
 }
 
 function billingItemsForSubscription(subscription: TenantProductSubscription | null): TenantProductSubscription['items'] {
-  return subscription ? subscription.items : []
+  return subscription ? subscription.items.filter(item => (
+    item.storeId && item.status !== 'cancelled' && item.status !== 'expired'
+  )) : []
 }
 
 function apiErrorText(error: unknown): string {

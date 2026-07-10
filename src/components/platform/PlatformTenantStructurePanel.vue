@@ -26,6 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   saveOperatingEntity: [form: PlatformOperatingEntityFormModel]
   saveStore: [form: PlatformStoreFormModel]
+  deleteStore: [store: PlatformStore]
   saveAdminStoreAccess: [form: PlatformTenantAdminStoreAccessFormModel]
 }>()
 
@@ -232,6 +233,10 @@ function closeStoreForm(): void {
 
 function submitStore(): void {
   emit('saveStore', { ...storeForm })
+}
+
+function deleteStore(store: PlatformStore): void {
+  emit('deleteStore', store)
 }
 
 function toggleAdminStoreFromEvent(storeId: string, event: Event): void {
@@ -486,9 +491,14 @@ function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
               <strong>{{ store.storeName }}</strong>
               <small>{{ store.storeCode }} · {{ storeEntityName(store) }} · {{ $t(`platform.tenants.structure.status.${store.status}`) }}</small>
             </div>
-            <button class="text-button" type="button" @click="editStore(store)">
-              {{ $t('common.actions.edit') }}
-            </button>
+            <div class="row-actions">
+              <button class="text-button" type="button" :disabled="saving" @click="editStore(store)">
+                {{ $t('common.actions.edit') }}
+              </button>
+              <button class="text-button danger" type="button" :disabled="saving" @click="deleteStore(store)">
+                {{ $t('platform.tenants.structure.actions.deleteStore') }}
+              </button>
+            </div>
           </article>
         </div>
 
@@ -830,6 +840,14 @@ function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
   gap: 2px;
 }
 
+.row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .data-row strong,
 .data-row small {
   min-width: 0;
@@ -999,6 +1017,10 @@ select {
   background: transparent;
 }
 
+.text-button.danger {
+  color: #b91c1c;
+}
+
 .primary-button:disabled,
 .secondary-button:disabled,
 .text-button:disabled {
@@ -1090,6 +1112,10 @@ select {
   .data-row,
   .section-heading {
     align-items: stretch;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
   }
 
   .section-heading {

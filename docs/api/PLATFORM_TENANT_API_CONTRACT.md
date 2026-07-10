@@ -106,6 +106,37 @@ Rules:
 - `storeCode` is unique per tenant among non-deleted stores.
 - Invalid tenant ids return `TENANT_NOT_FOUND`; invalid store ids return `STORE_NOT_FOUND`; invalid operating entity ids return `REQUEST_INVALID`; duplicate store codes return `STORE_CODE_CONFLICT`.
 
+### `DELETE /api/v1/platform/tenants/{tenantId}/stores/{storeId}`
+
+Soft-deletes a tenant store and disables its active operational entry points.
+
+Response:
+
+```json
+{
+  "success": true,
+  "store": {
+    "id": "20000000-0000-0000-0000-000000000983",
+    "tenantId": "10000000-0000-0000-0000-000000000983",
+    "storeCode": "lsc106",
+    "storeName": "LSC106 门店",
+    "status": "inactive",
+    "deleted": true
+  }
+}
+```
+
+Rules:
+- This is a soft delete. The store row remains for historical references, but `stores.deleted_at` is set and `status` becomes `inactive`.
+- The store is removed from platform store lists and tenant-admin authorisation options because those APIs return only non-deleted stores.
+- Active `tenant_host_aliases` and `public_host_bindings` for the store are archived.
+- Active `auth_account_store_access` rows for the store are soft-deleted.
+- Store manager accounts created for that store are disabled and soft-deleted.
+- If any active account used the deleted store as `default_store_id`, its default is moved to the first remaining active store access in the same tenant, or cleared when none remains.
+- Active or suspended store-scoped subscription items for the store are marked `cancelled` so the store is no longer available for single-store renewal.
+- The parent subscription amount and period are recomputed from remaining active store-scoped subscription items.
+- Invalid tenant ids return `TENANT_NOT_FOUND`; invalid, deleted, or cross-tenant store ids return `STORE_NOT_FOUND`.
+
 ## Tenant Admin Store Access
 
 ### `GET /api/v1/platform/tenants/{tenantId}/admin-store-access`
@@ -161,4 +192,4 @@ Rules:
 - Invalid, inactive, deleted, null, or cross-tenant store ids return `REQUEST_INVALID` with HTTP 400.
 
 ## Compatibility
-Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills. `V040` is additive and does not change existing tenant, store, or login API responses.
+Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. Existing store create, update, and list endpoints are unchanged. Store deletion is additive and uses existing soft-delete/status fields, so it requires no database migration. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills. `V040` is additive and does not change existing tenant, store, or login API responses.

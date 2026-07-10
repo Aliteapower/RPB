@@ -25,6 +25,7 @@ public class PlatformTenantAuditService {
     static final String OPERATION_OPERATING_ENTITY_UPDATE = "platform.tenant.operating_entity.update";
     static final String OPERATION_STORE_CREATE = "platform.tenant.store.create";
     static final String OPERATION_STORE_UPDATE = "platform.tenant.store.update";
+    static final String OPERATION_STORE_DELETE = "platform.tenant.store.delete";
 
     private static final String TARGET_TENANT = "tenant";
     private static final String TARGET_OPERATING_ENTITY = "operating_entity";
@@ -100,6 +101,13 @@ public class PlatformTenantAuditService {
         metadata.put("previous", storeMetadata(before));
         metadata.put("changedFields", changedStoreFields(before, after));
         append(OPERATION_STORE_UPDATE, TARGET_STORE, after.id(), operator, metadata);
+    }
+
+    public void recordStoreDeleted(PlatformStore before, PlatformStore after, PlatformOperator operator) {
+        Map<String, Object> metadata = storeMetadata(after);
+        metadata.put("previous", storeMetadata(before));
+        metadata.put("deleted", true);
+        append(OPERATION_STORE_DELETE, TARGET_STORE, after.id(), operator, metadata);
     }
 
     private void append(
