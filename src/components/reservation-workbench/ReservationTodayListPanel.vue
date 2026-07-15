@@ -30,6 +30,7 @@ import {
 import ReservationTodayListItem from './ReservationTodayListItem.vue'
 
 const props = defineProps<{
+  canAssignReservationTable: boolean
   canCancelReservation: boolean
   canNoShowReservation: boolean
   canRunCurrentDayActions: boolean
@@ -52,6 +53,7 @@ const emit = defineEmits<{
   'check-in-requested': [item: ReservationTodayViewItem]
   'no-showed': [value: MarkReservationNoShowResponse]
   'seat-requested': [item: ReservationTodayViewItem]
+  'table-assignment-requested': [item: ReservationTodayViewItem]
 }>()
 
 const phoneFilter = ref('')
@@ -175,6 +177,10 @@ function handleCheckInRequested(item: ReservationTodayViewItem): void {
 
 function handleSeatRequested(item: ReservationTodayViewItem): void {
   emit('seat-requested', item)
+}
+
+function handleTableAssignmentRequested(item: ReservationTodayViewItem): void {
+  emit('table-assignment-requested', item)
 }
 
 function createReservationCancelIdempotencyKey(reservationId: string): string {
@@ -306,6 +312,7 @@ function createLocalStatusActionError(
       <ReservationTodayListItem
         v-for="item in visibleItems"
         :key="item.reservationId"
+        :can-assign-reservation-table="canAssignReservationTable"
         :can-cancel-reservation="canCancelReservation"
         :can-no-show-reservation="canNoShowReservation"
         :can-run-current-day-actions="canRunCurrentDayActions"
@@ -320,6 +327,7 @@ function createLocalStatusActionError(
         @check-in-requested="handleCheckInRequested"
         @no-show-requested="handleNoShowRequested"
         @seat-requested="handleSeatRequested"
+        @table-assignment-requested="handleTableAssignmentRequested"
       />
     </section>
   </section>

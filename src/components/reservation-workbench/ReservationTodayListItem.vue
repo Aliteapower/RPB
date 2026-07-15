@@ -39,6 +39,7 @@ const queueStatusLabelKeys: Record<string, string> = {
 }
 
 const props = defineProps<{
+  canAssignReservationTable: boolean
   canCancelReservation: boolean
   canNoShowReservation: boolean
   canRunCurrentDayActions: boolean
@@ -56,6 +57,7 @@ const emit = defineEmits<{
   'check-in-requested': [item: ReservationTodayViewItem]
   'no-show-requested': [item: ReservationTodayViewItem]
   'seat-requested': [item: ReservationTodayViewItem]
+  'table-assignment-requested': [item: ReservationTodayViewItem]
 }>()
 
 const { t, locale } = useI18n()
@@ -77,6 +79,11 @@ const statusClass = computed(() => `status-${props.item.status.replace(/_/g, '-'
 const queueTicketStatus = computed(() => props.item.queueTicketStatus?.trim() ?? '')
 const hasQueueTicket = computed(() => !!props.item.queueTicketId?.trim())
 const showCheckIn = computed(() => props.item.status === 'confirmed')
+const showAssignTable = computed(() =>
+  props.item.status === 'confirmed' &&
+  !props.item.assignedResourceId?.trim() &&
+  !props.item.currentResourceId?.trim()
+)
 const showDirectSeat = computed(() => props.item.status === 'arrived' && !hasQueueTicket.value)
 const showQueueSeat = computed(
   () => props.item.status === 'arrived' && hasQueueTicket.value && queueTicketStatus.value === 'called'
@@ -154,6 +161,14 @@ watch(activeLocale, () => {
   resetShareFeedback()
 })
 
+watch(
+  () => [props.item.assignedResourceId, props.item.assignedResourceCode],
+  () => {
+    shareInfo.value = null
+    resetShareFeedback()
+  }
+)
+
 function requestCancel(): void {
   emit('cancel-requested', props.item)
 }
@@ -180,6 +195,13 @@ function requestSeat(): void {
   }
 
   emit('seat-requested', props.item)
+}
+
+function requestTableAssignment(): void {
+  if (!showAssignTable.value || !props.canAssignReservationTable) {
+    return
+  }
+  emit('table-assignment-requested', props.item)
 }
 
 async function shareReservationLink(): Promise<void> {
@@ -404,6 +426,15 @@ function resourceLabel(type: string | null | undefined): string {
         @system-share-requested="shareReservationLink"
         @copy-requested="copyReservationShareLink"
       />
+
+      <button
+        v-if="showAssignTable && canAssignReservationTable"
+        class="reservation-today-list-item__action reservation-today-list-item__action--secondary"
+        type="button"
+        @click="requestTableAssignment"
+      >
+        {{ $t('reservationWorkbench.tableAssignment.action') }}
+      </button>
 
       <button
         v-if="showCheckIn"

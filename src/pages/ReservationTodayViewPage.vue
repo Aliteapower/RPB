@@ -15,6 +15,7 @@ import {
 import CreateReservationDialog from '../components/reservation-workbench/CreateReservationDialog.vue'
 import ReservationQuickActionPanel from '../components/reservation-workbench/ReservationQuickActionPanel.vue'
 import ReservationSeatDialog from '../components/reservation-workbench/ReservationSeatDialog.vue'
+import ReservationTableAssignmentDialog from '../components/reservation-workbench/ReservationTableAssignmentDialog.vue'
 import ReservationTodayListPanel from '../components/reservation-workbench/ReservationTodayListPanel.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwitcher.vue'
@@ -22,6 +23,7 @@ import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { ReservationCheckInApiErrorResponse } from '../types/reservationCheckIn'
+import type { ReservationTableAssignmentResponse } from '../types/reservationTableAssignment'
 import type {
   ReservationTodayViewApiErrorResponse,
   ReservationTodayViewItem,
@@ -62,6 +64,8 @@ const apps = ref<MeAppEntry[]>([])
 const showCreateReservationDialog = ref(false)
 const showSeatDialog = ref(false)
 const selectedSeatReservation = ref<ReservationTodayViewItem | null>(null)
+const showTableAssignmentDialog = ref(false)
+const selectedTableAssignmentReservation = ref<ReservationTodayViewItem | null>(null)
 const checkingInReservationId = ref<string | null>(null)
 const visibleMonthKey = ref(monthKeyFromDate(businessDate.value))
 const reservationCounts = ref<Record<string, number>>({})
@@ -90,6 +94,10 @@ const canCancelReservation = computed(
 const canNoShowReservation = computed(
   () => reservationQueueEntry.value?.permissions.includes('reservation.no_show') ?? false
 )
+const canAssignReservationTable = computed(() => {
+  const permissions = reservationQueueEntry.value?.permissions ?? []
+  return permissions.includes('table.view') && permissions.includes('reservation.create')
+})
 
 watch(
   [storeId, businessDate, selectedStatus],
@@ -132,6 +140,15 @@ watch(
   open => {
     if (!open) {
       selectedSeatReservation.value = null
+    }
+  }
+)
+
+watch(
+  showTableAssignmentDialog,
+  open => {
+    if (!open) {
+      selectedTableAssignmentReservation.value = null
     }
   }
 )
@@ -340,6 +357,20 @@ function openReservationSeatDialog(item: ReservationTodayViewItem): void {
   showSeatDialog.value = true
 }
 
+function openReservationTableAssignmentDialog(item: ReservationTodayViewItem): void {
+  if (!canAssignReservationTable.value) {
+    return
+  }
+  selectedTableAssignmentReservation.value = item
+  showTableAssignmentDialog.value = true
+}
+
+function handleReservationTableAssigned(_response: ReservationTableAssignmentResponse): void {
+  showTableAssignmentDialog.value = false
+  selectedTableAssignmentReservation.value = null
+  void loadTodayView()
+}
+
 function queueSeatingRouteQuery(item: ReservationTodayViewItem): Record<string, string | undefined> {
   return {
     queueTicketId: item.queueTicketId?.trim() || undefined,
@@ -486,6 +517,7 @@ function isOpenCreateQuery(value: unknown): boolean {
       <ReservationTodayListPanel
         v-model:selected-status="selectedStatus"
         :api-error="apiError"
+        :can-assign-reservation-table="canAssignReservationTable"
         :can-cancel-reservation="canCancelReservation"
         :can-no-show-reservation="canNoShowReservation"
         :can-run-current-day-actions="canRunCurrentDayActions"
@@ -501,6 +533,7 @@ function isOpenCreateQuery(value: unknown): boolean {
         @check-in-requested="handleReservationCheckIn"
         @no-showed="handleReservationNoShowed"
         @seat-requested="openReservationSeatDialog"
+        @table-assignment-requested="openReservationTableAssignmentDialog"
       />
 
       <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
@@ -523,6 +556,13 @@ function isOpenCreateQuery(value: unknown): boolean {
       :item="selectedSeatReservation"
       :store-id="storeId"
       @seated="handleReservationSeated"
+    />
+
+    <ReservationTableAssignmentDialog
+      v-model:open="showTableAssignmentDialog"
+      :item="selectedTableAssignmentReservation"
+      :store-id="storeId"
+      @assigned="handleReservationTableAssigned"
     />
 
     <StaffBottomNav :store-id="storeId" active-tab="reservation" />
