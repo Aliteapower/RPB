@@ -223,7 +223,7 @@ class ReservationTableAssignmentControllerTest {
         private ReservationTableAssignmentResult commandResult;
 
         private CapturingService() {
-            super(null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

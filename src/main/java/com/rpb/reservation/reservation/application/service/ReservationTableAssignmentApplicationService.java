@@ -29,10 +29,12 @@ import com.rpb.reservation.reservation.application.rule.ReservationTableAssignme
 import com.rpb.reservation.reservation.domain.Reservation;
 import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.value.ReservationId;
+import com.rpb.reservation.seating.application.port.out.SeatingRepositoryPort;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.table.application.DiningTableResourceRow;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
+import com.rpb.reservation.table.application.port.out.TableLockRepositoryPort;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.status.DiningTableStatus;
 import com.rpb.reservation.table.value.TableId;
@@ -67,7 +69,9 @@ public class ReservationTableAssignmentApplicationService {
     private final StoreRepositoryPort storeRepository;
     private final ReservationRepositoryPort reservationRepository;
     private final DiningTableRepositoryPort tableRepository;
+    private final TableLockRepositoryPort tableLockRepository;
     private final ReservationPreassignmentRepositoryPort preassignmentRepository;
+    private final SeatingRepositoryPort seatingRepository;
     private final BusinessEventRepositoryPort businessEventRepository;
     private final AuditLogRepositoryPort auditLogRepository;
     private final IdempotencyRepositoryPort idempotencyRepository;
@@ -83,7 +87,9 @@ public class ReservationTableAssignmentApplicationService {
         StoreRepositoryPort storeRepository,
         ReservationRepositoryPort reservationRepository,
         DiningTableRepositoryPort tableRepository,
+        TableLockRepositoryPort tableLockRepository,
         ReservationPreassignmentRepositoryPort preassignmentRepository,
+        SeatingRepositoryPort seatingRepository,
         BusinessEventRepositoryPort businessEventRepository,
         AuditLogRepositoryPort auditLogRepository,
         IdempotencyRepositoryPort idempotencyRepository,
@@ -92,7 +98,9 @@ public class ReservationTableAssignmentApplicationService {
         this.storeRepository = storeRepository;
         this.reservationRepository = reservationRepository;
         this.tableRepository = tableRepository;
+        this.tableLockRepository = tableLockRepository;
         this.preassignmentRepository = preassignmentRepository;
+        this.seatingRepository = seatingRepository;
         this.businessEventRepository = businessEventRepository;
         this.auditLogRepository = auditLogRepository;
         this.idempotencyRepository = idempotencyRepository;
@@ -123,6 +131,7 @@ public class ReservationTableAssignmentApplicationService {
             List<AssignableReservationTable> tables = tableRepository.findVisibleResourceRows(scope, null, reservation.partySize())
                 .stream()
                 .filter(row -> isEligible(row, reservation, assignments, requestedRange))
+                .filter(row -> !hasPhysicalBlocker(scope, row.resourceId()))
                 .map(ReservationTableAssignmentApplicationService::toAssignableTable)
                 .toList();
             return AssignableReservationTablesResult.success(
@@ -243,6 +252,9 @@ public class ReservationTableAssignmentApplicationService {
             .orElseThrow(() -> new ApplicationFailure(ReservationTableAssignmentError.TABLE_NOT_FOUND));
         requireScope(scope, table.scope());
         require(assignmentRule.validateTable(table, reservation.partySize()));
+        if (hasPhysicalBlocker(scope, table.id().value())) {
+            throw new ApplicationFailure(ReservationTableAssignmentError.TABLE_NOT_AVAILABLE);
+        }
 
         TimeRange requestedRange = reservationRange(reservation);
         boolean conflict = overlappingAssignments(scope, reservation, requestedRange).stream()
@@ -428,13 +440,22 @@ public class ReservationTableAssignmentApplicationService {
         return assignments == null ? Set.of() : assignments;
     }
 
+    private boolean hasPhysicalBlocker(StoreScope scope, UUID tableId) {
+        return tableLockRepository.existsActiveConflict(
+            scope,
+            RESOURCE_DINING_TABLE,
+            tableId,
+            OffsetDateTime.now(clock)
+        ) || seatingRepository.existsActiveResourceOccupancy(scope, RESOURCE_DINING_TABLE, tableId);
+    }
+
     private static boolean isEligible(
         DiningTableResourceRow row,
         Reservation reservation,
         Set<ReservationResourceAssignment> assignments,
         TimeRange requestedRange
     ) {
-        if (row == null || row.resourceId() == null || "inactive".equalsIgnoreCase(row.status())) {
+        if (row == null || row.resourceId() == null || !DiningTableStatus.AVAILABLE.code().equalsIgnoreCase(row.status())) {
             return false;
         }
         int partySize = reservation.partySize().value();

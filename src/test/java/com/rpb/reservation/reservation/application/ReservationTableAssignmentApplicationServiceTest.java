@@ -32,11 +32,13 @@ import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationCode;
 import com.rpb.reservation.reservation.value.ReservationId;
+import com.rpb.reservation.seating.application.port.out.SeatingRepositoryPort;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.table.application.DiningTableResourceRow;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
+import com.rpb.reservation.table.application.port.out.TableLockRepositoryPort;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.status.DiningTableStatus;
 import com.rpb.reservation.table.value.TableId;
@@ -235,6 +237,65 @@ class ReservationTableAssignmentApplicationServiceTest {
         assertThat(result.tables()).extracting(AssignableReservationTable::tableCode).containsExactly("A01");
     }
 
+    @Test
+    void assignableTableQueryReturnsOnlyCurrentlyAvailableTables() {
+        Scenario scenario = Scenario.ready("public_booking");
+        UUID lockedId = UUID.randomUUID();
+        UUID reservedId = UUID.randomUUID();
+        UUID occupiedId = UUID.randomUUID();
+        UUID cleaningId = UUID.randomUUID();
+        UUID inactiveId = UUID.randomUUID();
+        when(scenario.tableRepository.findVisibleResourceRows(scenario.scope, null, new PartySize(2))).thenReturn(List.of(
+            scenario.row(scenario.tableId, "A01", 1, 4, "available"),
+            scenario.row(lockedId, "A02", 1, 4, "locked"),
+            scenario.row(reservedId, "A03", 1, 4, "reserved"),
+            scenario.row(occupiedId, "A04", 1, 4, "occupied"),
+            scenario.row(cleaningId, "A05", 1, 4, "cleaning"),
+            scenario.row(inactiveId, "A06", 1, 4, "inactive")
+        ));
+
+        AssignableReservationTablesResult result = scenario.service.listAssignableTables(scenario.query());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.tables()).extracting(AssignableReservationTable::tableCode).containsExactly("A01");
+    }
+
+    @Test
+    void assignableTableQueryExcludesActiveLockAndOccupancy() {
+        Scenario scenario = Scenario.ready("staff");
+        UUID lockedId = UUID.randomUUID();
+        UUID occupiedId = UUID.randomUUID();
+        when(scenario.tableRepository.findVisibleResourceRows(scenario.scope, null, new PartySize(2))).thenReturn(List.of(
+            scenario.row(lockedId, "A02", 1, 4, "available"),
+            scenario.row(occupiedId, "A03", 1, 4, "available")
+        ));
+        when(scenario.tableLockRepository.existsActiveConflict(
+            eq(scenario.scope), eq("dining_table"), eq(lockedId), any(OffsetDateTime.class)
+        )).thenReturn(true);
+        when(scenario.seatingRepository.existsActiveResourceOccupancy(
+            scenario.scope, "dining_table", occupiedId
+        )).thenReturn(true);
+
+        AssignableReservationTablesResult result = scenario.service.listAssignableTables(scenario.query());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.tables()).isEmpty();
+    }
+
+    @Test
+    void assignmentRejectsTableThatBecameOccupiedAfterListLoad() {
+        Scenario scenario = Scenario.ready("staff");
+        when(scenario.seatingRepository.existsActiveResourceOccupancy(
+            scenario.scope, "dining_table", scenario.tableId
+        )).thenReturn(true);
+
+        ReservationTableAssignmentResult result = scenario.service.assignTable(scenario.command());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationTableAssignmentError.TABLE_NOT_AVAILABLE);
+        verify(scenario.preassignmentRepository, never()).save(any(), any());
+    }
+
     private static final class Scenario {
         private final UUID tenantId = UUID.randomUUID();
         private final UUID storeId = UUID.randomUUID();
@@ -249,7 +310,9 @@ class ReservationTableAssignmentApplicationServiceTest {
         private final StoreRepositoryPort storeRepository = mock(StoreRepositoryPort.class);
         private final ReservationRepositoryPort reservationRepository = mock(ReservationRepositoryPort.class);
         private final DiningTableRepositoryPort tableRepository = mock(DiningTableRepositoryPort.class);
+        private final TableLockRepositoryPort tableLockRepository = mock(TableLockRepositoryPort.class);
         private final ReservationPreassignmentRepositoryPort preassignmentRepository = mock(ReservationPreassignmentRepositoryPort.class);
+        private final SeatingRepositoryPort seatingRepository = mock(SeatingRepositoryPort.class);
         private final BusinessEventRepositoryPort businessEventRepository = mock(BusinessEventRepositoryPort.class);
         private final AuditLogRepositoryPort auditLogRepository = mock(AuditLogRepositoryPort.class);
         private final IdempotencyRepositoryPort idempotencyRepository = mock(IdempotencyRepositoryPort.class);
@@ -258,7 +321,9 @@ class ReservationTableAssignmentApplicationServiceTest {
             storeRepository,
             reservationRepository,
             tableRepository,
+            tableLockRepository,
             preassignmentRepository,
+            seatingRepository,
             businessEventRepository,
             auditLogRepository,
             idempotencyRepository,

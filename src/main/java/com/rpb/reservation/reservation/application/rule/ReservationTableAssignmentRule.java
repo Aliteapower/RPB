@@ -19,7 +19,7 @@ public class ReservationTableAssignmentRule {
     }
 
     public ReservationTableAssignmentError validateTable(DiningTable table, PartySize partySize) {
-        if (table.status() == DiningTableStatus.INACTIVE) {
+        if (table.status() != DiningTableStatus.AVAILABLE) {
             return ReservationTableAssignmentError.TABLE_NOT_AVAILABLE;
         }
         if (!table.capacity().includes(partySize)) {
