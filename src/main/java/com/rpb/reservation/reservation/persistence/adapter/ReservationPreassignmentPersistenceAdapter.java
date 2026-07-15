@@ -89,6 +89,19 @@ public class ReservationPreassignmentPersistenceAdapter implements ReservationPr
     }
 
     @Override
+    public Optional<ReservationPreassignment> findActivePreassignmentForReservation(
+        StoreScope scope,
+        UUID reservationId
+    ) {
+        return repository.findFirstByTenantIdAndStoreIdAndReservationIdAndStatusAndDeletedAtIsNullOrderByPreassignedAtAsc(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            reservationId,
+            "active"
+        ).map(entity -> toDomain(scope, entity));
+    }
+
+    @Override
     public Optional<ReservationResourceAssignment> findActiveAssignmentForResource(
         StoreScope scope,
         String resourceType,
@@ -102,6 +115,26 @@ public class ReservationPreassignmentPersistenceAdapter implements ReservationPr
             resourceId,
             businessDate.value()
         ).map(ReservationPreassignmentPersistenceAdapter::toAssignment);
+    }
+
+    @Override
+    public boolean releaseActivePreassignment(
+        StoreScope scope,
+        UUID preassignmentId,
+        UUID reservationId,
+        String resourceType,
+        UUID resourceId,
+        OffsetDateTime releasedAt
+    ) {
+        return repository.releaseActivePreassignment(
+            preassignmentId,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            reservationId,
+            resourceType,
+            resourceId,
+            releasedAt
+        ) == 1;
     }
 
     @Override
@@ -150,6 +183,21 @@ public class ReservationPreassignmentPersistenceAdapter implements ReservationPr
             row.getQueueTicketId(),
             row.getQueueTicketNumber(),
             row.getQueueTicketStatus()
+        );
+    }
+
+    private static ReservationPreassignment toDomain(
+        StoreScope scope,
+        ReservationPreassignmentEntity entity
+    ) {
+        UUID resourceId = entity.getTableId() == null ? entity.getTableGroupId() : entity.getTableId();
+        return new ReservationPreassignment(
+            entity.getId(),
+            scope,
+            new ReservationId(entity.getReservationId()),
+            entity.getResourceType(),
+            resourceId,
+            entity.getStatus()
         );
     }
 

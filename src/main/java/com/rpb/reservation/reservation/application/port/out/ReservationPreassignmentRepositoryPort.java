@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.reservation.domain.ReservationPreassignment;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +34,10 @@ public interface ReservationPreassignmentRepositoryPort {
         return Optional.empty();
     }
 
+    default Optional<ReservationPreassignment> findActivePreassignmentForReservation(StoreScope scope, UUID reservationId) {
+        return Optional.empty();
+    }
+
     default Optional<ReservationResourceAssignment> findActiveAssignmentForResource(
         StoreScope scope,
         String resourceType,
@@ -49,6 +54,17 @@ public interface ReservationPreassignmentRepositoryPort {
         return findActiveResourceAssignmentsForDate(scope, businessDate).stream()
             .map(ReservationResourceAssignment::target)
             .collect(Collectors.toSet());
+    }
+
+    default boolean releaseActivePreassignment(
+        StoreScope scope,
+        UUID preassignmentId,
+        UUID reservationId,
+        String resourceType,
+        UUID resourceId,
+        OffsetDateTime releasedAt
+    ) {
+        return false;
     }
 
     ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment);

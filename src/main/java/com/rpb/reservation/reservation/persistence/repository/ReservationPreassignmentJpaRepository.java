@@ -7,10 +7,43 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReservationPreassignmentJpaRepository extends JpaRepository<ReservationPreassignmentEntity, UUID> {
+
+    Optional<ReservationPreassignmentEntity> findFirstByTenantIdAndStoreIdAndReservationIdAndStatusAndDeletedAtIsNullOrderByPreassignedAtAsc(
+        UUID tenantId,
+        UUID storeId,
+        UUID reservationId,
+        String status
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+        update reservation_preassignments
+           set status = 'released',
+               released_at = :releasedAt,
+               updated_at = :releasedAt
+         where id = :preassignmentId
+           and tenant_id = :tenantId
+           and store_id = :storeId
+           and reservation_id = :reservationId
+           and resource_type = :resourceType
+           and coalesce(table_id, table_group_id) = :resourceId
+           and status = 'active'
+           and deleted_at is null
+        """, nativeQuery = true)
+    int releaseActivePreassignment(
+        @Param("preassignmentId") UUID preassignmentId,
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("reservationId") UUID reservationId,
+        @Param("resourceType") String resourceType,
+        @Param("resourceId") UUID resourceId,
+        @Param("releasedAt") OffsetDateTime releasedAt
+    );
 
     @Query(value = """
         select exists (

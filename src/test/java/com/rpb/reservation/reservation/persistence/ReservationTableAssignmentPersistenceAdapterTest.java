@@ -9,9 +9,11 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.persistence.adapter.ReservationPersistenceAdapter;
 import com.rpb.reservation.reservation.persistence.adapter.ReservationPreassignmentPersistenceAdapter;
 import com.rpb.reservation.reservation.persistence.entity.ReservationEntity;
+import com.rpb.reservation.reservation.persistence.entity.ReservationPreassignmentEntity;
 import com.rpb.reservation.reservation.persistence.mapper.DefaultReservationMapper;
 import com.rpb.reservation.reservation.persistence.repository.ReservationJpaRepository;
 import com.rpb.reservation.reservation.persistence.repository.ReservationPreassignmentJpaRepository;
@@ -112,6 +114,84 @@ class ReservationTableAssignmentPersistenceAdapterTest {
             LocalDate.of(2026, 7, 15),
             OffsetDateTime.ofInstant(start, ZoneOffset.UTC),
             OffsetDateTime.ofInstant(end, ZoneOffset.UTC)
+        );
+    }
+
+    @Test
+    void activePreassignmentLookupMapsScopedOwnership() {
+        ReservationPreassignmentJpaRepository repository = mock(ReservationPreassignmentJpaRepository.class);
+        UUID preassignmentId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+        UUID tableId = UUID.randomUUID();
+        OffsetDateTime assignedAt = OffsetDateTime.parse("2026-07-15T11:00:00Z");
+        ReservationPreassignmentEntity entity = ReservationPreassignmentEntity.of(
+            preassignmentId,
+            TENANT_ID,
+            STORE_ID,
+            reservationId,
+            "dining_table",
+            tableId,
+            null,
+            "active",
+            assignedAt,
+            null,
+            assignedAt,
+            assignedAt,
+            null
+        );
+        when(repository.findFirstByTenantIdAndStoreIdAndReservationIdAndStatusAndDeletedAtIsNullOrderByPreassignedAtAsc(
+            TENANT_ID,
+            STORE_ID,
+            reservationId,
+            "active"
+        )).thenReturn(Optional.of(entity));
+
+        Optional<ReservationPreassignment> result = new ReservationPreassignmentPersistenceAdapter(repository)
+            .findActivePreassignmentForReservation(SCOPE, reservationId);
+
+        assertThat(result).isPresent();
+        assertThat(result.orElseThrow().id()).isEqualTo(preassignmentId);
+        assertThat(result.orElseThrow().reservationId().value()).isEqualTo(reservationId);
+        assertThat(result.orElseThrow().resourceType()).isEqualTo("dining_table");
+        assertThat(result.orElseThrow().resourceId()).isEqualTo(tableId);
+        assertThat(result.orElseThrow().status()).isEqualTo("active");
+    }
+
+    @Test
+    void releasesOnlyMatchingActivePreassignmentWithinScope() {
+        ReservationPreassignmentJpaRepository repository = mock(ReservationPreassignmentJpaRepository.class);
+        UUID preassignmentId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+        UUID tableId = UUID.randomUUID();
+        OffsetDateTime releasedAt = OffsetDateTime.parse("2026-07-16T00:15:00Z");
+        when(repository.releaseActivePreassignment(
+            preassignmentId,
+            TENANT_ID,
+            STORE_ID,
+            reservationId,
+            "dining_table",
+            tableId,
+            releasedAt
+        )).thenReturn(1);
+
+        boolean released = new ReservationPreassignmentPersistenceAdapter(repository).releaseActivePreassignment(
+            SCOPE,
+            preassignmentId,
+            reservationId,
+            "dining_table",
+            tableId,
+            releasedAt
+        );
+
+        assertThat(released).isTrue();
+        verify(repository).releaseActivePreassignment(
+            preassignmentId,
+            TENANT_ID,
+            STORE_ID,
+            reservationId,
+            "dining_table",
+            tableId,
+            releasedAt
         );
     }
 
