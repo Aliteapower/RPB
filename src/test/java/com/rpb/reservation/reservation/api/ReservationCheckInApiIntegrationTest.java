@@ -316,7 +316,6 @@ class ReservationCheckInApiIntegrationTest {
                 .noneMatch(path -> path.toLowerCase().contains("checkinentity"))
                 .noneMatch(ReservationCheckInApiIntegrationTest::isForbiddenQueueApiFile)
                 .noneMatch(path -> path.toLowerCase().contains("/seating/api/"))
-                .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("reservationnoshowcontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"));
         }

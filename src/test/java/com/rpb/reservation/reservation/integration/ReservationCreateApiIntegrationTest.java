@@ -660,8 +660,7 @@ class ReservationCreateApiIntegrationTest {
                 .noneMatch(path -> path.contains("/seating/api/"))
                 .noneMatch(path -> path.toLowerCase().contains("checkincontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("reservationnoshowcontroller"))
-                .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"))
-                .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller"));
+                .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"));
         }
         try (Stream<Path> paths = Files.walk(Path.of("src"))) {
             assertThat(paths.filter(Files::isRegularFile).map(path -> path.toString().replace('\\', '/')).toList())

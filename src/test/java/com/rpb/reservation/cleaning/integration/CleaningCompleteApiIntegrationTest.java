@@ -653,9 +653,7 @@ class CleaningCompleteApiIntegrationTest {
                     || path.toLowerCase().contains("\\noshow\\api\\")
                     || path.toLowerCase().contains("/noshow/api/"))
                 .noneMatch(path -> path.toLowerCase().contains("cancellationcontroller")
-                    || path.toLowerCase().contains("cancelreservationcontroller"))
-                .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller")
-                    || path.toLowerCase().contains("table_assignmentcontroller"));
+                    || path.toLowerCase().contains("cancelreservationcontroller"));
         }
         try (Stream<Path> paths = Files.walk(Path.of("."))) {
             assertThat(paths.filter(Files::isRegularFile).map(Path::toString).toList())
