@@ -246,6 +246,7 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
     @Test
     void completedSameHashReplaysStoredResultWithoutMutation() {
         Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.preassignmentRepository.assignPreassignment(scenario.preassignment("active"));
         SeatArrivedReservationCommand command = scenario.commandWithTable(scenario.table.id().value());
         String hash = ReservationArrivedDirectSeatingApplicationService.requestHash(command);
         UUID replaySeatingId = UUID.randomUUID();
@@ -269,6 +270,7 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         assertThat(scenario.businessEventRepository.events).isEmpty();
         assertThat(scenario.stateTransitionLogRepository.logs).isEmpty();
         assertThat(scenario.auditLogRepository.logs).isEmpty();
+        assertThat(scenario.preassignmentRepository.releaseCalls).isZero();
     }
 
     @Test
@@ -417,6 +419,82 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         assertThat(result.error()).isEqualTo(ReservationArrivedDirectSeatingError.TABLE_NOT_AVAILABLE);
         assertThat(scenario.seatingRepository.saved).isEmpty();
         assertThat(scenario.reservationRepository.saved).isEmpty();
+    }
+
+    @Test
+    void seatsArrivedReservationOnOwnPreassignedTableAndReleasesOwnership() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        ReservationPreassignment preassignment = scenario.preassignment("active");
+        scenario.preassignmentRepository.assignPreassignment(preassignment);
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.preassignmentRepository.released).containsExactly(preassignment.id());
+        assertThat(scenario.reservationRepository.saved.getFirst().status()).isEqualTo(ReservationStatus.SEATED);
+        assertThat(scenario.diningTableRepository.saved.getFirst().status()).isEqualTo(DiningTableStatus.OCCUPIED);
+    }
+
+    @Test
+    void ownPreassignedReservedTableCanSeatWithoutPhysicalOccupancy() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.replaceTableStatus(DiningTableStatus.RESERVED);
+        scenario.preassignmentRepository.assignPreassignment(scenario.preassignment("active"));
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.diningTableRepository.saved.getFirst().status()).isEqualTo(DiningTableStatus.OCCUPIED);
+    }
+
+    @Test
+    void ownPreassignmentDoesNotOverrideOccupiedTable() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.replaceTableStatus(DiningTableStatus.OCCUPIED);
+        scenario.preassignmentRepository.assignPreassignment(scenario.preassignment("active"));
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationArrivedDirectSeatingError.TABLE_NOT_AVAILABLE);
+        assertThat(scenario.preassignmentRepository.released).isEmpty();
+    }
+
+    @Test
+    void preassignmentReleaseFailureReturnsRepositoryError() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        scenario.preassignmentRepository.assignPreassignment(scenario.preassignment("active"));
+        scenario.preassignmentRepository.releaseSucceeds = false;
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationArrivedDirectSeatingError.REPOSITORY_SAVE_FAILED);
+        assertThat(scenario.preassignmentRepository.released).isEmpty();
+    }
+
+    @Test
+    void seatAuditRecordsReleasedPreassignmentOwnership() {
+        Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
+        ReservationPreassignment preassignment = scenario.preassignment("active");
+        scenario.preassignmentRepository.assignPreassignment(preassignment);
+
+        ReservationArrivedDirectSeatingResult result = scenario.service()
+            .seatArrivedReservation(scenario.commandWithTable(scenario.table.id().value()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.auditLogRepository.logs)
+            .filteredOn(log -> "reservation.seat".equals(log.operationCode()))
+            .singleElement()
+            .satisfies(log -> assertThat(log.metadata()).contains(
+                preassignment.id().toString(),
+                "\"preassignmentStatusBefore\":\"active\"",
+                "\"preassignmentStatusAfter\":\"released\""
+            ));
     }
 
     @Test
@@ -740,6 +818,17 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
             );
         }
 
+        ReservationPreassignment preassignment(String status) {
+            return new ReservationPreassignment(
+                UUID.randomUUID(),
+                scope,
+                reservationId,
+                "dining_table",
+                table.id().value(),
+                status
+            );
+        }
+
         Reservation reservation(ReservationStatus status) {
             return reservation(status, LocalDate.of(2026, 6, 20));
         }
@@ -1015,10 +1104,18 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
     private static final class FakeReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
         final Map<UUID, ReservationResourceAssignment> byReservation = new HashMap<>();
         final Map<ReservationResourceTarget, ReservationResourceAssignment> byResource = new HashMap<>();
+        final List<UUID> released = new ArrayList<>();
+        ReservationPreassignment active;
+        boolean releaseSucceeds = true;
+        int releaseCalls;
 
         void assign(ReservationResourceAssignment assignment) {
             byReservation.put(assignment.reservationId(), assignment);
             byResource.put(assignment.target(), assignment);
+        }
+
+        void assignPreassignment(ReservationPreassignment preassignment) {
+            active = preassignment;
         }
 
         @Override
@@ -1049,6 +1146,17 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
         }
 
         @Override
+        public Optional<ReservationPreassignment> findActivePreassignmentForReservation(
+            StoreScope scope,
+            UUID reservationId
+        ) {
+            return Optional.ofNullable(active)
+                .filter(preassignment -> preassignment.scope().equals(scope))
+                .filter(preassignment -> preassignment.reservationId().value().equals(reservationId))
+                .filter(preassignment -> "active".equals(preassignment.status()));
+        }
+
+        @Override
         public Optional<ReservationResourceAssignment> findActiveAssignmentForResource(
             StoreScope scope,
             String resourceType,
@@ -1056,6 +1164,33 @@ class ReservationArrivedDirectSeatingApplicationServiceTest {
             BusinessDate businessDate
         ) {
             return Optional.ofNullable(byResource.get(new ReservationResourceTarget(resourceType, resourceId)));
+        }
+
+        @Override
+        public boolean releaseActivePreassignment(
+            StoreScope scope,
+            UUID preassignmentId,
+            UUID reservationId,
+            String resourceType,
+            UUID resourceId,
+            OffsetDateTime releasedAt
+        ) {
+            releaseCalls++;
+            if (
+                !releaseSucceeds
+                    || active == null
+                    || !active.id().equals(preassignmentId)
+                    || !active.scope().equals(scope)
+                    || !active.reservationId().value().equals(reservationId)
+                    || !active.resourceType().equals(resourceType)
+                    || !active.resourceId().equals(resourceId)
+                    || !"active".equals(active.status())
+            ) {
+                return false;
+            }
+            released.add(active.id());
+            active = null;
+            return true;
         }
 
         @Override
