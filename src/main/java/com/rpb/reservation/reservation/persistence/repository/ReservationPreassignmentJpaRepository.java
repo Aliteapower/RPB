@@ -2,6 +2,7 @@ package com.rpb.reservation.reservation.persistence.repository;
 
 import com.rpb.reservation.reservation.persistence.entity.ReservationPreassignmentEntity;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -212,6 +213,60 @@ public interface ReservationPreassignmentJpaRepository extends JpaRepository<Res
         @Param("tenantId") UUID tenantId,
         @Param("storeId") UUID storeId,
         @Param("businessDate") LocalDate businessDate
+    );
+
+    @Query(value = """
+        select
+            r.id as "reservationId",
+            r.reservation_code as "reservationCode",
+            r.status as "reservationStatus",
+            r.party_size as "partySize",
+            r.reserved_start_at as "reservedStartAt",
+            r.reserved_end_at as "reservedEndAt",
+            c.display_name as "customerName",
+            c.phone_e164 as "customerPhoneE164",
+            rp.resource_type as "resourceType",
+            coalesce(rp.table_id, rp.table_group_id) as "resourceId",
+            coalesce(dt.table_code, tg.group_code) as "resourceCode",
+            cast(null as uuid) as "queueTicketId",
+            cast(null as integer) as "queueTicketNumber",
+            cast(null as varchar) as "queueTicketStatus"
+        from reservation_preassignments rp
+        join reservations r
+          on r.id = rp.reservation_id
+         and r.tenant_id = rp.tenant_id
+         and r.store_id = rp.store_id
+         and r.deleted_at is null
+        left join customers c
+          on c.id = r.customer_id
+         and c.tenant_id = r.tenant_id
+         and c.deleted_at is null
+        left join dining_tables dt
+          on dt.id = rp.table_id
+         and dt.tenant_id = rp.tenant_id
+         and dt.store_id = rp.store_id
+         and dt.deleted_at is null
+        left join table_groups tg
+          on tg.id = rp.table_group_id
+         and tg.tenant_id = rp.tenant_id
+         and tg.store_id = rp.store_id
+         and tg.deleted_at is null
+        where rp.tenant_id = :tenantId
+          and rp.store_id = :storeId
+          and rp.status = 'active'
+          and rp.deleted_at is null
+          and r.status in ('confirmed', 'arrived')
+          and r.business_date = :businessDate
+          and r.reserved_start_at < :requestedEnd
+          and r.reserved_end_at > :requestedStart
+        order by r.reserved_start_at asc, r.created_at asc
+        """, nativeQuery = true)
+    List<ReservationResourceAssignmentProjection> findActiveResourceAssignmentsOverlapping(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("businessDate") LocalDate businessDate,
+        @Param("requestedStart") OffsetDateTime requestedStart,
+        @Param("requestedEnd") OffsetDateTime requestedEnd
     );
 
     @Query(value = """

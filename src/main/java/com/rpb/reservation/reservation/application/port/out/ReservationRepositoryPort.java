@@ -16,6 +16,10 @@ public interface ReservationRepositoryPort {
 
     Optional<Reservation> findById(StoreScope scope, ReservationId reservationId);
 
+    default Optional<Reservation> findByIdForUpdate(StoreScope scope, ReservationId reservationId) {
+        return findById(scope, reservationId);
+    }
+
     Optional<Reservation> findByCode(StoreScope scope, ReservationCode reservationCode);
 
     boolean existsByReservationCode(StoreScope scope, ReservationCode reservationCode);

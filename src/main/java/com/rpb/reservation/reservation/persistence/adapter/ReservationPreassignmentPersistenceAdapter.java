@@ -60,6 +60,23 @@ public class ReservationPreassignmentPersistenceAdapter implements ReservationPr
     }
 
     @Override
+    public Set<ReservationResourceAssignment> findActiveResourceAssignmentsOverlapping(
+        StoreScope scope,
+        BusinessDate businessDate,
+        TimeRange timeRange
+    ) {
+        return repository.findActiveResourceAssignmentsOverlapping(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            businessDate.value(),
+            OffsetDateTime.ofInstant(timeRange.start(), ZoneOffset.UTC),
+            OffsetDateTime.ofInstant(timeRange.end(), ZoneOffset.UTC)
+        ).stream()
+            .map(ReservationPreassignmentPersistenceAdapter::toAssignment)
+            .collect(Collectors.toSet());
+    }
+
+    @Override
     public Optional<ReservationResourceAssignment> findActiveAssignmentForReservation(
         StoreScope scope,
         UUID reservationId

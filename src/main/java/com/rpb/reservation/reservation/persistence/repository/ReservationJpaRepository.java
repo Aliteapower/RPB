@@ -1,6 +1,7 @@
 package com.rpb.reservation.reservation.persistence.repository;
 
 import com.rpb.reservation.reservation.persistence.entity.ReservationEntity;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +19,20 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
         UUID id,
         UUID tenantId,
         UUID storeId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select reservation from ReservationEntity reservation
+        where reservation.id = :reservationId
+          and reservation.tenantId = :tenantId
+          and reservation.storeId = :storeId
+          and reservation.deletedAt is null
+        """)
+    Optional<ReservationEntity> findForUpdate(
+        @Param("reservationId") UUID reservationId,
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId
     );
 
     Optional<ReservationEntity> findByTenantIdAndStoreIdAndReservationCodeAndDeletedAtIsNull(

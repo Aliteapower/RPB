@@ -21,6 +21,14 @@ public interface ReservationPreassignmentRepositoryPort {
 
     Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(StoreScope scope, BusinessDate businessDate);
 
+    default Set<ReservationResourceAssignment> findActiveResourceAssignmentsOverlapping(
+        StoreScope scope,
+        BusinessDate businessDate,
+        TimeRange timeRange
+    ) {
+        return Set.of();
+    }
+
     default Optional<ReservationResourceAssignment> findActiveAssignmentForReservation(StoreScope scope, UUID reservationId) {
         return Optional.empty();
     }

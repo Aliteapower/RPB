@@ -54,6 +54,15 @@ public class ReservationPersistenceAdapter implements ReservationRepositoryPort 
     }
 
     @Override
+    public Optional<Reservation> findByIdForUpdate(StoreScope scope, ReservationId reservationId) {
+        return repository.findForUpdate(
+            reservationId.value(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Reservation> findByCode(StoreScope scope, ReservationCode reservationCode) {
         return repository.findByTenantIdAndStoreIdAndReservationCodeAndDeletedAtIsNull(
             scope.tenantId().value(),

@@ -37,6 +37,15 @@ public class DiningTablePersistenceAdapter implements DiningTableRepositoryPort 
     }
 
     @Override
+    public Optional<DiningTable> findByIdForUpdate(StoreScope scope, TableId tableId) {
+        return repository.findForUpdate(
+            tableId.value(),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).map(mapper::toDomain);
+    }
+
+    @Override
     public List<DiningTable> findActiveByArea(StoreScope scope, UUID areaId) {
         return repository.findByTenantIdAndStoreIdAndAreaIdAndDeletedAtIsNull(
             scope.tenantId().value(),

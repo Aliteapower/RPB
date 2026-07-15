@@ -14,6 +14,10 @@ public interface DiningTableRepositoryPort {
 
     Optional<DiningTable> findById(StoreScope scope, TableId tableId);
 
+    default Optional<DiningTable> findByIdForUpdate(StoreScope scope, TableId tableId) {
+        return findById(scope, tableId);
+    }
+
     List<DiningTable> findActiveByArea(StoreScope scope, UUID areaId);
 
     List<DiningTable> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate);

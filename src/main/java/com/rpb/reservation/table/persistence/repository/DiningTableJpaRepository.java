@@ -1,16 +1,32 @@
 package com.rpb.reservation.table.persistence.repository;
 
 import com.rpb.reservation.table.persistence.entity.DiningTableEntity;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DiningTableJpaRepository extends JpaRepository<DiningTableEntity, UUID> {
 
     Optional<DiningTableEntity> findByIdAndTenantIdAndStoreIdAndDeletedAtIsNull(UUID id, UUID tenantId, UUID storeId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select diningTable from DiningTableEntity diningTable
+        where diningTable.id = :tableId
+          and diningTable.tenantId = :tenantId
+          and diningTable.storeId = :storeId
+          and diningTable.deletedAt is null
+        """)
+    Optional<DiningTableEntity> findForUpdate(
+        @Param("tableId") UUID tableId,
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId
+    );
 
     List<DiningTableEntity> findByTenantIdAndStoreIdAndAreaIdAndDeletedAtIsNull(UUID tenantId, UUID storeId, UUID areaId);
 
