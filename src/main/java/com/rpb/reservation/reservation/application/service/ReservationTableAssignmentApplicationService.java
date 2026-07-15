@@ -52,6 +52,8 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ReservationTableAssignmentApplicationService {
@@ -167,6 +169,7 @@ public class ReservationTableAssignmentApplicationService {
                 OffsetDateTime.now(clock).plusMinutes(30)
             );
         } catch (RuntimeException exception) {
+            markCurrentTransactionRollbackOnly();
             return ReservationTableAssignmentResult.failure(ReservationTableAssignmentError.PERSISTENCE_ERROR);
         }
 
@@ -174,11 +177,13 @@ public class ReservationTableAssignmentApplicationService {
             return executeAssignment(command, scope, started);
         } catch (ApplicationFailure failure) {
             markFailed(scope, started, failure.error());
+            markCurrentTransactionRollbackOnly();
             return failure.retryLater()
                 ? ReservationTableAssignmentResult.retryLater(failure.error())
                 : ReservationTableAssignmentResult.failure(failure.error());
         } catch (RuntimeException exception) {
             markFailed(scope, started, ReservationTableAssignmentError.PERSISTENCE_ERROR);
+            markCurrentTransactionRollbackOnly();
             return ReservationTableAssignmentResult.failure(ReservationTableAssignmentError.PERSISTENCE_ERROR);
         }
     }
@@ -337,8 +342,7 @@ public class ReservationTableAssignmentApplicationService {
             source(command),
             command.actorType(),
             command.actorId(),
-            metadata(reservation, table, idempotencyKey)
-                .replace("}", ",\"preassignmentId\":\"" + preassignment.id() + "\"}")
+            appendJsonStringField(metadata(reservation, table, idempotencyKey), "preassignmentId", preassignment.id().toString())
         );
         if (!auditRule.evaluate(audit.operationCode(), audit.targetType(), audit.targetId(), audit.actorType()).accepted()) {
             throw new ApplicationFailure(ReservationTableAssignmentError.AUDIT_WRITE_FAILED);
@@ -402,6 +406,12 @@ public class ReservationTableAssignmentApplicationService {
             idempotencyRepository.fail(scope, started, error.code());
         } catch (RuntimeException ignored) {
             // Preserve the original application failure.
+        }
+    }
+
+    private static void markCurrentTransactionRollbackOnly() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
         }
     }
 
@@ -548,6 +558,14 @@ public class ReservationTableAssignmentApplicationService {
             reservation.status().code(),
             escape(idempotencyKey.value())
         ).trim();
+    }
+
+    private static String appendJsonStringField(String jsonObject, String key, String value) {
+        if (jsonObject == null || jsonObject.length() < 2 || !jsonObject.endsWith("}")) {
+            throw new IllegalArgumentException("json_object_required");
+        }
+        return jsonObject.substring(0, jsonObject.length() - 1)
+            + ",\"" + escape(key) + "\":\"" + escape(value) + "\"}";
     }
 
     private static String extract(String json, String key) {

@@ -1,11 +1,16 @@
 package com.rpb.reservation.reservation.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.rpb.reservation.audit.application.port.out.BusinessEventRepositoryPort;
+import com.rpb.reservation.audit.domain.BusinessEvent;
+import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.io.IOException;
@@ -29,6 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockReset;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
@@ -67,6 +74,9 @@ class ReservationTableAssignmentApiIntegrationTest {
 
     @Autowired
     private TestCurrentActorProvider actorProvider;
+
+    @SpyBean(reset = MockReset.AFTER)
+    private BusinessEventRepositoryPort businessEventRepository;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -169,6 +179,31 @@ class ReservationTableAssignmentApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.share.tableCode").value("A01"))
             .andExpect(jsonPath("$.share.tablePending").value(false));
+    }
+
+    @Test
+    void eventFailureRollsBackAssignmentAndKeepsReservationConfirmed() throws Exception {
+        doThrow(new IllegalStateException("forced table assignment event failure"))
+            .when(businessEventRepository)
+            .append(any(StoreScope.class), any(BusinessEvent.class));
+
+        mockMvc.perform(put(ASSIGNMENT_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "assign-integration-event-failure")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tableId\":\"%s\"}".formatted(TABLE_ID)))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("BUSINESS_EVENT_WRITE_FAILED"));
+
+        assertThat(count("reservation_preassignments")).isZero();
+        assertThat(scalar("select status from reservations where id = ?", RESERVATION_ID)).isEqualTo("confirmed");
+        assertThat(count("business_events")).isZero();
+        assertThat(count("audit_logs")).isZero();
+        assertThat(countWhere(
+            "select count(*) from idempotency_records where tenant_id = ? and idempotency_key = ?",
+            TENANT_ID,
+            "assign-integration-event-failure"
+        )).isZero();
     }
 
     private void createFixture() {

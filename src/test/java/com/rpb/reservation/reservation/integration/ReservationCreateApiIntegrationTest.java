@@ -690,6 +690,7 @@ class ReservationCreateApiIntegrationTest {
             "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
             "src/components/reservation-workbench/ReservationSeatDialog.vue",
             "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
+            "src/components/reservation-workbench/ReservationTableAssignmentDialog.vue",
             "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
             "src/components/reservation-workbench/ReservationTodayListItem.vue",
             "src/components/reservation-workbench/ReservationTodayListPanel.vue",
