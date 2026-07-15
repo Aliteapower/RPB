@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -64,6 +65,10 @@ class ReservationTableAssignmentApiIntegrationTest {
         "/api/v1/stores/{storeId}/reservations/{reservationId}/table-assignment";
     private static final String ASSIGNABLE_ENDPOINT =
         "/api/v1/stores/{storeId}/reservations/{reservationId}/assignable-tables";
+    private static final String CHECK_IN_ENDPOINT =
+        "/api/v1/stores/{storeId}/reservations/{reservationId}/check-in";
+    private static final String DIRECT_SEATING_ENDPOINT =
+        "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/direct";
     private static JdbcTemplate cleanupJdbc;
 
     @Autowired
@@ -99,7 +104,13 @@ class ReservationTableAssignmentApiIntegrationTest {
             ACTOR_ID,
             "staff",
             Set.of("store_staff"),
-            Set.of("table.view", "reservation.create", "reservation.today_view"),
+            Set.of(
+                "table.view",
+                "reservation.create",
+                "reservation.today_view",
+                "reservation.check_in",
+                "reservation.seat"
+            ),
             Set.of(STORE_ID)
         ));
     }
@@ -206,6 +217,93 @@ class ReservationTableAssignmentApiIntegrationTest {
         )).isZero();
     }
 
+    @Test
+    void occupiedTableIsNeitherListedNorAcceptedForAssignment() throws Exception {
+        jdbc.update("update dining_tables set status = 'occupied' where id = ?", TABLE_ID);
+
+        mockMvc.perform(get(ASSIGNABLE_ENDPOINT, STORE_ID, RESERVATION_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tables.length()").value(0));
+
+        mockMvc.perform(put(ASSIGNMENT_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "assign-occupied-table")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(assignmentBody(TABLE_ID)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("TABLE_NOT_AVAILABLE"));
+
+        assertThat(count("reservation_preassignments")).isZero();
+        assertThat(scalar("select status from reservations where id = ?", RESERVATION_ID)).isEqualTo("confirmed");
+    }
+
+    @Test
+    void publicReservationAssignmentCheckInAndSeatingConsumesOwnershipOnce() throws Exception {
+        mockMvc.perform(put(ASSIGNMENT_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "assign-before-seating")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(assignmentBody(TABLE_ID)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.tableCode").value("A01"));
+
+        assertThat(scalar("select status from reservations where id = ?", RESERVATION_ID)).isEqualTo("confirmed");
+        assertThat(scalar(
+            "select status from reservation_preassignments where reservation_id = ?",
+            RESERVATION_ID
+        )).isEqualTo("active");
+
+        mockMvc.perform(post(CHECK_IN_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "check-in-before-seating")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(checkInBody(START.minusSeconds(300))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value("arrived"));
+
+        mockMvc.perform(post(DIRECT_SEATING_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "seat-preassigned-table")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(seatingBody(TABLE_ID)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.reservationStatus").value("seated"))
+            .andExpect(jsonPath("$.resourceId").value(TABLE_ID.toString()))
+            .andExpect(jsonPath("$.idempotency.replayed").value(false));
+
+        mockMvc.perform(post(DIRECT_SEATING_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "seat-preassigned-table")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(seatingBody(TABLE_ID)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.idempotency.replayed").value(true));
+
+        assertThat(scalar("select status from reservations where id = ?", RESERVATION_ID)).isEqualTo("seated");
+        assertThat(scalar("select status from dining_tables where id = ?", TABLE_ID)).isEqualTo("occupied");
+        assertThat(scalar(
+            "select status from reservation_preassignments where reservation_id = ?",
+            RESERVATION_ID
+        )).isEqualTo("released");
+        assertThat(countWhere(
+            "select count(*) from seating_resources where tenant_id = ? and table_id = ? and status = 'active'",
+            TENANT_ID,
+            TABLE_ID
+        )).isEqualTo(1);
+        assertThat(countWhere(
+            "select count(*) from audit_logs where tenant_id = ? and operation_code = 'reservation.seat' and metadata::text like '%preassignmentStatusAfter%released%'",
+            TENANT_ID
+        )).isEqualTo(1);
+        assertThat(countWhere(
+            "select count(*) from idempotency_records where tenant_id = ? and idempotency_key in (?, ?, ?) and status = 'completed'",
+            TENANT_ID,
+            "assign-before-seating",
+            "check-in-before-seating",
+            "seat-preassigned-table"
+        )).isEqualTo(3);
+    }
+
     private void createFixture() {
         jdbc.update("""
             insert into tenants (id, tenant_code, display_name, status, default_locale)
@@ -306,6 +404,32 @@ class ReservationTableAssignmentApiIntegrationTest {
 
     private static OffsetDateTime utc(Instant value) {
         return OffsetDateTime.ofInstant(value, ZoneOffset.UTC);
+    }
+
+    private static String assignmentBody(UUID tableId) {
+        return "{\"tableId\":\"%s\"}".formatted(tableId);
+    }
+
+    private static String checkInBody(Instant arrivedAt) {
+        return """
+            {
+              "arrivedAt": "%s",
+              "reasonCode": "customer_arrived",
+              "note": "Guest is waiting at host stand"
+            }
+            """.formatted(arrivedAt);
+    }
+
+    private static String seatingBody(UUID tableId) {
+        return """
+            {
+              "tableId": "%s",
+              "tableGroupId": null,
+              "overrideReasonCode": null,
+              "overrideNote": null,
+              "note": null
+            }
+            """.formatted(tableId);
     }
 
     private static Map<String, String> pointerSettings() {
