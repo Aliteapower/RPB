@@ -50,8 +50,17 @@
 
 All commands completed successfully on 2026-07-16.
 
+## Deployment
+
+- Deployed source commit `9e86b1c41ef01a3ae49aaa06ff38f2f046812f06` to the shared production environment on 2026-07-16 at 17:57 SGT.
+- The deployed backend JAR SHA-256 is `06f3324bc3538a63647ae739322cc6057c68ebc408a1ceb84713071ff2f6d1f7`; the uploaded frontend archive SHA-256 is `003fc2b05195cfae143deee4108b37896d20a0fbb2380bd3ccc666f78cb9cd17`.
+- `booking`, `platform`, `20000000`, `lsc106`, and `lsc83` login pages returned HTTP 200 with `/assets/index-DT9A_Bpd.js`; the tenant booking entry also returned HTTP 200.
+- The backend remained `active`, unauthenticated `/api/v1/auth/me` returned HTTP 401, and the post-start error log count was zero.
+- No migration ran. Production Flyway history remained successful through version `045`.
+- The pre-switch full backup is `/opt/rpb/backups/20260716-175742-9e86b1c4-full`.
+
 ## Rollback Notes
 
-- Restore the previous frontend login page and auth-session return type.
-- Restore the previous backend login response and remove resolved entry-store propagation.
+- Restore `/opt/rpb/backups/20260716-175742-9e86b1c4-full/reservation-platform.jar` to `/opt/rpb/app/reservation-platform.jar` and restore that backup's `frontend` contents to `/opt/rpb/frontend`.
+- Restart `rpb-backend`, then verify the service is active and unauthenticated `/api/v1/auth/me` returns HTTP 401.
 - No database or data rollback is required.
