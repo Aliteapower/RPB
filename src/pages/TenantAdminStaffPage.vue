@@ -59,6 +59,8 @@ const storeDirectory = computed(() => {
         storeId,
         storeCode: '',
         storeName: '',
+        shareDisplayName: null,
+        tenantLogoMediaUrl: null,
         status: 'active',
         locale: '',
         defaultStore: storeId === auth.user?.defaultStoreId

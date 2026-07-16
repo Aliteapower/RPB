@@ -1,32 +1,49 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { useAuthSessionStore } from '../../stores/authSession'
 import StoreSwitcher from '../store/StoreSwitcher.vue'
+import StaffBrandIdentity from './StaffBrandIdentity.vue'
+import { resolveStaffBrandIdentity } from './staffBrandIdentity'
 
 const props = defineProps<{
   appStatusLabel: string
   businessDate?: string | null
   currentTimeText: string
+  storeId: string
   storeLabel: string
 }>()
 
+const auth = useAuthSessionStore()
 const { t } = useI18n()
+const currentStore = computed(() => auth.authorizedStores.find(store => store.storeId === props.storeId))
+const brandIdentity = computed(() => resolveStaffBrandIdentity(
+  currentStore.value,
+  props.storeLabel,
+  t('staffHome.topbar.fallbackTitle')
+))
 const displayAppStatus = computed(() => {
   const status = props.appStatusLabel.trim()
   return status === t('staffHome.appStatus.available') ? '' : status
+})
+
+onMounted(() => {
+  if (!auth.storesLoaded && !auth.storesLoading) {
+    void auth.ensureAuthorizedStores()
+  }
 })
 </script>
 
 <template>
   <header class="staff-topbar" :aria-label="t('staffHome.topbar.aria')">
-    <div class="brand-block">
-      <span class="brand-mark" aria-hidden="true">{{ t('staffHome.topbar.brandMark') }}</span>
-      <div>
-        <p class="brand-kicker">{{ t('staffHome.topbar.kicker') }}</p>
-        <h1>{{ t('staffHome.topbar.title') }}</h1>
-      </div>
-    </div>
+    <StaffBrandIdentity
+      :kicker="t('staffHome.topbar.kicker')"
+      :display-name="brandIdentity.displayName"
+      :logo-media-url="brandIdentity.logoMediaUrl"
+      :fallback-mark="brandIdentity.fallbackMark"
+      :logo-alt="t('staffHome.topbar.logoAlt', { name: brandIdentity.displayName })"
+    />
 
     <div class="topbar-meta" :aria-label="t('staffHome.topbar.metaAria')">
       <div class="topbar-row topbar-row--time">
@@ -56,46 +73,6 @@ const displayAppStatus = computed(() => {
   position: sticky;
   top: 0;
   z-index: 10;
-}
-
-.brand-block {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  min-width: 0;
-}
-
-.brand-mark {
-  align-items: center;
-  background: #fff7ed;
-  border-radius: 999px;
-  color: #f97316;
-  display: inline-flex;
-  flex: 0 0 auto;
-  font-size: 0.92rem;
-  font-weight: 900;
-  height: 30px;
-  justify-content: center;
-  width: 30px;
-}
-
-.brand-kicker,
-h1 {
-  margin: 0;
-}
-
-.brand-kicker {
-  color: #64748b;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-h1 {
-  color: #0f172a;
-  font-size: 1.08rem;
-  letter-spacing: 0;
-  line-height: 1.18;
-  white-space: nowrap;
 }
 
 .topbar-meta {

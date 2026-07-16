@@ -320,6 +320,7 @@ function queueHint(item: ReservationTodayViewItem): string {
       :app-status-label="appStatusLabel"
       :business-date="displayedBusinessDate"
       :current-time-text="currentTimeText"
+      :store-id="storeId"
       :store-label="storeLabel"
     />
 

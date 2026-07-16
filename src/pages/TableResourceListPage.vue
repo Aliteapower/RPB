@@ -1264,6 +1264,7 @@ function formatStoreLabel(value: string | undefined): string {
       :app-status-label="appStatusLabel"
       :business-date="selectedBusinessDate"
       :current-time-text="currentTimeText"
+      :store-id="storeId"
       :store-label="storeLabel"
     >
       <template #action>

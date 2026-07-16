@@ -36,6 +36,8 @@ export interface AuthStoreAccess {
   storeId: string
   storeCode: string
   storeName: string
+  shareDisplayName: string | null
+  tenantLogoMediaUrl: string | null
   status: string
   locale: string
   defaultStore: boolean

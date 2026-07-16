@@ -1087,6 +1087,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
       :app-status-label="appStatusLabel"
       :business-date="currentBusinessDate"
       :current-time-text="currentTimeText"
+      :store-id="storeId"
       :store-label="storeLabel"
     />
 

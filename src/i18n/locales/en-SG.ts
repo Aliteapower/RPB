@@ -951,9 +951,9 @@ export const enSG = {
     topbar: {
       aria: 'Staff workbench top bar',
       metaAria: 'Store and app status',
-      brandMark: '食',
+      fallbackTitle: 'Store management',
       kicker: 'Store staff',
-      title: 'Shike Ops'
+      logoAlt: '{name} brand logo'
     },
     actions: {
       checkIn: {

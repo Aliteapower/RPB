@@ -29,6 +29,8 @@ const stores = computed(() => {
     storeId,
     storeCode: '',
     storeName: fallbackStoreLabel(storeId),
+    shareDisplayName: null,
+    tenantLogoMediaUrl: null,
     status: 'active',
     locale: '',
     defaultStore: storeId === auth.user?.defaultStoreId

@@ -362,6 +362,7 @@ function hasPermission(permission: string): boolean {
       :app-status-label="appStatusLabel"
       :business-date="displayedBusinessDate"
       :current-time-text="currentTimeText"
+      :store-id="storeId"
       :store-label="storeLabel"
     >
       <template #utility>

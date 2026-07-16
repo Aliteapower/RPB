@@ -399,6 +399,8 @@ function fallbackStoreAccess(storeId: string, user: AuthUser): AuthStoreAccess {
     storeId,
     storeCode: '',
     storeName: fallbackStoreLabel(storeId),
+    shareDisplayName: null,
+    tenantLogoMediaUrl: null,
     status: 'active',
     locale: '',
     defaultStore: storeId === user.defaultStoreId

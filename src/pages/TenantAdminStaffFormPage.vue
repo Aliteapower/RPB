@@ -81,6 +81,8 @@ const assignableStores = computed<AuthStoreAccess[]>(() => {
     storeId,
     storeCode: '',
     storeName: storeFallbackLabel(storeId),
+    shareDisplayName: null,
+    tenantLogoMediaUrl: null,
     status: 'active',
     locale: '',
     defaultStore: storeId === auth.user?.defaultStoreId
@@ -98,6 +100,8 @@ const storeChoices = computed<AuthStoreAccess[]>(() => {
         storeId,
         storeCode: storeId.slice(0, 8),
         storeName: storeFallbackLabel(storeId),
+        shareDisplayName: null,
+        tenantLogoMediaUrl: null,
         status: 'active',
         locale: '',
         defaultStore: storeId === defaultStoreId.value

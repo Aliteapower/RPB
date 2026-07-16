@@ -951,9 +951,9 @@ export const zhCN = {
     topbar: {
       aria: '员工工作台顶部栏',
       metaAria: '门店和应用状态',
-      brandMark: '食',
+      fallbackTitle: '门店管理',
       kicker: '门店员工',
-      title: '食刻 · 管理'
+      logoAlt: '{name} 品牌标志'
     },
     actions: {
       checkIn: {
