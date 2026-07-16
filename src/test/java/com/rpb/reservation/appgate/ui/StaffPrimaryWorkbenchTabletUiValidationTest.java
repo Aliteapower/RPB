@@ -112,8 +112,8 @@ class StaffPrimaryWorkbenchTabletUiValidationTest {
             .contains("class=\"reservation-workbench__quick-panel\"")
             .contains("class=\"reservation-workbench__list-panel\"")
             .contains("@media (min-width: 768px)")
-            .contains("@media (min-width: 1024px)")
-            .contains("grid-template-columns: minmax(280px, 0.38fr) minmax(0, 0.62fr);");
+            .doesNotContain("grid-template-columns: minmax(280px, 0.38fr) minmax(0, 0.62fr);")
+            .doesNotContain("grid-column: 2;");
     }
 
     @Test
@@ -127,8 +127,7 @@ class StaffPrimaryWorkbenchTabletUiValidationTest {
 
         assertThat(queue)
             .contains("@media (min-width: 768px)")
-            .contains("@media (min-width: 1024px)")
-            .contains("grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);")
+            .doesNotContain("grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);")
             .contains("@media (min-width: 1200px)")
             .contains("grid-template-columns: repeat(2, minmax(0, 1fr));");
 

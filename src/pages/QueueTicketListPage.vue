@@ -1885,26 +1885,6 @@ a:focus-visible {
   }
 }
 
-@media (min-width: 1024px) {
-  .queue-workbench-body {
-    align-items: start;
-    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
-  }
-
-  .queue-management-panel {
-    grid-column: 1;
-    grid-row: 1;
-    min-width: 0;
-  }
-
-  .queue-message-stack,
-  .empty-queue-panel,
-  .queue-list {
-    grid-column: 2;
-    min-width: 0;
-  }
-}
-
 @media (min-width: 1200px) {
   .queue-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

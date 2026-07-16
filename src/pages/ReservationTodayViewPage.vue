@@ -612,34 +612,4 @@ a:focus-visible {
   }
 }
 
-@media (min-width: 1024px) {
-  .reservation-workbench-body {
-    align-items: start;
-    grid-template-columns: minmax(280px, 0.38fr) minmax(0, 0.62fr);
-  }
-
-  .reservation-workbench__date-panel,
-  .reservation-workbench__quick-panel {
-    grid-column: 1;
-  }
-
-  .reservation-workbench__date-panel {
-    grid-row: 1;
-  }
-
-  .reservation-workbench__quick-panel {
-    grid-row: 2;
-  }
-
-  .reservation-workbench__list-panel,
-  .reservation-workbench__action-error {
-    grid-column: 2;
-  }
-
-  .reservation-workbench__list-panel {
-    grid-row: 1 / span 3;
-    min-width: 0;
-  }
-}
-
 </style>
