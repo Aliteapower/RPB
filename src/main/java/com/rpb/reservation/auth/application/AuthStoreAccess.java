@@ -10,6 +10,8 @@ public record AuthStoreAccess(
     UUID storeId,
     String storeCode,
     String storeName,
+    String shareDisplayName,
+    UUID tenantLogoMediaAssetId,
     String status,
     String locale,
     boolean defaultStore

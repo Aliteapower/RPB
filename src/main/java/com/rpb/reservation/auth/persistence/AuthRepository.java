@@ -386,6 +386,8 @@ public class AuthRepository {
                 store.id as store_id,
                 store.store_code,
                 store.display_name,
+                store.share_display_name,
+                tenant.logo_media_asset_id,
                 store.status,
                 store.locale,
                 account.default_store_id = store.id as default_store
@@ -420,6 +422,8 @@ public class AuthRepository {
                 rs.getObject("store_id", UUID.class),
                 rs.getString("store_code"),
                 rs.getString("display_name"),
+                rs.getString("share_display_name"),
+                rs.getObject("logo_media_asset_id", UUID.class),
                 rs.getString("status"),
                 rs.getString("locale"),
                 rs.getBoolean("default_store")
