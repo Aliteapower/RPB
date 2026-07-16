@@ -24,6 +24,7 @@ defineProps<{
 <style scoped>
 .staff-primary-workbench__surface {
   min-width: 0;
+  overflow-x: clip;
 }
 
 @media (min-width: 768px) {
@@ -42,6 +43,7 @@ defineProps<{
   .staff-primary-workbench__surface :deep(.staff-topbar) {
     margin-left: 0;
     margin-right: 0;
+    padding-right: 116px;
   }
 }
 </style>

@@ -34,6 +34,8 @@ class StaffPrimaryWorkbenchTabletUiValidationTest {
             .contains("@media (min-width: 768px)")
             .contains("grid-template-columns: 88px minmax(0, 1fr);")
             .contains("max-width: 1200px;")
+            .contains("overflow-x: clip;")
+            .contains("padding-right: 116px;")
             .doesNotContain("fetch(")
             .doesNotContain("watch(")
             .doesNotContain("onMounted(");
