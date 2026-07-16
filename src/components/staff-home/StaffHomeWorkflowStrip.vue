@@ -1,12 +1,18 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+</script>
+
 <template>
-  <section class="workflow-strip" aria-label="门店流转提示">
-    <span>散客入座</span>
+  <section class="workflow-strip" :aria-label="t('staffControls.workflow.aria')">
+    <span>{{ t('staffControls.workflow.walkInSeating') }}</span>
     <span class="workflow-arrow" aria-hidden="true">-&gt;</span>
-    <span>占用</span>
+    <span>{{ t('staffControls.workflow.occupied') }}</span>
     <span class="workflow-arrow" aria-hidden="true">-&gt;</span>
-    <span>清台</span>
+    <span>{{ t('staffControls.workflow.cleaning') }}</span>
     <span class="workflow-arrow" aria-hidden="true">-&gt;</span>
-    <span>可用</span>
+    <span>{{ t('staffControls.workflow.available') }}</span>
   </section>
 </template>
 

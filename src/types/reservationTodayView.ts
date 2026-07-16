@@ -27,6 +27,17 @@ export interface ReservationTodayViewItem {
   customerNickname?: string | null
   phoneMasked?: string | null
   note?: string | null
+  seatingId?: string | null
+  currentResourceType?: 'dining_table' | 'table_group' | (string & {}) | null
+  currentResourceId?: string | null
+  currentResourceCode?: string | null
+  assignedResourceType?: 'dining_table' | 'table_group' | (string & {}) | null
+  assignedResourceId?: string | null
+  assignedResourceCode?: string | null
+  queueTicketId?: string | null
+  queueTicketNumber?: number | null
+  queueTicketDisplayNumber?: string | null
+  queueTicketStatus?: string | null
 }
 
 export interface ReservationTodayViewResponse {

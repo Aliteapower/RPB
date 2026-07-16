@@ -87,6 +87,22 @@ class ReservationCheckInApplicationServiceTest {
     }
 
     @Test
+    void rejectsCheckInWhenReservationBusinessDateIsNotStoreToday() {
+        Scenario scenario = Scenario.ready(ReservationStatus.CONFIRMED);
+        scenario.replaceReservationBusinessDate(LocalDate.of(2026, 6, 21));
+
+        ReservationCheckInResult result = scenario.service().checkInReservation(scenario.command());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCheckInError.RESERVATION_NOT_TODAY);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+        assertThat(scenario.businessEventRepository.events).isEmpty();
+        assertThat(scenario.stateTransitionLogRepository.logs).isEmpty();
+        assertThat(scenario.auditLogRepository.logs).extracting(AuditLog::operationCode).contains("reservation.check_in.failed");
+        assertThat(scenario.idempotencyRepository.failed).hasSize(1);
+    }
+
+    @Test
     void alreadyArrivedWithNewKeyReturnsSuccessLikeResultWithoutDuplicateEvidence() {
         Scenario scenario = Scenario.ready(ReservationStatus.ARRIVED);
         scenario.stateTransitionLogRepository.logs.add(scenario.arrivalTransition(scenario.previousArrivedAt));
@@ -448,13 +464,17 @@ class ReservationCheckInApplicationServiceTest {
         }
 
         Reservation reservation(ReservationStatus status) {
+            return reservation(status, LocalDate.of(2026, 6, 20));
+        }
+
+        Reservation reservation(ReservationStatus status, LocalDate businessDate) {
             return new Reservation(
                 reservationId,
                 scope,
                 customerId,
                 new ReservationCode("R-CHECKIN-1"),
                 new PartySize(4),
-                new BusinessDate(LocalDate.of(2026, 6, 20)),
+                new BusinessDate(businessDate),
                 reservedStartAt,
                 reservedEndAt,
                 reservedStartAt.plusSeconds(15 * 60L),
@@ -467,6 +487,10 @@ class ReservationCheckInApplicationServiceTest {
                 Instant.parse("2026-06-18T01:00:00Z"),
                 null
             );
+        }
+
+        void replaceReservationBusinessDate(LocalDate businessDate) {
+            reservationRepository.reservations.put(reservationId.value(), reservation(ReservationStatus.CONFIRMED, businessDate));
         }
 
         StateTransitionLog arrivalTransition(Instant occurredAt) {

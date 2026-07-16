@@ -25,6 +25,27 @@ export async function seatArrivedReservation(
 ): Promise<SeatArrivedReservationResponse> {
   const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/seating/direct`
 
+  return submitReservationSeating(endpoint, request, idempotencyKey, fetcher)
+}
+
+export async function checkInAndSeatConfirmedReservation(
+  storeId: string,
+  reservationId: string,
+  request: SeatArrivedReservationRequest,
+  idempotencyKey: string,
+  fetcher: typeof fetch = fetch
+): Promise<SeatArrivedReservationResponse> {
+  const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/reservations/${encodeURIComponent(reservationId)}/seating/check-in-direct`
+
+  return submitReservationSeating(endpoint, request, idempotencyKey, fetcher)
+}
+
+async function submitReservationSeating(
+  endpoint: string,
+  request: SeatArrivedReservationRequest,
+  idempotencyKey: string,
+  fetcher: typeof fetch
+): Promise<SeatArrivedReservationResponse> {
   let response: Response
 
   try {
@@ -95,10 +116,16 @@ function toApiBody(request: SeatArrivedReservationRequest): SeatArrivedReservati
   return {
     tableId: request.tableId ?? null,
     tableGroupId: request.tableGroupId ?? null,
+    temporaryTableIds: temporaryTableIdsOrNull(request.temporaryTableIds),
     overrideReasonCode: request.overrideReasonCode ?? null,
     overrideNote: request.overrideNote ?? null,
     note: request.note ?? null
   }
+}
+
+function temporaryTableIdsOrNull(value: string[] | null | undefined): string[] | null {
+  const ids = value?.map(item => item.trim()).filter(Boolean) ?? []
+  return ids.length ? ids : null
 }
 
 async function readJson(response: Response): Promise<unknown> {

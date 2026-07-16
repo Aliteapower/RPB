@@ -1,5 +1,10 @@
+<script setup lang="ts">
+import FrontendLocaleSwitcher from './components/common/FrontendLocaleSwitcher.vue'
+</script>
+
 <template>
-  <RouterView />
+  <FrontendLocaleSwitcher />
+  <RouterView :key="$route.path" />
 </template>
 
 <style>

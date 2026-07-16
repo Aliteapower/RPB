@@ -9,6 +9,9 @@ public record QueueTicketListQuery(
     String actorType,
     String status,
     String limit,
-    String offset
+    String offset,
+    String tableArea,
+    String partySize,
+    String phone
 ) {
 }

@@ -10,6 +10,9 @@ export type QueueTicketListStatusFilter =
 
 export interface QueueTicketListQuery {
   status?: QueueTicketListStatusFilter
+  tableArea?: string
+  partySize?: number
+  phone?: string
   limit?: number
   offset?: number
 }
@@ -17,6 +20,7 @@ export interface QueueTicketListQuery {
 export interface QueueTicketListItem {
   queueTicketId: string
   queueTicketNumber: number
+  queueTicketDisplayNumber: string
   queueTicketStatus: string
   partySize: number
   partySizeGroup: string
@@ -25,6 +29,12 @@ export interface QueueTicketListItem {
   reservationStatus?: string | null
   customerName?: string | null
   customerPhoneMasked?: string | null
+  assignedResourceType?: 'dining_table' | 'table_group' | (string & {}) | null
+  assignedResourceId?: string | null
+  assignedResourceCode?: string | null
+  assignedResourceGroupType?: string | null
+  assignedResourceLabel?: string | null
+  assignedResourceAreaName?: string | null
   createdAt: string
   calledAt?: string | null
   holdUntilAt?: string | null

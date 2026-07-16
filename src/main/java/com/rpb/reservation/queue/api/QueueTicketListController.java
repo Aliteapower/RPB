@@ -47,7 +47,10 @@ public class QueueTicketListController {
         @PathVariable UUID storeId,
         @RequestParam(value = "status", required = false) String status,
         @RequestParam(value = "limit", required = false) String limit,
-        @RequestParam(value = "offset", required = false) String offset
+        @RequestParam(value = "offset", required = false) String offset,
+        @RequestParam(value = "tableArea", required = false) String tableArea,
+        @RequestParam(value = "partySize", required = false) String partySize,
+        @RequestParam(value = "phone", required = false) String phone
     ) {
         Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
         if (currentActor.isEmpty()) {
@@ -61,7 +64,16 @@ public class QueueTicketListController {
             return errorMapper.toResponse(QueueTicketListApiErrorCode.STORE_SCOPE_MISMATCH);
         }
 
-        QueueTicketListQuery query = apiMapper.toQuery(storeId, status, limit, offset, actor);
+        QueueTicketListQuery query = apiMapper.toQuery(
+            storeId,
+            status,
+            limit,
+            offset,
+            tableArea,
+            partySize,
+            phone,
+            actor
+        );
         QueueTicketListResult result = applicationService.listQueueTickets(query);
         if (!result.success()) {
             return errorMapper.toResponse(result);

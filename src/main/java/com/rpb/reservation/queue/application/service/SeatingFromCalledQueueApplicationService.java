@@ -13,7 +13,9 @@ import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.state.TransitionResult;
+import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
@@ -29,8 +31,11 @@ import com.rpb.reservation.queue.domain.QueueTicket;
 import com.rpb.reservation.queue.state.QueueTicketStateMachine;
 import com.rpb.reservation.queue.status.QueueTicketStatus;
 import com.rpb.reservation.queue.value.QueueTicketId;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
 import com.rpb.reservation.reservation.domain.Reservation;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.state.ReservationStateMachine;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationId;
@@ -45,6 +50,10 @@ import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableLockRepositoryPort;
+import com.rpb.reservation.table.application.TemporaryTableGroupError;
+import com.rpb.reservation.table.application.TemporaryTableGroupResult;
+import com.rpb.reservation.table.application.service.TemporaryTableGroupApplicationService;
+import com.rpb.reservation.table.application.service.TemporaryTableGroupCommand;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.domain.TableGroupMember;
@@ -57,6 +66,9 @@ import com.rpb.reservation.table.status.DiningTableStatus;
 import com.rpb.reservation.table.value.TableGroupId;
 import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
+import com.rpb.reservation.walkin.application.port.out.WalkInRepositoryPort;
+import com.rpb.reservation.walkin.domain.WalkIn;
+import com.rpb.reservation.walkin.value.WalkInId;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -67,6 +79,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,18 +93,21 @@ public class SeatingFromCalledQueueApplicationService {
     private static final String ACTION = "seat_called_queue_ticket";
     private static final String QUEUE_TICKET_SOURCE = "queue_ticket";
     private static final String TARGET_RESERVATION = "reservation";
+    private static final String TARGET_WALK_IN = "walk_in";
     private static final String TARGET_SEATING = "seating";
     private static final String TARGET_DINING_TABLE = "dining_table";
     private static final String RESOURCE_TABLE = "dining_table";
     private static final String RESOURCE_GROUP = "table_group";
     private static final String EVENT_QUEUE_TICKET_SEATED = "queue_ticket.seated";
     private static final String EVENT_RESERVATION_SEATED = "reservation.seated";
+    private static final String EVENT_WALK_IN_SEATED = "walk_in.seated";
     private static final String EVENT_SEATING_CREATED = "seating.created";
     private static final String EVENT_TABLE_OCCUPIED = "table.occupied";
     private static final String OPERATION_SEAT = "queue.seat";
     private static final String OPERATION_SEAT_FAILED = "queue.seat.failed";
     private static final String TRANSITION_QUEUE_TICKET_SEAT = "queue_ticket.seat";
     private static final String TRANSITION_RESERVATION_SEAT = "reservation.seat";
+    private static final String TRANSITION_WALK_IN_SEAT_FROM_QUEUE = "walk_in.seat_from_queue";
     private static final String TRANSITION_SEATING_OCCUPY = "seating.occupy";
     private static final String TRANSITION_TABLE_OCCUPY = "dining_table.occupy";
 
@@ -101,12 +117,15 @@ public class SeatingFromCalledQueueApplicationService {
     private final DiningTableRepositoryPort diningTableRepository;
     private final TableGroupRepositoryPort tableGroupRepository;
     private final TableLockRepositoryPort tableLockRepository;
+    private final ReservationPreassignmentRepositoryPort preassignmentRepository;
+    private final WalkInRepositoryPort walkInRepository;
     private final SeatingRepositoryPort seatingRepository;
     private final BusinessEventRepositoryPort businessEventRepository;
     private final StateTransitionLogRepositoryPort stateTransitionLogRepository;
     private final AuditLogRepositoryPort auditLogRepository;
     private final IdempotencyRepositoryPort idempotencyRepository;
     private final Clock clock;
+    private final TemporaryTableGroupApplicationService temporaryTableGroupService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
     private final DefaultTableCapacityRule tableCapacityRule = new DefaultTableCapacityRule();
@@ -123,6 +142,71 @@ public class SeatingFromCalledQueueApplicationService {
     private final QueueTicketSeatRule queueTicketSeatRule = new QueueTicketSeatRule();
     private final SeatingFromCalledQueueRule seatingFromCalledQueueRule = new SeatingFromCalledQueueRule();
 
+    public SeatingFromCalledQueueApplicationService(
+        StoreRepositoryPort storeRepository,
+        QueueTicketRepositoryPort queueTicketRepository,
+        ReservationRepositoryPort reservationRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
+        TableLockRepositoryPort tableLockRepository,
+        SeatingRepositoryPort seatingRepository,
+        BusinessEventRepositoryPort businessEventRepository,
+        StateTransitionLogRepositoryPort stateTransitionLogRepository,
+        AuditLogRepositoryPort auditLogRepository,
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock
+    ) {
+        this(
+            storeRepository,
+            queueTicketRepository,
+            reservationRepository,
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            NoopReservationPreassignmentRepository.INSTANCE,
+            NoopWalkInRepository.INSTANCE,
+            seatingRepository,
+            businessEventRepository,
+            stateTransitionLogRepository,
+            auditLogRepository,
+            idempotencyRepository,
+            clock
+        );
+    }
+
+    public SeatingFromCalledQueueApplicationService(
+        StoreRepositoryPort storeRepository,
+        QueueTicketRepositoryPort queueTicketRepository,
+        ReservationRepositoryPort reservationRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
+        TableLockRepositoryPort tableLockRepository,
+        WalkInRepositoryPort walkInRepository,
+        SeatingRepositoryPort seatingRepository,
+        BusinessEventRepositoryPort businessEventRepository,
+        StateTransitionLogRepositoryPort stateTransitionLogRepository,
+        AuditLogRepositoryPort auditLogRepository,
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock
+    ) {
+        this(
+            storeRepository,
+            queueTicketRepository,
+            reservationRepository,
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            NoopReservationPreassignmentRepository.INSTANCE,
+            walkInRepository,
+            seatingRepository,
+            businessEventRepository,
+            stateTransitionLogRepository,
+            auditLogRepository,
+            idempotencyRepository,
+            clock
+        );
+    }
+
     @Autowired
     public SeatingFromCalledQueueApplicationService(
         StoreRepositoryPort storeRepository,
@@ -131,6 +215,8 @@ public class SeatingFromCalledQueueApplicationService {
         DiningTableRepositoryPort diningTableRepository,
         TableGroupRepositoryPort tableGroupRepository,
         TableLockRepositoryPort tableLockRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        WalkInRepositoryPort walkInRepository,
         SeatingRepositoryPort seatingRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
@@ -144,6 +230,8 @@ public class SeatingFromCalledQueueApplicationService {
             diningTableRepository,
             tableGroupRepository,
             tableLockRepository,
+            preassignmentRepository,
+            walkInRepository,
             seatingRepository,
             businessEventRepository,
             stateTransitionLogRepository,
@@ -160,6 +248,8 @@ public class SeatingFromCalledQueueApplicationService {
         DiningTableRepositoryPort diningTableRepository,
         TableGroupRepositoryPort tableGroupRepository,
         TableLockRepositoryPort tableLockRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        WalkInRepositoryPort walkInRepository,
         SeatingRepositoryPort seatingRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
@@ -173,12 +263,22 @@ public class SeatingFromCalledQueueApplicationService {
         this.diningTableRepository = diningTableRepository;
         this.tableGroupRepository = tableGroupRepository;
         this.tableLockRepository = tableLockRepository;
+        this.preassignmentRepository = preassignmentRepository;
+        this.walkInRepository = walkInRepository;
         this.seatingRepository = seatingRepository;
         this.businessEventRepository = businessEventRepository;
         this.stateTransitionLogRepository = stateTransitionLogRepository;
         this.auditLogRepository = auditLogRepository;
         this.idempotencyRepository = idempotencyRepository;
         this.clock = clock;
+        this.temporaryTableGroupService = new TemporaryTableGroupApplicationService(
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            preassignmentRepository,
+            seatingRepository,
+            clock
+        );
     }
 
     @Transactional
@@ -228,6 +328,7 @@ public class SeatingFromCalledQueueApplicationService {
             value(command.queueTicketId()),
             value(command.tableId()),
             value(command.tableGroupId()),
+            values(command.temporaryTableIds()),
             value(command.actorId()),
             normalize(command.actorType()),
             normalize(command.overrideReasonCode()),
@@ -260,34 +361,47 @@ public class SeatingFromCalledQueueApplicationService {
             throw new ApplicationFailure(statusError);
         }
 
-        Reservation reservation = loadReservation(scope, queueTicket);
-        if (reservation.status() == ReservationStatus.SEATED) {
+        Optional<Reservation> reservation = loadReservationIfPresent(scope, queueTicket);
+        Optional<WalkIn> walkIn = loadWalkInIfPresent(scope, queueTicket);
+        validateQueueTicketSource(reservation, walkIn);
+        if (reservation.isPresent() && reservation.get().status() == ReservationStatus.SEATED) {
             throw new ApplicationFailure(SeatingFromCalledQueueError.RESERVATION_SEATED_WITHOUT_QUEUE_TICKET_SEATED);
         }
-        if (reservation.status() != ReservationStatus.ARRIVED) {
+        if (reservation.isPresent() && reservation.get().status() != ReservationStatus.ARRIVED) {
             throw new ApplicationFailure(SeatingFromCalledQueueError.RESERVATION_STATUS_NOT_ARRIVED);
         }
+        if (walkIn.isPresent() && !"queued".equals(walkIn.get().status())) {
+            throw new ApplicationFailure(SeatingFromCalledQueueError.ILLEGAL_STATE_TRANSITION);
+        }
         if (!queueTicketStateMachine.canTransition(QueueTicketStatus.CALLED, QueueTicketStatus.SEATED)
-            || !reservationStateMachine.canTransition(ReservationStatus.ARRIVED, ReservationStatus.SEATED)) {
+            || (reservation.isPresent() && !reservationStateMachine.canTransition(ReservationStatus.ARRIVED, ReservationStatus.SEATED))) {
             throw new ApplicationFailure(SeatingFromCalledQueueError.ILLEGAL_STATE_TRANSITION);
         }
 
-        ResourceSelection selection = resolveResource(command, scope, queueTicket.partySize());
+        ResourceSelection selection = resolveResource(command, scope, queueTicket, reservation);
+        validatePreassignment(scope, reservation, selection);
         require(seatingFromCalledQueueRule.validateQueueTicketSource(queueTicket.id().value()), SeatingFromCalledQueueError.INVALID_SEATING_SOURCE);
         require(seatingResourceValidator.validate(selection.resourceType(), selection.resourceId()), SeatingFromCalledQueueError.INVALID_SEATING_RESOURCE);
 
         Seating seating = createSeating(scope, command, queueTicket);
         SeatingResource seatingResource = createSeatingResource(scope, seating, selection);
         List<DiningTable> occupiedTables = occupyTables(scope, selection);
-        Reservation savedReservation = saveSeated(scope, reservation);
+        Optional<Reservation> savedReservation = reservation.map(value -> saveSeated(scope, value));
+        Optional<WalkIn> savedWalkIn = walkIn.map(value -> saveSeated(scope, value));
         QueueTicket savedQueueTicket = saveSeated(scope, queueTicket);
         List<String> groupMemberStatuses = occupiedTables.stream().map(table -> table.status().code()).toList();
         String tableStatus = selection.isTable() ? occupiedTables.getFirst().status().code() : null;
         List<UUID> occupiedTableIds = occupiedTables.stream().map(table -> table.id().value()).toList();
 
-        List<UUID> eventIds = appendBusinessEvents(scope, command, savedQueueTicket, savedReservation, seating, selection, started.idempotencyKey());
-        List<UUID> transitionIds = appendTransitionLogs(scope, command, savedQueueTicket, savedReservation, seating, occupiedTables, started.idempotencyKey());
-        AuditLog auditLog = appendCompletedAudit(scope, command, savedQueueTicket, savedReservation, seating, selection, occupiedTableIds, started.idempotencyKey());
+        List<UUID> eventIds = appendBusinessEvents(scope, command, savedQueueTicket, savedReservation, savedWalkIn, seating, selection, started.idempotencyKey());
+        List<UUID> transitionIds = appendTransitionLogs(scope, command, savedQueueTicket, savedReservation, savedWalkIn, seating, occupiedTables, started.idempotencyKey());
+        AuditLog auditLog = appendCompletedAudit(scope, command, savedQueueTicket, savedReservation, savedWalkIn, seating, selection, occupiedTableIds, started.idempotencyKey());
+        List<String> eventNames = new ArrayList<>();
+        eventNames.add(EVENT_QUEUE_TICKET_SEATED);
+        savedReservation.ifPresent(value -> eventNames.add(EVENT_RESERVATION_SEATED));
+        savedWalkIn.ifPresent(value -> eventNames.add(EVENT_WALK_IN_SEATED));
+        eventNames.add(EVENT_SEATING_CREATED);
+        eventNames.add(EVENT_TABLE_OCCUPIED);
 
         IdempotencyRecord completed = completeIdempotency(
             scope,
@@ -304,8 +418,8 @@ public class SeatingFromCalledQueueApplicationService {
         return SeatingFromCalledQueueResult.success(
             savedQueueTicket.id().value(),
             savedQueueTicket.ticketNumber().value(),
-            savedReservation.id().value(),
-            savedReservation.reservationCode().value(),
+            savedReservation.map(value -> value.id().value()).orElse(null),
+            savedReservation.map(value -> value.reservationCode().value()).orElse(null),
             seating.id().value(),
             seatingResource.resourceType(),
             seatingResource.resourceId(),
@@ -314,7 +428,7 @@ public class SeatingFromCalledQueueApplicationService {
             selection.isTable() ? List.of() : groupMemberStatuses,
             occupiedTableIds,
             completed.status().code(),
-            List.of(EVENT_QUEUE_TICKET_SEATED, EVENT_RESERVATION_SEATED, EVENT_SEATING_CREATED, EVENT_TABLE_OCCUPIED),
+            eventNames,
             eventIds,
             transitionIds,
             auditLog.id()
@@ -327,11 +441,8 @@ public class SeatingFromCalledQueueApplicationService {
         IdempotencyRecord started,
         QueueTicket queueTicket
     ) {
-        if (queueTicket.reservationId() == null || queueTicket.walkInId() != null) {
-            throw new ApplicationFailure(SeatingFromCalledQueueError.QUEUE_TICKET_SOURCE_NOT_RESERVATION);
-        }
-        Reservation reservation = loadReservation(scope, queueTicket);
-        if (reservation.status() != ReservationStatus.SEATED) {
+        Optional<Reservation> reservation = loadReservationIfPresent(scope, queueTicket);
+        if (reservation.isPresent() && reservation.get().status() != ReservationStatus.SEATED) {
             throw new ApplicationFailure(SeatingFromCalledQueueError.QUEUE_TICKET_SEATED_WITH_RESERVATION_NOT_SEATED);
         }
         Seating seating = seatingRepository.findActiveBySource(scope, QUEUE_TICKET_SOURCE, queueTicket.id().value())
@@ -372,8 +483,8 @@ public class SeatingFromCalledQueueApplicationService {
         return SeatingFromCalledQueueResult.alreadySeated(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            reservation.reservationCode().value(),
+            reservation.map(value -> value.id().value()).orElse(null),
+            reservation.map(value -> value.reservationCode().value()).orElse(null),
             seating.id().value(),
             seatingResource.resourceType(),
             seatingResource.resourceId(),
@@ -387,24 +498,61 @@ public class SeatingFromCalledQueueApplicationService {
         );
     }
 
-    private Reservation loadReservation(StoreScope scope, QueueTicket queueTicket) {
-        if (queueTicket.reservationId() == null || queueTicket.walkInId() != null) {
-            throw new ApplicationFailure(SeatingFromCalledQueueError.QUEUE_TICKET_SOURCE_NOT_RESERVATION);
+    private Optional<Reservation> loadReservationIfPresent(StoreScope scope, QueueTicket queueTicket) {
+        if (queueTicket.reservationId() == null) {
+            return Optional.empty();
         }
         Reservation reservation = reservationRepository.findById(scope, new ReservationId(queueTicket.reservationId()))
             .orElseThrow(() -> new ApplicationFailure(SeatingFromCalledQueueError.RESERVATION_NOT_FOUND));
         if (!scope.equals(reservation.scope())) {
             throw new ApplicationFailure(SeatingFromCalledQueueError.STORE_SCOPE_MISMATCH);
         }
-        return reservation;
+        return Optional.of(reservation);
     }
 
-    private ResourceSelection resolveResource(SeatCalledQueueTicketCommand command, StoreScope scope, PartySize partySize) {
+    private Optional<WalkIn> loadWalkInIfPresent(StoreScope scope, QueueTicket queueTicket) {
+        if (queueTicket.walkInId() == null) {
+            return Optional.empty();
+        }
+        WalkIn walkIn = walkInRepository.findById(scope, new WalkInId(queueTicket.walkInId()))
+            .orElseThrow(() -> new ApplicationFailure(SeatingFromCalledQueueError.QUEUE_TICKET_SOURCE_NOT_RESERVATION));
+        if (!scope.equals(walkIn.scope())) {
+            throw new ApplicationFailure(SeatingFromCalledQueueError.STORE_SCOPE_MISMATCH);
+        }
+        return Optional.of(walkIn);
+    }
+
+    private static void validateQueueTicketSource(Optional<Reservation> reservation, Optional<WalkIn> walkIn) {
+        if (reservation.isPresent() == walkIn.isPresent()) {
+            throw new ApplicationFailure(SeatingFromCalledQueueError.QUEUE_TICKET_SOURCE_NOT_RESERVATION);
+        }
+    }
+
+    private ResourceSelection resolveResource(
+        SeatCalledQueueTicketCommand command,
+        StoreScope scope,
+        QueueTicket queueTicket,
+        Optional<Reservation> reservation
+    ) {
+        PartySize partySize = queueTicket.partySize();
+        if (!command.temporaryTableIds().isEmpty()) {
+            TemporaryTableGroupResult result = temporaryTableGroupService.createForSeating(new TemporaryTableGroupCommand(
+                scope,
+                command.temporaryTableIds(),
+                partySize,
+                reservation.map(Reservation::businessDate).orElse(queueTicket.businessDate()),
+                reservation.map(value -> value.id().value()).orElse(queueTicket.id().value())
+            ));
+            if (!result.success()) {
+                throw new ApplicationFailure(temporaryTableGroupError(result.error()));
+            }
+            return new ResourceSelection(RESOURCE_GROUP, result.group().id().value(), null, result.group(), result.memberTables(), true);
+        }
         if (command.tableId() != null) {
             DiningTable table = diningTableRepository.findById(scope, new TableId(command.tableId()))
                 .orElseThrow(() -> new ApplicationFailure(SeatingFromCalledQueueError.TABLE_NOT_FOUND));
             validateTable(scope, table, partySize, SeatingFromCalledQueueError.TABLE_NOT_AVAILABLE);
-            return new ResourceSelection(RESOURCE_TABLE, table.id().value(), table, null, List.of());
+            return new ResourceSelection(RESOURCE_TABLE, table.id().value(), table, null, List.of(), false);
         }
 
         TableGroup group = tableGroupRepository.findById(scope, new TableGroupId(command.tableGroupId()))
@@ -425,7 +573,20 @@ public class SeatingFromCalledQueueApplicationService {
             validateGroupMemberTable(scope, table);
             memberTables.add(table);
         }
-        return new ResourceSelection(RESOURCE_GROUP, group.id().value(), null, group, memberTables);
+        return new ResourceSelection(RESOURCE_GROUP, group.id().value(), null, group, memberTables, false);
+    }
+
+    private static SeatingFromCalledQueueError temporaryTableGroupError(TemporaryTableGroupError error) {
+        return switch (error) {
+            case MEMBER_REQUIRED -> SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED;
+            case MEMBER_DUPLICATE -> SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE;
+            case MEMBER_UNAVAILABLE -> SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE;
+            case CAPACITY_INSUFFICIENT -> SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT;
+            case LOCK_CONFLICT -> SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT;
+            case PREASSIGNMENT_CONFLICT -> SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+            case GROUP_NAME_REQUIRED, GROUP_NAME_CONFLICT, GROUP_NOT_FOUND, GROUP_NOT_TEMPORARY, GROUP_NOT_DISSOLVABLE ->
+                SeatingFromCalledQueueError.INVALID_COMMAND;
+        };
     }
 
     private void validateTable(
@@ -458,6 +619,44 @@ public class SeatingFromCalledQueueApplicationService {
             tableLockRule.evaluate(tableLockRepository.existsActiveConflict(scope, resourceType, resourceId, OffsetDateTime.now(clock))),
             SeatingFromCalledQueueError.TABLE_LOCK_CONFLICT
         );
+    }
+
+    private void validatePreassignment(
+        StoreScope scope,
+        Optional<Reservation> reservation,
+        ResourceSelection selection
+    ) {
+        if (reservation.isEmpty()) {
+            return;
+        }
+        Reservation value = reservation.get();
+        ReservationResourceAssignment ownAssignment = preassignmentRepository
+            .findActiveAssignmentForReservation(scope, value.id().value())
+            .orElse(null);
+        if (ownAssignment != null && !matches(ownAssignment, selection)) {
+            throw new ApplicationFailure(resourceUnavailableError(selection));
+        }
+
+        ReservationResourceAssignment resourceAssignment = preassignmentRepository
+            .findActiveAssignmentForResource(scope, selection.resourceType(), selection.resourceId(), value.businessDate())
+            .orElse(null);
+        if (resourceAssignment != null && !resourceAssignment.reservationId().equals(value.id().value())) {
+            throw new ApplicationFailure(resourceUnavailableError(selection));
+        }
+    }
+
+    private static boolean matches(ReservationResourceAssignment assignment, ResourceSelection selection) {
+        return assignment.resourceType().equals(selection.resourceType())
+            && assignment.resourceId().equals(selection.resourceId());
+    }
+
+    private static SeatingFromCalledQueueError resourceUnavailableError(ResourceSelection selection) {
+        if (selection.temporaryGroup()) {
+            return SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+        }
+        return selection.isTable()
+            ? SeatingFromCalledQueueError.TABLE_NOT_AVAILABLE
+            : SeatingFromCalledQueueError.TABLE_GROUP_INVALID;
     }
 
     private Seating createSeating(StoreScope scope, SeatCalledQueueTicketCommand command, QueueTicket queueTicket) {
@@ -560,22 +759,31 @@ public class SeatingFromCalledQueueApplicationService {
         }
     }
 
+    private WalkIn saveSeated(StoreScope scope, WalkIn walkIn) {
+        try {
+            return walkInRepository.save(scope, new WalkIn(walkIn.id(), walkIn.scope(), walkIn.partySize(), "seated"));
+        } catch (RuntimeException exception) {
+            throw new ApplicationFailure(SeatingFromCalledQueueError.PERSISTENCE_ERROR, exception);
+        }
+    }
+
     private List<UUID> appendBusinessEvents(
         StoreScope scope,
         SeatCalledQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
+        Optional<WalkIn> walkIn,
         Seating seating,
         ResourceSelection selection,
         IdempotencyKey idempotencyKey
     ) {
-        String metadata = metadata(queueTicket, reservation, seating, selection, idempotencyKey, null);
-        List<BusinessEvent> events = List.of(
-            newBusinessEvent(EVENT_QUEUE_TICKET_SEATED, QUEUE_TICKET_SOURCE, queueTicket.id().value(), command, metadata),
-            newBusinessEvent(EVENT_RESERVATION_SEATED, TARGET_RESERVATION, reservation.id().value(), command, metadata),
-            newBusinessEvent(EVENT_SEATING_CREATED, TARGET_SEATING, seating.id().value(), command, metadata),
-            newBusinessEvent(EVENT_TABLE_OCCUPIED, selection.resourceType(), selection.resourceId(), command, metadata)
-        );
+        String metadata = metadata(queueTicket, reservation, walkIn, seating, selection, idempotencyKey, null);
+        List<BusinessEvent> events = new ArrayList<>();
+        events.add(newBusinessEvent(EVENT_QUEUE_TICKET_SEATED, QUEUE_TICKET_SOURCE, queueTicket.id().value(), command, metadata));
+        reservation.ifPresent(value -> events.add(newBusinessEvent(EVENT_RESERVATION_SEATED, TARGET_RESERVATION, value.id().value(), command, metadata)));
+        walkIn.ifPresent(value -> events.add(newBusinessEvent(EVENT_WALK_IN_SEATED, TARGET_WALK_IN, value.id().value(), command, metadata)));
+        events.add(newBusinessEvent(EVENT_SEATING_CREATED, TARGET_SEATING, seating.id().value(), command, metadata));
+        events.add(newBusinessEvent(EVENT_TABLE_OCCUPIED, selection.resourceType(), selection.resourceId(), command, metadata));
         List<UUID> ids = new ArrayList<>();
         for (BusinessEvent event : events) {
             require(
@@ -595,15 +803,17 @@ public class SeatingFromCalledQueueApplicationService {
         StoreScope scope,
         SeatCalledQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
+        Optional<WalkIn> walkIn,
         Seating seating,
         List<DiningTable> occupiedTables,
         IdempotencyKey idempotencyKey
     ) {
         List<StateTransitionLog> logs = new ArrayList<>();
-        String metadata = metadata(queueTicket, reservation, seating, null, idempotencyKey, null);
+        String metadata = metadata(queueTicket, reservation, walkIn, seating, null, idempotencyKey, null);
         logs.add(newTransition(QUEUE_TICKET_SOURCE, queueTicket.id().value(), "called", "seated", TRANSITION_QUEUE_TICKET_SEAT, command, metadata));
-        logs.add(newTransition(TARGET_RESERVATION, reservation.id().value(), "arrived", "seated", TRANSITION_RESERVATION_SEAT, command, metadata));
+        reservation.ifPresent(value -> logs.add(newTransition(TARGET_RESERVATION, value.id().value(), "arrived", "seated", TRANSITION_RESERVATION_SEAT, command, metadata)));
+        walkIn.ifPresent(value -> logs.add(newTransition(TARGET_WALK_IN, value.id().value(), "queued", "seated", TRANSITION_WALK_IN_SEAT_FROM_QUEUE, command, metadata)));
         logs.add(newTransition(TARGET_SEATING, seating.id().value(), "planned", "occupied", TRANSITION_SEATING_OCCUPY, command, metadata));
         for (DiningTable table : occupiedTables) {
             logs.add(newTransition(TARGET_DINING_TABLE, table.id().value(), "available", "occupied", TRANSITION_TABLE_OCCUPY, command, metadata));
@@ -627,7 +837,8 @@ public class SeatingFromCalledQueueApplicationService {
         StoreScope scope,
         SeatCalledQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
+        Optional<WalkIn> walkIn,
         Seating seating,
         ResourceSelection selection,
         List<UUID> occupiedTableIds,
@@ -649,7 +860,7 @@ public class SeatingFromCalledQueueApplicationService {
             source(command),
             command.actorType(),
             command.actorId(),
-            metadata(queueTicket, reservation, seating, selection, idempotencyKey, extra)
+            metadata(queueTicket, reservation, walkIn, seating, selection, idempotencyKey, extra)
         );
         require(auditRule.evaluate(auditLog.operationCode(), auditLog.targetType(), auditLog.targetId(), auditLog.actorType()), SeatingFromCalledQueueError.AUDIT_WRITE_FAILED);
         try {
@@ -738,7 +949,7 @@ public class SeatingFromCalledQueueApplicationService {
         StoreScope scope,
         IdempotencyRecord started,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         Seating seating,
         SeatingResource seatingResource,
         String tableStatus,
@@ -788,9 +999,9 @@ public class SeatingFromCalledQueueApplicationService {
             UUID.fromString(extract(snapshot, "queueTicketId")),
             Integer.parseInt(extractNumber(snapshot, "queueTicketNumber")),
             extract(snapshot, "queueTicketStatus"),
-            UUID.fromString(extract(snapshot, "reservationId")),
-            extract(snapshot, "reservationCode"),
-            extract(snapshot, "reservationStatus"),
+            extractNullableUuid(snapshot, "reservationId"),
+            extractNullableString(snapshot, "reservationCode"),
+            extractNullableString(snapshot, "reservationStatus"),
             UUID.fromString(extract(snapshot, "seatingId")),
             extract(snapshot, "resourceType"),
             UUID.fromString(extract(snapshot, "resourceId")),
@@ -827,11 +1038,21 @@ public class SeatingFromCalledQueueApplicationService {
         ) {
             return SeatingFromCalledQueueError.INVALID_COMMAND;
         }
-        if (command.tableId() != null && command.tableGroupId() != null) {
+        boolean hasTemporaryTables = command.temporaryTableIds() != null && !command.temporaryTableIds().isEmpty();
+        int selectedTargets = (command.tableId() == null ? 0 : 1)
+            + (command.tableGroupId() == null ? 0 : 1)
+            + (hasTemporaryTables ? 1 : 0);
+        if (selectedTargets > 1) {
             return SeatingFromCalledQueueError.RESOURCE_SELECTION_CONFLICT;
         }
-        if (command.tableId() == null && command.tableGroupId() == null) {
+        if (selectedTargets == 0) {
             return SeatingFromCalledQueueError.RESOURCE_SELECTION_REQUIRED;
+        }
+        if (hasTemporaryTables && command.temporaryTableIds().size() < 2) {
+            return SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED;
+        }
+        if (hasTemporaryTables && command.temporaryTableIds().stream().distinct().count() != command.temporaryTableIds().size()) {
+            return SeatingFromCalledQueueError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE;
         }
         return null;
     }
@@ -861,7 +1082,7 @@ public class SeatingFromCalledQueueApplicationService {
 
     private static String snapshot(
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         Seating seating,
         SeatingResource seatingResource,
         String tableStatus,
@@ -869,12 +1090,13 @@ public class SeatingFromCalledQueueApplicationService {
         boolean alreadySeated
     ) {
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"queueTicketStatus":"seated","reservationId":"%s","reservationCode":"%s","reservationStatus":"seated","seatingId":"%s","resourceType":"%s","resourceId":"%s","partySizeSnapshot":%d,"seatingStatus":"%s","seatingResourceStatus":"%s","tableStatus":%s,"groupMemberStatuses":%s,"alreadySeated":%s}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"queueTicketStatus":"seated","reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"seatingId":"%s","resourceType":"%s","resourceId":"%s","partySizeSnapshot":%d,"seatingStatus":"%s","seatingResourceStatus":"%s","tableStatus":%s,"groupMemberStatuses":%s,"alreadySeated":%s}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            escape(reservation.reservationCode().value()),
+            jsonNullable(reservation.map(value -> value.id().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.status().code()).orElse(null)),
             seating.id().value(),
             seatingResource.resourceType(),
             seatingResource.resourceId(),
@@ -889,7 +1111,19 @@ public class SeatingFromCalledQueueApplicationService {
 
     private static String metadata(
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
+        Seating seating,
+        ResourceSelection selection,
+        IdempotencyKey idempotencyKey,
+        String extraJsonWithoutLeadingBrace
+    ) {
+        return metadata(queueTicket, reservation, Optional.empty(), seating, selection, idempotencyKey, extraJsonWithoutLeadingBrace);
+    }
+
+    private static String metadata(
+        QueueTicket queueTicket,
+        Optional<Reservation> reservation,
+        Optional<WalkIn> walkIn,
         Seating seating,
         ResourceSelection selection,
         IdempotencyKey idempotencyKey,
@@ -899,15 +1133,20 @@ public class SeatingFromCalledQueueApplicationService {
         UUID resourceId = selection == null ? null : selection.resourceId();
         String extra = hasText(extraJsonWithoutLeadingBrace) ? extraJsonWithoutLeadingBrace : "";
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"reservationId":"%s","reservationCode":"%s","seatingId":"%s","resourceType":%s,"resourceId":%s,"beforeQueueTicketStatus":"called","afterQueueTicketStatus":"seated","beforeReservationStatus":"arrived","afterReservationStatus":"seated","idempotencyKey":"%s"%s}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"reservationId":%s,"reservationCode":%s,"walkInId":%s,"seatingId":"%s","resourceType":%s,"resourceId":%s,"beforeQueueTicketStatus":"called","afterQueueTicketStatus":"seated","beforeReservationStatus":%s,"afterReservationStatus":%s,"beforeWalkInStatus":%s,"afterWalkInStatus":%s,"idempotencyKey":"%s"%s}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            escape(reservation.reservationCode().value()),
+            jsonNullable(reservation.map(value -> value.id().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null)),
+            jsonNullable(walkIn.map(value -> value.id().value()).orElse(null)),
             seating.id().value(),
             jsonNullable(resourceType),
             jsonNullable(resourceId),
+            jsonNullable(reservation.map(value -> ReservationStatus.ARRIVED.code()).orElse(null)),
+            jsonNullable(reservation.map(value -> ReservationStatus.SEATED.code()).orElse(null)),
+            jsonNullable(walkIn.map(value -> "queued").orElse(null)),
+            jsonNullable(walkIn.map(value -> "seated").orElse(null)),
             escape(idempotencyKey.value()),
             extra
         ).trim();
@@ -938,6 +1177,11 @@ public class SeatingFromCalledQueueApplicationService {
             return null;
         }
         return extract(json, key);
+    }
+
+    private static UUID extractNullableUuid(String json, String key) {
+        String value = extractNullableString(json, key);
+        return value == null ? null : UUID.fromString(value);
     }
 
     private static String extractNumber(String json, String key) {
@@ -997,7 +1241,7 @@ public class SeatingFromCalledQueueApplicationService {
     }
 
     private static String source(SeatCalledQueueTicketCommand command) {
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromActorType(command == null ? null : command.actorType());
     }
 
     private static String normalize(String value) {
@@ -1006,6 +1250,17 @@ public class SeatingFromCalledQueueApplicationService {
 
     private static String value(Object value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    private static String values(List<UUID> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return values.stream()
+            .map(UUID::toString)
+            .sorted()
+            .reduce((left, right) -> left + "," + right)
+            .orElse("");
     }
 
     private static String escape(String value) {
@@ -1030,10 +1285,81 @@ public class SeatingFromCalledQueueApplicationService {
         UUID resourceId,
         DiningTable table,
         TableGroup group,
-        List<DiningTable> memberTables
+        List<DiningTable> memberTables,
+        boolean temporaryGroup
     ) {
         private boolean isTable() {
             return RESOURCE_TABLE.equals(resourceType);
+        }
+    }
+
+    private enum NoopReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
+        INSTANCE;
+
+        @Override
+        public boolean existsActiveResourceConflict(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            com.rpb.reservation.common.time.BusinessDate businessDate,
+            com.rpb.reservation.common.time.TimeRange timeRange
+        ) {
+            return false;
+        }
+
+        @Override
+        public Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(
+            StoreScope scope,
+            com.rpb.reservation.common.time.BusinessDate businessDate
+        ) {
+            return Set.of();
+        }
+
+        @Override
+        public Optional<ReservationResourceAssignment> findActiveAssignmentForReservation(
+            StoreScope scope,
+            UUID reservationId
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<ReservationResourceAssignment> findActiveAssignmentForResource(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            com.rpb.reservation.common.time.BusinessDate businessDate
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
+            return preassignment;
+        }
+    }
+
+    private enum NoopWalkInRepository implements WalkInRepositoryPort {
+        INSTANCE;
+
+        @Override
+        public Optional<WalkIn> findById(StoreScope scope, WalkInId walkInId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<WalkIn> findByCode(StoreScope scope, String walkInCode) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<WalkIn> findArrivals(StoreScope scope, BusinessDate businessDate, String statusCode) {
+            return List.of();
+        }
+
+        @Override
+        public WalkIn save(StoreScope scope, WalkIn walkIn) {
+            return walkIn;
         }
     }
 

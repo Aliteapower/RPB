@@ -24,6 +24,7 @@ public class WalkInDirectSeatingApiMapper {
             trimToNull(request.phoneE164()),
             request.tableId(),
             request.tableGroupId(),
+            request.temporaryTableIds(),
             idempotencyKey.trim(),
             actor.actorId(),
             trimToNull(actor.actorType()),

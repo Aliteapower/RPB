@@ -1,11 +1,16 @@
 package com.rpb.reservation.reservation.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rpb.reservation.audit.application.port.out.BusinessEventRepositoryPort;
+import com.rpb.reservation.audit.domain.BusinessEvent;
+import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.io.IOException;
@@ -13,8 +18,10 @@ import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockReset;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
@@ -46,6 +55,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @ActiveProfiles("test")
 class ReservationArrivedDirectSeatingLocalRuntimeTransactionTest {
     private static final LocalPostgresTestDatabase DATABASE = LocalPostgresTestDatabase.start();
+    private static final String CHECK_IN_DIRECT_ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/check-in-direct";
 
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000971");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000971");
@@ -69,6 +79,9 @@ class ReservationArrivedDirectSeatingLocalRuntimeTransactionTest {
 
     @Autowired
     private TestCurrentActorProvider actorProvider;
+
+    @SpyBean(reset = MockReset.AFTER)
+    private BusinessEventRepositoryPort businessEventRepository;
 
     private Fixture fixture;
 
@@ -202,6 +215,49 @@ class ReservationArrivedDirectSeatingLocalRuntimeTransactionTest {
         assertBoundaryTablesRemainEmpty();
     }
 
+    @Test
+    void checkInDirectRollsBackReservationAndTableWhenEventWriteFails() throws Exception {
+        MvcResult createResult = mockMvc.perform(post("/api/v1/stores/{storeId}/reservations", STORE_ID)
+                .header("Idempotency-Key", "runtime-create-atomic-seat-reservation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createReservationBody()))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value("confirmed"))
+            .andReturn();
+        UUID reservationId = UUID.fromString(objectMapper.readTree(createResult.getResponse().getContentAsString()).path("reservationId").asText());
+
+        doThrow(new IllegalStateException("forced event append failure"))
+            .when(businessEventRepository)
+            .append(any(StoreScope.class), any(BusinessEvent.class));
+
+        mockMvc.perform(post(CHECK_IN_DIRECT_ENDPOINT, STORE_ID, reservationId)
+                .header("Idempotency-Key", "runtime-check-in-seat-event-failure")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(seatBody(TABLE_ID)))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("EVENT_WRITE_FAILED"))
+            .andExpect(jsonPath("$.idempotency.status").value("failed"));
+
+        assertThat(fixture.scalarString("select status from reservations where id = ?", reservationId)).isEqualTo("confirmed");
+        assertThat(fixture.scalarInteger("select version from reservations where id = ?", reservationId)).isEqualTo(0);
+        assertThat(fixture.scalarString("select status from dining_tables where id = ?", TABLE_ID)).isEqualTo("available");
+        assertThat(fixture.count("seatings")).isEqualTo(0);
+        assertThat(fixture.count("seating_resources")).isEqualTo(0);
+        assertThat(fixture.countWhere("""
+            select count(*) from idempotency_records
+            where idempotency_key = 'runtime-check-in-seat-event-failure'
+              and action = 'check_in_and_seat_reservation'
+              and status = 'failed'
+            """)).isEqualTo(1);
+        assertThat(fixture.countWhere("""
+            select count(*) from audit_logs
+            where operation_code = 'reservation.check_in_and_seat.failed'
+            """)).isEqualTo(1);
+        assertBoundaryTablesRemainEmpty();
+    }
+
     private void assertBoundaryTablesRemainEmpty() {
         assertThat(fixture.count("queue_tickets")).isEqualTo(0);
         assertThat(fixture.count("cleanings")).isEqualTo(0);
@@ -248,6 +304,12 @@ class ReservationArrivedDirectSeatingLocalRuntimeTransactionTest {
 
     @TestConfiguration
     static class TestSecurityConfiguration {
+        @Bean
+        @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
+        }
+
         @Bean
         @Primary
         TestCurrentActorProvider testCurrentActorProvider() {
@@ -298,7 +360,7 @@ class ReservationArrivedDirectSeatingLocalRuntimeTransactionTest {
                     timezone, locale, date_format, time_format, currency
                 )
                 values (?, ?, 'store-seat-runtime-it', 'Seat Runtime Store', 'active',
-                    'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
                 """,
                 STORE_ID,
                 TENANT_ID

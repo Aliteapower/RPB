@@ -653,9 +653,7 @@ class CleaningCompleteApiIntegrationTest {
                     || path.toLowerCase().contains("\\noshow\\api\\")
                     || path.toLowerCase().contains("/noshow/api/"))
                 .noneMatch(path -> path.toLowerCase().contains("cancellationcontroller")
-                    || path.toLowerCase().contains("cancelreservationcontroller"))
-                .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller")
-                    || path.toLowerCase().contains("table_assignmentcontroller"));
+                    || path.toLowerCase().contains("cancelreservationcontroller"));
         }
         try (Stream<Path> paths = Files.walk(Path.of("."))) {
             assertThat(paths.filter(Files::isRegularFile).map(Path::toString).toList())
@@ -684,6 +682,13 @@ class CleaningCompleteApiIntegrationTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",

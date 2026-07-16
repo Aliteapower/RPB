@@ -13,6 +13,7 @@ import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -187,7 +188,7 @@ public class QueueSkipApplicationService {
             throw new ApplicationFailure(QueueSkipError.STORE_SCOPE_MISMATCH);
         }
 
-        Reservation reservation = loadReservation(scope, queueTicket);
+        Optional<Reservation> reservation = loadReservationIfPresent(scope, queueTicket);
 
         if (queueTicket.status() == QueueTicketStatus.SKIPPED) {
             return alreadySkipped(scope, started, queueTicket, reservation);
@@ -211,8 +212,8 @@ public class QueueSkipApplicationService {
         return QueueSkipResult.success(
             savedTicket.id().value(),
             savedTicket.ticketNumber().value(),
-            reservation.id().value(),
-            reservation.reservationCode().value(),
+            reservation.map(value -> value.id().value()).orElse(null),
+            reservation.map(value -> value.reservationCode().value()).orElse(null),
             savedTicket.skippedAt(),
             completed.status().code(),
             List.of(EVENT_QUEUE_TICKET_SKIPPED),
@@ -226,7 +227,7 @@ public class QueueSkipApplicationService {
         StoreScope scope,
         IdempotencyRecord started,
         QueueTicket queueTicket,
-        Reservation reservation
+        Optional<Reservation> reservation
     ) {
         QueueSkipError evidenceError = queueSkipEvidenceRule.validateAlreadySkippedEvidence(
             queueTicket,
@@ -241,16 +242,16 @@ public class QueueSkipApplicationService {
         return QueueSkipResult.alreadySkipped(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            reservation.reservationCode().value(),
+            reservation.map(value -> value.id().value()).orElse(null),
+            reservation.map(value -> value.reservationCode().value()).orElse(null),
             queueTicket.skippedAt(),
             completed.status().code()
         );
     }
 
-    private Reservation loadReservation(StoreScope scope, QueueTicket queueTicket) {
+    private Optional<Reservation> loadReservationIfPresent(StoreScope scope, QueueTicket queueTicket) {
         if (queueTicket.reservationId() == null) {
-            throw new ApplicationFailure(QueueSkipError.RESERVATION_NOT_FOUND);
+            return Optional.empty();
         }
         Reservation reservation = reservationRepository.findById(scope, new ReservationId(queueTicket.reservationId()))
             .orElseThrow(() -> new ApplicationFailure(QueueSkipError.RESERVATION_NOT_FOUND));
@@ -260,7 +261,7 @@ public class QueueSkipApplicationService {
         if (reservation.status() != ReservationStatus.ARRIVED) {
             throw new ApplicationFailure(QueueSkipError.RESERVATION_STATUS_NOT_ARRIVED);
         }
-        return reservation;
+        return Optional.of(reservation);
     }
 
     private QueueTicket saveSkipped(StoreScope scope, QueueTicket queueTicket) {
@@ -275,7 +276,7 @@ public class QueueSkipApplicationService {
         StoreScope scope,
         SkipQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey,
         boolean alreadySkipped
     ) {
@@ -304,7 +305,7 @@ public class QueueSkipApplicationService {
         StoreScope scope,
         SkipQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey
     ) {
         StateTransitionLog transition = new StateTransitionLog(
@@ -340,7 +341,7 @@ public class QueueSkipApplicationService {
         StoreScope scope,
         SkipQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey
     ) {
         AuditLog auditLog = new AuditLog(
@@ -397,7 +398,7 @@ public class QueueSkipApplicationService {
         StoreScope scope,
         IdempotencyRecord started,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         boolean alreadySkipped
     ) {
         IdempotencyRecord completionPayload = new IdempotencyRecord(
@@ -442,9 +443,9 @@ public class QueueSkipApplicationService {
             UUID.fromString(extract(snapshot, "queueTicketId")),
             Integer.parseInt(extractNumber(snapshot, "queueTicketNumber")),
             extract(snapshot, "queueTicketStatus"),
-            UUID.fromString(extract(snapshot, "reservationId")),
-            extract(snapshot, "reservationCode"),
-            extract(snapshot, "reservationStatus"),
+            extractNullableUuid(snapshot, "reservationId"),
+            extractNullableString(snapshot, "reservationCode"),
+            extractNullableString(snapshot, "reservationStatus"),
             Instant.parse(extract(snapshot, "skippedAt")),
             Boolean.parseBoolean(extractBoolean(snapshot, "alreadySkipped"))
         );
@@ -484,14 +485,18 @@ public class QueueSkipApplicationService {
         }
     }
 
-    private static String snapshot(QueueTicket queueTicket, Reservation reservation, boolean alreadySkipped) {
+    private static String snapshot(QueueTicket queueTicket, Optional<Reservation> reservation, boolean alreadySkipped) {
+        String reservationId = jsonNullable(reservation.map(value -> value.id().value()).orElse(null));
+        String reservationCode = jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null));
+        String reservationStatus = jsonNullable(reservation.map(value -> value.status().code()).orElse(null));
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"queueTicketStatus":"skipped","reservationId":"%s","reservationCode":"%s","reservationStatus":"arrived","skippedAt":"%s","alreadySkipped":%s}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"queueTicketStatus":"skipped","reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"skippedAt":"%s","alreadySkipped":%s}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            escape(reservation.reservationCode().value()),
+            reservationId,
+            reservationCode,
+            reservationStatus,
             queueTicket.skippedAt(),
             alreadySkipped
         ).trim();
@@ -499,18 +504,19 @@ public class QueueSkipApplicationService {
 
     private static String metadata(
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         SkipQueueTicketCommand command,
         IdempotencyKey idempotencyKey,
         boolean alreadySkipped
     ) {
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"beforeQueueTicketStatus":"called","afterQueueTicketStatus":"skipped","reservationId":"%s","reservationCode":"%s","reservationStatus":"arrived","queueGroupId":"%s","businessDate":"%s","partySize":%d,"queuePosition":%s,"calledAt":%s,"holdUntilAt":%s,"skippedAt":"%s","alreadySkipped":%s,"reasonCode":%s,"note":%s,"idempotencyKey":"%s"}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"beforeQueueTicketStatus":"called","afterQueueTicketStatus":"skipped","reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"queueGroupId":"%s","businessDate":"%s","partySize":%d,"queuePosition":%s,"calledAt":%s,"holdUntilAt":%s,"skippedAt":"%s","alreadySkipped":%s,"reasonCode":%s,"note":%s,"idempotencyKey":"%s"}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            escape(reservation.reservationCode().value()),
+            jsonNullable(reservation.map(value -> value.id().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.status().code()).orElse(null)),
             queueTicket.queueGroupId(),
             queueTicket.businessDate().value(),
             queueTicket.partySize().value(),
@@ -537,6 +543,19 @@ public class QueueSkipApplicationService {
         throw new IllegalArgumentException("snapshot_field_missing_" + key);
     }
 
+    private static String extractNullableString(String json, String key) {
+        Pattern nullPattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*null");
+        if (nullPattern.matcher(json).find()) {
+            return null;
+        }
+        return extract(json, key);
+    }
+
+    private static UUID extractNullableUuid(String json, String key) {
+        String value = extractNullableString(json, key);
+        return value == null ? null : UUID.fromString(value);
+    }
+
     private static String extractNumber(String json, String key) {
         Pattern number = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*([0-9]+)");
         Matcher matcher = number.matcher(json);
@@ -556,11 +575,15 @@ public class QueueSkipApplicationService {
     }
 
     private static String source(SkipQueueTicketCommand command) {
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromActorType(command == null ? null : command.actorType());
     }
 
     private static String jsonNullable(String value) {
         return hasText(value) ? "\"" + escape(value.trim()) + "\"" : "null";
+    }
+
+    private static String jsonNullable(UUID value) {
+        return value == null ? "null" : "\"" + value + "\"";
     }
 
     private static String jsonNullable(Instant value) {

@@ -51,6 +51,7 @@ class WalkInDirectSeatingRepositoryAdapterTest {
             1,
             4,
             "available",
+            0,
             true,
             OffsetDateTime.now(),
             OffsetDateTime.now(),

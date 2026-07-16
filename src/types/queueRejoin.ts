@@ -16,6 +16,7 @@ export interface RejoinQueueTicketResponse {
   success: true
   queueTicketId: string
   queueTicketNumber: number
+  queueTicketDisplayNumber?: string | null
   queueTicketStatus: string
   queuePosition?: number | null
   reservationId?: string | null

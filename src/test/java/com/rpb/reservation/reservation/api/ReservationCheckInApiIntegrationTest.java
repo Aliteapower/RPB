@@ -14,6 +14,7 @@ import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -315,7 +316,6 @@ class ReservationCheckInApiIntegrationTest {
                 .noneMatch(path -> path.toLowerCase().contains("checkinentity"))
                 .noneMatch(ReservationCheckInApiIntegrationTest::isForbiddenQueueApiFile)
                 .noneMatch(path -> path.toLowerCase().contains("/seating/api/"))
-                .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("reservationnoshowcontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"));
         }
@@ -339,6 +339,13 @@ class ReservationCheckInApiIntegrationTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -472,6 +479,12 @@ class ReservationCheckInApiIntegrationTest {
     static class TestSecurityConfiguration {
         @Bean
         @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
+        }
+
+        @Bean
+        @Primary
         TestCurrentActorProvider testCurrentActorProvider() {
             return new TestCurrentActorProvider();
         }
@@ -520,7 +533,7 @@ class ReservationCheckInApiIntegrationTest {
                     timezone, locale, date_format, time_format, currency
                 )
                 values (?, ?, 'store-checkin-api-it', 'CheckIn API Store', 'active',
-                    'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
                 """,
                 STORE_ID,
                 TENANT_ID

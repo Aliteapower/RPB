@@ -16,6 +16,7 @@ export interface SkipQueueTicketResponse {
   success: true
   queueTicketId: string
   queueTicketNumber: number
+  queueTicketDisplayNumber?: string | null
   queueTicketStatus: string
   reservationId?: string | null
   reservationCode?: string | null

@@ -10,6 +10,7 @@ export type SeatingFromCalledQueueIdempotencyStatus =
 export interface SeatCalledQueueTicketRequest {
   tableId?: string | null
   tableGroupId?: string | null
+  temporaryTableIds?: string[] | null
   overrideReasonCode?: string | null
   overrideNote?: string | null
   note?: string | null
@@ -25,9 +26,9 @@ export interface SeatCalledQueueTicketResponse {
   queueTicketId: string
   queueTicketNumber: number
   queueTicketStatus: string
-  reservationId: string
-  reservationCode: string
-  reservationStatus: string
+  reservationId?: string | null
+  reservationCode?: string | null
+  reservationStatus?: string | null
   seatingId: string
   seatingStatus: string
   resourceType: string

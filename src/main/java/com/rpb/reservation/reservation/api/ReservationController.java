@@ -3,18 +3,28 @@ package com.rpb.reservation.reservation.api;
 import com.rpb.reservation.appgate.guard.RequireAppGate;
 import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeatingResult;
 import com.rpb.reservation.reservation.application.ReservationArrivedToQueueResult;
+import com.rpb.reservation.reservation.application.ReservationCancelResult;
 import com.rpb.reservation.reservation.application.ReservationCheckInResult;
+import com.rpb.reservation.reservation.application.ReservationCompleteResult;
 import com.rpb.reservation.reservation.application.ReservationCreateResult;
+import com.rpb.reservation.reservation.application.ReservationNoShowResult;
+import com.rpb.reservation.reservation.application.command.CancelReservationCommand;
 import com.rpb.reservation.reservation.application.command.CheckInReservationCommand;
+import com.rpb.reservation.reservation.application.command.CompleteReservationCommand;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
+import com.rpb.reservation.reservation.application.command.MarkReservationNoShowCommand;
 import com.rpb.reservation.reservation.application.command.QueueArrivedReservationCommand;
 import com.rpb.reservation.reservation.application.command.SeatArrivedReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -36,12 +46,18 @@ public class ReservationController {
     private static final String CHECK_IN_PERMISSION = "reservation.check_in";
     private static final String SEAT_PERMISSION = "reservation.seat";
     private static final String QUEUE_PERMISSION = "reservation.queue";
+    private static final String CANCEL_PERMISSION = "reservation.cancel";
+    private static final String NO_SHOW_PERMISSION = "reservation.no_show";
+    private static final String COMPLETE_PERMISSION = "reservation.complete";
     private static final Set<String> ALLOWED_ROLES = Set.of("tenant_admin", "store_manager", "store_staff");
 
     private final ReservationCreateApplicationService applicationService;
     private final ReservationCheckInApplicationService checkInApplicationService;
     private final ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private final ReservationArrivedToQueueApplicationService queueApplicationService;
+    private final ReservationCancelApplicationService cancelApplicationService;
+    private final ReservationNoShowApplicationService noShowApplicationService;
+    private final ReservationCompleteApplicationService completeApplicationService;
     private final CurrentActorProvider currentActorProvider;
     private final ReservationApiMapper apiMapper;
     private final ReservationApiErrorMapper errorMapper;
@@ -51,6 +67,12 @@ public class ReservationController {
     private final ReservationArrivedDirectSeatingApiErrorMapper seatingErrorMapper;
     private final ReservationArrivedToQueueApiMapper queueApiMapper;
     private final ReservationArrivedToQueueApiErrorMapper queueErrorMapper;
+    private final ReservationCancelApiMapper cancelApiMapper;
+    private final ReservationCancelApiErrorMapper cancelErrorMapper;
+    private final ReservationNoShowApiMapper noShowApiMapper;
+    private final ReservationNoShowApiErrorMapper noShowErrorMapper;
+    private final ReservationCompleteApiMapper completeApiMapper;
+    private final ReservationCompleteApiErrorMapper completeErrorMapper;
 
     @Autowired
     public ReservationController(
@@ -58,6 +80,9 @@ public class ReservationController {
         ReservationCheckInApplicationService checkInApplicationService,
         ReservationArrivedDirectSeatingApplicationService seatingApplicationService,
         ReservationArrivedToQueueApplicationService queueApplicationService,
+        ReservationCancelApplicationService cancelApplicationService,
+        ReservationNoShowApplicationService noShowApplicationService,
+        ReservationCompleteApplicationService completeApplicationService,
         CurrentActorProvider currentActorProvider,
         ReservationApiMapper apiMapper,
         ReservationApiErrorMapper errorMapper,
@@ -66,12 +91,21 @@ public class ReservationController {
         ReservationArrivedDirectSeatingApiMapper seatingApiMapper,
         ReservationArrivedDirectSeatingApiErrorMapper seatingErrorMapper,
         ReservationArrivedToQueueApiMapper queueApiMapper,
-        ReservationArrivedToQueueApiErrorMapper queueErrorMapper
+        ReservationArrivedToQueueApiErrorMapper queueErrorMapper,
+        ReservationCancelApiMapper cancelApiMapper,
+        ReservationCancelApiErrorMapper cancelErrorMapper,
+        ReservationNoShowApiMapper noShowApiMapper,
+        ReservationNoShowApiErrorMapper noShowErrorMapper,
+        ReservationCompleteApiMapper completeApiMapper,
+        ReservationCompleteApiErrorMapper completeErrorMapper
     ) {
         this.applicationService = applicationService;
         this.checkInApplicationService = checkInApplicationService;
         this.seatingApplicationService = seatingApplicationService;
         this.queueApplicationService = queueApplicationService;
+        this.cancelApplicationService = cancelApplicationService;
+        this.noShowApplicationService = noShowApplicationService;
+        this.completeApplicationService = completeApplicationService;
         this.currentActorProvider = currentActorProvider;
         this.apiMapper = apiMapper;
         this.errorMapper = errorMapper;
@@ -81,6 +115,12 @@ public class ReservationController {
         this.seatingErrorMapper = seatingErrorMapper;
         this.queueApiMapper = queueApiMapper;
         this.queueErrorMapper = queueErrorMapper;
+        this.cancelApiMapper = cancelApiMapper;
+        this.cancelErrorMapper = cancelErrorMapper;
+        this.noShowApiMapper = noShowApiMapper;
+        this.noShowErrorMapper = noShowErrorMapper;
+        this.completeApiMapper = completeApiMapper;
+        this.completeErrorMapper = completeErrorMapper;
     }
 
     @PostMapping("/reservations")
@@ -206,6 +246,51 @@ public class ReservationController {
         return ResponseEntity.ok(seatingApiMapper.toResponse(result));
     }
 
+    @PostMapping("/reservations/{reservationId}/seating/check-in-direct")
+    @RequireAppGate(appKey = "reservation_queue", permission = SEAT_PERMISSION)
+    public ResponseEntity<?> checkInAndSeatConfirmedReservation(
+        @PathVariable UUID storeId,
+        @PathVariable UUID reservationId,
+        @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+        @RequestBody(required = false) SeatArrivedReservationRequest request
+    ) {
+        if (!hasText(idempotencyKey)) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.MISSING_IDEMPOTENCY_KEY);
+        }
+
+        SeatArrivedReservationRequest nonNullRequest = nonNull(request);
+        Optional<ReservationApiErrorCode> validationError = nonNullRequest.validateContract();
+        if (validationError.isPresent()) {
+            return seatingErrorMapper.toResponse(validationError.get());
+        }
+
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(SEAT_PERMISSION)) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return seatingErrorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        SeatArrivedReservationCommand command = seatingApiMapper.toCommand(
+            nonNullRequest,
+            storeId,
+            reservationId,
+            idempotencyKey,
+            actor
+        );
+        ReservationArrivedDirectSeatingResult result = seatingApplicationService.checkInAndSeatConfirmedReservation(command);
+        if (!result.success()) {
+            return seatingErrorMapper.toResponse(result);
+        }
+
+        return ResponseEntity.ok(seatingApiMapper.toResponse(result));
+    }
+
     @PostMapping("/reservations/{reservationId}/queue")
     @RequireAppGate(appKey = "reservation_queue", permission = QUEUE_PERMISSION)
     public ResponseEntity<?> queueArrivedReservation(
@@ -245,6 +330,123 @@ public class ReservationController {
         return ResponseEntity.ok(queueApiMapper.toResponse(result));
     }
 
+    @PostMapping("/reservations/{reservationId}/cancel")
+    @RequireAppGate(appKey = "reservation_queue", permission = CANCEL_PERMISSION)
+    public ResponseEntity<?> cancelReservation(
+        @PathVariable UUID storeId,
+        @PathVariable UUID reservationId,
+        @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+        @RequestBody(required = false) CancelReservationRequest request
+    ) {
+        if (!hasText(idempotencyKey)) {
+            return cancelErrorMapper.toResponse(ReservationApiErrorCode.MISSING_IDEMPOTENCY_KEY);
+        }
+
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return cancelErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(CANCEL_PERMISSION)) {
+            return cancelErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return cancelErrorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        CancelReservationCommand command = cancelApiMapper.toCommand(
+            nonNull(request),
+            storeId,
+            reservationId,
+            idempotencyKey,
+            actor
+        );
+        ReservationCancelResult result = cancelApplicationService.cancelReservation(command);
+        if (!result.success()) {
+            return cancelErrorMapper.toResponse(result);
+        }
+
+        return ResponseEntity.ok(cancelApiMapper.toResponse(result));
+    }
+
+    @PostMapping("/reservations/{reservationId}/no-show")
+    @RequireAppGate(appKey = "reservation_queue", permission = NO_SHOW_PERMISSION)
+    public ResponseEntity<?> markReservationNoShow(
+        @PathVariable UUID storeId,
+        @PathVariable UUID reservationId,
+        @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+        @RequestBody(required = false) MarkReservationNoShowRequest request
+    ) {
+        if (!hasText(idempotencyKey)) {
+            return noShowErrorMapper.toResponse(ReservationApiErrorCode.MISSING_IDEMPOTENCY_KEY);
+        }
+
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return noShowErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(NO_SHOW_PERMISSION)) {
+            return noShowErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return noShowErrorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        MarkReservationNoShowCommand command = noShowApiMapper.toCommand(
+            nonNull(request),
+            storeId,
+            reservationId,
+            idempotencyKey,
+            actor
+        );
+        ReservationNoShowResult result = noShowApplicationService.markNoShow(command);
+        if (!result.success()) {
+            return noShowErrorMapper.toResponse(result);
+        }
+
+        return ResponseEntity.ok(noShowApiMapper.toResponse(result));
+    }
+
+    @PostMapping("/reservations/{reservationId}/complete")
+    @RequireAppGate(appKey = "reservation_queue", permission = COMPLETE_PERMISSION)
+    public ResponseEntity<?> completeReservation(
+        @PathVariable UUID storeId,
+        @PathVariable UUID reservationId,
+        @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+        @RequestBody(required = false) CompleteReservationRequest request
+    ) {
+        if (!hasText(idempotencyKey)) {
+            return completeErrorMapper.toResponse(ReservationApiErrorCode.MISSING_IDEMPOTENCY_KEY);
+        }
+
+        Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
+        if (currentActor.isEmpty()) {
+            return completeErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        CurrentActor actor = currentActor.get();
+        if (!hasAllowedRole(actor) || !actor.hasPermission(COMPLETE_PERMISSION)) {
+            return completeErrorMapper.toResponse(ReservationApiErrorCode.FORBIDDEN);
+        }
+        if (!actor.canAccessStore(storeId)) {
+            return completeErrorMapper.toResponse(ReservationApiErrorCode.STORE_SCOPE_MISMATCH);
+        }
+
+        CompleteReservationCommand command = completeApiMapper.toCommand(
+            nonNull(request),
+            storeId,
+            reservationId,
+            idempotencyKey,
+            actor
+        );
+        ReservationCompleteResult result = completeApplicationService.completeReservation(command);
+        if (!result.success()) {
+            return completeErrorMapper.toResponse(result);
+        }
+
+        return ResponseEntity.ok(completeApiMapper.toResponse(result));
+    }
+
     private static CreateReservationRequest nonNull(CreateReservationRequest request) {
         return request == null ? new CreateReservationRequest(null, null, null, null, null, null, null, null) : request;
     }
@@ -254,11 +456,23 @@ public class ReservationController {
     }
 
     private static SeatArrivedReservationRequest nonNull(SeatArrivedReservationRequest request) {
-        return request == null ? new SeatArrivedReservationRequest(null, null, null, null, null) : request;
+        return request == null ? new SeatArrivedReservationRequest(null, null, List.of(), null, null, null) : request;
     }
 
     private static QueueArrivedReservationRequest nonNull(QueueArrivedReservationRequest request) {
         return request == null ? new QueueArrivedReservationRequest(null, null, null) : request;
+    }
+
+    private static CancelReservationRequest nonNull(CancelReservationRequest request) {
+        return request == null ? new CancelReservationRequest(null, null, null) : request;
+    }
+
+    private static MarkReservationNoShowRequest nonNull(MarkReservationNoShowRequest request) {
+        return request == null ? new MarkReservationNoShowRequest(null, null, null) : request;
+    }
+
+    private static CompleteReservationRequest nonNull(CompleteReservationRequest request) {
+        return request == null ? new CompleteReservationRequest(null, null, null) : request;
     }
 
     private static boolean hasAllowedRole(CurrentActor actor) {

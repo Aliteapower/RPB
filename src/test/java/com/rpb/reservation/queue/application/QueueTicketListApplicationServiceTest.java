@@ -18,9 +18,11 @@ import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.store.domain.StorePolicy;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.tenant.value.TenantId;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +38,8 @@ class QueueTicketListApplicationServiceTest {
     private static final Instant CREATED_AT = Instant.parse("2030-06-20T03:00:00Z");
     private static final Instant CALLED_AT = Instant.parse("2030-06-20T03:10:00Z");
     private static final Instant EXPIRES_AT = Instant.parse("2030-06-20T03:13:00Z");
+    private static final LocalDate BUSINESS_DATE = LocalDate.of(2030, 6, 20);
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
 
     private FakeStoreRepository storeRepository;
     private FakeQueueTicketRepository queueTicketRepository;
@@ -45,7 +49,7 @@ class QueueTicketListApplicationServiceTest {
     void setUp() {
         storeRepository = new FakeStoreRepository();
         queueTicketRepository = new FakeQueueTicketRepository();
-        service = new QueueTicketListApplicationService(storeRepository, queueTicketRepository);
+        service = new QueueTicketListApplicationService(storeRepository, queueTicketRepository, CLOCK);
     }
 
     @Test
@@ -62,6 +66,7 @@ class QueueTicketListApplicationServiceTest {
         QueueTicketListItem item = result.items().get(0);
         assertThat(item.queueTicketId()).isEqualTo(QUEUE_TICKET_ID);
         assertThat(item.queueTicketNumber()).isEqualTo(12);
+        assertThat(item.queueTicketDisplayNumber()).isEqualTo("B12");
         assertThat(item.queueTicketStatus()).isEqualTo("called");
         assertThat(item.partySize()).isEqualTo(4);
         assertThat(item.partySizeGroup()).isEqualTo("3-4");
@@ -75,6 +80,7 @@ class QueueTicketListApplicationServiceTest {
         assertThat(item.expiresAt()).isEqualTo(EXPIRES_AT);
         assertThat(item.holdUntilAt()).isEqualTo(EXPIRES_AT);
         assertThat(queueTicketRepository.lastStatus).isEqualTo(QueueTicketStatus.CALLED);
+        assertThat(queueTicketRepository.lastBusinessDate.value()).isEqualTo(BUSINESS_DATE);
         assertThat(queueTicketRepository.lastLimit).isEqualTo(50);
         assertThat(queueTicketRepository.lastOffset).isEqualTo(0);
     }
@@ -90,8 +96,23 @@ class QueueTicketListApplicationServiceTest {
         assertThat(result.page().offset()).isEqualTo(5);
         assertThat(result.page().total()).isEqualTo(12);
         assertThat(queueTicketRepository.lastStatus).isNull();
+        assertThat(queueTicketRepository.lastBusinessDate.value()).isEqualTo(BUSINESS_DATE);
         assertThat(queueTicketRepository.lastLimit).isEqualTo(25);
         assertThat(queueTicketRepository.lastOffset).isEqualTo(5);
+    }
+
+    @Test
+    void passesReceptionFiltersToRepositoryForPhonePartySizeAndTableArea() {
+        queueTicketRepository.rows = new QueueTicketListRows(List.of(row("waiting")), 1);
+
+        QueueTicketListResult result = service.listQueueTickets(
+            query(null, "50", "0", "A区", "4", "9876")
+        );
+
+        assertThat(result.success()).isTrue();
+        assertThat(queueTicketRepository.lastTableArea).isEqualTo("A区");
+        assertThat(queueTicketRepository.lastPartySize).isEqualTo(4);
+        assertThat(queueTicketRepository.lastPhoneDigits).isEqualTo("9876");
     }
 
     @Test
@@ -128,7 +149,29 @@ class QueueTicketListApplicationServiceTest {
     }
 
     private static QueueTicketListQuery query(String status, String limit, String offset) {
-        return new QueueTicketListQuery(TENANT_ID, STORE_ID, ACTOR_ID, "staff", status, limit, offset);
+        return query(status, limit, offset, null, null, null);
+    }
+
+    private static QueueTicketListQuery query(
+        String status,
+        String limit,
+        String offset,
+        String tableArea,
+        String partySize,
+        String phoneDigits
+    ) {
+        return new QueueTicketListQuery(
+            TENANT_ID,
+            STORE_ID,
+            ACTOR_ID,
+            "staff",
+            status,
+            limit,
+            offset,
+            tableArea,
+            partySize,
+            phoneDigits
+        );
     }
 
     private static QueueTicketListRow row(String status) {
@@ -183,8 +226,12 @@ class QueueTicketListApplicationServiceTest {
     private static final class FakeQueueTicketRepository implements QueueTicketRepositoryPort {
         private QueueTicketListRows rows = new QueueTicketListRows(List.of(), 0);
         private QueueTicketStatus lastStatus;
+        private BusinessDate lastBusinessDate;
         private int lastLimit;
         private int lastOffset;
+        private String lastTableArea;
+        private Integer lastPartySize;
+        private String lastPhoneDigits;
         private boolean called;
         private boolean throwPersistence;
 
@@ -192,13 +239,21 @@ class QueueTicketListApplicationServiceTest {
         public QueueTicketListRows findQueueTicketList(
             StoreScope scope,
             QueueTicketStatus status,
+            BusinessDate businessDate,
             int limit,
-            int offset
+            int offset,
+            String tableArea,
+            Integer partySize,
+            String phoneDigits
         ) {
             called = true;
             lastStatus = status;
+            lastBusinessDate = businessDate;
             lastLimit = limit;
             lastOffset = offset;
+            lastTableArea = tableArea;
+            lastPartySize = partySize;
+            lastPhoneDigits = phoneDigits;
             if (throwPersistence) {
                 throw new IllegalStateException("db_down");
             }

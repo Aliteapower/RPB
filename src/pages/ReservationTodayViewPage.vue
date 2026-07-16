@@ -1,69 +1,187 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+import { fetchMeApps } from '../api/meAppsApi'
+import {
+  checkInReservation,
+  ReservationCheckInApiError
+} from '../api/reservationCheckInApi'
+import { getReservationCalendarSummary } from '../api/reservationCalendarSummaryApi'
 import {
   getReservationTodayView,
   ReservationTodayViewApiError
 } from '../api/reservationTodayViewApi'
+import CreateReservationDialog from '../components/reservation-workbench/CreateReservationDialog.vue'
+import ReservationQuickActionPanel from '../components/reservation-workbench/ReservationQuickActionPanel.vue'
+import ReservationSeatDialog from '../components/reservation-workbench/ReservationSeatDialog.vue'
+import ReservationTableAssignmentDialog from '../components/reservation-workbench/ReservationTableAssignmentDialog.vue'
+import ReservationTodayListPanel from '../components/reservation-workbench/ReservationTodayListPanel.vue'
+import StaffPrimaryWorkbench from '../components/staff/StaffPrimaryWorkbench.vue'
+import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwitcher.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
+import type { ReservationCheckInApiErrorResponse } from '../types/reservationCheckIn'
+import type { ReservationTableAssignmentResponse } from '../types/reservationTableAssignment'
 import type {
   ReservationTodayViewApiErrorResponse,
   ReservationTodayViewItem,
   ReservationTodayViewResponse,
   ReservationTodayViewStatusFilter
 } from '../types/reservationTodayView'
+import type { MeAppEntry } from '../types/meApps'
+import type { CreateReservationResponse } from '../types/reservation'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
+const router = useRouter()
 const storeContext = useStoreContextStore()
+const { currentTimeText } = useCurrentClock()
 
 const statusOptions: Array<{ value: ReservationTodayViewStatusFilter; label: string }> = [
-  { value: 'operational', label: '进行中' },
-  { value: 'all', label: '全部' },
-  { value: 'confirmed', label: '已确认' },
-  { value: 'arrived', label: '已到店' },
-  { value: 'seated', label: '已入座' },
-  { value: 'cancelled', label: '已取消' },
-  { value: 'no_show', label: '爽约' },
-  { value: 'completed', label: '已完成' }
+  { value: 'operational', label: gt('generated.reservation-today-view.008') },
+  { value: 'all', label: gt('generated.reservation-today-view.009') },
+  { value: 'confirmed', label: gt('generated.reservation-today-view.010') },
+  { value: 'arrived', label: gt('generated.reservation-today-view.011') },
+  { value: 'seated', label: gt('generated.reservation-today-view.012') },
+  { value: 'cancelled', label: gt('generated.reservation-today-view.013') },
+  { value: 'no_show', label: gt('generated.reservation-today-view.014') },
+  { value: 'completed', label: gt('generated.reservation-today-view.015') }
 ]
 
-const statusLabels: Record<string, string> = {
-  confirmed: '已确认',
-  arrived: '已到店',
-  seated: '已入座',
-  cancelled: '已取消',
-  no_show: '爽约',
-  completed: '已完成',
-  draft: '草稿'
-}
-
-const businessDate = ref('')
-const selectedStatus = ref<ReservationTodayViewStatusFilter>('operational')
+const businessDate = ref(todayDateInput())
+const selectedStatus = ref<ReservationTodayViewStatusFilter>(
+  statusFilterFromQuery(route.query.status) ?? 'operational'
+)
 const isLoading = ref(false)
 const response = ref<ReservationTodayViewResponse | null>(null)
 const apiError = ref<ReservationTodayViewApiErrorResponse | null>(null)
-const copyStatus = reactive<Record<string, string>>({})
+const checkInApiError = ref<ReservationCheckInApiErrorResponse | null>(null)
+const apps = ref<MeAppEntry[]>([])
+const showCreateReservationDialog = ref(false)
+const showSeatDialog = ref(false)
+const selectedSeatReservation = ref<ReservationTodayViewItem | null>(null)
+const showTableAssignmentDialog = ref(false)
+const selectedTableAssignmentReservation = ref<ReservationTodayViewItem | null>(null)
+const checkingInReservationId = ref<string | null>(null)
+const visibleMonthKey = ref(monthKeyFromDate(businessDate.value))
+const reservationCounts = ref<Record<string, number>>({})
 let loadSequence = 0
+let appsLoadSequence = 0
+let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
-const staffHomeRoute = computed(() => ({
-  name: 'store-staff-home',
-  params: {
-    storeId: storeId.value
-  }
-}))
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
+const appStatusLabel = computed(() => (isLoading.value ? gt('generated.reservation-today-view.016') : gt('generated.reservation-today-view.017')))
 const items = computed(() => response.value?.items ?? [])
-const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || '后端默认')
+const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || gt('generated.reservation-today-view.018'))
 const storeTimezone = computed(() => response.value?.storeTimezone || 'Asia/Singapore')
+const storeTodayDate = computed(() => todayDateInput(storeTimezone.value))
+const canCreateReservationForSelectedDate = computed(() => businessDate.value >= storeTodayDate.value)
+const canRunCurrentDayActions = computed(() => businessDate.value === storeTodayDate.value)
 const showEmptyState = computed(
   () => !isLoading.value && !apiError.value && !!response.value && items.value.length === 0
 )
+const reservationQueueEntry = computed(() =>
+  apps.value.find(app => app.appKey === 'reservation_queue' && app.entryVisible)
+)
+const canCancelReservation = computed(
+  () => reservationQueueEntry.value?.permissions.includes('reservation.cancel') ?? false
+)
+const canNoShowReservation = computed(
+  () => reservationQueueEntry.value?.permissions.includes('reservation.no_show') ?? false
+)
+const canAssignReservationTable = computed(() => {
+  const permissions = reservationQueueEntry.value?.permissions ?? []
+  return permissions.includes('table.view') && permissions.includes('reservation.create')
+})
 
 watch(
   [storeId, businessDate, selectedStatus],
   () => {
     void loadTodayView()
+  },
+  { immediate: true }
+)
+
+watch(
+  businessDate,
+  nextBusinessDate => {
+    visibleMonthKey.value = monthKeyFromDate(nextBusinessDate)
+  }
+)
+
+watch(
+  () => route.query.status,
+  status => {
+    const nextStatus = statusFilterFromQuery(status)
+
+    if (nextStatus && nextStatus !== selectedStatus.value) {
+      selectedStatus.value = nextStatus
+    }
+  }
+)
+
+watch(
+  () => route.query.create,
+  create => {
+    if (isOpenCreateQuery(create)) {
+      openCreateReservationDialog()
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  showSeatDialog,
+  open => {
+    if (!open) {
+      selectedSeatReservation.value = null
+    }
+  }
+)
+
+watch(
+  showTableAssignmentDialog,
+  open => {
+    if (!open) {
+      selectedTableAssignmentReservation.value = null
+    }
+  }
+)
+
+watch(
+  [storeId, visibleMonthKey],
+  () => {
+    void loadCalendarSummary()
+  },
+  { immediate: true }
+)
+
+watch(
+  storeId,
+  async nextStoreId => {
+    const sequence = ++appsLoadSequence
+    apps.value = []
+
+    if (!nextStoreId) {
+      return
+    }
+
+    try {
+      const result = await fetchMeApps(nextStoreId)
+
+      if (sequence === appsLoadSequence) {
+        apps.value = result.apps
+      }
+    } catch {
+      if (sequence === appsLoadSequence) {
+        apps.value = []
+      }
+    }
   },
   { immediate: true }
 )
@@ -104,110 +222,177 @@ async function loadTodayView(): Promise<void> {
   }
 }
 
-async function copyReservationId(reservationId: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(reservationId)
-      setCopyStatus(reservationId, '已复制')
+async function loadCalendarSummary(): Promise<void> {
+  const currentStoreId = storeId.value
+  const currentMonth = visibleMonthKey.value
+  const sequence = ++calendarSummaryLoadSequence
+
+  if (!currentStoreId || !currentMonth) {
+    reservationCounts.value = {}
+    return
+  }
+
+  try {
+    const result = await getReservationCalendarSummary(currentStoreId, currentMonth)
+
+    if (sequence === calendarSummaryLoadSequence) {
+      reservationCounts.value = Object.fromEntries(
+        result.days.map(day => [day.businessDate, day.reservationCount])
+      )
+    }
+  } catch {
+    if (sequence === calendarSummaryLoadSequence) {
+      reservationCounts.value = {}
+    }
+  }
+}
+
+function refreshReservationWorkbench(): void {
+  checkInApiError.value = null
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
+function openCreateReservationDialog(): void {
+  if (!canCreateReservationForSelectedDate.value) {
+    return
+  }
+
+  showCreateReservationDialog.value = true
+}
+
+function handleReservationCreated(result: CreateReservationResponse): void {
+  const shouldReload =
+    businessDate.value === result.businessDate && selectedStatus.value === 'operational'
+
+  businessDate.value = result.businessDate
+  visibleMonthKey.value = monthKeyFromDate(result.businessDate)
+  selectedStatus.value = 'operational'
+
+  if (shouldReload) {
+    void loadTodayView()
+  }
+  void loadCalendarSummary()
+}
+
+function handleReservationCancelled(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
+function handleReservationNoShowed(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
+}
+
+async function handleReservationCheckIn(item: ReservationTodayViewItem): Promise<void> {
+  const currentStoreId = storeId.value
+
+  if (!currentStoreId || checkingInReservationId.value) {
+    return
+  }
+
+  if (!canRunCurrentDayActions.value) {
+    checkInApiError.value = createLocalCheckInError('RESERVATION_NOT_TODAY', 'reservation.not_today')
+    return
+  }
+
+  checkInApiError.value = null
+  checkingInReservationId.value = item.reservationId
+
+  try {
+    await checkInReservation(
+      currentStoreId,
+      item.reservationId,
+      {
+        arrivedAt: null,
+        reasonCode: 'staff_confirmed_arrival',
+        note: 'staff_reservation_today_list'
+      },
+      createReservationCheckInIdempotencyKey(item.reservationId)
+    )
+
+    if (selectedStatus.value === 'confirmed') {
+      selectedStatus.value = 'arrived'
+    } else {
+      void loadTodayView()
+    }
+    void loadCalendarSummary()
+  } catch (error) {
+    checkInApiError.value =
+      error instanceof ReservationCheckInApiError
+        ? error.response
+        : createLocalCheckInError('REQUEST_FAILED', 'reservation.check_in.request_failed')
+  } finally {
+    checkingInReservationId.value = null
+  }
+}
+
+function openReservationSeatDialog(item: ReservationTodayViewItem): void {
+  checkInApiError.value = null
+
+  if (!canRunCurrentDayActions.value) {
+    checkInApiError.value = createLocalCheckInError('RESERVATION_NOT_TODAY', 'reservation.not_today')
+    return
+  }
+
+  const queueTicketId = item.queueTicketId?.trim()
+
+  if (queueTicketId) {
+    if (item.queueTicketStatus?.trim() !== 'called') {
       return
-    } catch {
-      setCopyStatus(reservationId, '请手动复制')
-      return
     }
+
+    void router.push({
+      name: 'seating-from-called-queue',
+      params: {
+        storeId: storeId.value
+      },
+      query: queueSeatingRouteQuery(item)
+    })
+    return
   }
 
-  setCopyStatus(reservationId, '请手动复制')
+  selectedSeatReservation.value = item
+  showSeatDialog.value = true
 }
 
-function setCopyStatus(reservationId: string, message: string): void {
-  copyStatus[reservationId] = message
-
-  window.setTimeout(() => {
-    if (copyStatus[reservationId] === message) {
-      delete copyStatus[reservationId]
-    }
-  }, 1800)
+function openReservationTableAssignmentDialog(item: ReservationTodayViewItem): void {
+  if (!canAssignReservationTable.value) {
+    return
+  }
+  selectedTableAssignmentReservation.value = item
+  showTableAssignmentDialog.value = true
 }
 
-function checkInRoute(item: ReservationTodayViewItem) {
+function handleReservationTableAssigned(_response: ReservationTableAssignmentResponse): void {
+  showTableAssignmentDialog.value = false
+  selectedTableAssignmentReservation.value = null
+  void loadTodayView()
+}
+
+function queueSeatingRouteQuery(item: ReservationTodayViewItem): Record<string, string | undefined> {
   return {
-    name: 'reservation-check-in',
-    params: {
-      storeId: storeId.value
-    },
-    query: {
-      reservationId: item.reservationId
-    }
+    queueTicketId: item.queueTicketId?.trim() || undefined,
+    partySize: String(item.partySize),
+    assignedResourceType: optionalRouteQueryValue(item.assignedResourceType),
+    assignedResourceId: optionalRouteQueryValue(item.assignedResourceId),
+    assignedResourceCode: optionalRouteQueryValue(item.assignedResourceCode)
   }
 }
 
-function directSeatingRoute(item: ReservationTodayViewItem) {
-  return {
-    name: 'reservation-arrived-direct-seating',
-    params: {
-      storeId: storeId.value
-    },
-    query: {
-      reservationId: item.reservationId
-    }
-  }
+function optionalRouteQueryValue(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed || undefined
 }
 
-function queueReservationRoute(item: ReservationTodayViewItem) {
-  return {
-    name: 'reservation-arrived-to-queue',
-    params: {
-      storeId: storeId.value
-    },
-    query: {
-      reservationId: item.reservationId
-    }
-  }
+function handleReservationSeated(): void {
+  void loadTodayView()
+  void loadCalendarSummary()
 }
 
-function isReadOnlyStatus(status: string): boolean {
-  return status !== 'confirmed' && status !== 'arrived' && status !== 'seated'
-}
-
-function formatStoreDateTime(value: string): string {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: storeTimezone.value,
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).formatToParts(date)
-
-  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
-  return `${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`
-}
-
-function reservationTimeRange(item: ReservationTodayViewItem): string {
-  return `${formatStoreDateTime(item.reservedStartAt)} - ${formatStoreDateTime(item.reservedEndAt)}`
-}
-
-function statusLabel(status: string): string {
-  return statusLabels[status] ?? status
-}
-
-function statusClass(status: string): string {
-  return `status-${status.replace(/_/g, '-')}`
-}
-
-function customerDisplay(item: ReservationTodayViewItem): string {
-  const values = [item.customerName, item.customerNickname].filter(Boolean)
-  return values.length ? values.join(' / ') : '未填写'
-}
-
-function optionalDisplay(value: string | null | undefined): string {
-  return value?.trim() ? value : '未填写'
+function handleVisibleMonthChanged(month: string): void {
+  visibleMonthKey.value = month
 }
 
 function createLocalError(code: string, messageKey: string): ReservationTodayViewApiErrorResponse {
@@ -220,467 +405,241 @@ function createLocalError(code: string, messageKey: string): ReservationTodayVie
     }
   }
 }
+
+function createLocalCheckInError(
+  code: string,
+  messageKey: string
+): ReservationCheckInApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
+function createReservationCheckInIdempotencyKey(reservationId: string): string {
+  const randomValue =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  return `reservation:check-in:${reservationId}:${randomValue}`
+}
+
+function todayDateInput(timeZone = 'Asia/Singapore'): string {
+  const date = new Date()
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  const year = part('year')
+  const month = part('month')
+  const day = part('day')
+  return `${year}-${month}-${day}`
+}
+
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return gt('generated.reservation-today-view.019')
+  }
+
+  return `${gt('generated.reservation-today-view.007')}${value.slice(0, 8)}`
+}
+
+function monthKeyFromDate(value: string): string {
+  const [year, month] = value.split('-')
+  if (!year || !month) {
+    return ''
+  }
+  return `${year}-${month}`
+}
+
+function statusFilterFromQuery(
+  value: unknown
+): ReservationTodayViewStatusFilter | null {
+  const candidate = Array.isArray(value) ? value[0] : value
+
+  if (typeof candidate !== 'string') {
+    return null
+  }
+
+  return statusOptions.some(option => option.value === candidate)
+    ? (candidate as ReservationTodayViewStatusFilter)
+    : null
+}
+
+function isOpenCreateQuery(value: unknown): boolean {
+  const candidate = Array.isArray(value) ? value[0] : value
+  return candidate === '1' || candidate === 'true'
+}
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>今日预约</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
-    </section>
+  <StaffPrimaryWorkbench
+    :store-id="storeId"
+    active-tab="reservation"
+    class="reservation-workbench"
+  >
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="displayedBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    >
+      <template #action>
+        <button type="button" :disabled="isLoading" @click="refreshReservationWorkbench">
+          {{ isLoading ? gt('generated.reservation-today-view.001') : gt('generated.reservation-today-view.002') }}
+        </button>
+      </template>
+    </StaffHomeTopBar>
 
-    <section class="filter-panel" aria-label="今日预约筛选">
-      <label class="date-field">
-        <span>营业日期</span>
-        <input v-model="businessDate" name="businessDate" type="date" />
-      </label>
+    <div class="reservation-workbench-body">
+      <StaffBusinessDateSwitcher
+        class="reservation-workbench__date-panel"
+        v-model:selected-date="businessDate"
+        :today-date="storeTodayDate"
+        :reservation-counts="reservationCounts"
+        :calendar-label="gt('generated.reservation-today-view.003')"
+        @visible-month-changed="handleVisibleMonthChanged"
+      />
 
-      <div class="date-summary" aria-live="polite">
-        <span>当前日期</span>
-        <strong>{{ displayedBusinessDate }}</strong>
-      </div>
+      <ReservationQuickActionPanel
+        class="reservation-workbench__quick-panel"
+        :store-id="storeId"
+        :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
+        :selected-date="businessDate"
+        @open-create-reservation="openCreateReservationDialog"
+      />
 
-      <section class="status-filter" aria-label="状态筛选">
-        <p>状态筛选</p>
-        <div class="status-options">
-          <button
-            v-for="option in statusOptions"
-            :key="option.value"
-            :aria-pressed="selectedStatus === option.value"
-            :class="{ selected: selectedStatus === option.value }"
-            type="button"
-            @click="selectedStatus = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
+      <ReservationTodayListPanel
+        class="reservation-workbench__list-panel"
+        v-model:selected-status="selectedStatus"
+        :api-error="apiError"
+        :can-assign-reservation-table="canAssignReservationTable"
+        :can-cancel-reservation="canCancelReservation"
+        :can-no-show-reservation="canNoShowReservation"
+        :can-run-current-day-actions="canRunCurrentDayActions"
+        :checking-in-reservation-id="checkingInReservationId"
+        :is-loading="isLoading"
+        :items="items"
+        :seating-reservation-id="selectedSeatReservation?.reservationId ?? null"
+        :show-empty-state="showEmptyState"
+        :status-options="statusOptions"
+        :store-id="storeId"
+        :store-timezone="storeTimezone"
+        @cancelled="handleReservationCancelled"
+        @check-in-requested="handleReservationCheckIn"
+        @no-showed="handleReservationNoShowed"
+        @seat-requested="openReservationSeatDialog"
+        @table-assignment-requested="openReservationTableAssignmentDialog"
+      />
+
+      <section v-if="checkInApiError" class="reservation-workbench__action-error" aria-live="assertive">
+        <h2>{{ gt('generated.reservation-today-view.004') }}</h2>
+        <p>{{ gt('generated.reservation-today-view.005') }}{{ checkInApiError.error.code }}</p>
+        <p>{{ gt('generated.reservation-today-view.006') }}{{ checkInApiError.error.messageKey }}</p>
       </section>
-    </section>
+    </div>
 
-    <section v-if="isLoading" class="state-panel" aria-live="polite">
-      <h2>加载中...</h2>
-      <p>正在读取当前门店预约。</p>
-    </section>
+    <CreateReservationDialog
+      v-model:open="showCreateReservationDialog"
+      :min-date="storeTodayDate"
+      :selected-date="businessDate"
+      :store-id="storeId"
+      @created="handleReservationCreated"
+    />
 
-    <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
-      <h2>加载失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
-    </section>
+    <ReservationSeatDialog
+      v-model:open="showSeatDialog"
+      :item="selectedSeatReservation"
+      :store-id="storeId"
+      @seated="handleReservationSeated"
+    />
 
-    <section v-if="showEmptyState" class="state-panel" aria-live="polite">
-      <h2>今日暂无预约</h2>
-      <p>可以切换日期或状态筛选。</p>
-    </section>
+    <ReservationTableAssignmentDialog
+      v-model:open="showTableAssignmentDialog"
+      :item="selectedTableAssignmentReservation"
+      :store-id="storeId"
+      @assigned="handleReservationTableAssigned"
+    />
 
-    <section v-if="items.length" class="reservation-list" aria-label="今日预约列表">
-      <article v-for="item in items" :key="item.reservationId" class="reservation-card">
-        <header class="card-header">
-          <div>
-            <span>预约编号</span>
-            <strong>{{ item.reservationCode }}</strong>
-          </div>
-          <span class="status-pill" :class="statusClass(item.status)">
-            {{ statusLabel(item.status) }}
-          </span>
-        </header>
-
-        <p class="time-line">{{ reservationTimeRange(item) }}</p>
-        <p class="raw-status">状态代码：{{ item.status }}</p>
-
-        <dl class="card-details">
-          <div>
-            <dt>人数</dt>
-            <dd>{{ item.partySize }}</dd>
-          </div>
-          <div>
-            <dt>客户姓名 / 昵称</dt>
-            <dd>{{ customerDisplay(item) }}</dd>
-          </div>
-          <div>
-            <dt>手机号</dt>
-            <dd>{{ optionalDisplay(item.phoneMasked) }}</dd>
-          </div>
-          <div>
-            <dt>保留到</dt>
-            <dd>{{ formatStoreDateTime(item.holdUntilAt) }}</dd>
-          </div>
-          <div>
-            <dt>备注</dt>
-            <dd>{{ optionalDisplay(item.note) }}</dd>
-          </div>
-          <div class="reservation-id-row">
-            <dt>预约 ID</dt>
-            <dd>{{ item.reservationId }}</dd>
-          </div>
-        </dl>
-
-        <div class="card-actions">
-          <button class="secondary-button" type="button" @click="copyReservationId(item.reservationId)">
-            复制预约 ID
-          </button>
-
-          <RouterLink v-if="item.status === 'confirmed'" class="primary-button" :to="checkInRoute(item)">
-            预约到店
-          </RouterLink>
-
-          <RouterLink v-if="item.status === 'arrived'" class="primary-button" :to="directSeatingRoute(item)">
-            预约入座
-          </RouterLink>
-
-          <RouterLink
-            v-if="item.status === 'arrived'"
-            class="secondary-button queue-button"
-            :to="queueReservationRoute(item)"
-          >
-            进入排队
-          </RouterLink>
-
-          <span v-if="item.status === 'seated'" class="readonly-action">已入座</span>
-          <span v-if="isReadOnlyStatus(item.status)" class="readonly-action">只读</span>
-        </div>
-
-        <p v-if="copyStatus[item.reservationId]" class="copy-feedback" aria-live="polite">
-          {{ copyStatus[item.reservationId] }}
-        </p>
-      </article>
-    </section>
-  </main>
+  </StaffPrimaryWorkbench>
 </template>
 
 <style scoped>
-.page-shell {
+.reservation-workbench-body {
   display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 680px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
+  gap: 14px;
+  padding: 12px 14px calc(128px + env(safe-area-inset-bottom));
 }
 
-.page-header,
-.filter-panel,
-.state-panel,
-.reservation-card {
-  display: grid;
-  gap: 12px;
-}
-
-.page-header {
-  gap: 4px;
-}
-
-.eyebrow,
-.store-context,
-.raw-status,
-.date-summary span,
-.status-filter p,
-.copy-feedback {
-  color: #667085;
-  font-size: 0.82rem;
-  margin: 0;
-}
-
-.home-link {
-  color: #315f91;
-  font-size: 0.86rem;
-  font-weight: 800;
-  justify-self: start;
-  text-decoration: none;
-}
-
-h1,
-h2,
-.date-summary strong {
-  color: #14213d;
-  letter-spacing: 0;
-  margin: 0;
-}
-
-h1 {
-  font-size: 1.7rem;
-  line-height: 1.15;
-}
-
-h2 {
-  font-size: 1rem;
-}
-
-.filter-panel,
-.state-panel,
-.reservation-card {
-  background: #ffffff;
-  border: 1px solid #d8e0eb;
+.reservation-workbench__action-error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
   border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
-  padding: 14px;
-}
-
-label {
   display: grid;
   gap: 6px;
-}
-
-label span,
-dt,
-.card-header span,
-.status-filter p {
-  color: #41516a;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-input {
-  background: #fbfcfe;
-  border: 1px solid #c8d3e2;
-  border-radius: 6px;
-  color: #182536;
-  min-height: 44px;
-  outline: none;
-  padding: 10px 11px;
-  width: 100%;
-}
-
-input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
-}
-
-.date-field {
-  background: #eaf2ff;
-  border: 1px solid #b8cdf6;
-  border-radius: 8px;
   padding: 12px;
 }
 
-.date-summary {
-  display: grid;
-  gap: 4px;
-}
-
-.status-filter {
-  display: grid;
-  gap: 8px;
-}
-
-.status-options {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.status-options button {
-  background: #f8fafc;
-  border: 1px solid #c8d3e2;
-  border-radius: 999px;
-  color: #315f91;
-  flex: 0 0 auto;
-  font-weight: 800;
-  min-height: 40px;
-  padding: 0 13px;
-}
-
-.status-options button.selected {
-  background: #176b4d;
-  border-color: #176b4d;
-  color: #ffffff;
-}
-
-.state-panel p {
-  color: #41516a;
-  margin: 0;
-}
-
-.error-panel {
-  border-color: #f4b8b8;
-}
-
-.error-code {
-  color: #b42318;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.message-key {
-  overflow-wrap: anywhere;
-}
-
-.reservation-list {
-  display: grid;
-  gap: 12px;
-}
-
-.reservation-card {
-  border-color: #cdd8e7;
-}
-
-.card-header {
-  align-items: start;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.card-header div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.card-header strong {
-  color: #14213d;
-  font-size: 1.1rem;
-  overflow-wrap: anywhere;
-}
-
-.status-pill,
-.readonly-action {
-  align-items: center;
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 0.78rem;
-  font-weight: 800;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0 10px;
-  white-space: nowrap;
-}
-
-.status-pill {
-  background: #eaf2ff;
-  color: #315f91;
-}
-
-.status-confirmed {
-  background: #eaf2ff;
-  color: #315f91;
-}
-
-.status-arrived {
-  background: #eef6f1;
-  color: #176b4d;
-}
-
-.status-seated {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.status-cancelled,
-.status-no-show,
-.status-completed {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.time-line {
-  color: #14213d;
-  font-size: 1rem;
-  font-weight: 900;
-  margin: 0;
-}
-
-.card-details {
-  display: grid;
-  gap: 9px;
-  margin: 0;
-}
-
-.card-details div {
-  display: grid;
-  gap: 3px;
-}
-
-dt,
-dd {
-  margin: 0;
-}
-
-dd {
-  color: #1d2736;
-  overflow-wrap: anywhere;
-}
-
-.reservation-id-row dd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+.reservation-workbench__action-error h2,
+.reservation-workbench__action-error p {
+  color: #be123c;
   font-size: 0.86rem;
-}
-
-.card-actions {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr;
-}
-
-.primary-button,
-.secondary-button {
-  align-items: center;
-  border-radius: 8px;
-  display: inline-flex;
   font-weight: 800;
-  justify-content: center;
-  min-height: 46px;
-  padding: 0 14px;
-  text-align: center;
-  text-decoration: none;
-}
-
-.primary-button {
-  background: #176b4d;
-  border: 1px solid #176b4d;
-  color: #ffffff;
-}
-
-.secondary-button {
-  background: #ffffff;
-  border: 1px solid #b8cdf6;
-  color: #315f91;
-}
-
-.queue-button {
-  border-color: #a7d7be;
-  color: #176b4d;
-}
-
-.readonly-action {
-  background: #f1f5f9;
-  color: #475569;
-  min-height: 46px;
-}
-
-.copy-feedback {
-  color: #176b4d;
-  font-weight: 800;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.28);
+  outline: 3px solid rgba(249, 115, 22, 0.28);
   outline-offset: 2px;
 }
 
-@media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
-  }
-
-  h1 {
-    font-size: 2rem;
-  }
-
-  .filter-panel {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
-  }
-
-  .status-filter {
-    grid-column: 1 / -1;
-  }
-
-  .card-actions {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+@media (min-width: 768px) {
+  .reservation-workbench-body {
+    padding: 16px 18px 24px;
   }
 }
+
+@media (min-width: 1024px) {
+  .reservation-workbench-body {
+    align-items: start;
+    grid-template-columns: minmax(280px, 0.38fr) minmax(0, 0.62fr);
+  }
+
+  .reservation-workbench__date-panel,
+  .reservation-workbench__quick-panel {
+    grid-column: 1;
+  }
+
+  .reservation-workbench__date-panel {
+    grid-row: 1;
+  }
+
+  .reservation-workbench__quick-panel {
+    grid-row: 2;
+  }
+
+  .reservation-workbench__list-panel,
+  .reservation-workbench__action-error {
+    grid-column: 2;
+  }
+
+  .reservation-workbench__list-panel {
+    grid-row: 1 / span 3;
+    min-width: 0;
+  }
+}
+
 </style>

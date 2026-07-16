@@ -14,6 +14,7 @@ import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -49,6 +50,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 class ReservationArrivedDirectSeatingApiIntegrationTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/direct";
+    private static final String CHECK_IN_DIRECT_ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/check-in-direct";
     private static final LocalPostgresTestDatabase DATABASE = LocalPostgresTestDatabase.start();
 
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000951");
@@ -130,6 +132,33 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
 
         assertSuccessfulTableSeating("seat-table-success", RESERVATION_ID, TABLE_ID);
+    }
+
+    @Test
+    void checksInConfirmedReservationAndSeatsToTableThroughAtomicApi() throws Exception {
+        fixture.reservation(RESERVATION_ID, "R-CHECKIN-SEAT-0951", "confirmed", 4);
+
+        mockMvc.perform(post(CHECK_IN_DIRECT_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "check-in-seat-table-success")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(tableBody(TABLE_ID)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.reservationId").value(RESERVATION_ID.toString()))
+            .andExpect(jsonPath("$.reservationCode").value("R-CHECKIN-SEAT-0951"))
+            .andExpect(jsonPath("$.reservationStatus").value("seated"))
+            .andExpect(jsonPath("$.seatingStatus").value("occupied"))
+            .andExpect(jsonPath("$.resourceType").value("table"))
+            .andExpect(jsonPath("$.resourceId").value(TABLE_ID.toString()))
+            .andExpect(jsonPath("$.alreadySeated").value(false))
+            .andExpect(jsonPath("$.events[0]").value("reservation.arrived"))
+            .andExpect(jsonPath("$.events[1]").value("reservation.seated"))
+            .andExpect(jsonPath("$.events[2]").value("seating.created"))
+            .andExpect(jsonPath("$.events[3]").value("table.occupied"))
+            .andExpect(jsonPath("$.idempotency.status").value("completed"))
+            .andExpect(jsonPath("$.idempotency.replayed").value(false));
+
+        assertSuccessfulCheckInAndTableSeating("check-in-seat-table-success", RESERVATION_ID, TABLE_ID);
     }
 
     @Test
@@ -427,6 +456,46 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
         assertBoundaryTablesRemainEmpty();
     }
 
+    private void assertSuccessfulCheckInAndTableSeating(String idempotencyKey, UUID reservationId, UUID tableId) {
+        assertThat(fixture.scalarString("select status from reservations where id = ?", reservationId)).isEqualTo("seated");
+        assertThat(fixture.count("seatings")).isEqualTo(1);
+        assertThat(fixture.scalarInteger("""
+            select count(*) from seatings
+            where reservation_id = ?
+              and queue_ticket_id is null
+              and walk_in_id is null
+              and status = 'occupied'
+            """, reservationId)).isEqualTo(1);
+        assertThat(fixture.scalarInteger("""
+            select count(*) from seating_resources
+            where resource_type = 'dining_table'
+              and table_id = ?
+              and table_group_id is null
+              and status = 'active'
+            """, tableId)).isEqualTo(1);
+        assertThat(fixture.scalarString("select status from dining_tables where id = ?", tableId)).isEqualTo("occupied");
+        assertThat(fixture.countWhere("select count(*) from business_events where event_type in ('reservation.arrived', 'reservation.seated', 'seating.created', 'table.occupied')")).isEqualTo(4);
+        assertThat(fixture.countWhere("select count(*) from state_transition_logs where transition_code in ('reservation.check_in', 'reservation.seat', 'seating.occupy', 'dining_table.occupy')")).isEqualTo(4);
+        assertThat(fixture.countWhere("""
+            select count(*) from state_transition_logs
+            where target_type = 'reservation'
+              and from_status = 'confirmed'
+              and to_status = 'arrived'
+              and transition_code = 'reservation.check_in'
+            """)).isEqualTo(1);
+        assertThat(fixture.countWhere("""
+            select count(*) from state_transition_logs
+            where target_type = 'reservation'
+              and from_status = 'arrived'
+              and to_status = 'seated'
+              and transition_code = 'reservation.seat'
+            """)).isEqualTo(1);
+        assertThat(fixture.countWhere("select count(*) from audit_logs where operation_code in ('reservation.check_in', 'reservation.seat')")).isEqualTo(2);
+        assertThat(fixture.scalarString("select action from idempotency_records where idempotency_key = ?", idempotencyKey)).isEqualTo("check_in_and_seat_reservation");
+        assertThat(fixture.scalarString("select status from idempotency_records where idempotency_key = ?", idempotencyKey)).isEqualTo("completed");
+        assertBoundaryTablesRemainEmpty();
+    }
+
     private void assertNoBusinessMutationBeforeApplication() {
         assertThat(fixture.count("idempotency_records")).isEqualTo(0);
         assertThat(fixture.count("business_events")).isEqualTo(0);
@@ -475,6 +544,7 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
             reservationId,
             tableId,
             tableGroupId,
+            List.of(),
             "ignored-by-hash",
             ACTOR_ID,
             "staff",
@@ -502,6 +572,12 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
 
     @TestConfiguration
     static class TestSecurityConfiguration {
+        @Bean
+        @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
+        }
+
         @Bean
         @Primary
         TestCurrentActorProvider testCurrentActorProvider() {
@@ -552,7 +628,7 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
                     timezone, locale, date_format, time_format, currency
                 )
                 values (?, ?, 'store-seat-api-it', 'Seat API Store', 'active',
-                    'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
                 """,
                 STORE_ID,
                 TENANT_ID
@@ -679,7 +755,7 @@ class ReservationArrivedDirectSeatingApiIntegrationTest {
         }
 
         void createActiveLock(UUID tableId, String lockKey) {
-            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            OffsetDateTime now = OffsetDateTime.ofInstant(START_AT.minusSeconds(600), ZoneOffset.UTC);
             jdbc.update(
                 """
                 insert into table_locks (

@@ -16,6 +16,9 @@ public class QueueTicketListApiMapper {
         String status,
         String limit,
         String offset,
+        String tableArea,
+        String partySize,
+        String phone,
         CurrentActor actor
     ) {
         return new QueueTicketListQuery(
@@ -25,7 +28,10 @@ public class QueueTicketListApiMapper {
             trimToNull(actor.actorType()),
             trimToNull(status),
             trimToNull(limit),
-            trimToNull(offset)
+            trimToNull(offset),
+            trimToNull(tableArea),
+            trimToNull(partySize),
+            trimToNull(phone)
         );
     }
 
@@ -49,6 +55,7 @@ public class QueueTicketListApiMapper {
         return new QueueTicketListResponse.ItemResponse(
             item.queueTicketId(),
             item.queueTicketNumber(),
+            item.queueTicketDisplayNumber(),
             item.queueTicketStatus(),
             item.partySize(),
             item.partySizeGroup(),
@@ -57,6 +64,12 @@ public class QueueTicketListApiMapper {
             item.reservationStatus(),
             item.customerName(),
             item.customerPhoneMasked(),
+            item.assignedResourceType(),
+            item.assignedResourceId(),
+            item.assignedResourceCode(),
+            item.assignedResourceGroupType(),
+            item.assignedResourceLabel(),
+            item.assignedResourceAreaName(),
             item.createdAt(),
             item.calledAt(),
             item.holdUntilAt(),

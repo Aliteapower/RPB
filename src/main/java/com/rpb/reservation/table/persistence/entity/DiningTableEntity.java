@@ -40,6 +40,9 @@ public class DiningTableEntity {
     @Column(name = "status", nullable = false)
     private String status;
 
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
+
     @Column(name = "is_combinable", nullable = false)
     private Boolean combinable;
 
@@ -69,6 +72,7 @@ public class DiningTableEntity {
         Integer capacityMin,
         Integer capacityMax,
         String status,
+        Integer sortOrder,
         Boolean combinable,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
@@ -85,6 +89,7 @@ public class DiningTableEntity {
         entity.capacityMin = capacityMin;
         entity.capacityMax = capacityMax;
         entity.status = status;
+        entity.sortOrder = sortOrder;
         entity.combinable = combinable;
         entity.createdAt = createdAt;
         entity.updatedAt = updatedAt;
@@ -102,6 +107,7 @@ public class DiningTableEntity {
     public Integer getCapacityMin() { return capacityMin; }
     public Integer getCapacityMax() { return capacityMax; }
     public String getStatus() { return status; }
+    public Integer getSortOrder() { return sortOrder; }
     public Boolean getCombinable() { return combinable; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

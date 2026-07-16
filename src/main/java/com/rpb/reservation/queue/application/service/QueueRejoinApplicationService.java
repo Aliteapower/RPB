@@ -13,6 +13,7 @@ import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -185,7 +186,7 @@ public class QueueRejoinApplicationService {
             throw new ApplicationFailure(QueueRejoinError.STORE_SCOPE_MISMATCH);
         }
 
-        Reservation reservation = loadReservation(scope, queueTicket);
+        Optional<Reservation> reservation = loadReservationIfPresent(scope, queueTicket);
 
         if (queueTicket.status() == QueueTicketStatus.WAITING && queueTicket.rejoinedAt() != null) {
             return alreadyRejoined(scope, started, queueTicket, reservation);
@@ -220,8 +221,8 @@ public class QueueRejoinApplicationService {
             savedTicket.id().value(),
             savedTicket.ticketNumber().value(),
             savedTicket.queuePosition(),
-            reservation.id().value(),
-            reservation.reservationCode().value(),
+            reservation.map(value -> value.id().value()).orElse(null),
+            reservation.map(value -> value.reservationCode().value()).orElse(null),
             savedTicket.rejoinedAt(),
             completed.status().code(),
             List.of(EVENT_QUEUE_TICKET_REJOINED),
@@ -235,7 +236,7 @@ public class QueueRejoinApplicationService {
         StoreScope scope,
         IdempotencyRecord started,
         QueueTicket queueTicket,
-        Reservation reservation
+        Optional<Reservation> reservation
     ) {
         QueueRejoinError evidenceError = queueRejoinEvidenceRule.validateAlreadyRejoinedEvidence(
             queueTicket,
@@ -251,16 +252,16 @@ public class QueueRejoinApplicationService {
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
             queueTicket.queuePosition(),
-            reservation.id().value(),
-            reservation.reservationCode().value(),
+            reservation.map(value -> value.id().value()).orElse(null),
+            reservation.map(value -> value.reservationCode().value()).orElse(null),
             queueTicket.rejoinedAt(),
             completed.status().code()
         );
     }
 
-    private Reservation loadReservation(StoreScope scope, QueueTicket queueTicket) {
+    private Optional<Reservation> loadReservationIfPresent(StoreScope scope, QueueTicket queueTicket) {
         if (queueTicket.reservationId() == null) {
-            throw new ApplicationFailure(QueueRejoinError.RESERVATION_NOT_FOUND);
+            return Optional.empty();
         }
         Reservation reservation = reservationRepository.findById(scope, new ReservationId(queueTicket.reservationId()))
             .orElseThrow(() -> new ApplicationFailure(QueueRejoinError.RESERVATION_NOT_FOUND));
@@ -270,7 +271,7 @@ public class QueueRejoinApplicationService {
         if (reservation.status() != ReservationStatus.ARRIVED) {
             throw new ApplicationFailure(QueueRejoinError.RESERVATION_STATUS_NOT_ARRIVED);
         }
-        return reservation;
+        return Optional.of(reservation);
     }
 
     private int nextTailPosition(StoreScope scope, QueueTicket queueTicket) {
@@ -296,7 +297,7 @@ public class QueueRejoinApplicationService {
         StoreScope scope,
         RejoinQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey,
         boolean alreadyRejoined
     ) {
@@ -325,7 +326,7 @@ public class QueueRejoinApplicationService {
         StoreScope scope,
         RejoinQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey
     ) {
         StateTransitionLog transition = new StateTransitionLog(
@@ -361,7 +362,7 @@ public class QueueRejoinApplicationService {
         StoreScope scope,
         RejoinQueueTicketCommand command,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey
     ) {
         AuditLog auditLog = new AuditLog(
@@ -418,7 +419,7 @@ public class QueueRejoinApplicationService {
         StoreScope scope,
         IdempotencyRecord started,
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         boolean alreadyRejoined
     ) {
         IdempotencyRecord completionPayload = new IdempotencyRecord(
@@ -464,9 +465,9 @@ public class QueueRejoinApplicationService {
             Integer.parseInt(extractNumber(snapshot, "queueTicketNumber")),
             extract(snapshot, "queueTicketStatus"),
             extractOptionalNumber(snapshot, "queuePosition"),
-            UUID.fromString(extract(snapshot, "reservationId")),
-            extract(snapshot, "reservationCode"),
-            extract(snapshot, "reservationStatus"),
+            extractNullableUuid(snapshot, "reservationId"),
+            extractNullableString(snapshot, "reservationCode"),
+            extractNullableString(snapshot, "reservationStatus"),
             Instant.parse(extract(snapshot, "rejoinedAt")),
             Boolean.parseBoolean(extractBoolean(snapshot, "alreadyRejoined"))
         );
@@ -506,15 +507,16 @@ public class QueueRejoinApplicationService {
         }
     }
 
-    private static String snapshot(QueueTicket queueTicket, Reservation reservation, boolean alreadyRejoined) {
+    private static String snapshot(QueueTicket queueTicket, Optional<Reservation> reservation, boolean alreadyRejoined) {
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"queueTicketStatus":"waiting","queuePosition":%s,"reservationId":"%s","reservationCode":"%s","reservationStatus":"arrived","rejoinedAt":"%s","alreadyRejoined":%s}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"queueTicketStatus":"waiting","queuePosition":%s,"reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"rejoinedAt":"%s","alreadyRejoined":%s}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
             queueTicket.queuePosition() == null ? "null" : queueTicket.queuePosition(),
-            reservation.id().value(),
-            escape(reservation.reservationCode().value()),
+            jsonNullable(reservation.map(value -> value.id().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.status().code()).orElse(null)),
             queueTicket.rejoinedAt(),
             alreadyRejoined
         ).trim();
@@ -522,18 +524,19 @@ public class QueueRejoinApplicationService {
 
     private static String metadata(
         QueueTicket queueTicket,
-        Reservation reservation,
+        Optional<Reservation> reservation,
         RejoinQueueTicketCommand command,
         IdempotencyKey idempotencyKey,
         boolean alreadyRejoined
     ) {
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"beforeQueueTicketStatus":"skipped","afterQueueTicketStatus":"waiting","reservationId":"%s","reservationCode":"%s","reservationStatus":"arrived","queueGroupId":"%s","businessDate":"%s","partySize":%d,"queuePosition":%s,"skippedAt":%s,"rejoinedAt":"%s","alreadyRejoined":%s,"note":%s,"idempotencyKey":"%s"}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"beforeQueueTicketStatus":"skipped","afterQueueTicketStatus":"waiting","reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"queueGroupId":"%s","businessDate":"%s","partySize":%d,"queuePosition":%s,"skippedAt":%s,"rejoinedAt":"%s","alreadyRejoined":%s,"note":%s,"idempotencyKey":"%s"}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
-            reservation.id().value(),
-            escape(reservation.reservationCode().value()),
+            jsonNullable(reservation.map(value -> value.id().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null)),
+            jsonNullable(reservation.map(value -> value.status().code()).orElse(null)),
             queueTicket.queueGroupId(),
             queueTicket.businessDate().value(),
             queueTicket.partySize().value(),
@@ -556,6 +559,19 @@ public class QueueRejoinApplicationService {
             return matcher.group(1);
         }
         throw new IllegalArgumentException("snapshot_field_missing_" + key);
+    }
+
+    private static String extractNullableString(String json, String key) {
+        Pattern nullPattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*null");
+        if (nullPattern.matcher(json).find()) {
+            return null;
+        }
+        return extract(json, key);
+    }
+
+    private static UUID extractNullableUuid(String json, String key) {
+        String value = extractNullableString(json, key);
+        return value == null ? null : UUID.fromString(value);
     }
 
     private static String extractNumber(String json, String key) {
@@ -586,11 +602,15 @@ public class QueueRejoinApplicationService {
     }
 
     private static String source(RejoinQueueTicketCommand command) {
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromActorType(command == null ? null : command.actorType());
     }
 
     private static String jsonNullable(String value) {
         return hasText(value) ? "\"" + escape(value.trim()) + "\"" : "null";
+    }
+
+    private static String jsonNullable(UUID value) {
+        return value == null ? "null" : "\"" + value + "\"";
     }
 
     private static String jsonNullable(Instant value) {

@@ -1,153 +1,240 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+import {
+  getReservationTodayView,
+  ReservationTodayViewApiError
+} from '../api/reservationTodayViewApi'
+import {
+  checkInReservation,
+  ReservationCheckInApiError
+} from '../api/reservationCheckInApi'
 import {
   queueArrivedReservation,
   ReservationArrivedToQueueApiError
 } from '../api/reservationArrivedToQueueApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
+  ReservationTodayViewApiErrorResponse,
+  ReservationTodayViewItem,
+  ReservationTodayViewResponse
+} from '../types/reservationTodayView'
+import type { ReservationCheckInApiErrorResponse } from '../types/reservationCheckIn'
+import type {
   QueueArrivedReservationRequest,
-  QueueArrivedReservationResponse,
   ReservationArrivedToQueueApiErrorResponse
 } from '../types/reservationArrivedToQueue'
+import { useGeneratedText } from '../i18n/generatedText'
 
-const AUTO_PARTY_SIZE_GROUP = 'auto'
-
-const partySizeOptions = [
-  { value: AUTO_PARTY_SIZE_GROUP, label: '自动推导' },
-  { value: '1-2', label: '1-2' },
-  { value: '3-4', label: '3-4' },
-  { value: '5-6', label: '5-6' },
-  { value: '7+', label: '7+' }
-]
+const { gt } = useGeneratedText()
 
 const route = useRoute()
+const router = useRouter()
 const storeContext = useStoreContextStore()
+const { currentTimeText } = useCurrentClock()
 
-const form = reactive({
-  reservationId: '',
-  partySizeGroup: AUTO_PARTY_SIZE_GROUP,
-  reasonCode: '',
-  note: ''
-})
-
-const isSubmitting = ref(false)
-const result = ref<QueueArrivedReservationResponse | null>(null)
-const apiError = ref<ReservationArrivedToQueueApiErrorResponse | null>(null)
-const lastIdempotencyKey = ref('')
+const businessDate = ref(queryBusinessDate(route.query.businessDate) || todayDateInput())
+const isLoading = ref(false)
+const response = ref<ReservationTodayViewResponse | null>(null)
+const listApiError = ref<ReservationTodayViewApiErrorResponse | null>(null)
+const queueApiError = ref<ReservationArrivedToQueueApiErrorResponse | ReservationCheckInApiErrorResponse | null>(null)
+const submittingReservationId = ref<string | null>(null)
+let loadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
-const staffHomeRoute = computed(() => ({
-  name: 'store-staff-home',
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
+const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value)
+const queueCandidateReservations = computed(() =>
+  (response.value?.items ?? []).filter(item => ['confirmed', 'arrived'].includes(item.status))
+)
+const showEmptyState = computed(
+  () => !isLoading.value && !listApiError.value && queueCandidateReservations.value.length === 0
+)
+const appStatusLabel = computed(() =>
+  submittingReservationId.value ? gt('generated.reservation-arrived-to-queue.024') : gt('generated.reservation-arrived-to-queue.025')
+)
+const queueTicketListRoute = computed(() => ({
+  name: 'queue-ticket-list',
   params: {
-    storeId: storeId.value
+    storeId: storeId.value || ''
   }
 }))
-const canSubmit = computed(
-  () => !isSubmitting.value && !!storeId.value && !!form.reservationId.trim()
-)
-const arrivedStatus = computed(() => result.value?.reservationStatus === 'arrived')
-const waitingStatus = computed(() => result.value?.queueTicketStatus === 'waiting')
-const eventsDisplay = computed(() => {
-  if (!result.value?.events.length) {
-    return '[]'
+const reservationTodayViewRoute = computed(() => ({
+  name: 'reservation-today-view',
+  params: {
+    storeId: storeId.value || ''
+  },
+  query: {
+    businessDate: displayedBusinessDate.value
   }
-
-  return result.value.events.join(', ')
-})
+}))
+const walkInQueueRoute = computed(() => ({
+  name: 'walk-in-queue',
+  params: {
+    storeId: storeId.value || ''
+  }
+}))
 
 watch(
-  () => route.query.reservationId,
-  value => {
-    const reservationId = queryValue(value)
-
-    if (reservationId) {
-      form.reservationId = reservationId
-    }
+  [storeId, businessDate],
+  () => {
+    void loadArrivedReservations()
   },
   { immediate: true }
 )
 
-async function submitQueue(): Promise<void> {
-  apiError.value = validateForm()
-  result.value = null
+watch(
+  () => route.query.businessDate,
+  value => {
+    const nextBusinessDate = queryBusinessDate(value)
 
-  if (apiError.value || !storeId.value) {
+    if (nextBusinessDate && nextBusinessDate !== businessDate.value) {
+      businessDate.value = nextBusinessDate
+    }
+  }
+)
+
+async function loadArrivedReservations(): Promise<void> {
+  const currentStoreId = storeId.value
+  const sequence = ++loadSequence
+  listApiError.value = null
+  queueApiError.value = null
+
+  if (!currentStoreId) {
+    response.value = null
+    isLoading.value = false
     return
   }
 
-  const idempotencyKey = createIdempotencyKey()
-  lastIdempotencyKey.value = idempotencyKey
-  isSubmitting.value = true
+  isLoading.value = true
 
   try {
-    result.value = await queueArrivedReservation(
-      storeId.value,
-      form.reservationId.trim(),
-      toRequest(),
-      idempotencyKey
-    )
+    const result = await getReservationTodayView(currentStoreId, {
+      businessDate: businessDate.value,
+      status: 'operational'
+    })
+
+    if (sequence === loadSequence) {
+      response.value = result
+    }
   } catch (error) {
-    apiError.value =
-      error instanceof ReservationArrivedToQueueApiError
-        ? error.response
-        : createLocalError('UNKNOWN_ERROR', 'reservation.queue.unknown_error')
+    if (sequence === loadSequence) {
+      response.value = null
+      listApiError.value =
+        error instanceof ReservationTodayViewApiError
+          ? error.response
+          : createTodayViewError('REQUEST_FAILED', 'reservation.today_view.request_failed')
+    }
   } finally {
-    isSubmitting.value = false
+    if (sequence === loadSequence) {
+      isLoading.value = false
+    }
   }
 }
 
-function validateForm(): ReservationArrivedToQueueApiErrorResponse | null {
-  if (!storeId.value) {
-    return createLocalError('STORE_SCOPE_MISMATCH', 'reservation.store_scope_mismatch')
+async function queueReservation(item: ReservationTodayViewItem): Promise<void> {
+  const currentStoreId = storeId.value
+
+  if (!currentStoreId || !canQueueReservation(item) || submittingReservationId.value) {
+    return
   }
 
-  if (!form.reservationId.trim()) {
-    return createLocalError('INVALID_COMMAND', 'reservation.queue.reservation_id_required')
+  queueApiError.value = null
+  submittingReservationId.value = item.reservationId
+
+  try {
+    if (shouldCheckInBeforeQueue(item)) {
+      await checkInReservation(
+        currentStoreId,
+        item.reservationId,
+        {
+          arrivedAt: null,
+          reasonCode: 'staff_queue_check_in',
+          note: 'reservation_queue_one_tap'
+        },
+        createReservationCheckInIdempotencyKey(item.reservationId)
+      )
+    }
+
+    await queueArrivedReservation(
+      currentStoreId,
+      item.reservationId,
+      toRequest(),
+      createIdempotencyKey(item.reservationId)
+    )
+    await router.push(queueTicketListRoute.value)
+  } catch (error) {
+    if (error instanceof ReservationCheckInApiError) {
+      queueApiError.value = error.response
+    } else {
+      queueApiError.value =
+        error instanceof ReservationArrivedToQueueApiError
+          ? error.response
+          : createQueueError('UNKNOWN_ERROR', 'reservation.queue.unknown_error')
+    }
+  } finally {
+    submittingReservationId.value = null
+  }
+}
+
+function canQueueReservation(item: ReservationTodayViewItem): boolean {
+  return ['confirmed', 'arrived'].includes(item.status) && !item.queueTicketId
+}
+
+function shouldCheckInBeforeQueue(item: ReservationTodayViewItem): boolean {
+  return item.status === 'confirmed'
+}
+
+function actionLabel(item: ReservationTodayViewItem): string {
+  if (submittingReservationId.value === item.reservationId) {
+    return gt('generated.reservation-arrived-to-queue.026')
   }
 
-  return null
+  if (item.queueTicketId) {
+    return gt('generated.reservation-arrived-to-queue.027')
+  }
+
+  return shouldCheckInBeforeQueue(item) ? gt('generated.reservation-arrived-to-queue.028') : gt('generated.reservation-arrived-to-queue.029')
 }
 
 function toRequest(): QueueArrivedReservationRequest {
+  return {}
+}
+
+function createIdempotencyKey(reservationId: string): string {
+  const randomValue =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  return `reservation:queue:${reservationId}:${randomValue}`
+}
+
+function createReservationCheckInIdempotencyKey(reservationId: string): string {
+  const randomValue =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  return `reservation:check-in:${reservationId}:${randomValue}`
+}
+
+function createTodayViewError(code: string, messageKey: string): ReservationTodayViewApiErrorResponse {
   return {
-    partySizeGroup:
-      form.partySizeGroup === AUTO_PARTY_SIZE_GROUP
-        ? null
-        : optionalValue(form.partySizeGroup),
-    reasonCode: optionalValue(form.reasonCode),
-    note: optionalValue(form.note)
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    }
   }
 }
 
-function optionalValue(value: string): string | null {
-  const trimmed = value.trim()
-  return trimmed ? trimmed : null
-}
-
-function optionalDisplay(value: string | number | null | undefined): string {
-  if (typeof value === 'number') {
-    return String(value)
-  }
-
-  return value?.trim() ? value : '未返回'
-}
-
-function createIdempotencyKey(): string {
-  const prefix = 'reservation:queue'
-  if ('randomUUID' in crypto) {
-    return `${prefix}:${crypto.randomUUID()}`
-  }
-
-  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
-}
-
-function createLocalError(
-  code: string,
-  messageKey: string
-): ReservationArrivedToQueueApiErrorResponse {
+function createQueueError(code: string, messageKey: string): ReservationArrivedToQueueApiErrorResponse {
   return {
     success: false,
     error: {
@@ -161,391 +248,391 @@ function createLocalError(
   }
 }
 
-function queryValue(value: unknown): string {
-  if (Array.isArray(value)) {
-    return typeof value[0] === 'string' ? value[0] : ''
+function queryBusinessDate(value: unknown): string {
+  const candidate = Array.isArray(value) ? value[0] : value
+  return typeof candidate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate)
+    ? candidate
+    : ''
+}
+
+function todayDateInput(timeZone = 'Asia/Singapore'): string {
+  const date = new Date()
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  const year = part('year')
+  const month = part('month')
+  const day = part('day')
+  return `${year}-${month}-${day}`
+}
+
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return gt('generated.reservation-arrived-to-queue.030')
   }
 
-  return typeof value === 'string' ? value : ''
+  return `${gt('generated.reservation-arrived-to-queue.022')}${value.slice(0, 8)}`
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Singapore',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date)
+
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  return `${part('hour')}:${part('minute')}`
+}
+
+function customerLabel(item: ReservationTodayViewItem): string {
+  return item.customerName?.trim() || item.customerNickname?.trim() || gt('generated.reservation-arrived-to-queue.031')
+}
+
+function queueHint(item: ReservationTodayViewItem): string {
+  if (!item.queueTicketId) {
+    return shouldCheckInBeforeQueue(item) ? gt('generated.reservation-arrived-to-queue.032') : gt('generated.reservation-arrived-to-queue.033')
+  }
+
+  const ticket = item.queueTicketDisplayNumber?.trim()
+    ? `#${item.queueTicketDisplayNumber.trim()}`
+    : item.queueTicketNumber
+      ? `#${item.queueTicketNumber}`
+      : gt('generated.reservation-arrived-to-queue.034')
+  return `${ticket} · ${item.queueTicketStatus || gt('generated.reservation-arrived-to-queue.023')}`
 }
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>预约排队</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
-    </section>
+  <main class="staff-workbench-shell reservation-queue-workbench">
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="displayedBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    />
 
-    <form class="queue-form" @submit.prevent="submitQueue">
-      <label class="reservation-id-field">
-        <span>预约 ID</span>
-        <input
-          v-model="form.reservationId"
-          autocomplete="off"
-          name="reservationId"
-          required
-          type="text"
-        />
-      </label>
-
-      <section class="party-size-panel" aria-label="人数分组">
-        <label>
-          <span>人数分组</span>
-          <select v-model="form.partySizeGroup" name="partySizeGroup">
-            <option v-for="option in partySizeOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <p>选择自动推导时，由后端按预约人数匹配队列分组。</p>
+    <div class="reservation-queue-body">
+      <section class="queue-heading">
+        <div>
+          <p>{{ gt('generated.reservation-arrived-to-queue.001') }}</p>
+          <h1>{{ gt('generated.reservation-arrived-to-queue.002') }}</h1>
+        </div>
       </section>
 
-      <details class="field-group">
-        <summary>备注</summary>
-        <label>
-          <span>原因代码（可选）</span>
-          <input v-model="form.reasonCode" name="reasonCode" type="text" />
-        </label>
-        <label>
-          <span>备注（可选）</span>
-          <textarea v-model="form.note" name="note" rows="3" />
-        </label>
-      </details>
+      <section class="queue-list-panel" :aria-label="gt('generated.reservation-arrived-to-queue.003')">
+        <header>
+          <div>
+            <p>{{ gt('generated.reservation-arrived-to-queue.004') }}</p>
+            <h2>{{ gt('generated.reservation-arrived-to-queue.005') }}</h2>
+          </div>
+          <button type="button" :disabled="isLoading" @click="loadArrivedReservations">{{ gt('generated.reservation-arrived-to-queue.006') }}</button>
+        </header>
 
-      <button class="submit-button" :disabled="!canSubmit" type="submit">
-        {{ isSubmitting ? '提交中...' : '进入排队' }}
-      </button>
-    </form>
+        <div v-if="isLoading" class="queue-state"> {{ gt('generated.reservation-arrived-to-queue.007') }} </div>
 
-    <section v-if="result" class="result-panel success-panel" aria-live="polite">
-      <h2>{{ result.alreadyQueued ? '已在排队中' : '排队成功' }}</h2>
-      <div class="reservation-highlight ticket-highlight">
-        <span>排队号码</span>
-        <strong>{{ result.queueTicketNumber }}</strong>
-      </div>
-      <div class="reservation-highlight status-highlight">
-        <span>排队状态</span>
-        <strong>{{ result.queueTicketStatus }}</strong>
-      </div>
-      <div class="reservation-highlight">
-        <span>预约编号</span>
-        <strong>{{ result.reservationCode }}</strong>
-      </div>
-      <div class="reservation-highlight">
-        <span>人数分组</span>
-        <strong>{{ result.partySizeGroup }}</strong>
-      </div>
-      <div class="reservation-highlight already-queued-highlight">
-        <span>是否已在排队中</span>
-        <strong>{{ result.alreadyQueued }}</strong>
-      </div>
-      <p v-if="arrivedStatus" class="queue-note">预约状态：arrived</p>
-      <p v-if="waitingStatus" class="queue-note">排队状态：waiting</p>
-      <p v-if="result.alreadyQueued" class="queue-note">该预约已存在等待中的排队号</p>
-      <dl>
-        <div>
-          <dt>预约 ID</dt>
-          <dd>{{ result.reservationId }}</dd>
-        </div>
-        <div>
-          <dt>预约状态</dt>
-          <dd>{{ result.reservationStatus }}</dd>
-        </div>
-        <div>
-          <dt>排队记录 ID</dt>
-          <dd>{{ result.queueTicketId }}</dd>
-        </div>
-        <div>
-          <dt>队列分组 ID</dt>
-          <dd>{{ result.queueGroupId }}</dd>
-        </div>
-        <div>
-          <dt>队列分组代码</dt>
-          <dd>{{ optionalDisplay(result.queueGroupCode) }}</dd>
-        </div>
-        <div>
-          <dt>人数</dt>
-          <dd>{{ result.partySize }}</dd>
-        </div>
-        <div>
-          <dt>营业日期</dt>
-          <dd>{{ optionalDisplay(result.businessDate) }}</dd>
-        </div>
-        <div>
-          <dt>队列位置</dt>
-          <dd>{{ optionalDisplay(result.queuePosition) }}</dd>
-        </div>
-        <div>
-          <dt>事件</dt>
-          <dd>{{ eventsDisplay }}</dd>
-        </div>
-        <div>
-          <dt>幂等状态</dt>
-          <dd>{{ result.idempotency.status }}</dd>
-        </div>
-        <div>
-          <dt>幂等重放</dt>
-          <dd>{{ result.idempotency.replayed ?? false }}</dd>
-        </div>
-      </dl>
-    </section>
+        <section v-else-if="listApiError" class="result-panel error-panel" aria-live="assertive">
+          <h2>{{ gt('generated.reservation-arrived-to-queue.008') }}</h2>
+          <p class="error-code">{{ gt('generated.reservation-arrived-to-queue.009') }}{{ listApiError.error.code }}</p>
+          <p class="message-key">{{ gt('generated.reservation-arrived-to-queue.010') }}{{ listApiError.error.messageKey }}</p>
+        </section>
 
-    <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>排队失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
-    </section>
+        <div v-else-if="showEmptyState" class="queue-state queue-state--actions">
+          <strong>{{ gt('generated.reservation-arrived-to-queue.011') }}</strong>
+          <span>{{ gt('generated.reservation-arrived-to-queue.012') }}</span>
+          <div class="empty-actions">
+            <RouterLink class="empty-action-link" :to="reservationTodayViewRoute">{{ gt('generated.reservation-arrived-to-queue.013') }}</RouterLink>
+            <RouterLink class="empty-action-link primary" :to="walkInQueueRoute">{{ gt('generated.reservation-arrived-to-queue.014') }}</RouterLink>
+          </div>
+        </div>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
-    </p>
+        <article
+          v-for="item in queueCandidateReservations"
+          v-else
+          :key="item.reservationId"
+          class="reservation-card"
+          :class="{ queued: !!item.queueTicketId }"
+        >
+          <div class="reservation-card__main">
+            <strong>{{ item.reservationCode }}</strong>
+            <span>{{ customerLabel(item) }}</span>
+          </div>
+
+          <dl>
+            <div>
+              <dt>{{ gt('generated.reservation-arrived-to-queue.015') }}</dt>
+              <dd>{{ formatTime(item.reservedStartAt) }} - {{ formatTime(item.reservedEndAt) }}</dd>
+            </div>
+            <div>
+              <dt>{{ gt('generated.reservation-arrived-to-queue.016') }}</dt>
+              <dd>{{ item.partySize }}{{ gt('generated.reservation-arrived-to-queue.017') }}</dd>
+            </div>
+            <div>
+              <dt>{{ gt('generated.reservation-arrived-to-queue.018') }}</dt>
+              <dd>{{ queueHint(item) }}</dd>
+            </div>
+          </dl>
+
+          <button
+            class="queue-action-button"
+            :disabled="!canQueueReservation(item) || !!submittingReservationId"
+            type="button"
+            @click="queueReservation(item)"
+          >
+            {{ actionLabel(item) }}
+          </button>
+        </article>
+      </section>
+
+      <section v-if="queueApiError" class="result-panel error-panel" aria-live="assertive">
+        <h2>{{ gt('generated.reservation-arrived-to-queue.019') }}</h2>
+        <p class="error-code">{{ gt('generated.reservation-arrived-to-queue.020') }}{{ queueApiError.error.code }}</p>
+        <p class="message-key">{{ gt('generated.reservation-arrived-to-queue.021') }}{{ queueApiError.error.messageKey }}</p>
+      </section>
+    </div>
+
+    <StaffBottomNav :store-id="storeId" active-tab="reservation" />
   </main>
 </template>
 
 <style scoped>
-.page-shell {
+.reservation-queue-body {
   display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 620px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
+  gap: 14px;
+  padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
 }
 
-.page-header {
-  display: grid;
-  gap: 4px;
+.queue-heading,
+.queue-list-panel,
+.result-panel {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
 }
 
-.eyebrow,
-.store-context,
-.idempotency-key,
-.party-size-panel p,
-.queue-note {
-  color: #667085;
-  font-size: 0.82rem;
+.queue-heading {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.queue-heading p,
+.queue-list-panel header p,
+dt {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
   margin: 0;
-}
-
-.queue-note {
-  color: #176b4d;
-  font-weight: 800;
-}
-
-.home-link {
-  color: #315f91;
-  font-size: 0.86rem;
-  font-weight: 800;
-  justify-self: start;
-  text-decoration: none;
 }
 
 h1,
 h2 {
-  color: #14213d;
+  color: #0f172a;
   letter-spacing: 0;
   margin: 0;
 }
 
 h1 {
-  font-size: 1.7rem;
+  font-size: 1.24rem;
   line-height: 1.15;
 }
 
 h2 {
-  font-size: 1rem;
+  font-size: 0.94rem;
 }
 
-.queue-form,
-.result-panel {
-  background: #ffffff;
-  border: 1px solid #d8e0eb;
-  border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
-}
-
-.queue-form {
+.queue-list-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 14px;
 }
 
-label {
-  display: grid;
-  gap: 6px;
+.queue-list-panel header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
 }
 
-label span,
-summary,
-dt,
-.reservation-highlight span {
-  color: #41516a;
+.queue-list-panel header button {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  color: #c2410c;
+  font-size: 0.82rem;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.queue-state {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 110px;
+  text-align: center;
+}
+
+.queue-state--actions {
+  padding: 16px;
+}
+
+.queue-state--actions strong {
+  color: #0f172a;
+}
+
+.queue-state--actions span {
   font-size: 0.86rem;
   font-weight: 700;
 }
 
-input,
-select,
-textarea {
-  background: #fbfcfe;
-  border: 1px solid #c8d3e2;
-  border-radius: 6px;
-  color: #182536;
-  min-height: 44px;
-  outline: none;
-  padding: 10px 11px;
+.empty-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+.empty-action-link {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  color: #c2410c;
+  display: inline-flex;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 12px;
+  text-decoration: none;
 }
 
-.reservation-id-field {
-  background: #eaf2ff;
-  border: 1px solid #b8cdf6;
-  border-radius: 8px;
+.empty-action-link.primary {
+  background: #f97316;
+  color: #ffffff;
+}
+
+.reservation-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
   padding: 12px;
 }
 
-.reservation-id-field input {
-  background: #ffffff;
-  font-size: 1.05rem;
-  font-weight: 800;
-  min-height: 56px;
+.reservation-card.queued {
+  background: #f8fafc;
 }
 
-.party-size-panel,
-.field-group {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 12px;
+.reservation-card__main {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
 }
 
-.party-size-panel {
+.reservation-card__main strong {
+  color: #f97316;
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.reservation-card__main span {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+dl {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
 }
 
-.field-group[open] {
-  display: grid;
-  gap: 12px;
+dt,
+dd {
+  margin: 0;
 }
 
-summary {
-  cursor: pointer;
-  min-height: 32px;
+dd {
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
 }
 
-.submit-button {
+.queue-action-button {
+  align-items: center;
   background: #176b4d;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #ffffff;
-  font-weight: 800;
-  min-height: 52px;
+  display: inline-flex;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 46px;
   padding: 0 16px;
 }
 
-.submit-button:disabled {
-  background: #94a3b8;
+button:disabled {
+  background: #cbd5e1;
+  border-color: #cbd5e1;
+  color: #64748b;
   cursor: not-allowed;
 }
 
 .result-panel {
   display: grid;
-  gap: 10px;
-  padding: 14px;
-}
-
-.success-panel {
-  border-color: #a7d7be;
+  gap: 6px;
+  padding: 12px;
 }
 
 .error-panel {
-  border-color: #f4b8b8;
-}
-
-.reservation-highlight {
-  background: #eef6f1;
-  border: 1px solid #b8d8c4;
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  padding: 11px;
-}
-
-.ticket-highlight {
-  background: #fff7ed;
-  border-color: #fed7aa;
-}
-
-.ticket-highlight strong {
-  color: #c2410c;
-  font-size: 1.55rem;
-}
-
-.status-highlight {
-  background: #eaf2ff;
-  border-color: #b8cdf6;
-}
-
-.already-queued-highlight {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-.reservation-highlight strong {
-  color: #14213d;
-  font-size: 1.1rem;
-  overflow-wrap: anywhere;
-}
-
-dl {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-dt,
-dd {
-  margin: 0;
-}
-
-dd {
-  color: #1d2736;
-  overflow-wrap: anywhere;
+  border-color: #fecaca;
 }
 
 .error-code {
   color: #b42318;
-  font-weight: 800;
+  font-weight: 900;
   margin: 0;
 }
 
 .message-key {
-  color: #41516a;
+  color: #475569;
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.idempotency-key {
-  overflow-wrap: anywhere;
+button:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, 0.28);
+  outline-offset: 2px;
 }
 
-@media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
-  }
-
-  h1 {
-    font-size: 2rem;
+@media (max-width: 430px) {
+  dl {
+    grid-template-columns: 1fr;
   }
 }
 </style>

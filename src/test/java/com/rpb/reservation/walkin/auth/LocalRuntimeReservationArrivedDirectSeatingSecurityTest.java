@@ -18,14 +18,23 @@ import com.rpb.reservation.reservation.api.ReservationArrivedDirectSeatingApiErr
 import com.rpb.reservation.reservation.api.ReservationArrivedDirectSeatingApiMapper;
 import com.rpb.reservation.reservation.api.ReservationArrivedToQueueApiErrorMapper;
 import com.rpb.reservation.reservation.api.ReservationArrivedToQueueApiMapper;
+import com.rpb.reservation.reservation.api.ReservationCancelApiErrorMapper;
+import com.rpb.reservation.reservation.api.ReservationCancelApiMapper;
 import com.rpb.reservation.reservation.api.ReservationCheckInApiErrorMapper;
 import com.rpb.reservation.reservation.api.ReservationCheckInApiMapper;
+import com.rpb.reservation.reservation.api.ReservationCompleteApiErrorMapper;
+import com.rpb.reservation.reservation.api.ReservationCompleteApiMapper;
 import com.rpb.reservation.reservation.api.ReservationController;
+import com.rpb.reservation.reservation.api.ReservationNoShowApiErrorMapper;
+import com.rpb.reservation.reservation.api.ReservationNoShowApiMapper;
 import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeatingResult;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -50,6 +59,12 @@ import org.springframework.test.web.servlet.MockMvc;
     ReservationArrivedDirectSeatingApiErrorMapper.class,
     ReservationArrivedToQueueApiMapper.class,
     ReservationArrivedToQueueApiErrorMapper.class,
+    ReservationCancelApiMapper.class,
+    ReservationCancelApiErrorMapper.class,
+    ReservationNoShowApiMapper.class,
+    ReservationNoShowApiErrorMapper.class,
+    ReservationCompleteApiMapper.class,
+    ReservationCompleteApiErrorMapper.class,
     LocalRuntimeCurrentActorProvider.class,
     LocalRuntimeSecurityConfiguration.class
 })
@@ -66,6 +81,7 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 class LocalRuntimeReservationArrivedDirectSeatingSecurityTest {
     private static final String ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/direct";
+    private static final String CHECK_IN_DIRECT_ENDPOINT = "/api/v1/stores/{storeId}/reservations/{reservationId}/seating/check-in-direct";
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000901");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000901");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000901");
@@ -86,6 +102,15 @@ class LocalRuntimeReservationArrivedDirectSeatingSecurityTest {
 
     @MockBean
     private ReservationArrivedToQueueApplicationService queueApplicationService;
+
+    @MockBean
+    private ReservationCancelApplicationService cancelApplicationService;
+
+    @MockBean
+    private ReservationNoShowApplicationService noShowApplicationService;
+
+    @MockBean
+    private ReservationCompleteApplicationService completeApplicationService;
 
     @MockBean
     private AppGateService appGateService;
@@ -133,6 +158,51 @@ class LocalRuntimeReservationArrivedDirectSeatingSecurityTest {
             .andExpect(jsonPath("$.idempotency.status").value("completed"));
 
         verify(seatingApplicationService).seatArrivedReservation(any());
+        verifyNoInteractions(createApplicationService);
+        verifyNoInteractions(checkInApplicationService);
+    }
+
+    @Test
+    void acceptsLocalProfileCheckInAndSeatRequestWithoutJwtLoginWhenConfiguredActorHasPermission() throws Exception {
+        when(appGateService.evaluate(any())).thenReturn(AppGateDecision.allow(
+            "reservation_queue",
+            TENANT_ID,
+            STORE_ID,
+            "reservation.seat"
+        ));
+        when(seatingApplicationService.checkInAndSeatConfirmedReservation(any())).thenReturn(ReservationArrivedDirectSeatingResult.success(
+            RESERVATION_ID,
+            "R-CHECKIN-SEAT-0901",
+            SEATING_ID,
+            "dining_table",
+            TABLE_ID,
+            4,
+            "occupied",
+            List.of(),
+            List.of(TABLE_ID),
+            "completed",
+            List.of("reservation.arrived", "reservation.seated", "seating.created", "table.occupied"),
+            List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
+            List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
+            UUID.randomUUID()
+        ));
+
+        mockMvc.perform(post(CHECK_IN_DIRECT_ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "local-runtime-reservation-check-in-seat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tableId": "60000000-0000-0000-0000-000000000901",
+                      "note": "Assigned reservation arrived"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.resourceType").value("table"))
+            .andExpect(jsonPath("$.events[0]").value("reservation.arrived"))
+            .andExpect(jsonPath("$.idempotency.status").value("completed"));
+
+        verify(seatingApplicationService).checkInAndSeatConfirmedReservation(any());
         verifyNoInteractions(createApplicationService);
         verifyNoInteractions(checkInApplicationService);
     }

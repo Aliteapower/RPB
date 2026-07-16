@@ -29,4 +29,31 @@ public interface SeatingJpaRepository extends JpaRepository<SeatingEntity, UUID>
         @Param("sourceType") String sourceType,
         @Param("sourceId") UUID sourceId
     );
+
+    @Query(value = """
+        select s.*
+        from seatings s
+        where s.tenant_id = :tenantId
+          and s.store_id = :storeId
+          and s.deleted_at is null
+          and s.status in ('occupied', 'completed', 'cleaning_triggered')
+          and (
+              s.reservation_id = :reservationId
+              or s.queue_ticket_id in (
+                  select qt.id
+                  from queue_tickets qt
+                  where qt.tenant_id = s.tenant_id
+                    and qt.store_id = s.store_id
+                    and qt.reservation_id = :reservationId
+                    and qt.deleted_at is null
+              )
+          )
+        order by s.updated_at desc
+        limit 1
+        """, nativeQuery = true)
+    Optional<SeatingEntity> findCurrentByReservation(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("reservationId") UUID reservationId
+    );
 }

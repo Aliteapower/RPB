@@ -3,12 +3,16 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { checkInReservation, ReservationCheckInApiError } from '../api/reservationCheckInApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   CheckInReservationRequest,
   CheckInReservationResponse,
   ReservationCheckInApiErrorResponse
 } from '../types/reservationCheckIn'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
@@ -179,17 +183,31 @@ function queryValue(value: unknown): string {
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>预约到店</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
+  <main class="staff-workbench-shell staff-workbench-shell--padded reservation-check-in-workbench">
+    <section class="reservation-check-in-workbench__header">
+      <div>
+        <p class="eyebrow">{{ gt('generated.reservation-check-in.001') }}</p>
+        <h1>{{ gt('generated.reservation-check-in.002') }}</h1>
+        <p class="store-context">{{ gt('generated.reservation-check-in.003') }} {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
+      </div>
+      <RouterLink class="home-link" :to="staffHomeRoute">{{ gt('generated.reservation-check-in.004') }}</RouterLink>
     </section>
 
-    <form class="check-in-form" @submit.prevent="submitCheckIn">
-      <label class="reservation-id-field">
-        <span>预约 ID</span>
+    <form
+      class="reservation-check-in-card"
+      :aria-label="gt('generated.reservation-check-in.005')"
+      @submit.prevent="submitCheckIn"
+    >
+      <header class="reservation-check-in-card__header">
+        <span aria-hidden="true">{{ gt('generated.reservation-check-in.006') }}</span>
+        <div>
+          <h2>{{ gt('generated.reservation-check-in.007') }}</h2>
+          <p>{{ gt('generated.reservation-check-in.008') }}</p>
+        </div>
+      </header>
+
+      <label class="reservation-check-in-card__primary-field">
+        <span>{{ gt('generated.reservation-check-in.009') }}</span>
         <input
           v-model="form.reservationId"
           autocomplete="off"
@@ -199,96 +217,88 @@ function queryValue(value: unknown): string {
         />
       </label>
 
-      <details class="field-group">
-        <summary>到店信息</summary>
-        <label>
-          <span>到店时间（可选）</span>
-          <input v-model="form.arrivedAt" name="arrivedAt" type="datetime-local" />
-        </label>
-      </details>
+      <label>
+        <span>{{ gt('generated.reservation-check-in.010') }}</span>
+        <input v-model="form.arrivedAt" name="arrivedAt" type="datetime-local" />
+      </label>
 
-      <details class="field-group">
-        <summary>备注</summary>
-        <label>
-          <span>原因代码（可选）</span>
-          <input v-model="form.reasonCode" name="reasonCode" type="text" />
-        </label>
-        <label>
-          <span>备注（可选）</span>
-          <textarea v-model="form.note" name="note" rows="3" />
-        </label>
-      </details>
+      <label>
+        <span>{{ gt('generated.reservation-check-in.011') }}</span>
+        <input v-model="form.reasonCode" name="reasonCode" type="text" />
+      </label>
 
-      <button class="submit-button" :disabled="!canSubmit" type="submit">
-        {{ isSubmitting ? '提交中...' : '确认到店' }}
-      </button>
+      <label>
+        <span>{{ gt('generated.reservation-check-in.012') }}</span>
+        <textarea v-model="form.note" name="note" rows="3" />
+      </label>
+
+      <footer class="reservation-check-in-card__actions">
+        <button class="reservation-check-in-card__save" :disabled="!canSubmit" type="submit">
+          {{ isSubmitting ? gt('generated.reservation-check-in.013') : gt('generated.reservation-check-in.014') }}
+        </button>
+        <RouterLink class="reservation-check-in-card__cancel" :to="staffHomeRoute"> {{ gt('generated.reservation-check-in.015') }} </RouterLink>
+      </footer>
     </form>
 
-    <section v-if="result" class="result-panel success-panel" aria-live="polite">
-      <h2>到店确认成功</h2>
+    <section v-if="result" class="check-in-result-card check-in-result-card--success" aria-live="polite">
+      <h2>{{ gt('generated.reservation-check-in.016') }}</h2>
       <div class="reservation-highlight status-highlight">
-        <span>预约状态</span>
+        <span>{{ gt('generated.reservation-check-in.017') }}</span>
         <strong>{{ result.status }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>预约编号</span>
+        <span>{{ gt('generated.reservation-check-in.018') }}</span>
         <strong>{{ result.reservationCode }}</strong>
       </div>
       <div class="reservation-highlight">
-        <span>是否已到店</span>
+        <span>{{ gt('generated.reservation-check-in.019') }}</span>
         <strong>{{ result.alreadyArrived }}</strong>
       </div>
-      <p v-if="arrivedStatus" class="arrived-note">状态：arrived</p>
-      <p v-if="result.alreadyArrived" class="arrived-note">该预约此前已完成到店确认</p>
+      <p v-if="arrivedStatus" class="arrived-note">{{ gt('generated.reservation-check-in.020') }}</p>
+      <p v-if="result.alreadyArrived" class="arrived-note">{{ gt('generated.reservation-check-in.021') }}</p>
       <dl>
         <div>
-          <dt>预约 ID</dt>
+          <dt>{{ gt('generated.reservation-check-in.022') }}</dt>
           <dd>{{ result.reservationId }}</dd>
         </div>
         <div>
-          <dt>到店时间</dt>
+          <dt>{{ gt('generated.reservation-check-in.023') }}</dt>
           <dd>{{ formatStoreDateTime(result.arrivedAt) }}</dd>
         </div>
         <div>
-          <dt>事件</dt>
+          <dt>{{ gt('generated.reservation-check-in.024') }}</dt>
           <dd>{{ eventsDisplay }}</dd>
         </div>
         <div>
-          <dt>幂等状态</dt>
+          <dt>{{ gt('generated.reservation-check-in.025') }}</dt>
           <dd>{{ result.idempotency.status }}</dd>
         </div>
         <div>
-          <dt>幂等重放</dt>
+          <dt>{{ gt('generated.reservation-check-in.026') }}</dt>
           <dd>{{ result.idempotency.replayed ?? false }}</dd>
         </div>
       </dl>
     </section>
 
-    <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>到店确认失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
+    <section v-if="apiError" class="check-in-result-card check-in-result-card--error" aria-live="assertive">
+      <h2>{{ gt('generated.reservation-check-in.027') }}</h2>
+      <p class="error-code">{{ gt('generated.reservation-check-in.028') }}{{ apiError.error.code }}</p>
+      <p class="message-key">{{ gt('generated.reservation-check-in.029') }}{{ apiError.error.messageKey }}</p>
     </section>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
+    <p v-if="lastIdempotencyKey" class="idempotency-key"> {{ gt('generated.reservation-check-in.030') }} {{ lastIdempotencyKey }}
     </p>
+
+    <StaffBottomNav :store-id="storeId" active-tab="reservation" />
   </main>
 </template>
 
 <style scoped>
-.page-shell {
-  display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 620px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
-}
-
-.page-header {
-  display: grid;
-  gap: 4px;
+.reservation-check-in-workbench__header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
 }
 
 .eyebrow,
@@ -306,10 +316,17 @@ function queryValue(value: unknown): string {
 }
 
 .home-link {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d8e0eb;
+  border-radius: 999px;
   color: #315f91;
+  display: inline-flex;
   font-size: 0.86rem;
-  font-weight: 800;
-  justify-self: start;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
   text-decoration: none;
 }
 
@@ -321,7 +338,7 @@ h2 {
 }
 
 h1 {
-  font-size: 1.7rem;
+  font-size: 1.35rem;
   line-height: 1.15;
 }
 
@@ -329,18 +346,46 @@ h2 {
   font-size: 1rem;
 }
 
-.check-in-form,
-.result-panel {
+.reservation-check-in-card,
+.check-in-result-card {
   background: #ffffff;
   border: 1px solid #d8e0eb;
   border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
 }
 
-.check-in-form {
+.reservation-check-in-card {
+  display: grid;
+  gap: 11px;
+  padding: 16px;
+}
+
+.reservation-check-in-card__header {
+  align-items: center;
   display: grid;
   gap: 12px;
-  padding: 14px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.reservation-check-in-card__header > span {
+  align-items: center;
+  background: #ffedd5;
+  border-radius: 999px;
+  color: #f97316;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 950;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.reservation-check-in-card__header p {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 3px 0 0;
 }
 
 label {
@@ -349,7 +394,6 @@ label {
 }
 
 label span,
-summary,
 dt,
 .reservation-highlight span {
   color: #41516a;
@@ -359,78 +403,85 @@ dt,
 
 input,
 textarea {
-  background: #fbfcfe;
-  border: 1px solid #c8d3e2;
-  border-radius: 6px;
-  color: #182536;
-  min-height: 44px;
+  background: #ffffff;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  color: #0f172a;
+  min-height: 40px;
   outline: none;
-  padding: 10px 11px;
+  padding: 8px 12px;
   width: 100%;
 }
 
 input:focus,
 textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
 }
 
-.reservation-id-field {
-  background: #eaf2ff;
-  border: 1px solid #b8cdf6;
+.reservation-check-in-card__primary-field {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
   border-radius: 8px;
   padding: 12px;
 }
 
-.reservation-id-field input {
+.reservation-check-in-card__primary-field input {
   background: #ffffff;
   font-size: 1.05rem;
   font-weight: 800;
-  min-height: 56px;
+  min-height: 46px;
 }
 
-.field-group {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.field-group[open] {
+.reservation-check-in-card__actions {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-top: 4px;
 }
 
-summary {
-  cursor: pointer;
-  min-height: 32px;
-}
-
-.submit-button {
-  background: #176b4d;
-  border: 0;
-  border-radius: 8px;
-  color: #ffffff;
-  font-weight: 800;
-  min-height: 52px;
+.reservation-check-in-card__save,
+.reservation-check-in-card__cancel {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.92rem;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 42px;
   padding: 0 16px;
+  text-decoration: none;
 }
 
-.submit-button:disabled {
-  background: #94a3b8;
+.reservation-check-in-card__save {
+  background: #f97316;
+  border: 1px solid #f97316;
+  color: #ffffff;
+}
+
+.reservation-check-in-card__save:disabled {
+  background: #fdba74;
+  border-color: #fdba74;
   cursor: not-allowed;
 }
 
-.result-panel {
+.reservation-check-in-card__cancel {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.check-in-result-card {
   display: grid;
   gap: 10px;
   padding: 14px;
 }
 
-.success-panel {
+.check-in-result-card--success {
   border-color: #a7d7be;
 }
 
-.error-panel {
+.check-in-result-card--error {
   border-color: #f4b8b8;
 }
 
@@ -486,13 +537,12 @@ dd {
   overflow-wrap: anywhere;
 }
 
-@media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
-  }
-
-  h1 {
-    font-size: 2rem;
-  }
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, 0.28);
+  outline-offset: 2px;
 }
+
 </style>

@@ -20,11 +20,11 @@ class ReservationCheckInUiImplementationValidationTest {
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String staffHome = Files.readString(staffHomePath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String staffHome = FrontendSourceSupport.readString(staffHomePath);
 
         assertThat(router)
             .contains("ReservationCheckInPage")
@@ -37,8 +37,11 @@ class ReservationCheckInUiImplementationValidationTest {
         assertThat(staffHome)
             .contains("reservation.check_in")
             .contains("canCheckInReservation")
-            .contains("name: 'reservation-check-in'")
-            .contains("hasVisibleOperation");
+            .contains("reservationConfirmedTodayRoute")
+            .contains("name: 'reservation-today-view'")
+            .contains("status: 'confirmed'")
+            .contains("hasVisibleOperation")
+            .doesNotContain("reservation-check-in");
 
         assertThat(apiClient)
             .contains("checkInReservation")
@@ -68,6 +71,13 @@ class ReservationCheckInUiImplementationValidationTest {
             .contains("idempotency");
 
         assertThat(page)
+            .contains("StaffBottomNav")
+            .contains("staff-workbench-shell")
+            .contains("reservation-check-in-workbench")
+            .contains("reservation-check-in-card")
+            .contains("check-in-result-card")
+            .contains("确认预约客人已到店")
+            .contains("active-tab=\"reservation\"")
             .contains("reservationId")
             .contains("arrivedAt")
             .contains("reasonCode")

@@ -36,6 +36,8 @@ class WalkInDirectSeatingControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID TABLE_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final UUID TABLE_GROUP_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+    private static final UUID TEMP_TABLE_ID_A = UUID.fromString("70000000-0000-0000-0000-000000000981");
+    private static final UUID TEMP_TABLE_ID_B = UUID.fromString("70000000-0000-0000-0000-000000000982");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WalkInDirectSeatingApplicationService applicationService;
@@ -69,7 +71,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-1001")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", "Boss friend", null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", "Boss friend", null, null, null, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.walkInId").value(walkInId.toString()))
@@ -103,7 +105,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-table")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "+6591234567", TABLE_ID, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "+6591234567", TABLE_ID, null, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.resource.type").value("TABLE"));
 
@@ -120,10 +122,40 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-group")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(4, null, "Group", null, null, null, TABLE_GROUP_ID, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(4, null, "Group", null, null, null, TABLE_GROUP_ID, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.resource.type").value("TABLE_GROUP"))
             .andExpect(jsonPath("$.resource.id").value(TABLE_GROUP_ID.toString()));
+    }
+
+    @Test
+    void seatsWithTemporaryTablesAndMapsMemberIds() throws Exception {
+        when(applicationService.seatWalkInDirectly(any())).thenReturn(success(UUID.randomUUID(), UUID.randomUUID(), "table_group", TABLE_GROUP_ID, false));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-temp-group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 6,
+                      "customerName": "Group",
+                      "tableId": null,
+                      "tableGroupId": null,
+                      "temporaryTableIds": [
+                        "%s",
+                        "%s"
+                      ]
+                    }
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.resource.type").value("TABLE_GROUP"));
+
+        ArgumentCaptor<SeatWalkInDirectlyCommand> commandCaptor = ArgumentCaptor.forClass(SeatWalkInDirectlyCommand.class);
+        verify(applicationService).seatWalkInDirectly(commandCaptor.capture());
+        SeatWalkInDirectlyCommand command = commandCaptor.getValue();
+        assertThat(command.tableId()).isNull();
+        assertThat(command.tableGroupId()).isNull();
+        assertThat(command.temporaryTableIds()).containsExactly(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B);
     }
 
     @Test
@@ -133,7 +165,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-auto")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.idempotency.replayed").value(false));
     }
@@ -145,7 +177,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-replay")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.idempotency.status").value("completed"))
             .andExpect(jsonPath("$.idempotency.replayed").value(true));
@@ -155,7 +187,7 @@ class WalkInDirectSeatingControllerTest {
     void missingIdempotencyKeyReturnsValidationErrorWithoutCallingService() throws Exception {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("MISSING_IDEMPOTENCY_KEY"))
@@ -169,7 +201,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-invalid-party")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(0, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(0, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("INVALID_PARTY_SIZE"))
             .andExpect(jsonPath("$.error.messageKey").value("walkin.direct_seating.invalid_party_size"));
@@ -180,7 +212,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-invalid-phone")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "91234567", null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, "91234567", null, null, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("INVALID_PHONE_E164"))
             .andExpect(jsonPath("$.error.messageKey").value("walkin.direct_seating.invalid_phone_e164"));
@@ -191,9 +223,59 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-resource-conflict")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, TABLE_ID, TABLE_GROUP_ID, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, TABLE_ID, TABLE_GROUP_ID, null, null, null))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code").value("RESOURCE_CONFLICT"));
+    }
+
+    @Test
+    void temporaryTableSelectionValidationStopsBeforeService() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-one-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"partySize": 6, "temporaryTableIds": ["%s"]}
+                    """.formatted(TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-duplicate-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"partySize": 6, "temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-temp-conflict")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"partySize": 6, "tableId": "%s", "temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TABLE_ID, TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_CONFLICT"));
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void requestDtoExposesTemporaryTableIds() {
+        assertThat(SeatWalkInDirectlyRequest.class.getRecordComponents())
+            .extracting(component -> component.getName())
+            .containsExactly(
+                "partySize",
+                "customerId",
+                "customerName",
+                "customerNickname",
+                "phoneE164",
+                "tableId",
+                "tableGroupId",
+                "temporaryTableIds",
+                "overrideReasonCode",
+                "overrideNote"
+            );
     }
 
     @Test
@@ -202,6 +284,12 @@ class WalkInDirectSeatingControllerTest {
         assertApplicationError(WalkInDirectSeatingError.TABLE_RESOURCE_UNAVAILABLE, 409, "TABLE_NOT_AVAILABLE");
         assertApplicationError(WalkInDirectSeatingError.PARTY_SIZE_OUTSIDE_CAPACITY, 409, "TABLE_CAPACITY_INSUFFICIENT");
         assertApplicationError(WalkInDirectSeatingError.INVALID_TABLE_GROUP, 409, "TABLE_GROUP_INVALID");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED, 400, "TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE, 400, "TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE, 409, "TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT, 409, "TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_LOCK_CONFLICT");
+        assertApplicationError(WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT");
         assertApplicationError(WalkInDirectSeatingError.MANUAL_OVERRIDE_REQUIRED, 400, "OVERRIDE_REASON_REQUIRED");
         assertApplicationError(WalkInDirectSeatingError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS");
         assertApplicationError(WalkInDirectSeatingError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY");
@@ -235,7 +323,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-forbidden")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
 
@@ -249,7 +337,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, otherStore)
                 .header("Idempotency-Key", "idem-scope")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.error.code").value("STORE_SCOPE_MISMATCH"));
 
@@ -268,15 +356,44 @@ class WalkInDirectSeatingControllerTest {
             .filteredOn(path -> path.endsWith("Controller.java"))
             .containsExactlyInAnyOrder(
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInDirectSeatingController.java",
+                "src/main/java/com/rpb/reservation/walkin/api/WalkInQueueController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
+                "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/CallScreenAdminController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenMediaSeedController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenSeedController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/QueueDisplayController.java",
+                "src/main/java/com/rpb/reservation/customerauth/api/CustomerAuthController.java",
+                "src/main/java/com/rpb/reservation/i18n/api/PlatformI18nCatalogController.java",
+                "src/main/java/com/rpb/reservation/i18n/api/TenantAdminI18nCatalogController.java",
+                "src/main/java/com/rpb/reservation/publicbooking/api/PublicBookingController.java",
+                "src/main/java/com/rpb/reservation/publicbooking/api/PublicBookingEntryController.java",
+                "src/main/java/com/rpb/reservation/publicbooking/api/TenantAdminPublicBookingController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationMealPeriodSeedController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationShareTemplateSeedController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+                "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueTicketListController.java",
                 "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationTableAssignmentController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
-                "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
+                "src/main/java/com/rpb/reservation/staffhome/api/StaffHomeOverviewController.java",
+                "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
+                "src/main/java/com/rpb/reservation/table/api/TemporaryTableGroupController.java",
+                "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
+                "src/main/java/com/rpb/reservation/auth/api/AuthController.java",
+                "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java",
+                "src/main/java/com/rpb/reservation/platform/api/PlatformProfileController.java",
+                "src/main/java/com/rpb/reservation/platform/api/PlatformTenantController.java",
+                "src/main/java/com/rpb/reservation/platformbilling/api/PlatformProductLineController.java",
+                "src/main/java/com/rpb/reservation/platformbilling/api/PlatformTenantProductSubscriptionController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationPublicShareController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationShareInfoController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminShareProfileController.java"
             );
         assertThat(sourceFiles)
             .noneMatch(WalkInDirectSeatingControllerTest::isForbiddenQueueApiFile);
@@ -293,30 +410,104 @@ class WalkInDirectSeatingControllerTest {
         assertThat(vueFiles)
             .containsExactlyInAnyOrder(
                 "src/App.vue",
+                "src/components/call-screen/CallScreenAdModeSwitch.vue",
+                "src/components/common/CountryPhoneField.vue",
+                "src/components/common/DownloadableQrCode.vue",
+                "src/components/common/FrontendLocaleSwitcher.vue",
+                "src/components/common/PasswordInput.vue",
                 "src/components/DateTimeWheelPicker.vue",
+                "src/components/erp/ErpPagination.vue",
+                "src/components/erp/ErpQueryToolbar.vue",
+                "src/components/platform/PlatformAdminNav.vue",
+                "src/components/platform/PlatformTenantForm.vue",
+                "src/components/platform/PlatformTenantStructurePanel.vue",
+                "src/components/platform/PlatformTenantTable.vue",
+                "src/components/platform/product-line/PlatformProductLineDrawer.vue",
+                "src/components/platform/product-line/PlatformProductLineList.vue",
+                "src/components/platform/product-line/PlatformProductLinePriceForm.vue",
+                "src/components/reservation-workbench/CreateReservationDialog.vue",
+                "src/components/reservation-workbench/ReservationMonthCalendar.vue",
+                "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+                "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
+                "src/components/reservation-workbench/ReservationTableAssignmentDialog.vue",
+                "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
+                "src/components/reservation-workbench/ReservationTodayListItem.vue",
+                "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+                "src/components/staff/StaffBottomNav.vue",
+                "src/components/staff/StaffBusinessDateSwitcher.vue",
+                "src/components/staff/StaffGuestContactLookup.vue",
+                "src/components/staff/StaffGuestNameField.vue",
+                "src/components/staff/StaffSingaporePhoneField.vue",
+                "src/components/staff/StaffTimeWheelPicker.vue",
+                "src/components/staff-home/StaffHomeActionGroup.vue",
+                "src/components/staff-home/StaffHomeTopBar.vue",
+                "src/components/staff-home/StaffHomeWorkflowStrip.vue",
+                "src/components/staff-table/TableResourcePicker.vue",
+                "src/components/store/StoreSwitcher.vue",
+                "src/components/tenant-admin/TenantAdminNav.vue",
                 "src/pages/CleaningCompletePage.vue",
+                "src/pages/LoginPage.vue",
+                "src/pages/PlatformCallScreenSeedPage.vue",
+                "src/pages/PlatformI18nCatalogPage.vue",
+                "src/pages/PlatformProfilePage.vue",
+                "src/pages/PlatformProductLinesPage.vue",
+                "src/pages/PlatformReservationMealPeriodSeedPage.vue",
+                "src/pages/PlatformReservationShareTemplateSeedPage.vue",
+                "src/pages/PlatformTenantBillingPage.vue",
+                "src/pages/PlatformTenantFormPage.vue",
+                "src/pages/PlatformTenantsPage.vue",
+                "src/pages/PublicBookingPage.vue",
                 "src/pages/QueueCallPage.vue",
+                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueTicketListPage.vue",
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
+                "src/pages/ReservationPublicSharePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
-                "src/pages/WalkInDirectSeatingPage.vue"
+                "src/pages/TableResourceListPage.vue",
+                "src/pages/TenantAdminCallScreenPage.vue",
+                "src/pages/TenantAdminCustomersPage.vue",
+                "src/pages/TenantAdminI18nCatalogPage.vue",
+                "src/pages/TenantAdminProfilePage.vue",
+                "src/pages/TenantAdminPublicBookingPage.vue",
+                "src/pages/TenantAdminReservationSharePage.vue",
+                "src/pages/TenantAdminSettingsPage.vue",
+                "src/pages/TenantAdminStaffFormPage.vue",
+                "src/pages/TenantAdminStaffPage.vue",
+                "src/pages/TenantAdminTableFormPage.vue",
+                "src/pages/TenantAdminTablesPage.vue",
+                "src/pages/WalkInDirectSeatingPage.vue",
+                "src/pages/WalkInQueuePage.vue"
             );
         assertThat(vueFiles)
             .filteredOn(path -> !Set.of(
                 "src/pages/QueueCallPage.vue",
+                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueTicketListPage.vue",
                 "src/pages/CleaningCompletePage.vue",
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
-                "src/pages/SeatingFromCalledQueuePage.vue"
+                "src/pages/ReservationPublicSharePage.vue",
+                "src/pages/PlatformReservationMealPeriodSeedPage.vue",
+                "src/pages/PlatformReservationShareTemplateSeedPage.vue",
+                "src/pages/WalkInQueuePage.vue",
+                "src/components/reservation-workbench/CreateReservationDialog.vue",
+                "src/components/reservation-workbench/ReservationMonthCalendar.vue",
+                "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+                "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
+                "src/components/reservation-workbench/ReservationTableAssignmentDialog.vue",
+                "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
+                "src/components/reservation-workbench/ReservationTodayListItem.vue",
+                "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+                "src/pages/SeatingFromCalledQueuePage.vue",
+                "src/pages/TenantAdminReservationSharePage.vue"
             ).contains(path))
             .noneMatch(WalkInDirectSeatingControllerTest::isForbiddenUiFile);
     }
@@ -350,6 +541,13 @@ class WalkInDirectSeatingControllerTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -384,7 +582,7 @@ class WalkInDirectSeatingControllerTest {
         mockMvc.perform(post(ENDPOINT, STORE_ID)
                 .header("Idempotency-Key", "idem-" + applicationError.name())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null))))
+                .content(json(new SeatWalkInDirectlyRequest(2, null, "Guest", null, null, null, null, null, null, null))))
             .andExpect(status().is(expectedStatus))
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value(expectedApiCode))

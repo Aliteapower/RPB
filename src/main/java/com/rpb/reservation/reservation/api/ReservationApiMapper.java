@@ -23,9 +23,11 @@ public class ReservationApiMapper {
             request.partySize(),
             request.reservedStartAt(),
             request.reservedEndAt(),
+            request.businessDate(),
             request.customerId(),
             trimToNull(request.customerName()),
             trimToNull(request.customerNickname()),
+            trimToNull(request.customerEmail()),
             trimToNull(request.phoneE164()),
             trimToNull(request.note()),
             idempotencyKey.trim(),
@@ -33,7 +35,9 @@ public class ReservationApiMapper {
             trimToNull(actor.actorType()),
             null,
             "staff",
-            null
+            null,
+            request.tableId(),
+            request.tableGroupId()
         );
     }
 

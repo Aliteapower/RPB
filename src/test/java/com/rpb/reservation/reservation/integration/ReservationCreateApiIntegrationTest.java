@@ -11,6 +11,7 @@ import static com.rpb.reservation.reservation.integration.ReservationCreateInteg
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.REPLAY_RESERVATION_ID;
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.START_AT;
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.STORE_ID;
+import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.TABLE_ID;
 import static com.rpb.reservation.reservation.integration.ReservationCreateIntegrationFixture.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,9 +21,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rpb.reservation.common.scope.TenantScope;
+import com.rpb.reservation.customer.application.CustomerManagementApplicationService;
+import com.rpb.reservation.customer.application.CustomerManagementListResult;
 import com.rpb.reservation.reservation.api.CreateReservationRequest;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,6 +70,9 @@ class ReservationCreateApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private CustomerManagementApplicationService customerManagementService;
 
     @Autowired
     private TestCurrentActorProvider actorProvider;
@@ -145,6 +153,87 @@ class ReservationCreateApiIntegrationTest {
         assertThat(fixture.countWhere("select count(*) from customers where phone_e164 = '+6591234567'")).isEqualTo(1);
         assertThat(fixture.count("reservations")).isEqualTo(1);
         assertBoundaryTablesRemainEmpty();
+    }
+
+    @Test
+    void reservationCreatedCustomerIsVisibleInTenantAdminCustomerManagementList() throws Exception {
+        MvcResult created = mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "reservation-customer-management-list")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 2,
+                      "reservedStartAt": "%s",
+                      "reservedEndAt": "%s",
+                      "customerId": null,
+                      "customerName": "Management List Guest",
+                      "customerNickname": "先生",
+                      "customerEmail": "management-list-guest@example.test",
+                      "phoneE164": "+6591234599",
+                      "note": null
+                    }
+                    """.formatted(START_AT, END_AT)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.customer.phoneE164").value("+6591234599"))
+            .andReturn();
+        UUID customerId = UUID.fromString(objectMapper.readTree(created.getResponse().getContentAsString())
+            .path("customer")
+            .path("id")
+            .asText());
+
+        CustomerManagementListResult result = customerManagementService.list(
+            new TenantScope(new TenantId(TENANT_ID)),
+            "Management List Guest",
+            10,
+            0
+        );
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.customers()).singleElement().satisfies(customer -> {
+            assertThat(customer.id()).isEqualTo(customerId);
+            assertThat(customer.displayName()).isEqualTo("Management List Guest");
+            assertThat(customer.nickname()).isEqualTo("先生");
+            assertThat(customer.phoneE164()).isEqualTo("+6591234599");
+            assertThat(customer.email()).isEqualTo("management-list-guest@example.test");
+            assertThat(customer.status()).isEqualTo("active");
+        });
+    }
+
+    @Test
+    void createsReservationPreassignmentWhenTableIsSelectedThroughPostgresPath() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "reservation-table-preassignment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 4,
+                      "reservedStartAt": "%s",
+                      "reservedEndAt": "%s",
+                      "customerId": "%s",
+                      "customerName": "Table Guest",
+                      "customerNickname": null,
+                      "phoneE164": null,
+                      "note": null,
+                      "tableId": "%s",
+                      "tableGroupId": null
+                    }
+                    """.formatted(START_AT, END_AT, EXISTING_CUSTOMER_ID, TABLE_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(fixture.count("reservations")).isEqualTo(1);
+        assertThat(fixture.countWhere("""
+            select count(*) from reservation_preassignments
+            where tenant_id = ?
+              and store_id = ?
+              and table_id = ?
+              and table_group_id is null
+              and resource_type = 'dining_table'
+              and status = 'active'
+            """, TENANT_ID, STORE_ID, TABLE_ID)).isEqualTo(1);
+        assertThat(fixture.count("seatings")).isEqualTo(0);
+        assertThat(fixture.count("table_locks")).isEqualTo(0);
     }
 
     @Test
@@ -502,7 +591,7 @@ class ReservationCreateApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.apps[0].appKey").value("reservation_queue"))
-            .andExpect(jsonPath("$.apps[0].appName").value("订位排号系统"))
+            .andExpect(jsonPath("$.apps[0].appName").value("预约排队叫号产线"))
             .andExpect(jsonPath("$.apps[0].entryRoute").value("/stores/" + STORE_ID + "/staff"))
             .andExpect(jsonPath("$.apps[0].entryVisible").value(true))
             .andExpect(jsonPath("$.apps[0].permissions[0]").exists());
@@ -571,22 +660,44 @@ class ReservationCreateApiIntegrationTest {
                 .noneMatch(path -> path.contains("/seating/api/"))
                 .noneMatch(path -> path.toLowerCase().contains("checkincontroller"))
                 .noneMatch(path -> path.toLowerCase().contains("reservationnoshowcontroller"))
-                .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"))
-                .noneMatch(path -> path.toLowerCase().contains("tableassignmentcontroller"));
+                .noneMatch(path -> path.toLowerCase().contains("reservationcancellationcontroller"));
         }
-        try (Stream<Path> paths = Files.walk(Path.of("."))) {
+        try (Stream<Path> paths = Files.walk(Path.of("src"))) {
             assertThat(paths.filter(Files::isRegularFile).map(path -> path.toString().replace('\\', '/')).toList())
-                .noneMatch(path -> path.endsWith(".vue")
-                    && path.toLowerCase().contains("reservation")
-                    && !path.endsWith("src/pages/ReservationCreatePage.vue")
-                    && !path.endsWith("src/pages/ReservationCheckInPage.vue")
-                    && !path.endsWith("src/pages/ReservationArrivedDirectSeatingPage.vue")
-                    && !path.endsWith("src/pages/ReservationArrivedToQueuePage.vue")
-                    && !path.endsWith("src/pages/ReservationTodayViewPage.vue"))
+                .noneMatch(ReservationCreateApiIntegrationTest::isForbiddenReservationUiFile)
                 .noneMatch(path -> path.toLowerCase().contains("openapi") && (
                     path.endsWith(".yml") || path.endsWith(".yaml") || path.endsWith(".json")
                 ));
         }
+    }
+
+    private static boolean isForbiddenReservationUiFile(String path) {
+        String normalized = path.replace('\\', '/');
+        if (normalized.startsWith("./")) {
+            normalized = normalized.substring(2);
+        }
+        if (!normalized.endsWith(".vue") || !normalized.toLowerCase().contains("reservation")) {
+            return false;
+        }
+        return !Set.of(
+            "src/pages/ReservationCheckInPage.vue",
+            "src/pages/ReservationArrivedDirectSeatingPage.vue",
+            "src/pages/ReservationArrivedToQueuePage.vue",
+            "src/pages/ReservationPublicSharePage.vue",
+            "src/pages/ReservationTodayViewPage.vue",
+            "src/components/reservation-workbench/CreateReservationDialog.vue",
+            "src/components/reservation-workbench/ReservationMonthCalendar.vue",
+            "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+            "src/components/reservation-workbench/ReservationSeatDialog.vue",
+            "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
+            "src/components/reservation-workbench/ReservationTableAssignmentDialog.vue",
+            "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
+            "src/components/reservation-workbench/ReservationTodayListItem.vue",
+            "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+            "src/pages/PlatformReservationShareTemplateSeedPage.vue",
+            "src/pages/PlatformReservationMealPeriodSeedPage.vue",
+            "src/pages/TenantAdminReservationSharePage.vue"
+        ).contains(normalized);
     }
 
     private static boolean isForbiddenQueueApiFile(String path) {
@@ -607,6 +718,13 @@ class ReservationCreateApiIntegrationTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",

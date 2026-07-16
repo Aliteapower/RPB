@@ -13,6 +13,7 @@ import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -34,7 +35,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -69,25 +72,6 @@ public class ReservationCheckInApplicationService {
     private final ReservationCheckInRule reservationCheckInRule = new ReservationCheckInRule();
 
     @Autowired
-    public ReservationCheckInApplicationService(
-        StoreRepositoryPort storeRepository,
-        ReservationRepositoryPort reservationRepository,
-        BusinessEventRepositoryPort businessEventRepository,
-        StateTransitionLogRepositoryPort stateTransitionLogRepository,
-        AuditLogRepositoryPort auditLogRepository,
-        IdempotencyRepositoryPort idempotencyRepository
-    ) {
-        this(
-            storeRepository,
-            reservationRepository,
-            businessEventRepository,
-            stateTransitionLogRepository,
-            auditLogRepository,
-            idempotencyRepository,
-            Clock.systemUTC()
-        );
-    }
-
     public ReservationCheckInApplicationService(
         StoreRepositoryPort storeRepository,
         ReservationRepositoryPort reservationRepository,
@@ -180,6 +164,7 @@ public class ReservationCheckInApplicationService {
         if (!scope.equals(reservation.scope())) {
             throw new ApplicationFailure(ReservationCheckInError.STORE_SCOPE_MISMATCH);
         }
+        requireReservationForStoreToday(store, reservation);
 
         ReservationCheckInError statusError = reservationCheckInRule.validate(reservation.status());
         if (statusError != null) {
@@ -221,6 +206,13 @@ public class ReservationCheckInApplicationService {
             List.of(transition.id()),
             auditLog.id()
         );
+    }
+
+    private void requireReservationForStoreToday(Store store, Reservation reservation) {
+        LocalDate storeToday = LocalDate.now(clock.withZone(ZoneId.of(store.timezone())));
+        if (!reservation.businessDate().value().equals(storeToday)) {
+            throw new ApplicationFailure(ReservationCheckInError.RESERVATION_NOT_TODAY);
+        }
     }
 
     private Reservation saveArrived(StoreScope scope, Reservation reservation) {
@@ -530,10 +522,7 @@ public class ReservationCheckInApplicationService {
     }
 
     private static String source(CheckInReservationCommand command) {
-        if (command == null || !hasText(command.actorType())) {
-            return "staff";
-        }
-        return command.actorType().trim();
+        return OperationSource.fromActorType(command == null ? null : command.actorType());
     }
 
     private static String jsonNullable(String value) {

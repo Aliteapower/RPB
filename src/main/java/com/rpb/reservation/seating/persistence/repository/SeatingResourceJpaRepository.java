@@ -16,17 +16,24 @@ public interface SeatingResourceJpaRepository extends JpaRepository<SeatingResou
         String status
     );
 
-    @Query("""
-        select count(resource) > 0 from SeatingResourceEntity resource
-        where resource.tenantId = :tenantId
-          and resource.storeId = :storeId
+    @Query(value = """
+        select count(*) > 0
+        from seating_resources resource
+        join seatings seating
+          on seating.id = resource.seating_id
+         and seating.tenant_id = resource.tenant_id
+         and seating.store_id = resource.store_id
+        where resource.tenant_id = :tenantId
+          and resource.store_id = :storeId
           and resource.status = 'active'
-          and resource.deletedAt is null
+          and resource.deleted_at is null
+          and seating.status = 'occupied'
+          and seating.deleted_at is null
           and (
-              (:resourceType = 'dining_table' and resource.tableId = :resourceId)
-              or (:resourceType = 'table_group' and resource.tableGroupId = :resourceId)
+              (:resourceType = 'dining_table' and resource.table_id = :resourceId)
+              or (:resourceType = 'table_group' and resource.table_group_id = :resourceId)
           )
-        """)
+        """, nativeQuery = true)
     boolean existsActiveResourceOccupancy(
         @Param("tenantId") UUID tenantId,
         @Param("storeId") UUID storeId,
@@ -41,6 +48,15 @@ public interface SeatingResourceJpaRepository extends JpaRepository<SeatingResou
           and store_id = :storeId
           and status = 'active'
           and deleted_at is null
+          and exists (
+              select 1
+              from seatings seating
+              where seating.id = seating_resources.seating_id
+                and seating.tenant_id = seating_resources.tenant_id
+                and seating.store_id = seating_resources.store_id
+                and seating.status = 'occupied'
+                and seating.deleted_at is null
+          )
           and (
               (:resourceType = 'dining_table' and table_id = :resourceId)
               or (:resourceType = 'table_group' and table_group_id = :resourceId)

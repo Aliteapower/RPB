@@ -12,78 +12,119 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
     private static final String LOCAL_VALIDATION_STORE_ID = "20000000-0000-0000-0000-000000000983";
 
     @Test
-    void staffHomeRendersReservationQueueOperationsOnlyBehindMeAppsEntry() throws Exception {
+    void staffHomeUsesPersistentOverviewApiInsteadOfDuplicatedEntryGrid() throws Exception {
         String source = readStaffHomeSources();
 
         assertThat(source)
-            .contains("fetchMeApps")
-            .contains("reservation_queue")
-            .contains("const hasReservationQueue")
-            .contains("const hasVisibleOperation")
-            .contains("const hasReceptionOperations")
-            .contains("const hasReservationOperations")
-            .contains("const hasQueueOperations")
-            .contains("const hasTableTurnoverOperations")
-            .contains("StaffHomeActionGroup")
+            .contains("getStaffHomeOverview")
+            .contains("StaffHomeOverviewApiError")
             .contains("StaffHomeTopBar")
-            .contains("StaffHomeWorkflowStrip")
-            .contains("<nav v-if=\"hasVisibleOperation\" class=\"operation-groups\"")
-            .contains("v-if=\"actions.length\"")
-            .doesNotContain("class=\"operation-section\"")
-            .doesNotContain("section-eyebrow")
-            .contains("reservation.check_in")
-            .contains("reservation.seat");
+            .contains("StaffPrimaryWorkbench")
+            .contains("overview")
+            .contains("primaryKpis")
+            .contains("partySizeGroups")
+            .contains("activeQueueTickets")
+            .contains("arrivedReservationGroups")
+            .contains(":business-date=\"displayedBusinessDate\"")
+            .contains("active-tab=\"home\"");
+
         assertThat(source)
-            .doesNotContain("<nav class=\"operation-groups\"")
-            .doesNotContain("queue.skip")
-            .doesNotContain("queue.rejoin");
+            .doesNotContain("fetchMeApps")
+            .doesNotContain("StaffHomeActionGroup")
+            .doesNotContain("StaffHomeWorkflowStrip")
+            .doesNotContain("StaffHomeActionItem")
+            .doesNotContain("<nav v-if=\"hasVisibleOperation\"")
+            .doesNotContain("const receptionActions")
+            .doesNotContain("const reservationActions")
+            .doesNotContain("const queueActions")
+            .doesNotContain("const tableTurnoverActions");
     }
 
     @Test
-    void staffHomeLightweightWorkbenchPreservesGroupedTenEntryBaseline() throws Exception {
+    void staffHomeFocusesOnTodayOperationalJudgementNotBackofficeBi() throws Exception {
         String source = readStaffHomeSources();
 
         assertAppearsInOrder(
             source,
-            "const receptionActions",
-            "label: '散客直接入座'",
-            "label: '预约到店'",
-            "const reservationActions",
-            "label: '创建预约'",
-            "label: '今日预约'",
-            "label: '预约排队'",
-            "label: '预约入座'",
-            "const queueActions",
-            "label: '排队列表'",
-            "label: '排队叫号'",
-            "label: '排队入座'",
-            "const tableTurnoverActions",
-            "label: '清台处理'"
+            "labelKey: 'staffHome.kpis.reservations'",
+            "labelKey: 'staffHome.kpis.arrived'",
+            "labelKey: 'staffHome.kpis.queue'",
+            "labelKey: 'staffHome.kpis.tables'"
         );
 
         assertThat(source)
-            .contains("walkInRoute")
-            .contains("cleaningRoute")
-            .contains("reservationRoute")
-            .contains("reservationTodayViewRoute")
-            .contains("reservationCheckInRoute")
-            .contains("reservationArrivedToQueueRoute")
-            .contains("queueTicketListRoute")
-            .contains("queueCallRoute")
-            .contains("seatingFromCalledQueueRoute")
-            .contains("reservationArrivedDirectSeatingRoute")
-            .contains("group-id=\"staff-section-reception\"")
-            .contains("heading=\"接待\"")
-            .contains(":actions=\"receptionActions\"")
-            .contains("group-id=\"staff-section-reservation\"")
-            .contains("heading=\"预约管理\"")
-            .contains(":actions=\"reservationActions\"")
-            .contains("group-id=\"staff-section-queue\"")
-            .contains("heading=\"排队管理\"")
-            .contains(":actions=\"queueActions\"")
-            .contains("group-id=\"staff-section-table-turnover\"")
-            .contains("heading=\"桌台流转\"")
-            .contains(":actions=\"tableTurnoverActions\"");
+            .contains("staffHome.aria.todayOverview")
+            .contains("staffHome.aria.queuePartyGroups")
+            .contains("staffHome.aria.tableStatus")
+            .contains("waitingTickets")
+            .contains("calledTickets")
+            .contains("availableTables")
+            .contains("temporaryGroups")
+            .doesNotContain("周趋势")
+            .doesNotContain("月趋势")
+            .doesNotContain("报表")
+            .doesNotContain("BI");
+    }
+
+    @Test
+    void staffPagesShowFriendlyAppGateSubscriptionMessages() throws Exception {
+        String staffHomeSource = FrontendSourceSupport.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
+        String todayListSource = FrontendSourceSupport.readString(Path.of(
+            "src",
+            "components",
+            "reservation-workbench",
+            "ReservationTodayListPanel.vue"
+        ));
+        String queueTicketListSource = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String tableResourceListSource = FrontendSourceSupport.readString(Path.of("src", "pages", "TableResourceListPage.vue"));
+        Path appGateMessagesPath = Path.of("src", "utils", "appGateErrorMessages.ts");
+
+        assertThat(appGateMessagesPath).exists();
+        String appGateMessagesSource = FrontendSourceSupport.readString(appGateMessagesPath);
+
+        assertThat(staffHomeSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("apiError.value?.error.messageKey");
+
+        assertThat(todayListSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("错误代码：{{ apiError.error.code }}")
+            .doesNotContain("消息键：{{ apiError.error.messageKey }}");
+
+        assertThat(queueTicketListSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("错误代码：{{ apiError.error.code }}")
+            .doesNotContain("消息键：{{ apiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ callApiError.error.code }}")
+            .doesNotContain("消息键：{{ callApiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ skipApiError.error.code }}")
+            .doesNotContain("消息键：{{ skipApiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ rejoinApiError.error.code }}")
+            .doesNotContain("消息键：{{ rejoinApiError.error.messageKey }}")
+            .doesNotContain("错误代码：{{ cancelApiError.error.code }}")
+            .doesNotContain("消息键：{{ cancelApiError.error.messageKey }}");
+
+        assertThat(tableResourceListSource)
+            .contains("formatAppGateErrorMessage")
+            .contains("formatAppGateErrorTitle")
+            .doesNotContain("<strong>{{ apiError.error.code }}</strong>")
+            .doesNotContain("<span>{{ apiError.error.messageKey }}</span>")
+            .doesNotContain("<strong>{{ actionError.error.code }}</strong>")
+            .doesNotContain("<span>{{ actionError.error.messageKey }}</span>");
+
+        assertThat(appGateMessagesSource)
+            .contains("TENANT_APP_NOT_ENABLED")
+            .contains("appGate.errors.tenantAppNotEnabled.title")
+            .contains("appGate.errors.tenantAppNotEnabled.message")
+            .contains("TENANT_APP_EXPIRED")
+            .contains("appGate.errors.tenantAppExpired.title")
+            .contains("PERMISSION_DENIED")
+            .contains("appGate.errors.permissionDenied.title")
+            .doesNotContain("错误代码")
+            .doesNotContain("消息键");
     }
 
     @Test
@@ -109,9 +150,9 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
     @Test
     void localValidationDefaultsUseSingleStoreBaseline() throws Exception {
-        String routerSource = Files.readString(Path.of("src", "router", "index.ts"));
-        String storeContextSource = Files.readString(Path.of("src", "stores", "storeContext.ts"));
-        String handoffSource = Files.readString(Path.of("docs", "frontend", "STORE_STAFF_OPERATIONAL_HANDOFF.md"));
+        String routerSource = FrontendSourceSupport.readString(Path.of("src", "router", "index.ts"));
+        String storeContextSource = FrontendSourceSupport.readString(Path.of("src", "stores", "storeContext.ts"));
+        String handoffSource = FrontendSourceSupport.readString(Path.of("docs", "frontend", "STORE_STAFF_OPERATIONAL_HANDOFF.md"));
 
         assertThat(routerSource)
             .contains(LOCAL_VALIDATION_STORE_ID)
@@ -142,14 +183,11 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
 
         for (Path path : List.of(
             Path.of("src", "pages", "StoreStaffHomePage.vue"),
-            Path.of("src", "components", "staff-home", "StaffHomeActionGroup.vue"),
             Path.of("src", "components", "staff-home", "StaffHomeTopBar.vue"),
-            Path.of("src", "components", "staff-home", "StaffHomeWorkflowStrip.vue"),
-            Path.of("src", "components", "staff-home", "staffHomeActions.ts"),
             Path.of("src", "components", "staff-home", "useCurrentClock.ts")
         )) {
             if (Files.exists(path)) {
-                source.append(Files.readString(path)).append('\n');
+                source.append(FrontendSourceSupport.readString(path)).append('\n');
             }
         }
 

@@ -1,111 +1,196 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import {
   SeatingFromCalledQueueApiError,
   seatCalledQueueTicket
 } from '../api/seatingFromCalledQueueApi'
+import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import StaffHomeWorkflowStrip from '../components/staff-home/StaffHomeWorkflowStrip.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
+import TableResourcePicker from '../components/staff-table/TableResourcePicker.vue'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
   SeatCalledQueueTicketRequest,
-  SeatCalledQueueTicketResponse,
   SeatingFromCalledQueueApiErrorResponse
 } from '../types/seatingFromCalledQueue'
+import { useGeneratedText } from '../i18n/generatedText'
+
+const { gt } = useGeneratedText()
 
 const route = useRoute()
+const router = useRouter()
 const storeContext = useStoreContextStore()
+const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
 const form = reactive({
   queueTicketId: '',
   tableId: '',
   tableGroupId: '',
-  overrideReasonCode: '',
-  overrideNote: '',
-  note: ''
+  temporaryTableIds: [] as string[]
 })
 
 const isSubmitting = ref(false)
-const result = ref<SeatCalledQueueTicketResponse | null>(null)
 const apiError = ref<SeatingFromCalledQueueApiErrorResponse | null>(null)
-const lastIdempotencyKey = ref('')
+const queuePartySize = ref<number | null>(null)
+const assignedResourceType = ref('')
+const assignedResourceId = ref('')
+const assignedResourceCode = ref('')
+const assignedResourceLabel = ref('')
+const assignedResourceAreaName = ref('')
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
-const staffHomeRoute = computed(() => ({
-  name: 'store-staff-home',
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
+const appStatusLabel = computed(() => (isSubmitting.value ? gt('generated.seating-from-called-queue.019') : gt('generated.seating-from-called-queue.020')))
+const tableResourceListRoute = computed(() => ({
+  name: 'table-resource-list',
   params: {
-    storeId: storeId.value
+    storeId: storeId.value || ''
   }
 }))
 const hasQueueTicketId = computed(() => !!form.queueTicketId.trim())
 const hasTableId = computed(() => !!form.tableId.trim())
 const hasTableGroupId = computed(() => !!form.tableGroupId.trim())
-const hasExactlyOneResource = computed(() => hasTableId.value !== hasTableGroupId.value)
+const hasTemporaryTables = computed(() => form.temporaryTableIds.length > 0)
+const selectedResourceCount = computed(
+  () => Number(hasTableId.value) + Number(hasTableGroupId.value) + Number(hasTemporaryTables.value)
+)
+const hasAssignedResource = computed(() => !!assignedResourceType.value && !!assignedResourceId.value)
+const assignedResourceSelectionSatisfied = computed(() => {
+  if (!hasAssignedResource.value) {
+    return true
+  }
+
+  if (assignedResourceType.value === 'dining_table') {
+    return form.tableId === assignedResourceId.value && !hasTableGroupId.value && !hasTemporaryTables.value
+  }
+
+  if (assignedResourceType.value === 'table_group') {
+    return form.tableGroupId === assignedResourceId.value && !hasTableId.value && !hasTemporaryTables.value
+  }
+
+  return false
+})
+const hasValidTemporaryTables = computed(
+  () => !hasTemporaryTables.value || form.temporaryTableIds.length >= 2
+)
+const hasExactlyOneResource = computed(
+  () => selectedResourceCount.value === 1 && hasValidTemporaryTables.value
+)
 const resourceSelectionError = computed(() => {
   if (!hasQueueTicketId.value) {
     return null
   }
 
-  if (!hasTableId.value && !hasTableGroupId.value) {
-    return createLocalError('RESOURCE_SELECTION_REQUIRED', 'queue.seat.resource_selection_required')
-      .error
-  }
-
-  if (hasTableId.value && hasTableGroupId.value) {
+  if (selectedResourceCount.value > 1) {
     return createLocalError('RESOURCE_SELECTION_CONFLICT', 'queue.seat.resource_selection_conflict')
       .error
   }
 
+  if (form.temporaryTableIds.length === 1) {
+    return createLocalError(
+      'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED',
+      'queue.seat.temporary_table_group_member_required'
+    ).error
+  }
+
+  if (
+    hasAssignedResource.value &&
+    selectedResourceCount.value > 0 &&
+    !assignedResourceSelectionSatisfied.value
+  ) {
+    return createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+      .error
+  }
+
   return null
+})
+const resourceSelectionHint = computed(() => {
+  if (hasAssignedResource.value) {
+    return assignedResourceSelectionSatisfied.value
+      ? gt('generated.seating-from-called-queue.021')
+      : gt('generated.seating-from-called-queue.022')
+  }
+
+  if (!hasQueueTicketId.value || selectedResourceCount.value !== 0) {
+    return ''
+  }
+
+  return gt('generated.seating-from-called-queue.023')
 })
 const canSubmit = computed(
   () =>
     !isSubmitting.value &&
     !!storeId.value &&
     hasQueueTicketId.value &&
-    hasExactlyOneResource.value
+    hasExactlyOneResource.value &&
+    assignedResourceSelectionSatisfied.value
 )
-const seatedQueueStatus = computed(() => result.value?.queueTicketStatus === 'seated')
-const seatedReservationStatus = computed(() => result.value?.reservationStatus === 'seated')
-const eventsDisplay = computed(() => {
-  if (!result.value?.events.length) {
-    return '[]'
-  }
+const queueTicketContextText = computed(() =>
+  hasQueueTicketId.value ? gt('generated.seating-from-called-queue.024') : gt('generated.seating-from-called-queue.025')
+)
+const assignedResourceDisplayText = computed(() => {
+  const code = assignedResourceLabel.value || assignedResourceCode.value || assignedResourceId.value
+  const prefix = assignedResourceType.value === 'table_group' ? gt('generated.seating-from-called-queue.026') : gt('generated.seating-from-called-queue.027')
+  const area = assignedResourceAreaName.value ? ` · ${assignedResourceAreaName.value}` : ''
 
-  return result.value.events.join(', ')
+  return `${prefix} ${code}${area}`
 })
 
 watch(
-  () => route.query.queueTicketId,
-  value => {
-    const queueTicketId = queryValue(value)
+  () => [
+    route.query.queueTicketId,
+    route.query.partySize,
+    route.query.assignedResourceType,
+    route.query.assignedResourceId,
+    route.query.assignedResourceCode,
+    route.query.assignedResourceLabel,
+    route.query.assignedResourceAreaName
+  ] as const,
+  () => {
+    const queueTicketId = queryValue(route.query.queueTicketId)
+
+    if (queueTicketId && queueTicketId !== form.queueTicketId) {
+      form.tableId = ''
+      form.tableGroupId = ''
+      form.temporaryTableIds = []
+    }
 
     if (queueTicketId) {
       form.queueTicketId = queueTicketId
     }
+
+    queuePartySize.value = parsePartySize(queryValue(route.query.partySize))
+    assignedResourceType.value = normalizeAssignedResourceType(queryValue(route.query.assignedResourceType))
+    assignedResourceId.value = queryValue(route.query.assignedResourceId)
+    assignedResourceCode.value = queryValue(route.query.assignedResourceCode)
+    assignedResourceLabel.value = queryValue(route.query.assignedResourceLabel)
+    assignedResourceAreaName.value = queryValue(route.query.assignedResourceAreaName)
+    applyAssignedResourceSelection()
   },
   { immediate: true }
 )
 
 async function submitQueueSeating(): Promise<void> {
   apiError.value = validateForm()
-  result.value = null
 
   if (apiError.value || !storeId.value) {
     return
   }
 
   const idempotencyKey = createIdempotencyKey()
-  lastIdempotencyKey.value = idempotencyKey
   isSubmitting.value = true
 
   try {
-    result.value = await seatCalledQueueTicket(
+    await seatCalledQueueTicket(
       storeId.value,
       form.queueTicketId.trim(),
       toRequest(),
       idempotencyKey
     )
+    await router.push(tableResourceListRoute.value)
   } catch (error) {
     apiError.value =
       error instanceof SeatingFromCalledQueueApiError
@@ -125,38 +210,106 @@ function validateForm(): SeatingFromCalledQueueApiErrorResponse | null {
     return createLocalError('INVALID_COMMAND', 'queue.seat.queue_ticket_id_required')
   }
 
-  if (!hasTableId.value && !hasTableGroupId.value) {
+  if (selectedResourceCount.value === 0) {
     return createLocalError('RESOURCE_SELECTION_REQUIRED', 'queue.seat.resource_selection_required')
   }
 
-  if (hasTableId.value && hasTableGroupId.value) {
+  if (selectedResourceCount.value > 1) {
     return createLocalError('RESOURCE_SELECTION_CONFLICT', 'queue.seat.resource_selection_conflict')
   }
 
+  if (form.temporaryTableIds.length === 1) {
+    return createLocalError(
+      'TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED',
+      'queue.seat.temporary_table_group_member_required'
+    )
+  }
+
+  if (hasAssignedResource.value && !assignedResourceSelectionSatisfied.value) {
+    return createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+  }
+
   return null
+}
+
+function selectTable(tableId: string): void {
+  clearSubmissionError()
+  if (!isAssignedResourceSelectionAllowed('dining_table', tableId)) {
+    apiError.value = createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+    applyAssignedResourceSelection()
+    return
+  }
+
+  form.tableId = tableId
+  form.tableGroupId = ''
+  form.temporaryTableIds = []
+}
+
+function selectTableGroup(tableGroupId: string): void {
+  clearSubmissionError()
+  if (!isAssignedResourceSelectionAllowed('table_group', tableGroupId)) {
+    apiError.value = createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+    applyAssignedResourceSelection()
+    return
+  }
+
+  form.tableGroupId = tableGroupId
+  form.tableId = ''
+  form.temporaryTableIds = []
+}
+
+function selectTemporaryTables(tableIds: string[]): void {
+  clearSubmissionError()
+  if (hasAssignedResource.value) {
+    apiError.value = createLocalError('ASSIGNED_RESOURCE_REQUIRED', 'queue.seat.assigned_resource_required')
+    applyAssignedResourceSelection()
+    return
+  }
+
+  form.temporaryTableIds = tableIds
+  form.tableId = ''
+  form.tableGroupId = ''
+}
+
+function applyAssignedResourceSelection(): void {
+  if (!hasAssignedResource.value) {
+    return
+  }
+
+  if (assignedResourceType.value === 'table_group') {
+    form.tableGroupId = assignedResourceId.value
+    form.tableId = ''
+    form.temporaryTableIds = []
+    return
+  }
+
+  form.tableId = assignedResourceId.value
+  form.tableGroupId = ''
+  form.temporaryTableIds = []
+}
+
+function isAssignedResourceSelectionAllowed(resourceType: string, resourceId: string): boolean {
+  return (
+    !hasAssignedResource.value ||
+    (assignedResourceType.value === resourceType && assignedResourceId.value === resourceId)
+  )
+}
+
+function clearSubmissionError(): void {
+  apiError.value = null
 }
 
 function toRequest(): SeatCalledQueueTicketRequest {
   return {
     tableId: optionalValue(form.tableId),
     tableGroupId: optionalValue(form.tableGroupId),
-    overrideReasonCode: optionalValue(form.overrideReasonCode),
-    overrideNote: optionalValue(form.overrideNote),
-    note: optionalValue(form.note)
+    temporaryTableIds: form.temporaryTableIds.length ? form.temporaryTableIds : null
   }
 }
 
 function optionalValue(value: string): string | null {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
-}
-
-function optionalDisplay(value: string | number | boolean | null | undefined): string {
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-
-  return value?.trim() ? value : '未返回'
 }
 
 function createIdempotencyKey(): string {
@@ -185,6 +338,14 @@ function createLocalError(
   }
 }
 
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return gt('generated.seating-from-called-queue.028')
+  }
+
+  return `${gt('generated.seating-from-called-queue.018')}${value.slice(0, 8)}`
+}
+
 function queryValue(value: unknown): string {
   if (Array.isArray(value)) {
     return typeof value[0] === 'string' ? value[0] : ''
@@ -192,280 +353,208 @@ function queryValue(value: unknown): string {
 
   return typeof value === 'string' ? value : ''
 }
+
+function parsePartySize(value: string): number | null {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function normalizeAssignedResourceType(value: string): string {
+  return value === 'dining_table' || value === 'table_group' ? value : ''
+}
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>排队入座</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
-    </section>
+  <main class="staff-workbench-shell queue-seating-workbench">
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="currentBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    />
 
-    <form class="queue-seating-form" @submit.prevent="submitQueueSeating">
-      <label class="queue-ticket-id-field">
-        <span>排队票 ID</span>
-        <input
-          v-model="form.queueTicketId"
-          autocomplete="off"
-          name="queueTicketId"
-          required
-          type="text"
-        />
-      </label>
+    <div class="queue-seating-workbench-body">
+      <StaffHomeWorkflowStrip />
 
-      <section class="resource-panel" aria-label="桌台选择">
-        <p class="resource-rule">桌台 ID 和桌组 ID 必须二选一</p>
-        <label>
-          <span>桌台 ID</span>
-          <input v-model="form.tableId" autocomplete="off" name="tableId" type="text" />
-        </label>
-        <label>
-          <span>桌组 ID</span>
-          <input v-model="form.tableGroupId" autocomplete="off" name="tableGroupId" type="text" />
-        </label>
-        <p v-if="resourceSelectionError" class="resource-error">
-          错误代码：{{ resourceSelectionError.code }}<br />
-          消息键：{{ resourceSelectionError.messageKey }}
-        </p>
-      </section>
+      <form class="queue-seating-form" @submit.prevent="submitQueueSeating">
+        <header class="queue-seating-heading">
+          <div>
+            <p>{{ gt('generated.seating-from-called-queue.001') }}</p>
+            <h1>{{ gt('generated.seating-from-called-queue.002') }}</h1>
+          </div>
+          <span class="queue-source-pill">{{ queueTicketContextText }}</span>
+        </header>
 
-      <details class="field-group">
-        <summary>调整信息</summary>
-        <label>
-          <span>调整原因代码（可选）</span>
-          <input v-model="form.overrideReasonCode" name="overrideReasonCode" type="text" />
-        </label>
-        <label>
-          <span>调整说明（可选）</span>
-          <textarea v-model="form.overrideNote" name="overrideNote" rows="3" />
-        </label>
-      </details>
+        <section class="queue-ticket-context" :aria-label="gt('generated.seating-from-called-queue.003')">
+          <span>{{ gt('generated.seating-from-called-queue.004') }}</span>
+          <strong>{{ hasQueueTicketId ? gt('generated.seating-from-called-queue.005') : gt('generated.seating-from-called-queue.006') }}</strong>
+        </section>
 
-      <details class="field-group">
-        <summary>备注</summary>
-        <label>
-          <span>备注（可选）</span>
-          <textarea v-model="form.note" name="note" rows="3" />
-        </label>
-      </details>
+        <section v-if="hasAssignedResource" class="assigned-resource-context" :aria-label="gt('generated.seating-from-called-queue.007')">
+          <span>{{ gt('generated.seating-from-called-queue.008') }}</span>
+          <strong>{{ assignedResourceDisplayText }}</strong>
+          <small>{{ gt('generated.seating-from-called-queue.009') }}</small>
+        </section>
 
-      <button class="submit-button" :disabled="!canSubmit" type="submit">
-        {{ isSubmitting ? '提交中...' : '确认入座' }}
-      </button>
-    </form>
+        <section class="resource-panel" :aria-label="gt('generated.seating-from-called-queue.010')">
+          <TableResourcePicker
+            :store-id="storeId"
+            :party-size="queuePartySize"
+            :business-date="currentBusinessDate"
+            :available-only="true"
+            :selected-table-id="form.tableId"
+            :selected-table-group-id="form.tableGroupId"
+            :selected-temporary-table-ids="form.temporaryTableIds"
+            :required-resource-type="assignedResourceType"
+            :required-resource-id="assignedResourceId"
+            :temporary-selection-enabled="!hasAssignedResource"
+            :show-selection-mode-controls="!hasAssignedResource"
+            @select-table="selectTable"
+            @select-table-group="selectTableGroup"
+            @select-temporary-tables="selectTemporaryTables"
+          />
+          <p v-if="resourceSelectionError" class="resource-error"> {{ gt('generated.seating-from-called-queue.011') }}{{ resourceSelectionError.code }}<br /> {{ gt('generated.seating-from-called-queue.012') }}{{ resourceSelectionError.messageKey }}
+          </p>
+          <p v-if="resourceSelectionHint" class="resource-hint">
+            {{ resourceSelectionHint }}
+          </p>
+        </section>
 
-    <section v-if="result" class="result-panel success-panel" aria-live="polite">
-      <h2>{{ result.alreadySeated ? '已入座' : '入座成功' }}</h2>
-      <div class="queue-highlight ticket-highlight">
-        <span>排队号码</span>
-        <strong>{{ result.queueTicketNumber }}</strong>
-      </div>
-      <div class="queue-highlight status-highlight">
-        <span>排队状态</span>
-        <strong>{{ result.queueTicketStatus }}</strong>
-      </div>
-      <div class="queue-highlight status-highlight">
-        <span>预约状态</span>
-        <strong>{{ result.reservationStatus }}</strong>
-      </div>
-      <div class="queue-highlight">
-        <span>预约编号</span>
-        <strong>{{ result.reservationCode }}</strong>
-      </div>
-      <div class="queue-highlight seating-highlight">
-        <span>入座记录 ID</span>
-        <strong>{{ result.seatingId }}</strong>
-      </div>
-      <div class="queue-highlight">
-        <span>资源</span>
-        <strong>{{ result.resourceType }} {{ result.resourceId }}</strong>
-      </div>
-      <div class="queue-highlight already-seated-highlight">
-        <span>是否已入座</span>
-        <strong>{{ result.alreadySeated }}</strong>
-      </div>
-      <p v-if="seatedQueueStatus" class="seated-note">排队状态：seated</p>
-      <p v-if="seatedReservationStatus" class="seated-note">预约状态：seated</p>
-      <p v-if="result.alreadySeated" class="seated-note">该排队票已有入座记录，本次按成功展示。</p>
-      <dl>
-        <div>
-          <dt>排队记录 ID</dt>
-          <dd>{{ result.queueTicketId }}</dd>
-        </div>
-        <div>
-          <dt>预约 ID</dt>
-          <dd>{{ result.reservationId }}</dd>
-        </div>
-        <div>
-          <dt>入座状态</dt>
-          <dd>{{ result.seatingStatus }}</dd>
-        </div>
-        <div>
-          <dt>资源类型</dt>
-          <dd>{{ result.resourceType }}</dd>
-        </div>
-        <div>
-          <dt>资源 ID</dt>
-          <dd>{{ result.resourceId }}</dd>
-        </div>
-        <div>
-          <dt>事件</dt>
-          <dd>{{ eventsDisplay }}</dd>
-        </div>
-        <div>
-          <dt>幂等状态</dt>
-          <dd>{{ result.idempotency.status }}</dd>
-        </div>
-        <div>
-          <dt>幂等重放</dt>
-          <dd>{{ optionalDisplay(result.idempotency.replayed ?? false) }}</dd>
-        </div>
-      </dl>
-    </section>
+        <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
+          <h2>{{ gt('generated.seating-from-called-queue.013') }}</h2>
+          <p class="error-code">{{ gt('generated.seating-from-called-queue.014') }}{{ apiError.error.code }}</p>
+          <p class="message-key">{{ gt('generated.seating-from-called-queue.015') }}{{ apiError.error.messageKey }}</p>
+        </section>
 
-    <section v-if="apiError" class="result-panel error-panel" aria-live="assertive">
-      <h2>入座失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
-    </section>
+        <button class="submit-button" :disabled="!canSubmit" type="submit">
+          {{ isSubmitting ? gt('generated.seating-from-called-queue.016') : gt('generated.seating-from-called-queue.017') }}
+        </button>
+      </form>
+    </div>
 
-    <p v-if="lastIdempotencyKey" class="idempotency-key">
-      幂等键 {{ lastIdempotencyKey }}
-    </p>
+    <StaffBottomNav :store-id="storeId" active-tab="queue" />
   </main>
 </template>
 
 <style scoped>
-.page-shell {
+.queue-seating-workbench-body {
   display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 620px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
-}
-
-.page-header {
-  display: grid;
-  gap: 4px;
-}
-
-.eyebrow,
-.store-context,
-.idempotency-key,
-.resource-rule,
-.seated-note {
-  color: #667085;
-  font-size: 0.82rem;
-  margin: 0;
-}
-
-.seated-note {
-  color: #176b4d;
-  font-weight: 800;
-}
-
-.home-link {
-  color: #315f91;
-  font-size: 0.86rem;
-  font-weight: 800;
-  justify-self: start;
-  text-decoration: none;
-}
-
-h1,
-h2 {
-  color: #14213d;
-  letter-spacing: 0;
-  margin: 0;
-}
-
-h1 {
-  font-size: 1.7rem;
-  line-height: 1.15;
-}
-
-h2 {
-  font-size: 1rem;
+  gap: 14px;
+  padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
 }
 
 .queue-seating-form,
 .result-panel {
   background: #ffffff;
-  border: 1px solid #d8e0eb;
-  border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
 }
 
 .queue-seating-form {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   padding: 14px;
 }
 
-label {
+.queue-seating-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.queue-seating-heading > div {
   display: grid;
-  gap: 6px;
+  gap: 3px;
+  min-width: 0;
 }
 
-label span,
-summary,
-dt,
-.queue-highlight span {
-  color: #41516a;
-  font-size: 0.86rem;
-  font-weight: 700;
+.queue-seating-heading p,
+.queue-ticket-context span,
+.assigned-resource-context span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
 }
 
-input,
-textarea {
-  background: #fbfcfe;
-  border: 1px solid #c8d3e2;
-  border-radius: 6px;
-  color: #182536;
-  min-height: 44px;
-  outline: none;
-  padding: 10px 11px;
-  width: 100%;
+h1,
+h2,
+.queue-ticket-context strong,
+.assigned-resource-context strong {
+  color: #0f172a;
+  letter-spacing: 0;
+  margin: 0;
 }
 
-input:focus,
-textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+h1 {
+  font-size: 1.24rem;
+  line-height: 1.15;
 }
 
-.queue-ticket-id-field {
+h2 {
+  font-size: 0.98rem;
+}
+
+.queue-source-pill {
+  align-items: center;
   background: #fff7ed;
   border: 1px solid #fed7aa;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 999px;
+  color: #c2410c;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 
-.queue-ticket-id-field input {
-  background: #ffffff;
-  font-size: 1.05rem;
-  font-weight: 800;
-  min-height: 56px;
-}
-
-.resource-panel,
-.field-group {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+.queue-ticket-context {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
   padding: 10px 12px;
 }
 
-.resource-panel {
-  display: grid;
-  gap: 12px;
+.queue-ticket-context strong {
+  font-size: 0.96rem;
 }
 
-.resource-rule {
-  color: #315f91;
+.assigned-resource-context {
+  background: #ecfdf5;
+  border: 1px solid #5eead4;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.assigned-resource-context strong {
+  color: #0f766e;
+  font-size: 1.08rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.assigned-resource-context small {
+  color: #0f766e;
+  font-size: 0.78rem;
   font-weight: 800;
+}
+
+.resource-panel {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  padding: 10px 12px;
 }
 
 .resource-error {
@@ -476,22 +565,23 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
-.field-group[open] {
-  display: grid;
-  gap: 12px;
-}
-
-summary {
-  cursor: pointer;
-  min-height: 32px;
+.resource-hint {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin: 0;
+  padding: 9px 10px;
 }
 
 .submit-button {
-  background: #176b4d;
+  background: #197a55;
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 900;
   min-height: 52px;
   padding: 0 16px;
 }
@@ -503,72 +593,12 @@ summary {
 
 .result-panel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   padding: 14px;
 }
 
-.success-panel {
-  border-color: #a7d7be;
-}
-
 .error-panel {
-  border-color: #f4b8b8;
-}
-
-.queue-highlight {
-  background: #eef6f1;
-  border: 1px solid #b8d8c4;
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  padding: 11px;
-}
-
-.ticket-highlight {
-  background: #fff7ed;
-  border-color: #fed7aa;
-}
-
-.ticket-highlight strong {
-  color: #c2410c;
-  font-size: 1.55rem;
-}
-
-.status-highlight {
-  background: #eaf2ff;
-  border-color: #b8cdf6;
-}
-
-.seating-highlight {
-  background: #f0f9ff;
-  border-color: #bae6fd;
-}
-
-.already-seated-highlight {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-.queue-highlight strong {
-  color: #14213d;
-  font-size: 1.1rem;
-  overflow-wrap: anywhere;
-}
-
-dl {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-dt,
-dd {
-  margin: 0;
-}
-
-dd {
-  color: #1d2736;
-  overflow-wrap: anywhere;
+  border-color: #fecaca;
 }
 
 .error-code {
@@ -588,12 +618,8 @@ dd {
 }
 
 @media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
-  }
-
-  h1 {
-    font-size: 2rem;
+  .queue-seating-workbench-body {
+    padding-top: 16px;
   }
 }
 </style>

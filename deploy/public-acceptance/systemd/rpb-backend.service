@@ -1,0 +1,28 @@
+[Unit]
+Description=RPB backend protected public acceptance service
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rpb
+Group=rpb
+WorkingDirectory=/opt/rpb/app
+EnvironmentFile=/etc/rpb/rpb-backend.env
+ExecStart=/usr/bin/java \
+  -jar /opt/rpb/app/reservation-platform.jar \
+  --server.port=${SERVER_PORT} \
+  --spring.flyway.enabled=${SPRING_FLYWAY_ENABLED} \
+  --rpb.local-auth.enabled=${RPB_LOCAL_AUTH_ENABLED} \
+  --rpb.call-screen-media.storage-root=${RPB_CALL_SCREEN_MEDIA_STORAGE_ROOT}
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/rpb/media /opt/rpb/logs
+
+[Install]
+WantedBy=multi-user.target

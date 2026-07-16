@@ -16,17 +16,19 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         Path routerPath = Path.of("src", "router", "index.ts");
         Path staffHomePath = Path.of("src", "pages", "StoreStaffHomePage.vue");
         Path reportPath = Path.of("docs", "frontend", "SEATING_FROM_CALLED_QUEUE_UI_IMPLEMENTATION_REPORT.md");
+        Path zhPath = Path.of("src", "i18n", "locales", "zh-CN.ts");
 
         assertThat(pagePath).exists();
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
         assertThat(reportPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
-        String router = Files.readString(routerPath);
-        String staffHome = Files.readString(staffHomePath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
+        String router = FrontendSourceSupport.readString(routerPath);
+        String staffHome = FrontendSourceSupport.readString(staffHomePath);
+        String zh = FrontendSourceSupport.readString(zhPath);
 
         assertThat(router)
             .contains("SeatingFromCalledQueuePage")
@@ -41,10 +43,13 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         assertThat(staffHome)
             .contains("queue.seat")
             .contains("canSeatCalledQueueTicket")
-            .contains("name: 'seating-from-called-queue'")
-            .contains("排队入座")
-            .contains("输入已叫号排队票 ID 并安排桌台入座")
+            .contains("to: queueTicketListRoute.value")
+            .contains("staffHome.actions.seatQueue.label")
+            .contains("staffHome.actions.seatQueue.description")
             .contains("hasVisibleOperation");
+        assertThat(zh)
+            .contains("label: '排队入座'")
+            .contains("description: '从已叫号票直接安排桌台'");
         assertForbiddenQueueSeatOperationsAbsent(staffHome);
 
         assertThat(apiClient)
@@ -81,34 +86,145 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
             .contains("idempotency");
 
         assertThat(page)
+            .contains("StaffHomeTopBar")
+            .contains("StaffHomeWorkflowStrip")
+            .contains("StaffBottomNav")
+            .contains("queue-seating-workbench")
+            .contains("queue-seating-workbench-body")
             .contains("<h1>排队入座</h1>")
             .contains("route.query.queueTicketId")
             .contains("queueTicketId")
             .contains("tableId")
             .contains("tableGroupId")
-            .contains("overrideReasonCode")
-            .contains("overrideNote")
-            .contains("note")
             .contains("hasExactlyOneResource")
             .contains("RESOURCE_SELECTION_REQUIRED")
             .contains("RESOURCE_SELECTION_CONFLICT")
             .contains("createIdempotencyKey")
             .contains("queue:seat")
-            .contains("lastIdempotencyKey")
             .contains("seatCalledQueueTicket")
-            .contains("queueTicketNumber")
-            .contains("queueTicketStatus")
-            .contains("reservationStatus")
-            .contains("seatingId")
-            .contains("seatingStatus")
-            .contains("resourceType")
-            .contains("resourceId")
-            .contains("alreadySeated")
-            .contains("eventsDisplay")
-            .contains("idempotency")
+            .contains("router.push(tableResourceListRoute.value)")
             .contains("error.code")
-            .contains("error.messageKey");
+            .contains("error.messageKey")
+            .doesNotContain("page-shell")
+            .doesNotContain("返回员工首页")
+            .doesNotContain("store-context")
+            .doesNotContain("name=\"queueTicketId\"")
+            .doesNotContain("排队票 ID")
+            .doesNotContain("手动填写资源 ID")
+            .doesNotContain("调整信息")
+            .doesNotContain("备注")
+            .doesNotContain("overrideReasonCode")
+            .doesNotContain("overrideNote")
+            .doesNotContain("lastIdempotencyKey")
+            .doesNotContain("eventsDisplay")
+            .doesNotContain("幂等键")
+            .doesNotContain("资源 ID");
         assertForbiddenFormFieldsAbsent(page);
+    }
+
+    @Test
+    void seatingFromCalledQueueUiDoesNotShowRequiredResourceAsInitialError() throws Exception {
+        String page = FrontendSourceSupport.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+
+        int errorStart = page.indexOf("const resourceSelectionError = computed");
+        int hintStart = page.indexOf("const resourceSelectionHint = computed");
+        assertThat(errorStart).isGreaterThanOrEqualTo(0);
+        assertThat(hintStart).isGreaterThan(errorStart);
+
+        String inlineSelectionError = page.substring(errorStart, hintStart);
+
+        assertThat(inlineSelectionError)
+            .doesNotContain("selectedResourceCount.value === 0")
+            .contains("selectedResourceCount.value > 1")
+            .contains("form.temporaryTableIds.length === 1");
+        assertThat(page)
+            .contains("resourceSelectionHint")
+            .contains("请选择桌台、桌组，或在临时组合中选择至少 2 张桌台")
+            .contains("v-if=\"resourceSelectionHint\"")
+            .contains("v-if=\"resourceSelectionError\"");
+    }
+
+    @Test
+    void queueSeatingApiAcceptsWalkInSuccessResponseWithoutReservationFields() throws Exception {
+        String apiClient = FrontendSourceSupport.readString(Path.of("src", "api", "seatingFromCalledQueueApi.ts"));
+        String types = FrontendSourceSupport.readString(Path.of("src", "types", "seatingFromCalledQueue.ts"));
+
+        assertThat(types)
+            .contains("reservationId?: string | null")
+            .contains("reservationCode?: string | null")
+            .contains("reservationStatus?: string | null");
+
+        assertThat(apiClient)
+            .contains("isOptionalString(candidate.reservationId)")
+            .contains("isOptionalString(candidate.reservationCode)")
+            .contains("isOptionalString(candidate.reservationStatus)")
+            .doesNotContain("typeof candidate.reservationId === 'string' &&")
+            .doesNotContain("typeof candidate.reservationCode === 'string' &&")
+            .doesNotContain("typeof candidate.reservationStatus === 'string' &&");
+    }
+
+    @Test
+    void queueSeatingRoutesCarryReservationPreassignmentContext() throws Exception {
+        String queueListPage = FrontendSourceSupport.readString(Path.of("src", "pages", "QueueTicketListPage.vue"));
+        String todayViewPage = FrontendSourceSupport.readString(Path.of("src", "pages", "ReservationTodayViewPage.vue"));
+
+        assertThat(queueListPage)
+            .contains("queueSeatRoute(item: QueueTicketListItem)")
+            .contains("partySize: String(item.partySize)")
+            .contains("assignedResourceType: optionalQueryValue(item.assignedResourceType)")
+            .contains("assignedResourceId: optionalQueryValue(item.assignedResourceId)")
+            .contains("assignedResourceCode: optionalQueryValue(item.assignedResourceCode)")
+            .contains("assignedResourceLabel: optionalQueryValue(item.assignedResourceLabel)")
+            .contains("assignedResourceAreaName: optionalQueryValue(item.assignedResourceAreaName)");
+
+        assertThat(todayViewPage)
+            .contains("queueSeatingRouteQuery(item)")
+            .contains("partySize: String(item.partySize)")
+            .contains("assignedResourceType: optionalRouteQueryValue(item.assignedResourceType)")
+            .contains("assignedResourceId: optionalRouteQueryValue(item.assignedResourceId)")
+            .contains("assignedResourceCode: optionalRouteQueryValue(item.assignedResourceCode)");
+    }
+
+    @Test
+    void seatingFromCalledQueueUiAutoSelectsAndLocksReservationAssignedResource() throws Exception {
+        String page = FrontendSourceSupport.readString(Path.of("src", "pages", "SeatingFromCalledQueuePage.vue"));
+
+        assertThat(page)
+            .contains("route.query.assignedResourceType")
+            .contains("route.query.assignedResourceId")
+            .contains("route.query.assignedResourceCode")
+            .contains("queuePartySize")
+            .contains("hasAssignedResource")
+            .contains("assignedResourceSelectionSatisfied")
+            .contains("applyAssignedResourceSelection")
+            .contains("预约指定")
+            .contains("已自动选择")
+            .contains(":party-size=\"queuePartySize\"")
+            .contains(":required-resource-type=\"assignedResourceType\"")
+            .contains(":required-resource-id=\"assignedResourceId\"")
+            .contains(":temporary-selection-enabled=\"!hasAssignedResource\"")
+            .contains(":show-selection-mode-controls=\"!hasAssignedResource\"")
+            .contains("ASSIGNED_RESOURCE_REQUIRED")
+            .contains("queue.seat.assigned_resource_required");
+    }
+
+    @Test
+    void tableResourcePickerCanRestrictSelectionToRequiredResource() throws Exception {
+        String picker = FrontendSourceSupport.readString(Path.of("src", "components", "staff-table", "TableResourcePicker.vue"));
+        String zhSource = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "zh-CN.ts"));
+
+        assertThat(picker)
+            .contains("requiredResourceType?: string | null")
+            .contains("requiredResourceId?: string | null")
+            .contains("hasRequiredResource")
+            .contains("matchesRequiredResource")
+            .contains("if (hasRequiredResource.value && !matchesRequiredResource(resource))")
+            .contains("staffControls.tablePicker.mustUseRequiredResource")
+            .contains("resource.selectable || matchesRequiredResource(resource)");
+
+        assertThat(zhSource)
+            .contains("requiredResource: '预约指定'")
+            .contains("mustUseRequiredResource: '需使用预约指定桌台'");
     }
 
     @Test
@@ -125,7 +241,6 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
                 "src/pages/QueuePage.vue",
                 "src/pages/QueueSkipPage.vue",
                 "src/pages/QueueRejoinPage.vue",
-                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueWorkbenchPage.vue",
                 "src/pages/SeatingFromQueuePage.vue",
                 "src/pages/TableMapPage.vue",
@@ -142,7 +257,6 @@ class SeatingFromCalledQueueUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/seatingFromCalledQueueApi.ts")
             .doesNotContain(
-                "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
                 "src/api/queueCallFromListApi.ts",
                 "src/api/queueSeatFromListApi.ts",

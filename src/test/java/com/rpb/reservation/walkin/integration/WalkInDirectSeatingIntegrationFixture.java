@@ -45,7 +45,7 @@ final class WalkInDirectSeatingIntegrationFixture {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-it', 'Integration Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             STORE_ID,
             TENANT_ID
@@ -57,7 +57,7 @@ final class WalkInDirectSeatingIntegrationFixture {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-it-other', 'Integration Other Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             OTHER_STORE_ID,
             TENANT_ID
@@ -115,6 +115,26 @@ final class WalkInDirectSeatingIntegrationFixture {
             lockKey,
             now.plusMinutes(10),
             now
+        );
+    }
+
+    void createExpiredActiveLock(UUID tableId, String lockKey) {
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update(
+            """
+            insert into table_locks (
+                id, tenant_id, store_id, resource_type, resource_id, lock_key, lock_owner,
+                locked_until_at, source_type, source_id, idempotency_key, status, locked_at
+            )
+            values (gen_random_uuid(), ?, ?, 'dining_table', ?, ?, 'staff',
+                ?, 'manual', null, null, 'active', ?)
+            """,
+            TENANT_ID,
+            STORE_ID,
+            tableId,
+            lockKey,
+            now.minusMinutes(1),
+            now.minusMinutes(4)
         );
     }
 

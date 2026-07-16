@@ -23,9 +23,14 @@ public class DefaultTableAvailabilityRule implements TableAvailabilityRule {
     }
 
     public RuleDecision evaluate(TableGroup group) {
-        if (group == null || group.status() != TableGroupStatus.ACTIVE) {
+        if (group == null || !isAvailableGroup(group)) {
             return RuleDecision.deny("invalid_table_group");
         }
         return RuleDecision.allow();
+    }
+
+    private static boolean isAvailableGroup(TableGroup group) {
+        return group.status() == TableGroupStatus.ACTIVE
+            || ("temporary".equals(group.groupType()) && group.status() == TableGroupStatus.CREATED);
     }
 }

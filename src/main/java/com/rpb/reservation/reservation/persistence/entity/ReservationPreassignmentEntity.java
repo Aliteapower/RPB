@@ -54,6 +54,38 @@ public class ReservationPreassignmentEntity {
     protected ReservationPreassignmentEntity() {
     }
 
+    public static ReservationPreassignmentEntity of(
+        UUID id,
+        UUID tenantId,
+        UUID storeId,
+        UUID reservationId,
+        String resourceType,
+        UUID tableId,
+        UUID tableGroupId,
+        String status,
+        OffsetDateTime preassignedAt,
+        OffsetDateTime releasedAt,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt,
+        OffsetDateTime deletedAt
+    ) {
+        ReservationPreassignmentEntity entity = new ReservationPreassignmentEntity();
+        entity.id = id;
+        entity.tenantId = tenantId;
+        entity.storeId = storeId;
+        entity.reservationId = reservationId;
+        entity.resourceType = resourceType;
+        entity.tableId = tableId;
+        entity.tableGroupId = tableGroupId;
+        entity.status = status;
+        entity.preassignedAt = preassignedAt;
+        entity.releasedAt = releasedAt;
+        entity.createdAt = createdAt;
+        entity.updatedAt = updatedAt;
+        entity.deletedAt = deletedAt;
+        return entity;
+    }
+
     public UUID getId() { return id; }
     public UUID getTenantId() { return tenantId; }
     public UUID getStoreId() { return storeId; }

@@ -13,6 +13,7 @@ import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
@@ -195,7 +196,7 @@ public class QueueCallApplicationService {
                 throw new ApplicationFailure(evidenceError);
             }
             Optional<Reservation> reservation = loadReservationIfPresent(scope, queueTicket);
-            return alreadyCalled(scope, command, started, queueTicket, reservation);
+            return repeatCall(scope, command, started, queueTicket, reservation);
         }
 
         QueueCallError statusError = queueCallRule.validateFreshCall(queueTicket.status());
@@ -212,9 +213,9 @@ public class QueueCallApplicationService {
         }
 
         QueueTicket savedTicket = saveCalled(scope, queueTicket.call(calledAt, holdWindow.holdUntilAt()));
-        BusinessEvent event = appendBusinessEvent(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, false);
-        StateTransitionLog transition = appendTransitionLog(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow);
-        AuditLog auditLog = appendCompletedAudit(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow);
+        BusinessEvent event = appendBusinessEvent(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, QueueTicketStatus.WAITING.code(), false);
+        StateTransitionLog transition = appendTransitionLog(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, QueueTicketStatus.WAITING.code());
+        AuditLog auditLog = appendCompletedAudit(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, QueueTicketStatus.WAITING.code());
         IdempotencyRecord completed = completeIdempotency(scope, started, savedTicket, reservation, false);
 
         return QueueCallResult.success(
@@ -232,22 +233,33 @@ public class QueueCallApplicationService {
         );
     }
 
-    private QueueCallResult alreadyCalled(
+    private QueueCallResult repeatCall(
         StoreScope scope,
         CallQueueTicketCommand command,
         IdempotencyRecord started,
         QueueTicket queueTicket,
         Optional<Reservation> reservation
     ) {
-        IdempotencyRecord completed = completeIdempotency(scope, started, queueTicket, reservation, true);
-        return QueueCallResult.alreadyCalled(
-            queueTicket.id().value(),
-            queueTicket.ticketNumber().value(),
+        Instant calledAt = command.calledAt() == null ? Instant.now(clock) : command.calledAt();
+        QueueCallHoldPolicy.HoldWindow holdWindow = resolveHoldWindow(scope, calledAt);
+        QueueTicket savedTicket = saveCalled(scope, queueTicket.call(calledAt, holdWindow.holdUntilAt()));
+        BusinessEvent event = appendBusinessEvent(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, QueueTicketStatus.CALLED.code(), false);
+        StateTransitionLog transition = appendTransitionLog(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, QueueTicketStatus.CALLED.code());
+        AuditLog auditLog = appendCompletedAudit(scope, command, savedTicket, reservation, started.idempotencyKey(), holdWindow, QueueTicketStatus.CALLED.code());
+        IdempotencyRecord completed = completeIdempotency(scope, started, savedTicket, reservation, false);
+
+        return QueueCallResult.success(
+            savedTicket.id().value(),
+            savedTicket.ticketNumber().value(),
             reservation.map(value -> value.id().value()).orElse(null),
             reservation.map(value -> value.reservationCode().value()).orElse(null),
-            queueTicket.calledAt(),
-            queueTicket.expiresAt(),
-            completed.status().code()
+            savedTicket.calledAt(),
+            savedTicket.expiresAt(),
+            completed.status().code(),
+            List.of(EVENT_QUEUE_TICKET_CALLED),
+            List.of(event.id()),
+            List.of(transition.id()),
+            auditLog.id()
         );
     }
 
@@ -292,6 +304,7 @@ public class QueueCallApplicationService {
         Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey,
         QueueCallHoldPolicy.HoldWindow holdWindow,
+        String beforeStatus,
         boolean alreadyCalled
     ) {
         BusinessEvent event = new BusinessEvent(
@@ -302,7 +315,7 @@ public class QueueCallApplicationService {
             command.actorType(),
             command.actorId(),
             source(command),
-            metadata(queueTicket, reservation, command, idempotencyKey, holdWindow, alreadyCalled)
+            metadata(queueTicket, reservation, command, idempotencyKey, holdWindow, beforeStatus, alreadyCalled)
         );
         require(
             businessEventRule.evaluate(event.eventType(), event.targetType(), event.targetId(), event.actorType()),
@@ -321,19 +334,20 @@ public class QueueCallApplicationService {
         QueueTicket queueTicket,
         Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey,
-        QueueCallHoldPolicy.HoldWindow holdWindow
+        QueueCallHoldPolicy.HoldWindow holdWindow,
+        String beforeStatus
     ) {
         StateTransitionLog transition = new StateTransitionLog(
             UUID.randomUUID(),
             TARGET_QUEUE_TICKET,
             queueTicket.id().value(),
-            QueueTicketStatus.WAITING.code(),
+            beforeStatus,
             QueueTicketStatus.CALLED.code(),
             TRANSITION_QUEUE_TICKET_CALL,
             command.actorType(),
             command.actorId(),
             source(command),
-            metadata(queueTicket, reservation, command, idempotencyKey, holdWindow, false)
+            metadata(queueTicket, reservation, command, idempotencyKey, holdWindow, beforeStatus, false)
         );
         require(
             stateTransitionRule.evaluate(
@@ -358,7 +372,8 @@ public class QueueCallApplicationService {
         QueueTicket queueTicket,
         Optional<Reservation> reservation,
         IdempotencyKey idempotencyKey,
-        QueueCallHoldPolicy.HoldWindow holdWindow
+        QueueCallHoldPolicy.HoldWindow holdWindow,
+        String beforeStatus
     ) {
         AuditLog auditLog = new AuditLog(
             UUID.randomUUID(),
@@ -368,7 +383,7 @@ public class QueueCallApplicationService {
             source(command),
             command.actorType(),
             command.actorId(),
-            metadata(queueTicket, reservation, command, idempotencyKey, holdWindow, false)
+            metadata(queueTicket, reservation, command, idempotencyKey, holdWindow, beforeStatus, false)
         );
         require(auditRule.evaluate(auditLog.operationCode(), auditLog.targetType(), auditLog.targetId(), auditLog.actorType()), QueueCallError.AUDIT_WRITE_FAILED);
         try {
@@ -527,13 +542,15 @@ public class QueueCallApplicationService {
         CallQueueTicketCommand command,
         IdempotencyKey idempotencyKey,
         QueueCallHoldPolicy.HoldWindow holdWindow,
+        String beforeStatus,
         boolean alreadyCalled
     ) {
         return """
-            {"queueTicketId":"%s","queueTicketNumber":%d,"beforeQueueTicketStatus":"waiting","afterQueueTicketStatus":"called","reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"queueGroupId":"%s","businessDate":"%s","partySize":%d,"queuePosition":%s,"calledAt":"%s","holdUntilAt":"%s","queueCallHoldMinutes":%d,"holdPolicySource":"%s","alreadyCalled":%s,"reasonCode":%s,"note":%s,"idempotencyKey":"%s"}
+            {"queueTicketId":"%s","queueTicketNumber":%d,"beforeQueueTicketStatus":"%s","afterQueueTicketStatus":"called","reservationId":%s,"reservationCode":%s,"reservationStatus":%s,"queueGroupId":"%s","businessDate":"%s","partySize":%d,"queuePosition":%s,"calledAt":"%s","holdUntilAt":"%s","queueCallHoldMinutes":%d,"holdPolicySource":"%s","alreadyCalled":%s,"reasonCode":%s,"note":%s,"idempotencyKey":"%s"}
             """.formatted(
             queueTicket.id().value(),
             queueTicket.ticketNumber().value(),
+            beforeStatus,
             jsonNullable(reservation.map(value -> value.id().value()).orElse(null)),
             jsonNullable(reservation.map(value -> value.reservationCode().value()).orElse(null)),
             jsonNullable(reservation.map(value -> value.status().code()).orElse(null)),
@@ -596,7 +613,7 @@ public class QueueCallApplicationService {
     }
 
     private static String source(CallQueueTicketCommand command) {
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromActorType(command == null ? null : command.actorType());
     }
 
     private static String jsonNullable(String value) {

@@ -5,6 +5,7 @@ defineProps<{
   actions: StaffHomeActionItem[]
   groupId: string
   heading: string
+  layout?: 'two' | 'three'
 }>()
 </script>
 
@@ -12,7 +13,13 @@ defineProps<{
   <section v-if="actions.length" class="action-section" :aria-labelledby="groupId">
     <h2 :id="groupId" class="section-title">{{ heading }}</h2>
 
-    <div class="action-grid" :class="{ 'single-action-grid': actions.length === 1 }">
+    <div
+      class="action-grid"
+      :class="{
+        'single-action-grid': actions.length === 1,
+        'three-action-grid': layout === 'three'
+      }"
+    >
       <RouterLink
         v-for="action in actions"
         :key="action.id"
@@ -25,6 +32,7 @@ defineProps<{
       >
         <span class="action-symbol" aria-hidden="true">{{ action.symbol }}</span>
         <span class="action-label">{{ action.label }}</span>
+        <span v-if="action.description" class="action-description">{{ action.description }}</span>
       </RouterLink>
     </div>
   </section>
@@ -66,6 +74,10 @@ defineProps<{
   grid-template-columns: 1fr;
 }
 
+.three-action-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .operation-link {
   align-items: center;
   background: #ffffff;
@@ -99,6 +111,13 @@ defineProps<{
   font-size: 0.88rem;
   font-weight: 900;
   line-height: 1.2;
+}
+
+.action-description {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .high-frequency-action {

@@ -14,6 +14,12 @@ public interface QueueTicketListProjection {
     String getReservationStatus();
     String getCustomerName();
     String getCustomerPhoneE164();
+    String getAssignedResourceType();
+    UUID getAssignedResourceId();
+    String getAssignedResourceCode();
+    String getAssignedResourceGroupType();
+    String getAssignedResourceLabel();
+    String getAssignedResourceAreaName();
     Instant getCreatedAt();
     Instant getCalledAt();
     Instant getExpiresAt();

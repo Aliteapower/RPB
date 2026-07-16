@@ -17,8 +17,10 @@ export function useCurrentClock() {
   })
 
   const currentTimeText = computed(() => formatClockTime(currentTime.value))
+  const currentBusinessDate = computed(() => formatBusinessDate(currentTime.value))
 
   return {
+    currentBusinessDate,
     currentTimeText
   }
 }
@@ -29,4 +31,16 @@ function formatClockTime(value: Date): string {
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0')
+}
+
+function formatBusinessDate(value: Date, timeZone = 'Asia/Singapore'): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(value)
+
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
 }

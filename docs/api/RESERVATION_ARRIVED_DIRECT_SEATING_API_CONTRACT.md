@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Expose the minimum REST API slice for seating an already-arrived Reservation directly at a Table or TableGroup.
+Expose the REST API slice for seating a Reservation directly at a Table or TableGroup, including the already-arrived path and the assigned-table check-in-and-seat path.
 
 ```text
 arrived Reservation
@@ -15,13 +15,28 @@ arrived Reservation
 -> idempotency is applied
 ```
 
-This contract does not implement Queue, Reservation arrival/check-in, No-show, Cancellation, Reservation list/calendar APIs, UI, migrations, seed data, or production data changes.
+This contract does not implement Queue, standalone Reservation check-in, No-show, Cancellation, Reservation list/calendar APIs, migrations, seed data, or production data changes.
 
 ## Endpoint
 
 ```http
 POST /api/v1/stores/{storeId}/reservations/{reservationId}/seating/direct
 ```
+
+For staff table-page assigned reservations that are still confirmed, the API also exposes:
+
+```http
+POST /api/v1/stores/{storeId}/reservations/{reservationId}/seating/check-in-direct
+```
+
+The check-in direct endpoint uses the same request DTO, response DTO, App Gate permission, resource validation, and idempotency envelope as `/seating/direct`.
+
+Behavior difference:
+
+| Endpoint | Required source status | Fresh success workflow | Idempotency action |
+| --- | --- | --- | --- |
+| `/seating/direct` | `arrived` | `arrived -> seated` | `seat_arrived_reservation` |
+| `/seating/check-in-direct` | `confirmed` | `confirmed -> arrived -> seated` | `check_in_and_seat_reservation` |
 
 Path variables:
 
@@ -193,6 +208,7 @@ Reservation API errors keep the existing envelope:
 | `STORE_SCOPE_MISMATCH` | `STORE_SCOPE_MISMATCH` | 403 |
 | `STORE_ACCESS_DENIED` | `FORBIDDEN` | 403 |
 | `RESERVATION_NOT_FOUND` | `RESERVATION_NOT_FOUND` | 404 |
+| `RESERVATION_STATUS_NOT_CONFIRMED` | `RESERVATION_STATUS_NOT_CONFIRMED` | 409 |
 | `RESERVATION_STATUS_NOT_ARRIVED` | `RESERVATION_STATUS_NOT_ARRIVED` | 409 |
 | `RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING` | `RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING` | 409 |
 | `RESERVATION_CANNOT_SEAT_CANCELLED` | `RESERVATION_CANNOT_SEAT_CANCELLED` | 409 |
@@ -238,6 +254,13 @@ Fresh success must write or update:
 - `idempotency_records.action = seat_arrived_reservation`.
 - `idempotency_records.status = completed`.
 
+Fresh `/seating/check-in-direct` success additionally writes:
+
+- `business_events.event_type = reservation.arrived`.
+- `state_transition_logs.transition_code = reservation.check_in` with `confirmed -> arrived`.
+- `audit_logs.operation_code = reservation.check_in`.
+- `idempotency_records.action = check_in_and_seat_reservation`.
+
 ## Test Contract
 
 The API implementation must cover:
@@ -252,6 +275,8 @@ The API implementation must cover:
 - Application error mapping.
 - App Gate annotation and denial behavior.
 - PostgreSQL integration evidence for state, event, transition, audit, idempotency, and no-duplicate behavior.
+- Atomic check-in-and-seat coverage for confirmed assigned reservations, including `reservation.arrived` and `reservation.seat` evidence.
+- Transaction rollback coverage for late evidence write failure: reservation status, table status, seating, and seating resources must not be partially committed.
 - Local runtime security allowlist coverage if local runtime security is changed.
 
 ## Boundary Rules
@@ -259,10 +284,9 @@ The API implementation must cover:
 This API must not:
 
 - Implement Queue API or UI.
-- Implement Reservation CheckIn API changes.
+- Change the standalone Reservation CheckIn API path.
 - Implement No-show or Cancellation API.
 - Add Reservation list/calendar APIs.
-- Add Vue/UI files.
 - Add or modify Flyway migrations.
 - Create a new app key.
 - Create a new permission model.

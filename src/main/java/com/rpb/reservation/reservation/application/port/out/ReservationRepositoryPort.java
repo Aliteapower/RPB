@@ -7,6 +7,7 @@ import com.rpb.reservation.customer.value.CustomerId;
 import com.rpb.reservation.reservation.domain.Reservation;
 import com.rpb.reservation.reservation.value.ReservationCode;
 import com.rpb.reservation.reservation.value.ReservationId;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -14,6 +15,10 @@ import java.util.Set;
 public interface ReservationRepositoryPort {
 
     Optional<Reservation> findById(StoreScope scope, ReservationId reservationId);
+
+    default Optional<Reservation> findByIdForUpdate(StoreScope scope, ReservationId reservationId) {
+        return findById(scope, reservationId);
+    }
 
     Optional<Reservation> findByCode(StoreScope scope, ReservationCode reservationCode);
 
@@ -34,6 +39,15 @@ public interface ReservationRepositoryPort {
     default List<ReservationTodayViewRow> findTodayView(
         StoreScope scope,
         BusinessDate businessDate,
+        Set<String> statuses
+    ) {
+        return List.of();
+    }
+
+    default List<ReservationCalendarSummaryRow> findCalendarSummary(
+        StoreScope scope,
+        LocalDate startInclusive,
+        LocalDate endExclusive,
         Set<String> statuses
     ) {
         return List.of();

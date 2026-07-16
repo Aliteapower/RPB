@@ -11,11 +11,15 @@ export interface CreateReservationRequest {
   partySize: number
   reservedStartAt: string
   reservedEndAt?: string | null
+  businessDate?: string | null
   customerId?: string | null
   customerName?: string | null
   customerNickname?: string | null
+  customerEmail?: string | null
   phoneE164?: string | null
   note?: string | null
+  tableId?: string | null
+  tableGroupId?: string | null
 }
 
 export interface ReservationCustomerProjection {

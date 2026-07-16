@@ -272,6 +272,27 @@ public record QueueTicket(
         );
     }
 
+    public QueueTicket cancel() {
+        return new QueueTicket(
+            id,
+            scope,
+            queueGroupId,
+            customerId,
+            reservationId,
+            walkInId,
+            ticketNumber,
+            partySize,
+            businessDate,
+            QueueTicketStatus.CANCELLED,
+            queuePosition,
+            calledAt,
+            expiresAt,
+            skippedAt,
+            rejoinedAt,
+            note
+        );
+    }
+
     public String callIntent() {
         return "queue_ticket.call.intent";
     }

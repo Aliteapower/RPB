@@ -52,6 +52,7 @@ public class TableLockPersistenceAdapter implements TableLockRepositoryPort {
         if (repository.existsById(lock.id())) {
             return mapper.toDomain(repository.save(entity));
         }
+        expireStaleActiveLocksBeforeCreating(scope, entity);
         TableLockEntity newEntity = newEntity(entity);
         entityManager.persist(newEntity);
         return mapper.toDomain(newEntity);
@@ -105,6 +106,19 @@ public class TableLockPersistenceAdapter implements TableLockRepositoryPort {
             entity.getCreatedAt(),
             entity.getUpdatedAt(),
             null
+        );
+    }
+
+    private void expireStaleActiveLocksBeforeCreating(StoreScope scope, TableLockEntity entity) {
+        if (!"active".equals(entity.getStatus())) {
+            return;
+        }
+        repository.expireActiveLocksForResourceBefore(
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            entity.getResourceType(),
+            entity.getResourceId(),
+            entity.getLockedAt()
         );
     }
 }

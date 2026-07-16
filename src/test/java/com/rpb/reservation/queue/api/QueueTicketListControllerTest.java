@@ -39,6 +39,7 @@ class QueueTicketListControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000992");
     private static final UUID QUEUE_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000992");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000992");
+    private static final UUID ASSIGNED_RESOURCE_ID = UUID.fromString("70000000-0000-0000-0000-000000000992");
     private static final Instant CREATED_AT = Instant.parse("2030-06-20T03:00:00Z");
     private static final Instant CALLED_AT = Instant.parse("2030-06-20T03:10:00Z");
     private static final Instant HOLD_UNTIL_AT = Instant.parse("2030-06-20T03:13:00Z");
@@ -68,11 +69,15 @@ class QueueTicketListControllerTest {
         mockMvc.perform(get(ENDPOINT, STORE_ID)
                 .param("status", "called")
                 .param("limit", "25")
-                .param("offset", "5"))
+                .param("offset", "5")
+                .param("tableArea", "A区")
+                .param("partySize", "4")
+                .param("phone", "9876"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.items[0].queueTicketId").value(QUEUE_TICKET_ID.toString()))
             .andExpect(jsonPath("$.items[0].queueTicketNumber").value(12))
+            .andExpect(jsonPath("$.items[0].queueTicketDisplayNumber").value("B12"))
             .andExpect(jsonPath("$.items[0].queueTicketStatus").value("called"))
             .andExpect(jsonPath("$.items[0].partySize").value(4))
             .andExpect(jsonPath("$.items[0].partySizeGroup").value("3-4"))
@@ -81,6 +86,12 @@ class QueueTicketListControllerTest {
             .andExpect(jsonPath("$.items[0].reservationStatus").value("arrived"))
             .andExpect(jsonPath("$.items[0].customerName").value("Queue Guest"))
             .andExpect(jsonPath("$.items[0].customerPhoneMasked").value("****5432"))
+            .andExpect(jsonPath("$.items[0].assignedResourceType").value("dining_table"))
+            .andExpect(jsonPath("$.items[0].assignedResourceId").value(ASSIGNED_RESOURCE_ID.toString()))
+            .andExpect(jsonPath("$.items[0].assignedResourceCode").value("A01"))
+            .andExpect(jsonPath("$.items[0].assignedResourceGroupType").doesNotExist())
+            .andExpect(jsonPath("$.items[0].assignedResourceLabel").value("桌号 A01"))
+            .andExpect(jsonPath("$.items[0].assignedResourceAreaName").value("A区"))
             .andExpect(jsonPath("$.items[0].createdAt").value(CREATED_AT.toString()))
             .andExpect(jsonPath("$.items[0].calledAt").value(CALLED_AT.toString()))
             .andExpect(jsonPath("$.items[0].holdUntilAt").value(HOLD_UNTIL_AT.toString()))
@@ -99,6 +110,9 @@ class QueueTicketListControllerTest {
         assertThat(query.status()).isEqualTo("called");
         assertThat(query.limit()).isEqualTo("25");
         assertThat(query.offset()).isEqualTo("5");
+        assertThat(query.tableArea()).isEqualTo("A区");
+        assertThat(query.partySize()).isEqualTo("4");
+        assertThat(query.phone()).isEqualTo("9876");
     }
 
     @Test
@@ -106,6 +120,9 @@ class QueueTicketListControllerTest {
         Method method = QueueTicketListController.class.getMethod(
             "listQueueTickets",
             UUID.class,
+            String.class,
+            String.class,
+            String.class,
             String.class,
             String.class,
             String.class
@@ -166,6 +183,7 @@ class QueueTicketListControllerTest {
             List.of(new QueueTicketListItem(
                 QUEUE_TICKET_ID,
                 12,
+                "B12",
                 "called",
                 4,
                 "3-4",
@@ -174,6 +192,12 @@ class QueueTicketListControllerTest {
                 "arrived",
                 "Queue Guest",
                 "****5432",
+                "dining_table",
+                ASSIGNED_RESOURCE_ID,
+                "A01",
+                null,
+                "桌号 A01",
+                "A区",
                 CREATED_AT,
                 CALLED_AT,
                 HOLD_UNTIL_AT,

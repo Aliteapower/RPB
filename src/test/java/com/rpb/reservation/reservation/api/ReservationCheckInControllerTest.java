@@ -16,8 +16,11 @@ import com.rpb.reservation.reservation.application.ReservationCheckInResult;
 import com.rpb.reservation.reservation.application.command.CheckInReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.lang.reflect.Method;
@@ -46,6 +49,9 @@ class ReservationCheckInControllerTest {
     private ReservationCheckInApplicationService checkInApplicationService;
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
+    private ReservationCancelApplicationService cancelApplicationService;
+    private ReservationNoShowApplicationService noShowApplicationService;
+    private ReservationCompleteApplicationService completeApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -55,6 +61,9 @@ class ReservationCheckInControllerTest {
         checkInApplicationService = mock(ReservationCheckInApplicationService.class);
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
+        cancelApplicationService = mock(ReservationCancelApplicationService.class);
+        noShowApplicationService = mock(ReservationNoShowApplicationService.class);
+        completeApplicationService = mock(ReservationCompleteApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.check_in"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders
             .standaloneSetup(new ReservationController(
@@ -62,6 +71,9 @@ class ReservationCheckInControllerTest {
                 checkInApplicationService,
                 seatingApplicationService,
                 queueApplicationService,
+                cancelApplicationService,
+                noShowApplicationService,
+                completeApplicationService,
                 actorProvider,
                 new ReservationApiMapper(),
                 new ReservationApiErrorMapper(),
@@ -70,7 +82,13 @@ class ReservationCheckInControllerTest {
                 new ReservationArrivedDirectSeatingApiMapper(),
                 new ReservationArrivedDirectSeatingApiErrorMapper(),
                 new ReservationArrivedToQueueApiMapper(),
-                new ReservationArrivedToQueueApiErrorMapper()
+                new ReservationArrivedToQueueApiErrorMapper(),
+                new ReservationCancelApiMapper(),
+                new ReservationCancelApiErrorMapper(),
+                new ReservationNoShowApiMapper(),
+                new ReservationNoShowApiErrorMapper(),
+                new ReservationCompleteApiMapper(),
+                new ReservationCompleteApiErrorMapper()
             ))
             .build();
     }
@@ -203,6 +221,7 @@ class ReservationCheckInControllerTest {
         assertApplicationError(ReservationCheckInError.STORE_ACCESS_DENIED, 403, "FORBIDDEN", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_NOT_FOUND, 404, "RESERVATION_NOT_FOUND", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_STATUS_NOT_CONFIRMED, 409, "RESERVATION_STATUS_NOT_CONFIRMED", "failed");
+        assertApplicationError(ReservationCheckInError.RESERVATION_NOT_TODAY, 409, "RESERVATION_NOT_TODAY", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_CANCELLED, 409, "RESERVATION_CANNOT_CHECK_IN_CANCELLED", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_NO_SHOW, 409, "RESERVATION_CANNOT_CHECK_IN_NO_SHOW", "failed");
         assertApplicationError(ReservationCheckInError.RESERVATION_CANNOT_CHECK_IN_COMPLETED, 409, "RESERVATION_CANNOT_CHECK_IN_COMPLETED", "failed");
@@ -312,6 +331,7 @@ class ReservationCheckInControllerTest {
             case "EVENT_WRITE_FAILED" -> "reservation.event_write_failed";
             case "RESERVATION_NOT_FOUND" -> "reservation.not_found";
             case "RESERVATION_STATUS_NOT_CONFIRMED" -> "reservation.status_not_confirmed";
+            case "RESERVATION_NOT_TODAY" -> "reservation.not_today";
             case "RESERVATION_CANNOT_CHECK_IN_CANCELLED" -> "reservation.cannot_check_in_cancelled";
             case "RESERVATION_CANNOT_CHECK_IN_NO_SHOW" -> "reservation.cannot_check_in_no_show";
             case "RESERVATION_CANNOT_CHECK_IN_COMPLETED" -> "reservation.cannot_check_in_completed";

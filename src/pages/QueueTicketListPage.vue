@@ -1,13 +1,29 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
 
 import { fetchMeApps } from '../api/meAppsApi'
+import { callQueueTicket, QueueCallApiError } from '../api/queueCallApi'
+import { cancelQueueTicket, QueueCancelApiError } from '../api/queueCancelApi'
 import { listQueueTickets, QueueTicketListApiError } from '../api/queueTicketListApi'
 import { QueueRejoinApiError, rejoinQueueTicket } from '../api/queueRejoinApi'
 import { QueueSkipApiError, skipQueueTicket } from '../api/queueSkipApi'
+import { fetchTableResources } from '../api/tableResourceApi'
+import StaffPrimaryWorkbench from '../components/staff/StaffPrimaryWorkbench.vue'
+import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
+import { formatAppGateErrorMessage, formatAppGateErrorTitle } from '../utils/appGateErrorMessages'
 import type { MeAppEntry } from '../types/meApps'
+import type {
+  CallQueueTicketResponse,
+  QueueCallApiErrorResponse
+} from '../types/queueCall'
+import type {
+  CancelQueueTicketResponse,
+  QueueCancelApiErrorResponse
+} from '../types/queueCancel'
 import type {
   QueueTicketListApiErrorResponse,
   QueueTicketListItem,
@@ -22,40 +38,74 @@ import type {
   QueueSkipApiErrorResponse,
   SkipQueueTicketResponse
 } from '../types/queueSkip'
+import type { TableResourceItem } from '../types/tableResource'
+import { useGeneratedText } from '../i18n/generatedText'
 
-type UiStatusFilter = 'all' | 'waiting' | 'called' | 'seated'
+const { gt } = useGeneratedText()
+
+type UiStatusFilter =
+  | 'all'
+  | 'waiting'
+  | 'called'
+  | 'skipped'
+  | 'rejoined'
+  | 'seated'
+  | 'cancelled'
+  | 'expired'
+
+type QueueTicketDisplaySource = {
+  queueTicketId: string
+  queueTicketNumber: number
+  queueTicketDisplayNumber?: string | null
+}
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
+const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
-const defaultLimit = 50
+const todayListLimit = 100
 const storeTimezone = 'Asia/Singapore'
 
 const statusOptions: Array<{ value: UiStatusFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'waiting', label: '等待中' },
-  { value: 'called', label: '已叫号' },
-  { value: 'seated', label: '已入座' }
+  { value: 'all', label: gt('generated.queue-ticket-list.074') },
+  { value: 'waiting', label: gt('generated.queue-ticket-list.075') },
+  { value: 'called', label: gt('generated.queue-ticket-list.076') },
+  { value: 'skipped', label: gt('generated.queue-ticket-list.077') },
+  { value: 'rejoined', label: gt('generated.queue-ticket-list.078') },
+  { value: 'seated', label: gt('generated.queue-ticket-list.079') },
+  { value: 'cancelled', label: gt('generated.queue-ticket-list.080') },
+  { value: 'expired', label: gt('generated.queue-ticket-list.081') }
 ]
 
+const seatActionLabel = { label: gt('generated.queue-ticket-list.082') }
+const allTableAreasValue = 'all'
+const unassignedTableAreaValue = '__unassigned__'
+const unassignedTableAreaLabel = gt('generated.queue-ticket-list.083')
+const allPartySizeGroupsValue = 'all'
+
 const statusLabels: Record<string, string> = {
-  waiting: '等待中',
-  called: '已叫号',
-  seated: '已入座',
-  skipped: '已过号',
-  rejoined: '已重回',
-  expired: '已过期',
-  cancelled: '已取消'
+  waiting: gt('generated.queue-ticket-list.084'),
+  called: gt('generated.queue-ticket-list.085'),
+  seated: gt('generated.queue-ticket-list.086'),
+  skipped: gt('generated.queue-ticket-list.087'),
+  rejoined: gt('generated.queue-ticket-list.088'),
+  expired: gt('generated.queue-ticket-list.089'),
+  cancelled: gt('generated.queue-ticket-list.090')
 }
 
 const selectedStatus = ref<UiStatusFilter>('all')
-const limit = ref(defaultLimit)
-const offset = ref(0)
+const selectedTableArea = ref(allTableAreasValue)
+const selectedPartySizeGroup = ref(allPartySizeGroupsValue)
+const phoneFilter = ref('')
 const isLoading = ref(false)
 const response = ref<QueueTicketListResponse | null>(null)
 const apiError = ref<QueueTicketListApiErrorResponse | null>(null)
 const apps = ref<MeAppEntry[]>([])
+const tableResources = ref<TableResourceItem[]>([])
 const appsLoading = ref(false)
+const callApiError = ref<QueueCallApiErrorResponse | null>(null)
+const callSuccess = ref<CallQueueTicketResponse | null>(null)
+const callInFlightTicketIds = ref<Set<string>>(new Set())
 const skipApiError = ref<QueueSkipApiErrorResponse | null>(null)
 const skipSuccess = ref<SkipQueueTicketResponse | null>(null)
 const skipInFlightTicketId = ref<string | null>(null)
@@ -64,8 +114,13 @@ const rejoinApiError = ref<QueueRejoinApiErrorResponse | null>(null)
 const rejoinSuccess = ref<RejoinQueueTicketResponse | null>(null)
 const rejoinInFlightTicketId = ref<string | null>(null)
 const rejoinInFlightTicketIds = ref<Set<string>>(new Set())
+const cancelApiError = ref<QueueCancelApiErrorResponse | null>(null)
+const cancelSuccess = ref<CancelQueueTicketResponse | null>(null)
+const cancelInFlightTicketIds = ref<Set<string>>(new Set())
+const actionDisplayNumbers = ref<Record<string, string>>({})
 let loadSequence = 0
 let appsLoadSequence = 0
+let tableResourcesLoadSequence = 0
 
 const appGateSkipErrorCodes = new Set([
   'TENANT_APP_NOT_ENABLED',
@@ -79,52 +134,162 @@ const appGateRejoinErrorCodes = new Set([
   'PERMISSION_DENIED'
 ])
 const rejoinErrorCodesThatRefresh = new Set(['QUEUE_TICKET_STATUS_NOT_SKIPPED'])
+const appGateCallErrorCodes = new Set([
+  'TENANT_APP_NOT_ENABLED',
+  'STORE_APP_NOT_ENABLED',
+  'PERMISSION_DENIED'
+])
+const callErrorCodesThatRefresh = new Set(['QUEUE_TICKET_STATUS_NOT_WAITING'])
+const appGateCancelErrorCodes = new Set([
+  'TENANT_APP_NOT_ENABLED',
+  'STORE_APP_NOT_ENABLED',
+  'PERMISSION_DENIED'
+])
+const cancelErrorCodesThatRefresh = new Set([
+  'QUEUE_TICKET_CANNOT_CANCEL_SEATED',
+  'QUEUE_TICKET_CANNOT_CANCEL_EXPIRED'
+])
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
-const staffHomeRoute = computed(() => ({
-  name: 'store-staff-home',
-  params: {
-    storeId: storeId.value
-  }
-}))
+const storeLabel = computed(() => formatStoreLabel(storeId.value))
 const items = computed(() => response.value?.items ?? [])
-const page = computed(() => response.value?.page ?? { limit: limit.value, offset: offset.value, total: 0 })
+const visibleItems = computed(() => {
+  if (selectedPartySizeGroup.value === allPartySizeGroupsValue) {
+    return items.value
+  }
+
+  return items.value.filter(item => queueGroupKey(item) === selectedPartySizeGroup.value)
+})
+const resultCountLabel = computed(() => formatQueueGroupCount(visibleItems.value.length, totalPartySize(visibleItems.value)))
+const normalizedPhoneFilter = computed(() => phoneFilter.value.replace(/\D/g, '').slice(0, 16))
+const tableAreaOptions = computed(() => {
+  const areaCounts = new Map<string, number>()
+
+  for (const resource of tableResources.value) {
+    if (resource.resourceType !== 'dining_table') {
+      continue
+    }
+
+    const title = areaTitle(resource)
+    areaCounts.set(title, (areaCounts.get(title) ?? 0) + 1)
+  }
+
+  const areaOptions = Array.from(areaCounts, ([label, count]) => ({
+    value: label,
+    label,
+    count
+  })).sort((first, second) => first.label.localeCompare(second.label, 'zh-CN'))
+
+  return [
+    {
+      value: allTableAreasValue,
+      label: gt('generated.queue-ticket-list.091'),
+      count: tableResources.value.filter(resource => resource.resourceType === 'dining_table').length
+    },
+    {
+      value: unassignedTableAreaValue,
+      label: unassignedTableAreaLabel
+    },
+    ...areaOptions
+  ]
+})
+const queueGroupOptions = computed(() => {
+  const groupCounts = new Map<string, { label: string; partyCount: number; peopleCount: number }>()
+
+  for (const item of items.value) {
+    const value = queueGroupKey(item)
+    const existing = groupCounts.get(value)
+
+    if (existing) {
+      existing.partyCount += 1
+      existing.peopleCount += item.partySize
+      continue
+    }
+
+    groupCounts.set(value, {
+      label: queueGroupLabel(item.partySizeGroup),
+      partyCount: 1,
+      peopleCount: item.partySize
+    })
+  }
+
+  if (selectedPartySizeGroup.value !== allPartySizeGroupsValue && !groupCounts.has(selectedPartySizeGroup.value)) {
+    groupCounts.set(selectedPartySizeGroup.value, {
+      label: selectedPartySizeGroup.value,
+      partyCount: 0,
+      peopleCount: 0
+    })
+  }
+
+  const options = Array.from(groupCounts, ([value, option]) => ({
+    value,
+    ...option
+  })).sort((first, second) => compareQueueGroups(first.label, second.label))
+
+  return [
+    {
+      value: allPartySizeGroupsValue,
+      label: gt('generated.queue-ticket-list.092'),
+      partyCount: items.value.length,
+      peopleCount: totalPartySize(items.value)
+    },
+    ...options
+  ]
+})
+const activeFilterCount = computed(
+  () =>
+    Number(selectedTableArea.value !== allTableAreasValue) +
+    Number(selectedPartySizeGroup.value !== allPartySizeGroupsValue) +
+    Number(!!normalizedPhoneFilter.value)
+)
 const reservationQueueEntry = computed(() =>
   apps.value.find(app => app.appKey === 'reservation_queue' && app.entryVisible)
 )
+const appStatusLabel = computed(() => {
+  if (appsLoading.value) {
+    return gt('generated.queue-ticket-list.093')
+  }
+
+  return reservationQueueEntry.value ? gt('generated.queue-ticket-list.094') : gt('generated.queue-ticket-list.095')
+})
 const canSkipQueueTicket = computed(
   () => reservationQueueEntry.value?.permissions.includes('queue.skip') ?? false
 )
 const canRejoinQueueTicket = computed(
   () => reservationQueueEntry.value?.permissions.includes('queue.rejoin') ?? false
 )
+const canCallQueueTicket = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.call') ?? false
+)
+const canSeatCalledQueueTicket = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.seat') ?? false
+)
+const canCancelQueueTicket = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.cancel') ?? false
+)
+const canOpenQueueDisplay = computed(
+  () => reservationQueueEntry.value?.permissions.includes('queue.display.view') ?? false
+)
+const queueDisplayRoute = computed<RouteLocationRaw>(() => ({
+  name: 'queue-display',
+  params: { storeId: storeId.value }
+}))
 const showEmptyState = computed(
-  () => !isLoading.value && !apiError.value && !!response.value && items.value.length === 0
+  () => !isLoading.value && !apiError.value && !!response.value && visibleItems.value.length === 0
 )
-const canGoPrevious = computed(() => offset.value > 0 && !isLoading.value)
-const canGoNext = computed(
-  () =>
-    !isLoading.value &&
-    !!response.value &&
-    items.value.length > 0 &&
-    page.value.offset + items.value.length < page.value.total
-)
-const pageRangeText = computed(() => {
-  if (!response.value) {
-    return '尚未加载'
-  }
-
-  if (page.value.total === 0) {
-    return '0 / 0'
-  }
-
-  return `${page.value.offset + 1}-${page.value.offset + items.value.length} / ${page.value.total}`
-})
 
 watch(
-  [storeId, selectedStatus, limit, offset],
+  [storeId, selectedStatus, selectedTableArea, normalizedPhoneFilter],
   () => {
     void loadQueueTickets()
+  },
+  { immediate: true }
+)
+
+watch(
+  storeId,
+  nextStoreId => {
+    void loadTableResources(nextStoreId)
   },
   { immediate: true }
 )
@@ -176,12 +341,20 @@ async function loadQueueTickets(): Promise<QueueTicketListResponse | null> {
   let loadedResponse: QueueTicketListResponse | null = null
 
   const query: QueueTicketListQuery = {
-    limit: limit.value,
-    offset: offset.value
+    limit: todayListLimit,
+    offset: 0
   }
 
   if (selectedStatus.value !== 'all') {
     query.status = selectedStatus.value
+  }
+
+  if (selectedTableArea.value !== allTableAreasValue) {
+    query.tableArea = selectedTableArea.value
+  }
+
+  if (normalizedPhoneFilter.value) {
+    query.phone = normalizedPhoneFilter.value
   }
 
   try {
@@ -207,29 +380,55 @@ async function loadQueueTickets(): Promise<QueueTicketListResponse | null> {
   return loadedResponse
 }
 
+async function loadTableResources(nextStoreId = storeId.value): Promise<void> {
+  const sequence = ++tableResourcesLoadSequence
+  tableResources.value = []
+
+  if (!nextStoreId) {
+    return
+  }
+
+  try {
+    const result = await fetchTableResources(nextStoreId)
+
+    if (sequence === tableResourcesLoadSequence) {
+      tableResources.value = result.resources
+    }
+  } catch {
+    if (sequence === tableResourcesLoadSequence) {
+      tableResources.value = []
+    }
+  }
+}
+
 function selectStatus(status: UiStatusFilter): void {
   if (selectedStatus.value === status) {
     return
   }
 
   selectedStatus.value = status
-  offset.value = 0
 }
 
-function goPrevious(): void {
-  if (!canGoPrevious.value) {
+function selectTableArea(tableArea: string): void {
+  if (selectedTableArea.value === tableArea) {
     return
   }
 
-  offset.value = Math.max(0, offset.value - page.value.limit)
+  selectedTableArea.value = tableArea
 }
 
-function goNext(): void {
-  if (!canGoNext.value) {
+function selectPartySizeGroup(partySizeGroup: string): void {
+  if (selectedPartySizeGroup.value === partySizeGroup) {
     return
   }
 
-  offset.value += page.value.limit
+  selectedPartySizeGroup.value = partySizeGroup
+}
+
+function resetReceptionFilters(): void {
+  selectedTableArea.value = allTableAreasValue
+  selectedPartySizeGroup.value = allPartySizeGroupsValue
+  phoneFilter.value = ''
 }
 
 function refresh(): void {
@@ -244,6 +443,35 @@ function canShowRejoinAction(item: QueueTicketListItem): boolean {
   return canRejoinQueueTicket.value && item.queueTicketStatus === 'skipped'
 }
 
+function canShowCallAction(item: QueueTicketListItem): boolean {
+  return canCallQueueTicket.value && ['waiting', 'called', 'rejoined'].includes(item.queueTicketStatus)
+}
+
+function canShowSeatAction(item: QueueTicketListItem): boolean {
+  return canSeatCalledQueueTicket.value && item.queueTicketStatus === 'called'
+}
+
+function canShowCancelAction(item: QueueTicketListItem): boolean {
+  return (
+    canCancelQueueTicket.value &&
+    ['waiting', 'called', 'skipped', 'rejoined'].includes(item.queueTicketStatus)
+  )
+}
+
+function canShowAnyQueueAction(item: QueueTicketListItem): boolean {
+  return (
+    canShowCallAction(item) ||
+    canShowSkipAction(item) ||
+    canShowRejoinAction(item) ||
+    canShowSeatAction(item) ||
+    canShowCancelAction(item)
+  )
+}
+
+function isCallingTicket(item: QueueTicketListItem): boolean {
+  return callInFlightTicketIds.value.has(item.queueTicketId)
+}
+
 function isSkippingTicket(item: QueueTicketListItem): boolean {
   return skipInFlightTicketIds.value.has(item.queueTicketId)
 }
@@ -252,17 +480,42 @@ function isRejoiningTicket(item: QueueTicketListItem): boolean {
   return rejoinInFlightTicketIds.value.has(item.queueTicketId)
 }
 
-function confirmSkipTicket(item: QueueTicketListItem): void {
-  if (!canShowSkipAction(item) || isSkippingTicket(item)) {
+function isCancellingTicket(item: QueueTicketListItem): boolean {
+  return cancelInFlightTicketIds.value.has(item.queueTicketId)
+}
+
+function isTicketActionBusy(item: QueueTicketListItem): boolean {
+  return (
+    isCallingTicket(item) ||
+    isSkippingTicket(item) ||
+    isRejoiningTicket(item) ||
+    isCancellingTicket(item)
+  )
+}
+
+function confirmCallTicket(item: QueueTicketListItem): void {
+  if (!canShowCallAction(item) || isTicketActionBusy(item)) {
     return
   }
 
-  skipApiError.value = null
-  skipSuccess.value = null
-  rejoinApiError.value = null
-  rejoinSuccess.value = null
+  clearQueueActionMessages()
 
-  if (!globalThis.confirm(`确认过号 #${item.queueTicketNumber}？`)) {
+  const actionLabel = item.queueTicketStatus === 'called' ? gt('generated.queue-ticket-list.096') : gt('generated.queue-ticket-list.097')
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.062')}${actionLabel} ${queueTicketDisplayText(item)}？`)) {
+    return
+  }
+
+  void executeConfirmedCall(item)
+}
+
+function confirmSkipTicket(item: QueueTicketListItem): void {
+  if (!canShowSkipAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  clearQueueActionMessages()
+
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.063')}${queueTicketDisplayText(item)}？`)) {
     return
   }
 
@@ -270,30 +523,73 @@ function confirmSkipTicket(item: QueueTicketListItem): void {
 }
 
 function confirmRejoinTicket(item: QueueTicketListItem): void {
-  if (!canShowRejoinAction(item) || isRejoiningTicket(item)) {
+  if (!canShowRejoinAction(item) || isTicketActionBusy(item)) {
     return
   }
 
-  rejoinApiError.value = null
-  rejoinSuccess.value = null
-  skipApiError.value = null
-  skipSuccess.value = null
+  clearQueueActionMessages()
 
-  if (!globalThis.confirm(`确认重新入队 #${item.queueTicketNumber}？`)) {
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.064')}${queueTicketDisplayText(item)}？`)) {
     return
   }
 
   void executeConfirmedRejoin(item)
 }
 
+function confirmCancelTicket(item: QueueTicketListItem): void {
+  if (!canShowCancelAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  clearQueueActionMessages()
+
+  if (!globalThis.confirm(`${gt('generated.queue-ticket-list.065')}${queueTicketDisplayText(item)}？`)) {
+    return
+  }
+
+  void executeConfirmedCancel(item)
+}
+
+async function executeConfirmedCall(item: QueueTicketListItem): Promise<void> {
+  const currentStoreId = storeId.value
+
+  if (!currentStoreId || !canShowCallAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  const idempotencyKey = createCallIdempotencyKey()
+  rememberQueueTicketDisplayNumber(item)
+  setCallLoading(item.queueTicketId, true)
+
+  try {
+    const result = await callQueueTicket(currentStoreId, item.queueTicketId, {}, idempotencyKey)
+    callSuccess.value = result
+    await refreshAfterQueueActionSuccess()
+  } catch (error) {
+    const resolvedError =
+      error instanceof QueueCallApiError
+        ? error.response
+        : createCallLocalError('UNKNOWN_ERROR', 'queue.call.unknown_error')
+
+    callApiError.value = resolvedError
+
+    if (shouldRefreshAfterCallError(resolvedError)) {
+      void loadQueueTickets()
+    }
+  } finally {
+    setCallLoading(item.queueTicketId, false)
+  }
+}
+
 async function executeConfirmedSkip(item: QueueTicketListItem): Promise<void> {
   const currentStoreId = storeId.value
 
-  if (!currentStoreId || !canShowSkipAction(item) || isSkippingTicket(item)) {
+  if (!currentStoreId || !canShowSkipAction(item) || isTicketActionBusy(item)) {
     return
   }
 
   const idempotencyKey = createIdempotencyKey()
+  rememberQueueTicketDisplayNumber(item)
   setSkipLoading(item.queueTicketId, true)
 
   try {
@@ -319,11 +615,12 @@ async function executeConfirmedSkip(item: QueueTicketListItem): Promise<void> {
 async function executeConfirmedRejoin(item: QueueTicketListItem): Promise<void> {
   const currentStoreId = storeId.value
 
-  if (!currentStoreId || !canShowRejoinAction(item) || isRejoiningTicket(item)) {
+  if (!currentStoreId || !canShowRejoinAction(item) || isTicketActionBusy(item)) {
     return
   }
 
   const idempotencyKey = createRejoinIdempotencyKey()
+  rememberQueueTicketDisplayNumber(item)
   setRejoinLoading(item.queueTicketId, true)
 
   try {
@@ -346,21 +643,57 @@ async function executeConfirmedRejoin(item: QueueTicketListItem): Promise<void> 
   }
 }
 
-async function refreshAfterSkipSuccess(): Promise<void> {
-  const refreshed = await loadQueueTickets()
+async function executeConfirmedCancel(item: QueueTicketListItem): Promise<void> {
+  const currentStoreId = storeId.value
 
-  if (refreshed && refreshed.items.length === 0 && offset.value > 0) {
-    offset.value = Math.max(0, offset.value - refreshed.page.limit)
+  if (!currentStoreId || !canShowCancelAction(item) || isTicketActionBusy(item)) {
+    return
+  }
+
+  const idempotencyKey = createCancelIdempotencyKey()
+  rememberQueueTicketDisplayNumber(item)
+  setCancelLoading(item.queueTicketId, true)
+
+  try {
+    const result = await cancelQueueTicket(currentStoreId, item.queueTicketId, {}, idempotencyKey)
+    cancelSuccess.value = result
+    await refreshAfterQueueActionSuccess()
+  } catch (error) {
+    const resolvedError =
+      error instanceof QueueCancelApiError
+        ? error.response
+        : createCancelLocalError('UNKNOWN_ERROR', 'queue.cancel.unknown_error')
+
+    cancelApiError.value = resolvedError
+
+    if (shouldRefreshAfterCancelError(resolvedError)) {
+      void loadQueueTickets()
+    }
+  } finally {
+    setCancelLoading(item.queueTicketId, false)
   }
 }
 
-async function refreshAfterRejoinSuccess(): Promise<void> {
-  const refreshed = await loadQueueTickets()
+async function refreshAfterQueueActionSuccess(): Promise<void> {
+  await loadQueueTickets()
+}
 
-  if (refreshed && refreshed.items.length === 0 && offset.value > 0) {
-    offset.value = Math.max(0, offset.value - refreshed.page.limit)
-    await loadQueueTickets()
+async function refreshAfterSkipSuccess(): Promise<void> {
+  await refreshAfterQueueActionSuccess()
+}
+
+async function refreshAfterRejoinSuccess(): Promise<void> {
+  await refreshAfterQueueActionSuccess()
+}
+
+function shouldRefreshAfterCallError(error: QueueCallApiErrorResponse): boolean {
+  const code = error.error.code
+
+  if (appGateCallErrorCodes.has(code)) {
+    return false
   }
+
+  return callErrorCodesThatRefresh.has(code)
 }
 
 function shouldRefreshAfterSkipError(error: QueueSkipApiErrorResponse): boolean {
@@ -381,6 +714,28 @@ function shouldRefreshAfterRejoinError(error: QueueRejoinApiErrorResponse): bool
   }
 
   return rejoinErrorCodesThatRefresh.has(code)
+}
+
+function shouldRefreshAfterCancelError(error: QueueCancelApiErrorResponse): boolean {
+  const code = error.error.code
+
+  if (appGateCancelErrorCodes.has(code)) {
+    return false
+  }
+
+  return cancelErrorCodesThatRefresh.has(code)
+}
+
+function setCallLoading(queueTicketId: string, loading: boolean): void {
+  const nextIds = new Set(callInFlightTicketIds.value)
+
+  if (loading) {
+    nextIds.add(queueTicketId)
+  } else {
+    nextIds.delete(queueTicketId)
+  }
+
+  callInFlightTicketIds.value = nextIds
 }
 
 function setSkipLoading(queueTicketId: string, loading: boolean): void {
@@ -417,6 +772,39 @@ function setRejoinLoading(queueTicketId: string, loading: boolean): void {
   rejoinInFlightTicketIds.value = nextIds
 }
 
+function setCancelLoading(queueTicketId: string, loading: boolean): void {
+  const nextIds = new Set(cancelInFlightTicketIds.value)
+
+  if (loading) {
+    nextIds.add(queueTicketId)
+  } else {
+    nextIds.delete(queueTicketId)
+  }
+
+  cancelInFlightTicketIds.value = nextIds
+}
+
+function clearQueueActionMessages(): void {
+  callApiError.value = null
+  callSuccess.value = null
+  skipApiError.value = null
+  skipSuccess.value = null
+  rejoinApiError.value = null
+  rejoinSuccess.value = null
+  cancelApiError.value = null
+  cancelSuccess.value = null
+}
+
+function createCallIdempotencyKey(): string {
+  const prefix = 'queue:call'
+
+  if (globalThis.crypto && 'randomUUID' in globalThis.crypto) {
+    return `${prefix}:${globalThis.crypto.randomUUID()}`
+  }
+
+  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+}
+
 function createIdempotencyKey(): string {
   const prefix = 'queue:skip'
 
@@ -437,9 +825,42 @@ function createRejoinIdempotencyKey(): string {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
 }
 
+function createCancelIdempotencyKey(): string {
+  const prefix = 'queue:cancel'
+
+  if (globalThis.crypto && 'randomUUID' in globalThis.crypto) {
+    return `${prefix}:${globalThis.crypto.randomUUID()}`
+  }
+
+  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+}
+
+function queueSeatRoute(item: QueueTicketListItem): RouteLocationRaw {
+  return {
+    name: 'seating-from-called-queue',
+    params: {
+      storeId: storeId.value
+    },
+    query: {
+      queueTicketId: item.queueTicketId,
+      partySize: String(item.partySize),
+      assignedResourceType: optionalQueryValue(item.assignedResourceType),
+      assignedResourceId: optionalQueryValue(item.assignedResourceId),
+      assignedResourceCode: optionalQueryValue(item.assignedResourceCode),
+      assignedResourceLabel: optionalQueryValue(item.assignedResourceLabel),
+      assignedResourceAreaName: optionalQueryValue(item.assignedResourceAreaName)
+    }
+  }
+}
+
+function optionalQueryValue(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed || undefined
+}
+
 function formatStoreDateTime(value: string | null | undefined): string {
   if (!value) {
-    return '未返回'
+    return gt('generated.queue-ticket-list.098')
   }
 
   const date = new Date(value)
@@ -470,7 +891,122 @@ function statusClass(status: string): string {
 }
 
 function optionalDisplay(value: string | null | undefined): string {
-  return value?.trim() ? value : '未返回'
+  return value?.trim() ? value : gt('generated.queue-ticket-list.099')
+}
+
+function customerDisplayName(value: string | null | undefined): string {
+  if (value?.trim()) {
+    return value.trim()
+  }
+
+  return gt('generated.queue-ticket-list.100')
+}
+
+function queueTicketDisplayValue(item: QueueTicketListItem): string {
+  return item.queueTicketDisplayNumber?.trim() || String(item.queueTicketNumber)
+}
+
+function queueTicketDisplayText(item: QueueTicketListItem): string {
+  return `#${queueTicketDisplayValue(item)}`
+}
+
+function rememberQueueTicketDisplayNumber(item: QueueTicketListItem): void {
+  actionDisplayNumbers.value = {
+    ...actionDisplayNumbers.value,
+    [item.queueTicketId]: queueTicketDisplayValue(item)
+  }
+}
+
+function queueTicketDisplayTextByResult(result: QueueTicketDisplaySource): string {
+  const displayNumber =
+    result.queueTicketDisplayNumber?.trim() ||
+    actionDisplayNumbers.value[result.queueTicketId]?.trim() ||
+    items.value.find(item => item.queueTicketId === result.queueTicketId)?.queueTicketDisplayNumber?.trim() ||
+    String(result.queueTicketNumber)
+
+  return `#${displayNumber}`
+}
+
+function totalPartySize(queueItems: QueueTicketListItem[]): number {
+  return queueItems.reduce((total, item) => total + item.partySize, 0)
+}
+
+function queueGroupKey(item: QueueTicketListItem): string {
+  return queueGroupLabel(item.partySizeGroup)
+}
+
+function queueGroupLabel(value: string | null | undefined): string {
+  return value?.trim() ? value.trim() : gt('generated.queue-ticket-list.101')
+}
+
+function formatQueueGroupCount(partyCount: number, peopleCount: number): string {
+  return `${partyCount}${gt('generated.queue-ticket-list.066')}${peopleCount}${gt('generated.queue-ticket-list.067')}`
+}
+
+function compareQueueGroups(first: string, second: string): number {
+  const firstMin = leadingNumber(first)
+  const secondMin = leadingNumber(second)
+
+  if (firstMin !== null && secondMin !== null && firstMin !== secondMin) {
+    return firstMin - secondMin
+  }
+
+  if (firstMin !== null && secondMin === null) {
+    return -1
+  }
+
+  if (firstMin === null && secondMin !== null) {
+    return 1
+  }
+
+  return first.localeCompare(second, 'zh-CN')
+}
+
+function leadingNumber(value: string): number | null {
+  const match = value.match(/\d+/)
+  return match ? Number(match[0]) : null
+}
+
+function queueTimeText(item: QueueTicketListItem): string {
+  if (item.calledAt) {
+    return `${gt('generated.queue-ticket-list.068')}${formatStoreDateTime(item.calledAt)}`
+  }
+
+  return `${gt('generated.queue-ticket-list.069')}${formatStoreDateTime(item.createdAt)}`
+}
+
+function formatStoreLabel(value: string | undefined): string {
+  if (!value) {
+    return gt('generated.queue-ticket-list.102')
+  }
+
+  return `${gt('generated.queue-ticket-list.070')}${value.slice(0, 8)}`
+}
+
+function assignedResourceText(item: QueueTicketListItem): string {
+  const label = item.assignedResourceLabel?.trim()
+
+  if (label) {
+    return label
+  }
+
+  const code = item.assignedResourceCode?.trim()
+
+  if (!code) {
+    return gt('generated.queue-ticket-list.103')
+  }
+
+  return item.assignedResourceType === 'table_group' ? `${gt('generated.queue-ticket-list.071')}${code}` : `${gt('generated.queue-ticket-list.072')}${code}`
+}
+
+function assignedAreaText(item: QueueTicketListItem): string {
+  const areaName = item.assignedResourceAreaName?.trim()
+  return areaName ? `${gt('generated.queue-ticket-list.073')}${areaName}` : gt('generated.queue-ticket-list.104')
+}
+
+function areaTitle(resource: TableResourceItem): string {
+  const areaName = resource.areaName?.trim()
+  return areaName || gt('generated.queue-ticket-list.105')
 }
 
 function isCalledTicket(item: QueueTicketListItem): boolean {
@@ -488,7 +1024,35 @@ function createLocalError(code: string, messageKey: string): QueueTicketListApiE
   }
 }
 
+function createCallLocalError(code: string, messageKey: string): QueueCallApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
 function createSkipLocalError(code: string, messageKey: string): QueueSkipApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      messageKey,
+      details: {}
+    },
+    idempotency: {
+      status: 'failed'
+    }
+  }
+}
+
+function createCancelLocalError(code: string, messageKey: string): QueueCancelApiErrorResponse {
   return {
     success: false,
     error: {
@@ -518,308 +1082,629 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="page-header">
-      <p class="eyebrow">门店员工</p>
-      <h1>排队列表</h1>
-      <p class="store-context">门店 {{ storeId || 'VITE_DEFAULT_STORE_ID' }}</p>
-      <RouterLink class="home-link" :to="staffHomeRoute">返回员工首页</RouterLink>
-    </section>
+  <StaffPrimaryWorkbench :store-id="storeId" active-tab="queue" class="queue-workbench">
+    <StaffHomeTopBar
+      :app-status-label="appStatusLabel"
+      :business-date="currentBusinessDate"
+      :current-time-text="currentTimeText"
+      :store-label="storeLabel"
+    />
 
-    <section class="filter-panel" aria-label="排队列表筛选">
-      <section class="status-filter" aria-label="状态筛选">
-        <p>状态筛选</p>
-        <div class="status-options">
-          <button
-            v-for="option in statusOptions"
-            :key="option.value"
-            :aria-pressed="selectedStatus === option.value"
-            :class="{ selected: selectedStatus === option.value }"
-            type="button"
-            @click="selectStatus(option.value)"
-          >
-            {{ option.label }}
-          </button>
+    <div class="queue-workbench-body">
+      <section class="queue-management-panel" :aria-label="gt('generated.queue-ticket-list.001')">
+        <header class="queue-panel-heading">
+          <div>
+            <p class="section-kicker">{{ gt('generated.queue-ticket-list.002') }} {{ currentBusinessDate }}</p>
+            <h1>{{ gt('generated.queue-ticket-list.003') }}</h1>
+          </div>
+          <div class="queue-heading-actions">
+            <RouterLink
+              v-if="canOpenQueueDisplay"
+              :aria-label="gt('generated.queue-ticket-list.004')"
+              class="queue-display-link"
+              :to="queueDisplayRoute"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span aria-hidden="true" class="queue-display-icon" /> {{ gt('generated.queue-ticket-list.005') }} </RouterLink>
+            <button type="button" :disabled="isLoading" @click="refresh">
+              {{ isLoading ? gt('generated.queue-ticket-list.006') : gt('generated.queue-ticket-list.007') }}
+            </button>
+          </div>
+        </header>
+
+        <div class="queue-toolbar today-queue-management">
+          <section class="queue-status-tabs" :aria-label="gt('generated.queue-ticket-list.008')">
+            <p>{{ gt('generated.queue-ticket-list.009') }}</p>
+            <div class="status-options">
+              <button
+                v-for="option in statusOptions"
+                :key="option.value"
+                :aria-pressed="selectedStatus === option.value"
+                :class="{ selected: selectedStatus === option.value }"
+                type="button"
+                @click="selectStatus(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </section>
+
+          <section class="queue-list-filters compact-queue-filters" :aria-label="gt('generated.queue-ticket-list.010')">
+            <div class="table-area-filter compact-table-area-filter" :aria-label="gt('generated.queue-ticket-list.011')">
+              <div class="compact-filter-heading">
+                <p>{{ gt('generated.queue-ticket-list.012') }}</p>
+                <span>{{ activeFilterCount ? `${resultCountLabel}${gt('generated.queue-ticket-list.013')}${activeFilterCount}${gt('generated.queue-ticket-list.014')}` : resultCountLabel }}</span>
+              </div>
+              <div class="filter-chip-row">
+                <button
+                  v-for="option in tableAreaOptions"
+                  :key="option.value"
+                  :aria-pressed="selectedTableArea === option.value"
+                  :class="{ selected: selectedTableArea === option.value }"
+                  class="filter-chip area-filter-chip"
+                  type="button"
+                  @click="selectTableArea(option.value)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="party-group-filter" :aria-label="gt('generated.queue-ticket-list.015')">
+              <div class="compact-filter-heading">
+                <p>{{ gt('generated.queue-ticket-list.016') }}</p>
+                <span>{{ gt('generated.queue-ticket-list.017') }}</span>
+              </div>
+              <div class="filter-chip-row">
+                <button
+                  v-for="option in queueGroupOptions"
+                  :key="option.value"
+                  :aria-pressed="selectedPartySizeGroup === option.value"
+                  :class="{ selected: selectedPartySizeGroup === option.value }"
+                  class="filter-chip queue-group-chip"
+                  type="button"
+                  @click="selectPartySizeGroup(option.value)"
+                >
+                  <strong>{{ option.label }}</strong>
+                  <span>{{ formatQueueGroupCount(option.partyCount, option.peopleCount) }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="queue-filter-controls compact-filter-controls">
+              <label class="queue-phone-filter">
+                <span class="visually-hidden">{{ gt('generated.queue-ticket-list.018') }}</span>
+                <input
+                  v-model="phoneFilter"
+                  autocomplete="off"
+                  inputmode="numeric"
+                  name="queuePhoneFilter"
+                  :placeholder="gt('generated.queue-ticket-list.019')"
+                  type="search"
+                />
+              </label>
+
+              <button class="reset-filter-button" type="button" @click="resetReceptionFilters"> {{ gt('generated.queue-ticket-list.020') }} </button>
+            </div>
+          </section>
         </div>
       </section>
 
-      <div class="page-summary" aria-live="polite">
-        <span>分页</span>
-        <strong>{{ pageRangeText }}</strong>
-        <small>limit {{ page.limit }} / offset {{ page.offset }} / total {{ page.total }}</small>
-      </div>
-    </section>
-
-    <section v-if="isLoading" class="state-panel" aria-live="polite">
-      <h2>加载中...</h2>
-      <p>正在读取当前门店排队票。</p>
-    </section>
-
-    <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
-      <h2>加载失败</h2>
-      <p class="error-code">错误代码：{{ apiError.error.code }}</p>
-      <p class="message-key">消息键：{{ apiError.error.messageKey }}</p>
-    </section>
-
-    <section v-if="skipApiError" class="state-panel error-panel" aria-live="assertive">
-      <h2>过号失败</h2>
-      <p class="error-code">错误代码：{{ skipApiError.error.code }}</p>
-      <p class="message-key">消息键：{{ skipApiError.error.messageKey }}</p>
-    </section>
-
-    <section v-if="rejoinApiError" class="state-panel error-panel" aria-live="assertive">
-      <h2>重新入队失败</h2>
-      <p class="error-code">错误代码：{{ rejoinApiError.error.code }}</p>
-      <p class="message-key">消息键：{{ rejoinApiError.error.messageKey }}</p>
-    </section>
-
-    <section v-if="skipSuccess" class="state-panel success-panel" aria-live="polite">
-      <h2>{{ skipSuccess.alreadySkipped ? '过号已完成' : '过号成功' }}</h2>
-      <p>排队号码 #{{ skipSuccess.queueTicketNumber }}</p>
-    </section>
-
-    <section v-if="rejoinSuccess" class="state-panel success-panel" aria-live="polite">
-      <h2>{{ rejoinSuccess.alreadyRejoined ? '重新入队已完成' : '重新入队成功' }}</h2>
-      <p>排队号码 #{{ rejoinSuccess.queueTicketNumber }}</p>
-    </section>
-
-    <section v-if="showEmptyState" class="state-panel" aria-live="polite">
-      <h2>暂无排队票</h2>
-      <p>可以切换状态筛选或刷新列表。</p>
-    </section>
-
-    <section v-if="items.length" class="queue-list" aria-label="排队票列表">
-      <article v-for="item in items" :key="item.queueTicketId" class="queue-card">
-        <header class="card-header">
-          <div>
-            <span>排队号码</span>
-            <strong>#{{ item.queueTicketNumber }}</strong>
-          </div>
-          <span class="status-pill" :class="statusClass(item.queueTicketStatus)">
-            {{ statusLabel(item.queueTicketStatus) }}
-          </span>
-        </header>
-
-        <section v-if="isCalledTicket(item)" class="hold-highlight" aria-label="叫号保留时间">
-          <span>保留到</span>
-          <strong>{{ formatStoreDateTime(item.holdUntilAt) }}</strong>
+      <section class="queue-message-stack" :aria-label="gt('generated.queue-ticket-list.021')">
+        <section v-if="isLoading" class="state-panel" aria-live="polite">
+          <h2>{{ gt('generated.queue-ticket-list.022') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.023') }}</p>
         </section>
 
-        <p class="raw-status">状态代码：{{ item.queueTicketStatus }}</p>
-
-        <section
-          v-if="canShowSkipAction(item) || canShowRejoinAction(item)"
-          class="card-actions"
-          aria-label="排队票操作"
-        >
-          <button
-            v-if="canShowSkipAction(item)"
-            class="skip-button"
-            type="button"
-            :disabled="isSkippingTicket(item)"
-            @click="confirmSkipTicket(item)"
-          >
-            {{ isSkippingTicket(item) ? '过号中...' : '过号' }}
-          </button>
-          <button
-            v-if="canShowRejoinAction(item)"
-            class="rejoin-button"
-            type="button"
-            :disabled="isRejoiningTicket(item)"
-            @click="confirmRejoinTicket(item)"
-          >
-            {{ isRejoiningTicket(item) ? '入队中...' : '重新入队' }}
-          </button>
+        <section v-if="apiError" class="state-panel error-panel" aria-live="assertive">
+          <h2>{{ formatAppGateErrorTitle(apiError.error, gt('generated.queue-ticket-list.024')) }}</h2>
+          <p>{{ formatAppGateErrorMessage(apiError.error, gt('generated.queue-ticket-list.025')) }}</p>
         </section>
 
-        <dl class="card-details">
-          <div>
-            <dt>人数</dt>
-            <dd>{{ item.partySize }}</dd>
-          </div>
-          <div>
-            <dt>人数分组</dt>
-            <dd>{{ item.partySizeGroup }}</dd>
-          </div>
-          <div>
-            <dt>预约编号</dt>
-            <dd>{{ optionalDisplay(item.reservationCode) }}</dd>
-          </div>
-          <div>
-            <dt>预约状态</dt>
-            <dd>{{ optionalDisplay(item.reservationStatus) }}</dd>
-          </div>
-          <div>
-            <dt>客户姓名</dt>
-            <dd>{{ optionalDisplay(item.customerName) }}</dd>
-          </div>
-          <div>
-            <dt>手机号</dt>
-            <dd>{{ optionalDisplay(item.customerPhoneMasked) }}</dd>
-          </div>
-          <div>
-            <dt>创建时间</dt>
-            <dd>{{ formatStoreDateTime(item.createdAt) }}</dd>
-          </div>
-          <div>
-            <dt>叫号时间</dt>
-            <dd>{{ formatStoreDateTime(item.calledAt) }}</dd>
-          </div>
-          <div>
-            <dt>保留到</dt>
-            <dd>{{ formatStoreDateTime(item.holdUntilAt) }}</dd>
-          </div>
-          <div class="debug-row">
-            <dt>排队票 ID</dt>
-            <dd>{{ item.queueTicketId }}</dd>
-          </div>
-          <div class="debug-row">
-            <dt>预约 ID</dt>
-            <dd>{{ optionalDisplay(item.reservationId) }}</dd>
-          </div>
-          <div class="debug-row">
-            <dt>过期时间</dt>
-            <dd>{{ formatStoreDateTime(item.expiresAt) }}</dd>
-          </div>
-        </dl>
-      </article>
-    </section>
+        <section v-if="callApiError" class="state-panel error-panel" aria-live="assertive">
+          <h2>{{ formatAppGateErrorTitle(callApiError.error, gt('generated.queue-ticket-list.026')) }}</h2>
+          <p>{{ formatAppGateErrorMessage(callApiError.error, gt('generated.queue-ticket-list.027')) }}</p>
+        </section>
 
-    <nav class="pagination-controls" aria-label="排队列表分页">
-      <button type="button" :disabled="!canGoPrevious" @click="goPrevious">上一页</button>
-      <button type="button" :disabled="isLoading" @click="refresh">刷新</button>
-      <button type="button" :disabled="!canGoNext" @click="goNext">下一页</button>
-    </nav>
-  </main>
+        <section v-if="skipApiError" class="state-panel error-panel" aria-live="assertive">
+          <h2>{{ formatAppGateErrorTitle(skipApiError.error, gt('generated.queue-ticket-list.028')) }}</h2>
+          <p :data-message-key="skipApiError.error.messageKey">
+            {{ formatAppGateErrorMessage(skipApiError.error, gt('generated.queue-ticket-list.029')) }}
+          </p>
+        </section>
+
+        <section v-if="rejoinApiError" class="state-panel error-panel" aria-live="assertive">
+          <h2>{{ formatAppGateErrorTitle(rejoinApiError.error, gt('generated.queue-ticket-list.030')) }}</h2>
+          <p :data-message-key="rejoinApiError.error.messageKey">
+            {{ formatAppGateErrorMessage(rejoinApiError.error, gt('generated.queue-ticket-list.031')) }}
+          </p>
+        </section>
+
+        <section v-if="cancelApiError" class="state-panel error-panel" aria-live="assertive">
+          <h2>{{ formatAppGateErrorTitle(cancelApiError.error, gt('generated.queue-ticket-list.032')) }}</h2>
+          <p>{{ formatAppGateErrorMessage(cancelApiError.error, gt('generated.queue-ticket-list.033')) }}</p>
+        </section>
+
+        <section v-if="callSuccess" class="state-panel success-panel" aria-live="polite">
+          <h2>{{ callSuccess.alreadyCalled ? gt('generated.queue-ticket-list.034') : gt('generated.queue-ticket-list.035') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.036') }} {{ queueTicketDisplayTextByResult(callSuccess) }}{{ gt('generated.queue-ticket-list.037') }} {{ formatStoreDateTime(callSuccess.holdUntilAt) }}</p>
+        </section>
+
+        <section v-if="skipSuccess" class="state-panel success-panel" aria-live="polite">
+          <h2>{{ skipSuccess.alreadySkipped ? gt('generated.queue-ticket-list.038') : gt('generated.queue-ticket-list.039') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.040') }} {{ queueTicketDisplayTextByResult(skipSuccess) }}</p>
+        </section>
+
+        <section v-if="rejoinSuccess" class="state-panel success-panel" aria-live="polite">
+          <h2>{{ rejoinSuccess.alreadyRejoined ? gt('generated.queue-ticket-list.041') : gt('generated.queue-ticket-list.042') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.043') }} {{ queueTicketDisplayTextByResult(rejoinSuccess) }}</p>
+        </section>
+
+        <section v-if="cancelSuccess" class="state-panel success-panel" aria-live="polite">
+          <h2>{{ cancelSuccess.alreadyCancelled ? gt('generated.queue-ticket-list.044') : gt('generated.queue-ticket-list.045') }}</h2>
+          <p>{{ gt('generated.queue-ticket-list.046') }} {{ queueTicketDisplayTextByResult(cancelSuccess) }}</p>
+        </section>
+      </section>
+
+      <section v-if="showEmptyState" class="empty-queue-panel" aria-live="polite">
+        <h2>{{ gt('generated.queue-ticket-list.047') }}</h2>
+        <p>{{ gt('generated.queue-ticket-list.048') }}</p>
+      </section>
+
+      <section v-if="visibleItems.length" class="queue-list" :aria-label="gt('generated.queue-ticket-list.049')">
+        <article v-for="item in visibleItems" :key="item.queueTicketId" class="compact-ticket-card">
+          <div class="compact-ticket-main">
+            <div class="compact-ticket-number">
+              {{ queueTicketDisplayText(item) }}
+            </div>
+
+            <div class="compact-ticket-info">
+              <div class="compact-ticket-title">
+                <strong>{{ customerDisplayName(item.customerName) }}</strong>
+                <span class="status-pill" :class="statusClass(item.queueTicketStatus)">
+                  {{ statusLabel(item.queueTicketStatus) }}
+                </span>
+              </div>
+
+              <p>
+                {{ item.partySize }}{{ gt('generated.queue-ticket-list.050') }} {{ item.partySizeGroup }} ·
+                {{ optionalDisplay(item.customerPhoneMasked) }}
+              </p>
+              <p>{{ assignedAreaText(item) }} · {{ assignedResourceText(item) }}</p>
+              <p>{{ queueTimeText(item) }}</p>
+            </div>
+          </div>
+
+          <p v-if="isCalledTicket(item)" class="hold-highlight">{{ gt('generated.queue-ticket-list.051') }} {{ formatStoreDateTime(item.holdUntilAt) }}</p>
+
+          <section
+            v-if="canShowAnyQueueAction(item)"
+            class="compact-ticket-actions"
+            :aria-label="gt('generated.queue-ticket-list.052')"
+          >
+            <button
+              v-if="canShowCallAction(item)"
+              class="call-button"
+              type="button"
+              :disabled="isTicketActionBusy(item)"
+              @click="confirmCallTicket(item)"
+            >
+              {{ isCallingTicket(item) ? gt('generated.queue-ticket-list.053') : item.queueTicketStatus === 'called' ? gt('generated.queue-ticket-list.054') : gt('generated.queue-ticket-list.055') }}
+            </button>
+            <button
+              v-if="canShowSkipAction(item)"
+              class="skip-button"
+              type="button"
+              :disabled="isTicketActionBusy(item)"
+              @click="confirmSkipTicket(item)"
+            >
+              {{ isSkippingTicket(item) ? gt('generated.queue-ticket-list.056') : gt('generated.queue-ticket-list.057') }}
+            </button>
+            <button
+              v-if="canShowRejoinAction(item)"
+              class="rejoin-button"
+              type="button"
+              :disabled="isTicketActionBusy(item)"
+              @click="confirmRejoinTicket(item)"
+            >
+              {{ isRejoiningTicket(item) ? gt('generated.queue-ticket-list.058') : gt('generated.queue-ticket-list.059') }}
+            </button>
+            <RouterLink
+              v-if="canShowSeatAction(item)"
+              class="seat-link"
+              :to="queueSeatRoute(item)"
+            >
+              {{ seatActionLabel.label }}
+            </RouterLink>
+            <button
+              v-if="canShowCancelAction(item)"
+              class="cancel-button"
+              type="button"
+              :disabled="isTicketActionBusy(item)"
+              @click="confirmCancelTicket(item)"
+            >
+              {{ isCancellingTicket(item) ? gt('generated.queue-ticket-list.060') : gt('generated.queue-ticket-list.061') }}
+            </button>
+          </section>
+        </article>
+      </section>
+    </div>
+
+  </StaffPrimaryWorkbench>
 </template>
 
 <style scoped>
-.page-shell {
+.queue-workbench-body {
   display: grid;
-  gap: 16px;
-  margin: 0 auto;
-  max-width: 680px;
-  min-height: 100vh;
-  padding: 20px 14px 32px;
+  gap: 14px;
+  padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
 }
 
-.page-header,
-.filter-panel,
+.queue-management-panel,
 .state-panel,
-.queue-card {
+.empty-queue-panel,
+.compact-ticket-card {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+}
+
+.queue-management-panel {
   display: grid;
   gap: 12px;
+  padding: 14px;
 }
 
-.page-header {
-  gap: 4px;
+.queue-panel-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
 }
 
-.eyebrow,
-.store-context,
-.raw-status,
-.status-filter p,
-.page-summary span,
-.page-summary small {
-  color: #667085;
-  font-size: 0.82rem;
-  margin: 0;
+.queue-panel-heading > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
 }
 
-.home-link {
-  color: #315f91;
-  font-size: 0.86rem;
+.queue-heading-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.section-kicker,
+.queue-status-tabs p,
+.compact-ticket-info p {
+  color: #64748b;
+  font-size: 0.78rem;
   font-weight: 800;
-  justify-self: start;
-  text-decoration: none;
+  line-height: 1.25;
+  margin: 0;
 }
 
 h1,
 h2,
-.page-summary strong {
-  color: #14213d;
+.compact-ticket-info strong {
+  color: #0f172a;
   letter-spacing: 0;
   margin: 0;
 }
 
 h1 {
-  font-size: 1.7rem;
+  font-size: 1.24rem;
   line-height: 1.15;
 }
 
 h2 {
-  font-size: 1rem;
+  font-size: 0.98rem;
 }
 
-.filter-panel,
-.state-panel,
-.queue-card {
-  background: #ffffff;
-  border: 1px solid #d8e0eb;
+.queue-panel-heading button,
+.queue-display-link,
+.status-options button,
+.filter-chip,
+.reset-filter-button,
+.call-button,
+.skip-button,
+.rejoin-button,
+.seat-link,
+.cancel-button {
+  align-items: center;
   border-radius: 8px;
-  box-shadow: 0 10px 32px rgba(20, 33, 61, 0.08);
-  padding: 14px;
+  display: inline-flex;
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0;
+  min-height: 42px;
+  text-align: center;
+  text-decoration: none;
 }
 
-.status-filter,
-.page-summary {
+.queue-panel-heading button {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #315f91;
+  font-size: 0.82rem;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.queue-display-link {
+  background: #f97316;
+  border: 1px solid #f97316;
+  color: #ffffff;
+  font-size: 0.82rem;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.queue-display-icon {
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  box-sizing: border-box;
+  display: inline-block;
+  height: 10px;
+  margin-right: 5px;
+  position: relative;
+  width: 13px;
+}
+
+.queue-display-icon::after {
+  background: currentColor;
+  border-radius: 999px;
+  bottom: -4px;
+  content: '';
+  height: 2px;
+  left: 3px;
+  position: absolute;
+  width: 5px;
+}
+
+.queue-toolbar {
   display: grid;
-  gap: 8px;
+  gap: 12px;
+}
+
+.queue-status-tabs,
+.today-queue-management {
+  display: grid;
+  gap: 9px;
+}
+
+.status-options,
+.filter-chip-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.status-options::-webkit-scrollbar,
+.filter-chip-row::-webkit-scrollbar {
+  display: none;
 }
 
 .status-options {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+  background: #eef2f7;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  gap: 4px;
+  padding: 4px;
 }
 
-.status-options button,
-.pagination-controls button {
-  background: #f8fafc;
-  border: 1px solid #c8d3e2;
-  border-radius: 8px;
+.filter-chip {
+  background: #ffffff;
+  border: 1px solid #d1dae7;
   color: #315f91;
-  font-weight: 800;
-  min-height: 42px;
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
 .status-options button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #315f91;
   flex: 0 0 auto;
-  padding: 0 13px;
+  min-height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
 .status-options button.selected {
-  background: #176b4d;
-  border-color: #176b4d;
+  background: #f97316;
+  border-color: #f97316;
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.2);
   color: #ffffff;
 }
 
-.page-summary {
-  border-top: 1px solid #e4e9f2;
-  padding-top: 12px;
+.status-options button:not(.selected):hover {
+  background: #ffffff;
+  border-color: #d1dae7;
 }
 
-.page-summary small {
-  overflow-wrap: anywhere;
+.filter-chip.selected {
+  background: #fff7ed;
+  border-color: #fb923c;
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.28);
+  color: #c2410c;
 }
 
-.state-panel p {
-  color: #41516a;
+.queue-list-filters {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.compact-filter-heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.compact-filter-heading p {
+  color: #14213d;
+  font-size: 0.86rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.compact-filter-heading span,
+.filter-chip span {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.filter-chip.selected span {
+  color: #c2410c;
+}
+
+.table-area-filter,
+.party-group-filter {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.table-area-filter {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 10px;
+}
+
+.area-filter-chip {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  min-width: 58px;
+  padding: 0 10px;
+}
+
+.queue-filter-controls {
+  display: grid;
+  gap: 6px;
+}
+
+.queue-phone-filter {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.queue-phone-filter input {
+  background: #ffffff;
+  border: 1px solid #d1dae7;
+  border-radius: 8px;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 850;
+  min-height: 30px;
+  outline: none;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.queue-group-chip {
+  align-items: flex-start;
+  background: #ffffff;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 38px;
+  min-width: 84px;
+  padding: 5px 10px;
+}
+
+.queue-group-chip.selected {
+  background: #f97316;
+  border-color: #f97316;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
+  color: #ffffff;
+}
+
+.queue-group-chip.selected span {
+  color: #fff7ed;
+}
+
+.queue-group-chip strong {
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.queue-group-chip span {
+  font-size: 0.68rem;
+}
+
+.queue-phone-filter input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.compact-filter-controls {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.reset-filter-button {
+  background: #ffffff;
+  border: 1px solid #d1dae7;
+  color: #315f91;
+  font-size: 0.72rem;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.queue-message-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.state-panel,
+.empty-queue-panel {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.state-panel p,
+.empty-queue-panel p {
+  color: #475569;
   margin: 0;
 }
 
 .error-panel {
-  border-color: #f4b8b8;
+  border-color: #fecaca;
 }
 
 .success-panel {
-  border-color: #a7d7be;
+  border-color: #bbf7d0;
 }
 
 .error-code {
   color: #b42318;
-  font-weight: 800;
+  font-weight: 900;
   overflow-wrap: anywhere;
 }
 
@@ -827,72 +1712,50 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-.card-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.skip-button,
-.rejoin-button {
-  background: #fff7ed;
-  border: 1px solid #fdba74;
-  border-radius: 8px;
-  color: #c2410c;
-  font-weight: 800;
-  min-height: 42px;
-  min-width: 88px;
-  padding: 0 14px;
-}
-
-.rejoin-button {
-  background: #eef6f1;
-  border-color: #a7d7be;
-  color: #176b4d;
-}
-
-.skip-button:disabled,
-.rejoin-button:disabled {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #94a3b8;
-  cursor: not-allowed;
-}
-
 .queue-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
-.queue-card {
-  border-color: #cdd8e7;
-}
-
-.card-header {
-  align-items: start;
+.compact-ticket-card {
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
 }
 
-.card-header div {
+.compact-ticket-main {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.compact-ticket-number {
+  color: #f97316;
+  font-size: 1.62rem;
+  font-weight: 950;
+  line-height: 1.05;
+  min-width: 44px;
+  overflow-wrap: anywhere;
+}
+
+.compact-ticket-info {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.card-header span,
-.hold-highlight span,
-dt {
-  color: #41516a;
-  font-size: 0.86rem;
-  font-weight: 700;
+.compact-ticket-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
 }
 
-.card-header strong {
-  color: #14213d;
-  font-size: 1.85rem;
-  line-height: 1.05;
+.compact-ticket-info strong {
+  font-size: 0.98rem;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
@@ -902,27 +1765,27 @@ dt {
   border-radius: 999px;
   color: #315f91;
   display: inline-flex;
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: 0.76rem;
+  font-weight: 900;
   justify-content: center;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 28px;
+  padding: 0 9px;
   white-space: nowrap;
 }
 
 .status-waiting {
-  background: #eaf2ff;
-  color: #315f91;
-}
-
-.status-called {
   background: #fff7ed;
   color: #c2410c;
 }
 
+.status-called {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .status-seated {
-  background: #eef6f1;
-  color: #176b4d;
+  background: #dcfce7;
+  color: #047857;
 }
 
 .status-skipped,
@@ -936,85 +1799,115 @@ dt {
 .hold-highlight {
   background: #fff7ed;
   border: 1px solid #fed7aa;
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-}
-
-.hold-highlight strong {
+  border-radius: 10px;
   color: #c2410c;
-  font-size: 1.15rem;
-}
-
-.card-details {
-  display: grid;
-  gap: 9px;
+  font-size: 0.82rem;
+  font-weight: 900;
   margin: 0;
+  padding: 8px 10px;
 }
 
-.card-details div {
-  display: grid;
-  gap: 3px;
-}
-
-dt,
-dd {
-  margin: 0;
-}
-
-dd {
-  color: #1d2736;
-  overflow-wrap: anywhere;
-}
-
-.debug-row dd {
-  color: #475569;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 0.84rem;
-}
-
-.pagination-controls {
+.compact-ticket-actions {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.pagination-controls button {
+.call-button,
+.skip-button,
+.rejoin-button,
+.seat-link,
+.cancel-button {
+  border: 1px solid transparent;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 10px;
 }
 
-.pagination-controls button:disabled {
+.call-button {
+  background: #ffedd5;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+
+.skip-button {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.rejoin-button {
+  background: #eaf2ff;
+  border-color: #bfdbfe;
+  color: #315f91;
+}
+
+.seat-link {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #047857;
+}
+
+.cancel-button {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+button:disabled,
+.call-button:disabled,
+.skip-button:disabled,
+.rejoin-button:disabled,
+.cancel-button:disabled {
   background: #eef2f7;
+  border-color: #cbd5e1;
   color: #94a3b8;
   cursor: not-allowed;
 }
 
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.28);
+  outline: 3px solid rgba(249, 115, 22, 0.28);
   outline-offset: 2px;
 }
 
-@media (min-width: 720px) {
-  .page-shell {
-    padding-top: 36px;
+@media (min-width: 768px) {
+  .queue-workbench-body {
+    padding: 16px 18px 24px;
   }
 
-  h1 {
-    font-size: 2rem;
+  .queue-toolbar {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .filter-panel {
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+  .compact-filter-controls {
+    align-items: end;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .queue-workbench-body {
+    align-items: start;
+    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
   }
 
-  .page-summary {
-    border-left: 1px solid #e4e9f2;
-    border-top: 0;
-    padding-left: 12px;
-    padding-top: 0;
+  .queue-management-panel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .queue-message-stack,
+  .empty-queue-panel,
+  .queue-list {
+    grid-column: 2;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .queue-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

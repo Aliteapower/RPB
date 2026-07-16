@@ -15,6 +15,7 @@ import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
@@ -23,9 +24,14 @@ import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositor
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.status.IdempotencyStatus;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationCapacityPolicyPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
 import com.rpb.reservation.reservation.domain.Reservation;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceTarget;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationCode;
 import com.rpb.reservation.reservation.value.ReservationId;
@@ -34,6 +40,16 @@ import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.store.domain.StorePolicy;
 import com.rpb.reservation.store.value.StoreId;
+import com.rpb.reservation.table.application.DiningTableResourceRow;
+import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
+import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
+import com.rpb.reservation.table.domain.DiningTable;
+import com.rpb.reservation.table.domain.TableGroup;
+import com.rpb.reservation.table.domain.TableGroupMember;
+import com.rpb.reservation.table.status.DiningTableStatus;
+import com.rpb.reservation.table.status.TableGroupStatus;
+import com.rpb.reservation.table.value.TableGroupId;
+import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.time.Clock;
 import java.time.Instant;
@@ -41,10 +57,12 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +126,21 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void createsCustomerWithOptionalEmailFromReservationProfile() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithCustomerEmail());
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.customerRepository.saved).hasSize(1);
+        Customer saved = scenario.customerRepository.saved.getFirst();
+        assertThat(saved.displayName()).isEqualTo("Email Guest");
+        assertThat(saved.nickname()).isEqualTo("女士");
+        assertThat(saved.phone().value()).isEqualTo("+6591234568");
+        assertThat(saved.email()).isEqualTo("email-guest@example.test");
+    }
+
+    @Test
     void derivesReservedEndAtFromStorePolicyExpectedDiningDurationWhenMissing() {
         Scenario scenario = Scenario.ready();
 
@@ -120,6 +153,80 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void createsActiveReservationPreassignmentWhenTableIsSelected() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithTable(scenario.tableA1.id()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.preassignmentRepository.saved).hasSize(1);
+        ReservationPreassignment preassignment = scenario.preassignmentRepository.saved.getFirst();
+        assertThat(preassignment.reservationId().value()).isEqualTo(result.reservationId());
+        assertThat(preassignment.resourceType()).isEqualTo("dining_table");
+        assertThat(preassignment.resourceId()).isEqualTo(scenario.tableA1.id().value());
+        assertThat(preassignment.status()).isEqualTo("active");
+        assertThat(scenario.queueTicketCreated).isFalse();
+        assertThat(scenario.seatingCreated).isFalse();
+        assertThat(scenario.tableLockCreated).isFalse();
+    }
+
+    @Test
+    void rejectsSelectedTableWhenAnotherActivePreassignmentOverlapsTheSlot() {
+        Scenario scenario = Scenario.ready();
+        scenario.preassignmentRepository.conflictingTargets.add(
+            new ReservationResourceTarget("dining_table", scenario.tableA1.id().value())
+        );
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithTable(scenario.tableA1.id()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCreateError.TABLE_NOT_AVAILABLE);
+        assertThat(scenario.preassignmentRepository.saved).isEmpty();
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+        assertThat(scenario.idempotencyRepository.failed).hasSize(1);
+    }
+
+    @Test
+    void rejectsSelectedTableWhenCapacityDoesNotFitPartySize() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithTable(scenario.smallTable.id()));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCreateError.TABLE_CAPACITY_INSUFFICIENT);
+        assertThat(scenario.preassignmentRepository.saved).isEmpty();
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+    }
+
+    @Test
+    void createsActiveReservationPreassignmentWhenTableGroupIsSelected() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithTableGroup(scenario.groupVip.id()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.preassignmentRepository.saved).hasSize(1);
+        ReservationPreassignment preassignment = scenario.preassignmentRepository.saved.getFirst();
+        assertThat(preassignment.resourceType()).isEqualTo("table_group");
+        assertThat(preassignment.resourceId()).isEqualTo(scenario.groupVip.id().value());
+        assertThat(preassignment.status()).isEqualTo("active");
+    }
+
+    @Test
+    void createsActiveReservationPreassignmentWhenTemporaryTableGroupIsSelected() {
+        Scenario scenario = Scenario.ready();
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.commandWithTableGroup(scenario.temporaryGroup.id()));
+
+        assertThat(result.success()).isTrue();
+        assertThat(scenario.preassignmentRepository.saved).hasSize(1);
+        ReservationPreassignment preassignment = scenario.preassignmentRepository.saved.getFirst();
+        assertThat(preassignment.resourceType()).isEqualTo("table_group");
+        assertThat(preassignment.resourceId()).isEqualTo(scenario.temporaryGroup.id().value());
+        assertThat(preassignment.status()).isEqualTo("active");
+    }
+
+    @Test
     void rejectsCapacityUnavailableUsingV1FallbackCapacity() {
         Scenario scenario = Scenario.ready();
         scenario.reservationRepository.capacityUsage = 49;
@@ -128,6 +235,21 @@ class ReservationCreateApplicationServiceTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.error()).isEqualTo(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+        assertThat(scenario.idempotencyRepository.failed).hasSize(1);
+    }
+
+    @Test
+    void rejectsPublicBookingReservationWhenCapacityPolicyRejectsPublicQuota() {
+        Scenario scenario = Scenario.ready();
+        scenario.capacityPolicy.forcedDecision = ReservationCapacityDecision.reject(12, 10, "public_booking_capacity_insufficient");
+
+        ReservationCreateResult result = scenario.service().createReservation(scenario.publicBookingSourceCommand());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT);
+        assertThat(scenario.capacityPolicy.queries).hasSize(1);
+        assertThat(scenario.capacityPolicy.queries.getFirst().source()).isEqualTo(OperationSource.PUBLIC_BOOKING);
         assertThat(scenario.reservationRepository.saved).isEmpty();
         assertThat(scenario.idempotencyRepository.failed).hasSize(1);
     }
@@ -287,6 +409,20 @@ class ReservationCreateApplicationServiceTest {
     }
 
     @Test
+    void publicBookingStartTimeOutsideEffectiveMealPeriodSlotsIsRejected() {
+        Scenario scenario = Scenario.ready();
+        Instant arbitraryStartAt = Instant.parse("2026-06-20T04:10:00Z");
+
+        ReservationCreateResult result = scenario.service().createReservation(
+            scenario.publicBookingSourceCommandWithRange(arbitraryStartAt, arbitraryStartAt.plusSeconds(90 * 60L))
+        );
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).isEqualTo(ReservationCreateError.RESERVATION_TIME_SLOT_UNAVAILABLE);
+        assertThat(scenario.reservationRepository.saved).isEmpty();
+    }
+
+    @Test
     void customerNotFoundIsRejected() {
         Scenario scenario = Scenario.ready();
 
@@ -421,6 +557,40 @@ class ReservationCreateApplicationServiceTest {
         final UUID actorId = UUID.randomUUID();
         final Store store = new Store(storeId, tenantId, "STORE-1", "Asia/Singapore", "en-SG", "active");
         final StorePolicy policy = new StorePolicy(UUID.randomUUID(), scope, 15, 3, 90, "same_group_tail", "default");
+        final DiningTable tableA1 = new DiningTable(
+            new TableId(UUID.randomUUID()),
+            scope,
+            UUID.randomUUID(),
+            "A01",
+            new com.rpb.reservation.common.value.CapacityRange(2, 4),
+            DiningTableStatus.AVAILABLE,
+            true
+        );
+        final DiningTable smallTable = new DiningTable(
+            new TableId(UUID.randomUUID()),
+            scope,
+            UUID.randomUUID(),
+            "S01",
+            new com.rpb.reservation.common.value.CapacityRange(1, 2),
+            DiningTableStatus.AVAILABLE,
+            true
+        );
+        final TableGroup groupVip = new TableGroup(
+            new TableGroupId(UUID.randomUUID()),
+            scope,
+            "VIP-1",
+            "fixed",
+            new com.rpb.reservation.common.value.CapacityRange(6, 10),
+            TableGroupStatus.ACTIVE
+        );
+        final TableGroup temporaryGroup = new TableGroup(
+            new TableGroupId(UUID.randomUUID()),
+            scope,
+            "临组1",
+            "temporary",
+            new com.rpb.reservation.common.value.CapacityRange(6, 10),
+            TableGroupStatus.CREATED
+        );
         final Customer existingCustomer = new Customer(
             new CustomerId(UUID.randomUUID()),
             scope.tenantScope(),
@@ -433,10 +603,14 @@ class ReservationCreateApplicationServiceTest {
         final FakeStorePolicyRepository storePolicyRepository = new FakeStorePolicyRepository(this);
         final FakeCustomerRepository customerRepository = new FakeCustomerRepository(this);
         final FakeReservationRepository reservationRepository = new FakeReservationRepository();
+        final FakeReservationPreassignmentRepository preassignmentRepository = new FakeReservationPreassignmentRepository();
+        final FakeDiningTableRepository diningTableRepository = new FakeDiningTableRepository(this);
+        final FakeTableGroupRepository tableGroupRepository = new FakeTableGroupRepository(this);
         final FakeBusinessEventRepository businessEventRepository = new FakeBusinessEventRepository();
         final FakeStateTransitionLogRepository stateTransitionLogRepository = new FakeStateTransitionLogRepository();
         final FakeAuditLogRepository auditLogRepository = new FakeAuditLogRepository();
         final FakeIdempotencyRepository idempotencyRepository = new FakeIdempotencyRepository();
+        final FakeReservationCapacityPolicy capacityPolicy = new FakeReservationCapacityPolicy();
         boolean queueTicketCreated;
         boolean seatingCreated;
         boolean tableLockCreated;
@@ -449,6 +623,10 @@ class ReservationCreateApplicationServiceTest {
         static Scenario ready() {
             Scenario scenario = new Scenario();
             scenario.customerRepository.customers.put(scenario.existingCustomer.id().value(), scenario.existingCustomer);
+            scenario.diningTableRepository.tables.put(scenario.tableA1.id(), scenario.tableA1);
+            scenario.diningTableRepository.tables.put(scenario.smallTable.id(), scenario.smallTable);
+            scenario.tableGroupRepository.groups.put(scenario.groupVip.id(), scenario.groupVip);
+            scenario.tableGroupRepository.groups.put(scenario.temporaryGroup.id(), scenario.temporaryGroup);
             return scenario;
         }
 
@@ -458,12 +636,16 @@ class ReservationCreateApplicationServiceTest {
                 storePolicyRepository,
                 customerRepository,
                 reservationRepository,
+                preassignmentRepository,
+                diningTableRepository,
+                tableGroupRepository,
                 businessEventRepository,
                 stateTransitionLogRepository,
                 auditLogRepository,
                 idempotencyRepository,
                 Clock.fixed(now, ZoneOffset.UTC),
-                () -> 7
+                () -> 7,
+                capacityPolicy
             );
         }
 
@@ -484,6 +666,48 @@ class ReservationCreateApplicationServiceTest {
                 "staff",
                 null,
                 "staff",
+                null
+            );
+        }
+
+        CreateReservationCommand publicBookingSourceCommand() {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                4,
+                startAt,
+                endAt,
+                existingCustomer.id().value(),
+                null,
+                null,
+                null,
+                "Window seat preferred",
+                "idem-customer-reservation-create",
+                existingCustomer.id().value(),
+                OperationSource.CUSTOMER,
+                null,
+                OperationSource.PUBLIC_BOOKING,
+                null
+            );
+        }
+
+        CreateReservationCommand publicBookingSourceCommandWithRange(Instant reservedStartAt, Instant reservedEndAt) {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                2,
+                reservedStartAt,
+                reservedEndAt,
+                existingCustomer.id().value(),
+                null,
+                null,
+                null,
+                "Window seat preferred",
+                "idem-public-booking-range",
+                existingCustomer.id().value(),
+                OperationSource.CUSTOMER,
+                null,
+                OperationSource.PUBLIC_BOOKING,
                 null
             );
         }
@@ -530,6 +754,28 @@ class ReservationCreateApplicationServiceTest {
             );
         }
 
+        CreateReservationCommand commandWithCustomerEmail() {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                2,
+                startAt,
+                endAt,
+                null,
+                "Email Guest",
+                "女士",
+                "email-guest@example.test",
+                "+6591234568",
+                null,
+                "idem-email-profile",
+                actorId,
+                "staff",
+                null,
+                "staff",
+                null
+            );
+        }
+
         CreateReservationCommand commandWithoutEndAt() {
             return new CreateReservationCommand(
                 tenantId.value(),
@@ -548,6 +794,52 @@ class ReservationCreateApplicationServiceTest {
                 null,
                 "staff",
                 null
+            );
+        }
+
+        CreateReservationCommand commandWithTable(TableId tableId) {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                4,
+                startAt,
+                endAt,
+                existingCustomer.id().value(),
+                null,
+                null,
+                null,
+                null,
+                "idem-table-" + tableId.value(),
+                actorId,
+                "staff",
+                null,
+                "staff",
+                null,
+                tableId.value(),
+                null
+            );
+        }
+
+        CreateReservationCommand commandWithTableGroup(TableGroupId tableGroupId) {
+            return new CreateReservationCommand(
+                tenantId.value(),
+                storeId.value(),
+                8,
+                startAt,
+                endAt,
+                existingCustomer.id().value(),
+                null,
+                null,
+                null,
+                null,
+                "idem-table-group-" + tableGroupId.value(),
+                actorId,
+                "staff",
+                null,
+                "staff",
+                null,
+                null,
+                tableGroupId.value()
             );
         }
 
@@ -678,6 +970,26 @@ class ReservationCreateApplicationServiceTest {
         }
     }
 
+    private static final class FakeReservationCapacityPolicy implements ReservationCapacityPolicyPort {
+        final List<ReservationCapacityQuery> queries = new ArrayList<>();
+        ReservationCapacityDecision forcedDecision;
+
+        @Override
+        public ReservationCapacityDecision evaluate(ReservationCapacityQuery query) {
+            queries.add(query);
+            if (forcedDecision != null) {
+                return forcedDecision;
+            }
+            int limit = 50;
+            int partySize = query.partySize().value();
+            int currentUsage = query.currentUsage();
+            if (currentUsage + partySize <= limit) {
+                return ReservationCapacityDecision.accept(limit, currentUsage);
+            }
+            return ReservationCapacityDecision.reject(limit, currentUsage, "reservation_capacity_insufficient");
+        }
+    }
+
     private static final class FakeStoreRepository implements StoreRepositoryPort {
         private final Scenario scenario;
 
@@ -716,6 +1028,162 @@ class ReservationCreateApplicationServiceTest {
         @Override
         public Optional<StorePolicy> findByStoreScope(StoreScope scope) {
             return scenario.scope.equals(scope) ? Optional.of(scenario.policy) : Optional.empty();
+        }
+    }
+
+    private static final class FakeDiningTableRepository implements DiningTableRepositoryPort {
+        private final Map<TableId, DiningTable> tables = new HashMap<>();
+        private final Scenario scenario;
+
+        private FakeDiningTableRepository(Scenario scenario) {
+            this.scenario = scenario;
+        }
+
+        @Override
+        public Optional<DiningTable> findById(StoreScope scope, TableId tableId) {
+            return Optional.ofNullable(tables.get(tableId)).filter(table -> table.scope().equals(scope));
+        }
+
+        @Override
+        public List<DiningTable> findActiveByArea(StoreScope scope, UUID areaId) {
+            return tables.values().stream()
+                .filter(table -> table.scope().equals(scope))
+                .filter(table -> table.areaId().equals(areaId))
+                .toList();
+        }
+
+        @Override
+        public List<DiningTable> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate) {
+            return tables.values().stream()
+                .filter(table -> table.scope().equals(scope))
+                .filter(table -> table.capacity().includes(partySize))
+                .toList();
+        }
+
+        @Override
+        public List<DiningTable> findVisibleResources(StoreScope scope, String status, PartySize partySize) {
+            return findCandidates(scope, partySize == null ? new PartySize(1) : partySize, new BusinessDate(LocalDate.of(2026, 6, 20)));
+        }
+
+        @Override
+        public List<DiningTableResourceRow> findVisibleResourceRows(StoreScope scope, String status, PartySize partySize) {
+            return tables.values().stream()
+                .filter(table -> table.scope().equals(scope))
+                .map(table -> new DiningTableResourceRow(
+                    table.id().value(),
+                    table.tableCode(),
+                    table.tableCode(),
+                    "A区",
+                    table.capacity().min(),
+                    table.capacity().max(),
+                    table.status().code()
+                ))
+                .toList();
+        }
+
+        @Override
+        public DiningTable save(StoreScope scope, DiningTable table) {
+            assertThat(scope).isEqualTo(scenario.scope);
+            tables.put(table.id(), table);
+            return table;
+        }
+    }
+
+    private static final class FakeTableGroupRepository implements TableGroupRepositoryPort {
+        private final Map<TableGroupId, TableGroup> groups = new HashMap<>();
+        private final Scenario scenario;
+
+        private FakeTableGroupRepository(Scenario scenario) {
+            this.scenario = scenario;
+        }
+
+        @Override
+        public Optional<TableGroup> findById(StoreScope scope, TableGroupId tableGroupId) {
+            return Optional.ofNullable(groups.get(tableGroupId)).filter(group -> group.scope().equals(scope));
+        }
+
+        @Override
+        public List<TableGroupMember> findActiveMembers(StoreScope scope, TableGroupId tableGroupId) {
+            return List.of();
+        }
+
+        @Override
+        public List<TableGroup> findActiveGroupsForTable(StoreScope scope, TableId tableId) {
+            return List.of();
+        }
+
+        @Override
+        public List<TableGroup> findCandidates(StoreScope scope, PartySize partySize, BusinessDate businessDate) {
+            return groups.values().stream()
+                .filter(group -> group.scope().equals(scope))
+                .filter(group -> group.capacity().includes(partySize))
+                .toList();
+        }
+
+        @Override
+        public List<TableGroup> findVisibleGroups(StoreScope scope, String status, PartySize partySize) {
+            return findCandidates(scope, partySize == null ? new PartySize(1) : partySize, new BusinessDate(LocalDate.of(2026, 6, 20)));
+        }
+
+        @Override
+        public TableGroup save(StoreScope scope, TableGroup tableGroup) {
+            assertThat(scope).isEqualTo(scenario.scope);
+            groups.put(tableGroup.id(), tableGroup);
+            return tableGroup;
+        }
+
+        @Override
+        public TableGroupMember saveMember(StoreScope scope, TableGroupMember member) {
+            return member;
+        }
+    }
+
+    private static final class FakeReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
+        final List<ReservationPreassignment> saved = new ArrayList<>();
+        final Set<ReservationResourceTarget> conflictingTargets = new HashSet<>();
+
+        @Override
+        public boolean existsActiveResourceConflict(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            BusinessDate businessDate,
+            TimeRange timeRange
+        ) {
+            return conflictingTargets.contains(new ReservationResourceTarget(resourceType, resourceId));
+        }
+
+        @Override
+        public Set<ReservationResourceTarget> findActiveResourceTargetsForDate(StoreScope scope, BusinessDate businessDate) {
+            return conflictingTargets;
+        }
+
+        @Override
+        public Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(StoreScope scope, BusinessDate businessDate) {
+            return conflictingTargets.stream()
+                .map(target -> new ReservationResourceAssignment(
+                    UUID.randomUUID(),
+                    "R-CONFLICT",
+                    "confirmed",
+                    4,
+                    null,
+                    null,
+                    null,
+                    null,
+                    target.resourceType(),
+                    target.resourceId(),
+                    null,
+                    null,
+                    null,
+                    null
+                ))
+                .collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
+            saved.add(preassignment);
+            return preassignment;
         }
     }
 

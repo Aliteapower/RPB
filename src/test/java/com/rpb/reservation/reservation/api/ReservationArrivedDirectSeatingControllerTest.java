@@ -16,8 +16,11 @@ import com.rpb.reservation.reservation.application.ReservationArrivedDirectSeati
 import com.rpb.reservation.reservation.application.command.SeatArrivedReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.lang.reflect.Method;
@@ -41,12 +44,17 @@ class ReservationArrivedDirectSeatingControllerTest {
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000901");
     private static final UUID TABLE_ID = UUID.fromString("60000000-0000-0000-0000-000000000901");
     private static final UUID TABLE_GROUP_ID = UUID.fromString("70000000-0000-0000-0000-000000000901");
+    private static final UUID TEMP_TABLE_ID_A = UUID.fromString("70000000-0000-0000-0000-000000000981");
+    private static final UUID TEMP_TABLE_ID_B = UUID.fromString("70000000-0000-0000-0000-000000000982");
     private static final UUID SEATING_ID = UUID.fromString("80000000-0000-0000-0000-000000000901");
 
     private ReservationCreateApplicationService createApplicationService;
     private ReservationCheckInApplicationService checkInApplicationService;
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
+    private ReservationCancelApplicationService cancelApplicationService;
+    private ReservationNoShowApplicationService noShowApplicationService;
+    private ReservationCompleteApplicationService completeApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -56,6 +64,9 @@ class ReservationArrivedDirectSeatingControllerTest {
         checkInApplicationService = mock(ReservationCheckInApplicationService.class);
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
+        cancelApplicationService = mock(ReservationCancelApplicationService.class);
+        noShowApplicationService = mock(ReservationNoShowApplicationService.class);
+        completeApplicationService = mock(ReservationCompleteApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(actor(Set.of("store_staff"), Set.of("reservation.seat"), Set.of(STORE_ID)));
         mockMvc = MockMvcBuilders
             .standaloneSetup(new ReservationController(
@@ -63,6 +74,9 @@ class ReservationArrivedDirectSeatingControllerTest {
                 checkInApplicationService,
                 seatingApplicationService,
                 queueApplicationService,
+                cancelApplicationService,
+                noShowApplicationService,
+                completeApplicationService,
                 actorProvider,
                 new ReservationApiMapper(),
                 new ReservationApiErrorMapper(),
@@ -71,7 +85,13 @@ class ReservationArrivedDirectSeatingControllerTest {
                 new ReservationArrivedDirectSeatingApiMapper(),
                 new ReservationArrivedDirectSeatingApiErrorMapper(),
                 new ReservationArrivedToQueueApiMapper(),
-                new ReservationArrivedToQueueApiErrorMapper()
+                new ReservationArrivedToQueueApiErrorMapper(),
+                new ReservationCancelApiMapper(),
+                new ReservationCancelApiErrorMapper(),
+                new ReservationNoShowApiMapper(),
+                new ReservationNoShowApiErrorMapper(),
+                new ReservationCompleteApiMapper(),
+                new ReservationCompleteApiErrorMapper()
             ))
             .build();
     }
@@ -154,6 +174,36 @@ class ReservationArrivedDirectSeatingControllerTest {
         assertThat(commandCaptor.getValue().overrideReasonCode()).isEqualTo("MANUAL_ASSIGNMENT");
         assertThat(commandCaptor.getValue().overrideNote()).isEqualTo("Large party");
         assertThat(commandCaptor.getValue().note()).isEqualTo("Birthday group");
+    }
+
+    @Test
+    void seatsArrivedReservationToTemporaryTablesAndMapsMemberIds() throws Exception {
+        when(seatingApplicationService.seatArrivedReservation(any())).thenReturn(tableGroupSuccess());
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "idem-temp-group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "tableId": null,
+                      "tableGroupId": null,
+                      "temporaryTableIds": [
+                        "%s",
+                        "%s"
+                      ],
+                      "note": " Combine tables "
+                    }
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resourceType").value("table_group"));
+
+        ArgumentCaptor<SeatArrivedReservationCommand> commandCaptor = ArgumentCaptor.forClass(SeatArrivedReservationCommand.class);
+        verify(seatingApplicationService).seatArrivedReservation(commandCaptor.capture());
+        SeatArrivedReservationCommand command = commandCaptor.getValue();
+        assertThat(command.tableId()).isNull();
+        assertThat(command.tableGroupId()).isNull();
+        assertThat(command.temporaryTableIds()).containsExactly(TEMP_TABLE_ID_A, TEMP_TABLE_ID_B);
+        assertThat(command.note()).isEqualTo("Combine tables");
     }
 
     @Test
@@ -240,10 +290,51 @@ class ReservationArrivedDirectSeatingControllerTest {
     }
 
     @Test
+    void temporaryTableSelectionValidationStopsBeforeService() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "idem-empty-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"temporaryTableIds": []}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "idem-one-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"temporaryTableIds": ["%s"]}
+                    """.formatted(TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "idem-duplicate-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TEMP_TABLE_ID_A, TEMP_TABLE_ID_A)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE"));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, RESERVATION_ID)
+                .header("Idempotency-Key", "idem-conflicting-temp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"tableId": "%s", "temporaryTableIds": ["%s", "%s"]}
+                    """.formatted(TABLE_ID, TEMP_TABLE_ID_A, TEMP_TABLE_ID_B)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_SELECTION_CONFLICT"));
+
+        verifyNoInteractions(seatingApplicationService);
+    }
+
+    @Test
     void requestDtoOnlyExposesAllowedFields() {
         assertThat(SeatArrivedReservationRequest.class.getRecordComponents())
             .extracting(component -> component.getName())
-            .containsExactly("tableId", "tableGroupId", "overrideReasonCode", "overrideNote", "note");
+            .containsExactly("tableId", "tableGroupId", "temporaryTableIds", "overrideReasonCode", "overrideNote", "note");
     }
 
     @Test
@@ -273,6 +364,7 @@ class ReservationArrivedDirectSeatingControllerTest {
         assertApplicationError(ReservationArrivedDirectSeatingError.STORE_ACCESS_DENIED, 403, "FORBIDDEN", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_NOT_FOUND, 404, "RESERVATION_NOT_FOUND", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_STATUS_NOT_ARRIVED, 409, "RESERVATION_STATUS_NOT_ARRIVED", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_NOT_TODAY, 409, "RESERVATION_NOT_TODAY", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING, 409, "RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_CANCELLED, 409, "RESERVATION_CANNOT_SEAT_CANCELLED", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.RESERVATION_CANNOT_SEAT_NO_SHOW, 409, "RESERVATION_CANNOT_SEAT_NO_SHOW", "failed");
@@ -285,6 +377,12 @@ class ReservationArrivedDirectSeatingControllerTest {
         assertApplicationError(ReservationArrivedDirectSeatingError.TABLE_GROUP_INVALID, 409, "TABLE_GROUP_INVALID", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.TABLE_GROUP_MEMBER_UNAVAILABLE, 409, "TABLE_GROUP_MEMBER_UNAVAILABLE", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.TABLE_GROUP_CAPACITY_INSUFFICIENT, 409, "TABLE_GROUP_CAPACITY_INSUFFICIENT", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED, 400, "TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE, 400, "TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE, 409, "TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT, 409, "TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_LOCK_CONFLICT", "failed");
+        assertApplicationError(ReservationArrivedDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT, 409, "TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT", "failed");
         assertApplicationError(ReservationArrivedDirectSeatingError.IDEMPOTENCY_CONFLICT, 409, "IDEMPOTENCY_CONFLICT", "conflict");
         assertApplicationError(ReservationArrivedDirectSeatingError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS", "started");
         assertApplicationError(ReservationArrivedDirectSeatingError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY", "failed");
@@ -424,6 +522,7 @@ class ReservationArrivedDirectSeatingControllerTest {
         return switch (apiCode) {
             case "RESERVATION_NOT_FOUND" -> "reservation.not_found";
             case "RESERVATION_STATUS_NOT_ARRIVED" -> "reservation.status_not_arrived";
+            case "RESERVATION_NOT_TODAY" -> "reservation.not_today";
             case "RESERVATION_SEATED_WITHOUT_ACTIVE_SEATING" -> "reservation.seated_without_active_seating";
             case "RESERVATION_CANNOT_SEAT_CANCELLED" -> "reservation.cannot_seat_cancelled";
             case "RESERVATION_CANNOT_SEAT_NO_SHOW" -> "reservation.cannot_seat_no_show";

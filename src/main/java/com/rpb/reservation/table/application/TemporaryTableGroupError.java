@@ -1,0 +1,15 @@
+package com.rpb.reservation.table.application;
+
+public enum TemporaryTableGroupError {
+    GROUP_NAME_REQUIRED,
+    GROUP_NAME_CONFLICT,
+    GROUP_NOT_FOUND,
+    GROUP_NOT_TEMPORARY,
+    GROUP_NOT_DISSOLVABLE,
+    MEMBER_REQUIRED,
+    MEMBER_DUPLICATE,
+    MEMBER_UNAVAILABLE,
+    CAPACITY_INSUFFICIENT,
+    LOCK_CONFLICT,
+    PREASSIGNMENT_CONFLICT
+}

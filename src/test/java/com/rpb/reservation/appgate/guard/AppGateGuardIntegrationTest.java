@@ -17,6 +17,7 @@ import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.appgate.domain.AppGateDecision;
 import com.rpb.reservation.appgate.domain.AppGateDenyReason;
 import com.rpb.reservation.cleaning.api.CleaningController;
+import com.rpb.reservation.queuedisplay.api.QueueDisplayController;
 import com.rpb.reservation.queue.api.CallQueueTicketRequest;
 import com.rpb.reservation.queue.api.QueueCallController;
 import com.rpb.reservation.queue.api.QueueTicketListController;
@@ -73,9 +74,16 @@ class AppGateGuardIntegrationTest {
                 UUID.class,
                 String.class,
                 String.class,
+                String.class,
+                String.class,
+                String.class,
                 String.class
             ),
             "queue.view"
+        );
+        assertAnnotation(
+            QueueDisplayController.class.getMethod("getState", UUID.class, String.class),
+            "queue.display.view"
         );
         assertAnnotation(
             SeatingFromCalledQueueController.class.getMethod(

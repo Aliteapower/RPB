@@ -28,4 +28,26 @@ public interface ReservationTodayViewProjection {
     String getPhoneE164();
 
     String getNote();
+
+    UUID getSeatingId();
+
+    String getCurrentResourceType();
+
+    UUID getCurrentResourceId();
+
+    String getCurrentResourceCode();
+
+    String getAssignedResourceType();
+
+    UUID getAssignedResourceId();
+
+    String getAssignedResourceCode();
+
+    UUID getQueueTicketId();
+
+    Integer getQueueTicketNumber();
+
+    String getQueueTicketGroupCode();
+
+    String getQueueTicketStatus();
 }

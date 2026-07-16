@@ -4,18 +4,27 @@ import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryDay;
+import com.rpb.reservation.reservation.application.ReservationCalendarSummaryResult;
+import com.rpb.reservation.reservation.application.ReservationTimeSlotListResult;
 import com.rpb.reservation.reservation.application.ReservationTodayViewError;
 import com.rpb.reservation.reservation.application.ReservationTodayViewItem;
 import com.rpb.reservation.reservation.application.ReservationTodayViewResult;
+import com.rpb.reservation.reservation.application.port.out.ReservationCalendarSummaryRow;
+import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationTodayViewRow;
+import com.rpb.reservation.reservation.application.query.ReservationCalendarSummaryQuery;
+import com.rpb.reservation.reservation.application.query.ReservationTimeSlotQuery;
 import com.rpb.reservation.reservation.application.query.ReservationTodayViewQuery;
 import com.rpb.reservation.reservation.status.ReservationStatus;
+import com.rpb.reservation.queue.application.QueueTicketDisplayNumbers;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
@@ -47,14 +56,23 @@ public class ReservationTodayViewApplicationService {
     private final StoreRepositoryPort storeRepository;
     private final ReservationRepositoryPort reservationRepository;
     private final Clock clock;
+    private final ReservationMealPeriodScheduleService mealPeriodScheduleService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
 
     @Autowired
     public ReservationTodayViewApplicationService(
         StoreRepositoryPort storeRepository,
+        ReservationRepositoryPort reservationRepository,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository
+    ) {
+        this(storeRepository, reservationRepository, mealPeriodRepository, Clock.systemUTC());
+    }
+
+    public ReservationTodayViewApplicationService(
+        StoreRepositoryPort storeRepository,
         ReservationRepositoryPort reservationRepository
     ) {
-        this(storeRepository, reservationRepository, Clock.systemUTC());
+        this(storeRepository, reservationRepository, ReservationMealPeriodRepositoryPort.platformDefault(), Clock.systemUTC());
     }
 
     public ReservationTodayViewApplicationService(
@@ -62,9 +80,19 @@ public class ReservationTodayViewApplicationService {
         ReservationRepositoryPort reservationRepository,
         Clock clock
     ) {
+        this(storeRepository, reservationRepository, ReservationMealPeriodRepositoryPort.platformDefault(), clock);
+    }
+
+    public ReservationTodayViewApplicationService(
+        StoreRepositoryPort storeRepository,
+        ReservationRepositoryPort reservationRepository,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository,
+        Clock clock
+    ) {
         this.storeRepository = storeRepository;
         this.reservationRepository = reservationRepository;
         this.clock = clock;
+        this.mealPeriodScheduleService = new ReservationMealPeriodScheduleService(mealPeriodRepository);
     }
 
     @Transactional(readOnly = true)
@@ -117,7 +145,116 @@ public class ReservationTodayViewApplicationService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public ReservationCalendarSummaryResult getCalendarSummary(ReservationCalendarSummaryQuery query) {
+        ReservationTodayViewError validationError = validate(query);
+        if (validationError != null) {
+            return ReservationCalendarSummaryResult.failure(validationError);
+        }
+
+        StoreScope scope = new StoreScope(new TenantId(query.tenantId()), query.storeId());
+        Store store = storeRepository.findById(scope).orElse(null);
+        if (store == null) {
+            return ReservationCalendarSummaryResult.failure(ReservationTodayViewError.STORE_NOT_FOUND);
+        }
+        if (!scope.equals(store.scope())) {
+            return ReservationCalendarSummaryResult.failure(ReservationTodayViewError.STORE_SCOPE_MISMATCH);
+        }
+
+        RuleDecision storeAccess = storeAccessPolicy.decide(scope, query.actorId(), query.actorType());
+        if (!storeAccess.accepted()) {
+            return ReservationCalendarSummaryResult.failure(ReservationTodayViewError.STORE_ACCESS_DENIED);
+        }
+
+        ZoneId zoneId = zoneId(store.timezone());
+        YearMonth month = resolveMonth(query.month(), zoneId);
+        if (month == null) {
+            return ReservationCalendarSummaryResult.failure(ReservationTodayViewError.INVALID_BUSINESS_DATE);
+        }
+
+        try {
+            List<ReservationCalendarSummaryDay> days = reservationRepository
+                .findCalendarSummary(scope, month.atDay(1), month.plusMonths(1).atDay(1), ALL_VIEW_STATUSES)
+                .stream()
+                .map(ReservationTodayViewApplicationService::toCalendarSummaryDay)
+                .toList();
+            return ReservationCalendarSummaryResult.success(
+                scope.storeId().value(),
+                month,
+                zoneId.getId(),
+                days
+            );
+        } catch (RuntimeException exception) {
+            return ReservationCalendarSummaryResult.failure(ReservationTodayViewError.PERSISTENCE_ERROR);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationTimeSlotListResult getTimeSlots(ReservationTimeSlotQuery query) {
+        ReservationTodayViewError validationError = validate(query);
+        if (validationError != null) {
+            return ReservationTimeSlotListResult.failure(validationError);
+        }
+
+        StoreScope scope = new StoreScope(new TenantId(query.tenantId()), query.storeId());
+        Store store = storeRepository.findById(scope).orElse(null);
+        if (store == null) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.STORE_NOT_FOUND);
+        }
+        if (!scope.equals(store.scope())) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.STORE_SCOPE_MISMATCH);
+        }
+
+        RuleDecision storeAccess = storeAccessPolicy.decide(scope, query.actorId(), query.actorType());
+        if (!storeAccess.accepted()) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.STORE_ACCESS_DENIED);
+        }
+
+        ZoneId zoneId = zoneId(store.timezone());
+        LocalDate businessDate = resolveBusinessDate(query.businessDate(), zoneId);
+        if (businessDate == null) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.INVALID_BUSINESS_DATE);
+        }
+
+        try {
+            return ReservationTimeSlotListResult.success(
+                scope.storeId().value(),
+                businessDate,
+                zoneId.getId(),
+                mealPeriodScheduleService.listSlots(scope, zoneId.getId(), businessDate, java.time.Instant.now(clock))
+            );
+        } catch (RuntimeException exception) {
+            return ReservationTimeSlotListResult.failure(ReservationTodayViewError.PERSISTENCE_ERROR);
+        }
+    }
+
     private static ReservationTodayViewError validate(ReservationTodayViewQuery query) {
+        if (
+            query == null
+                || query.tenantId() == null
+                || query.storeId() == null
+                || query.actorId() == null
+                || !hasText(query.actorType())
+        ) {
+            return ReservationTodayViewError.INVALID_COMMAND;
+        }
+        return null;
+    }
+
+    private static ReservationTodayViewError validate(ReservationCalendarSummaryQuery query) {
+        if (
+            query == null
+                || query.tenantId() == null
+                || query.storeId() == null
+                || query.actorId() == null
+                || !hasText(query.actorType())
+        ) {
+            return ReservationTodayViewError.INVALID_COMMAND;
+        }
+        return null;
+    }
+
+    private static ReservationTodayViewError validate(ReservationTimeSlotQuery query) {
         if (
             query == null
                 || query.tenantId() == null
@@ -143,8 +280,23 @@ public class ReservationTodayViewApplicationService {
             row.customerName(),
             row.customerNickname(),
             maskPhone(row.phoneE164()),
-            row.note()
+            row.note(),
+            row.seatingId(),
+            row.currentResourceType(),
+            row.currentResourceId(),
+            row.currentResourceCode(),
+            row.assignedResourceType(),
+            row.assignedResourceId(),
+            row.assignedResourceCode(),
+            row.queueTicketId(),
+            row.queueTicketNumber(),
+            QueueTicketDisplayNumbers.fromGroupCode(row.queueTicketGroupCode(), row.queueTicketNumber()),
+            row.queueTicketStatus()
         );
+    }
+
+    private static ReservationCalendarSummaryDay toCalendarSummaryDay(ReservationCalendarSummaryRow row) {
+        return new ReservationCalendarSummaryDay(row.businessDate(), row.reservationCount());
     }
 
     private LocalDate resolveBusinessDate(String rawBusinessDate, ZoneId zoneId) {
@@ -153,6 +305,17 @@ public class ReservationTodayViewApplicationService {
         }
         try {
             return LocalDate.parse(rawBusinessDate.trim());
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
+    }
+
+    private YearMonth resolveMonth(String rawMonth, ZoneId zoneId) {
+        if (!hasText(rawMonth)) {
+            return YearMonth.from(LocalDate.now(clock.withZone(zoneId)));
+        }
+        try {
+            return YearMonth.parse(rawMonth.trim());
         } catch (DateTimeParseException exception) {
             return null;
         }

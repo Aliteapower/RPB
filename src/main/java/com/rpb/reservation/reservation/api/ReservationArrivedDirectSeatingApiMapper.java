@@ -23,6 +23,7 @@ public class ReservationArrivedDirectSeatingApiMapper {
             reservationId,
             request.tableId(),
             request.tableGroupId(),
+            request.temporaryTableIds(),
             idempotencyKey.trim(),
             actor.actorId(),
             trimToNull(actor.actorType()),

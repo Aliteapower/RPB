@@ -16,6 +16,8 @@ final class ReservationCreateIntegrationFixture {
     static final UUID DUPLICATE_CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000000502");
     static final UUID CAPACITY_CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000000503");
     static final UUID REPLAY_RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000599");
+    static final UUID AREA_ID = UUID.fromString("60000000-0000-0000-0000-000000000501");
+    static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000000501");
     static final Instant START_AT = Instant.parse("2030-06-20T03:00:00Z");
     static final Instant END_AT = Instant.parse("2030-06-20T04:30:00Z");
     static final Instant HOLD_UNTIL_AT = Instant.parse("2030-06-20T03:15:00Z");
@@ -46,7 +48,7 @@ final class ReservationCreateIntegrationFixture {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-reservation-it', 'Reservation Integration Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             STORE_ID,
             TENANT_ID
@@ -58,7 +60,7 @@ final class ReservationCreateIntegrationFixture {
                 timezone, locale, date_format, time_format, currency
             )
             values (?, ?, 'store-reservation-it-other', 'Reservation Integration Other Store', 'active',
-                'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
             """,
             OTHER_STORE_ID,
             TENANT_ID
@@ -81,6 +83,36 @@ final class ReservationCreateIntegrationFixture {
         customer(EXISTING_CUSTOMER_ID, "C-EXISTING", null);
         customer(DUPLICATE_CUSTOMER_ID, "C-DUPLICATE", null);
         customer(CAPACITY_CUSTOMER_ID, "C-CAPACITY", null);
+        createTableResources();
+    }
+
+    void createTableResources() {
+        jdbc.update(
+            """
+            insert into store_areas (
+                id, tenant_id, store_id, area_code, display_name, status, sort_order
+            )
+            values (?, ?, ?, 'A', 'A区', 'active', 1)
+            on conflict do nothing
+            """,
+            AREA_ID,
+            TENANT_ID,
+            STORE_ID
+        );
+        jdbc.update(
+            """
+            insert into dining_tables (
+                id, tenant_id, store_id, area_id, table_code, display_name,
+                capacity_min, capacity_max, status, is_combinable
+            )
+            values (?, ?, ?, ?, 'A01', 'A01', 2, 4, 'available', true)
+            on conflict do nothing
+            """,
+            TABLE_ID,
+            TENANT_ID,
+            STORE_ID,
+            AREA_ID
+        );
     }
 
     void customer(UUID customerId, String customerCode, String phoneE164) {

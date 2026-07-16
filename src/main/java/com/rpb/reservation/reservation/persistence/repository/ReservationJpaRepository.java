@@ -1,6 +1,7 @@
 package com.rpb.reservation.reservation.persistence.repository;
 
 import com.rpb.reservation.reservation.persistence.entity.ReservationEntity;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +19,20 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
         UUID id,
         UUID tenantId,
         UUID storeId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select reservation from ReservationEntity reservation
+        where reservation.id = :reservationId
+          and reservation.tenantId = :tenantId
+          and reservation.storeId = :storeId
+          and reservation.deletedAt is null
+        """)
+    Optional<ReservationEntity> findForUpdate(
+        @Param("reservationId") UUID reservationId,
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId
     );
 
     Optional<ReservationEntity> findByTenantIdAndStoreIdAndReservationCodeAndDeletedAtIsNull(
@@ -123,12 +139,84 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
           c.displayName as customerName,
           c.nickname as customerNickname,
           c.phoneE164 as phoneE164,
-          r.note as note
+          r.note as note,
+          s.id as seatingId,
+          sr.resourceType as currentResourceType,
+          coalesce(sr.tableId, sr.tableGroupId) as currentResourceId,
+          coalesce(dt.tableCode, tg.groupCode) as currentResourceCode,
+          rp.resourceType as assignedResourceType,
+          coalesce(rp.tableId, rp.tableGroupId) as assignedResourceId,
+          coalesce(assignedDt.tableCode, assignedTg.groupCode) as assignedResourceCode,
+          qt.id as queueTicketId,
+          qt.ticketNumber as queueTicketNumber,
+          qg.groupCode as queueTicketGroupCode,
+          qt.status as queueTicketStatus
         from ReservationEntity r
           left join CustomerEntity c
             on c.tenantId = r.tenantId
            and c.id = r.customerId
            and c.deletedAt is null
+          left join QueueTicketEntity qt
+            on qt.tenantId = r.tenantId
+           and qt.storeId = r.storeId
+           and qt.reservationId = r.id
+           and qt.status in ('waiting', 'called', 'skipped', 'rejoined', 'seated')
+           and qt.deletedAt is null
+          left join QueueGroupEntity qg
+            on qg.tenantId = qt.tenantId
+           and qg.storeId = qt.storeId
+           and qg.id = qt.queueGroupId
+           and qg.deletedAt is null
+          left join SeatingEntity s
+            on s.tenantId = r.tenantId
+           and s.storeId = r.storeId
+           and (
+             s.reservationId = r.id
+             or s.queueTicketId = qt.id
+           )
+           and s.status in ('occupied', 'completed', 'cleaning_triggered')
+           and s.deletedAt is null
+          left join SeatingResourceEntity sr
+            on sr.tenantId = r.tenantId
+           and sr.storeId = r.storeId
+           and sr.seatingId = s.id
+           and sr.status in ('active', 'released')
+           and sr.deletedAt is null
+           and sr.assignedAt = (
+             select max(latestSr.assignedAt)
+             from SeatingResourceEntity latestSr
+             where latestSr.tenantId = sr.tenantId
+               and latestSr.storeId = sr.storeId
+               and latestSr.seatingId = sr.seatingId
+               and latestSr.status in ('active', 'released')
+               and latestSr.deletedAt is null
+           )
+          left join DiningTableEntity dt
+            on dt.tenantId = r.tenantId
+           and dt.storeId = r.storeId
+           and dt.id = sr.tableId
+           and dt.deletedAt is null
+          left join TableGroupEntity tg
+            on tg.tenantId = r.tenantId
+           and tg.storeId = r.storeId
+           and tg.id = sr.tableGroupId
+           and tg.deletedAt is null
+          left join ReservationPreassignmentEntity rp
+            on rp.tenantId = r.tenantId
+           and rp.storeId = r.storeId
+           and rp.reservationId = r.id
+           and rp.status = 'active'
+           and rp.deletedAt is null
+          left join DiningTableEntity assignedDt
+            on assignedDt.tenantId = r.tenantId
+           and assignedDt.storeId = r.storeId
+           and assignedDt.id = rp.tableId
+           and assignedDt.deletedAt is null
+          left join TableGroupEntity assignedTg
+            on assignedTg.tenantId = r.tenantId
+           and assignedTg.storeId = r.storeId
+           and assignedTg.id = rp.tableGroupId
+           and assignedTg.deletedAt is null
         where r.tenantId = :tenantId
           and r.storeId = :storeId
           and r.businessDate = :businessDate
@@ -140,6 +228,28 @@ public interface ReservationJpaRepository extends JpaRepository<ReservationEntit
         @Param("tenantId") UUID tenantId,
         @Param("storeId") UUID storeId,
         @Param("businessDate") LocalDate businessDate,
+        @Param("statuses") Collection<String> statuses
+    );
+
+    @Query("""
+        select
+          r.businessDate as businessDate,
+          count(r.id) as reservationCount
+        from ReservationEntity r
+        where r.tenantId = :tenantId
+          and r.storeId = :storeId
+          and r.businessDate >= :startInclusive
+          and r.businessDate < :endExclusive
+          and r.status in :statuses
+          and r.deletedAt is null
+        group by r.businessDate
+        order by r.businessDate asc
+        """)
+    List<ReservationCalendarSummaryProjection> findCalendarSummary(
+        @Param("tenantId") UUID tenantId,
+        @Param("storeId") UUID storeId,
+        @Param("startInclusive") LocalDate startInclusive,
+        @Param("endExclusive") LocalDate endExclusive,
         @Param("statuses") Collection<String> statuses
     );
 }

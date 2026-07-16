@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.CapacityRange;
 import com.rpb.reservation.table.status.TableGroupStatus;
 import com.rpb.reservation.table.value.TableGroupId;
+import java.time.OffsetDateTime;
 import java.util.Objects;
 
 /**
@@ -16,7 +17,9 @@ public record TableGroup(
     String groupCode,
     String groupType,
     CapacityRange capacity,
-    TableGroupStatus status
+    TableGroupStatus status,
+    OffsetDateTime activeFromAt,
+    OffsetDateTime activeUntilAt
 ) {
 
     public TableGroup {
@@ -26,6 +29,17 @@ public record TableGroup(
         Objects.requireNonNull(status, "table_group_status_required");
         requireText(groupCode, "table_group_code_required");
         requireText(groupType, "table_group_type_required");
+    }
+
+    public TableGroup(
+        TableGroupId id,
+        StoreScope scope,
+        String groupCode,
+        String groupType,
+        CapacityRange capacity,
+        TableGroupStatus status
+    ) {
+        this(id, scope, groupCode, groupType, capacity, status, null, null);
     }
 
     public String releaseIntent() {

@@ -10,6 +10,7 @@ public enum ReservationCheckInError {
     STORE_ACCESS_DENIED("store_access_denied"),
     RESERVATION_NOT_FOUND("reservation_not_found"),
     RESERVATION_STATUS_NOT_CONFIRMED("reservation_status_not_confirmed"),
+    RESERVATION_NOT_TODAY("reservation_not_today"),
     RESERVATION_CANNOT_CHECK_IN_CANCELLED("reservation_cannot_check_in_cancelled"),
     RESERVATION_CANNOT_CHECK_IN_NO_SHOW("reservation_cannot_check_in_no_show"),
     RESERVATION_CANNOT_CHECK_IN_COMPLETED("reservation_cannot_check_in_completed"),

@@ -13,6 +13,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -53,12 +54,18 @@ class QueueTicketListApiIntegrationTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000993");
     private static final UUID CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000000993");
     private static final UUID QUEUE_GROUP_ID = UUID.fromString("92000000-0000-0000-0000-000000000993");
+    private static final UUID AREA_A_ID = UUID.fromString("61000000-0000-0000-0000-000000000993");
+    private static final UUID AREA_B_ID = UUID.fromString("61000000-0000-0000-0000-000000000994");
+    private static final UUID TABLE_A_ID = UUID.fromString("71000000-0000-0000-0000-000000000993");
+    private static final UUID TABLE_B_ID = UUID.fromString("71000000-0000-0000-0000-000000000994");
+    private static final UUID TEMP_TABLE_GROUP_ID = UUID.fromString("72000000-0000-0000-0000-000000000993");
     private static final UUID WAITING_RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000993");
     private static final UUID CALLED_RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000994");
     private static final UUID SEATED_RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000995");
     private static final UUID WAITING_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000993");
     private static final UUID CALLED_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000994");
     private static final UUID SEATED_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000995");
+    private static final UUID HISTORICAL_TICKET_ID = UUID.fromString("91000000-0000-0000-0000-000000000996");
     private static final LocalDate BUSINESS_DATE = LocalDate.parse("2030-06-20");
     private static final Instant START_AT = Instant.parse("2030-06-20T03:00:00Z");
     private static final Instant CALLED_AT = Instant.parse("2030-06-20T03:20:00Z");
@@ -108,6 +115,16 @@ class QueueTicketListApiIntegrationTest {
         fixture.queueTicket(WAITING_TICKET_ID, WAITING_RESERVATION_ID, "waiting", 10, null, null, 1);
         fixture.queueTicket(CALLED_TICKET_ID, CALLED_RESERVATION_ID, "called", 11, CALLED_AT, EXPIRES_AT, 2);
         fixture.queueTicket(SEATED_TICKET_ID, SEATED_RESERVATION_ID, "seated", 12, null, null, 3);
+        fixture.queueTicketOn(
+            HISTORICAL_TICKET_ID,
+            BUSINESS_DATE.minusDays(1),
+            null,
+            "waiting",
+            99,
+            null,
+            null,
+            -100
+        );
 
         mockMvc.perform(get(ENDPOINT, STORE_ID)
                 .param("status", "called")
@@ -117,6 +134,7 @@ class QueueTicketListApiIntegrationTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.items[0].queueTicketId").value(CALLED_TICKET_ID.toString()))
             .andExpect(jsonPath("$.items[0].queueTicketNumber").value(11))
+            .andExpect(jsonPath("$.items[0].queueTicketDisplayNumber").value("B11"))
             .andExpect(jsonPath("$.items[0].queueTicketStatus").value("called"))
             .andExpect(jsonPath("$.items[0].partySize").value(4))
             .andExpect(jsonPath("$.items[0].partySizeGroup").value("3-4"))
@@ -141,6 +159,124 @@ class QueueTicketListApiIntegrationTest {
             .andExpect(jsonPath("$.page.limit").value(2))
             .andExpect(jsonPath("$.page.offset").value(1))
             .andExpect(jsonPath("$.page.total").value(3));
+
+        assertReadOnlyBoundary();
+    }
+
+    @Test
+    void filtersQueueTicketsByPhonePartySizeAndAssignedTableArea() throws Exception {
+        fixture.area(AREA_A_ID, "A", "A区", 1);
+        fixture.area(AREA_B_ID, "B", "B区", 2);
+        fixture.table(TABLE_A_ID, AREA_A_ID, "A01", 2, 4);
+        fixture.table(TABLE_B_ID, AREA_B_ID, "B01", 2, 4);
+        fixture.reservationWithPhone(WAITING_RESERVATION_ID, "R-LIST-A", "arrived", 4, "+6591112222");
+        fixture.reservationWithPhone(CALLED_RESERVATION_ID, "R-LIST-B", "arrived", 4, "+6599998888");
+        fixture.preassignTable(WAITING_RESERVATION_ID, TABLE_A_ID);
+        fixture.preassignTable(CALLED_RESERVATION_ID, TABLE_B_ID);
+        fixture.queueTicketForReservationCustomer(WAITING_TICKET_ID, WAITING_RESERVATION_ID, "waiting", 10, null, null, 1, 4);
+        fixture.queueTicketForReservationCustomer(CALLED_TICKET_ID, CALLED_RESERVATION_ID, "waiting", 11, null, null, 2, 4);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("tableArea", "A区")
+                .param("partySize", "4")
+                .param("phone", "2222")
+                .param("limit", "50")
+                .param("offset", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].queueTicketId").value(WAITING_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.items[0].customerPhoneMasked").value("****2222"))
+            .andExpect(jsonPath("$.items[0].assignedResourceCode").value("A01"))
+            .andExpect(jsonPath("$.items[0].assignedResourceAreaName").value("A区"))
+            .andExpect(jsonPath("$.page.total").value(1));
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("tableArea", "B区")
+                .param("partySize", "4")
+                .param("phone", "2222")
+                .param("limit", "50")
+                .param("offset", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(0))
+            .andExpect(jsonPath("$.page.total").value(0));
+
+        assertReadOnlyBoundary();
+    }
+
+    @Test
+    void exposesDisplayNumberAndTemporaryGroupResourceLabelWithoutWritingAnonymousCustomerName() throws Exception {
+        fixture.area(AREA_A_ID, "A", "A区", 1);
+        fixture.area(AREA_B_ID, "B", "B区", 2);
+        fixture.table(TABLE_A_ID, AREA_A_ID, "A02", 2, 4);
+        fixture.table(TABLE_B_ID, AREA_B_ID, "B01", 4, 6);
+        fixture.temporaryTableGroup(TEMP_TABLE_GROUP_ID, "b", "b", 2, 10);
+        fixture.groupMember(TEMP_TABLE_GROUP_ID, TABLE_A_ID);
+        fixture.groupMember(TEMP_TABLE_GROUP_ID, TABLE_B_ID);
+        fixture.reservation(WAITING_RESERVATION_ID, "R-LIST-TEMP-GROUP", "arrived", 4);
+        fixture.preassignGroup(WAITING_RESERVATION_ID, TEMP_TABLE_GROUP_ID);
+        fixture.anonymousQueueTicket(WAITING_TICKET_ID, WAITING_RESERVATION_ID, "waiting", 11, 1, 4);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("status", "waiting")
+                .param("limit", "50")
+                .param("offset", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].queueTicketId").value(WAITING_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.items[0].queueTicketNumber").value(11))
+            .andExpect(jsonPath("$.items[0].queueTicketDisplayNumber").value("B11"))
+            .andExpect(jsonPath("$.items[0].customerName").value("Queue List Reservation Guest"))
+            .andExpect(jsonPath("$.items[0].assignedResourceType").value("table_group"))
+            .andExpect(jsonPath("$.items[0].assignedResourceId").value(TEMP_TABLE_GROUP_ID.toString()))
+            .andExpect(jsonPath("$.items[0].assignedResourceCode").value("b"))
+            .andExpect(jsonPath("$.items[0].assignedResourceGroupType").value("temporary"))
+            .andExpect(jsonPath("$.items[0].assignedResourceLabel").value("临时组 b"))
+            .andExpect(jsonPath("$.items[0].assignedResourceAreaName").value("A区 + B区"));
+
+        assertThat(fixture.countWhere("select count(*) from customers where display_name = '顾客'")).isEqualTo(0);
+        assertReadOnlyBoundary();
+    }
+
+    @Test
+    void phoneFilterMatchesReservationCustomerWhenTicketAlsoHasCustomer() throws Exception {
+        fixture.reservationWithPhone(WAITING_RESERVATION_ID, "R-LIST-PHONE", "arrived", 4, "+6591234598");
+        fixture.queueTicket(WAITING_TICKET_ID, WAITING_RESERVATION_ID, "waiting", 10, null, null, 1);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("phone", "4598")
+                .param("limit", "50")
+                .param("offset", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].queueTicketId").value(WAITING_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.page.total").value(1));
+
+        assertReadOnlyBoundary();
+    }
+
+    @Test
+    void filtersQueueTicketsByUnassignedTableArea() throws Exception {
+        fixture.area(AREA_A_ID, "A", "A区", 1);
+        fixture.table(TABLE_A_ID, AREA_A_ID, "A01", 2, 4);
+        fixture.reservation(WAITING_RESERVATION_ID, "R-LIST-NO-AREA", "arrived", 4);
+        fixture.reservation(CALLED_RESERVATION_ID, "R-LIST-A-AREA", "arrived", 4);
+        fixture.preassignTable(CALLED_RESERVATION_ID, TABLE_A_ID);
+        fixture.queueTicket(WAITING_TICKET_ID, WAITING_RESERVATION_ID, "waiting", 10, null, null, 1);
+        fixture.queueTicket(CALLED_TICKET_ID, CALLED_RESERVATION_ID, "waiting", 11, null, null, 2);
+
+        mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("tableArea", "__unassigned__")
+                .param("limit", "50")
+                .param("offset", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].queueTicketId").value(WAITING_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.items[0].assignedResourceAreaName").doesNotExist())
+            .andExpect(jsonPath("$.page.total").value(1));
 
         assertReadOnlyBoundary();
     }
@@ -245,6 +381,12 @@ class QueueTicketListApiIntegrationTest {
     static class TestSecurityConfiguration {
         @Bean
         @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2030-06-20T02:00:00Z"), ZoneOffset.UTC);
+        }
+
+        @Bean
+        @Primary
         TestCurrentActorProvider testCurrentActorProvider() {
             return new TestCurrentActorProvider();
         }
@@ -293,7 +435,7 @@ class QueueTicketListApiIntegrationTest {
                     timezone, locale, date_format, time_format, currency
                 )
                 values (?, ?, 'store-queue-list-api-it', 'Queue List API Store', 'active',
-                    'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
                 """,
                 STORE_ID,
                 TENANT_ID
@@ -314,6 +456,16 @@ class QueueTicketListApiIntegrationTest {
         }
 
         void reservation(UUID reservationId, String reservationCode, String status, int partySize) {
+            reservationWithPhone(
+                reservationId,
+                reservationCode,
+                status,
+                partySize,
+                "+659876" + reservationId.toString().substring(32)
+            );
+        }
+
+        void reservationWithPhone(UUID reservationId, String reservationCode, String status, int partySize, String phoneE164) {
             UUID reservationCustomerId = reservationId;
             jdbc.update(
                 """
@@ -327,7 +479,7 @@ class QueueTicketListApiIntegrationTest {
                 reservationCustomerId,
                 TENANT_ID,
                 "C-QUEUE-LIST-API-" + reservationId.toString().substring(24),
-                "+659876" + reservationId.toString().substring(32)
+                phoneE164
             );
             jdbc.update(
                 """
@@ -355,8 +507,101 @@ class QueueTicketListApiIntegrationTest {
             );
         }
 
+        void area(UUID areaId, String areaCode, String displayName, int sortOrder) {
+            jdbc.update(
+                """
+                insert into store_areas (
+                    id, tenant_id, store_id, area_code, display_name, status, sort_order
+                )
+                values (?, ?, ?, ?, ?, 'active', ?)
+                """,
+                areaId,
+                TENANT_ID,
+                STORE_ID,
+                areaCode,
+                displayName,
+                sortOrder
+            );
+        }
+
+        void table(UUID tableId, UUID areaId, String tableCode, int capacityMin, int capacityMax) {
+            jdbc.update(
+                """
+                insert into dining_tables (
+                    id, tenant_id, store_id, area_id, table_code, display_name,
+                    capacity_min, capacity_max, status
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, 'available')
+                """,
+                tableId,
+                TENANT_ID,
+                STORE_ID,
+                areaId,
+                tableCode,
+                tableCode,
+                capacityMin,
+                capacityMax
+            );
+        }
+
+        void preassignTable(UUID reservationId, UUID tableId) {
+            jdbc.update(
+                """
+                insert into reservation_preassignments (
+                    tenant_id, store_id, reservation_id, resource_type, table_id,
+                    table_group_id, status, preassigned_at
+                )
+                values (?, ?, ?, 'dining_table', ?, null, 'active', ?)
+                """,
+                TENANT_ID,
+                STORE_ID,
+                reservationId,
+                tableId,
+                utc(START_AT.minusSeconds(1800))
+            );
+        }
+
+        void preassignGroup(UUID reservationId, UUID tableGroupId) {
+            jdbc.update(
+                """
+                insert into reservation_preassignments (
+                    tenant_id, store_id, reservation_id, resource_type, table_id,
+                    table_group_id, status, preassigned_at
+                )
+                values (?, ?, ?, 'table_group', null, ?, 'active', ?)
+                """,
+                TENANT_ID,
+                STORE_ID,
+                reservationId,
+                tableGroupId,
+                utc(START_AT.minusSeconds(1800))
+            );
+        }
+
         void queueTicket(
             UUID queueTicketId,
+            UUID reservationId,
+            String status,
+            int ticketNumber,
+            Instant calledAt,
+            Instant expiresAt,
+            int createdOffset
+        ) {
+            queueTicketOn(
+                queueTicketId,
+                BUSINESS_DATE,
+                reservationId,
+                status,
+                ticketNumber,
+                calledAt,
+                expiresAt,
+                createdOffset
+            );
+        }
+
+        void queueTicketOn(
+            UUID queueTicketId,
+            LocalDate businessDate,
             UUID reservationId,
             String status,
             int ticketNumber,
@@ -381,11 +626,81 @@ class QueueTicketListApiIntegrationTest {
                 CUSTOMER_ID,
                 reservationId,
                 ticketNumber,
+                businessDate,
+                status,
+                ticketNumber,
+                calledAt == null ? null : utc(calledAt),
+                expiresAt == null ? null : utc(expiresAt),
+                utc(START_AT.plusSeconds(createdOffset)),
+                utc(START_AT.plusSeconds(createdOffset))
+            );
+        }
+
+        void queueTicketForReservationCustomer(
+            UUID queueTicketId,
+            UUID reservationId,
+            String status,
+            int ticketNumber,
+            Instant calledAt,
+            Instant expiresAt,
+            int createdOffset,
+            int partySize
+        ) {
+            jdbc.update(
+                """
+                insert into queue_tickets (
+                    id, tenant_id, store_id, queue_group_id, customer_id, reservation_id,
+                    walk_in_id, ticket_number, party_size, business_date, status,
+                    queue_position, called_at, expires_at, note, created_at, updated_at
+                )
+                values (?, ?, ?, ?, null, ?, null, ?, ?, ?, ?,
+                    ?, ?, ?, 'Existing ticket', ?, ?)
+                """,
+                queueTicketId,
+                TENANT_ID,
+                STORE_ID,
+                QUEUE_GROUP_ID,
+                reservationId,
+                ticketNumber,
+                partySize,
                 BUSINESS_DATE,
                 status,
                 ticketNumber,
                 calledAt == null ? null : utc(calledAt),
                 expiresAt == null ? null : utc(expiresAt),
+                utc(START_AT.plusSeconds(createdOffset)),
+                utc(START_AT.plusSeconds(createdOffset))
+            );
+        }
+
+        void anonymousQueueTicket(
+            UUID queueTicketId,
+            UUID reservationId,
+            String status,
+            int ticketNumber,
+            int createdOffset,
+            int partySize
+        ) {
+            jdbc.update(
+                """
+                insert into queue_tickets (
+                    id, tenant_id, store_id, queue_group_id, customer_id, reservation_id,
+                    walk_in_id, ticket_number, party_size, business_date, status,
+                    queue_position, called_at, expires_at, note, created_at, updated_at
+                )
+                values (?, ?, ?, ?, null, ?, null, ?, ?, ?, ?,
+                    ?, null, null, 'Anonymous ticket', ?, ?)
+                """,
+                queueTicketId,
+                TENANT_ID,
+                STORE_ID,
+                QUEUE_GROUP_ID,
+                reservationId,
+                ticketNumber,
+                partySize,
+                BUSINESS_DATE,
+                status,
+                ticketNumber,
                 utc(START_AT.plusSeconds(createdOffset)),
                 utc(START_AT.plusSeconds(createdOffset))
             );
@@ -420,6 +735,47 @@ class QueueTicketListApiIntegrationTest {
                 maxPartySize,
                 "queue.group." + groupCode,
                 sortOrder
+            );
+        }
+
+        private void temporaryTableGroup(
+            UUID groupId,
+            String groupCode,
+            String displayName,
+            int capacityMin,
+            int capacityMax
+        ) {
+            jdbc.update(
+                """
+                insert into table_groups (
+                    id, tenant_id, store_id, group_code, group_type, status,
+                    display_name, capacity_min, capacity_max, active_from_at
+                )
+                values (?, ?, ?, ?, 'temporary', 'occupied', ?, ?, ?, ?)
+                """,
+                groupId,
+                TENANT_ID,
+                STORE_ID,
+                groupCode,
+                displayName,
+                capacityMin,
+                capacityMax,
+                utc(START_AT.minusSeconds(900))
+            );
+        }
+
+        private void groupMember(UUID tableGroupId, UUID tableId) {
+            jdbc.update(
+                """
+                insert into table_group_members (
+                    tenant_id, store_id, table_group_id, table_id, member_role
+                )
+                values (?, ?, ?, ?, 'member')
+                """,
+                TENANT_ID,
+                STORE_ID,
+                tableGroupId,
+                tableId
             );
         }
 

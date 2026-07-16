@@ -12,29 +12,37 @@ import com.rpb.reservation.audit.rule.DefaultStateTransitionRule;
 import com.rpb.reservation.common.rule.RuleDecision;
 import com.rpb.reservation.common.scope.DefaultStoreAccessPolicy;
 import com.rpb.reservation.common.scope.StoreScope;
-import com.rpb.reservation.common.scope.TenantScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.time.TimeRange;
-import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
+import com.rpb.reservation.customer.application.CustomerManagementError;
+import com.rpb.reservation.customer.application.CustomerManagementException;
+import com.rpb.reservation.customer.application.CustomerProfileCommand;
+import com.rpb.reservation.customer.application.CustomerProfileResolver;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
-import com.rpb.reservation.customer.value.CustomerId;
 import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositoryPort;
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
 import com.rpb.reservation.idempotency.status.IdempotencyStatus;
+import com.rpb.reservation.reservation.application.ReservationCapacityDecision;
+import com.rpb.reservation.reservation.application.ReservationCapacityQuery;
 import com.rpb.reservation.reservation.application.ReservationCreateError;
 import com.rpb.reservation.reservation.application.ReservationCreateResult;
+import com.rpb.reservation.reservation.application.ReservationTimeSlot;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
+import com.rpb.reservation.reservation.application.port.out.ReservationCapacityPolicyPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
 import com.rpb.reservation.reservation.application.port.out.ReservationRepositoryPort;
-import com.rpb.reservation.reservation.application.rule.ReservationAvailabilityRule;
 import com.rpb.reservation.reservation.application.rule.ReservationCodePolicy;
 import com.rpb.reservation.reservation.application.rule.ReservationDuplicateRule;
 import com.rpb.reservation.reservation.application.rule.ReservationHoldPolicy;
 import com.rpb.reservation.reservation.application.rule.ReservationTimeRangeRule;
 import com.rpb.reservation.reservation.domain.Reservation;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.reservation.status.ReservationStatus;
 import com.rpb.reservation.reservation.value.ReservationCode;
 import com.rpb.reservation.reservation.value.ReservationId;
@@ -42,6 +50,14 @@ import com.rpb.reservation.store.application.port.out.StorePolicyRepositoryPort;
 import com.rpb.reservation.store.application.port.out.StoreRepositoryPort;
 import com.rpb.reservation.store.domain.Store;
 import com.rpb.reservation.store.domain.StorePolicy;
+import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
+import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
+import com.rpb.reservation.table.domain.DiningTable;
+import com.rpb.reservation.table.domain.TableGroup;
+import com.rpb.reservation.table.rule.DefaultTableAvailabilityRule;
+import com.rpb.reservation.table.status.DiningTableStatus;
+import com.rpb.reservation.table.value.TableGroupId;
+import com.rpb.reservation.table.value.TableId;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -74,14 +90,19 @@ public class ReservationCreateApplicationService {
 
     private final StoreRepositoryPort storeRepository;
     private final StorePolicyRepositoryPort storePolicyRepository;
-    private final CustomerRepositoryPort customerRepository;
+    private final CustomerProfileResolver customerProfileResolver;
     private final ReservationRepositoryPort reservationRepository;
+    private final ReservationPreassignmentRepositoryPort preassignmentRepository;
+    private final DiningTableRepositoryPort diningTableRepository;
+    private final TableGroupRepositoryPort tableGroupRepository;
     private final BusinessEventRepositoryPort businessEventRepository;
     private final StateTransitionLogRepositoryPort stateTransitionLogRepository;
     private final AuditLogRepositoryPort auditLogRepository;
     private final IdempotencyRepositoryPort idempotencyRepository;
     private final Clock clock;
     private final ReservationCodePolicy reservationCodePolicy;
+    private final ReservationMealPeriodScheduleService reservationMealPeriodScheduleService;
+    private final ReservationCapacityPolicyPort capacityPolicy;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultAuditRule auditRule = new DefaultAuditRule();
     private final DefaultBusinessEventRule businessEventRule = new DefaultBusinessEventRule();
@@ -89,31 +110,43 @@ public class ReservationCreateApplicationService {
     private final DefaultIdempotencyRule idempotencyRule = new DefaultIdempotencyRule();
     private final ReservationHoldPolicy reservationHoldPolicy = new ReservationHoldPolicy();
     private final ReservationTimeRangeRule reservationTimeRangeRule = new ReservationTimeRangeRule();
-    private final ReservationAvailabilityRule reservationAvailabilityRule = new ReservationAvailabilityRule();
     private final ReservationDuplicateRule reservationDuplicateRule = new ReservationDuplicateRule();
+    private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
 
     @Autowired
     public ReservationCreateApplicationService(
         StoreRepositoryPort storeRepository,
         StorePolicyRepositoryPort storePolicyRepository,
         CustomerRepositoryPort customerRepository,
+        CustomerProfileResolver customerProfileResolver,
         ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
-        IdempotencyRepositoryPort idempotencyRepository
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository,
+        ReservationCapacityPolicyPort capacityPolicy
     ) {
         this(
             storeRepository,
             storePolicyRepository,
-            customerRepository,
+            customerProfileResolver,
             reservationRepository,
+            preassignmentRepository,
+            diningTableRepository,
+            tableGroupRepository,
             businessEventRepository,
             stateTransitionLogRepository,
             auditLogRepository,
             idempotencyRepository,
-            Clock.systemUTC(),
-            new ReservationCodePolicy()
+            clock,
+            new ReservationCodePolicy(),
+            mealPeriodRepository,
+            capacityPolicy
         );
     }
 
@@ -122,6 +155,9 @@ public class ReservationCreateApplicationService {
         StorePolicyRepositoryPort storePolicyRepository,
         CustomerRepositoryPort customerRepository,
         ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
@@ -132,39 +168,89 @@ public class ReservationCreateApplicationService {
         this(
             storeRepository,
             storePolicyRepository,
-            customerRepository,
+            new CustomerProfileResolver(customerRepository),
             reservationRepository,
+            preassignmentRepository,
+            diningTableRepository,
+            tableGroupRepository,
             businessEventRepository,
             stateTransitionLogRepository,
             auditLogRepository,
             idempotencyRepository,
             clock,
-            new ReservationCodePolicy(reservationCodeSequenceSupplier)
+            new ReservationCodePolicy(reservationCodeSequenceSupplier),
+            ReservationMealPeriodRepositoryPort.platformDefault(),
+            ReservationCapacityPolicyPort.fixed(V1_FALLBACK_CAPACITY_LIMIT)
+        );
+    }
+
+    public ReservationCreateApplicationService(
+        StoreRepositoryPort storeRepository,
+        StorePolicyRepositoryPort storePolicyRepository,
+        CustomerRepositoryPort customerRepository,
+        ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
+        BusinessEventRepositoryPort businessEventRepository,
+        StateTransitionLogRepositoryPort stateTransitionLogRepository,
+        AuditLogRepositoryPort auditLogRepository,
+        IdempotencyRepositoryPort idempotencyRepository,
+        Clock clock,
+        IntSupplier reservationCodeSequenceSupplier,
+        ReservationCapacityPolicyPort capacityPolicy
+    ) {
+        this(
+            storeRepository,
+            storePolicyRepository,
+            new CustomerProfileResolver(customerRepository),
+            reservationRepository,
+            preassignmentRepository,
+            diningTableRepository,
+            tableGroupRepository,
+            businessEventRepository,
+            stateTransitionLogRepository,
+            auditLogRepository,
+            idempotencyRepository,
+            clock,
+            new ReservationCodePolicy(reservationCodeSequenceSupplier),
+            ReservationMealPeriodRepositoryPort.platformDefault(),
+            capacityPolicy
         );
     }
 
     private ReservationCreateApplicationService(
         StoreRepositoryPort storeRepository,
         StorePolicyRepositoryPort storePolicyRepository,
-        CustomerRepositoryPort customerRepository,
+        CustomerProfileResolver customerProfileResolver,
         ReservationRepositoryPort reservationRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
         BusinessEventRepositoryPort businessEventRepository,
         StateTransitionLogRepositoryPort stateTransitionLogRepository,
         AuditLogRepositoryPort auditLogRepository,
         IdempotencyRepositoryPort idempotencyRepository,
         Clock clock,
-        ReservationCodePolicy reservationCodePolicy
+        ReservationCodePolicy reservationCodePolicy,
+        ReservationMealPeriodRepositoryPort mealPeriodRepository,
+        ReservationCapacityPolicyPort capacityPolicy
     ) {
         this.storeRepository = storeRepository;
         this.storePolicyRepository = storePolicyRepository;
-        this.customerRepository = customerRepository;
+        this.customerProfileResolver = customerProfileResolver;
         this.reservationRepository = reservationRepository;
+        this.preassignmentRepository = preassignmentRepository;
+        this.diningTableRepository = diningTableRepository;
+        this.tableGroupRepository = tableGroupRepository;
         this.businessEventRepository = businessEventRepository;
         this.stateTransitionLogRepository = stateTransitionLogRepository;
         this.auditLogRepository = auditLogRepository;
         this.idempotencyRepository = idempotencyRepository;
         this.clock = clock;
         this.reservationCodePolicy = reservationCodePolicy;
+        this.reservationMealPeriodScheduleService = new ReservationMealPeriodScheduleService(mealPeriodRepository);
+        this.capacityPolicy = capacityPolicy;
     }
 
     @Transactional
@@ -221,15 +307,19 @@ public class ReservationCreateApplicationService {
             value(command.partySize()),
             value(command.reservedStartAt()),
             value(command.reservedEndAt()),
+            value(command.businessDate()),
             value(command.customerId()),
             normalize(command.customerName()),
             normalize(command.customerNickname()),
+            normalize(command.customerEmail()),
             normalize(command.phoneE164()),
             normalize(command.note()),
             normalize(command.actorType()),
             normalize(command.reservationCode()),
             normalize(command.source()),
-            normalize(command.reasonCode())
+            normalize(command.reasonCode()),
+            value(command.tableId()),
+            value(command.tableGroupId())
         );
         return sha256(normalized);
     }
@@ -254,10 +344,21 @@ public class ReservationCreateApplicationService {
         }
 
         PartySize partySize = new PartySize(command.partySize());
-        BusinessDate businessDate = businessDate(store, reservedStartAt);
+        BusinessDate businessDate = command.businessDate() == null
+            ? businessDate(store, reservedStartAt)
+            : new BusinessDate(command.businessDate());
+        String operationSource = source(command);
+        String capacityPeriodKey = capacityPeriodKey(
+            scope,
+            store.timezone(),
+            businessDate.value(),
+            reservedStartAt,
+            now,
+            operationSource
+        );
         TimeRange timeRange = new TimeRange(reservedStartAt, reservedEndAt);
         Instant holdUntilAt = reservationHoldPolicy.holdUntilAt(reservedStartAt, policy);
-        Customer customer = resolveCustomer(command, scope.tenantScope());
+        Customer customer = resolveCustomer(command, scope);
 
         boolean duplicateActive = reservationRepository.existsActiveDuplicate(scope, customer.id(), timeRange);
         if (!reservationDuplicateRule.allows(duplicateActive)) {
@@ -265,9 +366,20 @@ public class ReservationCreateApplicationService {
         }
 
         int capacityUsage = reservationRepository.findActiveCapacityUsage(scope, businessDate, timeRange);
-        if (!reservationAvailabilityRule.canAccept(capacityUsage, partySize.value(), V1_FALLBACK_CAPACITY_LIMIT)) {
+        ReservationCapacityDecision capacityDecision = capacityPolicy.evaluate(new ReservationCapacityQuery(
+            scope,
+            operationSource,
+            capacityPeriodKey,
+            businessDate,
+            timeRange,
+            partySize,
+            capacityUsage
+        ));
+        if (!capacityDecision.accepted()) {
             throw new ApplicationFailure(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT);
         }
+
+        ResourceSelection resourceSelection = resolveResourceSelection(command, scope, partySize, businessDate, timeRange);
 
         ReservationCode reservationCode = resolveReservationCode(command, businessDate, scope);
         Instant persistedAt = Instant.now(clock);
@@ -283,6 +395,7 @@ public class ReservationCreateApplicationService {
             holdUntilAt,
             persistedAt
         );
+        savePreassignment(scope, reservation, resourceSelection);
 
         List<UUID> eventIds = appendBusinessEvents(scope, command, reservation, started.idempotencyKey());
         List<UUID> transitionIds = appendTransitionLogs(scope, command, reservation, started.idempotencyKey());
@@ -306,29 +419,47 @@ public class ReservationCreateApplicationService {
         );
     }
 
-    private Customer resolveCustomer(CreateReservationCommand command, TenantScope tenantScope) {
-        E164Phone phone = parsePhone(command.phoneE164());
-        if (command.customerId() != null) {
-            return customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
-                .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.CUSTOMER_NOT_FOUND));
-        }
-        if (phone.isPresent()) {
-            Optional<Customer> existing = customerRepository.findByPhone(tenantScope, phone);
-            if (existing.isPresent()) {
-                return existing.get();
-            }
-        }
-        return customerRepository.save(
-            tenantScope,
-            new Customer(
-                new CustomerId(UUID.randomUUID()),
-                tenantScope,
-                "C-" + UUID.randomUUID().toString().substring(0, 8),
-                "temporary",
-                phone,
-                "active"
-            )
+    private String capacityPeriodKey(
+        StoreScope scope,
+        String timezone,
+        LocalDate businessDate,
+        Instant reservedStartAt,
+        Instant now,
+        String operationSource
+    ) {
+        Optional<ReservationTimeSlot> selectedSlot = reservationMealPeriodScheduleService.findSelectableSlot(
+            scope,
+            timezone,
+            businessDate,
+            reservedStartAt,
+            now
         );
+        if (OperationSource.PUBLIC_BOOKING.equals(operationSource) && selectedSlot.isEmpty()) {
+            throw new ApplicationFailure(ReservationCreateError.RESERVATION_TIME_SLOT_UNAVAILABLE);
+        }
+        return selectedSlot.map(ReservationTimeSlot::periodKey).orElse("");
+    }
+
+    private Customer resolveCustomer(CreateReservationCommand command, StoreScope scope) {
+        try {
+            return customerProfileResolver.resolve(
+                scope.tenantScope(),
+                new CustomerProfileCommand(
+                    command.customerId(),
+                    blankToNull(command.customerName()),
+                    blankToNull(command.customerNickname()),
+                    blankToNull(command.phoneE164()),
+                    blankToNull(command.customerEmail())
+                )
+            );
+        } catch (CustomerManagementException exception) {
+            if (exception.code() == CustomerManagementError.CUSTOMER_NOT_FOUND) {
+                throw new ApplicationFailure(ReservationCreateError.CUSTOMER_NOT_FOUND);
+            }
+            throw new ApplicationFailure(ReservationCreateError.INVALID_COMMAND);
+        } catch (IllegalArgumentException exception) {
+            throw new ApplicationFailure(ReservationCreateError.INVALID_PHONE_E164);
+        }
     }
 
     private ReservationCode resolveReservationCode(CreateReservationCommand command, BusinessDate businessDate, StoreScope scope) {
@@ -382,6 +513,90 @@ public class ReservationCreateApplicationService {
                     persistedAt,
                     persistedAt,
                     null
+                )
+            );
+        } catch (RuntimeException exception) {
+            throw new ApplicationFailure(ReservationCreateError.REPOSITORY_SAVE_FAILED);
+        }
+    }
+
+    private ResourceSelection resolveResourceSelection(
+        CreateReservationCommand command,
+        StoreScope scope,
+        PartySize partySize,
+        BusinessDate businessDate,
+        TimeRange timeRange
+    ) {
+        if (command.tableId() != null && command.tableGroupId() != null) {
+            throw new ApplicationFailure(ReservationCreateError.RESOURCE_SELECTION_CONFLICT);
+        }
+        if (command.tableId() != null) {
+            DiningTable table = diningTableRepository.findById(scope, new TableId(command.tableId()))
+                .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.TABLE_NOT_FOUND));
+            if (table.status() == DiningTableStatus.INACTIVE) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_NOT_AVAILABLE);
+            }
+            if (!table.capacity().includes(partySize)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_CAPACITY_INSUFFICIENT);
+            }
+            if (hasActivePreassignmentConflict(scope, "dining_table", command.tableId(), businessDate, timeRange)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_NOT_AVAILABLE);
+            }
+            return new ResourceSelection("dining_table", command.tableId());
+        }
+        if (command.tableGroupId() != null) {
+            TableGroup group = tableGroupRepository.findById(scope, new TableGroupId(command.tableGroupId()))
+                .orElseThrow(() -> new ApplicationFailure(ReservationCreateError.TABLE_GROUP_NOT_FOUND));
+            require(tableAvailabilityRule.evaluate(group), ReservationCreateError.TABLE_GROUP_INVALID);
+            if (!group.capacity().includes(partySize)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_CAPACITY_INSUFFICIENT);
+            }
+            if (hasActivePreassignmentConflict(scope, "table_group", command.tableGroupId(), businessDate, timeRange)) {
+                throw new ApplicationFailure(ReservationCreateError.TABLE_GROUP_INVALID);
+            }
+            return new ResourceSelection("table_group", command.tableGroupId());
+        }
+        return null;
+    }
+
+    private boolean hasActivePreassignmentConflict(
+        StoreScope scope,
+        String resourceType,
+        UUID resourceId,
+        BusinessDate businessDate,
+        TimeRange timeRange
+    ) {
+        try {
+            return preassignmentRepository.existsActiveResourceConflict(
+                scope,
+                resourceType,
+                resourceId,
+                businessDate,
+                timeRange
+            );
+        } catch (RuntimeException exception) {
+            throw new ApplicationFailure(ReservationCreateError.PERSISTENCE_ERROR);
+        }
+    }
+
+    private void savePreassignment(
+        StoreScope scope,
+        Reservation reservation,
+        ResourceSelection resourceSelection
+    ) {
+        if (resourceSelection == null) {
+            return;
+        }
+        try {
+            preassignmentRepository.save(
+                scope,
+                new ReservationPreassignment(
+                    UUID.randomUUID(),
+                    scope,
+                    reservation.id(),
+                    resourceSelection.resourceType(),
+                    resourceSelection.resourceId(),
+                    "active"
                 )
             );
         } catch (RuntimeException exception) {
@@ -593,15 +808,10 @@ public class ReservationCreateApplicationService {
         if (command.reservedStartAt() == null) {
             return ReservationCreateError.INVALID_TIME_RANGE;
         }
-        return null;
-    }
-
-    private static E164Phone parsePhone(String phoneE164) {
-        try {
-            return hasText(phoneE164) ? new E164Phone(phoneE164.trim()) : E164Phone.empty();
-        } catch (IllegalArgumentException exception) {
-            throw new ApplicationFailure(ReservationCreateError.INVALID_PHONE_E164);
+        if (command.tableId() != null && command.tableGroupId() != null) {
+            return ReservationCreateError.RESOURCE_SELECTION_CONFLICT;
         }
+        return null;
     }
 
     private static BusinessDate businessDate(Store store, Instant reservedStartAt) {
@@ -622,10 +832,10 @@ public class ReservationCreateApplicationService {
     }
 
     private static String source(CreateReservationCommand command) {
-        if (hasText(command.source())) {
-            return command.source().trim();
-        }
-        return hasText(command.actorType()) ? command.actorType().trim() : "staff";
+        return OperationSource.fromSourceOrActor(
+            command == null ? null : command.source(),
+            command == null ? null : command.actorType()
+        );
     }
 
     private static String snapshot(Reservation reservation) {
@@ -712,6 +922,9 @@ public class ReservationCreateApplicationService {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private record ResourceSelection(String resourceType, UUID resourceId) {
     }
 
     private static final class ApplicationFailure extends RuntimeException {

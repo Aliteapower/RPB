@@ -15,8 +15,11 @@ import com.rpb.reservation.reservation.application.ReservationCreateResult;
 import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedDirectSeatingApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationArrivedToQueueApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCancelApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCheckInApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationCompleteApplicationService;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
+import com.rpb.reservation.reservation.application.service.ReservationNoShowApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.nio.file.Files;
@@ -42,6 +45,8 @@ class ReservationControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID CUSTOMER_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final UUID RESERVATION_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+    private static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000000001");
+    private static final UUID TABLE_GROUP_ID = UUID.fromString("71000000-0000-0000-0000-000000000001");
     private static final Instant RESERVED_START_AT = Instant.parse("2030-06-20T11:00:00Z");
     private static final Instant RESERVED_END_AT = Instant.parse("2030-06-20T12:30:00Z");
     private static final Instant HOLD_UNTIL_AT = Instant.parse("2030-06-20T11:15:00Z");
@@ -50,6 +55,9 @@ class ReservationControllerTest {
     private ReservationCheckInApplicationService checkInApplicationService;
     private ReservationArrivedDirectSeatingApplicationService seatingApplicationService;
     private ReservationArrivedToQueueApplicationService queueApplicationService;
+    private ReservationCancelApplicationService cancelApplicationService;
+    private ReservationNoShowApplicationService noShowApplicationService;
+    private ReservationCompleteApplicationService completeApplicationService;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
@@ -59,6 +67,9 @@ class ReservationControllerTest {
         checkInApplicationService = mock(ReservationCheckInApplicationService.class);
         seatingApplicationService = mock(ReservationArrivedDirectSeatingApplicationService.class);
         queueApplicationService = mock(ReservationArrivedToQueueApplicationService.class);
+        cancelApplicationService = mock(ReservationCancelApplicationService.class);
+        noShowApplicationService = mock(ReservationNoShowApplicationService.class);
+        completeApplicationService = mock(ReservationCompleteApplicationService.class);
         actorProvider = new MutableCurrentActorProvider(CurrentActor.storeStaff(
             TENANT_ID,
             ACTOR_ID,
@@ -75,6 +86,9 @@ class ReservationControllerTest {
                 checkInApplicationService,
                 seatingApplicationService,
                 queueApplicationService,
+                cancelApplicationService,
+                noShowApplicationService,
+                completeApplicationService,
                 actorProvider,
                 apiMapper,
                 errorMapper,
@@ -83,7 +97,13 @@ class ReservationControllerTest {
                 new ReservationArrivedDirectSeatingApiMapper(),
                 new ReservationArrivedDirectSeatingApiErrorMapper(),
                 new ReservationArrivedToQueueApiMapper(),
-                new ReservationArrivedToQueueApiErrorMapper()
+                new ReservationArrivedToQueueApiErrorMapper(),
+                new ReservationCancelApiMapper(),
+                new ReservationCancelApiErrorMapper(),
+                new ReservationNoShowApiMapper(),
+                new ReservationNoShowApiErrorMapper(),
+                new ReservationCompleteApiMapper(),
+                new ReservationCompleteApiErrorMapper()
             ))
             .build();
     }
@@ -100,13 +120,17 @@ class ReservationControllerTest {
                       "partySize": 4,
                       "reservedStartAt": "2030-06-20T11:00:00Z",
                       "reservedEndAt": null,
+                      "businessDate": "2030-06-20",
                       "customerId": null,
                       "customerName": " Guest ",
                       "customerNickname": " VIP friend ",
+                      "customerEmail": " guest@example.test ",
                       "phoneE164": "+6591234567",
-                      "note": " Window seat "
+                      "note": " Window seat ",
+                      "tableId": "%s",
+                      "tableGroupId": null
                     }
-                    """))
+                    """.formatted(TABLE_ID)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.reservationId").value(RESERVATION_ID.toString()))
@@ -133,9 +157,11 @@ class ReservationControllerTest {
         assertThat(command.partySize()).isEqualTo(4);
         assertThat(command.reservedStartAt()).isEqualTo(RESERVED_START_AT);
         assertThat(command.reservedEndAt()).isNull();
+        assertThat(command.businessDate()).isEqualTo(LocalDate.parse("2030-06-20"));
         assertThat(command.customerId()).isNull();
         assertThat(command.customerName()).isEqualTo("Guest");
         assertThat(command.customerNickname()).isEqualTo("VIP friend");
+        assertThat(command.customerEmail()).isEqualTo("guest@example.test");
         assertThat(command.phoneE164()).isEqualTo("+6591234567");
         assertThat(command.note()).isEqualTo("Window seat");
         assertThat(command.idempotencyKey()).isEqualTo("idem-create");
@@ -144,6 +170,54 @@ class ReservationControllerTest {
         assertThat(command.reservationCode()).isNull();
         assertThat(command.source()).isEqualTo("staff");
         assertThat(command.reasonCode()).isNull();
+        assertThat(command.tableId()).isEqualTo(TABLE_ID);
+        assertThat(command.tableGroupId()).isNull();
+    }
+
+    @Test
+    void mapsTableGroupPreassignmentRequestToCommand() throws Exception {
+        when(applicationService.createReservation(any())).thenReturn(success(false));
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-create-group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 8,
+                      "reservedStartAt": "2030-06-20T11:00:00Z",
+                      "reservedEndAt": "2030-06-20T12:30:00Z",
+                      "customerId": "%s",
+                      "tableId": null,
+                      "tableGroupId": "%s"
+                    }
+                    """.formatted(CUSTOMER_ID, TABLE_GROUP_ID)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        ArgumentCaptor<CreateReservationCommand> commandCaptor = ArgumentCaptor.forClass(CreateReservationCommand.class);
+        verify(applicationService).createReservation(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().tableId()).isNull();
+        assertThat(commandCaptor.getValue().tableGroupId()).isEqualTo(TABLE_GROUP_ID);
+    }
+
+    @Test
+    void rejectsRequestWithBothTableAndTableGroupBeforeCallingService() throws Exception {
+        mockMvc.perform(post(ENDPOINT, STORE_ID)
+                .header("Idempotency-Key", "idem-resource-conflict")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "partySize": 4,
+                      "reservedStartAt": "2030-06-20T11:00:00Z",
+                      "reservedEndAt": "2030-06-20T12:30:00Z",
+                      "tableId": "%s",
+                      "tableGroupId": "%s"
+                    }
+                    """.formatted(TABLE_ID, TABLE_GROUP_ID)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_SELECTION_CONFLICT"));
+
+        verifyNoInteractions(applicationService);
     }
 
     @Test
@@ -268,11 +342,15 @@ class ReservationControllerTest {
                 "partySize",
                 "reservedStartAt",
                 "reservedEndAt",
+                "businessDate",
                 "customerId",
                 "customerName",
                 "customerNickname",
+                "customerEmail",
                 "phoneE164",
-                "note"
+                "note",
+                "tableId",
+                "tableGroupId"
             );
     }
 
@@ -284,6 +362,7 @@ class ReservationControllerTest {
         assertApplicationError(ReservationCreateError.CUSTOMER_NOT_FOUND, 404, "CUSTOMER_NOT_FOUND");
         assertApplicationError(ReservationCreateError.RESERVATION_DUPLICATE_ACTIVE, 409, "RESERVATION_DUPLICATE_ACTIVE");
         assertApplicationError(ReservationCreateError.RESERVATION_CAPACITY_INSUFFICIENT, 409, "RESERVATION_CAPACITY_INSUFFICIENT");
+        assertApplicationError(ReservationCreateError.RESERVATION_TIME_SLOT_UNAVAILABLE, 409, "RESERVATION_TIME_SLOT_UNAVAILABLE");
         assertApplicationError(ReservationCreateError.RESERVATION_CODE_CONFLICT, 409, "RESERVATION_CODE_CONFLICT");
         assertApplicationError(ReservationCreateError.COMMAND_IN_PROGRESS, 409, "IDEMPOTENCY_IN_PROGRESS");
         assertApplicationError(ReservationCreateError.FAILED_IDEMPOTENCY_REQUIRES_NEW_KEY, 409, "IDEMPOTENCY_FAILED_REQUIRES_NEW_KEY");
@@ -362,15 +441,44 @@ class ReservationControllerTest {
             .filteredOn(path -> path.endsWith("Controller.java"))
             .containsExactlyInAnyOrder(
                 "src/main/java/com/rpb/reservation/walkin/api/WalkInDirectSeatingController.java",
+                "src/main/java/com/rpb/reservation/walkin/api/WalkInQueueController.java",
                 "src/main/java/com/rpb/reservation/cleaning/api/CleaningController.java",
+                "src/main/java/com/rpb/reservation/customer/api/CustomerPhoneLookupController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/CallScreenAdminController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenMediaSeedController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/PlatformCallScreenSeedController.java",
+                "src/main/java/com/rpb/reservation/queuedisplay/api/QueueDisplayController.java",
+                "src/main/java/com/rpb/reservation/customerauth/api/CustomerAuthController.java",
+                "src/main/java/com/rpb/reservation/i18n/api/PlatformI18nCatalogController.java",
+                "src/main/java/com/rpb/reservation/i18n/api/TenantAdminI18nCatalogController.java",
+                "src/main/java/com/rpb/reservation/publicbooking/api/PublicBookingController.java",
+                "src/main/java/com/rpb/reservation/publicbooking/api/PublicBookingEntryController.java",
+                "src/main/java/com/rpb/reservation/publicbooking/api/TenantAdminPublicBookingController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationMealPeriodSeedController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/PlatformReservationShareTemplateSeedController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+                "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueRejoinController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueSkipController.java",
                 "src/main/java/com/rpb/reservation/queue/api/QueueTicketListController.java",
                 "src/main/java/com/rpb/reservation/queue/api/SeatingFromCalledQueueController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationTableAssignmentController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationPublicShareController.java",
                 "src/main/java/com/rpb/reservation/reservation/api/ReservationTodayViewController.java",
-                "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java"
+                "src/main/java/com/rpb/reservation/staffhome/api/StaffHomeOverviewController.java",
+                "src/main/java/com/rpb/reservation/table/api/TableResourceListController.java",
+                "src/main/java/com/rpb/reservation/table/api/TemporaryTableGroupController.java",
+                "src/main/java/com/rpb/reservation/table/api/TableSwitchController.java",
+                "src/main/java/com/rpb/reservation/auth/api/AuthController.java",
+                "src/main/java/com/rpb/reservation/appgate/api/MeAppsController.java",
+                "src/main/java/com/rpb/reservation/platform/api/PlatformProfileController.java",
+                "src/main/java/com/rpb/reservation/platform/api/PlatformTenantController.java",
+                "src/main/java/com/rpb/reservation/platformbilling/api/PlatformProductLineController.java",
+                "src/main/java/com/rpb/reservation/platformbilling/api/PlatformTenantProductSubscriptionController.java",
+                "src/main/java/com/rpb/reservation/reservation/api/ReservationShareInfoController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminController.java",
+                "src/main/java/com/rpb/reservation/tenantadmin/api/TenantAdminShareProfileController.java"
             );
         assertThat(sourceFiles)
             .noneMatch(ReservationControllerTest::isForbiddenQueueApiFile);
@@ -393,18 +501,78 @@ class ReservationControllerTest {
         assertThat(vueFiles)
             .containsExactlyInAnyOrder(
                 "src/App.vue",
+                "src/components/call-screen/CallScreenAdModeSwitch.vue",
+                "src/components/common/CountryPhoneField.vue",
+                "src/components/common/DownloadableQrCode.vue",
+                "src/components/common/FrontendLocaleSwitcher.vue",
+                "src/components/common/PasswordInput.vue",
                 "src/components/DateTimeWheelPicker.vue",
+                "src/components/erp/ErpPagination.vue",
+                "src/components/erp/ErpQueryToolbar.vue",
+                "src/components/platform/PlatformAdminNav.vue",
+                "src/components/platform/PlatformTenantForm.vue",
+                "src/components/platform/PlatformTenantStructurePanel.vue",
+                "src/components/platform/PlatformTenantTable.vue",
+                "src/components/platform/product-line/PlatformProductLineDrawer.vue",
+                "src/components/platform/product-line/PlatformProductLineList.vue",
+                "src/components/platform/product-line/PlatformProductLinePriceForm.vue",
+                "src/components/reservation-workbench/CreateReservationDialog.vue",
+                "src/components/reservation-workbench/ReservationMonthCalendar.vue",
+                "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+                "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
+                "src/components/reservation-workbench/ReservationTableAssignmentDialog.vue",
+                "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
+                "src/components/reservation-workbench/ReservationTodayListItem.vue",
+                "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+                "src/components/staff/StaffBottomNav.vue",
+                "src/components/staff/StaffBusinessDateSwitcher.vue",
+                "src/components/staff/StaffGuestContactLookup.vue",
+                "src/components/staff/StaffGuestNameField.vue",
+                "src/components/staff/StaffSingaporePhoneField.vue",
+                "src/components/staff/StaffTimeWheelPicker.vue",
+                "src/components/staff-home/StaffHomeActionGroup.vue",
+                "src/components/staff-home/StaffHomeTopBar.vue",
+                "src/components/staff-home/StaffHomeWorkflowStrip.vue",
+                "src/components/staff-table/TableResourcePicker.vue",
+                "src/components/store/StoreSwitcher.vue",
+                "src/components/tenant-admin/TenantAdminNav.vue",
                 "src/pages/CleaningCompletePage.vue",
+                "src/pages/LoginPage.vue",
+                "src/pages/PlatformCallScreenSeedPage.vue",
+                "src/pages/PlatformI18nCatalogPage.vue",
+                "src/pages/PlatformProfilePage.vue",
+                "src/pages/PlatformProductLinesPage.vue",
+                "src/pages/PlatformReservationMealPeriodSeedPage.vue",
+                "src/pages/PlatformReservationShareTemplateSeedPage.vue",
+                "src/pages/PlatformTenantBillingPage.vue",
+                "src/pages/PlatformTenantFormPage.vue",
+                "src/pages/PlatformTenantsPage.vue",
+                "src/pages/PublicBookingPage.vue",
                 "src/pages/QueueCallPage.vue",
+                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueTicketListPage.vue",
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
+                "src/pages/ReservationPublicSharePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
                 "src/pages/SeatingFromCalledQueuePage.vue",
                 "src/pages/StoreStaffHomePage.vue",
-                "src/pages/WalkInDirectSeatingPage.vue"
+                "src/pages/TableResourceListPage.vue",
+                "src/pages/TenantAdminCallScreenPage.vue",
+                "src/pages/TenantAdminCustomersPage.vue",
+                "src/pages/TenantAdminI18nCatalogPage.vue",
+                "src/pages/TenantAdminProfilePage.vue",
+                "src/pages/TenantAdminPublicBookingPage.vue",
+                "src/pages/TenantAdminReservationSharePage.vue",
+                "src/pages/TenantAdminSettingsPage.vue",
+                "src/pages/TenantAdminStaffFormPage.vue",
+                "src/pages/TenantAdminStaffPage.vue",
+                "src/pages/TenantAdminTableFormPage.vue",
+                "src/pages/TenantAdminTablesPage.vue",
+                "src/pages/WalkInDirectSeatingPage.vue",
+                "src/pages/WalkInQueuePage.vue"
             );
         assertThat(vueFiles)
             .filteredOn(path -> !Set.of(
@@ -412,9 +580,21 @@ class ReservationControllerTest {
                 "src/pages/ReservationArrivedDirectSeatingPage.vue",
                 "src/pages/ReservationArrivedToQueuePage.vue",
                 "src/pages/ReservationCheckInPage.vue",
-                "src/pages/ReservationCreatePage.vue",
+                "src/pages/ReservationPublicSharePage.vue",
                 "src/pages/ReservationTodayViewPage.vue",
-                "src/pages/SeatingFromCalledQueuePage.vue"
+                "src/components/reservation-workbench/CreateReservationDialog.vue",
+                "src/components/reservation-workbench/ReservationMonthCalendar.vue",
+                "src/components/reservation-workbench/ReservationQuickActionPanel.vue",
+                "src/components/reservation-workbench/ReservationSeatDialog.vue",
+                "src/components/reservation-workbench/ReservationShareCopyPanel.vue",
+                "src/components/reservation-workbench/ReservationTableAssignmentDialog.vue",
+                "src/components/reservation-workbench/ReservationTableSwitchDialog.vue",
+                "src/components/reservation-workbench/ReservationTodayListItem.vue",
+                "src/components/reservation-workbench/ReservationTodayListPanel.vue",
+                "src/pages/PlatformReservationMealPeriodSeedPage.vue",
+                "src/pages/PlatformReservationShareTemplateSeedPage.vue",
+                "src/pages/SeatingFromCalledQueuePage.vue",
+                "src/pages/TenantAdminReservationSharePage.vue"
             ).contains(path))
             .noneMatch(path -> path.toLowerCase().contains("reservation"));
     }
@@ -434,6 +614,13 @@ class ReservationControllerTest {
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+            "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+            "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
             "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -513,11 +700,14 @@ class ReservationControllerTest {
               "partySize": 4,
               "reservedStartAt": "2030-06-20T11:00:00Z",
               "reservedEndAt": "2030-06-20T12:30:00Z",
+              "businessDate": "2030-06-20",
               "customerId": null,
               "customerName": "Guest",
               "customerNickname": null,
               "phoneE164": "+6591234567",
-              "note": null
+              "note": null,
+              "tableId": null,
+              "tableGroupId": null
             }
             """;
     }
@@ -526,6 +716,7 @@ class ReservationControllerTest {
         return switch (apiCode) {
             case "RESERVATION_DUPLICATE_ACTIVE" -> "reservation.duplicate_active";
             case "RESERVATION_CAPACITY_INSUFFICIENT" -> "reservation.capacity_insufficient";
+            case "RESERVATION_TIME_SLOT_UNAVAILABLE" -> "reservation.time_slot_unavailable";
             case "RESERVATION_CODE_CONFLICT" -> "reservation.code_conflict";
             case "RESERVATION_START_IN_PAST" -> "reservation.start_in_past";
             case "EVENT_WRITE_FAILED" -> "reservation.event_write_failed";

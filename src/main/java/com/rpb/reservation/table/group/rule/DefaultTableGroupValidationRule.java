@@ -18,7 +18,7 @@ public class DefaultTableGroupValidationRule implements TableGroupValidationRule
     }
 
     public RuleDecision evaluate(TableGroup group, List<TableGroupMember> members) {
-        if (group == null || group.status() != TableGroupStatus.ACTIVE || members == null || members.isEmpty()) {
+        if (group == null || !isUsableGroup(group) || members == null || members.isEmpty()) {
             return RuleDecision.deny("invalid_table_group");
         }
         Set<Object> tableIds = new HashSet<>();
@@ -28,5 +28,10 @@ public class DefaultTableGroupValidationRule implements TableGroupValidationRule
             }
         }
         return RuleDecision.allow();
+    }
+
+    private static boolean isUsableGroup(TableGroup group) {
+        return group.status() == TableGroupStatus.ACTIVE
+            || ("temporary".equals(group.groupType()) && group.status() == TableGroupStatus.CREATED);
     }
 }

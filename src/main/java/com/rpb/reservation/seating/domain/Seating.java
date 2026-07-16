@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.seating.status.SeatingStatus;
 import com.rpb.reservation.seating.value.SeatingId;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -20,7 +21,8 @@ public record Seating(
     String manualOverrideReasonCode,
     String note,
     PartySize partySizeSnapshot,
-    SeatingStatus status
+    SeatingStatus status,
+    Instant completedAt
 ) {
 
     public Seating {
@@ -39,10 +41,35 @@ public record Seating(
         String sourceType,
         UUID sourceId,
         String seatingCode,
+        String manualOverrideReasonCode,
+        String note,
         PartySize partySizeSnapshot,
         SeatingStatus status
     ) {
-        this(id, scope, sourceType, sourceId, seatingCode, null, null, partySizeSnapshot, status);
+        this(
+            id,
+            scope,
+            sourceType,
+            sourceId,
+            seatingCode,
+            manualOverrideReasonCode,
+            note,
+            partySizeSnapshot,
+            status,
+            null
+        );
+    }
+
+    public Seating(
+        SeatingId id,
+        StoreScope scope,
+        String sourceType,
+        UUID sourceId,
+        String seatingCode,
+        PartySize partySizeSnapshot,
+        SeatingStatus status
+    ) {
+        this(id, scope, sourceType, sourceId, seatingCode, null, null, partySizeSnapshot, status, null);
     }
 
     public Seating(
@@ -52,7 +79,7 @@ public record Seating(
         PartySize partySizeSnapshot,
         SeatingStatus status
     ) {
-        this(id, scope, sourceType, null, null, null, null, partySizeSnapshot, status);
+        this(id, scope, sourceType, null, null, null, null, partySizeSnapshot, status, null);
     }
 
     public String occupyIntent() {

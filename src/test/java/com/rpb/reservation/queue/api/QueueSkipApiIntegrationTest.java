@@ -120,6 +120,28 @@ class QueueSkipApiIntegrationTest {
     }
 
     @Test
+    void skipsWalkInQueueTicketWithoutReservationThroughApi() throws Exception {
+        fixture.queueTicket(QUEUE_TICKET_ID, null, "called", CALLED_AT, EXPIRES_AT, null, 12, 1);
+
+        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
+                .header("Idempotency-Key", "skip-walk-in")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson(SKIPPED_AT)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.queueTicketId").value(QUEUE_TICKET_ID.toString()))
+            .andExpect(jsonPath("$.queueTicketStatus").value("skipped"))
+            .andExpect(jsonPath("$.alreadySkipped").value(false));
+
+        assertThat(fixture.scalarString("select status from queue_tickets where id = ?", QUEUE_TICKET_ID))
+            .isEqualTo("skipped");
+        assertThat(fixture.count("reservations")).isEqualTo(0);
+        assertThat(fixture.countWhere("select count(*) from business_events where event_type = 'queue_ticket.skipped'"))
+            .isEqualTo(1);
+        assertBoundaryNoDownstreamSlices();
+    }
+
+    @Test
     void completedReplayDoesNotDuplicateEvidence() throws Exception {
         fixture.reservation(RESERVATION_ID, "R-SKIP-REPLAY", "arrived", 4);
         fixture.queueTicket(QUEUE_TICKET_ID, RESERVATION_ID, "called", CALLED_AT, EXPIRES_AT, null, 12, 1);
@@ -223,17 +245,6 @@ class QueueSkipApiIntegrationTest {
             .andExpect(jsonPath("$.error.code").value("QUEUE_TICKET_STATUS_NOT_CALLED"));
         assertThat(fixture.scalarString("select status from queue_tickets where id = ?", QUEUE_TICKET_ID)).isEqualTo("waiting");
         assertFailedIdempotencyAndFailureAudit("skip-waiting");
-
-        fixture.reset();
-        fixture.createBaseStore();
-        fixture.queueTicket(QUEUE_TICKET_ID, null, "called", CALLED_AT, EXPIRES_AT, null, 12, 1);
-        mockMvc.perform(post(ENDPOINT, STORE_ID, QUEUE_TICKET_ID)
-                .header("Idempotency-Key", "skip-reservation-not-found")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestJson(SKIPPED_AT)))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.error.code").value("RESERVATION_NOT_FOUND"));
-        assertFailedIdempotencyAndFailureAudit("skip-reservation-not-found");
 
         fixture.reset();
         fixture.createBaseStore();
@@ -499,7 +510,7 @@ class QueueSkipApiIntegrationTest {
                     timezone, locale, date_format, time_format, currency
                 )
                 values (?, ?, 'store-queue-skip-api-it', 'Queue Skip API Store', 'active',
-                    'Asia/Singapore', 'en-SG', 'yyyy-MM-dd', 'HH:mm', 'SGD')
+                    'Asia/Singapore', 'en-SG', 'DD-MM-YYYY', 'HH:mm', 'SGD')
                 """,
                 STORE_ID,
                 TENANT_ID

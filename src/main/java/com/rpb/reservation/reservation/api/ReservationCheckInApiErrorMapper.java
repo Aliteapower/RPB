@@ -37,6 +37,7 @@ public class ReservationCheckInApiErrorMapper {
             case STORE_ACCESS_DENIED -> ReservationApiErrorCode.FORBIDDEN;
             case RESERVATION_NOT_FOUND -> ReservationApiErrorCode.RESERVATION_NOT_FOUND;
             case RESERVATION_STATUS_NOT_CONFIRMED -> ReservationApiErrorCode.RESERVATION_STATUS_NOT_CONFIRMED;
+            case RESERVATION_NOT_TODAY -> ReservationApiErrorCode.RESERVATION_NOT_TODAY;
             case RESERVATION_CANNOT_CHECK_IN_CANCELLED -> ReservationApiErrorCode.RESERVATION_CANNOT_CHECK_IN_CANCELLED;
             case RESERVATION_CANNOT_CHECK_IN_NO_SHOW -> ReservationApiErrorCode.RESERVATION_CANNOT_CHECK_IN_NO_SHOW;
             case RESERVATION_CANNOT_CHECK_IN_COMPLETED -> ReservationApiErrorCode.RESERVATION_CANNOT_CHECK_IN_COMPLETED;

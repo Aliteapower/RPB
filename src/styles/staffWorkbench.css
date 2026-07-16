@@ -1,0 +1,21 @@
+.staff-workbench-shell {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef4f8 46%, #e8eef4 100%);
+  color: #0f172a;
+  margin: 0 auto;
+  max-width: 520px;
+  min-height: 100dvh;
+}
+
+.staff-workbench-shell--padded {
+  display: grid;
+  gap: 14px;
+  padding: 20px 14px calc(128px + env(safe-area-inset-bottom));
+  scroll-padding-bottom: calc(128px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 720px) {
+  .staff-workbench-shell {
+    border-left: 1px solid #dbe3ee;
+    border-right: 1px solid #dbe3ee;
+  }
+}

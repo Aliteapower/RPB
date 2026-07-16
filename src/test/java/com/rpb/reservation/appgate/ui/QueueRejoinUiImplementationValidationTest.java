@@ -18,9 +18,9 @@ class QueueRejoinUiImplementationValidationTest {
         assertThat(apiPath).exists();
         assertThat(typesPath).exists();
 
-        String page = Files.readString(pagePath);
-        String apiClient = Files.readString(apiPath);
-        String types = Files.readString(typesPath);
+        String page = FrontendSourceSupport.readString(pagePath);
+        String apiClient = FrontendSourceSupport.readString(apiPath);
+        String types = FrontendSourceSupport.readString(typesPath);
 
         assertThat(apiClient)
             .contains("rejoinQueueTicket")
@@ -83,7 +83,6 @@ class QueueRejoinUiImplementationValidationTest {
             .contains("src/pages/QueueTicketListPage.vue")
             .doesNotContain(
                 "src/pages/QueueRejoinPage.vue",
-                "src/pages/QueueDisplayPage.vue",
                 "src/pages/QueueWorkbenchPage.vue",
                 "src/pages/TableMapPage.vue",
                 "src/pages/ReservationCalendarPage.vue",
@@ -100,7 +99,6 @@ class QueueRejoinUiImplementationValidationTest {
         assertThat(apiFiles)
             .contains("src/api/queueRejoinApi.ts")
             .doesNotContain(
-                "src/api/queueDisplayApi.ts",
                 "src/api/queueWorkbenchApi.ts",
                 "src/api/queueCallFromListApi.ts",
                 "src/api/queueSeatFromListApi.ts",

@@ -17,6 +17,7 @@ import com.rpb.reservation.common.state.TransitionResult;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.common.value.IdempotencyKey;
+import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.common.value.PartySize;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
 import com.rpb.reservation.customer.domain.Customer;
@@ -26,6 +27,9 @@ import com.rpb.reservation.idempotency.application.port.out.IdempotencyRepositor
 import com.rpb.reservation.idempotency.domain.IdempotencyRecord;
 import com.rpb.reservation.idempotency.rule.DefaultIdempotencyRule;
 import com.rpb.reservation.idempotency.status.IdempotencyStatus;
+import com.rpb.reservation.reservation.application.port.out.ReservationPreassignmentRepositoryPort;
+import com.rpb.reservation.reservation.application.port.out.ReservationResourceAssignment;
+import com.rpb.reservation.reservation.domain.ReservationPreassignment;
 import com.rpb.reservation.seating.application.port.out.SeatingRepositoryPort;
 import com.rpb.reservation.seating.domain.Seating;
 import com.rpb.reservation.seating.domain.SeatingResource;
@@ -39,6 +43,10 @@ import com.rpb.reservation.store.domain.StorePolicy;
 import com.rpb.reservation.table.application.port.out.DiningTableRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableGroupRepositoryPort;
 import com.rpb.reservation.table.application.port.out.TableLockRepositoryPort;
+import com.rpb.reservation.table.application.TemporaryTableGroupError;
+import com.rpb.reservation.table.application.TemporaryTableGroupResult;
+import com.rpb.reservation.table.application.service.TemporaryTableGroupApplicationService;
+import com.rpb.reservation.table.application.service.TemporaryTableGroupCommand;
 import com.rpb.reservation.table.domain.DiningTable;
 import com.rpb.reservation.table.domain.TableGroup;
 import com.rpb.reservation.table.domain.TableGroupMember;
@@ -63,17 +71,19 @@ import com.rpb.reservation.walkin.value.WalkInId;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,12 +100,14 @@ public class WalkInDirectSeatingApplicationService {
     private final DiningTableRepositoryPort diningTableRepository;
     private final TableGroupRepositoryPort tableGroupRepository;
     private final TableLockRepositoryPort tableLockRepository;
+    private final ReservationPreassignmentRepositoryPort preassignmentRepository;
     private final WalkInRepositoryPort walkInRepository;
     private final SeatingRepositoryPort seatingRepository;
     private final BusinessEventRepositoryPort businessEventRepository;
     private final StateTransitionLogRepositoryPort stateTransitionLogRepository;
     private final AuditLogRepositoryPort auditLogRepository;
     private final IdempotencyRepositoryPort idempotencyRepository;
+    private final TemporaryTableGroupApplicationService temporaryTableGroupService;
     private final DefaultStoreAccessPolicy storeAccessPolicy = new DefaultStoreAccessPolicy();
     private final DefaultCustomerIdentityRule customerIdentityRule = new DefaultCustomerIdentityRule();
     private final DefaultTableAvailabilityRule tableAvailabilityRule = new DefaultTableAvailabilityRule();
@@ -124,17 +136,57 @@ public class WalkInDirectSeatingApplicationService {
         AuditLogRepositoryPort auditLogRepository,
         IdempotencyRepositoryPort idempotencyRepository
     ) {
+        this(
+            storeRepository,
+            customerRepository,
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            NoopReservationPreassignmentRepository.INSTANCE,
+            walkInRepository,
+            seatingRepository,
+            businessEventRepository,
+            stateTransitionLogRepository,
+            auditLogRepository,
+            idempotencyRepository
+        );
+    }
+
+    @Autowired
+    public WalkInDirectSeatingApplicationService(
+        StoreRepositoryPort storeRepository,
+        CustomerRepositoryPort customerRepository,
+        DiningTableRepositoryPort diningTableRepository,
+        TableGroupRepositoryPort tableGroupRepository,
+        TableLockRepositoryPort tableLockRepository,
+        ReservationPreassignmentRepositoryPort preassignmentRepository,
+        WalkInRepositoryPort walkInRepository,
+        SeatingRepositoryPort seatingRepository,
+        BusinessEventRepositoryPort businessEventRepository,
+        StateTransitionLogRepositoryPort stateTransitionLogRepository,
+        AuditLogRepositoryPort auditLogRepository,
+        IdempotencyRepositoryPort idempotencyRepository
+    ) {
         this.storeRepository = storeRepository;
         this.customerRepository = customerRepository;
         this.diningTableRepository = diningTableRepository;
         this.tableGroupRepository = tableGroupRepository;
         this.tableLockRepository = tableLockRepository;
+        this.preassignmentRepository = preassignmentRepository;
         this.walkInRepository = walkInRepository;
         this.seatingRepository = seatingRepository;
         this.businessEventRepository = businessEventRepository;
         this.stateTransitionLogRepository = stateTransitionLogRepository;
         this.auditLogRepository = auditLogRepository;
         this.idempotencyRepository = idempotencyRepository;
+        this.temporaryTableGroupService = new TemporaryTableGroupApplicationService(
+            diningTableRepository,
+            tableGroupRepository,
+            tableLockRepository,
+            preassignmentRepository,
+            seatingRepository,
+            Clock.systemUTC()
+        );
     }
 
     @Transactional
@@ -147,10 +199,11 @@ public class WalkInDirectSeatingApplicationService {
         StoreScope scope = new StoreScope(new TenantId(command.tenantId()), command.storeId());
         IdempotencyKey idempotencyKey = new IdempotencyKey(command.idempotencyKey());
         String requestHash = requestHash(command);
+        String source = source(command.actorType());
 
         Optional<IdempotencyRecord> existing = idempotencyRepository.findByScopeActionKey(
             scope,
-            command.actorType(),
+            source,
             ACTION,
             idempotencyKey
         );
@@ -160,7 +213,7 @@ public class WalkInDirectSeatingApplicationService {
 
         IdempotencyRecord started;
         try {
-            started = idempotencyRepository.start(scope, command.actorType(), ACTION, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
+            started = idempotencyRepository.start(scope, source, ACTION, idempotencyKey, requestHash, OffsetDateTime.now().plusMinutes(30));
         } catch (RuntimeException exception) {
             return WalkInDirectSeatingResult.failure(WalkInDirectSeatingError.REPOSITORY_SAVE_FAILED);
         }
@@ -193,6 +246,7 @@ public class WalkInDirectSeatingApplicationService {
             normalize(command.phoneE164()),
             value(command.tableId()),
             value(command.tableGroupId()),
+            values(command.temporaryTableIds()),
             normalize(command.actorType()),
             normalize(command.overrideReasonCode()),
             normalize(command.overrideNote())
@@ -271,10 +325,8 @@ public class WalkInDirectSeatingApplicationService {
             new SeatingResource(UUID.randomUUID(), scope, seating.id(), selection.resourceType(), selection.resourceId(), "active")
         );
 
-        DiningTable occupiedTable = null;
-        if (selection.table() != null) {
-            occupiedTable = occupyTable(scope, selection.table());
-        }
+        List<DiningTable> occupiedTables = occupyTables(scope, selection);
+        DiningTable occupiedTable = occupiedTables.size() == 1 ? occupiedTables.getFirst() : null;
 
         List<UUID> eventIds = appendBusinessEvents(scope, command, walkIn, seating, lock, selection);
         List<UUID> transitionIds = appendTransitionLogs(scope, command, walkIn, seating, selection, occupiedTable);
@@ -314,13 +366,14 @@ public class WalkInDirectSeatingApplicationService {
         E164Phone phone = parsePhone(command.phoneE164());
         require(customerIdentityRule.evaluate(command.customerId(), command.customerName(), command.customerNickname(), phone), WalkInDirectSeatingError.INVALID_CUSTOMER_IDENTITY);
         if (command.customerId() != null) {
-            return customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
+            Customer customer = customerRepository.findById(tenantScope, new CustomerId(command.customerId()))
                 .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.INVALID_CUSTOMER_IDENTITY));
+            return refreshCustomerProfile(tenantScope, customer, command, phone);
         }
         if (phone.isPresent()) {
             Optional<Customer> existing = customerRepository.findByPhone(tenantScope, phone);
             if (existing.isPresent()) {
-                return existing.get();
+                return refreshCustomerProfile(tenantScope, existing.get(), command, phone);
             }
         }
         return customerRepository.save(
@@ -331,20 +384,52 @@ public class WalkInDirectSeatingApplicationService {
                 "C-" + UUID.randomUUID().toString().substring(0, 8),
                 "walk_in_guest",
                 phone,
-                "active"
+                "active",
+                blankToNull(command.customerName()),
+                blankToNull(command.customerNickname())
             )
         );
+    }
+
+    private Customer refreshCustomerProfile(
+        TenantScope tenantScope,
+        Customer customer,
+        SeatWalkInDirectlyCommand command,
+        E164Phone phone
+    ) {
+        Customer refreshed = customer.refreshProfile(
+            phone,
+            blankToNull(command.customerName()),
+            blankToNull(command.customerNickname())
+        );
+        if (refreshed.equals(customer)) {
+            return customer;
+        }
+        return customerRepository.save(tenantScope, refreshed);
     }
 
     private ResourceSelection resolveResource(SeatWalkInDirectlyCommand command, StoreScope scope, PartySize partySize, BusinessDate businessDate) {
         List<DiningTable> tableCandidates = diningTableRepository.findCandidates(scope, partySize, businessDate);
         List<TableGroup> groupCandidates = tableGroupRepository.findCandidates(scope, partySize, businessDate);
 
+        if (!command.temporaryTableIds().isEmpty()) {
+            TemporaryTableGroupResult result = temporaryTableGroupService.createForSeating(new TemporaryTableGroupCommand(
+                scope,
+                command.temporaryTableIds(),
+                partySize,
+                businessDate,
+                null
+            ));
+            if (!result.success()) {
+                throw new ApplicationFailure(temporaryTableGroupError(result.error()));
+            }
+            return new ResourceSelection(RESOURCE_GROUP, result.group().id().value(), null, result.group(), result.memberTables());
+        }
+
         if (command.tableId() != null) {
             DiningTable selected = diningTableRepository.findById(scope, new TableId(command.tableId()))
                 .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.TABLE_RESOURCE_UNAVAILABLE));
             validateTable(selected, partySize);
-            validateManualOverride(command, selected.id().value(), tableCandidates.stream().findFirst().map(table -> table.id().value()).orElse(null));
             return new ResourceSelection(RESOURCE_TABLE, selected.id().value(), selected, null, List.of());
         }
 
@@ -353,8 +438,7 @@ public class WalkInDirectSeatingApplicationService {
                 .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.INVALID_TABLE_GROUP));
             List<TableGroupMember> members = tableGroupRepository.findActiveMembers(scope, selected.id());
             validateGroup(selected, members, partySize);
-            validateManualOverride(command, selected.id().value(), groupCandidates.stream().findFirst().map(group -> group.id().value()).orElse(null));
-            return new ResourceSelection(RESOURCE_GROUP, selected.id().value(), null, selected, members);
+            return new ResourceSelection(RESOURCE_GROUP, selected.id().value(), null, selected, loadMemberTables(scope, members));
         }
 
         require(tableAssignmentRule.evaluate(tableCandidates, groupCandidates), WalkInDirectSeatingError.NO_ASSIGNABLE_TABLE);
@@ -371,7 +455,7 @@ public class WalkInDirectSeatingApplicationService {
             try {
                 List<TableGroupMember> members = tableGroupRepository.findActiveMembers(scope, group.id());
                 validateGroup(group, members, partySize);
-                return new ResourceSelection(RESOURCE_GROUP, group.id().value(), null, group, members);
+                return new ResourceSelection(RESOURCE_GROUP, group.id().value(), null, group, loadMemberTables(scope, members));
             } catch (ApplicationFailure failure) {
                 firstFailure = firstFailure == null ? failure : firstFailure;
             }
@@ -380,6 +464,29 @@ public class WalkInDirectSeatingApplicationService {
             throw firstFailure;
         }
         throw new ApplicationFailure(WalkInDirectSeatingError.NO_ASSIGNABLE_TABLE);
+    }
+
+    private static WalkInDirectSeatingError temporaryTableGroupError(TemporaryTableGroupError error) {
+        return switch (error) {
+            case MEMBER_REQUIRED -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED;
+            case MEMBER_DUPLICATE -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE;
+            case MEMBER_UNAVAILABLE -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_UNAVAILABLE;
+            case CAPACITY_INSUFFICIENT -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_CAPACITY_INSUFFICIENT;
+            case LOCK_CONFLICT -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_LOCK_CONFLICT;
+            case PREASSIGNMENT_CONFLICT -> WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_PREASSIGNMENT_CONFLICT;
+            case GROUP_NAME_REQUIRED, GROUP_NAME_CONFLICT, GROUP_NOT_FOUND, GROUP_NOT_TEMPORARY, GROUP_NOT_DISSOLVABLE ->
+                WalkInDirectSeatingError.INVALID_COMMAND;
+        };
+    }
+
+    private List<DiningTable> loadMemberTables(StoreScope scope, List<TableGroupMember> members) {
+        List<DiningTable> tables = new ArrayList<>();
+        for (TableGroupMember member : members) {
+            DiningTable table = diningTableRepository.findById(scope, member.tableId())
+                .orElseThrow(() -> new ApplicationFailure(WalkInDirectSeatingError.INVALID_TABLE_GROUP));
+            tables.add(table);
+        }
+        return tables;
     }
 
     private void validateTable(DiningTable table, PartySize partySize) {
@@ -393,12 +500,15 @@ public class WalkInDirectSeatingApplicationService {
         require(tableCapacityRule.evaluate(partySize, group.capacity()), WalkInDirectSeatingError.PARTY_SIZE_OUTSIDE_CAPACITY);
     }
 
-    private void validateManualOverride(SeatWalkInDirectlyCommand command, UUID selectedResourceId, UUID recommendedResourceId) {
-        boolean selectedRecommended = recommendedResourceId == null || Objects.equals(selectedResourceId, recommendedResourceId);
-        require(
-            tableAssignmentRule.evaluateManualOverride(selectedRecommended, command.overrideReasonCode(), command.overrideNote()),
-            WalkInDirectSeatingError.MANUAL_OVERRIDE_REQUIRED
-        );
+    private List<DiningTable> occupyTables(StoreScope scope, ResourceSelection selection) {
+        if (selection.table() != null) {
+            return List.of(occupyTable(scope, selection.table()));
+        }
+        List<DiningTable> occupied = new ArrayList<>();
+        for (DiningTable memberTable : selection.memberTables()) {
+            occupied.add(occupyTable(scope, memberTable));
+        }
+        return occupied;
     }
 
     private DiningTable occupyTable(StoreScope scope, DiningTable table) {
@@ -490,7 +600,7 @@ public class WalkInDirectSeatingApplicationService {
             "walk_in_direct_seating.completed",
             "seating",
             seating.id().value(),
-            command.actorType(),
+            source(command.actorType()),
             command.actorType(),
             command.actorId(),
             metadata
@@ -512,7 +622,7 @@ public class WalkInDirectSeatingApplicationService {
                     "walk_in_direct_seating.failed",
                     "walk_in_direct_seating",
                     null,
-                    command.actorType(),
+                    source(command.actorType()),
                     command.actorType(),
                     command.actorId(),
                     "{\"failureReason\":\"" + escape(error.code()) + "\"}"
@@ -531,7 +641,7 @@ public class WalkInDirectSeatingApplicationService {
             targetId,
             command.actorType(),
             command.actorId(),
-            command.actorType(),
+            source(command.actorType()),
             metadata
         );
     }
@@ -554,7 +664,7 @@ public class WalkInDirectSeatingApplicationService {
             transitionCode,
             command.actorType(),
             command.actorId(),
-            command.actorType(),
+            source(command.actorType()),
             metadata
         );
     }
@@ -606,8 +716,18 @@ public class WalkInDirectSeatingApplicationService {
         if (command.partySize() == null || command.partySize() <= 0) {
             return WalkInDirectSeatingError.INVALID_PARTY_SIZE;
         }
-        if (command.tableId() != null && command.tableGroupId() != null) {
+        boolean hasTemporaryTables = command.temporaryTableIds() != null && !command.temporaryTableIds().isEmpty();
+        int selectedTargets = (command.tableId() == null ? 0 : 1)
+            + (command.tableGroupId() == null ? 0 : 1)
+            + (hasTemporaryTables ? 1 : 0);
+        if (selectedTargets > 1) {
             return WalkInDirectSeatingError.INVALID_RESOURCE_SELECTION;
+        }
+        if (hasTemporaryTables && command.temporaryTableIds().size() < 2) {
+            return WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_REQUIRED;
+        }
+        if (hasTemporaryTables && command.temporaryTableIds().stream().distinct().count() != command.temporaryTableIds().size()) {
+            return WalkInDirectSeatingError.TEMPORARY_TABLE_GROUP_MEMBER_DUPLICATE;
         }
         return null;
     }
@@ -636,6 +756,10 @@ public class WalkInDirectSeatingApplicationService {
                 ? fallback
                 : WalkInDirectSeatingError.fromCode(decision.violationCode()));
         }
+    }
+
+    private static String source(String actorType) {
+        return OperationSource.fromActorType(actorType);
     }
 
     private static String snapshot(UUID walkInId, UUID seatingId, String resourceType, UUID resourceId, int partySizeSnapshot) {
@@ -692,16 +816,55 @@ public class WalkInDirectSeatingApplicationService {
         return value == null ? "" : String.valueOf(value);
     }
 
+    private static String values(List<UUID> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return values.stream()
+            .map(UUID::toString)
+            .sorted()
+            .reduce((left, right) -> left + "," + right)
+            .orElse("");
+    }
+
     private record ResourceSelection(
         String resourceType,
         UUID resourceId,
         DiningTable table,
         TableGroup group,
-        List<TableGroupMember> members
+        List<DiningTable> memberTables
     ) {
     }
 
     private record ExecutionResult(WalkInDirectSeatingResult result) {
+    }
+
+    private enum NoopReservationPreassignmentRepository implements ReservationPreassignmentRepositoryPort {
+        INSTANCE;
+
+        @Override
+        public boolean existsActiveResourceConflict(
+            StoreScope scope,
+            String resourceType,
+            UUID resourceId,
+            BusinessDate businessDate,
+            com.rpb.reservation.common.time.TimeRange timeRange
+        ) {
+            return false;
+        }
+
+        @Override
+        public Set<ReservationResourceAssignment> findActiveResourceAssignmentsForDate(
+            StoreScope scope,
+            BusinessDate businessDate
+        ) {
+            return Set.of();
+        }
+
+        @Override
+        public ReservationPreassignment save(StoreScope scope, ReservationPreassignment preassignment) {
+            return preassignment;
+        }
     }
 
     private static final class ApplicationFailure extends RuntimeException {

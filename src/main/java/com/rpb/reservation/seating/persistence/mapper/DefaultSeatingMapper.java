@@ -32,7 +32,8 @@ public class DefaultSeatingMapper implements SeatingMapper {
             entity.getManualOverrideReasonCode(),
             entity.getNote(),
             new PartySize(entity.getPartySizeSnapshot()),
-            statusFromCode(entity.getStatus())
+            statusFromCode(entity.getStatus()),
+            entity.getCompletedAt() == null ? null : entity.getCompletedAt().toInstant()
         );
     }
 
@@ -62,7 +63,7 @@ public class DefaultSeatingMapper implements SeatingMapper {
             domain.partySizeSnapshot().value(),
             domain.status().code(),
             now,
-            null,
+            domain.completedAt() == null ? null : OffsetDateTime.ofInstant(domain.completedAt(), java.time.ZoneOffset.UTC),
             domain.manualOverrideReasonCode(),
             domain.note(),
             now,

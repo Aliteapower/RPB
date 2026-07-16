@@ -6,6 +6,7 @@ import com.rpb.reservation.queue.application.command.SeatCalledQueueTicketComman
 import com.rpb.reservation.queue.application.service.SeatingFromCalledQueueApplicationService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -89,7 +90,7 @@ public class SeatingFromCalledQueueController {
     }
 
     private static SeatCalledQueueTicketRequest nonNull(SeatCalledQueueTicketRequest request) {
-        return request == null ? new SeatCalledQueueTicketRequest(null, null, null, null, null) : request;
+        return request == null ? new SeatCalledQueueTicketRequest(null, null, List.of(), null, null, null) : request;
     }
 
     private static boolean hasAllowedRole(CurrentActor actor) {

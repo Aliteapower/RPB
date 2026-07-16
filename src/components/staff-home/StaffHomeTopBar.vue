@@ -1,25 +1,43 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import StoreSwitcher from '../store/StoreSwitcher.vue'
+
+const props = defineProps<{
   appStatusLabel: string
+  businessDate?: string | null
   currentTimeText: string
   storeLabel: string
 }>()
+
+const { t } = useI18n()
+const displayAppStatus = computed(() => {
+  const status = props.appStatusLabel.trim()
+  return status === t('staffHome.appStatus.available') ? '' : status
+})
 </script>
 
 <template>
-  <header class="staff-topbar" aria-label="员工工作台顶部栏">
+  <header class="staff-topbar" :aria-label="t('staffHome.topbar.aria')">
     <div class="brand-block">
-      <span class="brand-mark" aria-hidden="true">食</span>
+      <span class="brand-mark" aria-hidden="true">{{ t('staffHome.topbar.brandMark') }}</span>
       <div>
-        <p class="brand-kicker">门店员工</p>
-        <h1>食刻 · 管理</h1>
+        <p class="brand-kicker">{{ t('staffHome.topbar.kicker') }}</p>
+        <h1>{{ t('staffHome.topbar.title') }}</h1>
       </div>
     </div>
 
-    <div class="topbar-meta" aria-label="当前门店和应用状态">
-      <span class="time-pill">{{ currentTimeText }}</span>
-      <span class="store-pill">{{ storeLabel }}</span>
-      <span class="app-pill">{{ appStatusLabel }}</span>
+    <div class="topbar-meta" :aria-label="t('staffHome.topbar.metaAria')">
+      <div class="topbar-row topbar-row--time">
+        <span class="time-pill">{{ currentTimeText }}</span>
+        <slot name="utility" />
+      </div>
+      <div class="topbar-row topbar-row--store">
+        <StoreSwitcher :fallback-label="storeLabel" surface="staff" />
+        <span v-if="displayAppStatus" class="app-pill">{{ displayAppStatus }}</span>
+        <slot name="action" />
+      </div>
     </div>
   </header>
 </template>
@@ -81,16 +99,23 @@ h1 {
 }
 
 .topbar-meta {
-  align-items: center;
+  align-items: flex-end;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 5px;
   min-width: 0;
 }
 
+.topbar-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+  width: 100%;
+}
+
 .time-pill,
-.store-pill,
 .app-pill {
   border-radius: 999px;
   font-size: 0.74rem;
@@ -98,7 +123,7 @@ h1 {
   line-height: 1;
   max-width: 120px;
   overflow: hidden;
-  padding: 7px 9px;
+  padding: 6px 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -108,19 +133,35 @@ h1 {
   color: #64748b;
 }
 
-.store-pill {
-  background: #eef2ff;
-  color: #4338ca;
-}
-
 .app-pill {
   background: #ffedd5;
   color: #c2410c;
 }
 
+:slotted(button) {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #c2410c;
+  font-size: 0.74rem;
+  font-weight: 900;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+:slotted(button:disabled) {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
 @media (max-width: 420px) {
-  .store-pill {
-    max-width: 86px;
+  .staff-topbar {
+    gap: 8px;
+  }
+
+  .topbar-row {
+    gap: 5px;
   }
 
   .app-pill {

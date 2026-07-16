@@ -26,6 +26,21 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void reservationCancelPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.RESERVATION_CANCEL).isEqualTo("reservation.cancel");
+    }
+
+    @Test
+    void reservationNoShowPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.RESERVATION_NO_SHOW).isEqualTo("reservation.no_show");
+    }
+
+    @Test
+    void reservationCompletePermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.RESERVATION_COMPLETE).isEqualTo("reservation.complete");
+    }
+
+    @Test
     void queueCallPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.QUEUE_CALL).isEqualTo("queue.call");
     }
@@ -46,8 +61,38 @@ class AppGateRequiredPermissionTest {
     }
 
     @Test
+    void queueCancelPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.QUEUE_CANCEL).isEqualTo("queue.cancel");
+    }
+
+    @Test
     void queueViewPermissionKeyIsStable() {
         assertThat(AppGateRequiredPermission.QUEUE_VIEW).isEqualTo("queue.view");
+    }
+
+    @Test
+    void queueDisplayViewPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.QUEUE_DISPLAY_VIEW).isEqualTo("queue.display.view");
+    }
+
+    @Test
+    void tableViewPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.TABLE_VIEW).isEqualTo("table.view");
+    }
+
+    @Test
+    void tableSwitchPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.TABLE_SWITCH).isEqualTo("table.switch");
+    }
+
+    @Test
+    void customerLookupPermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.CUSTOMER_LOOKUP).isEqualTo("customer.lookup");
+    }
+
+    @Test
+    void walkInQueueCreatePermissionKeyIsStable() {
+        assertThat(AppGateRequiredPermission.WALKIN_QUEUE_CREATE).isEqualTo("walkin.queue.create");
     }
 
     @Test
@@ -55,6 +100,7 @@ class AppGateRequiredPermissionTest {
         assertThat(AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS)
             .containsExactlyInAnyOrder(
                 AppGateRequiredPermission.WALKIN_DIRECT_SEATING_CREATE,
+                AppGateRequiredPermission.WALKIN_QUEUE_CREATE,
                 AppGateRequiredPermission.CLEANING_START,
                 AppGateRequiredPermission.CLEANING_COMPLETE,
                 AppGateRequiredPermission.RESERVATION_CREATE,
@@ -62,11 +108,19 @@ class AppGateRequiredPermissionTest {
                 AppGateRequiredPermission.RESERVATION_SEAT,
                 AppGateRequiredPermission.RESERVATION_TODAY_VIEW,
                 AppGateRequiredPermission.RESERVATION_QUEUE,
+                AppGateRequiredPermission.RESERVATION_CANCEL,
+                AppGateRequiredPermission.RESERVATION_NO_SHOW,
+                AppGateRequiredPermission.RESERVATION_COMPLETE,
                 AppGateRequiredPermission.QUEUE_CALL,
                 AppGateRequiredPermission.QUEUE_SEAT,
                 AppGateRequiredPermission.QUEUE_SKIP,
                 AppGateRequiredPermission.QUEUE_REJOIN,
-                AppGateRequiredPermission.QUEUE_VIEW
+                AppGateRequiredPermission.QUEUE_CANCEL,
+                AppGateRequiredPermission.QUEUE_VIEW,
+                AppGateRequiredPermission.QUEUE_DISPLAY_VIEW,
+                AppGateRequiredPermission.TABLE_VIEW,
+                AppGateRequiredPermission.TABLE_SWITCH,
+                AppGateRequiredPermission.CUSTOMER_LOOKUP
             );
     }
 }

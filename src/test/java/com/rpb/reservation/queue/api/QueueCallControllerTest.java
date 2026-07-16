@@ -52,6 +52,13 @@ class QueueCallControllerTest {
         "src/main/java/com/rpb/reservation/queue/api/QueueCallApiErrorResponse.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueCallApiMapper.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueCallController.java",
+        "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketRequest.java",
+        "src/main/java/com/rpb/reservation/queue/api/CancelQueueTicketResponse.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorCode.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorMapper.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiErrorResponse.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueCancelApiMapper.java",
+        "src/main/java/com/rpb/reservation/queue/api/QueueCancelController.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorCode.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorMapper.java",
         "src/main/java/com/rpb/reservation/queue/api/QueueTicketListApiErrorResponse.java",
@@ -229,14 +236,13 @@ class QueueCallControllerTest {
                     && Set.of(
                         "src/pages/QueueSkipPage.vue",
                         "src/pages/QueueRejoinPage.vue",
-                        "src/pages/QueueDisplayPage.vue",
                         "src/pages/QueueWorkbenchPage.vue"
                     ).contains(path));
         }
 
         try (var paths = Files.walk(Path.of("src", "main", "resources", "db", "migration"))) {
             assertThat(paths.filter(Files::isRegularFile).map(path -> path.getFileName().toString()).toList())
-                .noneMatch(path -> path.startsWith("V003"));
+                .noneMatch(path -> path.startsWith("V003") && !"V003__auth_minimal_login.sql".equals(path));
         }
     }
 
