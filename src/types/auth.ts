@@ -28,6 +28,11 @@ export interface AuthUser {
   permissions: string[]
 }
 
+export interface AuthLoginSession {
+  user: AuthUser
+  entryStoreId: string | null
+}
+
 export interface AuthStoreAccess {
   tenantId: string
   tenantCode: string
@@ -62,6 +67,7 @@ export interface LoginRequest {
 export interface AuthLoginResponse {
   success: true
   user: AuthUser
+  entryStoreId: string | null
   expiresAt: string
 }
 

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 
 import { AuthApiError, fetchCurrentStores, fetchCurrentUser, login, logout } from '../api/authApi'
-import type { AuthStoreAccess, AuthUser, LoginRequest } from '../types/auth'
+import type { AuthLoginSession, AuthStoreAccess, AuthUser, LoginRequest } from '../types/auth'
 
 const missingStoreScopeRoute = '/login?storeScope=missing'
 
@@ -85,13 +85,16 @@ export const useAuthSessionStore = defineStore('authSession', {
 
       return this.authorizedStores
     },
-    async loginWithPassword(request: LoginRequest): Promise<AuthUser> {
+    async loginWithPassword(request: LoginRequest): Promise<AuthLoginSession> {
       const response = await login(request)
       this.user = response.user
       this.loaded = true
       this.authorizedStores = []
       this.storesLoaded = false
-      return response.user
+      return {
+        user: response.user,
+        entryStoreId: response.entryStoreId
+      }
     },
     async logoutCurrentUser(): Promise<void> {
       try {

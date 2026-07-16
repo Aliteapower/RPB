@@ -172,11 +172,7 @@ export const enSG = {
     },
     store: {
       authorized: 'Authorised stores',
-      authorizedDescription: 'After sign-in, you enter by store access and can switch when multiple stores are granted.',
-      selectionAria: 'Choose authorised store',
-      select: 'Choose store',
-      enter: 'Enter store',
-      switch: 'Switch store'
+      authorizedDescription: 'After sign-in, you enter the current domain store or your account default and can switch in the workbench.'
     },
     errors: {
       captchaLoadFailed: 'Slider captcha failed to load.',

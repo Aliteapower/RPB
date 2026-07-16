@@ -92,7 +92,7 @@ class AuthLoginUiValidationTest {
     }
 
     @Test
-    void loginPageSeparatesPlatformTenantAndStaffEntrancesWithFutureStoreSelection() throws Exception {
+    void loginPageSeparatesEntrancesAndRoutesTenantUsersDirectlyToAStore() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
         Path authTypePath = Path.of("src", "types", "auth.ts");
         Path hostContextPath = Path.of("src", "utils", "hostContext.ts");
@@ -113,11 +113,10 @@ class AuthLoginUiValidationTest {
             .contains("loginUsername: '1000'")
             .contains("20000000")
             .contains("1000")
-            .contains("pendingStoreSelection")
-            .contains("selectedStoreId")
+            .contains("entryStoreId")
+            .contains("preferredLoginStoreId")
+            .contains("tenantAdminStoreRoute")
             .contains("login.store.authorized")
-            .contains("login.store.switch")
-            .contains("selectStoreAndContinue")
             .contains("loginPayloadUsername")
             .contains("export type AuthLoginEntry = 'platform_admin' | 'tenant_admin' | 'staff'")
             .contains("loginEntry?: AuthLoginEntry")
@@ -131,22 +130,32 @@ class AuthLoginUiValidationTest {
             .contains("rememberAccount")
             .contains("rememberAccountStorageKey")
             .contains("login.remember.account")
+            .doesNotContain("pendingStoreSelection")
+            .doesNotContain("selectedStoreId")
+            .doesNotContain("selectStoreAndContinue")
+            .doesNotContain("login.store.switch")
             .doesNotContain("presetPassword: '393930'")
             .doesNotContain("password = ref('393930')");
     }
 
     @Test
-    void staffLoginStoreSelectionLoadsStoreNamesInsteadOfShowingRawStoreIds() throws Exception {
+    void tenantLoginPrefersAuthorizedEntryStoreThenAccountDefaultThenFirstStore() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
-        String pageSource = FrontendSourceSupport.readString(pagePath);
+        Path storePath = Path.of("src", "stores", "authSession.ts");
+        Path authTypePath = Path.of("src", "types", "auth.ts");
+        String source = FrontendSourceSupport.readString(pagePath)
+            + FrontendSourceSupport.readString(storePath)
+            + FrontendSourceSupport.readString(authTypePath);
 
-        assertThat(pageSource)
-            .contains("AuthStoreAccess")
-            .contains("authorizedStoreOptions")
-            .contains("await auth.ensureAuthorizedStores(true)")
-            .contains("storeOptionLabel(store)")
-            .contains("<option v-for=\"store in authorizedStoreOptions\"")
-            .doesNotContain("<option v-for=\"storeId in authorizedStoreIds\"");
+        assertThat(source)
+            .contains("entryStoreId: string | null")
+            .contains("user.storeIds.includes(entryStoreId)")
+            .contains("user.defaultStoreId && user.storeIds.includes(user.defaultStoreId)")
+            .contains("user.storeIds[0] ?? ''")
+            .contains("`/stores/${storeId}/staff`")
+            .contains("`/stores/${storeId}/admin/profile`")
+            .doesNotContain("<option v-for=\"store in authorizedStoreOptions\"")
+            .doesNotContain("login.store.enter");
     }
 
     @Test

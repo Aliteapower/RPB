@@ -172,11 +172,7 @@ export const zhCN = {
     },
     store: {
       authorized: '授权店面',
-      authorizedDescription: '登录后按授权进入，可在多店权限下切换店面',
-      selectionAria: '选择授权店面',
-      select: '选择店面',
-      enter: '进入店面',
-      switch: '切换店面'
+      authorizedDescription: '登录后直接进入当前域名或账号默认店面，可在工作台切换店面'
     },
     errors: {
       captchaLoadFailed: '滑块校验加载失败',

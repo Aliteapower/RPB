@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { AuthApiError, createSliderCaptcha } from '../api/authApi'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuthSessionStore } from '../stores/authSession'
-import type { AuthLoginEntry, AuthStoreAccess, AuthUser, SliderCaptchaChallenge } from '../types/auth'
+import type { AuthLoginEntry, AuthUser, SliderCaptchaChallenge } from '../types/auth'
 import { resolveLoginHostContext } from '../utils/hostContext'
 
 type LoginEntryId = 'platform-admin' | 'tenant-admin' | 'tenant-staff'
@@ -86,8 +86,6 @@ const loadingCaptcha = ref(false)
 const submitting = ref(false)
 const draggingSlider = ref(false)
 const errorText = ref('')
-const pendingStoreSelection = ref(false)
-const selectedStoreId = ref('')
 const rememberAccount = ref(false)
 let sliderResizeObserver: ResizeObserver | null = null
 let activeSliderPointerId: number | null = null
@@ -119,15 +117,6 @@ const tenantCodeFieldVisible = computed(() => selectedEntry.value.id !== 'platfo
 const loginPayloadUsername = computed(() =>
   isStaffEntry.value ? employeeUsername.value.trim() : username.value.trim()
 )
-const authorizedStoreOptions = computed<AuthStoreAccess[]>(() => {
-  const user = auth.user
-  if (!user) {
-    return []
-  }
-  const storesById = new Map(auth.authorizedStores.map(store => [store.storeId, store]))
-  return user.storeIds.map(storeId => storesById.get(storeId) ?? fallbackStoreAccess(storeId, user))
-})
-const canChooseStore = computed(() => pendingStoreSelection.value && authorizedStoreOptions.value.length > 0)
 
 const sliderMax = computed(() => {
   if (!captcha.value) {
@@ -165,8 +154,6 @@ function selectEntry(entry: LoginEntry): void {
   employeeUsername.value = defaultEmployeeUsername(entry)
   tenantCode.value = hostContext.kind === 'tenant' ? hostContext.tenantCode : (entry.tenantCode ?? '')
   password.value = ''
-  pendingStoreSelection.value = false
-  selectedStoreId.value = ''
   errorText.value = ''
   applyRememberedAccount(entry)
 }
@@ -300,10 +287,9 @@ async function submitLogin(): Promise<void> {
 
   submitting.value = true
   errorText.value = ''
-  pendingStoreSelection.value = false
 
   try {
-    const user = await auth.loginWithPassword({
+    const loginSession = await auth.loginWithPassword({
       username: loginPayloadUsername.value,
       password: password.value,
       captchaId: captcha.value.challengeId,
@@ -312,7 +298,7 @@ async function submitLogin(): Promise<void> {
       tenantCode: selectedEntry.value.id === 'platform-admin' ? null : (resolvedTenantCode.value || null)
     })
     persistRememberedAccount()
-    await continueAfterLogin(user)
+    await continueAfterLogin(loginSession.user, loginSession.entryStoreId)
   } catch (error) {
     errorText.value = loginErrorText(error)
     await refreshSlider()
@@ -321,7 +307,7 @@ async function submitLogin(): Promise<void> {
   }
 }
 
-async function continueAfterLogin(user: AuthUser): Promise<void> {
+async function continueAfterLogin(user: AuthUser, entryStoreId: string | null): Promise<void> {
   if (typeof route.query.redirect === 'string') {
     await router.replace(route.query.redirect)
     return
@@ -337,20 +323,14 @@ async function continueAfterLogin(user: AuthUser): Promise<void> {
     return
   }
 
+  const storeId = preferredLoginStoreId(user, entryStoreId)
   if (selectedEntry.value.id === 'tenant-admin' && auth.isTenantAdmin) {
-    await router.replace(auth.tenantAdminHomeRoute)
+    await router.replace(tenantAdminStoreRoute(storeId))
     return
   }
 
-  if (isStaffEntry.value && user.storeIds.length > 1) {
-    await auth.ensureAuthorizedStores(true)
-    selectedStoreId.value = preferredStoreId(user, authorizedStoreOptions.value.map(store => store.storeId))
-    pendingStoreSelection.value = true
-    return
-  }
-
-  if (isStaffEntry.value && user.storeIds.length === 1) {
-    await router.replace(storeRoute(user.storeIds[0]))
+  if (isStaffEntry.value) {
+    await router.replace(storeRoute(storeId))
     return
   }
 
@@ -358,57 +338,26 @@ async function continueAfterLogin(user: AuthUser): Promise<void> {
 }
 
 async function stopMissingStoreScopeLogin(): Promise<void> {
-  pendingStoreSelection.value = false
-  selectedStoreId.value = ''
   await auth.logoutCurrentUser()
   await refreshSlider()
   errorText.value = missingStoreScopeText.value
 }
 
-async function selectStoreAndContinue(): Promise<void> {
-  if (!selectedStoreId.value) {
-    return
+function preferredLoginStoreId(user: AuthUser, entryStoreId: string | null): string {
+  if (entryStoreId && user.storeIds.includes(entryStoreId)) {
+    return entryStoreId
   }
-  await router.replace(storeRoute(selectedStoreId.value))
+  return user.defaultStoreId && user.storeIds.includes(user.defaultStoreId)
+    ? user.defaultStoreId
+    : (user.storeIds[0] ?? '')
 }
 
 function storeRoute(storeId: string): string {
   return `/stores/${storeId}/staff`
 }
 
-function preferredStoreId(user: AuthUser, storeIds: string[]): string {
-  return user.defaultStoreId && storeIds.includes(user.defaultStoreId)
-    ? user.defaultStoreId
-    : (storeIds[0] ?? '')
-}
-
-function storeOptionLabel(store: AuthStoreAccess): string {
-  const storeName = store.storeName || fallbackStoreLabel(store.storeId)
-  const baseLabel = store.storeCode && store.storeCode !== storeName
-    ? `${storeName} (${store.storeCode})`
-    : storeName
-  return store.operatingEntityName ? `${baseLabel} / ${store.operatingEntityName}` : baseLabel
-}
-
-function fallbackStoreAccess(storeId: string, user: AuthUser): AuthStoreAccess {
-  return {
-    tenantId: user.tenantId || '',
-    tenantCode: '',
-    operatingEntityId: null,
-    operatingEntityName: null,
-    storeId,
-    storeCode: '',
-    storeName: fallbackStoreLabel(storeId),
-    shareDisplayName: null,
-    tenantLogoMediaUrl: null,
-    status: 'active',
-    locale: '',
-    defaultStore: storeId === user.defaultStoreId
-  }
-}
-
-function fallbackStoreLabel(storeId: string): string {
-  return t('staffHome.store.label', { shortId: storeId.slice(0, 8) })
+function tenantAdminStoreRoute(storeId: string): string {
+  return `/stores/${storeId}/admin/profile`
 }
 
 function initialLoginEntryId(): LoginEntryId {
@@ -622,20 +571,6 @@ function loginErrorText(error: unknown): string {
           {{ submitting ? t('common.actions.loggingIn') : t('common.actions.login') }}
         </button>
       </form>
-
-      <section v-if="canChooseStore" class="store-selection" :aria-label="t('login.store.selectionAria')">
-        <label class="login-field">
-          <span>{{ t('login.store.select') }}</span>
-          <select v-model="selectedStoreId">
-            <option v-for="store in authorizedStoreOptions" :key="store.storeId" :value="store.storeId">
-              {{ storeOptionLabel(store) }}
-            </option>
-          </select>
-        </label>
-        <button class="login-submit" type="button" :aria-label="t('login.store.switch')" @click="selectStoreAndContinue">
-          {{ t('login.store.enter') }}
-        </button>
-      </section>
     </section>
   </main>
 </template>
@@ -740,16 +675,9 @@ function loginErrorText(error: unknown): string {
   font-weight: 800;
 }
 
-.login-form,
-.store-selection {
+.login-form {
   display: grid;
   gap: 16px;
-}
-
-.store-selection {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
 }
 
 .field-grid {
@@ -769,8 +697,7 @@ function loginErrorText(error: unknown): string {
   font-weight: 600;
 }
 
-.login-field input,
-.login-field select {
+.login-field input {
   width: 100%;
   min-height: 44px;
   box-sizing: border-box;
