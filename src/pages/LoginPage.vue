@@ -8,8 +8,8 @@ import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type { AuthLoginEntry, AuthUser, SliderCaptchaChallenge } from '../types/auth'
 import { resolveLoginHostContext } from '../utils/hostContext'
-
-type LoginEntryId = 'platform-admin' | 'tenant-admin' | 'tenant-staff'
+import { resolvePostLoginDestination } from './loginStoreRouting'
+import type { LoginEntryId } from './loginStoreRouting'
 
 interface LoginEntry {
   id: LoginEntryId
@@ -308,32 +308,23 @@ async function submitLogin(): Promise<void> {
 }
 
 async function continueAfterLogin(user: AuthUser, entryStoreId: string | null): Promise<void> {
-  if (typeof route.query.redirect === 'string') {
-    await router.replace(route.query.redirect)
-    return
-  }
-
-  if (selectedEntry.value.id === 'platform-admin' && user.roles.includes('platform_admin')) {
-    await router.replace(auth.platformHomeRoute)
-    return
-  }
-
-  if (!auth.isPlatformAdmin && user.storeIds.length === 0) {
+  const destination = resolvePostLoginDestination({
+    redirect: typeof route.query.redirect === 'string' ? route.query.redirect : undefined,
+    entryId: selectedEntry.value.id,
+    user,
+    entryStoreId,
+    isPlatformAdmin: auth.isPlatformAdmin,
+    isTenantAdmin: auth.isTenantAdmin,
+    platformHomeRoute: auth.platformHomeRoute
+  })
+  if (destination.kind === 'missing-store') {
     await stopMissingStoreScopeLogin()
     return
   }
-
-  const storeId = preferredLoginStoreId(user, entryStoreId)
-  if (selectedEntry.value.id === 'tenant-admin' && auth.isTenantAdmin) {
-    await router.replace(tenantAdminStoreRoute(storeId))
+  if (destination.kind === 'route') {
+    await router.replace(destination.path)
     return
   }
-
-  if (isStaffEntry.value) {
-    await router.replace(storeRoute(storeId))
-    return
-  }
-
   await router.replace(auth.defaultHomeRoute)
 }
 
@@ -341,23 +332,6 @@ async function stopMissingStoreScopeLogin(): Promise<void> {
   await auth.logoutCurrentUser()
   await refreshSlider()
   errorText.value = missingStoreScopeText.value
-}
-
-function preferredLoginStoreId(user: AuthUser, entryStoreId: string | null): string {
-  if (entryStoreId && user.storeIds.includes(entryStoreId)) {
-    return entryStoreId
-  }
-  return user.defaultStoreId && user.storeIds.includes(user.defaultStoreId)
-    ? user.defaultStoreId
-    : (user.storeIds[0] ?? '')
-}
-
-function storeRoute(storeId: string): string {
-  return `/stores/${storeId}/staff`
-}
-
-function tenantAdminStoreRoute(storeId: string): string {
-  return `/stores/${storeId}/admin/profile`
 }
 
 function initialLoginEntryId(): LoginEntryId {

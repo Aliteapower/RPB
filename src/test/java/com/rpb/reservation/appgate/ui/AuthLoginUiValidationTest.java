@@ -62,8 +62,11 @@ class AuthLoginUiValidationTest {
     @Test
     void loginStopsMissingStoreScopeInsteadOfRoutingToValidationStore() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        Path routingPath = Path.of("src", "pages", "loginStoreRouting.ts");
         Path storePath = Path.of("src", "stores", "authSession.ts");
-        String source = FrontendSourceSupport.readString(pagePath) + FrontendSourceSupport.readString(storePath);
+        String source = FrontendSourceSupport.readString(pagePath)
+            + FrontendSourceSupport.readString(routingPath)
+            + FrontendSourceSupport.readString(storePath);
 
         assertThat(source)
             .contains("missingStoreScopeText")
@@ -94,10 +97,12 @@ class AuthLoginUiValidationTest {
     @Test
     void loginPageSeparatesEntrancesAndRoutesTenantUsersDirectlyToAStore() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        Path routingPath = Path.of("src", "pages", "loginStoreRouting.ts");
         Path authTypePath = Path.of("src", "types", "auth.ts");
         Path hostContextPath = Path.of("src", "utils", "hostContext.ts");
         String pageSource = FrontendSourceSupport.readString(pagePath);
         String source = pageSource
+            + FrontendSourceSupport.readString(routingPath)
             + FrontendSourceSupport.readString(authTypePath)
             + FrontendSourceSupport.readString(hostContextPath);
 
@@ -130,6 +135,8 @@ class AuthLoginUiValidationTest {
             .contains("rememberAccount")
             .contains("rememberAccountStorageKey")
             .contains("login.remember.account")
+            .contains("destination.kind === 'missing-store'")
+            .contains("await stopMissingStoreScopeLogin()")
             .doesNotContain("pendingStoreSelection")
             .doesNotContain("selectedStoreId")
             .doesNotContain("selectStoreAndContinue")
@@ -141,9 +148,11 @@ class AuthLoginUiValidationTest {
     @Test
     void tenantLoginPrefersAuthorizedEntryStoreThenAccountDefaultThenFirstStore() throws Exception {
         Path pagePath = Path.of("src", "pages", "LoginPage.vue");
+        Path routingPath = Path.of("src", "pages", "loginStoreRouting.ts");
         Path storePath = Path.of("src", "stores", "authSession.ts");
         Path authTypePath = Path.of("src", "types", "auth.ts");
         String source = FrontendSourceSupport.readString(pagePath)
+            + FrontendSourceSupport.readString(routingPath)
             + FrontendSourceSupport.readString(storePath)
             + FrontendSourceSupport.readString(authTypePath);
 

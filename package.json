@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "test:login-routing": "node --experimental-strip-types --test frontend-tests/loginStoreRouting.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
