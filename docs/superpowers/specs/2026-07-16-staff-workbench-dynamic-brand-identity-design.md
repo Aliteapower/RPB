@@ -29,7 +29,7 @@ The required source data already exists:
 - `stores.display_name` stores the backend store name;
 - `tenants.logo_media_asset_id` stores the shared tenant logo;
 - `GET /api/v1/me/stores` already returns the current account's authorized store read models and is cached by the frontend auth session store;
-- `CallScreenMediaService.tenantLogoMediaUrl` already creates the tenant logo media URL, and the corresponding GET media route is readable by the browser.
+- `CallScreenMediaService` already validates and reads the configured tenant-logo asset. The existing platform media route is platform-admin-only, so staff delivery requires an authenticated, authorized-store-scoped read route.
 
 The existing tenant-admin profile and sharing-profile APIs are intentionally protected by `tenant.admin.manage`; regular store employees must not depend on or gain access to those management contracts.
 
@@ -80,7 +80,9 @@ Each item in `GET /api/v1/me/stores` adds:
 - `shareDisplayName: string | null`;
 - `tenantLogoMediaUrl: string | null`.
 
-The API response mapper converts `tenantLogoMediaAssetId` to a URL with `CallScreenMediaService.tenantLogoMediaUrl(tenantId, assetId)`. Keeping the asset ID in the application model and URL construction in the API layer prevents HTTP concerns from leaking into persistence or application logic.
+The API response mapper converts `tenantLogoMediaAssetId` to the current-account URL `/api/v1/me/stores/{storeId}/logo/media/{assetId}`. The read route authenticates the session, requires `storeId` to be in the account's active authorized-store catalog, verifies that `assetId` is the store tenant's current logo, and only then delegates media-byte loading to `CallScreenMediaService`.
+
+The media endpoint does not require `tenant.admin.manage` or `queue.display.view`, because the same shared top bar is used across employee apps. It does not expose upload, delete, or other management operations.
 
 The additions are backward-compatible JSON fields. Existing authentication, roles, permissions, session behavior, and store-access filtering remain unchanged.
 
@@ -151,11 +153,11 @@ The hard-coded product-specific `食刻 · 管理` / `Shike Ops` values are no l
 
 ## API, Database, and Security Impact
 
-- API: additive fields on `GET /api/v1/me/stores`.
+- API: additive fields on `GET /api/v1/me/stores` and an authenticated read-only `GET /api/v1/me/stores/{storeId}/logo/media/{assetId}` route.
 - Database: no schema or migration changes.
 - Security: no permission expansion; only authorized store rows are enriched.
 - Tenant isolation: enforced by the existing account, tenant, access, and store predicates.
-- Media: reuse the existing tenant-logo media URL and ownership validation; no new upload or mutation route.
+- Media: reuse the existing tenant-logo ownership and active-asset validation behind a staff-safe authorized-store route; no new upload or mutation route.
 - Privacy: display name and tenant logo are non-customer brand metadata already used by the product's public and administrative surfaces.
 
 ## TDD and Verification Strategy
@@ -165,7 +167,8 @@ The hard-coded product-specific `食刻 · 管理` / `Shike Ops` values are no l
 1. Add a failing API/integration assertion that an authorized store includes its configured sharing display name and tenant logo media URL.
 2. Add a missing-value assertion returning JSON nulls without changing store access.
 3. Preserve or extend store-access isolation assertions so unauthorized and cross-tenant stores are absent.
-4. Implement the minimal repository, application record, and API mapper changes.
+4. Add an authorized media-read success assertion and an unauthorized cross-tenant media-read rejection assertion.
+5. Implement the minimal repository, application record, API mapper, and read-route changes.
 
 ### Frontend
 
@@ -192,6 +195,8 @@ If authenticated local browser validation starts the backend, it must use the Po
 - Modify `src/main/java/com/rpb/reservation/auth/application/AuthStoreAccess.java`.
 - Modify `src/main/java/com/rpb/reservation/auth/persistence/AuthRepository.java`.
 - Modify `src/main/java/com/rpb/reservation/auth/api/AuthStoreAccessResponse.java`.
+- Modify `src/main/java/com/rpb/reservation/auth/api/AuthController.java` and `AuthApiErrorCode.java` for the staff-safe logo media route.
+- Modify `src/main/java/com/rpb/reservation/auth/application/AuthApplicationService.java` for authorized-store/logo-asset validation.
 - Modify `src/types/auth.ts`.
 - Add a brand identity resolver and presentation component under `src/components/staff-home`.
 - Modify `src/components/staff-home/StaffHomeTopBar.vue`.
@@ -214,4 +219,4 @@ If authenticated local browser validation starts the backend, it must use the Po
 
 ## Rollback
 
-Remove the two additive authorized-store response fields, restore the fixed top-bar brand rendering, remove the shared brand resolver/presentation component, and remove the `storeId` top-bar prop wiring. No data, migration, permission, or media rollback is required.
+Remove the two additive authorized-store response fields and staff Logo read route, restore the fixed top-bar brand rendering, remove the shared brand resolver/presentation component, and remove the `storeId` top-bar prop wiring. No data, migration, permission, or stored-media rollback is required.

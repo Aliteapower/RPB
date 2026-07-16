@@ -4,7 +4,9 @@
 
 **Goal:** Show each authorized store's configured sharing display name and its tenant logo in every tenant employee workbench top bar, replacing the fixed `食刻 · 管理` identity.
 
-**Architecture:** Enrich the existing authenticated authorized-store read model instead of exposing tenant-admin management APIs or adding a second brand request. Keep the media asset UUID in the Java application model and construct the existing tenant-logo media URL in the API mapper. On the frontend, resolve brand fallback rules in one pure module, render them in one focused component, and let `StaffHomeTopBar` compose the current authorized store by an explicit `storeId` prop.
+**Architecture:** Enrich the existing authenticated authorized-store read model instead of exposing tenant-admin management APIs or adding a second brand-metadata request. Keep the media asset UUID in the Java application model and construct an authenticated authorized-store Logo URL in the API mapper. On the frontend, resolve brand fallback rules in one pure module, render them in one focused component, and let `StaffHomeTopBar` compose the current authorized store by an explicit `storeId` prop.
+
+> Implementation review correction: the initially referenced platform tenant-logo URL requires a platform-admin actor. The completed implementation therefore serves the same validated asset through `GET /api/v1/me/stores/{storeId}/logo/media/{assetId}`, which authenticates the current session and rejects stores outside the account's authorized catalog before loading media bytes. No management or queue-display permission is added.
 
 **Tech Stack:** Java 21, Spring Boot, Spring MVC, JdbcTemplate, PostgreSQL, JUnit 5, MockMvc, AssertJ, Vue 3 Composition API, TypeScript, Pinia, Vue I18n, scoped CSS, Maven, Vite.
 
