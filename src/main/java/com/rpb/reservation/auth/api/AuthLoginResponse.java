@@ -5,6 +5,7 @@ import java.time.Instant;
 public record AuthLoginResponse(
     boolean success,
     AuthUserResponse user,
+    String entryStoreId,
     Instant expiresAt
 ) {
 }

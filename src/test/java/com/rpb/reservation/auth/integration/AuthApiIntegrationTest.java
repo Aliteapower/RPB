@@ -4,6 +4,7 @@ import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALI
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -380,7 +381,8 @@ class AuthApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.user.username").value("1000"))
-            .andExpect(jsonPath("$.user.roles[0]").value("store_staff"));
+            .andExpect(jsonPath("$.user.roles[0]").value("store_staff"))
+            .andExpect(jsonPath("$.entryStoreId").value(nullValue()));
 
         login("lsc106.booking.yumstone.sg", null, "staff", "20000000", "1000", "393930")
             .andExpect(status().isUnauthorized())
@@ -407,7 +409,9 @@ class AuthApiIntegrationTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.user.username").value("20000000"))
             .andExpect(jsonPath("$.user.roles[0]").value("tenant_admin"))
-            .andExpect(jsonPath("$.user.storeIds").value(hasItem(AUTH_SECONDARY_STORE_ID.toString())));
+            .andExpect(jsonPath("$.user.storeIds").value(hasItem(AUTH_SECONDARY_STORE_ID.toString())))
+            .andExpect(jsonPath("$.user.defaultStoreId").value(VALIDATION_STORE_ID.toString()))
+            .andExpect(jsonPath("$.entryStoreId").value(AUTH_SECONDARY_STORE_ID.toString()));
     }
 
     @Test

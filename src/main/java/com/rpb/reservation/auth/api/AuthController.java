@@ -61,7 +61,12 @@ public class AuthController {
             userAgent(httpRequest)
         );
         cookieService.writeSessionCookie(response, result.sessionToken(), result.expiresAt());
-        return new AuthLoginResponse(true, AuthUserResponse.from(result.principal()), result.expiresAt());
+        return new AuthLoginResponse(
+            true,
+            AuthUserResponse.from(result.principal()),
+            result.entryStoreId() == null ? null : result.entryStoreId().toString(),
+            result.expiresAt()
+        );
     }
 
     @GetMapping("/api/v1/auth/me")

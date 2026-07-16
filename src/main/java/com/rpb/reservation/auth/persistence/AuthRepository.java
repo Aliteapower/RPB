@@ -135,7 +135,7 @@ public class AuthRepository {
         ).stream().findFirst();
     }
 
-    public Optional<AuthAccountRecord> findActiveTenantAccountByLoginCodeAndUsername(
+    public Optional<AuthLoginAccountRecord> findActiveTenantAccountByLoginCodeAndUsername(
         String loginCode,
         String actorType,
         String username
@@ -173,7 +173,8 @@ public class AuthRepository {
                   )
             )
             select account.id, account.tenant_id, account.username, account.display_name,
-                   account.actor_type, account.status, account.password_hash, account.default_store_id
+                   account.actor_type, account.status, account.password_hash, account.default_store_id,
+                   login_context.default_store_id as entry_store_id
             from auth_accounts account
             join resolved_login_context login_context on login_context.tenant_id = account.tenant_id
             where lower(account.username) = lower(?)
@@ -233,7 +234,7 @@ public class AuthRepository {
               )
             order by account.created_at, account.id
             """,
-            (rs, rowNum) -> account(rs),
+            (rs, rowNum) -> loginAccount(rs),
             loginCode,
             loginCode,
             username,
@@ -479,6 +480,13 @@ public class AuthRepository {
         );
     }
 
+    private static AuthLoginAccountRecord loginAccount(ResultSet rs) throws SQLException {
+        return new AuthLoginAccountRecord(
+            account(rs),
+            rs.getObject("entry_store_id", UUID.class)
+        );
+    }
+
     private static AuthAccountRecord accountFromSession(ResultSet rs) throws SQLException {
         return new AuthAccountRecord(
             rs.getObject("account_id", UUID.class),
@@ -519,6 +527,12 @@ public class AuthRepository {
         String status,
         String passwordHash,
         UUID defaultStoreId
+    ) {
+    }
+
+    public record AuthLoginAccountRecord(
+        AuthAccountRecord account,
+        UUID entryStoreId
     ) {
     }
 

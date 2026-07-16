@@ -6,6 +6,7 @@ import com.rpb.reservation.auth.api.LoginRequest;
 import com.rpb.reservation.auth.api.SliderCaptchaResponse;
 import com.rpb.reservation.auth.persistence.AuthRepository;
 import com.rpb.reservation.auth.persistence.AuthRepository.AuthAccountRecord;
+import com.rpb.reservation.auth.persistence.AuthRepository.AuthLoginAccountRecord;
 import com.rpb.reservation.auth.persistence.AuthRepository.AuthSessionRecord;
 import com.rpb.reservation.auth.persistence.AuthRepository.SliderChallengeRecord;
 import com.rpb.reservation.common.web.HostPrefixContext;
@@ -102,8 +103,9 @@ public class AuthApplicationService {
         verifyPasswordShape(password);
         verifyCaptcha(request.captchaId(), request.captchaX());
 
-        AuthAccountRecord account = resolveLoginAccount(request, hostPrefixContext, username)
+        AuthLoginAccountRecord loginAccount = resolveLoginAccount(request, hostPrefixContext, username)
             .orElseThrow(() -> new AuthApiException(AuthApiErrorCode.INVALID_CREDENTIALS));
+        AuthAccountRecord account = loginAccount.account();
         if (!"active".equals(account.status())) {
             throw new AuthApiException(AuthApiErrorCode.ACCOUNT_DISABLED);
         }
@@ -123,10 +125,15 @@ public class AuthApplicationService {
             remoteAddr,
             userAgent
         );
-        return new AuthLoginResult(repository.principalFor(account), sessionToken, expiresAt);
+        return new AuthLoginResult(
+            repository.principalFor(account),
+            loginAccount.entryStoreId(),
+            sessionToken,
+            expiresAt
+        );
     }
 
-    private Optional<AuthAccountRecord> resolveLoginAccount(
+    private Optional<AuthLoginAccountRecord> resolveLoginAccount(
         LoginRequest request,
         HostPrefixContext hostPrefixContext,
         String username
@@ -139,7 +146,8 @@ public class AuthApplicationService {
             if (requestedEntry != null && !ENTRY_PLATFORM_ADMIN.equals(requestedEntry)) {
                 return Optional.empty();
             }
-            return repository.findActivePlatformAccountByUsername(username);
+            return repository.findActivePlatformAccountByUsername(username)
+                .map(AuthApplicationService::withoutEntryStore);
         }
 
         if (context.isTenant()) {
@@ -154,18 +162,25 @@ public class AuthApplicationService {
         }
 
         if (requestedEntry == null) {
-            return repository.findActiveAccountByUsername(username);
+            return repository.findActiveAccountByUsername(username)
+                .map(AuthApplicationService::withoutEntryStore);
         }
         if (ENTRY_PLATFORM_ADMIN.equals(requestedEntry)) {
-            return repository.findActivePlatformAccountByUsername(username);
+            return repository.findActivePlatformAccountByUsername(username)
+                .map(AuthApplicationService::withoutEntryStore);
         }
         if (ENTRY_TENANT_ADMIN.equals(requestedEntry) || ENTRY_STAFF.equals(requestedEntry)) {
             if (requestedTenantCode == null) {
                 return Optional.empty();
             }
-            return repository.findActiveTenantAccountByLoginCodeAndUsername(requestedTenantCode, requestedEntry, username);
+            return repository.findActiveTenantAccountByLoginCodeAndUsername(requestedTenantCode, requestedEntry, username)
+                .map(loginAccount -> withoutEntryStore(loginAccount.account()));
         }
         return Optional.empty();
+    }
+
+    private static AuthLoginAccountRecord withoutEntryStore(AuthAccountRecord account) {
+        return new AuthLoginAccountRecord(account, null);
     }
 
     @Transactional
