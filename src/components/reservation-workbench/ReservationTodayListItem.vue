@@ -68,6 +68,10 @@ const customerName = computed(() => {
 })
 
 const phoneDisplay = computed(() => optionalDisplay(props.item.phoneMasked))
+const displayNote = computed(() => props.item.note?.trim() ?? '')
+const hasNote = computed(() => !!displayNote.value)
+const isNoteExpanded = ref(false)
+const noteRegionId = computed(() => `reservation-note-${props.item.reservationId}`)
 const timeRange = computed(
   () => `${formatStoreTime(props.item.reservedStartAt)} - ${formatStoreTime(props.item.reservedEndAt)}`
 )
@@ -168,6 +172,22 @@ watch(
     resetShareFeedback()
   }
 )
+
+watch(
+  () => props.item.note,
+  () => {
+    isNoteExpanded.value = false
+  }
+)
+
+function toggleNote(): void {
+  if (!hasNote.value) {
+    isNoteExpanded.value = false
+    return
+  }
+
+  isNoteExpanded.value = !isNoteExpanded.value
+}
 
 function requestCancel(): void {
   emit('cancel-requested', props.item)
@@ -414,6 +434,17 @@ function resourceLabel(type: string | null | undefined): string {
         {{ statusText }}
       </span>
 
+      <button
+        v-if="hasNote"
+        class="reservation-today-list-item__action reservation-today-list-item__action--note"
+        type="button"
+        :aria-expanded="isNoteExpanded"
+        :aria-controls="noteRegionId"
+        @click="toggleNote"
+      >
+        {{ isNoteExpanded ? $t('reservationWorkbench.item.hideNote') : $t('reservationWorkbench.item.hasNote') }}
+      </button>
+
       <ReservationShareCopyPanel
         :share-info="shareInfo"
         :loading="isLoadingShareInfo"
@@ -480,6 +511,16 @@ function resourceLabel(type: string | null | undefined): string {
         {{ isCancelling ? $t('reservationWorkbench.item.cancelling') : $t('common.actions.cancel') }}
       </button>
     </div>
+
+    <section
+      v-if="hasNote && isNoteExpanded"
+      :id="noteRegionId"
+      class="reservation-today-list-item__note"
+      :aria-label="$t('reservationWorkbench.item.noteLabel')"
+    >
+      <strong>{{ $t('reservationWorkbench.item.noteLabel') }}</strong>
+      <p>{{ displayNote }}</p>
+    </section>
   </article>
 </template>
 
@@ -604,6 +645,12 @@ function resourceLabel(type: string | null | undefined): string {
   color: #1d4ed8;
 }
 
+.reservation-today-list-item__action--note {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #c2410c;
+}
+
 .reservation-today-list-item__action--danger {
   background: #ef4444;
   border: 0;
@@ -616,6 +663,33 @@ function resourceLabel(type: string | null | undefined): string {
   border-color: #e2e8f0;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+.reservation-today-list-item__note {
+  background: #fffaf5;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.reservation-today-list-item__note strong {
+  color: #9a3412;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.reservation-today-list-item__note p {
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.55;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 a:focus-visible,
