@@ -4,15 +4,22 @@ import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALI
 import static com.rpb.reservation.auth.integration.AuthPostgresTestDatabase.VALIDATION_TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rpb.reservation.customerauth.application.port.out.CustomerEmailDeliveryPort;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
+import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,6 +37,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -64,6 +73,9 @@ class AuthApiIntegrationTest {
 
     @MockBean
     private CustomerEmailDeliveryPort customerEmailDeliveryPort;
+
+    @MockBean
+    private CallScreenMediaService callScreenMediaService;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -187,23 +199,7 @@ class AuthApiIntegrationTest {
     void currentUserStoresReturnsAuthorizedActiveStoresWithDefaultFlag() throws Exception {
         upsertAuthSecondaryStore();
         grantStoreAccess("1000", AUTH_SECONDARY_STORE_ID);
-        jdbc.update(
-            """
-            insert into call_screen_media_assets (
-                id, owner_scope, tenant_id, media_kind, content_type,
-                byte_size, original_filename, storage_key, status
-            )
-            values (?, 'tenant', ?, 'image', 'image/png',
-                    128, 'auth-brand-logo.png', 'tests/auth-brand-logo.png', 'active')
-            """,
-            AUTH_TENANT_LOGO_ASSET_ID,
-            VALIDATION_TENANT_ID
-        );
-        jdbc.update(
-            "update tenants set logo_media_asset_id = ? where id = ?",
-            AUTH_TENANT_LOGO_ASSET_ID,
-            VALIDATION_TENANT_ID
-        );
+        configureTenantLogo();
         jdbc.update(
             "update stores set share_display_name = '认证分享门店' where id = ? and tenant_id = ?",
             VALIDATION_STORE_ID,
@@ -230,7 +226,7 @@ class AuthApiIntegrationTest {
         assertThat(defaultStore.path("defaultStore").asBoolean()).isTrue();
         assertThat(defaultStore.path("shareDisplayName").asText()).isEqualTo("认证分享门店");
         assertThat(defaultStore.path("tenantLogoMediaUrl").asText()).isEqualTo(
-            "/api/v1/platform/tenants/" + VALIDATION_TENANT_ID + "/logo/media/" + AUTH_TENANT_LOGO_ASSET_ID
+            "/api/v1/me/stores/" + VALIDATION_STORE_ID + "/logo/media/" + AUTH_TENANT_LOGO_ASSET_ID
         );
 
         JsonNode secondaryStore = storeById(stores, AUTH_SECONDARY_STORE_ID);
@@ -241,8 +237,55 @@ class AuthApiIntegrationTest {
         assertThat(secondaryStore.path("defaultStore").asBoolean()).isFalse();
         assertThat(secondaryStore.path("shareDisplayName").isNull()).isTrue();
         assertThat(secondaryStore.path("tenantLogoMediaUrl").asText()).isEqualTo(
-            "/api/v1/platform/tenants/" + VALIDATION_TENANT_ID + "/logo/media/" + AUTH_TENANT_LOGO_ASSET_ID
+            "/api/v1/me/stores/" + AUTH_SECONDARY_STORE_ID + "/logo/media/" + AUTH_TENANT_LOGO_ASSET_ID
         );
+    }
+
+    @Test
+    void currentUserCanReadConfiguredLogoThroughAuthorizedStoreScope() throws Exception {
+        configureTenantLogo();
+        byte[] logoBytes = new byte[] {1, 2, 3};
+        when(callScreenMediaService.readTenantLogoMedia(VALIDATION_TENANT_ID, AUTH_TENANT_LOGO_ASSET_ID))
+            .thenReturn(new CallScreenMediaContent(new ByteArrayResource(logoBytes), "image/png", logoBytes.length));
+
+        MvcResult login = login("1000", "393930")
+            .andExpect(status().isOk())
+            .andReturn();
+        Cookie sessionCookie = login.getResponse().getCookie("RPB_SESSION");
+
+        mockMvc.perform(get(
+                "/api/v1/me/stores/{storeId}/logo/media/{assetId}",
+                VALIDATION_STORE_ID,
+                AUTH_TENANT_LOGO_ASSET_ID
+            ).cookie(sessionCookie))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_PNG))
+            .andExpect(content().bytes(logoBytes))
+            .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, max-age=300"))
+            .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+
+        verify(callScreenMediaService).readTenantLogoMedia(VALIDATION_TENANT_ID, AUTH_TENANT_LOGO_ASSET_ID);
+    }
+
+    @Test
+    void currentUserCannotReadLogoThroughUnauthorizedForeignStoreScope() throws Exception {
+        configureTenantLogo();
+        upsertForeignBrandStore();
+
+        MvcResult login = login("1000", "393930")
+            .andExpect(status().isOk())
+            .andReturn();
+        Cookie sessionCookie = login.getResponse().getCookie("RPB_SESSION");
+
+        mockMvc.perform(get(
+                "/api/v1/me/stores/{storeId}/logo/media/{assetId}",
+                AUTH_FOREIGN_STORE_ID,
+                AUTH_TENANT_LOGO_ASSET_ID
+            ).cookie(sessionCookie))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.error.code").value("STORE_ACCESS_DENIED"));
+
+        verifyNoInteractions(callScreenMediaService);
     }
 
     @Test
@@ -630,6 +673,26 @@ class AuthApiIntegrationTest {
             """,
             AUTH_FOREIGN_STORE_ID,
             AUTH_FOREIGN_TENANT_ID
+        );
+    }
+
+    private void configureTenantLogo() {
+        jdbc.update(
+            """
+            insert into call_screen_media_assets (
+                id, owner_scope, tenant_id, media_kind, content_type,
+                byte_size, original_filename, storage_key, status
+            )
+            values (?, 'tenant', ?, 'image', 'image/png',
+                    128, 'auth-brand-logo.png', 'tests/auth-brand-logo.png', 'active')
+            """,
+            AUTH_TENANT_LOGO_ASSET_ID,
+            VALIDATION_TENANT_ID
+        );
+        jdbc.update(
+            "update tenants set logo_media_asset_id = ? where id = ?",
+            AUTH_TENANT_LOGO_ASSET_ID,
+            VALIDATION_TENANT_ID
         );
     }
 
