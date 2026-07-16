@@ -182,6 +182,18 @@ public class AuthApplicationService {
     }
 
     @Transactional
+    public AuthStoreAccess currentStoreLogoAccess(String sessionToken, UUID storeId, UUID assetId) {
+        AuthStoreAccess store = currentStores(sessionToken).stream()
+            .filter(candidate -> candidate.storeId().equals(storeId))
+            .findFirst()
+            .orElseThrow(() -> new AuthApiException(AuthApiErrorCode.STORE_ACCESS_DENIED));
+        if (!assetId.equals(store.tenantLogoMediaAssetId())) {
+            throw new AuthApiException(AuthApiErrorCode.MEDIA_NOT_FOUND);
+        }
+        return store;
+    }
+
+    @Transactional
     public Optional<AuthSessionAuthentication> authenticateSession(String sessionToken) {
         if (sessionToken == null || sessionToken.isBlank()) {
             return Optional.empty();

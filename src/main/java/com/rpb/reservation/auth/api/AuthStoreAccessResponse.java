@@ -1,7 +1,6 @@
 package com.rpb.reservation.auth.api;
 
 import com.rpb.reservation.auth.application.AuthStoreAccess;
-import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
 import java.util.List;
 
 public record AuthStoreAccessResponse(
@@ -49,7 +48,7 @@ public record AuthStoreAccessResponse(
         private static String tenantLogoMediaUrl(AuthStoreAccess store) {
             return store.tenantLogoMediaAssetId() == null
                 ? null
-                : CallScreenMediaService.tenantLogoMediaUrl(store.tenantId(), store.tenantLogoMediaAssetId());
+                : "/api/v1/me/stores/" + store.storeId() + "/logo/media/" + store.tenantLogoMediaAssetId();
         }
     }
 }
