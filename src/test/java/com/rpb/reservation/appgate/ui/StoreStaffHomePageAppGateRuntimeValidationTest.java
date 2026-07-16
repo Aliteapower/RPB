@@ -19,7 +19,7 @@ class StoreStaffHomePageAppGateRuntimeValidationTest {
             .contains("getStaffHomeOverview")
             .contains("StaffHomeOverviewApiError")
             .contains("StaffHomeTopBar")
-            .contains("StaffBottomNav")
+            .contains("StaffPrimaryWorkbench")
             .contains("overview")
             .contains("primaryKpis")
             .contains("partySizeGroups")

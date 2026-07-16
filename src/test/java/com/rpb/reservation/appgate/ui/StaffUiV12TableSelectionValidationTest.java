@@ -436,29 +436,34 @@ class StaffUiV12TableSelectionValidationTest {
             .contains("border-left: 1px solid #dbe3ee;")
             .contains("border-right: 1px solid #dbe3ee;");
 
-        List<Path> paths = List.of(
+        List<Path> primaryPagePaths = List.of(
             Path.of("src", "pages", "StoreStaffHomePage.vue"),
             Path.of("src", "pages", "ReservationTodayViewPage.vue"),
-            Path.of("src", "pages", "ReservationCheckInPage.vue"),
             Path.of("src", "pages", "QueueTicketListPage.vue"),
             Path.of("src", "pages", "TableResourceListPage.vue")
         );
 
-        for (Path path : paths) {
+        for (Path path : primaryPagePaths) {
             String source = readSource(path);
 
             assertThat(source)
-                .as("%s should render staff bottom navigation", path)
-                .contains("StaffBottomNav")
+                .as("%s should delegate adaptive navigation to the primary workbench", path)
+                .contains("StaffPrimaryWorkbench")
+                .doesNotContain("StaffBottomNav")
                 .contains("active-tab=");
             assertThat(source)
                 .as("%s should use the shared lightweight workbench shell", path)
-                .contains("staff-workbench-shell")
                 .doesNotContain("background: linear-gradient(180deg, #f8fafc 0%, #eef4f8 46%, #e8eef4 100%);")
                 .doesNotContain("border-left: 1px solid #dbe3ee;")
                 .doesNotContain("border-right: 1px solid #dbe3ee;")
                 .doesNotContain("max-width: 680px;");
         }
+
+        String checkInSource = readSource(Path.of("src", "pages", "ReservationCheckInPage.vue"));
+        assertThat(checkInSource)
+            .contains("StaffBottomNav")
+            .contains("staff-workbench-shell")
+            .contains("active-tab=");
     }
 
     @Test

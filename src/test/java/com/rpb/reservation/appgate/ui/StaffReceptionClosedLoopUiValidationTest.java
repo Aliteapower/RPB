@@ -15,7 +15,7 @@ class StaffReceptionClosedLoopUiValidationTest {
         assertThat(staffHome)
             .contains("getStaffHomeOverview")
             .contains("StaffHomeTopBar")
-            .contains("StaffBottomNav")
+            .contains("StaffPrimaryWorkbench")
             .contains("displayedBusinessDate")
             .contains("labelKey: 'staffHome.kpis.reservations'")
             .contains("labelKey: 'staffHome.kpis.arrived'")
