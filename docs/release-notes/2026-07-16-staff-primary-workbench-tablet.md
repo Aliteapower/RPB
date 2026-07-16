@@ -33,7 +33,7 @@
 
 - Low: the implementation changes Vue templates and responsive CSS only; page API calls, state transitions, dialogs, and business actions remain unchanged.
 - Breakpoint behavior is centralized in `StaffPrimaryWorkbench` and `StaffBottomNav`; page-specific grids remain owned by their page modules.
-- The new bundle has not been deployed to production. The authenticated `lsc106` site was inspected read-only as the pre-deployment baseline and still serves the previous narrow layout.
+- The frontend bundle was deployed to the `lsc106` production site on 2026-07-16. No backend, database, API, permission, environment, or runtime configuration change was included.
 
 ## Verification
 
@@ -41,14 +41,18 @@
 - Frontend production build: `vue-tsc --noEmit && vite build` completed successfully with 357 transformed modules.
 - Browser geometry matrix: Home, Reservation, Queue, and Table at 390x844, 768x1024, 1024x768, and 1366x1024; all 16 combinations had no horizontal overflow or locale-switcher overlap.
 - Visual checks confirmed the existing mobile bottom navigation, tablet portrait navigation rail, tablet landscape two-column work areas, and the 1200px centered large-landscape boundary.
-- Local visual validation used the pointer-backed runtime with an empty application dataset, so error and empty states were rendered; a post-deployment authenticated production smoke test with real data remains required.
+- Authenticated production smoke matrix: Home, Reservation, Queue, and Table at 390x844, 768x1024, and 1024x768; all 12 combinations rendered real tenant data without horizontal overflow, locale-switcher overlap, or console errors.
+- Production health checks returned `200` for the login page and new frontend asset, `401` for the unauthenticated `/api/auth/me` probe, and confirmed the backend service remained active.
 
 ## Deployment
 
-- Publish the frontend bundle through the normal production deployment process; no backend restart or Flyway action is required for this UI-only change.
-- After publication, authenticate at the tenant employee H5 site and smoke-test all four primary pages in mobile, tablet portrait, and tablet landscape viewports without performing destructive business actions.
+- Deployed frontend source commit: `07f17545379882706e2b24ee487a16d11d56f87a`.
+- Production entry asset changed from `/assets/index-DDcJTY8m.js` to `/assets/index-CEyPae27.js`.
+- Deployment backup: `/opt/rpb/backups/20260716-110042-07f17545-frontend`.
+- The deployment was frontend-only: no backend restart, Flyway action, database mutation, or destructive business action was performed.
+- Browser-cache diagnostics briefly reproduced the previous hashed entry asset; a cache-busted navigation loaded the new entry asset and completed the full authenticated production matrix.
 
 ## Rollback Notes
 
-- Restore the previous frontend bundle. No database, API, permission, configuration, or data rollback is required.
+- Restore `/opt/rpb/backups/20260716-110042-07f17545-frontend`. No database, API, permission, configuration, or data rollback is required.
 - Rolling back restores the previous phone-width tablet presentation and bottom navigation behavior.
