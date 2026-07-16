@@ -49,8 +49,18 @@
 - 备注可能包含较长文本，已通过 `white-space: pre-wrap` 与 `overflow-wrap: anywhere` 限制布局风险。
 - 备注内容通过 Vue 文本插值输出，不使用 `v-html`。
 
+## Deployment
+
+- 已于 2026-07-16 将提交 `0f7b2d41e79c9f21a302f46107ee2f506568434a` 的前端产物部署到生产共享目录 `/opt/rpb/frontend`。
+- 本次为全站共享前端发布，不是仅发布 `lsc106`；`booking`、`lsc106`、`lsc83`、`20000000`、`platform` 五个入口均加载新入口 `/assets/index-BWyijP9Z.js`。
+- 新预约页面资源 `/assets/ReservationTodayViewPage-DNVV6fYC.js` 与 `/assets/ReservationTodayViewPage-Du9vXmfn.css` 均返回 `200`，并包含备注入口、展开区域、整行布局与安全换行规则。
+- 部署包 SHA-256：`4398bca6322ffcd64f27203d8dc2c3ce12766c4e073f2f0d76933d9e286c5d4e`。
+- 部署备份：`/opt/rpb/backups/20260716-132517-0f7b2d41-frontend`。
+- 本次为前端-only 部署：后端保持 `active`，未重启后端，未运行 Flyway，未修改数据库、权限、API、环境变量或生产业务数据。
+- 生产健康检查：五个登录入口均返回 `200`，`lsc106` 当日预约路由返回 `200`，未登录 `/api/v1/auth/me` 返回 `401`。
+
 ## Rollback Notes
 
 - 回滚本次前端组件、双语文案和契约测试提交即可恢复原展示。
 - 无数据库、API 或权限回滚步骤。
-- 若已部署前端，可恢复上一个前端静态资源版本并重新加载页面。
+- 如需生产回滚，恢复 `/opt/rpb/backups/20260716-132517-0f7b2d41-frontend/frontend` 到 `/opt/rpb/frontend`，并确认入口恢复为 `/assets/index-CteLXukj.js`。
