@@ -434,7 +434,9 @@ class AuthApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.user.username").value("1000"))
-            .andExpect(jsonPath("$.user.storeIds").value(hasItem(AUTH_SECONDARY_STORE_ID.toString())));
+            .andExpect(jsonPath("$.user.storeIds").value(hasItem(AUTH_SECONDARY_STORE_ID.toString())))
+            .andExpect(jsonPath("$.user.defaultStoreId").value(VALIDATION_STORE_ID.toString()))
+            .andExpect(jsonPath("$.entryStoreId").value(AUTH_SECONDARY_STORE_ID.toString()));
     }
 
     @Test
