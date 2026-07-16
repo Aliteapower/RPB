@@ -10,7 +10,7 @@ import { listQueueTickets, QueueTicketListApiError } from '../api/queueTicketLis
 import { QueueRejoinApiError, rejoinQueueTicket } from '../api/queueRejoinApi'
 import { QueueSkipApiError, skipQueueTicket } from '../api/queueSkipApi'
 import { fetchTableResources } from '../api/tableResourceApi'
-import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffPrimaryWorkbench from '../components/staff/StaffPrimaryWorkbench.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
@@ -1082,7 +1082,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 </script>
 
 <template>
-  <main class="staff-workbench-shell queue-workbench">
+  <StaffPrimaryWorkbench :store-id="storeId" active-tab="queue" class="queue-workbench">
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :business-date="currentBusinessDate"
@@ -1331,8 +1331,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
       </section>
     </div>
 
-    <StaffBottomNav :store-id="storeId" active-tab="queue" />
-  </main>
+  </StaffPrimaryWorkbench>
 </template>
 
 <style scoped>
@@ -1871,9 +1870,9 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 768px) {
   .queue-workbench-body {
-    padding-top: 16px;
+    padding: 16px 18px 24px;
   }
 
   .queue-toolbar {
@@ -1883,6 +1882,32 @@ a:focus-visible {
   .compact-filter-controls {
     align-items: end;
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .queue-workbench-body {
+    align-items: start;
+    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  }
+
+  .queue-management-panel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .queue-message-stack,
+  .empty-queue-panel,
+  .queue-list {
+    grid-column: 2;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .queue-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

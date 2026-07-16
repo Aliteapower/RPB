@@ -31,7 +31,7 @@ import {
   TemporaryTableGroupApiError
 } from '../api/temporaryTableGroupApi'
 import ReservationTableSwitchDialog from '../components/reservation-workbench/ReservationTableSwitchDialog.vue'
-import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffPrimaryWorkbench from '../components/staff/StaffPrimaryWorkbench.vue'
 import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwitcher.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
@@ -1259,7 +1259,7 @@ function formatStoreLabel(value: string | undefined): string {
 </script>
 
 <template>
-  <main class="staff-workbench-shell table-page">
+  <StaffPrimaryWorkbench :store-id="storeId" active-tab="table" class="table-page">
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :business-date="selectedBusinessDate"
@@ -1629,8 +1629,7 @@ function formatStoreLabel(value: string | undefined): string {
       @switched="handleTableSwitched"
     />
 
-    <StaffBottomNav :store-id="storeId" active-tab="table" />
-  </main>
+  </StaffPrimaryWorkbench>
 </template>
 
 <style scoped>
@@ -2267,6 +2266,35 @@ select:focus-visible {
   .table-page__area-tools,
   .table-page__bulk-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (min-width: 768px) {
+  .table-page-body {
+    padding: 16px 18px 24px;
+  }
+
+  .table-page__resource-grid,
+  .table-page__resource-grid--groups {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .temporary-group-panel {
+    grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1fr) minmax(260px, 1.4fr);
+  }
+
+  .temporary-group-panel__actions {
+    justify-content: flex-end;
+  }
+
+  .table-page__resource-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .table-page__resource-grid--groups {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 </style>
