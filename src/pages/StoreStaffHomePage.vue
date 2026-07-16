@@ -7,7 +7,7 @@ import {
   getStaffHomeOverview,
   StaffHomeOverviewApiError
 } from '../api/staffHomeOverviewApi'
-import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffPrimaryWorkbench from '../components/staff/StaffPrimaryWorkbench.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useAuthSessionStore } from '../stores/authSession'
@@ -357,7 +357,7 @@ function hasPermission(permission: string): boolean {
 </script>
 
 <template>
-  <main class="staff-workbench-shell staff-shell">
+  <StaffPrimaryWorkbench :store-id="storeId" active-tab="home" class="staff-shell">
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :business-date="displayedBusinessDate"
@@ -473,8 +473,7 @@ function hasPermission(permission: string): boolean {
       </section>
     </div>
 
-    <StaffBottomNav :store-id="storeId" active-tab="home" />
-  </main>
+  </StaffPrimaryWorkbench>
 </template>
 
 <style scoped>
@@ -831,6 +830,44 @@ function hasPermission(permission: string): boolean {
   .status-grid--tables,
   .operation-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .home-overview-body {
+    padding: 16px 18px 24px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-overview-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .date-strip,
+  .overview-error,
+  .operation-toolbar,
+  .empty-state,
+  .kpi-grid {
+    grid-column: 1 / -1;
+  }
+
+  .overview-section {
+    min-width: 0;
+  }
+
+  .status-grid--tables {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .status-grid--tables {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 </style>

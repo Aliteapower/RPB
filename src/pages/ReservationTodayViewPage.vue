@@ -17,7 +17,7 @@ import ReservationQuickActionPanel from '../components/reservation-workbench/Res
 import ReservationSeatDialog from '../components/reservation-workbench/ReservationSeatDialog.vue'
 import ReservationTableAssignmentDialog from '../components/reservation-workbench/ReservationTableAssignmentDialog.vue'
 import ReservationTodayListPanel from '../components/reservation-workbench/ReservationTodayListPanel.vue'
-import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
+import StaffPrimaryWorkbench from '../components/staff/StaffPrimaryWorkbench.vue'
 import StaffBusinessDateSwitcher from '../components/staff/StaffBusinessDateSwitcher.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
@@ -484,7 +484,11 @@ function isOpenCreateQuery(value: unknown): boolean {
 </script>
 
 <template>
-  <main class="staff-workbench-shell reservation-workbench">
+  <StaffPrimaryWorkbench
+    :store-id="storeId"
+    active-tab="reservation"
+    class="reservation-workbench"
+  >
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :business-date="displayedBusinessDate"
@@ -500,6 +504,7 @@ function isOpenCreateQuery(value: unknown): boolean {
 
     <div class="reservation-workbench-body">
       <StaffBusinessDateSwitcher
+        class="reservation-workbench__date-panel"
         v-model:selected-date="businessDate"
         :today-date="storeTodayDate"
         :reservation-counts="reservationCounts"
@@ -508,6 +513,7 @@ function isOpenCreateQuery(value: unknown): boolean {
       />
 
       <ReservationQuickActionPanel
+        class="reservation-workbench__quick-panel"
         :store-id="storeId"
         :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
         :selected-date="businessDate"
@@ -515,6 +521,7 @@ function isOpenCreateQuery(value: unknown): boolean {
       />
 
       <ReservationTodayListPanel
+        class="reservation-workbench__list-panel"
         v-model:selected-status="selectedStatus"
         :api-error="apiError"
         :can-assign-reservation-table="canAssignReservationTable"
@@ -565,8 +572,7 @@ function isOpenCreateQuery(value: unknown): boolean {
       @assigned="handleReservationTableAssigned"
     />
 
-    <StaffBottomNav :store-id="storeId" active-tab="reservation" />
-  </main>
+  </StaffPrimaryWorkbench>
 </template>
 
 <style scoped>
@@ -598,6 +604,42 @@ button:focus-visible,
 a:focus-visible {
   outline: 3px solid rgba(249, 115, 22, 0.28);
   outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .reservation-workbench-body {
+    padding: 16px 18px 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .reservation-workbench-body {
+    align-items: start;
+    grid-template-columns: minmax(280px, 0.38fr) minmax(0, 0.62fr);
+  }
+
+  .reservation-workbench__date-panel,
+  .reservation-workbench__quick-panel {
+    grid-column: 1;
+  }
+
+  .reservation-workbench__date-panel {
+    grid-row: 1;
+  }
+
+  .reservation-workbench__quick-panel {
+    grid-row: 2;
+  }
+
+  .reservation-workbench__list-panel,
+  .reservation-workbench__action-error {
+    grid-column: 2;
+  }
+
+  .reservation-workbench__list-panel {
+    grid-row: 1 / span 3;
+    min-width: 0;
+  }
 }
 
 </style>
