@@ -42,8 +42,17 @@
 - `StaffWorkbenchBrandIdentityUiValidationTest` covers the shared resolver/component, Logo error fallback, localized fixed-brand removal, and all eight top-bar page integrations.
 - Related authentication/i18n/responsive workbench regression suites and the frontend production build pass.
 
+## Deployment
+
+- Deployed the full-stack release from source commit `04e5628a7d67fdcea2acee864c43489581ac647e` to the shared production environment on 2026-07-16 at 14:52 SGT. The release applies to all production tenant hosts, not only `lsc106`.
+- The deployed backend JAR SHA-256 is `25b98ff3067019bfb647f43e862a5f00379b38016f54f0dc452bdf1f9b0ba275`; the uploaded frontend archive SHA-256 is `10c66a1a53fc503666beea06036a2c35e3d97d5f73253bac8c99f048c200bb30`.
+- `booking`, `lsc106`, `lsc83`, `20000000`, and `platform` production login pages all returned HTTP 200 and `/assets/index-C7bWH8IG.js` after the switch. The backend service remained active, and authenticated-route guards continued to return HTTP 401 without a session.
+- Authenticated Chrome verification on the `lsc106` reservation page showed `老四川川菜`, the configured tenant Logo loaded from the staff-safe media route, and no fixed `食刻 · 管理` text. The existing reservation remark entry remained visible.
+- No migration ran for this release. Production Flyway history remained successful through version `045`; no permission, App Gate, or runtime environment changes were made.
+- The pre-switch full backup is `/opt/rpb/backups/20260716-145244-04e5628a-full`.
+
 ## Rollback Notes
 
-- Revert the dynamic-brand backend, frontend, tests, and documentation commits together.
-- Restore the fixed top-bar identity and remove the two additive authorized-store fields plus the staff Logo read endpoint.
-- No schema, data, permission, uploaded-media, or cache migration rollback is needed.
+- Restore `/opt/rpb/backups/20260716-145244-04e5628a-full/reservation-platform.jar` to `/opt/rpb/app/reservation-platform.jar` and restore that backup's frontend contents to `/opt/rpb/frontend`, then restart `rpb-backend`.
+- Verify the backend service is active, `/api/v1/auth/me` returns HTTP 401 without a session, and the production login pages again serve the previous `/assets/index-BWyijP9Z.js` entry asset.
+- No schema, data, permission, uploaded-media, cache, or Flyway rollback is required.
