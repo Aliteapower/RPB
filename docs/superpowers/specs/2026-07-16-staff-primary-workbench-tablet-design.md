@@ -1,7 +1,7 @@
 # Tenant Staff Primary Workbench Tablet Design
 
-**Date:** 2026-07-16  
-**Status:** Accepted for implementation planning  
+**Date:** 2026-07-16
+**Status:** Accepted for implementation planning
 **Scope:** Frontend UI only
 
 ## Objective
