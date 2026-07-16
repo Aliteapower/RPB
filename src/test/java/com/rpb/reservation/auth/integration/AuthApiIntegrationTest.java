@@ -48,6 +48,9 @@ class AuthApiIntegrationTest {
     private static final UUID AREA_ID = UUID.fromString("60000000-0000-0000-0000-000000000983");
     private static final UUID TABLE_ID = UUID.fromString("70000000-0000-0000-0000-000000000983");
     private static final UUID AUTH_SECONDARY_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000984");
+    private static final UUID AUTH_TENANT_LOGO_ASSET_ID = UUID.fromString("90000000-0000-0000-0000-000000000984");
+    private static final UUID AUTH_FOREIGN_TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000985");
+    private static final UUID AUTH_FOREIGN_STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000985");
     private static final String PASSWORD_393930_HASH = "$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy";
 
     @Autowired
@@ -97,6 +100,11 @@ class AuthApiIntegrationTest {
         );
         jdbc.update("delete from auth_account_store_access where tenant_id = ? and store_id = ?", VALIDATION_TENANT_ID, AUTH_SECONDARY_STORE_ID);
         jdbc.update("update tenants set tenant_code = '20000000' where id = ?", VALIDATION_TENANT_ID);
+        jdbc.update("update tenants set logo_media_asset_id = null where id = ?", VALIDATION_TENANT_ID);
+        jdbc.update("update stores set share_display_name = null where tenant_id = ?", VALIDATION_TENANT_ID);
+        jdbc.update("delete from call_screen_media_assets where id = ?", AUTH_TENANT_LOGO_ASSET_ID);
+        jdbc.update("delete from stores where id = ?", AUTH_FOREIGN_STORE_ID);
+        jdbc.update("delete from tenants where id = ?", AUTH_FOREIGN_TENANT_ID);
         jdbc.update(
             "update auth_accounts set password_hash = ? where username in ('sysadmin', '20000000', '1000')",
             PASSWORD_393930_HASH
@@ -179,6 +187,28 @@ class AuthApiIntegrationTest {
     void currentUserStoresReturnsAuthorizedActiveStoresWithDefaultFlag() throws Exception {
         upsertAuthSecondaryStore();
         grantStoreAccess("1000", AUTH_SECONDARY_STORE_ID);
+        jdbc.update(
+            """
+            insert into call_screen_media_assets (
+                id, owner_scope, tenant_id, media_kind, content_type,
+                byte_size, original_filename, storage_key, status
+            )
+            values (?, 'tenant', ?, 'image', 'image/png',
+                    128, 'auth-brand-logo.png', 'tests/auth-brand-logo.png', 'active')
+            """,
+            AUTH_TENANT_LOGO_ASSET_ID,
+            VALIDATION_TENANT_ID
+        );
+        jdbc.update(
+            "update tenants set logo_media_asset_id = ? where id = ?",
+            AUTH_TENANT_LOGO_ASSET_ID,
+            VALIDATION_TENANT_ID
+        );
+        jdbc.update(
+            "update stores set share_display_name = '认证分享门店' where id = ? and tenant_id = ?",
+            VALIDATION_STORE_ID,
+            VALIDATION_TENANT_ID
+        );
 
         MvcResult login = login("1000", "393930")
             .andExpect(status().isOk())
@@ -198,6 +228,10 @@ class AuthApiIntegrationTest {
         assertThat(defaultStore.path("status").asText()).isEqualTo("active");
         assertThat(defaultStore.path("locale").asText()).isNotBlank();
         assertThat(defaultStore.path("defaultStore").asBoolean()).isTrue();
+        assertThat(defaultStore.path("shareDisplayName").asText()).isEqualTo("认证分享门店");
+        assertThat(defaultStore.path("tenantLogoMediaUrl").asText()).isEqualTo(
+            "/api/v1/platform/tenants/" + VALIDATION_TENANT_ID + "/logo/media/" + AUTH_TENANT_LOGO_ASSET_ID
+        );
 
         JsonNode secondaryStore = storeById(stores, AUTH_SECONDARY_STORE_ID);
         assertThat(secondaryStore.path("storeCode").asText()).isEqualTo("auth-secondary");
@@ -205,6 +239,32 @@ class AuthApiIntegrationTest {
         assertThat(secondaryStore.path("status").asText()).isEqualTo("active");
         assertThat(secondaryStore.path("locale").asText()).isEqualTo("en-SG");
         assertThat(secondaryStore.path("defaultStore").asBoolean()).isFalse();
+        assertThat(secondaryStore.path("shareDisplayName").isNull()).isTrue();
+        assertThat(secondaryStore.path("tenantLogoMediaUrl").asText()).isEqualTo(
+            "/api/v1/platform/tenants/" + VALIDATION_TENANT_ID + "/logo/media/" + AUTH_TENANT_LOGO_ASSET_ID
+        );
+    }
+
+    @Test
+    void currentUserStoresDoesNotExposeForeignTenantBranding() throws Exception {
+        upsertForeignBrandStore();
+
+        MvcResult login = login("1000", "393930")
+            .andExpect(status().isOk())
+            .andReturn();
+        Cookie sessionCookie = login.getResponse().getCookie("RPB_SESSION");
+
+        MvcResult result = mockMvc.perform(get("/api/v1/me/stores").cookie(sessionCookie))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andReturn();
+
+        JsonNode stores = objectMapper.readTree(result.getResponse().getContentAsString()).path("stores");
+        assertThat(stores).hasSize(1);
+        stores.forEach(store -> {
+            assertThat(store.path("tenantId").asText()).isEqualTo(VALIDATION_TENANT_ID.toString());
+            assertThat(store.path("shareDisplayName").asText()).isNotEqualTo("外部租户品牌");
+        });
     }
 
     @Test
@@ -548,6 +608,28 @@ class AuthApiIntegrationTest {
             VALIDATION_TENANT_ID,
             storeCode,
             displayName
+        );
+    }
+
+    private void upsertForeignBrandStore() {
+        jdbc.update(
+            """
+            insert into tenants (id, tenant_code, display_name, status, default_locale)
+            values (?, 'auth-foreign', '认证外部租户', 'active', 'zh-CN')
+            """,
+            AUTH_FOREIGN_TENANT_ID
+        );
+        jdbc.update(
+            """
+            insert into stores (
+                id, tenant_id, store_code, display_name, share_display_name, status,
+                timezone, locale, date_format, time_format, currency
+            )
+            values (?, ?, 'auth-foreign-store', '认证外部门店', '外部租户品牌', 'active',
+                    'Asia/Singapore', 'zh-CN', 'DD-MM-YYYY', 'HH:mm', 'SGD')
+            """,
+            AUTH_FOREIGN_STORE_ID,
+            AUTH_FOREIGN_TENANT_ID
         );
     }
 
