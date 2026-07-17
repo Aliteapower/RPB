@@ -24,12 +24,15 @@ const USED_STORE: PlatformStore = {
   updatedAt: '2026-07-17T00:00:00Z', deletedAt: null
 }
 
-function mountPanel(): VueWrapper {
+function mountPanel(overrides: {
+  operatingEntities?: PlatformOperatingEntity[]
+  stores?: PlatformStore[]
+} = {}): VueWrapper {
   const i18n = createI18n({ legacy: false, locale: 'en-SG', messages: { 'en-SG': enSG } })
   return mount(PlatformTenantStructurePanel, {
     props: {
-      operatingEntities: [EMPTY_ENTITY, USED_ENTITY],
-      stores: [USED_STORE],
+      operatingEntities: overrides.operatingEntities ?? [EMPTY_ENTITY, USED_ENTITY],
+      stores: overrides.stores ?? [USED_STORE],
       adminStoreOptions: [],
       adminStoreIds: [],
       defaultAdminStoreId: '',
@@ -69,6 +72,28 @@ describe('PlatformTenantStructurePanel operating entity deletion', () => {
     await wrapper.setProps({ operatingEntities: [USED_ENTITY] })
     expect(wrapper.get('.structure-entity-button').classes()).toContain('structure-entity-button--active')
     expect(wrapper.get('.structure-entity-button').text()).toContain('Used Entity')
+    wrapper.unmount()
+  })
+
+  it('closes a new-store form when its operating entity disappears', async () => {
+    const wrapper = mountPanel()
+    const storeSection = wrapper.findAll('.structure-section')[1]
+    await storeSection.get('.section-heading .secondary-button').trigger('click')
+    expect(storeSection.get('.inline-form select').element).toHaveProperty('value', EMPTY_ENTITY.id)
+
+    await wrapper.setProps({ operatingEntities: [USED_ENTITY] })
+
+    expect(storeSection.find('.inline-form').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('hides delete for an entity with a non-deleted inactive store', () => {
+    const wrapper = mountPanel({
+      operatingEntities: [USED_ENTITY],
+      stores: [{ ...USED_STORE, status: 'inactive' }]
+    })
+
+    expect(wrapper.get('.structure-entity-row').find('.text-button.danger').exists()).toBe(false)
     wrapper.unmount()
   })
 })

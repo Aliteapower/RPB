@@ -76,14 +76,37 @@ Rules:
 
 Soft-deletes an operating entity only when no current store references it.
 
+Success returns HTTP 200 using the existing `PlatformOperatingEntityResponse` envelope:
+
+```json
+{
+  "success": true,
+  "operatingEntity": {
+    "id": "50000000-0000-0000-0000-000000000983",
+    "tenantId": "10000000-0000-0000-0000-000000000983",
+    "entityCode": "lsc106-entity",
+    "displayName": "LSC106 经营主体",
+    "status": "archived",
+    "defaultLocale": "en-SG",
+    "contactPhone": "+6590000106",
+    "address": "106 Orchard Road",
+    "principalName": "LSC106 Manager",
+    "deleted": true,
+    "createdAt": "2026-07-17T00:00:00Z",
+    "updatedAt": "2026-07-17T01:00:00Z",
+    "deletedAt": "2026-07-17T01:00:00Z"
+  }
+}
+```
+
 Rules:
-- A current store is in the same tenant/entity with `stores.deleted_at is null`.
+- A current store is in the same tenant/entity with `stores.deleted_at is null`; `created`, `active`, and `inactive` stores all block deletion.
 - Soft-deleted historical stores do not block deletion.
 - The final no-store operating entity may be deleted.
-- Success sets `status = archived`, sets `deleted_at`, increments `version`, and returns `deleted = true`.
+- Success sets `status = archived`, sets `deleted_at`, increments `version`, and returns `deleted = true` with a non-null `deletedAt`.
 - A current store returns HTTP 409 with `OPERATING_ENTITY_HAS_STORES` and makes no mutation.
 - Invalid tenants return `TENANT_NOT_FOUND`; invalid, deleted, repeated, or cross-tenant entities return `OPERATING_ENTITY_NOT_FOUND`.
-- Repeating a successful delete returns `OPERATING_ENTITY_NOT_FOUND` while the entity remains deleted.
+- Replay semantics are intentionally non-replaying: repeating a successful delete returns `OPERATING_ENTITY_NOT_FOUND`; the archived row, version, timestamps, and single delete audit remain unchanged.
 
 ## Tenant Stores
 
@@ -205,4 +228,4 @@ Rules:
 - Invalid, inactive, deleted, null, or cross-tenant store ids return `REQUEST_INVALID` with HTTP 400.
 
 ## Compatibility
-Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. Existing store create, update, and list endpoints are unchanged. Store deletion is additive and uses existing soft-delete/status fields, so it requires no database migration. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills. `V040` is additive and does not change existing tenant, store, or login API responses.
+Existing callers that do not send `onboardingMode` keep the previous single-store bootstrap behavior. Existing callers that do not send `adminStoreIds` or `defaultAdminStoreId` keep the previous tenant update behavior. Existing store create, update, and list endpoints are unchanged. Store deletion and operating-entity deletion are additive and use existing soft-delete/status fields, so they require no database migration and do not change existing response envelopes. `V038` and `V039` are data-only migrations for operating entity and tenant-code host alias backfills. `V040` is additive and does not change existing tenant, store, or login API responses.

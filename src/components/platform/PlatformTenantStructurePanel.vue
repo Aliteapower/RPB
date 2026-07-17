@@ -105,13 +105,18 @@ watch(
       resetEntityForm()
     }
     if (
-      selectedOperatingEntityId.value &&
-      props.operatingEntities.some(entity => entity.id === selectedOperatingEntityId.value)
+      !selectedOperatingEntityId.value ||
+      !props.operatingEntities.some(entity => entity.id === selectedOperatingEntityId.value)
     ) {
-      return
+      selectedOperatingEntityId.value = activeOperatingEntities.value[0]?.id || props.operatingEntities[0]?.id || ''
     }
-    selectedOperatingEntityId.value = activeOperatingEntities.value[0]?.id || props.operatingEntities[0]?.id || ''
-    if (!storeForm.operatingEntityId) {
+    if (
+      storeFormOpen.value &&
+      !storeForm.id &&
+      !activeOperatingEntities.value.some(entity => entity.id === storeForm.operatingEntityId)
+    ) {
+      closeStoreForm()
+    } else if (!storeForm.operatingEntityId) {
       storeForm.operatingEntityId = selectedOperatingEntityId.value || activeOperatingEntities.value[0]?.id || ''
     }
   },

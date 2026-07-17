@@ -35,9 +35,12 @@ const ENTITY: PlatformOperatingEntity = {
 }
 
 const StructureStub = defineComponent({
-  props: { operatingEntities: { type: Array, required: true } },
+  props: {
+    operatingEntities: { type: Array, required: true },
+    saving: { type: Boolean, required: true }
+  },
   emits: ['deleteOperatingEntity'],
-  template: '<button class="delete-entity" @click="$emit(\'deleteOperatingEntity\', operatingEntities[0])">Delete</button>'
+  template: '<button class="delete-entity" :disabled="saving" @click="$emit(\'deleteOperatingEntity\', operatingEntities[0])">Delete</button>'
 })
 const EmptyStub = defineComponent({ template: '<div />' })
 let wrapper: VueWrapper | undefined
@@ -99,6 +102,7 @@ describe('PlatformTenantFormPage operating entity deletion', () => {
     const page = await mountPage()
     await page.get('.delete-entity').trigger('click')
     expect(api.deleteOperatingEntity).not.toHaveBeenCalled()
+    expect(page.get('.delete-entity').attributes('disabled')).toBeUndefined()
   })
 
   it('deletes and reloads structure/access after confirmation', async () => {

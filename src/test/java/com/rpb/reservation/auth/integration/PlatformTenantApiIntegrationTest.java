@@ -14,14 +14,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rpb.reservation.appgate.domain.AppGateRequiredPermission;
+import com.rpb.reservation.platform.application.PlatformOperator;
+import com.rpb.reservation.platform.application.PlatformStoreMutationCommand;
 import com.rpb.reservation.platform.application.PlatformTenantAuditService;
 import com.rpb.reservation.platform.application.PlatformTenantServiceErrorCode;
 import com.rpb.reservation.platform.application.PlatformTenantServiceException;
+import com.rpb.reservation.platform.application.PlatformTenantStructureService;
+import com.rpb.reservation.platform.persistence.PlatformTenantStructureRepository;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +49,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -56,6 +70,15 @@ class PlatformTenantApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private PlatformTenantStructureService structureService;
+
+    @Autowired
+    private PlatformTenantStructureRepository structureRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @SpyBean(reset = MockReset.AFTER)
     private PlatformTenantAuditService platformTenantAuditService;
@@ -1661,6 +1684,10 @@ class PlatformTenantApiIntegrationTest {
     @Test
     void platformAdminDeletesFinalOperatingEntityAfterItsOnlyStoreIsSoftDeleted() throws Exception {
         Cookie session = login("sysadmin");
+        UUID actorId = jdbc.queryForObject(
+            "select id from auth_accounts where username = 'sysadmin'",
+            UUID.class
+        );
         UUID tenantId = createGroupTenant(session, "codex-entity-delete", "Codex 主体删除集团", "abc123");
         UUID entityId = jdbc.queryForObject(
             "select id from operating_entities where tenant_id = ? and deleted_at is null",
@@ -1670,6 +1697,18 @@ class PlatformTenantApiIntegrationTest {
         UUID storeId = createStore(
             session, tenantId, entityId, "codex-entity-delete-store", "Codex 主体删除门店", null, null
         );
+        jdbc.update(
+            "update stores set status = 'inactive' where tenant_id = ? and id = ?",
+            tenantId,
+            storeId
+        );
+        assertThat(countWhere(
+            "select count(*) from stores where tenant_id = ? and id = ? and status = 'inactive' and deleted_at is null",
+            tenantId, storeId
+        )).isEqualTo(1);
+        OperatingEntityRowState beforeConflict = operatingEntityRowState(tenantId, entityId);
+        OperatingEntityAuditSnapshot previousSnapshot = operatingEntityAuditSnapshot(tenantId, entityId);
+        int auditCountBeforeConflict = operatingEntityDeleteAuditCount(entityId);
 
         mockMvc.perform(delete(
                 "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
@@ -1679,10 +1718,10 @@ class PlatformTenantApiIntegrationTest {
             .andExpect(jsonPath("$.error.code").value("OPERATING_ENTITY_HAS_STORES"))
             .andExpect(jsonPath("$.error.messageKey").value("platform.tenants.operating_entity_has_stores"));
 
-        assertThat(countWhere(
-            "select count(*) from operating_entities where tenant_id = ? and id = ? and deleted_at is null",
-            tenantId, entityId
-        )).isEqualTo(1);
+        assertThat(operatingEntityRowState(tenantId, entityId)).isEqualTo(beforeConflict);
+        assertThat(beforeConflict.status()).isEqualTo("active");
+        assertThat(beforeConflict.deletedAt()).isNull();
+        assertThat(operatingEntityDeleteAuditCount(entityId)).isEqualTo(auditCountBeforeConflict);
 
         mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, storeId)
                 .cookie(session))
@@ -1694,21 +1733,30 @@ class PlatformTenantApiIntegrationTest {
             ).cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.operatingEntity.id").value(entityId.toString()))
+            .andExpect(jsonPath("$.operatingEntity.tenantId").value(tenantId.toString()))
             .andExpect(jsonPath("$.operatingEntity.status").value("archived"))
-            .andExpect(jsonPath("$.operatingEntity.deleted").value(true));
+            .andExpect(jsonPath("$.operatingEntity.deleted").value(true))
+            .andExpect(jsonPath("$.operatingEntity.deletedAt").isNotEmpty());
 
-        assertThat(countWhere(
-            "select count(*) from operating_entities where tenant_id = ? and id = ? and status = 'archived' and deleted_at is not null",
-            tenantId, entityId
-        )).isEqualTo(1);
+        OperatingEntityRowState archivedState = operatingEntityRowState(tenantId, entityId);
+        assertThat(archivedState.status()).isEqualTo("archived");
+        assertThat(archivedState.deletedAt()).isNotNull();
+        assertThat(archivedState.updatedAt()).isEqualTo(archivedState.deletedAt());
+        assertThat(archivedState.version()).isEqualTo(beforeConflict.version() + 1);
+        OperatingEntityAuditSnapshot deletedSnapshot = operatingEntityAuditSnapshot(tenantId, entityId);
         assertThat(countWhere(
             "select count(*) from stores where tenant_id = ? and id = ? and operating_entity_id = ? and deleted_at is not null",
             tenantId, storeId, entityId
         )).isEqualTo(1);
-        assertThat(countWhere(
-            "select count(*) from audit_logs where target_type = 'operating_entity' and target_id = ? and operation_code = 'platform.tenant.operating_entity.delete'",
-            entityId
-        )).isEqualTo(1);
+        assertThat(operatingEntityDeleteAuditCount(entityId)).isEqualTo(1);
+
+        OperatingEntityDeleteAuditRow audit = operatingEntityDeleteAudit(entityId);
+        assertThat(audit.actorId()).isEqualTo(actorId);
+        assertThat(audit.actorType()).isEqualTo("platform_admin");
+        assertThat(audit.source()).isEqualTo("staff");
+        JsonNode metadata = objectMapper.readTree(audit.metadata());
+        assertOperatingEntityAuditSnapshot(metadata, deletedSnapshot);
+        assertOperatingEntityAuditSnapshot(metadata.path("previous"), previousSnapshot);
 
         mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/operating-entities", tenantId).cookie(session))
             .andExpect(status().isOk())
@@ -1720,6 +1768,130 @@ class PlatformTenantApiIntegrationTest {
             ).cookie(session))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.error.code").value("OPERATING_ENTITY_NOT_FOUND"));
+
+        assertThat(operatingEntityRowState(tenantId, entityId)).isEqualTo(archivedState);
+        assertThat(operatingEntityDeleteAuditCount(entityId)).isEqualTo(1);
+    }
+
+    @Test
+    void storeAssignmentKeyShareLockMakesDeleteWaitAndRecheckCurrentStores() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(
+            session,
+            "codex-lock-assignment-first",
+            "Codex 门店先锁集团",
+            "abc123"
+        );
+        UUID entityId = currentOperatingEntityId(tenantId);
+        PlatformOperator operator = sysadminOperator();
+        AtomicInteger assignmentPid = new AtomicInteger();
+        AtomicInteger deletePid = new AtomicInteger();
+        CountDownLatch keyShareHeld = new CountDownLatch(1);
+        CountDownLatch releaseAssignment = new CountDownLatch(1);
+        CountDownLatch deleteStarted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> assignment = executor.submit(() -> new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> {
+                    assignmentPid.set(currentBackendPid());
+                    assertThat(structureRepository.lockActiveOperatingEntity(tenantId, entityId)).isTrue();
+                    keyShareHeld.countDown();
+                    awaitLatch(releaseAssignment, "release store assignment");
+                    structureService.createStore(
+                        tenantId,
+                        storeMutation(entityId, "codex-lock-assignment-store", "inactive"),
+                        operator
+                    );
+                }));
+            awaitLatch(keyShareHeld, "store assignment key-share lock");
+
+            Future<?> deletion = executor.submit(() -> new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> {
+                    deletePid.set(currentBackendPid());
+                    deleteStarted.countDown();
+                    structureService.deleteOperatingEntity(tenantId, entityId, operator);
+                }));
+            awaitLatch(deleteStarted, "delete transaction start");
+
+            awaitBlockedBy(deletePid.get(), assignmentPid.get());
+            assertThat(deletion.isDone()).isFalse();
+
+            releaseAssignment.countDown();
+            assignment.get(20, TimeUnit.SECONDS);
+            assertServiceError(deletion, PlatformTenantServiceErrorCode.OPERATING_ENTITY_HAS_STORES);
+
+            assertThat(countWhere(
+                "select count(*) from stores where tenant_id = ? and operating_entity_id = ? and store_code = ? and status = 'inactive' and deleted_at is null",
+                tenantId, entityId, "codex-lock-assignment-store"
+            )).isEqualTo(1);
+            assertThat(operatingEntityRowState(tenantId, entityId).status()).isEqualTo("active");
+            assertThat(operatingEntityDeleteAuditCount(entityId)).isZero();
+        } finally {
+            releaseAssignment.countDown();
+            shutdownExecutor(executor);
+        }
+    }
+
+    @Test
+    void operatingEntityUpdateLockMakesStoreCreationWaitAndRejectsItAfterDeleteCommits() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(
+            session,
+            "codex-lock-delete-first",
+            "Codex 删除先锁集团",
+            "abc123"
+        );
+        UUID entityId = currentOperatingEntityId(tenantId);
+        PlatformOperator operator = sysadminOperator();
+        AtomicInteger deletePid = new AtomicInteger();
+        AtomicInteger storePid = new AtomicInteger();
+        CountDownLatch updateLockHeld = new CountDownLatch(1);
+        CountDownLatch releaseDelete = new CountDownLatch(1);
+        CountDownLatch storeStarted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> deletion = executor.submit(() -> new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> {
+                    deletePid.set(currentBackendPid());
+                    structureService.deleteOperatingEntity(tenantId, entityId, operator);
+                    updateLockHeld.countDown();
+                    awaitLatch(releaseDelete, "release operating entity delete");
+                }));
+            awaitLatch(updateLockHeld, "operating entity update lock");
+
+            Future<?> creation = executor.submit(() -> new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> {
+                    storePid.set(currentBackendPid());
+                    storeStarted.countDown();
+                    structureService.createStore(
+                        tenantId,
+                        storeMutation(entityId, "codex-lock-delete-store", "active"),
+                        operator
+                    );
+                }));
+            awaitLatch(storeStarted, "store creation transaction start");
+
+            awaitBlockedBy(storePid.get(), deletePid.get());
+            assertThat(creation.isDone()).isFalse();
+
+            releaseDelete.countDown();
+            deletion.get(20, TimeUnit.SECONDS);
+            assertServiceError(creation, PlatformTenantServiceErrorCode.REQUEST_INVALID);
+
+            assertThat(countWhere(
+                "select count(*) from stores where tenant_id = ? and operating_entity_id = ? and store_code = ? and deleted_at is null",
+                tenantId, entityId, "codex-lock-delete-store"
+            )).isZero();
+            OperatingEntityRowState archivedState = operatingEntityRowState(tenantId, entityId);
+            assertThat(archivedState.status()).isEqualTo("archived");
+            assertThat(archivedState.deletedAt()).isNotNull();
+            assertThat(operatingEntityDeleteAuditCount(entityId)).isEqualTo(1);
+        } finally {
+            releaseDelete.countDown();
+            shutdownExecutor(executor);
+        }
     }
 
     @Test
@@ -1783,6 +1955,227 @@ class PlatformTenantApiIntegrationTest {
             "select count(*) from audit_logs where target_type = 'operating_entity' and target_id = ? and operation_code = 'platform.tenant.operating_entity.delete'",
             entityId
         )).isZero();
+    }
+
+    private UUID currentOperatingEntityId(UUID tenantId) {
+        return jdbc.queryForObject(
+            "select id from operating_entities where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+    }
+
+    private PlatformOperator sysadminOperator() {
+        return new PlatformOperator(
+            jdbc.queryForObject("select id from auth_accounts where username = 'sysadmin'", UUID.class),
+            "platform_admin"
+        );
+    }
+
+    private static PlatformStoreMutationCommand storeMutation(
+        UUID operatingEntityId,
+        String storeCode,
+        String status
+    ) {
+        return new PlatformStoreMutationCommand(
+            operatingEntityId,
+            storeCode,
+            storeCode,
+            status,
+            "Asia/Singapore",
+            "zh-CN",
+            "DD-MM-YYYY",
+            "HH:mm",
+            "SGD",
+            null,
+            null
+        );
+    }
+
+    private int currentBackendPid() {
+        return jdbc.queryForObject("select pg_backend_pid()", Integer.class);
+    }
+
+    private void awaitBlockedBy(int waitingPid, int blockingPid) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Boolean blocked = jdbc.queryForObject(
+                """
+                select exists (
+                    select 1
+                    from pg_stat_activity
+                    where pid = ?
+                      and wait_event_type = 'Lock'
+                      and ? = any(pg_blocking_pids(pid))
+                )
+                """,
+                Boolean.class,
+                waitingPid,
+                blockingPid
+            );
+            if (Boolean.TRUE.equals(blocked)) {
+                return;
+            }
+            Thread.onSpinWait();
+        }
+        String activity = jdbc.queryForObject(
+            """
+            select coalesce((
+                select concat(
+                    'state=', state,
+                    ', wait_event_type=', coalesce(wait_event_type, 'none'),
+                    ', wait_event=', coalesce(wait_event, 'none'),
+                    ', blockers=', pg_blocking_pids(pid)::text
+                )
+                from pg_stat_activity
+                where pid = ?
+            ), 'missing')
+            """,
+            String.class,
+            waitingPid
+        );
+        throw new AssertionError(
+            "PostgreSQL backend " + waitingPid + " was not blocked by " + blockingPid + ": " + activity
+        );
+    }
+
+    private static void awaitLatch(CountDownLatch latch, String description) {
+        try {
+            if (!latch.await(20, TimeUnit.SECONDS)) {
+                throw new AssertionError("Timed out waiting for " + description);
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for " + description, exception);
+        }
+    }
+
+    private static void assertServiceError(
+        Future<?> future,
+        PlatformTenantServiceErrorCode expectedCode
+    ) throws Exception {
+        try {
+            future.get(20, TimeUnit.SECONDS);
+            throw new AssertionError("Expected service error " + expectedCode);
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            while (!(cause instanceof PlatformTenantServiceException) && cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            assertThat(cause).isInstanceOfSatisfying(
+                PlatformTenantServiceException.class,
+                serviceException -> assertThat(serviceException.code()).isEqualTo(expectedCode)
+            );
+        }
+    }
+
+    private static void shutdownExecutor(ExecutorService executor) {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(20, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                if (!executor.awaitTermination(20, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Concurrent test executor did not terminate");
+                }
+            }
+        } catch (InterruptedException exception) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while stopping concurrent test executor", exception);
+        }
+    }
+
+    private OperatingEntityRowState operatingEntityRowState(UUID tenantId, UUID operatingEntityId) {
+        return jdbc.queryForObject(
+            """
+            select status, deleted_at, updated_at, version
+            from operating_entities
+            where tenant_id = ?
+              and id = ?
+            """,
+            (rs, rowNum) -> new OperatingEntityRowState(
+                rs.getString("status"),
+                rs.getObject("deleted_at", OffsetDateTime.class),
+                rs.getObject("updated_at", OffsetDateTime.class),
+                rs.getLong("version")
+            ),
+            tenantId,
+            operatingEntityId
+        );
+    }
+
+    private OperatingEntityAuditSnapshot operatingEntityAuditSnapshot(UUID tenantId, UUID operatingEntityId) {
+        return jdbc.queryForObject(
+            """
+            select id, tenant_id, entity_code, display_name, status,
+                   default_locale, contact_phone, address, principal_name,
+                   deleted_at is not null as deleted
+            from operating_entities
+            where tenant_id = ?
+              and id = ?
+            """,
+            (rs, rowNum) -> new OperatingEntityAuditSnapshot(
+                rs.getObject("id", UUID.class),
+                rs.getObject("tenant_id", UUID.class),
+                rs.getString("entity_code"),
+                rs.getString("display_name"),
+                rs.getString("status"),
+                rs.getString("default_locale"),
+                rs.getString("contact_phone"),
+                rs.getString("address"),
+                rs.getString("principal_name"),
+                rs.getBoolean("deleted")
+            ),
+            tenantId,
+            operatingEntityId
+        );
+    }
+
+    private static void assertOperatingEntityAuditSnapshot(
+        JsonNode metadata,
+        OperatingEntityAuditSnapshot expected
+    ) {
+        assertThat(metadata.path("operatingEntityId").asText()).isEqualTo(expected.operatingEntityId().toString());
+        assertThat(metadata.path("tenantId").asText()).isEqualTo(expected.tenantId().toString());
+        assertThat(metadata.path("entityCode").asText()).isEqualTo(expected.entityCode());
+        assertThat(metadata.path("displayName").asText()).isEqualTo(expected.displayName());
+        assertThat(metadata.path("status").asText()).isEqualTo(expected.status());
+        assertThat(nullableJsonText(metadata, "defaultLocale")).isEqualTo(expected.defaultLocale());
+        assertThat(nullableJsonText(metadata, "contactPhone")).isEqualTo(expected.contactPhone());
+        assertThat(nullableJsonText(metadata, "address")).isEqualTo(expected.address());
+        assertThat(nullableJsonText(metadata, "principalName")).isEqualTo(expected.principalName());
+        assertThat(metadata.path("deleted").asBoolean()).isEqualTo(expected.deleted());
+    }
+
+    private static String nullableJsonText(JsonNode node, String fieldName) {
+        JsonNode field = node.path(fieldName);
+        return field.isNull() || field.isMissingNode() ? null : field.asText();
+    }
+
+    private int operatingEntityDeleteAuditCount(UUID operatingEntityId) {
+        return countWhere(
+            "select count(*) from audit_logs where target_type = 'operating_entity' and target_id = ? and operation_code = 'platform.tenant.operating_entity.delete'",
+            operatingEntityId
+        );
+    }
+
+    private OperatingEntityDeleteAuditRow operatingEntityDeleteAudit(UUID operatingEntityId) {
+        return jdbc.queryForObject(
+            """
+            select actor_id, actor_type, source, metadata::text
+            from audit_logs
+            where target_type = 'operating_entity'
+              and target_id = ?
+              and operation_code = 'platform.tenant.operating_entity.delete'
+            """,
+            (rs, rowNum) -> new OperatingEntityDeleteAuditRow(
+                rs.getObject("actor_id", UUID.class),
+                rs.getString("actor_type"),
+                rs.getString("source"),
+                rs.getString("metadata")
+            ),
+            operatingEntityId
+        );
     }
 
     private UUID createTenant(Cookie session, String tenantCode, String displayName) throws Exception {
@@ -2128,6 +2521,36 @@ class PlatformTenantApiIntegrationTest {
             tenantId,
             operationCode
         );
+    }
+
+    private record OperatingEntityRowState(
+        String status,
+        OffsetDateTime deletedAt,
+        OffsetDateTime updatedAt,
+        long version
+    ) {
+    }
+
+    private record OperatingEntityDeleteAuditRow(
+        UUID actorId,
+        String actorType,
+        String source,
+        String metadata
+    ) {
+    }
+
+    private record OperatingEntityAuditSnapshot(
+        UUID operatingEntityId,
+        UUID tenantId,
+        String entityCode,
+        String displayName,
+        String status,
+        String defaultLocale,
+        String contactPhone,
+        String address,
+        String principalName,
+        boolean deleted
+    ) {
     }
 
     private record SliderTarget(String challengeId, int targetX) {
