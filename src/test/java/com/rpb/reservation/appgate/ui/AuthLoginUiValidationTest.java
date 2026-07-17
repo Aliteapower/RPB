@@ -315,6 +315,7 @@ class AuthLoginUiValidationTest {
         String formSource = FrontendSourceSupport.readString(formPath);
         String formPageSource = FrontendSourceSupport.readString(formPagePath);
         String structureSource = FrontendSourceSupport.readString(structurePath);
+        String platformApiSource = FrontendSourceSupport.readString(apiPath);
         String zh = FrontendSourceSupport.readString(zhPath);
         String en = FrontendSourceSupport.readString(enPath);
 
@@ -336,6 +337,7 @@ class AuthLoginUiValidationTest {
             .contains("deleteOperatingEntity")
             .contains("async function deleteEntity")
             .contains("confirmDeleteEntity")
+            .contains("await deleteOperatingEntity(tenantId.value, entity.id)")
             .contains("OPERATING_ENTITY_HAS_STORES")
             .contains("async function saveAdminStoreAccess")
             .contains("adminStoreIds: [...submittedForm.adminStoreIds]")
@@ -358,6 +360,7 @@ class AuthLoginUiValidationTest {
             .contains("emit('deleteStore', store)")
             .contains("deleteOperatingEntity: [entity: PlatformOperatingEntity]")
             .contains("entityHasCurrentStores")
+            .contains("return props.stores.some(store => store.operatingEntityId === entityId)")
             .contains("v-if=\"!entityHasCurrentStores(entity.id)\"")
             .contains("emit('deleteOperatingEntity', entity)")
             .contains("platform.tenants.structure.actions.deleteStore")
@@ -393,6 +396,15 @@ class AuthLoginUiValidationTest {
             .contains("PlatformOperatingEntityFormModel")
             .contains("PlatformStoreFormModel");
 
+        int deleteOperatingEntityStart = platformApiSource.indexOf("export async function deleteOperatingEntity(");
+        int deleteOperatingEntityEnd = platformApiSource.indexOf("export async function listTenantStores(", deleteOperatingEntityStart);
+        assertThat(deleteOperatingEntityStart).isGreaterThanOrEqualTo(0);
+        assertThat(deleteOperatingEntityEnd).isGreaterThan(deleteOperatingEntityStart);
+        String deleteOperatingEntitySource = platformApiSource.substring(deleteOperatingEntityStart, deleteOperatingEntityEnd);
+        assertThat(deleteOperatingEntitySource)
+            .contains("`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/operating-entities/${encodeURIComponent(operatingEntityId)}`")
+            .contains("method: 'DELETE'");
+
         assertThat(zh)
             .contains("adminStoreAccess")
             .contains("title: '授权门店'")
@@ -403,6 +415,7 @@ class AuthLoginUiValidationTest {
             .contains("newStore: '新增分店'")
             .contains("deleteStore: '删除'")
             .contains("deleteEntity: '删除'")
+            .contains("confirmDeleteEntity: '删除经营主体 {entityName}？历史记录将保留，删除后不可在当前列表恢复。'")
             .contains("operatingEntityHasStores: '该经营主体仍有门店，无法删除'")
             .contains("confirmDeleteStore: '删除门店 {storeName}？删除后该门店登录、授权、子域名入口和活跃计费项将停用。'");
         assertThat(en)
@@ -415,6 +428,7 @@ class AuthLoginUiValidationTest {
             .contains("newStore: 'Add branch'")
             .contains("deleteStore: 'Delete'")
             .contains("deleteEntity: 'Delete'")
+            .contains("confirmDeleteEntity: 'Delete operating entity {entityName}? History is retained and the entity cannot be restored from this list.'")
             .contains("operatingEntityHasStores: 'This operating entity still has stores and cannot be deleted'")
             .contains("confirmDeleteStore: 'Delete store {storeName}? Store login, access, subdomain entry and active billing items will be disabled.'");
     }
