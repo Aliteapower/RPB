@@ -32,7 +32,11 @@ public abstract class JacksonIdempotencySnapshotCodec<T> implements IdempotencyS
             throw new IdempotencySnapshotException("idempotency_snapshot_payload_required");
         }
         try {
-            return objectMapper.readValue(payload, snapshotType);
+            T snapshot = objectMapper.readValue(payload, snapshotType);
+            if (snapshot == null) {
+                throw new IdempotencySnapshotException("idempotency_snapshot_decode_failed");
+            }
+            return snapshot;
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             throw new IdempotencySnapshotException("idempotency_snapshot_decode_failed", exception);
         }

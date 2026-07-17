@@ -38,6 +38,13 @@ class JacksonIdempotencySnapshotCodecTest {
             .hasMessage("idempotency_snapshot_decode_failed");
     }
 
+    @Test
+    void rejectsJsonNullWithDecodeFailure() {
+        assertThatThrownBy(() -> codec.decode("null"))
+            .isInstanceOf(IdempotencySnapshotException.class)
+            .hasMessage("idempotency_snapshot_decode_failed");
+    }
+
     private record ExampleSnapshot(UUID id, String status, List<String> memberStatuses) {
     }
 
