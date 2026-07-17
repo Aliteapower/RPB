@@ -166,7 +166,7 @@ function editEntity(entity: PlatformOperatingEntity): void {
     id: entity.id,
     entityCode: entity.entityCode,
     displayName: entity.displayName,
-    status: entity.status,
+    status: entity.status === 'archived' ? 'inactive' : entity.status,
     defaultLocale: entity.defaultLocale || 'zh-CN',
     contactPhone: entity.contactPhone || '',
     address: entity.address || '',

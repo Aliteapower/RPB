@@ -611,7 +611,8 @@ export const enSG = {
         forbidden: 'You do not have platform admin permission',
         conflict: 'Tenant code or admin account already exists',
         notFound: 'Tenant was not found',
-        invalid: 'Check required fields and the 6-character password'
+        invalid: 'Check required fields and the 6-character password',
+        operatingEntityHasStores: 'This operating entity still has stores and cannot be deleted'
       },
       list: {
         kickerPlatform: 'Platform',
@@ -697,7 +698,7 @@ export const enSG = {
           aria: 'Operating entity and store switcher'
         },
         guide: {
-          noEntities: 'The group prepares a default operating entity automatically. Add a branch next.',
+          noEntities: 'No operating entities. Add an operating entity first.',
           noStores: 'The default operating entity is ready. Add a branch next.',
           noActiveEntities: 'Enable the default operating entity before adding branches.',
           noStoresForEntity: 'This operating entity has no branches yet.'
@@ -707,7 +708,8 @@ export const enSG = {
           newStore: 'Add branch',
           deleteStore: 'Delete',
           deleteEntity: 'Delete',
-          confirmDeleteStore: 'Delete store {storeName}? Store login, access, subdomain entry and active billing items will be disabled.'
+          confirmDeleteStore: 'Delete store {storeName}? Store login, access, subdomain entry and active billing items will be disabled.',
+          confirmDeleteEntity: 'Delete operating entity {entityName}? History is retained and the entity cannot be restored from this list.'
         },
         formTitles: {
           editEntity: 'Edit entity',
@@ -757,7 +759,8 @@ export const enSG = {
         status: {
           created: 'Created',
           active: 'Enabled',
-          inactive: 'Disabled'
+          inactive: 'Disabled',
+          archived: 'Archived'
         }
       }
     },

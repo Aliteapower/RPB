@@ -611,7 +611,8 @@ export const zhCN = {
         forbidden: '没有平台后台权限',
         conflict: '租户代码或管理员账号已存在',
         notFound: '租户不存在',
-        invalid: '请检查必填项和 6 位密码'
+        invalid: '请检查必填项和 6 位密码',
+        operatingEntityHasStores: '该经营主体仍有门店，无法删除'
       },
       list: {
         kickerPlatform: '平台',
@@ -697,7 +698,7 @@ export const zhCN = {
           aria: '经营主体与门店切换'
         },
         guide: {
-          noEntities: '集团会自动准备默认经营主体，请继续新增分店。',
+          noEntities: '暂无经营主体，请先新增经营主体。',
           noStores: '默认经营主体已就绪，可以继续新增分店。',
           noActiveEntities: '需要先启用默认经营主体，才能新增分店。',
           noStoresForEntity: '当前经营主体还没有分店。'
@@ -707,7 +708,8 @@ export const zhCN = {
           newStore: '新增分店',
           deleteStore: '删除',
           deleteEntity: '删除',
-          confirmDeleteStore: '删除门店 {storeName}？删除后该门店登录、授权、子域名入口和活跃计费项将停用。'
+          confirmDeleteStore: '删除门店 {storeName}？删除后该门店登录、授权、子域名入口和活跃计费项将停用。',
+          confirmDeleteEntity: '删除经营主体 {entityName}？历史记录将保留，删除后不可在当前列表恢复。'
         },
         formTitles: {
           editEntity: '编辑经营主体',
@@ -757,7 +759,8 @@ export const zhCN = {
         status: {
           created: '已创建',
           active: '启用',
-          inactive: '停用'
+          inactive: '停用',
+          archived: '已归档'
         }
       }
     },

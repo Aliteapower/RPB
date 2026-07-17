@@ -28,7 +28,8 @@ export interface PlatformTenantStoreAccessStore {
 export type TenantStatus = 'created' | 'active' | 'suspended' | 'closed'
 export type TenantListStatus = 'all' | 'active' | 'deleted'
 export type PlatformTenantOnboardingMode = 'single_store' | 'group_multi_store'
-export type PlatformOperatingEntityStatus = 'active' | 'inactive'
+export type PlatformOperatingEntityStatus = 'active' | 'inactive' | 'archived'
+export type PlatformOperatingEntityMutableStatus = Exclude<PlatformOperatingEntityStatus, 'archived'>
 export type PlatformStoreStatus = 'created' | 'active' | 'inactive'
 
 export interface PlatformOperatingEntity {
@@ -50,7 +51,7 @@ export interface PlatformOperatingEntity {
 export interface PlatformOperatingEntityMutation {
   entityCode: string
   displayName: string
-  status: PlatformOperatingEntityStatus
+  status: PlatformOperatingEntityMutableStatus
   defaultLocale?: string | null
   contactPhone?: string | null
   address?: string | null
@@ -250,6 +251,20 @@ export async function updateOperatingEntity(
     {
       method: 'PATCH',
       body: request,
+      fetcher
+    }
+  )
+}
+
+export async function deleteOperatingEntity(
+  tenantId: string,
+  operatingEntityId: string,
+  fetcher?: PlatformFetcher
+): Promise<PlatformOperatingEntityResponse> {
+  return requestJson(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/operating-entities/${encodeURIComponent(operatingEntityId)}`,
+    {
+      method: 'DELETE',
       fetcher
     }
   )

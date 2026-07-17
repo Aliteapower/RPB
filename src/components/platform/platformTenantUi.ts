@@ -1,5 +1,5 @@
 import type {
-  PlatformOperatingEntityStatus,
+  PlatformOperatingEntityMutableStatus,
   PlatformStoreStatus,
   PlatformTenantOnboardingMode,
   TenantStatus
@@ -39,7 +39,7 @@ export interface PlatformOperatingEntityFormModel {
   id: string
   entityCode: string
   displayName: string
-  status: PlatformOperatingEntityStatus
+  status: PlatformOperatingEntityMutableStatus
   defaultLocale: string
   contactPhone: string
   address: string

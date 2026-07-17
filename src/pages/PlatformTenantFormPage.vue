@@ -9,6 +9,7 @@ import {
   createOperatingEntity,
   createTenant,
   createTenantStore,
+  deleteOperatingEntity,
   deleteTenantStore,
   getTenant,
   getTenantAdminStoreAccess,
@@ -300,6 +301,27 @@ async function deleteStore(store: PlatformStore): Promise<void> {
   }
 }
 
+async function deleteEntity(entity: PlatformOperatingEntity): Promise<void> {
+  if (structureSaving.value || mode.value !== 'edit') {
+    return
+  }
+  const entityName = entity.displayName || entity.entityCode
+  if (!window.confirm(t('platform.tenants.structure.actions.confirmDeleteEntity', { entityName }))) {
+    return
+  }
+
+  structureSaving.value = true
+  errorText.value = ''
+  try {
+    await deleteOperatingEntity(tenantId.value, entity.id)
+    await reloadStructureAndAccess()
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    structureSaving.value = false
+  }
+}
+
 async function saveAdminStoreAccess(submittedForm: PlatformTenantAdminStoreAccessFormModel): Promise<void> {
   if (structureSaving.value || mode.value !== 'edit') {
     return
@@ -377,6 +399,9 @@ function apiErrorText(error: unknown): string {
   if (error.response.error.code === 'REQUEST_INVALID') {
     return t('platform.tenants.errors.invalid')
   }
+  if (error.response.error.code === 'OPERATING_ENTITY_HAS_STORES') {
+    return t('platform.tenants.errors.operatingEntityHasStores')
+  }
   return t('platform.tenants.errors.operationFailed')
 }
 </script>
@@ -421,6 +446,7 @@ function apiErrorText(error: unknown): string {
         @save-operating-entity="saveOperatingEntity"
         @save-store="saveStore"
         @delete-store="deleteStore"
+        @delete-operating-entity="deleteEntity"
         @save-admin-store-access="saveAdminStoreAccess"
       />
     </section>
