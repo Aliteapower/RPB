@@ -27,6 +27,7 @@ const emit = defineEmits<{
   saveOperatingEntity: [form: PlatformOperatingEntityFormModel]
   saveStore: [form: PlatformStoreFormModel]
   deleteStore: [store: PlatformStore]
+  deleteOperatingEntity: [entity: PlatformOperatingEntity]
   saveAdminStoreAccess: [form: PlatformTenantAdminStoreAccessFormModel]
 }>()
 
@@ -99,6 +100,10 @@ const storeStatusOptions = [
 watch(
   () => props.operatingEntities,
   () => {
+    if (entityForm.id && !props.operatingEntities.some(entity => entity.id === entityForm.id)) {
+      entityFormOpen.value = false
+      resetEntityForm()
+    }
     if (
       selectedOperatingEntityId.value &&
       props.operatingEntities.some(entity => entity.id === selectedOperatingEntityId.value)
@@ -237,6 +242,14 @@ function submitStore(): void {
 
 function deleteStore(store: PlatformStore): void {
   emit('deleteStore', store)
+}
+
+function entityHasCurrentStores(entityId: string): boolean {
+  return props.stores.some(store => store.operatingEntityId === entityId)
+}
+
+function deleteOperatingEntity(entity: PlatformOperatingEntity): void {
+  emit('deleteOperatingEntity', entity)
 }
 
 function toggleAdminStoreFromEvent(storeId: string, event: Event): void {
@@ -395,9 +408,20 @@ function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
               <strong>{{ operatingEntityLabel(entity) }}</strong>
               <small>{{ entity.entityCode }} · {{ $t(`platform.tenants.structure.status.${entity.status}`) }}</small>
             </button>
-            <button class="text-button" type="button" @click="editEntity(entity)">
-              {{ $t('common.actions.edit') }}
-            </button>
+            <div class="row-actions">
+              <button class="text-button" type="button" :disabled="saving" @click="editEntity(entity)">
+                {{ $t('common.actions.edit') }}
+              </button>
+              <button
+                v-if="!entityHasCurrentStores(entity.id)"
+                class="text-button danger"
+                type="button"
+                :disabled="saving"
+                @click="deleteOperatingEntity(entity)"
+              >
+                {{ $t('platform.tenants.structure.actions.deleteEntity') }}
+              </button>
+            </div>
           </article>
         </div>
 
