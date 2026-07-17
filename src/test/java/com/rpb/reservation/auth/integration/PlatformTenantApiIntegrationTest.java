@@ -68,6 +68,20 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_user_sessions");
         jdbc.update("delete from auth_slider_captcha_challenges");
         jdbc.update("delete from audit_logs where operation_code like 'platform.tenant.%'");
+        jdbc.update("""
+            delete from audit_logs
+            where store_id in (select id from stores where store_code like 'codex-%')
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
+        jdbc.update("""
+            delete from store_app_settings
+            where store_id in (select id from stores where store_code like 'codex-%')
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
+        jdbc.update("""
+            delete from tenant_app_entitlements
+            where tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
         jdbc.update("delete from auth_account_roles where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_permissions where account_id in (select id from auth_accounts where username like 'codex-%')");
         jdbc.update("delete from auth_account_store_access where account_id in (select id from auth_accounts where username like 'codex-%')");
