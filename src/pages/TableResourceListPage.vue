@@ -37,6 +37,10 @@ import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import { formatAppGateErrorMessage, formatAppGateErrorTitle } from '../utils/appGateErrorMessages'
+import {
+  formatStoreTime,
+  storeDateInput as todayDateInput
+} from '../utils/storeTemporalContext'
 import type {
   TableResourceApiErrorResponse,
   TableResourceItem,
@@ -1214,39 +1218,6 @@ function monthKeyFromDate(value: string): string {
     return ''
   }
   return `${year}-${month}`
-}
-
-function formatStoreTime(value: string): string {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Singapore',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).formatToParts(date)
-
-  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
-  return `${part('hour')}:${part('minute')}`
-}
-
-function todayDateInput(timeZone = 'Asia/Singapore'): string {
-  const date = new Date()
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(date)
-  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
-  const year = part('year')
-  const month = part('month')
-  const day = part('day')
-  return `${year}-${month}-${day}`
 }
 
 function formatStoreLabel(value: string | undefined): string {
