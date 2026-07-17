@@ -15,6 +15,7 @@ import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreContextStore } from '../stores/storeContext'
 import { formatAppGateErrorMessage, formatAppGateErrorTitle } from '../utils/appGateErrorMessages'
+import { formatStoreMonthDayTime } from '../utils/storeTemporalContext'
 import type { MeAppEntry } from '../types/meApps'
 import type {
   CallQueueTicketResponse,
@@ -64,7 +65,6 @@ const storeContext = useStoreContextStore()
 const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
 const todayListLimit = 100
-const storeTimezone = 'Asia/Singapore'
 
 const statusOptions: Array<{ value: UiStatusFilter; label: string }> = [
   { value: 'all', label: gt('generated.queue-ticket-list.074') },
@@ -863,23 +863,7 @@ function formatStoreDateTime(value: string | null | undefined): string {
     return gt('generated.queue-ticket-list.098')
   }
 
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: storeTimezone,
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).formatToParts(date)
-
-  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
-  return `${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`
+  return formatStoreMonthDayTime(value)
 }
 
 function statusLabel(status: string): string {
