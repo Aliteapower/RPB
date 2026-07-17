@@ -23,6 +23,7 @@ public class PlatformTenantAuditService {
     static final String OPERATION_RESTORE = "platform.tenant.restore";
     static final String OPERATION_OPERATING_ENTITY_CREATE = "platform.tenant.operating_entity.create";
     static final String OPERATION_OPERATING_ENTITY_UPDATE = "platform.tenant.operating_entity.update";
+    static final String OPERATION_OPERATING_ENTITY_DELETE = "platform.tenant.operating_entity.delete";
     static final String OPERATION_STORE_CREATE = "platform.tenant.store.create";
     static final String OPERATION_STORE_UPDATE = "platform.tenant.store.update";
     static final String OPERATION_STORE_DELETE = "platform.tenant.store.delete";
@@ -90,6 +91,17 @@ public class PlatformTenantAuditService {
         metadata.put("previous", operatingEntityMetadata(before));
         metadata.put("changedFields", changedOperatingEntityFields(before, after));
         append(OPERATION_OPERATING_ENTITY_UPDATE, TARGET_OPERATING_ENTITY, after.id(), operator, metadata);
+    }
+
+    public void recordOperatingEntityDeleted(
+        PlatformOperatingEntity before,
+        PlatformOperatingEntity after,
+        PlatformOperator operator
+    ) {
+        Map<String, Object> metadata = operatingEntityMetadata(after);
+        metadata.put("previous", operatingEntityMetadata(before));
+        metadata.put("deleted", true);
+        append(OPERATION_OPERATING_ENTITY_DELETE, TARGET_OPERATING_ENTITY, after.id(), operator, metadata);
     }
 
     public void recordStoreCreated(PlatformStore store, PlatformOperator operator) {

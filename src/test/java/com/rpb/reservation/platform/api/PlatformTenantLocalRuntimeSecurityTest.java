@@ -123,6 +123,8 @@ class PlatformTenantLocalRuntimeSecurityTest {
     void localRuntimeAllowsTenantStructureApisWhenConfiguredActorIsPlatformAdmin() throws Exception {
         when(structureService.listOperatingEntities(TENANT_ID)).thenReturn(List.of(operatingEntity()));
         when(structureService.listStores(TENANT_ID)).thenReturn(List.of(store()));
+        when(structureService.deleteOperatingEntity(eq(TENANT_ID), eq(OPERATING_ENTITY_ID), any()))
+            .thenReturn(deletedOperatingEntity());
         when(structureService.deleteStore(eq(TENANT_ID), eq(STORE_ID), any())).thenReturn(deletedStore());
 
         mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/operating-entities", TENANT_ID))
@@ -135,6 +137,15 @@ class PlatformTenantLocalRuntimeSecurityTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.stores[0].storeCode").value("local-validation-store"))
             .andExpect(jsonPath("$.stores[0].operatingEntityName").value("Local Operating Entity"));
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                TENANT_ID,
+                OPERATING_ENTITY_ID
+            ))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.operatingEntity.id").value(OPERATING_ENTITY_ID.toString()))
+            .andExpect(jsonPath("$.operatingEntity.deleted").value(true));
 
         mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", TENANT_ID, STORE_ID))
             .andExpect(status().isOk())
@@ -238,6 +249,23 @@ class PlatformTenantLocalRuntimeSecurityTest {
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             OffsetDateTime.parse("2026-06-25T00:00:00Z"),
             null
+        );
+    }
+
+    private static PlatformOperatingEntity deletedOperatingEntity() {
+        return new PlatformOperatingEntity(
+            OPERATING_ENTITY_ID,
+            TENANT_ID,
+            "local-entity",
+            "Local Operating Entity",
+            "archived",
+            "zh-CN",
+            "+6590000000",
+            "1 Local Street",
+            "Local Manager",
+            OffsetDateTime.parse("2026-06-25T00:00:00Z"),
+            OffsetDateTime.parse("2026-07-17T00:00:00Z"),
+            OffsetDateTime.parse("2026-07-17T00:00:00Z")
         );
     }
 

@@ -72,6 +72,19 @@ Rules:
 - `entityCode` is unique per tenant among non-deleted operating entities.
 - Invalid tenant ids return `TENANT_NOT_FOUND`; invalid request payloads return `REQUEST_INVALID`; duplicate codes return `OPERATING_ENTITY_CODE_CONFLICT`.
 
+### `DELETE /api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}`
+
+Soft-deletes an operating entity only when no current store references it.
+
+Rules:
+- A current store is in the same tenant/entity with `stores.deleted_at is null`.
+- Soft-deleted historical stores do not block deletion.
+- The final no-store operating entity may be deleted.
+- Success sets `status = archived`, sets `deleted_at`, increments `version`, and returns `deleted = true`.
+- A current store returns HTTP 409 with `OPERATING_ENTITY_HAS_STORES` and makes no mutation.
+- Invalid tenants return `TENANT_NOT_FOUND`; invalid, deleted, repeated, or cross-tenant entities return `OPERATING_ENTITY_NOT_FOUND`.
+- Repeating a successful delete returns `OPERATING_ENTITY_NOT_FOUND` while the entity remains deleted.
+
 ## Tenant Stores
 
 Stores remain tenant-scoped operational units. New stores created through the platform API must point to an active operating entity in the same tenant.

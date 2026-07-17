@@ -111,6 +111,33 @@ public class PlatformTenantStructureService {
         }
     }
 
+    @Transactional
+    public PlatformOperatingEntity deleteOperatingEntity(
+        UUID tenantId,
+        UUID operatingEntityId,
+        PlatformOperator operator
+    ) {
+        requireTenant(tenantId);
+        if (operatingEntityId == null) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
+        }
+        PlatformOperatingEntity existing = structureRepository
+            .findOperatingEntityForUpdate(tenantId, operatingEntityId)
+            .orElseThrow(() -> new PlatformTenantServiceException(
+                PlatformTenantServiceErrorCode.OPERATING_ENTITY_NOT_FOUND
+            ));
+        if (structureRepository.currentStoreExists(tenantId, operatingEntityId)) {
+            throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.OPERATING_ENTITY_HAS_STORES);
+        }
+        PlatformOperatingEntity deleted = structureRepository
+            .softDeleteOperatingEntity(tenantId, operatingEntityId)
+            .orElseThrow(() -> new PlatformTenantServiceException(
+                PlatformTenantServiceErrorCode.OPERATING_ENTITY_NOT_FOUND
+            ));
+        auditService.recordOperatingEntityDeleted(existing, deleted, operator);
+        return deleted;
+    }
+
     @Transactional(readOnly = true)
     public List<PlatformStore> listStores(UUID tenantId) {
         requireTenant(tenantId);
@@ -333,7 +360,7 @@ public class PlatformTenantStructureService {
     }
 
     private void validateOperatingEntity(UUID tenantId, UUID operatingEntityId) {
-        if (!structureRepository.activeOperatingEntityExists(tenantId, operatingEntityId)) {
+        if (!structureRepository.lockActiveOperatingEntity(tenantId, operatingEntityId)) {
             throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);
         }
     }

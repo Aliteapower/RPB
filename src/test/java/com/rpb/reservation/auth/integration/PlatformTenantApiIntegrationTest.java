@@ -1,6 +1,8 @@
 package com.rpb.reservation.auth.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -12,6 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rpb.reservation.appgate.domain.AppGateRequiredPermission;
+import com.rpb.reservation.platform.application.PlatformTenantAuditService;
+import com.rpb.reservation.platform.application.PlatformTenantServiceErrorCode;
+import com.rpb.reservation.platform.application.PlatformTenantServiceException;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,6 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockReset;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -49,6 +56,9 @@ class PlatformTenantApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @SpyBean(reset = MockReset.AFTER)
+    private PlatformTenantAuditService platformTenantAuditService;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -1646,6 +1656,133 @@ class PlatformTenantApiIntegrationTest {
             .doesNotContain("QWE123")
             .doesNotContain("qwe123");
         assertThat(auditMetadataValue(createdTenantId, "platform.tenant.update", "passwordChanged")).isEqualTo("true");
+    }
+
+    @Test
+    void platformAdminDeletesFinalOperatingEntityAfterItsOnlyStoreIsSoftDeleted() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(session, "codex-entity-delete", "Codex 主体删除集团", "abc123");
+        UUID entityId = jdbc.queryForObject(
+            "select id from operating_entities where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+        UUID storeId = createStore(
+            session, tenantId, entityId, "codex-entity-delete-store", "Codex 主体删除门店", null, null
+        );
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                tenantId, entityId
+            ).cookie(session))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.error.code").value("OPERATING_ENTITY_HAS_STORES"))
+            .andExpect(jsonPath("$.error.messageKey").value("platform.tenants.operating_entity_has_stores"));
+
+        assertThat(countWhere(
+            "select count(*) from operating_entities where tenant_id = ? and id = ? and deleted_at is null",
+            tenantId, entityId
+        )).isEqualTo(1);
+
+        mockMvc.perform(delete("/api/v1/platform/tenants/{tenantId}/stores/{storeId}", tenantId, storeId)
+                .cookie(session))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                tenantId, entityId
+            ).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.operatingEntity.id").value(entityId.toString()))
+            .andExpect(jsonPath("$.operatingEntity.status").value("archived"))
+            .andExpect(jsonPath("$.operatingEntity.deleted").value(true));
+
+        assertThat(countWhere(
+            "select count(*) from operating_entities where tenant_id = ? and id = ? and status = 'archived' and deleted_at is not null",
+            tenantId, entityId
+        )).isEqualTo(1);
+        assertThat(countWhere(
+            "select count(*) from stores where tenant_id = ? and id = ? and operating_entity_id = ? and deleted_at is not null",
+            tenantId, storeId, entityId
+        )).isEqualTo(1);
+        assertThat(countWhere(
+            "select count(*) from audit_logs where target_type = 'operating_entity' and target_id = ? and operation_code = 'platform.tenant.operating_entity.delete'",
+            entityId
+        )).isEqualTo(1);
+
+        mockMvc.perform(get("/api/v1/platform/tenants/{tenantId}/operating-entities", tenantId).cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.operatingEntities.length()").value(0));
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                tenantId, entityId
+            ).cookie(session))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error.code").value("OPERATING_ENTITY_NOT_FOUND"));
+    }
+
+    @Test
+    void operatingEntityDeleteHidesCrossTenantOwnershipAndRejectsTenantAdmin() throws Exception {
+        Cookie platformSession = login("sysadmin");
+        UUID firstTenantId = createGroupTenant(platformSession, "codex-entity-alpha", "Codex 主体甲", "abc123");
+        UUID secondTenantId = createGroupTenant(platformSession, "codex-entity-beta", "Codex 主体乙", "abc123");
+        UUID firstEntityId = jdbc.queryForObject(
+            "select id from operating_entities where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            firstTenantId
+        );
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                UUID.randomUUID(), firstEntityId
+            ).cookie(platformSession))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error.code").value("TENANT_NOT_FOUND"));
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                secondTenantId, firstEntityId
+            ).cookie(platformSession))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error.code").value("OPERATING_ENTITY_NOT_FOUND"));
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                firstTenantId, firstEntityId
+            ).cookie(login("20000000")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void operatingEntityDeleteRollsBackWhenAuditWriteFails() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(session, "codex-entity-audit", "Codex 主体审计集团", "abc123");
+        UUID entityId = jdbc.queryForObject(
+            "select id from operating_entities where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+        doThrow(new PlatformTenantServiceException(PlatformTenantServiceErrorCode.AUDIT_WRITE_FAILED))
+            .when(platformTenantAuditService)
+            .recordOperatingEntityDeleted(any(), any(), any());
+
+        mockMvc.perform(delete(
+                "/api/v1/platform/tenants/{tenantId}/operating-entities/{operatingEntityId}",
+                tenantId, entityId
+            ).cookie(session))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.error.code").value("AUDIT_WRITE_FAILED"));
+
+        assertThat(countWhere(
+            "select count(*) from operating_entities where tenant_id = ? and id = ? and status = 'active' and deleted_at is null",
+            tenantId, entityId
+        )).isEqualTo(1);
+        assertThat(countWhere(
+            "select count(*) from audit_logs where target_type = 'operating_entity' and target_id = ? and operation_code = 'platform.tenant.operating_entity.delete'",
+            entityId
+        )).isZero();
     }
 
     private UUID createTenant(Cookie session, String tenantCode, String displayName) throws Exception {

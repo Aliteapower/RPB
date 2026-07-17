@@ -117,6 +117,17 @@ public class PlatformTenantController {
         ));
     }
 
+    @DeleteMapping("/{tenantId}/operating-entities/{operatingEntityId}")
+    public ResponseEntity<PlatformOperatingEntityResponse> deleteOperatingEntity(
+        @PathVariable UUID tenantId,
+        @PathVariable UUID operatingEntityId
+    ) {
+        CurrentActor actor = requirePlatformAdmin();
+        return ResponseEntity.ok(PlatformOperatingEntityResponse.from(
+            structureService.deleteOperatingEntity(tenantId, operatingEntityId, toOperator(actor))
+        ));
+    }
+
     @GetMapping("/{tenantId}/stores")
     public ResponseEntity<PlatformStoreListResponse> listStores(@PathVariable UUID tenantId) {
         requirePlatformAdmin();

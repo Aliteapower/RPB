@@ -53,21 +53,76 @@ public class PlatformTenantStructureRepository {
         ).stream().findFirst();
     }
 
-    public boolean activeOperatingEntityExists(UUID tenantId, UUID operatingEntityId) {
-        Integer count = jdbc.queryForObject(
+    public boolean lockActiveOperatingEntity(UUID tenantId, UUID operatingEntityId) {
+        return !jdbc.query(
             """
-            select count(*)
+            select id
             from operating_entities
             where tenant_id = ?
               and id = ?
               and status = 'active'
+              and deleted_at is null
+            for key share
+            """,
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            tenantId,
+            operatingEntityId
+        ).isEmpty();
+    }
+
+    public Optional<PlatformOperatingEntity> findOperatingEntityForUpdate(UUID tenantId, UUID operatingEntityId) {
+        return jdbc.query(
+            """
+            select id, tenant_id, entity_code, display_name, status,
+                   default_locale, contact_phone, address, principal_name,
+                   created_at, updated_at, deleted_at
+            from operating_entities
+            where tenant_id = ?
+              and id = ?
+              and deleted_at is null
+            for update
+            """,
+            (rs, rowNum) -> operatingEntity(rs),
+            tenantId,
+            operatingEntityId
+        ).stream().findFirst();
+    }
+
+    public boolean currentStoreExists(UUID tenantId, UUID operatingEntityId) {
+        Integer count = jdbc.queryForObject(
+            """
+            select count(*)
+            from stores
+            where tenant_id = ?
+              and operating_entity_id = ?
               and deleted_at is null
             """,
             Integer.class,
             tenantId,
             operatingEntityId
         );
-        return count != null && count == 1;
+        return count != null && count > 0;
+    }
+
+    public Optional<PlatformOperatingEntity> softDeleteOperatingEntity(UUID tenantId, UUID operatingEntityId) {
+        return jdbc.query(
+            """
+            update operating_entities
+            set status = 'archived',
+                deleted_at = coalesce(deleted_at, now()),
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and id = ?
+              and deleted_at is null
+            returning id, tenant_id, entity_code, display_name, status,
+                      default_locale, contact_phone, address, principal_name,
+                      created_at, updated_at, deleted_at
+            """,
+            (rs, rowNum) -> operatingEntity(rs),
+            tenantId,
+            operatingEntityId
+        ).stream().findFirst();
     }
 
     public PlatformOperatingEntity insertOperatingEntity(

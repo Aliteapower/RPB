@@ -12,6 +12,7 @@ public enum PlatformTenantApiErrorCode {
     MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "platform.tenants.media_not_found"),
     TENANT_CODE_CONFLICT(HttpStatus.CONFLICT, "platform.tenants.tenant_code_conflict"),
     OPERATING_ENTITY_CODE_CONFLICT(HttpStatus.CONFLICT, "platform.tenants.operating_entity_code_conflict"),
+    OPERATING_ENTITY_HAS_STORES(HttpStatus.CONFLICT, "platform.tenants.operating_entity_has_stores"),
     STORE_CODE_CONFLICT(HttpStatus.CONFLICT, "platform.tenants.store_code_conflict"),
     PERSISTENCE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "platform.tenants.persistence_error"),
     AUDIT_WRITE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "platform.tenants.audit_write_failed");
