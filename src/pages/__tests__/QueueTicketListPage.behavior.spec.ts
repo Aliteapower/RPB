@@ -24,9 +24,15 @@ vi.mock('../../api/queueTicketListApi', async importOriginal => ({
 }))
 
 import { QueueTicketListApiError } from '../../api/queueTicketListApi'
+import type { QueueTicketListResponse } from '../../types/queueTicketList'
 import QueueTicketListPage from '../QueueTicketListPage.vue'
 
 const EmptyShell = defineComponent({ template: '<div />' })
+const emptyQueueResponse: QueueTicketListResponse = {
+  success: true,
+  items: [],
+  page: { limit: 100, offset: 0, total: 0 }
+}
 let wrapper: VueWrapper | undefined
 
 async function mountPage(): Promise<VueWrapper> {
@@ -60,17 +66,12 @@ describe('QueueTicketListPage behaviour', () => {
     vi.resetAllMocks()
     api.fetchMeApps.mockResolvedValue({ success: true, apps: [] })
     api.fetchTableResources.mockResolvedValue({ success: true, resources: [] })
+    api.listQueueTickets.mockResolvedValue(emptyQueueResponse)
   })
 
   afterEach(() => wrapper?.unmount())
 
   it('requests the first Queue page with the stable pagination contract', async () => {
-    api.listQueueTickets.mockResolvedValueOnce({
-      success: true,
-      items: [],
-      page: { limit: 100, offset: 0, total: 0 }
-    })
-
     await mountPage()
     await flushPromises()
 
@@ -113,15 +114,10 @@ describe('QueueTicketListPage behaviour', () => {
 
     expect(loadingPage.find('.queue-list').exists()).toBe(true)
     expect(loadingPage.text()).toContain('Q007')
+    expect(loadingPage.text()).toContain('07-17 00:30')
   })
 
   it('shows the stable empty Queue state after an empty response', async () => {
-    api.listQueueTickets.mockResolvedValueOnce({
-      success: true,
-      items: [],
-      page: { limit: 100, offset: 0, total: 0 }
-    })
-
     const emptyPage = await mountPage()
     await flushPromises()
 
@@ -153,12 +149,6 @@ describe('QueueTicketListPage behaviour', () => {
   })
 
   it('normalizes the phone filter before requesting Queue tickets', async () => {
-    api.listQueueTickets.mockResolvedValueOnce({
-      success: true,
-      items: [],
-      page: { limit: 100, offset: 0, total: 0 }
-    })
-
     const filterPage = await mountPage()
     await flushPromises()
 
