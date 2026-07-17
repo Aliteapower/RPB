@@ -332,6 +332,11 @@ class AuthLoginUiValidationTest {
             .contains("deleteTenantStore")
             .contains("async function deleteStore")
             .contains("window.confirm(t('platform.tenants.structure.actions.confirmDeleteStore'")
+            .contains("@delete-operating-entity=\"deleteEntity\"")
+            .contains("deleteOperatingEntity")
+            .contains("async function deleteEntity")
+            .contains("confirmDeleteEntity")
+            .contains("OPERATING_ENTITY_HAS_STORES")
             .contains("async function saveAdminStoreAccess")
             .contains("adminStoreIds: [...submittedForm.adminStoreIds]")
             .contains("defaultAdminStoreId: optionalValue(submittedForm.defaultAdminStoreId)");
@@ -351,6 +356,10 @@ class AuthLoginUiValidationTest {
             .contains("store.operatingEntityId === selectedOperatingEntityId")
             .contains("deleteStore: [store: PlatformStore]")
             .contains("emit('deleteStore', store)")
+            .contains("deleteOperatingEntity: [entity: PlatformOperatingEntity]")
+            .contains("entityHasCurrentStores")
+            .contains("v-if=\"!entityHasCurrentStores(entity.id)\"")
+            .contains("emit('deleteOperatingEntity', entity)")
             .contains("platform.tenants.structure.actions.deleteStore")
             .contains("platform.tenants.structure.adminStoreAccess.title")
             .contains("platform.tenants.structure.adminStoreAccess.defaultStore");
@@ -393,6 +402,8 @@ class AuthLoginUiValidationTest {
             .contains("newEntity: '新增经营主体'")
             .contains("newStore: '新增分店'")
             .contains("deleteStore: '删除'")
+            .contains("deleteEntity: '删除'")
+            .contains("operatingEntityHasStores: '该经营主体仍有门店，无法删除'")
             .contains("confirmDeleteStore: '删除门店 {storeName}？删除后该门店登录、授权、子域名入口和活跃计费项将停用。'");
         assertThat(en)
             .contains("adminStoreAccess")
@@ -403,6 +414,8 @@ class AuthLoginUiValidationTest {
             .contains("newEntity: 'Add entity'")
             .contains("newStore: 'Add branch'")
             .contains("deleteStore: 'Delete'")
+            .contains("deleteEntity: 'Delete'")
+            .contains("operatingEntityHasStores: 'This operating entity still has stores and cannot be deleted'")
             .contains("confirmDeleteStore: 'Delete store {storeName}? Store login, access, subdomain entry and active billing items will be disabled.'");
     }
 
