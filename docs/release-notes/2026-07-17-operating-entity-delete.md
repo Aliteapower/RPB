@@ -42,7 +42,18 @@
 - `mvn -q "-Dtest=PlatformTenantApiIntegrationTest,PlatformTenantLocalRuntimeSecurityTest,AuthLoginUiValidationTest" test` passed: 47 tests (23 platform tenant API, 8 local runtime security, 16 frontend source guards).
 - `mvn -q -DskipTests package` passed. The full PostgreSQL-dependent integration suite was not run.
 
+## Deployment
+
+- Deployed backend and frontend source commit `7d675ed6d82552ad21ed17b9bf82d2fb0a9c6220` to the shared `booking.yumstone.sg` production environment on 2026-07-17 at 18:03 SGT.
+- Backend JAR SHA-256: `477e7d127affd9ddc82cb77dc8ce6b52a9b9d6e6eae61d5a3cd010fb6139f0ab`; frontend archive SHA-256: `fdf32a68e7bdd63b4e5ceaf26013090351186cd043146b12e9145237dadd43fa`.
+- The pre-switch full backup is `/opt/rpb/backups/20260717-180339-7d675ed6-full`.
+- The backend remained `active`, unauthenticated `/api/v1/auth/me` returned HTTP 401, and the post-start backend ERROR log count was zero.
+- Production Flyway history remained successful through version `045`; no migration, data change, permission change, App Gate change, or environment change ran.
+- The `booking`, `platform`, `20000000`, `lsc106`, and `lsc83` login entries and the `20000000` booking entry returned HTTP 200 with `/assets/index-CsT21tJv.js`. The operating-entity feature chunk returned HTTP 200 and contained the guarded delete flow.
+- Authenticated Chrome verification on tenant `fb8e092d-aa34-42eb-bb55-5229044c3885` showed Delete for the no-store operating entity `麻辣烫 (ocd)` and no Delete action for `老成都 (lcd)`, which still owns a current store. No production entity was deleted during validation.
+
 ## Rollback Notes
 
-- Remove the frontend action and the additive endpoint in a follow-up release, then redeploy the prior compatible application version.
+- Restore `/opt/rpb/backups/20260717-180339-7d675ed6-full/reservation-platform.jar` to `/opt/rpb/app/reservation-platform.jar`, restore that backup's `frontend` directory to `/opt/rpb/frontend`, and restart `rpb-backend`.
+- Verify the backend is active, unauthenticated `/api/v1/auth/me` returns HTTP 401, and production pages serve the previous frontend entry asset.
 - Previously soft-deleted entities remain retained historical records; no schema or data rollback is required.
