@@ -3,6 +3,7 @@ import { createI18n } from 'vue-i18n'
 import { describe, expect, it } from 'vitest'
 
 import type { PlatformOperatingEntity, PlatformStore } from '../../../api/platformApi'
+import { enSG } from '../../../i18n/locales/en-SG'
 import PlatformTenantStructurePanel from '../PlatformTenantStructurePanel.vue'
 
 const EMPTY_ENTITY: PlatformOperatingEntity = {
@@ -24,7 +25,7 @@ const USED_STORE: PlatformStore = {
 }
 
 function mountPanel(): VueWrapper {
-  const i18n = createI18n({ legacy: false, locale: 'en-SG', messages: { 'en-SG': {} } })
+  const i18n = createI18n({ legacy: false, locale: 'en-SG', messages: { 'en-SG': enSG } })
   return mount(PlatformTenantStructurePanel, {
     props: {
       operatingEntities: [EMPTY_ENTITY, USED_ENTITY],
@@ -44,6 +45,7 @@ describe('PlatformTenantStructurePanel operating entity deletion', () => {
     const rows = wrapper.findAll('.structure-entity-row')
     expect(rows[0].find('.text-button.danger').exists()).toBe(true)
     expect(rows[1].find('.text-button.danger').exists()).toBe(false)
+    expect(rows[0].get('.text-button.danger').text()).toBe('Delete')
     await rows[0].get('.text-button.danger').trigger('click')
     expect(wrapper.emitted('deleteOperatingEntity')?.[0]).toEqual([EMPTY_ENTITY])
     await wrapper.setProps({ saving: true })

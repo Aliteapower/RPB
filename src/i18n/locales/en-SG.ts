@@ -706,6 +706,7 @@ export const enSG = {
           newEntity: 'Add entity',
           newStore: 'Add branch',
           deleteStore: 'Delete',
+          deleteEntity: 'Delete',
           confirmDeleteStore: 'Delete store {storeName}? Store login, access, subdomain entry and active billing items will be disabled.'
         },
         formTitles: {

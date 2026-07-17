@@ -706,6 +706,7 @@ export const zhCN = {
           newEntity: '新增经营主体',
           newStore: '新增分店',
           deleteStore: '删除',
+          deleteEntity: '删除',
           confirmDeleteStore: '删除门店 {storeName}？删除后该门店登录、授权、子域名入口和活跃计费项将停用。'
         },
         formTitles: {
