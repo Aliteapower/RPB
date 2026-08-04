@@ -1,8 +1,11 @@
 package com.rpb.reservation.platform.application;
 
+import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.platform.persistence.PlatformTenantRepository;
 import com.rpb.reservation.platform.persistence.PlatformTenantStructureRepository;
 import com.rpb.reservation.platform.persistence.PlatformStoreAdminAccountRepository;
+import com.rpb.reservation.queue.application.DefaultQueueGroupProvisioningService;
+import com.rpb.reservation.tenant.value.TenantId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -30,6 +33,7 @@ public class PlatformTenantStructureService {
     private final PasswordEncoder passwordEncoder;
     private final PlatformTenantAuditService auditService;
     private final PublicHostBindingService publicHostBindingService;
+    private final DefaultQueueGroupProvisioningService queueGroupProvisioningService;
 
     public PlatformTenantStructureService(
         PlatformTenantRepository tenantRepository,
@@ -37,7 +41,8 @@ public class PlatformTenantStructureService {
         PlatformStoreAdminAccountRepository storeAdminAccountRepository,
         PasswordEncoder passwordEncoder,
         PlatformTenantAuditService auditService,
-        PublicHostBindingService publicHostBindingService
+        PublicHostBindingService publicHostBindingService,
+        DefaultQueueGroupProvisioningService queueGroupProvisioningService
     ) {
         this.tenantRepository = tenantRepository;
         this.structureRepository = structureRepository;
@@ -45,6 +50,7 @@ public class PlatformTenantStructureService {
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.publicHostBindingService = publicHostBindingService;
+        this.queueGroupProvisioningService = queueGroupProvisioningService;
     }
 
     @Transactional(readOnly = true)
@@ -162,6 +168,10 @@ public class PlatformTenantStructureService {
                 input.timeFormat(),
                 input.currency()
             );
+            queueGroupProvisioningService.provisionDefaults(new StoreScope(
+                new TenantId(tenantId),
+                store.id()
+            ));
             upsertStoreAdminIfRequested(tenantId, store.id(), input);
             UUID hostAliasId = structureRepository.upsertStoreHostAlias(
                 tenantId,

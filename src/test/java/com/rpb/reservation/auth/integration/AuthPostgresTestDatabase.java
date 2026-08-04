@@ -26,6 +26,23 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
         this.port = port;
     }
 
+    static AuthPostgresTestDatabase startWithBaseSchema() {
+        try {
+            Path targetDirectory = Path.of("target", "test-postgres", UUID.randomUUID().toString());
+            deleteIfExists(targetDirectory);
+            Files.createDirectories(targetDirectory);
+            int port = freePort();
+            AuthPostgresTestDatabase database = new AuthPostgresTestDatabase(targetDirectory, port);
+            database.init();
+            database.startServer();
+            database.applyMigration("src/main/resources/db/migration/V001__reservation_platform_bootstrap.sql");
+            Runtime.getRuntime().addShutdownHook(new Thread(database::closeQuietly));
+            return database;
+        } catch (IOException exception) {
+            throw new IllegalStateException("auth_postgres_start_failed", exception);
+        }
+    }
+
     static AuthPostgresTestDatabase startWithValidationStore() {
         try {
             Path targetDirectory = Path.of("target", "test-postgres", UUID.randomUUID().toString());
@@ -80,6 +97,8 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
             database.applyMigration("src/main/resources/db/migration/V042__allow_store_item_subscription_events.sql");
             database.applyMigration("src/main/resources/db/migration/V043__admin_dual_entry_login_backfill.sql");
             database.applyMigration("src/main/resources/db/migration/V044__sync_active_store_subscription_app_settings.sql");
+            database.applyMigration("src/main/resources/db/migration/V045__reservation_active_preassignment_uniqueness.sql");
+            database.applyMigration("src/main/resources/db/migration/V046__backfill_default_queue_groups.sql");
             Runtime.getRuntime().addShutdownHook(new Thread(database::closeQuietly));
             return database;
         } catch (IOException exception) {
@@ -129,7 +148,7 @@ final class AuthPostgresTestDatabase implements AutoCloseable {
         );
     }
 
-    private void applyMigration(String migrationPath) {
+    void applyMigration(String migrationPath) {
         run(
             command("psql"),
             "-v", "ON_ERROR_STOP=1",
