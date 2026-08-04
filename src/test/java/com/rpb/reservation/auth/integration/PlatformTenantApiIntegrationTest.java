@@ -100,6 +100,11 @@ class PlatformTenantApiIntegrationTest {
             """);
         jdbc.update("delete from tenant_host_aliases where alias_code like 'codex-%'");
         jdbc.update("delete from tenant_host_aliases where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("""
+            delete from queue_groups
+            where store_id in (select id from stores where store_code like 'codex-%')
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
         jdbc.update("delete from stores where store_code like 'codex-%'");
         jdbc.update("delete from stores where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from operating_entities where entity_code like 'codex-%'");
@@ -149,6 +154,53 @@ class PlatformTenantApiIntegrationTest {
             AuthPostgresTestDatabase.VALIDATION_STORE_ID,
             AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
             AuthPostgresTestDatabase.VALIDATION_STORE_ID
+        );
+    }
+
+    @Test
+    void platformAdminCreatesTenantWithDefaultQueueGroups() throws Exception {
+        Cookie session = login("sysadmin");
+
+        UUID tenantId = createTenant(session, "codex-queue-defaults", "Codex 排队默认组租户");
+        UUID storeId = jdbc.queryForObject(
+            "select id from stores where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+
+        assertThat(defaultQueueGroups(tenantId, storeId)).containsExactly(
+            new QueueGroupRow("1-2", 1, 2, "queue.group.1_2", "active", 1),
+            new QueueGroupRow("3-4", 3, 4, "queue.group.3_4", "active", 2),
+            new QueueGroupRow("5-6", 5, 6, "queue.group.5_6", "active", 3),
+            new QueueGroupRow("7+", 7, null, "queue.group.7_plus", "active", 4)
+        );
+    }
+
+    @Test
+    void platformAdminCreatesStoreWithDefaultQueueGroups() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(session, "codex-queue-store", "Codex 排队分店集团", "abc123");
+        UUID operatingEntityId = jdbc.queryForObject(
+            "select id from operating_entities where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+
+        UUID storeId = createStore(
+            session,
+            tenantId,
+            operatingEntityId,
+            "codex-queue-store-a",
+            "Codex 排队分店 A",
+            null,
+            null
+        );
+
+        assertThat(defaultQueueGroups(tenantId, storeId)).containsExactly(
+            new QueueGroupRow("1-2", 1, 2, "queue.group.1_2", "active", 1),
+            new QueueGroupRow("3-4", 3, 4, "queue.group.3_4", "active", 2),
+            new QueueGroupRow("5-6", 5, 6, "queue.group.5_6", "active", 3),
+            new QueueGroupRow("7+", 7, null, "queue.group.7_plus", "active", 4)
         );
     }
 
@@ -1848,6 +1900,29 @@ class PlatformTenantApiIntegrationTest {
         return jdbc.queryForObject(sql, Integer.class, args);
     }
 
+    private java.util.List<QueueGroupRow> defaultQueueGroups(UUID tenantId, UUID storeId) {
+        return jdbc.query(
+            """
+            select group_code, min_party_size, max_party_size, display_i18n_key, status, sort_order
+            from queue_groups
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            order by sort_order, group_code
+            """,
+            (rs, rowNum) -> new QueueGroupRow(
+                rs.getString("group_code"),
+                rs.getInt("min_party_size"),
+                rs.getObject("max_party_size", Integer.class),
+                rs.getString("display_i18n_key"),
+                rs.getString("status"),
+                rs.getInt("sort_order")
+            ),
+            tenantId,
+            storeId
+        );
+    }
+
     private JsonNode storeById(JsonNode stores, UUID storeId) {
         for (JsonNode store : stores) {
             if (storeId.toString().equals(store.path("storeId").asText())) {
@@ -1979,6 +2054,15 @@ class PlatformTenantApiIntegrationTest {
         );
     }
 
+    private record QueueGroupRow(
+        String groupCode,
+        int minPartySize,
+        Integer maxPartySize,
+        String displayI18nKey,
+        String status,
+        int sortOrder
+    ) {
+    }
     private record SliderTarget(String challengeId, int targetX) {
     }
 }
