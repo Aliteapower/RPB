@@ -329,7 +329,7 @@ git commit -m "feat: add payment schema foundation"
 - Produces: `PaymentMethodProfileService.updateProfile(StoreScope scope, PaymentMethodProfileCommand command)`.
 - Produces: `PaymentMethodProfileService.findEffectiveProfile(StoreScope scope)`.
 
-- [ ] **Step 1: Write failing service test**
+- [x] **Step 1: Write failing service test**
 
 ```java
 @Test
@@ -343,7 +343,7 @@ void rejectsActivePayNowUenProfileWithoutMerchantName() {
 }
 ```
 
-- [ ] **Step 2: Run test and verify RED**
+- [x] **Step 2: Run test and verify RED**
 
 Run:
 
@@ -353,7 +353,7 @@ Run:
 
 Expected: FAIL because service classes do not exist.
 
-- [ ] **Step 3: Implement minimal profile validation and repository port**
+- [x] **Step 3: Implement minimal profile validation and repository port**
 
 Validation rules:
 
@@ -366,7 +366,7 @@ if ("mobile".equals(paynowType) && paynowMobile.isBlank()) throw invalid();
 if (!"SGD".equals(currency)) throw invalid();
 ```
 
-- [ ] **Step 4: Run service test and verify GREEN**
+- [x] **Step 4: Run service test and verify GREEN**
 
 Run:
 
@@ -376,7 +376,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Add controller test for App Gate annotation**
+- [x] **Step 5: Add controller test for App Gate annotation**
 
 Use a source validation test similar to existing UI implementation validation tests or a `@WebMvcTest` verifying:
 
@@ -387,7 +387,7 @@ PaymentProfileController.class.getMethod("updateProfile", UUID.class, PaymentPro
 
 Expected app key `payment`, permission `payment.settings.manage`.
 
-- [ ] **Step 6: Implement controller**
+- [x] **Step 6: Implement controller**
 
 Use:
 
@@ -405,7 +405,7 @@ public class PaymentProfileController {
 }
 ```
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```powershell
 git add src/main/java/com/rpb/reservation/payment src/test/java/com/rpb/reservation/payment
