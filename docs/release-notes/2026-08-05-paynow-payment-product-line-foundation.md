@@ -39,3 +39,19 @@ Adds the RPB-native `payment` product-line foundation for PayNow quick payment.
   - `PlatformGroupTenantOnboardingUiValidationTest`
   - `ReservationArrivedToQueueUiImplementationValidationTest`
   - `ReservationShareInfoUiValidationTest`
+
+## 2026-08-06 Production Deployment
+
+- Production backend deployed commit `28f851ad`.
+- Risk acceptance: API-only production deployment was explicitly approved without staging smoke.
+- Flyway successfully applied `V047`; current production version is `047`.
+- Payment product line seed is active:
+  - `platform_apps.payment` exists with default entry route `/stores/:storeId/payments`.
+  - Monthly and yearly `platform_product_line_prices` rows exist with `SGD 0.00`.
+  - `payment_method_profiles`, `payment_intents`, `payment_sessions`, and `payment_display_counters` resolve in production.
+- `rpb-backend` status: `active`; startup ERROR count after deployment: `0`.
+- Public health check returned `401`.
+- Public login, booking, and queue smoke checks returned `200` for the tested production host-prefix routes.
+- Backend JAR SHA-256: `19eb68893f455bed24ebf0fa999df191ee3f67832f20ea4de392ad0dc054e6ab`.
+- Backup: `/opt/rpb/backups/20260806-0347-28f851ad-paynow-v047`.
+- To avoid creating real payment operational records, production PayNow profile or Quick Pay write APIs were not invoked.
