@@ -106,6 +106,7 @@ public class PaymentProfileController {
             case PAYMENT_PROFILE_NOT_FOUND -> PaymentApiErrorCode.PAYMENT_PROFILE_NOT_FOUND;
             case PAYMENT_PROFILE_DISABLED -> PaymentApiErrorCode.PAYMENT_PROFILE_DISABLED;
             case PAYMENT_INTENT_NOT_FOUND -> PaymentApiErrorCode.REQUEST_INVALID;
+            case PAYMENT_SESSION_NOT_FOUND -> PaymentApiErrorCode.PAYMENT_SESSION_NOT_FOUND;
             case PAYMENT_INTENT_STATE_CONFLICT -> PaymentApiErrorCode.REQUEST_INVALID;
             case IDEMPOTENCY_CONFLICT -> PaymentApiErrorCode.REQUEST_INVALID;
             case VERSION_CONFLICT -> PaymentApiErrorCode.VERSION_CONFLICT;

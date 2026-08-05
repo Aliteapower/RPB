@@ -1,6 +1,7 @@
 package com.rpb.reservation.payment.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -78,6 +79,33 @@ class PaymentIntentServiceTest {
         assertThat(result.nextDisplayNumber()).isEqualTo(2);
     }
 
+    @Test
+    void findsSessionBySessionNoForAccessibleStore() {
+        PaymentSession session = sampleSession();
+        repository.session = session;
+
+        PaymentSession result = service.findSessionByNo(scope, session.sessionNo(), actor);
+
+        assertThat(result).isEqualTo(session);
+    }
+
+    @Test
+    void rejectsSessionLookupForActorOutsideStoreScope() {
+        CurrentActor foreignActor = CurrentActor.storeStaff(
+            TENANT_ID,
+            ACTOR_ID,
+            "tenant_staff",
+            Set.of("store_staff"),
+            Set.of("payment.intent.view"),
+            Set.of(UUID.fromString("20000000-0000-0000-0000-000000000002"))
+        );
+
+        assertThatThrownBy(() -> service.findSessionByNo(scope, "PRS-ABC", foreignActor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting("code")
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
     private PaymentMethodProfile activeUenProfile() {
         return new PaymentMethodProfile(
             UUID.fromString("40000000-0000-0000-0000-000000000001"),
@@ -97,10 +125,35 @@ class PaymentIntentServiceTest {
         );
     }
 
+    private PaymentSession sampleSession() {
+        return new PaymentSession(
+            UUID.fromString("60000000-0000-0000-0000-000000000001"),
+            TENANT_ID,
+            STORE_ID,
+            UUID.fromString("50000000-0000-0000-0000-000000000001"),
+            "PRS-ABCDEF1234567890",
+            7,
+            java.time.LocalDate.parse("2026-08-05"),
+            "pending",
+            "{\"version\":1,\"payloads\":{\"paynow\":{\"payload\":\"000201\"}}}",
+            java.time.OffsetDateTime.parse("2026-08-05T04:12:00Z"),
+            0
+        );
+    }
+
     private static final class InMemoryPaymentIntentRepository implements PaymentIntentRepository {
+        private PaymentSession session;
+
         @Override
         public Optional<PaymentIntentCreateResult> findCreateResultByIdempotencyKey(StoreScope scope, String idempotencyKey) {
             return Optional.empty();
+        }
+
+        @Override
+        public Optional<PaymentSession> findSessionByNo(StoreScope scope, String sessionNo) {
+            return session != null && session.sessionNo().equals(sessionNo)
+                ? Optional.of(session)
+                : Optional.empty();
         }
 
         @Override

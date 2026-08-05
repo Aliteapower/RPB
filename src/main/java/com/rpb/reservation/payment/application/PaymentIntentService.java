@@ -65,6 +65,17 @@ public class PaymentIntentService {
             .orElseGet(() -> createNew(scope, normalized, actor));
     }
 
+    @Transactional(readOnly = true)
+    public PaymentSession findSessionByNo(StoreScope scope, String sessionNo, CurrentActor actor) {
+        Objects.requireNonNull(scope, "payment_scope_required");
+        validateActor(scope, actor);
+        if (isBlank(sessionNo)) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        return repository.findSessionByNo(scope, sessionNo.trim())
+            .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_SESSION_NOT_FOUND));
+    }
+
     private PaymentIntentCreateResult createNew(StoreScope scope, PaymentIntentCreateCommand command, CurrentActor actor) {
         PaymentMethodProfile profile = profileService.findEffectiveProfile(scope)
             .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_PROFILE_NOT_FOUND));

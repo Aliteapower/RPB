@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/stores/{storeId}/payments/intents")
 public class PaymentIntentController {
     private static final String INTENT_CREATE_PERMISSION = "payment.intent.create";
+    private static final String INTENT_VIEW_PERMISSION = "payment.intent.view";
 
     private final PaymentIntentService service;
     private final CurrentActorProvider currentActorProvider;
@@ -50,6 +52,23 @@ public class PaymentIntentController {
         StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
         return ResponseEntity.ok(PaymentIntentResponses.CreateIntentResponse.from(
             service.createQuickPay(scope, toCommand(request), actor)
+        ));
+    }
+
+    @GetMapping("/sessions/{sessionNo}")
+    @RequireAppGate(appKey = "payment", permission = INTENT_VIEW_PERMISSION)
+    public ResponseEntity<PaymentIntentResponses.SessionResponse> getSession(
+        @PathVariable UUID storeId,
+        @PathVariable String sessionNo
+    ) {
+        CurrentActor actor = currentActorProvider.currentActor()
+            .orElseThrow(() -> new PaymentApiException(PaymentApiErrorCode.UNAUTHENTICATED));
+        if (actor.tenantId() == null || !actor.canAccessStore(storeId)) {
+            throw new PaymentApiException(PaymentApiErrorCode.FORBIDDEN);
+        }
+        StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
+        return ResponseEntity.ok(PaymentIntentResponses.SessionResponse.from(
+            service.findSessionByNo(scope, sessionNo, actor)
         ));
     }
 
@@ -93,6 +112,7 @@ public class PaymentIntentController {
             case PAYMENT_PROFILE_INVALID -> PaymentApiErrorCode.REQUEST_INVALID;
             case PAYMENT_PROFILE_NOT_FOUND -> PaymentApiErrorCode.PAYMENT_PROFILE_NOT_FOUND;
             case PAYMENT_PROFILE_DISABLED -> PaymentApiErrorCode.PAYMENT_PROFILE_DISABLED;
+            case PAYMENT_SESSION_NOT_FOUND -> PaymentApiErrorCode.PAYMENT_SESSION_NOT_FOUND;
             case PAYMENT_INTENT_NOT_FOUND -> PaymentApiErrorCode.REQUEST_INVALID;
             case PAYMENT_INTENT_STATE_CONFLICT -> PaymentApiErrorCode.REQUEST_INVALID;
             case IDEMPOTENCY_CONFLICT -> PaymentApiErrorCode.REQUEST_INVALID;

@@ -81,6 +81,34 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
     }
 
     @Override
+    public Optional<PaymentSession> findSessionByNo(StoreScope scope, String sessionNo) {
+        return jdbc.query(
+            """
+            select
+                s.id as session_id,
+                s.tenant_id as session_tenant_id,
+                s.store_id as session_store_id,
+                s.intent_id as session_intent_id,
+                s.session_no,
+                s.display_number,
+                s.business_date,
+                s.status as session_status,
+                s.qr_payloads_json::text as qr_payloads_json,
+                s.expires_at as session_expires_at,
+                s.version as session_version
+            from payment_sessions s
+            where s.tenant_id = ?
+              and s.store_id = ?
+              and s.session_no = ?
+            """,
+            (rs, rowNum) -> mapSession(rs),
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            sessionNo
+        ).stream().findFirst();
+    }
+
+    @Override
     public int nextIntentSequence(StoreScope scope, YearMonth period) {
         String prefix = "PIT-" + period.format(PERIOD_FORMATTER) + "-";
         jdbc.query(
