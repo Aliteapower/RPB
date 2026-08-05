@@ -4,7 +4,7 @@ Use this guide to deploy and smoke-test the RPB-native `payment` product line in
 
 ## Scope
 
-This runbook covers the backend-only PayNow payment foundation from branch `codex/paynow-payment-product-line-design`.
+This runbook covers the backend-only PayNow payment foundation from branch `codex/paynow-payment-product-line-staging`.
 
 Included:
 
@@ -25,7 +25,7 @@ Not included:
 
 - Confirm the deployment target is staging/UAT, not production.
 - Confirm database backup or restore point exists before applying V047.
-- Confirm the branch or PR includes commit `24f404da` or later.
+- Confirm the branch or PR includes commit `75cf4c16` or later.
 - Confirm targeted tests passed:
 
 ```powershell
