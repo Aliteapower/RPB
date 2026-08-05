@@ -75,6 +75,7 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
         jdbc.update("delete from tenant_product_subscriptions where app_key like 'codex-%'");
         jdbc.update("delete from tenant_app_entitlements where app_key like 'codex-%'");
+        jdbc.update("delete from tenant_app_entitlements where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from store_app_settings where app_key like 'codex-%'");
         jdbc.update("delete from platform_product_line_prices where app_key like 'codex-%'");
         jdbc.update("delete from platform_apps where app_key like 'codex-%'");
@@ -103,6 +104,26 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("""
             delete from queue_groups
             where store_id in (select id from stores where store_code like 'codex-%')
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
+        jdbc.update("""
+            delete from audit_logs
+            where store_id in (
+                select id
+                from stores
+                where store_code like 'codex-%'
+                   or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            )
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
+        jdbc.update("""
+            delete from store_app_settings
+            where store_id in (
+                select id
+                from stores
+                where store_code like 'codex-%'
+                   or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            )
                or tenant_id in (select id from tenants where tenant_code like 'codex-%')
             """);
         jdbc.update("delete from stores where store_code like 'codex-%'");
