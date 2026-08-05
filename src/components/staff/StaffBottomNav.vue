@@ -49,7 +49,7 @@ const items = computed(() =>
   bottom: 0;
   box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 7px 10px calc(7px + env(safe-area-inset-bottom));

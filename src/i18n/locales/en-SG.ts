@@ -116,6 +116,7 @@ export const enSG = {
       customers: 'Customers',
       tables: 'Tables',
       settings: 'Settings',
+      paymentSettings: 'Payment settings',
       i18nCatalog: 'I18n catalog',
       shareTemplate: 'Booking share',
       publicBooking: 'Public booking',
@@ -126,7 +127,8 @@ export const enSG = {
       home: 'Home',
       reservation: 'Bookings',
       queue: 'Queue',
-      table: 'Tables'
+      table: 'Tables',
+      payment: 'Pay'
     }
   },
   login: {
@@ -967,6 +969,11 @@ export const enSG = {
         label: 'Seat queue',
         description: 'Seat a called ticket at a table',
         symbol: 'Seat'
+      },
+      quickPay: {
+        label: 'Quick pay',
+        description: 'Enter an amount and show a PayNow QR code',
+        symbol: 'Pay'
       }
     },
     store: {

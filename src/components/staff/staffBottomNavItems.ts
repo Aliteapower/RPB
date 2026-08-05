@@ -1,4 +1,4 @@
-export type StaffBottomNavTab = 'home' | 'reservation' | 'queue' | 'table'
+export type StaffBottomNavTab = 'home' | 'reservation' | 'queue' | 'table' | 'payment'
 
 export interface StaffBottomNavItem {
   tab: StaffBottomNavTab
@@ -31,5 +31,11 @@ export const staffBottomNavItems: StaffBottomNavItem[] = [
     labelKey: 'nav.staff.table',
     routeName: 'table-resource-list',
     symbol: '▦'
+  },
+  {
+    tab: 'payment',
+    labelKey: 'nav.staff.payment',
+    routeName: 'payment-quick-pay',
+    symbol: '$'
   }
 ]

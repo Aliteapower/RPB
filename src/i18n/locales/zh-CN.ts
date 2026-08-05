@@ -116,6 +116,7 @@ export const zhCN = {
       customers: '顾客管理',
       tables: '桌号管理',
       settings: '基础设置',
+      paymentSettings: '收款设置',
       i18nCatalog: '国际化字典',
       shareTemplate: '订位分享',
       publicBooking: '公网预约',
@@ -126,7 +127,8 @@ export const zhCN = {
       home: '首页',
       reservation: '预约',
       queue: '排队',
-      table: '桌台'
+      table: '桌台',
+      payment: '收款'
     }
   },
   login: {
@@ -967,6 +969,11 @@ export const zhCN = {
         label: '排队入座',
         description: '从已叫号票直接安排桌台',
         symbol: '座'
+      },
+      quickPay: {
+        label: '快速收款',
+        description: '输入金额并生成 PayNow 二维码',
+        symbol: '收'
       }
     },
     store: {

@@ -13,6 +13,8 @@ const PlatformReservationShareTemplateSeedPage = () => import('../pages/Platform
 const PlatformTenantBillingPage = () => import('../pages/PlatformTenantBillingPage.vue')
 const PlatformTenantFormPage = () => import('../pages/PlatformTenantFormPage.vue')
 const PlatformTenantsPage = () => import('../pages/PlatformTenantsPage.vue')
+const PaymentDisplayPage = () => import('../pages/PaymentDisplayPage.vue')
+const PaymentQuickPayPage = () => import('../pages/PaymentQuickPayPage.vue')
 const PublicBookingPage = () => import('../pages/PublicBookingPage.vue')
 const QueueCallPage = () => import('../pages/QueueCallPage.vue')
 const QueueDisplayPage = () => import('../pages/QueueDisplayPage.vue')
@@ -28,6 +30,7 @@ const TableResourceListPage = () => import('../pages/TableResourceListPage.vue')
 const TenantAdminCallScreenPage = () => import('../pages/TenantAdminCallScreenPage.vue')
 const TenantAdminCustomersPage = () => import('../pages/TenantAdminCustomersPage.vue')
 const TenantAdminI18nCatalogPage = () => import('../pages/TenantAdminI18nCatalogPage.vue')
+const TenantAdminPaymentSettingsPage = () => import('../pages/TenantAdminPaymentSettingsPage.vue')
 const TenantAdminProfilePage = () => import('../pages/TenantAdminProfilePage.vue')
 const TenantAdminPublicBookingPage = () => import('../pages/TenantAdminPublicBookingPage.vue')
 const TenantAdminReservationSharePage = () => import('../pages/TenantAdminReservationSharePage.vue')
@@ -148,6 +151,16 @@ export const router = createRouter({
       component: StoreStaffHomePage
     },
     {
+      path: '/stores/:storeId/payments',
+      name: 'payment-quick-pay',
+      component: PaymentQuickPayPage
+    },
+    {
+      path: '/stores/:storeId/payments/display/:sessionNo',
+      name: 'payment-display',
+      component: PaymentDisplayPage
+    },
+    {
       path: '/stores/:storeId/admin',
       redirect: to => ({
         name: 'tenant-admin-profile',
@@ -212,6 +225,12 @@ export const router = createRouter({
       path: '/stores/:storeId/admin/settings',
       name: 'tenant-admin-settings',
       component: TenantAdminSettingsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/settings',
+      name: 'tenant-admin-payment-settings',
+      component: TenantAdminPaymentSettingsPage,
       meta: { requiresTenantAdmin: true }
     },
     {

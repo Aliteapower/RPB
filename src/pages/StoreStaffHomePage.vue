@@ -43,7 +43,7 @@ interface OperationToolbarItem {
   descriptionKey: string
   symbolKey: string
   to: RouteLocationRaw
-  tone: 'reservation' | 'queue' | 'success'
+  tone: 'reservation' | 'queue' | 'success' | 'payment'
 }
 
 const route = useRoute()
@@ -77,8 +77,11 @@ const canCallQueueTicket = computed(() =>
 const canSeatCalledQueueTicket = computed(() =>
   hasPermission('queue.seat')
 )
+const canCreatePaymentIntent = computed(() =>
+  hasPermission('payment.intent.create')
+)
 const hasVisibleOperation = computed(
-  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value
+  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value
 )
 const appStatusLabel = computed(() => {
   if (isLoading.value) {
@@ -106,7 +109,23 @@ const queueTicketListRoute = computed(() => ({
     storeId: storeId.value
   }
 }))
+const paymentQuickPayRoute = computed(() => ({
+  name: 'payment-quick-pay',
+  params: {
+    storeId: storeId.value
+  }
+}))
 const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactToolbarItems([
+  canCreatePaymentIntent.value
+    ? {
+        id: 'payment-quick-pay',
+        labelKey: 'staffHome.actions.quickPay.label',
+        descriptionKey: 'staffHome.actions.quickPay.description',
+        symbolKey: 'staffHome.actions.quickPay.symbol',
+        to: paymentQuickPayRoute.value,
+        tone: 'payment'
+      }
+    : null,
   canCheckInReservation.value
     ? {
         id: 'reservation-confirmed-today',
@@ -669,6 +688,11 @@ function hasPermission(permission: string): boolean {
 .operation-tool--success .operation-symbol {
   background: #d1fae5;
   color: #047857;
+}
+
+.operation-tool--payment .operation-symbol {
+  background: #ccfbf1;
+  color: #0f766e;
 }
 
 .operation-tool:focus-visible {
