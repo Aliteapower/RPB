@@ -627,7 +627,7 @@ git commit -m "feat: expose payment intent API"
 - Consumes: all tasks above.
 - Produces: verification evidence and release note.
 
-- [ ] **Step 1: Run targeted backend tests**
+- [x] **Step 1: Run targeted backend tests**
 
 ```powershell
 .\mvnw -Dtest=AppGateServiceTest,PaymentMigrationTest,PayNowQrPayloadBuilderTest,PaymentMethodProfileServiceTest,PaymentIntentServiceTest,PaymentIntentControllerTest test
@@ -635,7 +635,7 @@ git commit -m "feat: expose payment intent API"
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full backend test suite if local runtime permits**
+- [x] **Step 2: Run full backend test suite if local runtime permits**
 
 ```powershell
 .\mvnw test
@@ -643,7 +643,9 @@ Expected: PASS.
 
 Expected: PASS or document unrelated pre-existing failure with exact test names.
 
-- [ ] **Step 3: Apply RPB review skills**
+Result: `mvn test` was attempted. It exposed a payment Spring constructor-selection issue, which was fixed and verified with `PlatformTenantApiIntegrationTest`. Existing frontend validation failures remain documented in the release note.
+
+- [x] **Step 3: Apply RPB review skills**
 
 Review against:
 
@@ -654,7 +656,7 @@ Review against:
 
 Required result: no P0/P1 blockers before final response.
 
-- [ ] **Step 4: Write release note**
+- [x] **Step 4: Write release note**
 
 Create `docs/release-notes/2026-08-05-paynow-payment-product-line-foundation.md` with:
 
@@ -686,7 +688,7 @@ Adds the RPB-native `payment` product-line foundation for PayNow quick payment.
 - `.\mvnw -Dtest=... test`
 ```
 
-- [ ] **Step 5: Commit review docs**
+- [x] **Step 5: Commit review docs**
 
 ```powershell
 git add docs/release-notes/2026-08-05-paynow-payment-product-line-foundation.md docs/superpowers/plans/2026-08-05-paynow-payment-product-line-foundation.md
