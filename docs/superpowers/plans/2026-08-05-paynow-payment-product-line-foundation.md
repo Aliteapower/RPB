@@ -63,7 +63,7 @@ Create and modify these files across the first implementation slice:
 - Consumes: `PlatformAppEntity.getConfigJson()`, `CurrentActor.hasPermission(String)`.
 - Produces: `AppGateRequiredPermission.PAYMENT_ENTRY_PERMISSIONS`, visible app support for `app_key = "payment"`, and a Flyway seed for `payment`.
 
-- [ ] **Step 1: Write failing visible-app test**
+- [x] **Step 1: Write failing visible-app test**
 
 Add this test to `AppGateServiceTest`:
 
@@ -88,7 +88,7 @@ void visibleAppsRecognizesPaymentIntentCreateAsPaymentPermission() {
 }
 ```
 
-- [ ] **Step 2: Run test and verify RED**
+- [x] **Step 2: Run test and verify RED**
 
 Run:
 
@@ -98,7 +98,7 @@ Run:
 
 Expected: FAIL because `AppGateService.entryPermissions` returns an empty set for non-`reservation_queue` apps.
 
-- [ ] **Step 3: Implement payment permission constants and entry resolution**
+- [x] **Step 3: Implement payment permission constants and entry resolution**
 
 Add constants:
 
@@ -124,7 +124,7 @@ if ("payment".equals(appKey)) {
 }
 ```
 
-- [ ] **Step 4: Run test and verify GREEN**
+- [x] **Step 4: Run test and verify GREEN**
 
 Run:
 
@@ -134,7 +134,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing migration test**
+- [x] **Step 5: Write failing migration test**
 
 Create `PaymentMigrationTest` based on `AppGateMigrationTest`. Apply migrations V001, V002, V008, V010, V036, V041, then V047. Assert:
 
@@ -157,7 +157,7 @@ assertThat(countWhere("""
     """)).isEqualTo(2);
 ```
 
-- [ ] **Step 6: Run migration test and verify RED**
+- [x] **Step 6: Run migration test and verify RED**
 
 Run:
 
@@ -167,7 +167,7 @@ Run:
 
 Expected: FAIL because `V047__payment_product_line_foundation.sql` does not exist.
 
-- [ ] **Step 7: Create V047 product-line seed**
+- [x] **Step 7: Create V047 product-line seed**
 
 Create migration with `platform_apps`, `platform_product_line_prices`, platform admin permission grants, and no payment operational tables yet:
 
@@ -198,7 +198,7 @@ values
 on conflict (app_key, billing_cycle) do nothing;
 ```
 
-- [ ] **Step 8: Run migration test and App Gate test**
+- [x] **Step 8: Run migration test and App Gate test**
 
 Run:
 
@@ -208,7 +208,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```powershell
 git add src/main/java/com/rpb/reservation/appgate src/main/resources/db/migration/V047__payment_product_line_foundation.sql src/test/java/com/rpb/reservation/appgate src/test/java/com/rpb/reservation/payment/PaymentMigrationTest.java
@@ -225,7 +225,7 @@ git commit -m "feat: seed payment product line"
 - Consumes: existing `tenants`, `stores`, `auth_accounts`.
 - Produces: `payment_method_profiles`, `payment_intents`, `payment_sessions`, `payment_display_counters`, `payment_proofs`, `payment_ocr_results`, `payment_verifications`, `payment_events`.
 
-- [ ] **Step 1: Extend failing migration test for tables and constraints**
+- [x] **Step 1: Extend failing migration test for tables and constraints**
 
 Add assertions:
 
@@ -248,7 +248,7 @@ assertThatThrownBy(() -> JDBC.update("""
     """, TENANT_ID, STORE_ID)).hasMessageContaining("ck_payment_intents_amount");
 ```
 
-- [ ] **Step 2: Run migration test and verify RED**
+- [x] **Step 2: Run migration test and verify RED**
 
 Run:
 
@@ -258,7 +258,7 @@ Run:
 
 Expected: FAIL because payment operational tables do not exist.
 
-- [ ] **Step 3: Add payment tables to V047**
+- [x] **Step 3: Add payment tables to V047**
 
 Add DDL matching the design document, using `uuid primary key default gen_random_uuid()`, scoped FKs, enum check constraints, and indexes.
 
@@ -294,7 +294,7 @@ create table if not exists payment_intents (
 );
 ```
 
-- [ ] **Step 4: Run migration test and verify GREEN**
+- [x] **Step 4: Run migration test and verify GREEN**
 
 Run:
 
@@ -304,7 +304,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```powershell
 git add src/main/resources/db/migration/V047__payment_product_line_foundation.sql src/test/java/com/rpb/reservation/payment/PaymentMigrationTest.java

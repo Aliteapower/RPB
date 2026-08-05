@@ -277,6 +277,24 @@ class AppGateServiceTest {
         assertThat(apps.get(0).permissions()).containsExactly("queue.view");
     }
 
+    @Test
+    void visibleAppsRecognizesPaymentIntentCreateAsPaymentPermission() {
+        when(entitlements.findAllByTenantId(TENANT_ID)).thenReturn(List.of(entitlementFor("payment", "enabled", null)));
+        when(storeSettings.findAllByTenantIdAndStoreId(TENANT_ID, STORE_ID)).thenReturn(List.of(storeSettingFor("payment", true, true)));
+        when(platformApps.findAllByStatusOrderBySortOrderAscAppKeyAsc("active"))
+            .thenReturn(List.of(platformAppFor("payment", "PayNow 支付产线", "/stores/:storeId/payments", "active", 30)));
+
+        List<AppGateAppEntry> apps = service.visibleApps(
+            actor(Set.of(STORE_ID), Set.of("payment.intent.create")),
+            STORE_ID
+        );
+
+        assertThat(apps).hasSize(1);
+        assertThat(apps.get(0).appKey()).isEqualTo("payment");
+        assertThat(apps.get(0).entryRoute()).isEqualTo("/stores/" + STORE_ID + "/payments");
+        assertThat(apps.get(0).permissions()).containsExactly("payment.intent.create");
+    }
+
     private void allowPlatformTenantAndStore() {
         when(platformApps.findByAppKey(APP_KEY)).thenReturn(Optional.of(platformApp("active")));
         when(entitlements.findByTenantIdAndAppKey(TENANT_ID, APP_KEY))
@@ -315,12 +333,30 @@ class AppGateServiceTest {
         return PlatformAppEntity.of(UUID.randomUUID(), APP_KEY, "订位排号系统", status, "/stores/:storeId/staff", null, 10, "{}");
     }
 
+    private static PlatformAppEntity platformAppFor(
+        String appKey,
+        String appName,
+        String defaultEntryRoute,
+        String status,
+        int sortOrder
+    ) {
+        return PlatformAppEntity.of(UUID.randomUUID(), appKey, appName, status, defaultEntryRoute, null, sortOrder, "{}");
+    }
+
     private static TenantAppEntitlementEntity entitlement(String status, OffsetDateTime validUntil) {
         return TenantAppEntitlementEntity.of(UUID.randomUUID(), TENANT_ID, APP_KEY, status, OffsetDateTime.now().minusDays(1), validUntil, "{}", null, null);
     }
 
+    private static TenantAppEntitlementEntity entitlementFor(String appKey, String status, OffsetDateTime validUntil) {
+        return TenantAppEntitlementEntity.of(UUID.randomUUID(), TENANT_ID, appKey, status, OffsetDateTime.now().minusDays(1), validUntil, "{}", null, null);
+    }
+
     private static StoreAppSettingEntity storeSetting(boolean enabled, boolean visible) {
         return StoreAppSettingEntity.of(UUID.randomUUID(), TENANT_ID, STORE_ID, APP_KEY, enabled, visible, "{}", null, null, null);
+    }
+
+    private static StoreAppSettingEntity storeSettingFor(String appKey, boolean enabled, boolean visible) {
+        return StoreAppSettingEntity.of(UUID.randomUUID(), TENANT_ID, STORE_ID, appKey, enabled, visible, "{}", null, null, null);
     }
 
     private static void assertDenied(AppGateDecision decision, AppGateDenyReason reason, String messageKey) {
