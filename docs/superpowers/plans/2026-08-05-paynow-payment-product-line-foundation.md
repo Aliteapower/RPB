@@ -485,7 +485,7 @@ git commit -m "feat: add PayNow QR payload builder"
 - Consumes: `PayNowQrPayloadBuilder.build(PayNowQrPayloadRequest request)`.
 - Produces: `PaymentIntentCreateResult createQuickPay(StoreScope scope, PaymentIntentCreateCommand command, CurrentActor actor)`.
 
-- [ ] **Step 1: Write failing intent creation test**
+- [x] **Step 1: Write failing intent creation test**
 
 ```java
 @Test
@@ -502,7 +502,7 @@ void createsQuickPayIntentSessionReferenceAndQrPayload() {
 }
 ```
 
-- [ ] **Step 2: Run test and verify RED**
+- [x] **Step 2: Run test and verify RED**
 
 Run:
 
@@ -512,7 +512,7 @@ Run:
 
 Expected: FAIL because service classes do not exist.
 
-- [ ] **Step 3: Implement minimal service**
+- [x] **Step 3: Implement minimal service**
 
 Rules:
 
@@ -527,7 +527,7 @@ Rules:
 - Allocate display number through repository counter method.
 - Store QR payloads JSON with one `paynow` payload.
 
-- [ ] **Step 4: Run service test and verify GREEN**
+- [x] **Step 4: Run service test and verify GREEN**
 
 Run:
 
@@ -537,7 +537,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 ```powershell
 git add src/main/java/com/rpb/reservation/payment src/test/java/com/rpb/reservation/payment

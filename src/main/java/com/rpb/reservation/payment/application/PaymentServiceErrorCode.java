@@ -1,8 +1,12 @@
 package com.rpb.reservation.payment.application;
 
 public enum PaymentServiceErrorCode {
+    REQUEST_INVALID,
     PAYMENT_PROFILE_INVALID,
     PAYMENT_PROFILE_NOT_FOUND,
     PAYMENT_PROFILE_DISABLED,
+    PAYMENT_INTENT_NOT_FOUND,
+    PAYMENT_INTENT_STATE_CONFLICT,
+    IDEMPOTENCY_CONFLICT,
     VERSION_CONFLICT
 }
