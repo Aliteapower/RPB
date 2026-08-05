@@ -128,12 +128,17 @@ public class AppGateService {
     }
 
     private static Set<String> entryPermissions(CurrentActor actor, String appKey) {
-        if (!"reservation_queue".equals(appKey)) {
-            return Set.of();
+        if ("reservation_queue".equals(appKey)) {
+            return AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.stream()
+                .filter(actor::hasPermission)
+                .collect(Collectors.toUnmodifiableSet());
         }
-        return AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.stream()
-            .filter(actor::hasPermission)
-            .collect(Collectors.toUnmodifiableSet());
+        if ("payment".equals(appKey)) {
+            return AppGateRequiredPermission.PAYMENT_ENTRY_PERMISSIONS.stream()
+                .filter(actor::hasPermission)
+                .collect(Collectors.toUnmodifiableSet());
+        }
+        return Set.of();
     }
 
     private static AppGateAppEntry toEntry(PlatformAppEntity app, UUID storeId, Set<String> permissions) {
