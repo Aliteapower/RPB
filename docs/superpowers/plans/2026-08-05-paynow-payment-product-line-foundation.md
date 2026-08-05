@@ -421,7 +421,7 @@ git commit -m "feat: add PayNow payment profile service"
 **Interfaces:**
 - Produces: `String build(PayNowQrPayloadRequest request)`.
 
-- [ ] **Step 1: Write failing payload test**
+- [x] **Step 1: Write failing payload test**
 
 ```java
 @Test
@@ -437,7 +437,7 @@ void buildsFixedAmountPayNowPayloadWithReference() {
 }
 ```
 
-- [ ] **Step 2: Run test and verify RED**
+- [x] **Step 2: Run test and verify RED**
 
 Run:
 
@@ -447,11 +447,11 @@ Run:
 
 Expected: FAIL because builder does not exist.
 
-- [ ] **Step 3: Implement minimal SGQR-compatible payload boundary**
+- [x] **Step 3: Implement minimal SGQR-compatible payload boundary**
 
 Implement a deterministic EMV-like payload builder sufficient for Phase 1 tests and future replacement behind the same interface. It must include proxy value, merchant name, amount formatted as `0.00`, and reference.
 
-- [ ] **Step 4: Run test and verify GREEN**
+- [x] **Step 4: Run test and verify GREEN**
 
 Run:
 
@@ -461,7 +461,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```powershell
 git add src/main/java/com/rpb/reservation/payment/provider src/test/java/com/rpb/reservation/payment/provider
