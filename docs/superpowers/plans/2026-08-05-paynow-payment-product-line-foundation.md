@@ -556,7 +556,7 @@ git commit -m "feat: create quick pay intents"
 - Consumes: `PaymentIntentService.createQuickPay(StoreScope, PaymentIntentCreateCommand, CurrentActor)`.
 - Produces: `POST /api/v1/stores/{storeId}/payments/intents`.
 
-- [ ] **Step 1: Write failing controller test**
+- [x] **Step 1: Write failing controller test**
 
 ```java
 @Test
@@ -569,7 +569,7 @@ void createQuickPayIntentRequiresPaymentAppGatePermission() throws Exception {
 }
 ```
 
-- [ ] **Step 2: Run test and verify RED**
+- [x] **Step 2: Run test and verify RED**
 
 Run:
 
@@ -579,7 +579,7 @@ Run:
 
 Expected: FAIL because controller does not exist.
 
-- [ ] **Step 3: Implement controller and DTOs**
+- [x] **Step 3: Implement controller and DTOs**
 
 Endpoint:
 
@@ -600,7 +600,7 @@ Response fields:
 - `session`
 - `nextDisplayNumber`
 
-- [ ] **Step 4: Run controller test and verify GREEN**
+- [x] **Step 4: Run controller test and verify GREEN**
 
 Run:
 
@@ -610,7 +610,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 6**
+- [x] **Step 5: Commit Task 6**
 
 ```powershell
 git add src/main/java/com/rpb/reservation/payment/api src/test/java/com/rpb/reservation/payment/api
