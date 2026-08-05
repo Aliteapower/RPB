@@ -83,6 +83,12 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
     @Override
     public int nextIntentSequence(StoreScope scope, YearMonth period) {
         String prefix = "PIT-" + period.format(PERIOD_FORMATTER) + "-";
+        jdbc.query(
+            "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+            (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+            },
+            "payment_intents:" + scope.tenantId().value() + ":" + period.format(PERIOD_FORMATTER)
+        );
         Integer next = jdbc.queryForObject(
             """
             select count(*) + 1

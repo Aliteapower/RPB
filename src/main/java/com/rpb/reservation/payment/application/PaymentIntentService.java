@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PaymentIntentService {
@@ -50,6 +51,7 @@ public class PaymentIntentService {
         this.clock = Objects.requireNonNull(clock, "payment_clock_required");
     }
 
+    @Transactional
     public PaymentIntentCreateResult createQuickPay(StoreScope scope, PaymentIntentCreateCommand command, CurrentActor actor) {
         Objects.requireNonNull(scope, "payment_scope_required");
         validateActor(scope, actor);
@@ -72,6 +74,20 @@ public class PaymentIntentService {
         OffsetDateTime expiresAt = now.plusSeconds(SESSION_TTL_SECONDS);
         YearMonth period = YearMonth.from(now);
         int sequence = repository.nextIntentSequence(scope, period);
+        return repository.findCreateResultByIdempotencyKey(scope, command.idempotencyKey())
+            .map(PaymentIntentCreateResult::asReplay)
+            .orElseGet(() -> createNewAfterSequenceLock(scope, command, actor, profile, expiresAt, period, sequence));
+    }
+
+    private PaymentIntentCreateResult createNewAfterSequenceLock(
+        StoreScope scope,
+        PaymentIntentCreateCommand command,
+        CurrentActor actor,
+        PaymentMethodProfile profile,
+        OffsetDateTime expiresAt,
+        YearMonth period,
+        int sequence
+    ) {
         String periodText = period.format(PERIOD_FORMATTER);
         String intentNo = "PIT-" + periodText + "-" + "%04d".formatted(sequence);
         String paymentReference = "QP-" + periodText + "-" + "%04d".formatted(sequence) + "-" + shortToken();
