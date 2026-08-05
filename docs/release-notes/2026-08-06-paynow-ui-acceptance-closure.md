@@ -43,3 +43,19 @@
 
 - Revert the PayNow UI commit and the session lookup API commit if the new UI needs to be removed.
 - No schema rollback is required for this round.
+
+## 2026-08-06 Production Deployment
+
+- Production backend and frontend deployed commit `8cca5be2`.
+- Backend backup: `/opt/rpb/backups/20260806-0501-8cca5be2/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260806-0501-8cca5be2/frontend`.
+- Backend JAR SHA-256: `f9b8738d2b1a9ac33ad5f1a0b5e573aa49cc77c1efe3e896c7c8bc908bff442c`.
+- Flyway remains at `047|payment product line foundation|t`; no new migration was applied.
+- `rpb-backend` status: `active`; startup ERROR count after deployment: `0`.
+- Public `/api/v1/auth/me` returned `401`.
+- Public `/login` returned `200` and loaded frontend asset `/assets/index-DUl8v7f3.js`.
+- Tenant admin PayNow settings route returned `200`: `/stores/20000000-0000-0000-0000-000000000983/admin/payment/settings`.
+- Staff quick PayNow route returned `200`: `/stores/20000000-0000-0000-0000-000000000983/payments`.
+- Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments`.
+- Protected session lookup smoke returned `403` without an authenticated payment actor, confirming the new QR display lookup is not public.
+- To avoid creating real payment operational records, production PayNow profile writes and Quick Pay write APIs were not invoked.
