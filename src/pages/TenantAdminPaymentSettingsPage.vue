@@ -3,15 +3,22 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
+  generatePaymentProfileTestQr,
   getPaymentProfile,
   PaymentApiError,
   updatePaymentProfile
 } from '../api/paymentApi'
+import DownloadableQrCode from '../components/common/DownloadableQrCode.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
-import type { PaymentProfileMutation } from '../types/payment'
+import type { PaymentProfileMutation, PaymentProfileTestQr } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
+import {
+  mergeQuickPayConfigIntoProfileConfigJson,
+  parsePresetAmountText,
+  readQuickPayConfigFromProfileConfigJson
+} from '../utils/paymentPresentBridge'
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -22,6 +29,8 @@ const saving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const profileExists = ref(false)
+const testingQr = ref(false)
+const testQr = ref<PaymentProfileTestQr | null>(null)
 
 const storeId = computed(() => String(route.params.storeId || ''))
 
@@ -35,6 +44,11 @@ const form = reactive<PaymentProfileMutation>({
   currency: 'SGD',
   configJson: '{}',
   version: null
+})
+const quickPayForm = reactive({
+  referencePrefix: 'QP',
+  dailyStartNumber: 0,
+  presetAmounts: ['5', '10', '20', '50', '100', '200']
 })
 
 const activeIdentifierLabel = computed(() =>
@@ -65,6 +79,7 @@ async function loadProfile(): Promise<void> {
       configJson: response.profile.configJson || '{}',
       version: response.profile.version
     })
+    syncQuickPayFormFromConfig()
   } catch (error) {
     if (error instanceof PaymentApiError && error.response.error.code === 'PAYMENT_PROFILE_NOT_FOUND') {
       profileExists.value = false
@@ -106,11 +121,30 @@ async function submitProfile(): Promise<void> {
       configJson: response.profile.configJson || '{}',
       version: response.profile.version
     })
+    syncQuickPayFormFromConfig()
     savedText.value = gt('generated.tenant-admin-payment-settings.020')
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     saving.value = false
+  }
+}
+
+async function generateTestQr(): Promise<void> {
+  if (testingQr.value || !storeId.value) {
+    return
+  }
+  testingQr.value = true
+  errorText.value = ''
+  savedText.value = ''
+  testQr.value = null
+  try {
+    const response = await generatePaymentProfileTestQr(storeId.value)
+    testQr.value = response.testQr
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    testingQr.value = false
   }
 }
 
@@ -129,15 +163,20 @@ function defaultProfile(): PaymentProfileMutation {
 }
 
 function normalizedRequest(): PaymentProfileMutation {
+  const configJson = mergeQuickPayConfigIntoProfileConfigJson(form.configJson, {
+    referencePrefix: quickPayForm.referencePrefix,
+    dailyStartNumber: quickPayForm.dailyStartNumber,
+    presetAmounts: quickPayForm.presetAmounts
+  })
   return {
     method: 'paynow',
     status: form.status,
     paynowType: form.paynowType,
-    paynowMobile: normalizeOptionalText(form.paynowMobile),
+    paynowMobile: form.paynowType === 'mobile' ? normalizeSingaporeMobile(form.paynowMobile) : normalizeOptionalText(form.paynowMobile),
     paynowUen: normalizeOptionalText(form.paynowUen),
     merchantName: form.merchantName.trim(),
     currency: 'SGD',
-    configJson: form.configJson.trim() || '{}',
+    configJson,
     version: form.version ?? null
   }
 }
@@ -145,6 +184,12 @@ function normalizedRequest(): PaymentProfileMutation {
 function localValidationText(): string {
   if (!isValidJson(form.configJson)) {
     return gt('generated.tenant-admin-payment-settings.021')
+  }
+  if (!quickPayForm.referencePrefix.trim() || quickPayForm.referencePrefix.trim().length > 3) {
+    return gt('generated.tenant-admin-payment-settings.035')
+  }
+  if (!parsePresetAmountText(quickPayForm.presetAmounts.join(',')).length) {
+    return gt('generated.tenant-admin-payment-settings.036')
   }
   if (form.status !== 'active') {
     return ''
@@ -155,10 +200,33 @@ function localValidationText(): string {
   if (form.paynowType === 'mobile' && !String(form.paynowMobile ?? '').trim()) {
     return gt('generated.tenant-admin-payment-settings.023')
   }
+  if (form.paynowType === 'mobile' && !normalizeSingaporeMobile(form.paynowMobile)) {
+    return gt('generated.tenant-admin-payment-settings.037')
+  }
   if (form.paynowType === 'uen' && !String(form.paynowUen ?? '').trim()) {
     return gt('generated.tenant-admin-payment-settings.024')
   }
   return ''
+}
+
+function syncQuickPayFormFromConfig(): void {
+  const config = readQuickPayConfigFromProfileConfigJson(form.configJson)
+  quickPayForm.referencePrefix = config.referencePrefix
+  quickPayForm.dailyStartNumber = config.dailyStartNumber
+  quickPayForm.presetAmounts = [...config.presetAmounts]
+}
+
+function normalizeSingaporeMobile(value: string | null | undefined): string | null {
+  const compact = String(value ?? '').trim().replace(/[\s-]/g, '')
+  if (!compact) {
+    return null
+  }
+  const withoutCountry = compact.startsWith('+65')
+    ? compact.slice(3)
+    : compact.startsWith('65') && compact.length === 10
+      ? compact.slice(2)
+      : compact
+  return /^[689]\d{7}$/.test(withoutCountry) ? `+65${withoutCountry}` : null
 }
 
 function isValidJson(value: string): boolean {
@@ -290,6 +358,56 @@ function isAppGateError(code: string, messageKey: string): boolean {
           <textarea v-model.trim="form.configJson" rows="5" spellcheck="false"></textarea>
         </section>
 
+        <section class="form-section form-section--wide" :aria-label="gt('generated.tenant-admin-payment-settings.032')">
+          <header>
+            <h2>{{ gt('generated.tenant-admin-payment-settings.032') }}</h2>
+            <span>{{ gt('generated.tenant-admin-payment-settings.033') }}</span>
+          </header>
+
+          <div class="field-grid">
+            <label>
+              <span>{{ gt('generated.tenant-admin-payment-settings.034') }}</span>
+              <input v-model.trim="quickPayForm.referencePrefix" maxlength="3" />
+            </label>
+
+            <label>
+              <span>{{ gt('generated.tenant-admin-payment-settings.038') }}</span>
+              <input v-model.number="quickPayForm.dailyStartNumber" inputmode="numeric" min="0" max="9999" type="number" />
+            </label>
+          </div>
+
+          <div class="preset-settings">
+            <strong>{{ gt('generated.tenant-admin-payment-settings.039') }}</strong>
+            <div class="preset-input-grid">
+              <label v-for="(_, index) in quickPayForm.presetAmounts" :key="index">
+                <span>{{ index + 1 }}</span>
+                <input v-model.trim="quickPayForm.presetAmounts[index]" inputmode="decimal" />
+              </label>
+            </div>
+          </div>
+
+          <div class="test-qr-actions">
+            <button class="secondary-button" type="button" :disabled="testingQr" @click="generateTestQr">
+              {{ testingQr ? gt('generated.tenant-admin-payment-settings.040') : gt('generated.tenant-admin-payment-settings.041') }}
+            </button>
+          </div>
+
+          <article v-if="testQr" class="test-qr-panel">
+            <div>
+              <strong>{{ testQr.currency }} {{ testQr.amount }}</strong>
+              <span>{{ testQr.paymentReference }}</span>
+            </div>
+            <DownloadableQrCode
+              :description="gt('generated.tenant-admin-payment-settings.042')"
+              :download-label="gt('generated.tenant-admin-payment-settings.043')"
+              file-name="paynow-test-010.png"
+              :size="180"
+              :title="gt('generated.tenant-admin-payment-settings.044')"
+              :value="testQr.qrPayload"
+            />
+          </article>
+        </section>
+
         <div class="form-actions">
           <button class="primary-button" type="submit" :disabled="saving">
             {{ saving ? gt('generated.tenant-admin-payment-settings.030') : gt('generated.tenant-admin-payment-settings.031') }}
@@ -340,7 +458,8 @@ function isAppGateError(code: string, messageKey: string): boolean {
 }
 
 .quick-pay-link,
-.primary-button {
+.primary-button,
+.secondary-button {
   align-items: center;
   border-radius: 6px;
   display: inline-flex;
@@ -355,6 +474,13 @@ function isAppGateError(code: string, messageKey: string): boolean {
   border: 1px solid #cbd5e1;
   color: #334155;
   text-decoration: none;
+}
+
+.secondary-button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  cursor: pointer;
 }
 
 .error-banner,
@@ -447,6 +573,66 @@ textarea {
   resize: vertical;
 }
 
+.preset-settings {
+  display: grid;
+  gap: 10px;
+}
+
+.preset-settings > strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.preset-input-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.preset-input-grid label {
+  gap: 5px;
+}
+
+.preset-input-grid label span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.test-qr-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.test-qr-panel {
+  align-items: start;
+  background: #f8fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.test-qr-panel > div {
+  display: grid;
+  gap: 6px;
+}
+
+.test-qr-panel strong {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.test-qr-panel span {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -466,7 +652,9 @@ textarea {
 
 @media (max-width: 980px) {
   .tenant-shell,
-  .field-grid {
+  .field-grid,
+  .preset-input-grid,
+  .test-qr-panel {
     grid-template-columns: 1fr;
   }
 

@@ -2,10 +2,12 @@ package com.rpb.reservation.payment.api;
 
 import com.rpb.reservation.payment.application.PaymentIntent;
 import com.rpb.reservation.payment.application.PaymentIntentCreateResult;
+import com.rpb.reservation.payment.application.PaymentQuickPayConfig;
 import com.rpb.reservation.payment.application.PaymentSession;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public final class PaymentIntentResponses {
@@ -92,5 +94,33 @@ public final class PaymentIntentResponses {
                 session.version()
             );
         }
+    }
+
+    public record TerminalConfigResponse(
+        boolean success,
+        TerminalConfig terminalConfig
+    ) {
+        public static TerminalConfigResponse from(PaymentQuickPayConfig config) {
+            return new TerminalConfigResponse(true, TerminalConfig.from(config));
+        }
+    }
+
+    public record TerminalConfig(
+        String referencePrefix,
+        int dailyStartNumber,
+        List<String> presetAmounts
+    ) {
+        static TerminalConfig from(PaymentQuickPayConfig config) {
+            return new TerminalConfig(
+                config.referencePrefix(),
+                config.dailyStartNumber(),
+                config.presetAmounts().stream().map(PaymentIntentResponses::amountText).toList()
+            );
+        }
+    }
+
+    private static String amountText(BigDecimal amount) {
+        BigDecimal normalized = amount.stripTrailingZeros();
+        return normalized.scale() < 0 ? normalized.setScale(0).toPlainString() : normalized.toPlainString();
     }
 }

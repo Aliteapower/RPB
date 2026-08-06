@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   createPaymentIntent,
+  getQuickPayTerminalConfig,
   PaymentApiError
 } from '../api/paymentApi'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
@@ -59,6 +60,7 @@ const presentSettingsEditorOpen = ref(false)
 const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
 let presentWindow: Window | null = null
+let profileLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => storeId.value ? gt('generated.payment-quick-pay.001', { shortId: storeId.value.slice(0, 8) }) : gt('generated.payment-quick-pay.002'))
@@ -76,10 +78,15 @@ onMounted(() => {
     terminalCode.value = 'T1'
   }
   reloadLocalPaymentState()
+  void loadQuickPayProfileDefaults()
 })
 
 watch([storeId, normalizedTerminalCode], () => {
   reloadLocalPaymentState()
+})
+
+watch(storeId, () => {
+  void loadQuickPayProfileDefaults()
 })
 
 watch(terminalCode, value => {
@@ -104,6 +111,24 @@ function reloadLocalPaymentState(): void {
   amountPresets.value = readQuickPayPresetAmounts(storeId.value)
   presentSettings.value = readPaymentPresentSettings(storeId.value, normalizedTerminalCode.value)
   recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
+}
+
+async function loadQuickPayProfileDefaults(): Promise<void> {
+  const currentStoreId = storeId.value
+  const sequence = ++profileLoadSequence
+  if (!currentStoreId) {
+    return
+  }
+  try {
+    const response = await getQuickPayTerminalConfig(currentStoreId)
+    if (sequence !== profileLoadSequence) {
+      return
+    }
+    const config = response.terminalConfig
+    amountPresets.value = readQuickPayPresetAmounts(currentStoreId, config.presetAmounts)
+  } catch {
+    // Keep the terminal usable with local/default presets if settings are unavailable.
+  }
 }
 
 function appendAmountToken(token: string): void {

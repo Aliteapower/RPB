@@ -51,6 +51,12 @@ export interface PaymentPresentSettings {
   primaryQr: PresentPrimaryQr
 }
 
+export interface QuickPayTerminalConfig {
+  referencePrefix: string
+  dailyStartNumber: number
+  presetAmounts: string[]
+}
+
 interface PaymentPresentBroadcastMessage {
   kind: 'payloads' | 'settings'
   payloads?: PaymentPresentPayload[]
@@ -308,16 +314,16 @@ export function pushPaymentPresentRecent(payload: PaymentPresentPayload): Paymen
   return next
 }
 
-export function readQuickPayPresetAmounts(storeId: string): string[] {
+export function readQuickPayPresetAmounts(storeId: string, defaultValues = DEFAULT_PRESET_AMOUNTS): string[] {
   const parsed = safeGet(presetStorageKey(storeId))
   if (!parsed) {
-    return DEFAULT_PRESET_AMOUNTS
+    return defaultValues
   }
   try {
     const values = normalizePresetAmounts(JSON.parse(parsed))
-    return values.length ? values : DEFAULT_PRESET_AMOUNTS
+    return values.length ? values : defaultValues
   } catch {
-    return DEFAULT_PRESET_AMOUNTS
+    return defaultValues
   }
 }
 
@@ -329,6 +335,37 @@ export function saveQuickPayPresetAmounts(storeId: string, values: string[]): st
 
 export function parsePresetAmountText(value: string): string[] {
   return normalizePresetAmounts(String(value || '').split(/[,\s，]+/))
+}
+
+export function readQuickPayConfigFromProfileConfigJson(configJson: string | null | undefined): QuickPayTerminalConfig {
+  const root = typeof configJson === 'string' && configJson.trim() ? safeParseJson(configJson) : {}
+  const source = root && typeof root === 'object' && !Array.isArray(root)
+    ? root as Record<string, unknown>
+    : {}
+  const quickPay = source.quickPay && typeof source.quickPay === 'object' && !Array.isArray(source.quickPay)
+    ? source.quickPay as Record<string, unknown>
+    : source
+  return normalizeQuickPayTerminalConfig(quickPay)
+}
+
+export function mergeQuickPayConfigIntoProfileConfigJson(
+  configJson: string | null | undefined,
+  config: Partial<QuickPayTerminalConfig>
+): string {
+  const parsed = typeof configJson === 'string' && configJson.trim() ? safeParseJson(configJson) : {}
+  const root = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+  const current = root.quickPay && typeof root.quickPay === 'object' && !Array.isArray(root.quickPay)
+    ? root.quickPay as Record<string, unknown>
+    : {}
+  return JSON.stringify({
+    ...root,
+    quickPay: {
+      ...current,
+      ...normalizeQuickPayTerminalConfig(config)
+    }
+  })
 }
 
 function parsePaymentPresentPayload(value: unknown): PaymentPresentPayload | null {
@@ -426,6 +463,31 @@ function normalizePresetAmounts(values: unknown): string[] {
     .filter(value => Number.isFinite(value) && value > 0)
     .map(value => formatPresetAmount(value))
   return Array.from(new Set(next)).slice(0, 6)
+}
+
+function normalizeQuickPayTerminalConfig(value: unknown): QuickPayTerminalConfig {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+  const presetAmounts = normalizePresetAmounts(source.presetAmounts)
+  return {
+    referencePrefix: normalizeReferencePrefix(source.referencePrefix),
+    dailyStartNumber: normalizeDailyStartNumber(source.dailyStartNumber),
+    presetAmounts: presetAmounts.length ? presetAmounts : DEFAULT_PRESET_AMOUNTS
+  }
+}
+
+function normalizeReferencePrefix(value: unknown): string {
+  const cleaned = String(value ?? 'QP').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+  return (cleaned || 'QP').slice(0, 3)
+}
+
+function normalizeDailyStartNumber(value: unknown): number {
+  const numberValue = Number(value ?? 0)
+  if (!Number.isFinite(numberValue)) {
+    return 0
+  }
+  return Math.max(0, Math.min(Math.trunc(numberValue), 9999))
 }
 
 function formatPresetAmount(value: number): string {

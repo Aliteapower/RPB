@@ -70,6 +70,19 @@ export interface PaymentProfileResponse {
   profile: PaymentProfile
 }
 
+export interface PaymentProfileTestQr {
+  method: PaymentMethod
+  amount: string
+  currency: string
+  paymentReference: string
+  qrPayload: string
+}
+
+export interface PaymentProfileTestQrResponse {
+  success: true
+  testQr: PaymentProfileTestQr
+}
+
 export interface PaymentIntentCreateRequest {
   idempotencyKey: string
   sourceType: PaymentIntentSourceType
@@ -89,6 +102,17 @@ export interface PaymentIntentCreateResponse {
   intent: PaymentIntent
   session: PaymentSession
   nextDisplayNumber: number
+}
+
+export interface QuickPayTerminalConfig {
+  referencePrefix: string
+  dailyStartNumber: number
+  presetAmounts: string[]
+}
+
+export interface QuickPayTerminalConfigResponse {
+  success: true
+  terminalConfig: QuickPayTerminalConfig
 }
 
 export interface PaymentApiErrorResponse {

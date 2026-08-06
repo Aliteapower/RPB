@@ -4,6 +4,8 @@ import type {
   PaymentIntentCreateResponse,
   PaymentProfileMutation,
   PaymentProfileResponse,
+  PaymentProfileTestQrResponse,
+  QuickPayTerminalConfigResponse,
   PaymentSession
 } from '../types/payment'
 
@@ -42,12 +44,26 @@ export async function updatePaymentProfile(
   return requestJson(profileEndpoint(storeId), { method: 'PATCH', body: request, fetcher })
 }
 
+export async function generatePaymentProfileTestQr(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProfileTestQrResponse> {
+  return requestJson(`${profileEndpoint(storeId)}/test-qr`, { method: 'POST', fetcher })
+}
+
 export async function createPaymentIntent(
   storeId: string,
   request: PaymentIntentCreateRequest,
   fetcher?: PaymentFetcher
 ): Promise<PaymentIntentCreateResponse> {
   return requestJson(intentEndpoint(storeId), { method: 'POST', body: request, fetcher })
+}
+
+export async function getQuickPayTerminalConfig(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<QuickPayTerminalConfigResponse> {
+  return requestJson(`${intentEndpoint(storeId)}/terminal-config`, { method: 'GET', fetcher })
 }
 
 export async function getPaymentSession(

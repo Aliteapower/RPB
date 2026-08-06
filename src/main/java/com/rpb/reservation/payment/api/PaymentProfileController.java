@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +33,13 @@ public class PaymentProfileController {
     public PaymentProfileController(PaymentMethodProfileService service, CurrentActorProvider currentActorProvider) {
         this.service = service;
         this.currentActorProvider = currentActorProvider;
+    }
+
+    @PostMapping("/test-qr")
+    @RequireAppGate(appKey = "payment", permission = SETTINGS_MANAGE_PERMISSION)
+    public ResponseEntity<PaymentProfileResponse.TestQrResponse> generateTestQr(@PathVariable UUID storeId) {
+        StoreScope scope = requireStoreScope(storeId);
+        return ResponseEntity.ok(PaymentProfileResponse.TestQrResponse.from(service.generateSettingsTestQr(scope)));
     }
 
     @GetMapping

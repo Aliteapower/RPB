@@ -76,6 +76,15 @@ public class PaymentIntentService {
             .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_SESSION_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
+    public PaymentQuickPayConfig findTerminalConfig(StoreScope scope, CurrentActor actor) {
+        Objects.requireNonNull(scope, "payment_scope_required");
+        validateActor(scope, actor);
+        return profileService.findEffectiveProfile(scope)
+            .map(profile -> PaymentQuickPayConfig.fromJson(profile.configJson()))
+            .orElseGet(PaymentQuickPayConfig::defaults);
+    }
+
     private PaymentIntentCreateResult createNew(StoreScope scope, PaymentIntentCreateCommand command, CurrentActor actor) {
         PaymentMethodProfile profile = profileService.findEffectiveProfile(scope)
             .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_PROFILE_NOT_FOUND));
@@ -101,11 +110,15 @@ public class PaymentIntentService {
         YearMonth period,
         int sequence
     ) {
+        PaymentQuickPayConfig quickPayConfig = PaymentQuickPayConfig.fromJson(profile.configJson());
         String periodText = period.format(PERIOD_FORMATTER);
         String intentNo = "PIT-" + periodText + "-" + "%04d".formatted(sequence);
-        String paymentReference = "QP-" + periodText + "-" + "%04d".formatted(sequence) + "-" + shortToken();
         LocalDate businessDate = LocalDate.now(clock);
-        int displayNumber = repository.allocateDisplayNumber(scope, businessDate, command.requestedDisplayNumber());
+        int allocatedDisplayNumber = repository.allocateDisplayNumber(scope, businessDate, command.requestedDisplayNumber());
+        int displayNumber = command.requestedDisplayNumber() == null
+            ? allocatedDisplayNumber + quickPayConfig.dailyStartNumber()
+            : allocatedDisplayNumber;
+        String paymentReference = quickPayConfig.referencePrefix() + "-" + periodText + "-" + "%04d".formatted(displayNumber) + "-" + shortToken();
         String qrPayload = qrPayloadBuilder.build(new PayNowQrPayloadRequest(
             profile.paynowType(),
             profile.paynowMobile(),

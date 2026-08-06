@@ -182,6 +182,8 @@ PayNow 路由参考：
 
 PayNow 可复用经验：`payment_runtime` 最值得借鉴的是员工交互模型，包括计算器输入、预设金额、可编辑展示数量、顾客屏、120 秒清除。
 
+后台配置和员工运行时配置要拆开 API。PayNow 后续优化里，员工端需要读取 quick-pay prefix、daily start number、preset amounts，但不能直接复用租户后台 profile API，因为后台 API 带有手机号/UEN、商户名称和 `payment.settings.manage` 权限。正确做法是提供窄接口，例如 `/payments/intents/terminal-config`，只暴露终端运行所需字段，并用 `payment.intent.create` 保护。
+
 ## 测试矩阵
 
 发布前至少覆盖：
@@ -272,6 +274,9 @@ PayNow 生产 smoke 没有执行真实收款写操作，因为没有受控测试
 - 不要把前端同浏览器状态误当成跨设备同步。
 - 不要把产品订阅、门店启用、运行时动作权限混成一个概念。
 - 不要把 provider payload 逻辑写进 POS、预约或页面组件。
+- 不要让员工端读取后台完整配置 API。把运行时默认配置拆成窄 DTO，避免泄露 merchant profile。
+- 不要接受 PayNow 手机号裸存。手机号输入可接受 8 位本地号，但保存和生成 SGQR 前必须规范化为 `+65xxxxxxxx`。
+- 不要用真实业务收款单测试配置页。配置页测试码应生成独立 0.10 QR，不写入 payment intent/session。
 
 ## 下一条产品线模板
 
@@ -362,4 +367,3 @@ Deployment:
 - 使用 clean commit 产物部署。
 - 生产 Flyway 状态已核对。
 - 发布说明包含备份和回滚细节。
-

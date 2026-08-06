@@ -20,7 +20,7 @@ public class PayNowQrPayloadBuilder {
             throw invalid();
         }
 
-        String proxyValue = PAYNOW_TYPE_MOBILE.equals(paynowType) ? trim(request.paynowMobile()) : trim(request.paynowUen());
+        String proxyValue = PAYNOW_TYPE_MOBILE.equals(paynowType) ? normalizeSingaporeMobile(request.paynowMobile()) : trim(request.paynowUen());
         String merchantName = trim(request.merchantName());
         String reference = trim(request.reference());
         BigDecimal amount = request.amount();
@@ -72,6 +72,23 @@ public class PayNowQrPayloadBuilder {
 
     private static PaymentServiceException invalid() {
         return new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_PROFILE_INVALID);
+    }
+
+    private static String normalizeSingaporeMobile(String value) {
+        String trimmed = trim(value);
+        if (trimmed == null || trimmed.isBlank()) {
+            return trimmed;
+        }
+        String compact = trimmed.replaceAll("[\\s-]", "");
+        if (compact.startsWith("+65")) {
+            compact = compact.substring(3);
+        } else if (compact.startsWith("65") && compact.length() == 10) {
+            compact = compact.substring(2);
+        }
+        if (!compact.matches("[689]\\d{7}")) {
+            throw invalid();
+        }
+        return "+65" + compact;
     }
 
     private static String trim(String value) {

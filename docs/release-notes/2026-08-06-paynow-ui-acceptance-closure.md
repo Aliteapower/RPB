@@ -5,6 +5,47 @@
 - Date: 2026-08-06
 - Branch: `codex/paynow-payment-product-line-staging`
 
+## 2026-08-06 Quick Pay Terminal Settings Optimization
+
+### New
+
+- Added a tenant-admin 0.10 PayNow test QR action on the PayNow settings page.
+- Added staff terminal config API: `GET /api/v1/stores/{storeId}/payments/intents/terminal-config`.
+- Added structured Quick Payment Terminal settings in `payment_method_profiles.config_json`:
+  - `quickPay.referencePrefix`, default `QP`, max 3.
+  - `quickPay.dailyStartNumber`, default `0`.
+  - `quickPay.presetAmounts`, default `5 / 10 / 20 / 50 / 100 / 200`.
+
+### Changed
+
+- PayNow mobile profiles now normalize Singapore phone numbers to `+65xxxxxxxx` before persistence and SGQR payload generation.
+- Quick Pay payment references use the configured prefix.
+- Auto display numbers apply `dailyStartNumber` when the staff request does not supply a display number.
+- Staff Quick Pay reads preset defaults from the narrow terminal config API, while retaining local employee preset overrides.
+
+### Migration
+
+- No database migration. Existing `payment_method_profiles.config_json` stores the new terminal settings.
+
+### Permission
+
+- Settings test QR remains under `payment.settings.manage`.
+- Staff terminal config uses `payment.intent.create` and does not expose merchant PayNow mobile/UEN or merchant name.
+
+### Validation
+
+- PASS: `mvn -q "-Dtest=PaymentMethodProfileServiceTest,PaymentIntentServiceTest,PayNowQrPayloadBuilderTest,PaymentProfileControllerTest,PaymentIntentControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
+- PASS: `npm run build`
+
+### Risk
+
+- Existing PayNow config JSON remains backward compatible. Invalid or missing quick-pay settings fall back to defaults.
+- The settings page test QR is a generated QR only; it does not create a payment intent/session and therefore will not appear in operational payment history.
+
+### Rollback Notes
+
+- Roll back backend and frontend artifacts to the previous PayNow UI build. Existing profile rows remain compatible because the new settings live inside optional JSON config.
+
 ## New
 
 - Added tenant admin PayNow settings route: `/stores/:storeId/admin/payment/settings`.

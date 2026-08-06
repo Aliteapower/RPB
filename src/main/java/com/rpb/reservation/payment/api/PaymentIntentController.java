@@ -72,6 +72,20 @@ public class PaymentIntentController {
         ));
     }
 
+    @GetMapping("/terminal-config")
+    @RequireAppGate(appKey = "payment", permission = INTENT_CREATE_PERMISSION)
+    public ResponseEntity<PaymentIntentResponses.TerminalConfigResponse> getTerminalConfig(@PathVariable UUID storeId) {
+        CurrentActor actor = currentActorProvider.currentActor()
+            .orElseThrow(() -> new PaymentApiException(PaymentApiErrorCode.UNAUTHENTICATED));
+        if (actor.tenantId() == null || !actor.canAccessStore(storeId)) {
+            throw new PaymentApiException(PaymentApiErrorCode.FORBIDDEN);
+        }
+        StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
+        return ResponseEntity.ok(PaymentIntentResponses.TerminalConfigResponse.from(
+            service.findTerminalConfig(scope, actor)
+        ));
+    }
+
     @ExceptionHandler(PaymentApiException.class)
     public ResponseEntity<PaymentApiErrorResponse> handleApiException(PaymentApiException exception) {
         return apiError(exception.code());

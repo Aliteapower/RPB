@@ -38,4 +38,18 @@ class PaymentIntentControllerTest {
         assertThat(gate.appKey()).isEqualTo("payment");
         assertThat(gate.permission()).isEqualTo("payment.intent.view");
     }
+
+    @Test
+    void getTerminalConfigRequiresPaymentCreatePermission() throws NoSuchMethodException {
+        Method method = PaymentIntentController.class.getMethod("getTerminalConfig", UUID.class);
+
+        GetMapping mapping = method.getAnnotation(GetMapping.class);
+        RequireAppGate gate = method.getAnnotation(RequireAppGate.class);
+
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.value()).containsExactly("/terminal-config");
+        assertThat(gate).isNotNull();
+        assertThat(gate.appKey()).isEqualTo("payment");
+        assertThat(gate.permission()).isEqualTo("payment.intent.create");
+    }
 }

@@ -41,4 +41,22 @@ class PayNowQrPayloadBuilderTest {
             "QP-202608-0001-A1B2"
         ))).hasMessageContaining(PaymentServiceErrorCode.PAYMENT_PROFILE_INVALID.name());
     }
+
+    @Test
+    void prefixesSingaporeMobileProxyWithCountryCode() {
+        PayNowQrPayloadBuilder builder = new PayNowQrPayloadBuilder();
+
+        String payload = builder.build(new PayNowQrPayloadRequest(
+            "mobile",
+            "8735 7878",
+            null,
+            "RPB Demo Restaurant",
+            new BigDecimal("0.10"),
+            "QP-TEST-010"
+        ));
+
+        assertThat(payload).contains("+6587357878");
+        assertThat(payload).contains("0.10");
+        assertThat(payload).contains("QP-TEST-010");
+    }
 }

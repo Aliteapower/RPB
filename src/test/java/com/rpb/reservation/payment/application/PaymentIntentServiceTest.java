@@ -80,6 +80,30 @@ class PaymentIntentServiceTest {
     }
 
     @Test
+    void appliesQuickPayReferencePrefixAndDailyStartNumberFromProfileConfig() {
+        when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfileWithConfig(
+            "{\"quickPay\":{\"referencePrefix\":\"AB\",\"dailyStartNumber\":10,\"presetAmounts\":[5,10,20]}}"
+        )));
+
+        PaymentIntentCreateResult result = service.createQuickPay(scope, new PaymentIntentCreateCommand(
+            "quick-pay-20260805-002",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("5.00"),
+            "SGD",
+            "COUNTER-1",
+            "Alice",
+            null,
+            "{}"
+        ), actor);
+
+        assertThat(result.intent().paymentReference()).startsWith("AB-202608-0011-");
+        assertThat(result.session().displayNumber()).isEqualTo(11);
+        assertThat(result.nextDisplayNumber()).isEqualTo(12);
+    }
+
+    @Test
     void findsSessionBySessionNoForAccessibleStore() {
         PaymentSession session = sampleSession();
         repository.session = session;
@@ -87,6 +111,19 @@ class PaymentIntentServiceTest {
         PaymentSession result = service.findSessionByNo(scope, session.sessionNo(), actor);
 
         assertThat(result).isEqualTo(session);
+    }
+
+    @Test
+    void returnsTerminalConfigWithoutExposingPayNowMerchantDetails() {
+        when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfileWithConfig(
+            "{\"quickPay\":{\"referencePrefix\":\"AB\",\"dailyStartNumber\":3,\"presetAmounts\":[1,2.5]}}"
+        )));
+
+        PaymentQuickPayConfig result = service.findTerminalConfig(scope, actor);
+
+        assertThat(result.referencePrefix()).isEqualTo("AB");
+        assertThat(result.dailyStartNumber()).isEqualTo(3);
+        assertThat(result.presetAmounts()).containsExactly(new BigDecimal("1"), new BigDecimal("2.5"));
     }
 
     @Test
@@ -107,6 +144,10 @@ class PaymentIntentServiceTest {
     }
 
     private PaymentMethodProfile activeUenProfile() {
+        return activeUenProfileWithConfig("{}");
+    }
+
+    private PaymentMethodProfile activeUenProfileWithConfig(String configJson) {
         return new PaymentMethodProfile(
             UUID.fromString("40000000-0000-0000-0000-000000000001"),
             TENANT_ID,
@@ -118,7 +159,7 @@ class PaymentIntentServiceTest {
             "202012345A",
             "RPB Demo Restaurant",
             "SGD",
-            "{}",
+            configJson,
             0,
             java.time.OffsetDateTime.parse("2026-08-05T04:00:00Z"),
             java.time.OffsetDateTime.parse("2026-08-05T04:00:00Z")
@@ -200,7 +241,7 @@ class PaymentIntentServiceTest {
                 session.expiresAt(),
                 0
             );
-            return new PaymentIntentCreateResult(true, false, savedIntent, savedSession, 2);
+            return new PaymentIntentCreateResult(true, false, savedIntent, savedSession, savedSession.displayNumber() + 1);
         }
     }
 }
