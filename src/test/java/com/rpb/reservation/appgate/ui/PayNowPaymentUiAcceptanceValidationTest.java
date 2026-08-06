@@ -21,6 +21,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("name: 'tenant-admin-payment-settings'")
             .contains("path: '/stores/:storeId/payments'")
             .contains("name: 'payment-quick-pay'")
+            .contains("path: '/stores/:storeId/payments/present/:terminalCode'")
+            .contains("name: 'payment-present'")
             .contains("path: '/stores/:storeId/payments/display/:sessionNo'")
             .contains("name: 'payment-display'");
 
@@ -52,6 +54,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String settings = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentSettingsPage.vue"));
         String quickPay = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentQuickPayPage.vue"));
         String display = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentDisplayPage.vue"));
+        String present = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentPresentPage.vue"));
+        String presentBridge = FrontendSourceSupport.readString(Path.of("src", "utils", "paymentPresentBridge.ts"));
 
         assertThat(api)
             .contains("/tenant-admin/payment/profile")
@@ -74,11 +78,27 @@ class PayNowPaymentUiAcceptanceValidationTest {
         assertThat(quickPay)
             .contains("createPaymentIntent")
             .contains("sourceType: 'quick_pay'")
-            .contains("DownloadableQrCode")
+            .contains("appendAmountToken")
+            .contains("backspaceAmount")
+            .contains("clearAmount")
+            .contains("savePresetEditor")
+            .contains("openPresentWindow")
+            .contains("publishPaymentPresentPayload")
             .contains("active-tab=\"payment\"");
         assertThat(display)
             .contains("getPaymentSession")
             .contains("DownloadableQrCode")
             .contains("active-tab=\"payment\"");
+        assertThat(present)
+            .contains("subscribePaymentPresentPayload")
+            .contains("PAYMENT_PRESENT_TTL_SECONDS")
+            .contains("Waiting for new payment")
+            .contains("clearActivePayload")
+            .contains("DownloadableQrCode");
+        assertThat(presentBridge)
+            .contains("BroadcastChannel")
+            .contains("localStorage")
+            .contains("rpb-payment-present")
+            .contains("120");
     }
 }

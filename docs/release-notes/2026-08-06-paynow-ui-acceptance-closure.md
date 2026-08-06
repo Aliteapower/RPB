@@ -44,6 +44,40 @@
 - Revert the PayNow UI commit and the session lookup API commit if the new UI needs to be removed.
 - No schema rollback is required for this round.
 
+## 2026-08-06 Quick Pay Terminal Optimization
+
+### New
+
+- Added an RPB-native PayNow customer display route: `/stores/:storeId/payments/present/:terminalCode`.
+- Added same-browser display synchronization through `BroadcastChannel` with `localStorage` fallback.
+- Added a 120-second customer-display TTL that clears the current QR and returns the display to “Waiting for new payment”.
+
+### Changed
+
+- Reworked the staff PayNow page into a terminal-style calculator workflow with numeric keypad input.
+- Changed default preset amounts to `5 / 10 / 20 / 50 / 100 / 200`.
+- Added employee-editable preset amounts stored locally per store.
+- Quick Pay now opens or reuses the customer display window before creating the payment intent, then pushes the generated QR to that display.
+
+### Migration
+
+- No database migration.
+- No new backend API endpoint.
+
+### Permission
+
+- Payment intent creation remains protected by `payment.intent.create`.
+- The new customer display route is still under the authenticated staff app shell and does not expose a public unauthenticated QR endpoint.
+
+### Risk
+
+- This phase supports same-browser cashier/display windows. A separate device display will require a backend active-session feed or polling API in a later phase.
+- Browser popup blocking can still prevent the customer display from opening if an operator blocks popups for the site.
+
+### Rollback Notes
+
+- Revert the frontend commit for this optimization. Existing PayNow profile, intent creation, and session display APIs remain compatible.
+
 ## 2026-08-06 Production Deployment
 
 - Production backend and frontend deployed commit `8cca5be2`.
