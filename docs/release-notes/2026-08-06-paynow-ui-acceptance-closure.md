@@ -93,6 +93,44 @@
 - Public smoke returned `200` for `/login`, `/stores/20000000-0000-0000-0000-000000000983/payments`, and `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1`.
 - Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments`.
 
+## 2026-08-06 Customer Display Quantity Settings
+
+### New
+
+- Added staff-editable PayNow customer display settings on the Quick Pay page.
+- Operators can choose the maximum active display payments: `1 / 2 / 3 / 4`.
+- The customer display page now renders multiple active PayNow QR cards in a responsive grid, each keeping the existing 120-second expiry behavior.
+
+### Changed
+
+- The same-browser PayNow display bridge now stores active display payloads as a bounded queue instead of a single current payload.
+- Display settings are stored locally per store and terminal, and are synchronized to the already-open display window through `BroadcastChannel` with `localStorage` fallback.
+- `QR per payment` remains fixed at `1` and primary QR remains `SGQR` until RPB exposes a second QR payload source.
+
+### Migration
+
+- No database migration.
+- No backend API endpoint or backend JAR change.
+
+### Permission
+
+- No new App Gate permissions.
+- Quick Pay creation remains protected by `payment.intent.create`; the customer display route remains inside the authenticated staff app shell.
+
+### Validation
+
+- PASS: `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
+- PASS: `npm run build`
+
+### Risk
+
+- This remains a same-browser cashier/display workflow. True cross-device display settings and active QR feed still require a backend display session API in a later phase.
+- Existing active single-payload display state is read compatibly; newly generated display state is stored as a payload queue.
+
+### Rollback Notes
+
+- Roll back by redeploying the previous frontend bundle. No schema or backend rollback is required.
+
 ## 2026-08-06 Production Deployment
 
 - Production backend and frontend deployed commit `8cca5be2`.

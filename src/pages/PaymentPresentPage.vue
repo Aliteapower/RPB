@@ -8,74 +8,106 @@ import { useStoreContextStore } from '../stores/storeContext'
 import {
   clearPaymentPresentPayload,
   isPaymentPresentPayloadActive,
+  MAX_PRESENT_PAYMENTS,
   paymentPresentSecondsRemaining,
   PAYMENT_PRESENT_TTL_SECONDS,
-  readPaymentPresentPayload,
+  readPaymentPresentPayloads,
   readPaymentPresentRecent,
-  subscribePaymentPresentPayload,
+  readPaymentPresentSettings,
+  subscribePaymentPresentPayloads,
+  subscribePaymentPresentSettings,
   type PaymentPresentPayload,
-  type PaymentPresentRecentItem
+  type PaymentPresentRecentItem,
+  type PaymentPresentSettings
 } from '../utils/paymentPresentBridge'
 
 const route = useRoute()
 const storeContext = useStoreContextStore()
 const { gt } = useGeneratedText()
 
-const activePayload = ref<PaymentPresentPayload | null>(null)
+const activePayloads = ref<PaymentPresentPayload[]>([])
+const presentSettings = ref<PaymentPresentSettings>({
+  maxPayments: 1,
+  qrPerPayment: 1,
+  primaryQr: 'sgqr'
+})
 const recentItems = ref<PaymentPresentRecentItem[]>([])
 const nowMs = ref(Date.now())
-let unsubscribe: (() => void) | null = null
+let unsubscribePayloads: (() => void) | null = null
+let unsubscribeSettings: (() => void) | null = null
 let timer: number | null = null
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const terminalCode = computed(() => String(route.params.terminalCode || 'T1').trim() || 'T1')
 const storeLabel = computed(() => storeId.value ? gt('generated.payment-present.001', { shortId: storeId.value.slice(0, 8) }) : gt('generated.payment-present.002'))
 const waitingForPaymentText = computed(() => gt('generated.payment-present.014') || 'Waiting for new payment')
-const activeCountdown = computed(() => activePayload.value ? formatCountdown(paymentPresentSecondsRemaining(activePayload.value, nowMs.value)) : '00:00')
+const activePayloadGridClass = computed(() => `cards-${Math.min(activePayloads.value.length || presentSettings.value.maxPayments, MAX_PRESENT_PAYMENTS)}`)
 
 onMounted(() => {
   refreshRecent()
-  const saved = storeId.value ? readPaymentPresentPayload(storeId.value, terminalCode.value) : null
-  applyIncomingPayload(saved)
+  presentSettings.value = storeId.value ? readPaymentPresentSettings(storeId.value, terminalCode.value) : presentSettings.value
+  const saved = storeId.value ? readPaymentPresentPayloads(storeId.value, terminalCode.value) : []
+  applyIncomingPayloads(saved)
   if (storeId.value) {
-    unsubscribe = subscribePaymentPresentPayload(storeId.value, terminalCode.value, applyIncomingPayload)
+    unsubscribePayloads = subscribePaymentPresentPayloads(storeId.value, terminalCode.value, applyIncomingPayloads)
+    unsubscribeSettings = subscribePaymentPresentSettings(storeId.value, terminalCode.value, applyIncomingSettings)
   }
   timer = window.setInterval(() => {
     nowMs.value = Date.now()
-    if (activePayload.value && !isPaymentPresentPayloadActive(activePayload.value, nowMs.value)) {
-      clearActivePayload()
-    }
+    filterExpiredActivePayloads()
   }, 1000)
 })
 
 onBeforeUnmount(() => {
-  unsubscribe?.()
-  unsubscribe = null
+  unsubscribePayloads?.()
+  unsubscribePayloads = null
+  unsubscribeSettings?.()
+  unsubscribeSettings = null
   if (timer) {
     window.clearInterval(timer)
     timer = null
   }
 })
 
-function applyIncomingPayload(payload: PaymentPresentPayload | null): void {
-  if (!payload || !isPaymentPresentPayloadActive(payload)) {
-    if (payload) {
-      clearPaymentPresentPayload(payload.storeId, payload.terminalCode)
+function applyIncomingPayloads(payloads: PaymentPresentPayload[]): void {
+  const next = payloads
+    .filter(payload => isPaymentPresentPayloadActive(payload, nowMs.value))
+    .slice(0, presentSettings.value.maxPayments)
+  if (!next.length) {
+    if (payloads.length) {
+      clearPaymentPresentPayload(payloads[0].storeId, payloads[0].terminalCode)
     }
-    activePayload.value = null
+    activePayloads.value = []
     refreshRecent()
     return
   }
-  activePayload.value = payload
+  activePayloads.value = next
   refreshRecent()
 }
 
 function clearActivePayload(): void {
-  if (activePayload.value) {
-    clearPaymentPresentPayload(activePayload.value.storeId, activePayload.value.terminalCode)
+  if (storeId.value) {
+    clearPaymentPresentPayload(storeId.value, terminalCode.value)
   }
-  activePayload.value = null
+  activePayloads.value = []
   refreshRecent()
+}
+
+function applyIncomingSettings(settings: PaymentPresentSettings): void {
+  presentSettings.value = settings
+  activePayloads.value = activePayloads.value.slice(0, settings.maxPayments)
+}
+
+function filterExpiredActivePayloads(): void {
+  const next = activePayloads.value.filter(payload => isPaymentPresentPayloadActive(payload, nowMs.value))
+  if (next.length === activePayloads.value.length) {
+    return
+  }
+  if (!next.length) {
+    clearActivePayload()
+    return
+  }
+  activePayloads.value = next
 }
 
 function refreshRecent(): void {
@@ -87,6 +119,10 @@ function formatCountdown(seconds: number): string {
   const minutes = String(Math.floor(safe / 60)).padStart(2, '0')
   const rest = String(safe % 60).padStart(2, '0')
   return `${minutes}:${rest}`
+}
+
+function activeCountdownText(payload: PaymentPresentPayload): string {
+  return formatCountdown(paymentPresentSecondsRemaining(payload, nowMs.value))
 }
 
 function recentSecondsText(item: PaymentPresentRecentItem): string {
@@ -110,38 +146,40 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
     </header>
 
     <section class="present-body">
-      <section v-if="activePayload" class="present-card">
-        <div class="present-index">{{ activePayload.displayNumber }}</div>
-        <header class="payment-head">
-          <div class="present-ref">
-            <span>{{ gt('generated.payment-present.005') }}</span>
-            <strong>{{ activePayload.intentNo }}</strong>
-          </div>
-          <div class="present-amount">
-            <span>{{ activePayload.currency }}</span>
-            <strong>{{ activePayload.amount }}</strong>
-          </div>
-        </header>
+      <section v-if="activePayloads.length" class="present-grid" :class="activePayloadGridClass">
+        <article v-for="payload in activePayloads" :key="payload.sessionNo" class="present-card">
+          <div class="present-index">{{ payload.displayNumber }}</div>
+          <header class="payment-head">
+            <div class="present-ref">
+              <span>{{ gt('generated.payment-present.005') }}</span>
+              <strong>{{ payload.intentNo }}</strong>
+            </div>
+            <div class="present-amount">
+              <span>{{ payload.currency }}</span>
+              <strong>{{ payload.amount }}</strong>
+            </div>
+          </header>
 
-        <dl class="payment-meta">
-          <div>
-            <dt>{{ gt('generated.payment-present.006') }}</dt>
-            <dd>{{ activePayload.status }}</dd>
-          </div>
-          <div>
-            <dt>{{ gt('generated.payment-present.007') }}</dt>
-            <dd>{{ activeCountdown }}</dd>
-          </div>
-        </dl>
+          <dl class="payment-meta">
+            <div>
+              <dt>{{ gt('generated.payment-present.006') }}</dt>
+              <dd>{{ payload.status }}</dd>
+            </div>
+            <div>
+              <dt>{{ gt('generated.payment-present.007') }}</dt>
+              <dd>{{ activeCountdownText(payload) }}</dd>
+            </div>
+          </dl>
 
-        <DownloadableQrCode
-          :description="gt('generated.payment-present.008')"
-          :download-label="gt('generated.payment-present.009')"
-          :file-name="`${activePayload.sessionNo}.png`"
-          :size="360"
-          :title="gt('generated.payment-present.010')"
-          :value="activePayload.qrPayload"
-        />
+          <DownloadableQrCode
+            :description="gt('generated.payment-present.008')"
+            :download-label="gt('generated.payment-present.009')"
+            :file-name="`${payload.sessionNo}.png`"
+            :size="320"
+            :title="gt('generated.payment-present.010')"
+            :value="payload.qrPayload"
+          />
+        </article>
       </section>
 
       <section v-else class="waiting-panel">
@@ -230,6 +268,11 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
+}
+
+.present-grid {
+  display: grid;
+  gap: 12px;
 }
 
 .present-card {
@@ -368,15 +411,27 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
 @media (min-width: 900px) {
   .present-body {
     grid-template-columns: minmax(0, 1fr);
-    max-width: 1280px;
+    max-width: 1440px;
+  }
+
+  .present-grid {
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  }
+
+  .present-grid.cards-1 {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .recent-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 560px) {
+  .present-grid {
+    grid-template-columns: 1fr;
+  }
+
   .payment-head {
     align-items: stretch;
     flex-direction: column;

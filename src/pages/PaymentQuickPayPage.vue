@@ -15,16 +15,21 @@ import { useStoreContextStore } from '../stores/storeContext'
 import type { PaymentIntentCreateResponse } from '../types/payment'
 import {
   buildPaymentPresentPayload,
+  MAX_PRESENT_PAYMENTS,
   parsePresetAmountText,
   paymentPresentUrl,
   publishPaymentPresentPayload,
+  publishPaymentPresentSettings,
   readPaymentPresentRecent,
+  readPaymentPresentSettings,
   readQuickPayPresetAmounts,
   saveQuickPayPresetAmounts,
+  type PaymentPresentSettings,
   type PaymentPresentRecentItem
 } from '../utils/paymentPresentBridge'
 
 const amountKeys = ['7', '8', '9', 'backspace', '4', '5', '6', 'clear', '1', '2', '3', '00', '0', '.']
+const presentMaxPaymentOptions = [1, 2, 3, 4] as const
 const terminalStorageKey = 'rpb.payment.quickPay.terminalCode'
 
 const route = useRoute()
@@ -44,6 +49,13 @@ const createdResult = ref<PaymentIntentCreateResponse | null>(null)
 const amountPresets = ref<string[]>([])
 const presetEditorOpen = ref(false)
 const presetEditorText = ref('')
+const presentSettings = ref<PaymentPresentSettings>({
+  maxPayments: 1,
+  qrPerPayment: 1,
+  primaryQr: 'sgqr'
+})
+const presentSettingsEditorOpen = ref(false)
+const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
 let presentWindow: Window | null = null
 
@@ -81,9 +93,15 @@ function reloadLocalPaymentState(): void {
   if (!storeId.value) {
     amountPresets.value = []
     recentItems.value = []
+    presentSettings.value = {
+      maxPayments: 1,
+      qrPerPayment: 1,
+      primaryQr: 'sgqr'
+    }
     return
   }
   amountPresets.value = readQuickPayPresetAmounts(storeId.value)
+  presentSettings.value = readPaymentPresentSettings(storeId.value, normalizedTerminalCode.value)
   recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
 }
 
@@ -150,6 +168,23 @@ function savePresetEditor(): void {
   amountPresets.value = saveQuickPayPresetAmounts(storeId.value, parsed)
   presetEditorOpen.value = false
   errorText.value = ''
+}
+
+function openPresentSettingsEditor(): void {
+  presentSettingsMaxPayments.value = presentSettings.value.maxPayments
+  presentSettingsEditorOpen.value = true
+}
+
+function savePresentSettingsEditor(): void {
+  if (!storeId.value) {
+    return
+  }
+  presentSettings.value = publishPaymentPresentSettings(storeId.value, normalizedTerminalCode.value, {
+    maxPayments: presentSettingsMaxPayments.value,
+    qrPerPayment: 1,
+    primaryQr: 'sgqr'
+  })
+  presentSettingsEditorOpen.value = false
 }
 
 async function submitQuickPay(): Promise<void> {
@@ -264,9 +299,14 @@ function apiErrorText(error: unknown): string {
       :store-label="storeLabel"
     >
       <template #action>
-        <button class="display-button" type="button" @click="openPresentWindow">
-          {{ gt('generated.payment-quick-pay.029') }}
-        </button>
+        <div class="topbar-actions">
+          <button class="display-button" type="button" @click="openPresentWindow">
+            {{ gt('generated.payment-quick-pay.029') }}
+          </button>
+          <button class="display-button" type="button" @click="openPresentSettingsEditor">
+            {{ gt('generated.payment-quick-pay.041') }}
+          </button>
+        </div>
       </template>
     </StaffHomeTopBar>
 
@@ -374,6 +414,41 @@ function apiErrorText(error: unknown): string {
       </section>
     </div>
 
+    <div v-if="presentSettingsEditorOpen" class="modal-backdrop" role="presentation" @click.self="presentSettingsEditorOpen = false">
+      <section class="preset-editor present-settings-editor" role="dialog" :aria-label="gt('generated.payment-quick-pay.042')">
+        <h2>{{ gt('generated.payment-quick-pay.042') }}</h2>
+        <p class="settings-help">{{ gt('generated.payment-quick-pay.043', { max: MAX_PRESENT_PAYMENTS }) }}</p>
+
+        <fieldset class="radio-group">
+          <legend>{{ gt('generated.payment-quick-pay.044') }}</legend>
+          <label v-for="option in presentMaxPaymentOptions" :key="option" class="radio-option">
+            <input v-model.number="presentSettingsMaxPayments" type="radio" name="max-present-payments" :value="option" />
+            <span>{{ option }}</span>
+          </label>
+        </fieldset>
+
+        <dl class="fixed-qr-settings">
+          <div>
+            <dt>{{ gt('generated.payment-quick-pay.045') }}</dt>
+            <dd>1</dd>
+          </div>
+          <div>
+            <dt>{{ gt('generated.payment-quick-pay.046') }}</dt>
+            <dd>SGQR</dd>
+          </div>
+        </dl>
+
+        <div class="editor-actions">
+          <button type="button" class="secondary-button" @click="presentSettingsEditorOpen = false">
+            {{ gt('generated.payment-quick-pay.039') }}
+          </button>
+          <button type="button" class="primary-button" @click="savePresentSettingsEditor">
+            {{ gt('generated.payment-quick-pay.040') }}
+          </button>
+        </div>
+      </section>
+    </div>
+
     <StaffBottomNav :store-id="storeId" active-tab="payment" />
   </main>
 </template>
@@ -398,6 +473,13 @@ function apiErrorText(error: unknown): string {
   font-weight: 900;
   min-height: 34px;
   padding: 0 10px;
+}
+
+.topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .payment-body {
@@ -676,6 +758,75 @@ textarea {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-help {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.radio-group {
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.radio-group legend {
+  color: #0f172a;
+  flex: 0 0 100%;
+  font-size: 0.82rem;
+  font-weight: 950;
+  margin-bottom: 2px;
+}
+
+.radio-option {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.radio-option input {
+  min-height: 0;
+  width: auto;
+}
+
+.radio-option span {
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.fixed-qr-settings {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+}
+
+.fixed-qr-settings div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.fixed-qr-settings dt,
+.fixed-qr-settings dd {
+  font-size: 0.8rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.fixed-qr-settings dt {
+  color: #64748b;
 }
 
 @media (max-width: 560px) {
