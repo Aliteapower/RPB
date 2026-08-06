@@ -33,3 +33,16 @@
 ## Rollback Notes
 - Revert the frontend changes in `src/composables/useStoreVisibleApps.ts`, `src/components/staff/StaffBottomNav.vue`, `src/components/staff/staffBottomNavItems.ts`, `src/pages/StoreStaffHomePage.vue`, and `src/components/tenant-admin/TenantAdminNav.vue`.
 - No schema rollback is required.
+
+## Production Deployment
+- Implementation commit deployed: `bb2cffd4`.
+- Deployment type: frontend static assets only; backend service and Flyway were not changed.
+- Production frontend root: `/opt/rpb/frontend`.
+- Production backup: `/opt/rpb/backups/20260806-193508-bb2cffd4-product-line-navigation-frontend`.
+- Smoke checks:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/staff` returned `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/settings` returned `200`.
+  - New chunks `useStoreVisibleApps-B7sFFcBD.js`, `StoreStaffHomePage-CU3ktGdW.js`, and `TenantAdminNav-BismCYmN.js` returned `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401` when unauthenticated.
+  - `nginx` status was `active`; recent nginx ERROR entries: `0`.
