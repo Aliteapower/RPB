@@ -31,6 +31,7 @@ const TableResourceListPage = () => import('../pages/TableResourceListPage.vue')
 const TenantAdminCallScreenPage = () => import('../pages/TenantAdminCallScreenPage.vue')
 const TenantAdminCustomersPage = () => import('../pages/TenantAdminCustomersPage.vue')
 const TenantAdminI18nCatalogPage = () => import('../pages/TenantAdminI18nCatalogPage.vue')
+const TenantAdminPaymentRecordsPage = () => import('../pages/TenantAdminPaymentRecordsPage.vue')
 const TenantAdminPaymentSettingsPage = () => import('../pages/TenantAdminPaymentSettingsPage.vue')
 const TenantAdminProfilePage = () => import('../pages/TenantAdminProfilePage.vue')
 const TenantAdminPublicBookingPage = () => import('../pages/TenantAdminPublicBookingPage.vue')
@@ -237,6 +238,12 @@ export const router = createRouter({
       path: '/stores/:storeId/admin/payment/settings',
       name: 'tenant-admin-payment-settings',
       component: TenantAdminPaymentSettingsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/records',
+      name: 'tenant-admin-payment-records',
+      component: TenantAdminPaymentRecordsPage,
       meta: { requiresTenantAdmin: true }
     },
     {

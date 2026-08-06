@@ -4,6 +4,7 @@ import com.rpb.reservation.payment.application.PaymentIntent;
 import com.rpb.reservation.payment.application.PaymentIntentCreateResult;
 import com.rpb.reservation.payment.application.PaymentQuickPayConfig;
 import com.rpb.reservation.payment.application.PaymentSession;
+import com.rpb.reservation.payment.application.QuickPayRecord;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -117,6 +118,78 @@ public final class PaymentIntentResponses {
                 config.presetAmounts().stream().map(PaymentIntentResponses::amountText).toList()
             );
         }
+    }
+
+    public record QuickPayRecordsResponse(
+        boolean success,
+        List<QuickPayRecordResponse> records,
+        QuickPayRecordSummary summary
+    ) {
+        public static QuickPayRecordsResponse from(List<QuickPayRecord> records) {
+            List<QuickPayRecordResponse> rows = records.stream().map(QuickPayRecordResponse::from).toList();
+            BigDecimal totalAmount = records.stream()
+                .map(QuickPayRecord::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal paidAmount = records.stream()
+                .filter(record -> "paid".equals(record.intentStatus()))
+                .map(QuickPayRecord::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            long pendingCount = records.stream().filter(record -> "pending".equals(record.intentStatus())).count();
+            long paidCount = records.stream().filter(record -> "paid".equals(record.intentStatus())).count();
+            return new QuickPayRecordsResponse(
+                true,
+                rows,
+                new QuickPayRecordSummary(records.size(), pendingCount, paidCount, amountText(totalAmount), amountText(paidAmount), "SGD")
+            );
+        }
+    }
+
+    public record QuickPayRecordResponse(
+        UUID intentId,
+        UUID sessionId,
+        String intentNo,
+        String sessionNo,
+        int displayNumber,
+        LocalDate businessDate,
+        BigDecimal amount,
+        String currency,
+        String paymentReference,
+        String intentStatus,
+        String sessionStatus,
+        String terminalCode,
+        String cashierName,
+        OffsetDateTime createdAt,
+        OffsetDateTime expiresAt
+    ) {
+        static QuickPayRecordResponse from(QuickPayRecord record) {
+            return new QuickPayRecordResponse(
+                record.intentId(),
+                record.sessionId(),
+                record.intentNo(),
+                record.sessionNo(),
+                record.displayNumber(),
+                record.businessDate(),
+                record.amount(),
+                record.currency(),
+                record.paymentReference(),
+                record.intentStatus(),
+                record.sessionStatus(),
+                record.terminalCode(),
+                record.cashierName(),
+                record.createdAt(),
+                record.expiresAt()
+            );
+        }
+    }
+
+    public record QuickPayRecordSummary(
+        int count,
+        long pendingCount,
+        long paidCount,
+        String totalAmount,
+        String paidAmount,
+        String currency
+    ) {
     }
 
     private static String amountText(BigDecimal amount) {

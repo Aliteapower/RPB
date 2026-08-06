@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PaymentIntentService {
     private static final Set<String> SUPPORTED_SOURCE_TYPES = Set.of("quick_pay", "generic_merchant");
+    private static final Set<String> RECORD_STATUSES = Set.of("pending", "awaiting_verification", "paid", "expired", "cancelled", "failed");
     private static final String METHOD_PAYNOW = "paynow";
     private static final String STATUS_ACTIVE = "active";
     private static final String CURRENCY_SGD = "SGD";
@@ -83,6 +85,13 @@ public class PaymentIntentService {
         return profileService.findEffectiveProfile(scope)
             .map(profile -> PaymentQuickPayConfig.fromJson(profile.configJson()))
             .orElseGet(PaymentQuickPayConfig::defaults);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuickPayRecord> findQuickPayRecords(StoreScope scope, QuickPayRecordQuery query, CurrentActor actor) {
+        Objects.requireNonNull(scope, "payment_scope_required");
+        validateActor(scope, actor);
+        return repository.findQuickPayRecords(scope, normalized(query));
     }
 
     private PaymentIntentCreateResult createNew(StoreScope scope, PaymentIntentCreateCommand command, CurrentActor actor) {
@@ -188,6 +197,24 @@ public class PaymentIntentService {
             trim(command.cashierName()),
             command.requestedDisplayNumber(),
             isBlank(command.metadataJson()) ? "{}" : command.metadataJson().trim()
+        );
+    }
+
+    private static QuickPayRecordQuery normalized(QuickPayRecordQuery query) {
+        QuickPayRecordQuery source = query == null
+            ? new QuickPayRecordQuery(null, null, null, null, 80)
+            : query;
+        String status = trimLower(source.status());
+        if (!isBlank(status) && !RECORD_STATUSES.contains(status)) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        int limit = Math.max(1, Math.min(source.limit() <= 0 ? 80 : source.limit(), 200));
+        return new QuickPayRecordQuery(
+            source.businessDate(),
+            status,
+            trim(source.terminalCode()),
+            trim(source.search()),
+            limit
         );
     }
 

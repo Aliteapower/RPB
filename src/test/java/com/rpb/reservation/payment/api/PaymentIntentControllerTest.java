@@ -52,4 +52,26 @@ class PaymentIntentControllerTest {
         assertThat(gate.appKey()).isEqualTo("payment");
         assertThat(gate.permission()).isEqualTo("payment.intent.create");
     }
+
+    @Test
+    void getQuickPayRecordsRequiresPaymentViewPermission() throws NoSuchMethodException {
+        Method method = PaymentIntentController.class.getMethod(
+            "getQuickPayRecords",
+            UUID.class,
+            java.time.LocalDate.class,
+            String.class,
+            String.class,
+            String.class,
+            int.class
+        );
+
+        GetMapping mapping = method.getAnnotation(GetMapping.class);
+        RequireAppGate gate = method.getAnnotation(RequireAppGate.class);
+
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.value()).containsExactly("/quick-pay-records");
+        assertThat(gate).isNotNull();
+        assertThat(gate.appKey()).isEqualTo("payment");
+        assertThat(gate.permission()).isEqualTo("payment.intent.view");
+    }
 }

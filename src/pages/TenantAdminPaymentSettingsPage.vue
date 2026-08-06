@@ -281,9 +281,14 @@ function isAppGateError(code: string, messageKey: string): boolean {
           <span>{{ gt('generated.tenant-admin-payment-settings.001') }}</span>
           <h1>{{ gt('generated.tenant-admin-payment-settings.002') }}</h1>
         </div>
-        <RouterLink class="quick-pay-link" :to="{ name: 'payment-quick-pay', params: { storeId } }">
-          {{ gt('generated.tenant-admin-payment-settings.003') }}
-        </RouterLink>
+        <div class="page-actions">
+          <RouterLink class="quick-pay-link" :to="{ name: 'tenant-admin-payment-records', params: { storeId } }">
+            {{ gt('generated.tenant-admin-payment-settings.045') }}
+          </RouterLink>
+          <RouterLink class="quick-pay-link" :to="{ name: 'payment-quick-pay', params: { storeId } }">
+            {{ gt('generated.tenant-admin-payment-settings.003') }}
+          </RouterLink>
+        </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
@@ -438,6 +443,12 @@ function isAppGateError(code: string, messageKey: string): boolean {
   gap: 16px;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.page-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .page-heading span,
@@ -663,6 +674,10 @@ textarea {
     align-items: stretch;
     flex-direction: column;
   }
+
+  .page-actions {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 700px) {
@@ -674,6 +689,10 @@ textarea {
   .primary-button {
     justify-content: center;
     width: 100%;
+  }
+
+  .page-actions {
+    display: grid;
   }
 }
 </style>

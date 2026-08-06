@@ -5,6 +5,8 @@ import type {
   PaymentProfileMutation,
   PaymentProfileResponse,
   PaymentProfileTestQrResponse,
+  QuickPayRecordsQuery,
+  QuickPayRecordsResponse,
   QuickPayTerminalConfigResponse,
   PaymentSession
 } from '../types/payment'
@@ -64,6 +66,22 @@ export async function getQuickPayTerminalConfig(
   fetcher?: PaymentFetcher
 ): Promise<QuickPayTerminalConfigResponse> {
   return requestJson(`${intentEndpoint(storeId)}/terminal-config`, { method: 'GET', fetcher })
+}
+
+export async function getQuickPayRecords(
+  storeId: string,
+  query: QuickPayRecordsQuery = {},
+  fetcher?: PaymentFetcher
+): Promise<QuickPayRecordsResponse> {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    const text = String(value ?? '').trim()
+    if (text) {
+      params.set(key, text)
+    }
+  })
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return requestJson(`${intentEndpoint(storeId)}/quick-pay-records${suffix}`, { method: 'GET', fetcher })
 }
 
 export async function getPaymentSession(

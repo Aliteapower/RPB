@@ -14,7 +14,10 @@ import com.rpb.reservation.walkin.api.CurrentActor;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -143,6 +146,43 @@ class PaymentIntentServiceTest {
             .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
     }
 
+    @Test
+    void findsQuickPayRecordsWithNormalizedQuery() {
+        QuickPayRecord record = sampleQuickPayRecord();
+        repository.quickPayRecords = List.of(record);
+
+        List<QuickPayRecord> result = service.findQuickPayRecords(scope, new QuickPayRecordQuery(
+            LocalDate.parse("2026-08-05"),
+            "PENDING",
+            " T1 ",
+            " QP-202608 ",
+            500
+        ), actor);
+
+        assertThat(result).containsExactly(record);
+        assertThat(repository.lastRecordQuery).isEqualTo(new QuickPayRecordQuery(
+            LocalDate.parse("2026-08-05"),
+            "pending",
+            "T1",
+            "QP-202608",
+            200
+        ));
+    }
+
+    @Test
+    void rejectsUnknownQuickPayRecordStatus() {
+        assertThatThrownBy(() -> service.findQuickPayRecords(scope, new QuickPayRecordQuery(
+            null,
+            "unknown",
+            null,
+            null,
+            80
+        ), actor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting("code")
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
     private PaymentMethodProfile activeUenProfile() {
         return activeUenProfileWithConfig("{}");
     }
@@ -182,8 +222,30 @@ class PaymentIntentServiceTest {
         );
     }
 
+    private QuickPayRecord sampleQuickPayRecord() {
+        return new QuickPayRecord(
+            UUID.fromString("50000000-0000-0000-0000-000000000001"),
+            UUID.fromString("60000000-0000-0000-0000-000000000001"),
+            "PIT-202608-0001",
+            "PRS-ABCDEF1234567890",
+            7,
+            LocalDate.parse("2026-08-05"),
+            new BigDecimal("18.80"),
+            "SGD",
+            "QP-202608-0007-ABCD",
+            "pending",
+            "pending",
+            "T1",
+            "Alice",
+            OffsetDateTime.parse("2026-08-05T04:10:00Z"),
+            OffsetDateTime.parse("2026-08-05T04:12:00Z")
+        );
+    }
+
     private static final class InMemoryPaymentIntentRepository implements PaymentIntentRepository {
         private PaymentSession session;
+        private List<QuickPayRecord> quickPayRecords = List.of();
+        private QuickPayRecordQuery lastRecordQuery;
 
         @Override
         public Optional<PaymentIntentCreateResult> findCreateResultByIdempotencyKey(StoreScope scope, String idempotencyKey) {
@@ -195,6 +257,12 @@ class PaymentIntentServiceTest {
             return session != null && session.sessionNo().equals(sessionNo)
                 ? Optional.of(session)
                 : Optional.empty();
+        }
+
+        @Override
+        public List<QuickPayRecord> findQuickPayRecords(StoreScope scope, QuickPayRecordQuery query) {
+            lastRecordQuery = query;
+            return quickPayRecords;
         }
 
         @Override

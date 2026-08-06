@@ -6,11 +6,15 @@ import com.rpb.reservation.payment.application.PaymentIntentCreateResult;
 import com.rpb.reservation.payment.application.PaymentIntentDraft;
 import com.rpb.reservation.payment.application.PaymentSession;
 import com.rpb.reservation.payment.application.PaymentSessionDraft;
+import com.rpb.reservation.payment.application.QuickPayRecord;
+import com.rpb.reservation.payment.application.QuickPayRecordQuery;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -106,6 +110,71 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
             scope.storeId().value(),
             sessionNo
         ).stream().findFirst();
+    }
+
+    @Override
+    public List<QuickPayRecord> findQuickPayRecords(StoreScope scope, QuickPayRecordQuery query) {
+        StringBuilder sql = new StringBuilder("""
+            select
+                i.id as intent_id,
+                s.id as session_id,
+                i.intent_no,
+                s.session_no,
+                s.display_number,
+                s.business_date,
+                i.amount,
+                i.currency,
+                i.payment_reference,
+                i.status as intent_status,
+                s.status as session_status,
+                s.terminal_code,
+                s.cashier_name,
+                i.created_at,
+                coalesce(s.expires_at, i.expires_at) as expires_at
+            from payment_intents i
+            join payment_sessions s
+              on s.tenant_id = i.tenant_id
+             and s.store_id = i.store_id
+             and s.intent_id = i.id
+            where i.tenant_id = ?
+              and i.store_id = ?
+              and i.source_type = 'quick_pay'
+            """);
+        List<Object> args = new ArrayList<>();
+        args.add(scope.tenantId().value());
+        args.add(scope.storeId().value());
+        if (query.businessDate() != null) {
+            sql.append(" and s.business_date = ?");
+            args.add(query.businessDate());
+        }
+        if (!isBlank(query.status())) {
+            sql.append(" and i.status = ?");
+            args.add(query.status());
+        }
+        if (!isBlank(query.terminalCode())) {
+            sql.append(" and s.terminal_code = ?");
+            args.add(query.terminalCode());
+        }
+        if (!isBlank(query.search())) {
+            sql.append("""
+                 and (
+                    i.intent_no ilike ?
+                    or i.payment_reference ilike ?
+                    or s.session_no ilike ?
+                    or s.terminal_code ilike ?
+                    or s.cashier_name ilike ?
+                 )
+                """);
+            String like = "%" + query.search() + "%";
+            args.add(like);
+            args.add(like);
+            args.add(like);
+            args.add(like);
+            args.add(like);
+        }
+        sql.append(" order by i.created_at desc, s.created_at desc limit ?");
+        args.add(query.limit());
+        return jdbc.query(sql.toString(), (rs, rowNum) -> mapQuickPayRecord(rs), args.toArray());
     }
 
     @Override
@@ -287,5 +356,29 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
             rs.getObject("session_expires_at", java.time.OffsetDateTime.class),
             rs.getInt("session_version")
         );
+    }
+
+    private static QuickPayRecord mapQuickPayRecord(ResultSet rs) throws SQLException {
+        return new QuickPayRecord(
+            rs.getObject("intent_id", UUID.class),
+            rs.getObject("session_id", UUID.class),
+            rs.getString("intent_no"),
+            rs.getString("session_no"),
+            rs.getInt("display_number"),
+            rs.getObject("business_date", LocalDate.class),
+            rs.getBigDecimal("amount"),
+            rs.getString("currency"),
+            rs.getString("payment_reference"),
+            rs.getString("intent_status"),
+            rs.getString("session_status"),
+            rs.getString("terminal_code"),
+            rs.getString("cashier_name"),
+            rs.getObject("created_at", java.time.OffsetDateTime.class),
+            rs.getObject("expires_at", java.time.OffsetDateTime.class)
+        );
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

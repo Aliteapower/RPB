@@ -19,6 +19,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
         assertThat(router)
             .contains("path: '/stores/:storeId/admin/payment/settings'")
             .contains("name: 'tenant-admin-payment-settings'")
+            .contains("path: '/stores/:storeId/admin/payment/records'")
+            .contains("name: 'tenant-admin-payment-records'")
             .contains("path: '/stores/:storeId/payments'")
             .contains("name: 'payment-quick-pay'")
             .contains("path: '/stores/:storeId/payments/present/:terminalCode'")
@@ -28,7 +30,10 @@ class PayNowPaymentUiAcceptanceValidationTest {
 
         assertThat(tenantNav)
             .contains("/admin/payment/settings")
-            .contains("nav.tenant.paymentSettings");
+            .contains("/admin/payment/records")
+            .contains("nav.tenant.paymentProductLine")
+            .contains("nav.tenant.paymentSettings")
+            .contains("nav.tenant.paymentRecords");
         assertThat(staffHome)
             .contains("payment.intent.create")
             .contains("staffHome.actions.quickPay.label")
@@ -38,11 +43,15 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("nav.staff.payment")
             .contains("payment-quick-pay");
         assertThat(zh)
-            .contains("paymentSettings: '收款设置'")
+            .contains("paymentProductLine: '收款 / PayNow'")
+            .contains("paymentSettings: '基础设置'")
+            .contains("paymentRecords: 'Quick Payment Records'")
             .contains("payment: '收款'")
             .contains("quickPay");
         assertThat(en)
-            .contains("paymentSettings: 'Payment settings'")
+            .contains("paymentProductLine: 'Pay / PayNow'")
+            .contains("paymentSettings: 'Settings'")
+            .contains("paymentRecords: 'Quick Payment Records'")
             .contains("payment: 'Pay'")
             .contains("quickPay");
     }
@@ -52,6 +61,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String api = FrontendSourceSupport.readString(Path.of("src", "api", "paymentApi.ts"));
         String types = FrontendSourceSupport.readString(Path.of("src", "types", "payment.ts"));
         String settings = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentSettingsPage.vue"));
+        String records = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentRecordsPage.vue"));
         String quickPay = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentQuickPayPage.vue"));
         String display = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentDisplayPage.vue"));
         String present = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentPresentPage.vue"));
@@ -61,6 +71,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         assertThat(api)
             .contains("/tenant-admin/payment/profile")
             .contains("/payments/intents")
+            .contains("/quick-pay-records")
             .contains("/sessions/")
             .contains("credentials: 'include'");
         assertThat(types)
@@ -74,6 +85,16 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("formatAppGateErrorMessage")
             .contains("appgate.permission_denied")
             .contains("TenantAdminNav")
+            .contains("tenant-admin-payment-records")
+            .doesNotContain("sidecar")
+            .doesNotContain("payment_runtime");
+        assertThat(records)
+            .contains("getQuickPayRecords")
+            .contains("Quick Payment Records")
+            .contains("formatAppGateErrorMessage")
+            .contains("appgate.permission_denied")
+            .contains("TenantAdminNav")
+            .contains("tenant-admin-payment-settings")
             .doesNotContain("sidecar")
             .doesNotContain("payment_runtime");
         assertThat(quickPay)

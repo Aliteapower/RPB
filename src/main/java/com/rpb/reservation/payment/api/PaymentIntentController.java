@@ -6,6 +6,7 @@ import com.rpb.reservation.payment.application.PaymentIntentCreateCommand;
 import com.rpb.reservation.payment.application.PaymentIntentService;
 import com.rpb.reservation.payment.application.PaymentServiceErrorCode;
 import com.rpb.reservation.payment.application.PaymentServiceException;
+import com.rpb.reservation.payment.application.QuickPayRecordQuery;
 import com.rpb.reservation.store.value.StoreId;
 import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -83,6 +85,37 @@ public class PaymentIntentController {
         StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
         return ResponseEntity.ok(PaymentIntentResponses.TerminalConfigResponse.from(
             service.findTerminalConfig(scope, actor)
+        ));
+    }
+
+    @GetMapping("/quick-pay-records")
+    @RequireAppGate(appKey = "payment", permission = INTENT_VIEW_PERMISSION)
+    public ResponseEntity<PaymentIntentResponses.QuickPayRecordsResponse> getQuickPayRecords(
+        @PathVariable UUID storeId,
+        @RequestParam(required = false) java.time.LocalDate businessDate,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String terminalCode,
+        @RequestParam(name = "q", required = false) String search,
+        @RequestParam(required = false, defaultValue = "80") int limit
+    ) {
+        CurrentActor actor = currentActorProvider.currentActor()
+            .orElseThrow(() -> new PaymentApiException(PaymentApiErrorCode.UNAUTHENTICATED));
+        if (actor.tenantId() == null || !actor.canAccessStore(storeId)) {
+            throw new PaymentApiException(PaymentApiErrorCode.FORBIDDEN);
+        }
+        StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
+        return ResponseEntity.ok(PaymentIntentResponses.QuickPayRecordsResponse.from(
+            service.findQuickPayRecords(
+                scope,
+                new QuickPayRecordQuery(
+                    businessDate,
+                    status,
+                    terminalCode,
+                    search,
+                    limit
+                ),
+                actor
+            )
         ));
     }
 

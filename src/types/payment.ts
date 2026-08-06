@@ -115,6 +115,47 @@ export interface QuickPayTerminalConfigResponse {
   terminalConfig: QuickPayTerminalConfig
 }
 
+export interface QuickPayRecord {
+  intentId: string
+  sessionId: string
+  intentNo: string
+  sessionNo: string
+  displayNumber: number
+  businessDate: string
+  amount: string
+  currency: string
+  paymentReference: string
+  intentStatus: string
+  sessionStatus: string
+  terminalCode: string | null
+  cashierName: string | null
+  createdAt: string
+  expiresAt: string
+}
+
+export interface QuickPayRecordSummary {
+  count: number
+  pendingCount: number
+  paidCount: number
+  totalAmount: string
+  paidAmount: string
+  currency: string
+}
+
+export interface QuickPayRecordsQuery {
+  businessDate?: string
+  status?: string
+  terminalCode?: string
+  q?: string
+  limit?: number
+}
+
+export interface QuickPayRecordsResponse {
+  success: true
+  records: QuickPayRecord[]
+  summary: QuickPayRecordSummary
+}
+
 export interface PaymentApiErrorResponse {
   success: false
   error: {
