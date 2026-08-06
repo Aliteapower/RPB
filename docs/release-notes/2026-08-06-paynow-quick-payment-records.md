@@ -48,3 +48,30 @@
 
 - `mvn -q "-Dtest=PaymentIntentControllerTest,PaymentIntentServiceTest,PayNowPaymentUiAcceptanceValidationTest" test`
 - `npm run build`
+
+## Production Deployment
+
+- Production backend and frontend deployed commit `f8998c12`.
+- Deployment time: 2026-08-06 17:43 SGT.
+- Backend artifact built from clean worktree `target/deploy-worktree-f8998c12`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-f8998c12`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-f8998c12-reservation-platform.jar`
+  - `/home/ubuntu/rpb-f8998c12-frontend.tgz`
+- Backend backup: `/opt/rpb/backups/20260806-1743-f8998c12-paynow-records/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260806-1743-f8998c12-paynow-records/frontend`.
+- Backend JAR SHA-256: `dfad42261896fef2fe034525630b779c246c37a9fa982b411a8adf50319e477f`.
+- Flyway remains at `050|paynow recent tenant admin permissions|true`; no new migration was applied.
+- `rpb-backend` status after restart: `active`.
+- Startup ERROR entries after deployment: `0`.
+- Public `/api/v1/auth/me` returned `401`.
+- Public `/login` returned `200` and loaded frontend asset `/assets/index-ah1EKTAi.js`.
+- PayNow settings route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/settings`.
+- Quick Payment Records route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records`.
+- PayNow quick pay route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`.
+- Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records`, and `20000000.booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`.
+- New frontend chunks returned `200`:
+  - `/assets/TenantAdminPaymentRecordsPage-BtfGTGEw.js`
+  - `/assets/TenantAdminPaymentSettingsPage-C2a4EQFw.js`
+- Protected Quick Payment Records API returned `403` without an authenticated payment actor.
+- To avoid creating real payment operational records, production Quick Pay write APIs were not invoked.
