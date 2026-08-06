@@ -13,6 +13,7 @@ import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { PaymentIntentCreateResponse } from '../types/payment'
+import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 import {
   buildPaymentPresentPayload,
   MAX_PRESENT_PAYMENTS,
@@ -276,6 +277,9 @@ function apiErrorText(error: unknown): string {
   }
   if (error.response.error.code === 'FORBIDDEN') {
     return gt('generated.payment-quick-pay.005')
+  }
+  if (error.response.error.code === 'PERMISSION_DENIED' || error.response.error.messageKey === 'appgate.permission_denied') {
+    return formatAppGateErrorMessage(error.response.error, gt('generated.payment-quick-pay.005'))
   }
   if (error.response.error.code === 'PAYMENT_PROFILE_NOT_FOUND') {
     return gt('generated.payment-quick-pay.006')

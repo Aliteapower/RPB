@@ -25,6 +25,7 @@ class PaymentMigrationTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID EXISTING_TENANT_ADMIN_ACCOUNT_ID = UUID.fromString("30000000-0000-0000-0000-000000000048");
+    private static final UUID EXISTING_STORE_STAFF_ACCOUNT_ID = UUID.fromString("30000000-0000-0000-0000-000000000049");
     private static boolean migrationsApplied;
 
     @AfterAll
@@ -84,6 +85,34 @@ class PaymentMigrationTest {
         }
     }
 
+    @Test
+    void grantsPaymentIntentPermissionsToExistingStoreStaff() {
+        try (LocalPostgresTestDatabase database = LocalPostgresTestDatabase.start()) {
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource(database));
+            database.applyMigrationsUntil("V048__paynow_existing_tenant_admin_permissions.sql");
+            insertExistingStoreStaffWithoutPaymentPermissions(jdbc);
+
+            database.applyMigrationsAfter("V048__paynow_existing_tenant_admin_permissions.sql");
+
+            assertThat(countWhere(jdbc, """
+                with required_permissions(permission_code) as (
+                    values
+                        ('payment.intent.view'),
+                        ('payment.intent.create')
+                )
+                select count(*)
+                from required_permissions permission
+                where not exists (
+                    select 1
+                    from auth_account_permissions existing
+                    where existing.account_id = ?
+                      and existing.permission_code = permission.permission_code
+                      and existing.deleted_at is null
+                )
+                """, EXISTING_STORE_STAFF_ACCOUNT_ID)).isZero();
+        }
+    }
+
     private static void insertExistingTenantAdminWithoutPaymentPermissions(JdbcTemplate jdbc) {
         ensureStoreScope(jdbc);
         jdbc.update("""
@@ -122,6 +151,46 @@ class PaymentMigrationTest {
             insert into auth_account_store_access (account_id, tenant_id, store_id)
             values (?, ?, ?)
             """, EXISTING_TENANT_ADMIN_ACCOUNT_ID, TENANT_ID, STORE_ID);
+    }
+
+    private static void insertExistingStoreStaffWithoutPaymentPermissions(JdbcTemplate jdbc) {
+        ensureStoreScope(jdbc);
+        jdbc.update("""
+            insert into auth_accounts (
+                id,
+                tenant_id,
+                username,
+                display_name,
+                actor_type,
+                status,
+                password_hash,
+                password_algo,
+                default_store_id
+            )
+            values (
+                ?,
+                ?,
+                'paynow-existing-staff',
+                'PayNow Existing Staff',
+                'staff',
+                'active',
+                '$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy',
+                'bcrypt-lowercase-v1',
+                ?
+            )
+            """, EXISTING_STORE_STAFF_ACCOUNT_ID, TENANT_ID, STORE_ID);
+        jdbc.update("""
+            insert into auth_account_roles (account_id, role_code)
+            values (?, 'store_staff')
+            """, EXISTING_STORE_STAFF_ACCOUNT_ID);
+        jdbc.update("""
+            insert into auth_account_permissions (account_id, permission_code)
+            values (?, 'reservation.today_view')
+            """, EXISTING_STORE_STAFF_ACCOUNT_ID);
+        jdbc.update("""
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            values (?, ?, ?)
+            """, EXISTING_STORE_STAFF_ACCOUNT_ID, TENANT_ID, STORE_ID);
     }
 
     @Test

@@ -56,6 +56,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String display = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentDisplayPage.vue"));
         String present = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentPresentPage.vue"));
         String presentBridge = FrontendSourceSupport.readString(Path.of("src", "utils", "paymentPresentBridge.ts"));
+        String staffRepository = FrontendSourceSupport.readString(Path.of("src", "main", "java", "com", "rpb", "reservation", "tenantadmin", "persistence", "TenantAdminStaffRepository.java"));
 
         assertThat(api)
             .contains("/tenant-admin/payment/profile")
@@ -89,7 +90,12 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("publishPaymentPresentSettings")
             .contains("readPaymentPresentSettings")
             .contains("MAX_PRESENT_PAYMENTS")
+            .contains("formatAppGateErrorMessage")
+            .contains("appgate.permission_denied")
             .contains("active-tab=\"payment\"");
+        assertThat(staffRepository)
+            .contains("\"payment.intent.view\"")
+            .contains("\"payment.intent.create\"");
         assertThat(display)
             .contains("getPaymentSession")
             .contains("DownloadableQrCode")

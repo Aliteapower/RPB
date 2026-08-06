@@ -147,6 +147,45 @@
 - Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments`.
 - To avoid creating real payment operational records, production Quick Pay write APIs were not invoked.
 
+## 2026-08-06 Quick Pay Staff Permission Fix
+
+### Fixed
+
+- Fixed PayNow Quick Pay creation returning `403` for existing store staff and store manager accounts that lacked `payment.intent.create`.
+- Quick Pay now maps App Gate `PERMISSION_DENIED` responses to the shared permission-denied message instead of the generic creation-failed banner.
+
+### Changed
+
+- Future staff accounts created in tenant admin staff management now receive `payment.intent.view` and `payment.intent.create`.
+
+### Migration
+
+- Added `V049__paynow_existing_store_staff_permissions.sql`.
+- V049 grants existing active `store_staff` and `store_manager` accounts:
+  - `payment.intent.view`
+  - `payment.intent.create`
+
+### Permission
+
+- This is a permission backfill for the RPB-native PayNow staff workflow.
+- No PayNow settings or verification permissions are granted to ordinary staff by V049.
+
+### Validation
+
+- PASS: `mvn -q "-Dtest=PaymentMigrationTest#grantsPaymentIntentPermissionsToExistingStoreStaff" test`
+- PASS: `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest#payNowPagesUseRpbNativePaymentApiAndQrComponent" test`
+- PASS: `mvn -q "-Dtest=PaymentMigrationTest,PayNowPaymentUiAcceptanceValidationTest,PaymentIntentControllerTest,PaymentIntentServiceTest" test`
+- PASS: `npm run build`
+
+### Risk
+
+- The permissions are account-level. Store access and store-level App Gate enablement still restrict which stores staff can use.
+
+### Rollback Notes
+
+- Roll back the backend JAR and frontend bundle to the previous deployed versions.
+- If permission rollback is required after V049 applies, delete only `payment.intent.view` and `payment.intent.create` rows from `auth_account_permissions` for accounts that should not retain PayNow staff collection access.
+
 ## 2026-08-06 Production Deployment
 
 - Production backend and frontend deployed commit `8cca5be2`.

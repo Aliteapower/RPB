@@ -38,6 +38,8 @@ public class TenantAdminStaffRepository {
         "table.view",
         "table.switch",
         "customer.lookup",
+        "payment.intent.view",
+        "payment.intent.create",
         "walkin.direct_seating.create",
         "walkin.queue.create",
         "cleaning.start",
