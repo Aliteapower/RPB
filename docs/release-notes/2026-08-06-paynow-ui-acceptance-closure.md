@@ -78,6 +78,21 @@
 
 - Revert the frontend commit for this optimization. Existing PayNow profile, intent creation, and session display APIs remain compatible.
 
+### Production Deployment
+
+- Production frontend deployed commit `90810be4`.
+- Deployment type: frontend-only; backend JAR was not changed and Flyway was not run.
+- Frontend artifact built from clean worktree `target/deploy-worktree-90810be4`.
+- Uploaded artifact: `/home/ubuntu/rpb-90810be4-frontend.tgz`.
+- Frontend backup: `/opt/rpb/backups/20260806-0911-90810be4-paynow-terminal-ui/frontend`.
+- Live entry asset: `/assets/index-CW3Vnp6N.js`.
+- PayNow quick pay asset: `PaymentQuickPayPage-DN7gL_sn.js`.
+- PayNow customer display asset: `PaymentPresentPage-BlG9qfpK.js`.
+- `rpb-backend` state remained `active`.
+- Server-side `/api/v1/auth/me` returned `401`.
+- Public smoke returned `200` for `/login`, `/stores/20000000-0000-0000-0000-000000000983/payments`, and `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1`.
+- Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments`.
+
 ## 2026-08-06 Production Deployment
 
 - Production backend and frontend deployed commit `8cca5be2`.
