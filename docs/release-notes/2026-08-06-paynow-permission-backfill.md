@@ -45,3 +45,17 @@ Ordinary staff accounts are not broadened by this migration.
 - Backend rollback can restore the previous JAR, but Flyway will keep V048 recorded unless a deliberate corrective migration is created.
 - To reverse the permission backfill, run a separately reviewed SQL migration deleting only these four permission rows for accounts that should not retain PayNow tenant-admin access.
 - Frontend rollback can restore the previous `/opt/rpb/frontend` backup.
+
+## Production Deployment
+
+- Deployed commit: `6a8c50d8`.
+- Deployment time: 2026-08-06 08:28 SGT.
+- Flyway status after restart: `048 | paynow existing tenant admin permissions | t`.
+- `rpb-backend` status after restart: `active`.
+- Startup ERROR count after deploy: `0`.
+- Public `/api/v1/auth/me`: `401`.
+- PayNow settings page: `200`.
+- PayNow quick-pay page: `200`.
+- Backend JAR SHA-256: `7aa87666918619e7e1f4e8843ebf6777c61fc083f9cb3a64ca177c34046a498f`.
+- Backup: `/opt/rpb/backups/20260806-082817-6a8c50d8-paynow-permission-backfill`.
+- Production tenant admin account `30000000-0000-0000-0000-000000000902` now has all four PayNow permissions listed above.
