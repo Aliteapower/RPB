@@ -24,3 +24,19 @@
 - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest,I18nCatalogAdminUiValidationTest" test` passed.
 - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest,I18nCatalogAdminUiValidationTest,AdminResponsiveUiValidationTest,TenantAdminCustomerManagementUiValidationTest" test` passed with 7 tests.
 - `npm run build` passed.
+
+## Production Deployment
+- Deployment date: 2026-08-06.
+- Deployed commit: `879cd423`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend JAR SHA-256: `A34B05C175E6A385B8445E9D1DBA7B0104BF43F12BFB8A333A56FF2F7B9A5C01`.
+- Backend backup: `/opt/rpb/backups/20260806-214228-879cd423`.
+- Frontend backup: `/opt/rpb/backups/20260806-214316-879cd423-frontend`.
+- Flyway latest: `051|payment i18n catalog product line scope|true`.
+- PayNow active `payment` / `quick_pay` i18n keys: `3`.
+- `rpb-backend`: `active / running`, PID `3631429`.
+- Recent backend `ERROR` count after deployment: `0`.
+- Public smoke:
+  - `https://booking.yumstone.sg/login` returned `200` and loaded `/assets/index-BHUX6SCA.js`.
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments` returned `200`.
