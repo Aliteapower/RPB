@@ -119,6 +119,7 @@ export const zhCN = {
       paymentProductLine: '收款 / PayNow',
       paymentSettings: '基础设置',
       paymentRecords: 'Quick Payment Records',
+      reservationQueueProductLine: '预约排队叫号',
       i18nCatalog: '国际化字典',
       shareTemplate: '订位分享',
       publicBooking: '公网预约',
@@ -947,6 +948,7 @@ export const zhCN = {
       refreshing: '刷新中',
       unavailable: '暂不可用',
       home: '首页',
+      payment: '收款',
       available: '应用可用'
     },
     topbar: {
@@ -1001,6 +1003,8 @@ export const zhCN = {
     hints: {
       unavailable: '今日概览暂不可用',
       loading: '正在读取今日营业数据',
+      paymentOnly: '当前门店只开通收款产品线',
+      noProductLine: '当前门店暂无可用产品线',
       queuePressure: '排队 {groups} 组，优先看等待和已叫号',
       calm: '当前没有排队压力'
     },

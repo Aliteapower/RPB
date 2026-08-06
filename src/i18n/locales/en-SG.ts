@@ -119,6 +119,7 @@ export const enSG = {
       paymentProductLine: 'Pay / PayNow',
       paymentSettings: 'Settings',
       paymentRecords: 'Quick Payment Records',
+      reservationQueueProductLine: 'Reservation Queue',
       i18nCatalog: 'I18n catalog',
       shareTemplate: 'Booking share',
       publicBooking: 'Public booking',
@@ -947,6 +948,7 @@ export const enSG = {
       refreshing: 'Refreshing',
       unavailable: 'Unavailable',
       home: 'Home',
+      payment: 'Pay',
       available: 'App available'
     },
     topbar: {
@@ -1001,6 +1003,8 @@ export const enSG = {
     hints: {
       unavailable: 'Today overview is unavailable',
       loading: 'Reading today’s operations',
+      paymentOnly: 'Only the PayNow product line is enabled for this store',
+      noProductLine: 'No product line is available for this store',
       queuePressure: '{groups} queue groups. Check waiting and called tickets first.',
       calm: 'No queue pressure right now'
     },

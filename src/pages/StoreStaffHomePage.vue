@@ -10,6 +10,7 @@ import {
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
+import { useStoreVisibleApps } from '../composables/useStoreVisibleApps'
 import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
 import type {
@@ -60,31 +61,38 @@ const loggingOut = ref(false)
 let overviewLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
+const {
+  findVisibleApp,
+  loaded: visibleAppsLoaded,
+  loading: visibleAppsLoading
+} = useStoreVisibleApps(storeId)
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
 const displayedBusinessDate = computed(() => overview.value?.businessDate ?? currentBusinessDate.value)
-const currentPermissions = computed(() => authSession.user?.permissions ?? [])
+const reservationQueueEntry = computed(() => findVisibleApp('reservation_queue'))
+const paymentEntry = computed(() => findVisibleApp('payment'))
 const hasReservationQueue = computed(() =>
-  currentPermissions.value.some(permission =>
-    permission.startsWith('reservation.') || permission.startsWith('queue.')
-  )
+  reservationQueueEntry.value !== undefined
 )
+const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined)
+const reservationQueuePermissions = computed(() => reservationQueueEntry.value?.permissions ?? [])
+const paymentPermissions = computed(() => paymentEntry.value?.permissions ?? [])
 const canCheckInReservation = computed(() =>
-  hasPermission('reservation.check_in')
+  hasReservationQueuePermission('reservation.check_in')
 )
 const canCallQueueTicket = computed(() =>
-  hasPermission('queue.call')
+  hasReservationQueuePermission('queue.call')
 )
 const canSeatCalledQueueTicket = computed(() =>
-  hasPermission('queue.seat')
+  hasReservationQueuePermission('queue.seat')
 )
 const canCreatePaymentIntent = computed(() =>
-  hasPermission('payment.intent.create')
+  hasPaymentPermission('payment.intent.create')
 )
 const hasVisibleOperation = computed(
   () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value
 )
 const appStatusLabel = computed(() => {
-  if (isLoading.value) {
+  if (visibleAppsLoading.value || isLoading.value) {
     return t('staffHome.appStatus.refreshing')
   }
 
@@ -92,7 +100,11 @@ const appStatusLabel = computed(() => {
     return t('staffHome.appStatus.unavailable')
   }
 
-  return t('staffHome.appStatus.home')
+  if (paymentEntry.value && !hasReservationQueue.value) {
+    return t('staffHome.appStatus.payment')
+  }
+
+  return hasVisibleProductLine.value ? t('staffHome.appStatus.home') : t('staffHome.appStatus.unavailable')
 })
 const reservationConfirmedTodayRoute = computed(() => ({
   name: 'reservation-today-view',
@@ -277,6 +289,14 @@ const overviewHint = computed(() => {
     return t('staffHome.hints.unavailable')
   }
 
+  if (visibleAppsLoading.value || !visibleAppsLoaded.value) {
+    return t('staffHome.hints.loading')
+  }
+
+  if (!hasReservationQueue.value) {
+    return paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
+  }
+
   if (!overview.value) {
     return t('staffHome.hints.loading')
   }
@@ -291,9 +311,28 @@ const errorTitle = computed(() => formatAppGateErrorTitle(apiError.value?.error,
 const errorText = computed(() => formatAppGateErrorMessage(apiError.value?.error, t('staffHome.errors.overviewLoadFailed')))
 
 watch(
-  [storeId, currentBusinessDate],
-  async ([nextStoreId, nextBusinessDate]) => {
+  [storeId, currentBusinessDate, hasReservationQueue, visibleAppsLoaded],
+  async ([nextStoreId, nextBusinessDate, hasVisibleReservationQueue, appsLoaded]) => {
+    if (!appsLoaded || !hasVisibleReservationQueue) {
+      overview.value = null
+      apiError.value = null
+      isLoading.value = false
+      return
+    }
+
     await loadOverview(nextStoreId, nextBusinessDate)
+  },
+  { immediate: true }
+)
+
+watch(
+  [visibleAppsLoaded, hasReservationQueue, canCreatePaymentIntent],
+  async ([appsLoaded, hasVisibleReservationQueue, canCreatePayment]) => {
+    if (!appsLoaded || hasVisibleReservationQueue || !canCreatePayment) {
+      return
+    }
+
+    await router.replace(paymentQuickPayRoute.value)
   },
   { immediate: true }
 )
@@ -370,8 +409,12 @@ function compactToolbarItems(actions: Array<OperationToolbarItem | null>): Opera
   return actions.filter((action): action is OperationToolbarItem => action !== null)
 }
 
-function hasPermission(permission: string): boolean {
-  return currentPermissions.value.includes(permission)
+function hasReservationQueuePermission(permission: string): boolean {
+  return reservationQueuePermissions.value.includes(permission)
+}
+
+function hasPaymentPermission(permission: string): boolean {
+  return paymentPermissions.value.includes(permission)
 }
 </script>
 
@@ -428,7 +471,7 @@ function hasPermission(permission: string): boolean {
       </nav>
 
       <section
-        v-else-if="hasReservationQueue && authSession.loaded"
+        v-else-if="visibleAppsLoaded && hasVisibleProductLine && authSession.loaded"
         class="empty-state"
         :aria-label="t('staffHome.aria.unavailableByPermission')"
       >
@@ -436,7 +479,7 @@ function hasPermission(permission: string): boolean {
         <strong>{{ t('staffHome.empty.permissionHint') }}</strong>
       </section>
 
-      <section class="kpi-grid" :aria-label="t('staffHome.aria.todayOverview')">
+      <section v-if="hasReservationQueue" class="kpi-grid" :aria-label="t('staffHome.aria.todayOverview')">
         <article
           v-for="item in primaryKpis"
           :key="item.key"
@@ -449,7 +492,7 @@ function hasPermission(permission: string): boolean {
         </article>
       </section>
 
-      <section class="overview-section" :aria-label="t('staffHome.aria.queuePartyGroups')">
+      <section v-if="hasReservationQueue" class="overview-section" :aria-label="t('staffHome.aria.queuePartyGroups')">
         <header>
           <div>
             <span>{{ t('staffHome.kpis.queue') }}</span>
@@ -475,7 +518,7 @@ function hasPermission(permission: string): boolean {
         </div>
       </section>
 
-      <section class="overview-section" :aria-label="t('staffHome.aria.tableStatus')">
+      <section v-if="hasReservationQueue" class="overview-section" :aria-label="t('staffHome.aria.tableStatus')">
         <header>
           <div>
             <span>{{ t('staffHome.aria.tableStatus') }}</span>

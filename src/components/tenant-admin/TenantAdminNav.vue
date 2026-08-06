@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import StoreSwitcher from '../store/StoreSwitcher.vue'
+import { useStoreVisibleApps } from '../../composables/useStoreVisibleApps'
 import { useAuthSessionStore } from '../../stores/authSession'
 
 const route = useRoute()
@@ -13,14 +14,22 @@ const { t } = useI18n()
 const loggingOut = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || auth.user?.defaultStoreId || auth.user?.storeIds[0] || ''))
+const currentStoreId = computed(() => storeId.value || undefined)
+const { hasVisibleApp, loaded: visibleAppsLoaded } = useStoreVisibleApps(currentStoreId)
+const hasPaymentProductLine = computed(() =>
+  !visibleAppsLoaded.value || hasVisibleApp('payment')
+)
+const hasReservationQueueProductLine = computed(() =>
+  !visibleAppsLoaded.value || hasVisibleApp('reservation_queue')
+)
 const primaryNavItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/profile`, labelKey: 'nav.tenant.profile' },
   { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },
-  { to: `/stores/${storeId.value}/admin/customers`, labelKey: 'nav.tenant.customers' },
-  { to: `/stores/${storeId.value}/admin/tables`, labelKey: 'nav.tenant.tables' },
-  { to: `/stores/${storeId.value}/admin/settings`, labelKey: 'nav.tenant.settings' }
+  { to: `/stores/${storeId.value}/admin/customers`, labelKey: 'nav.tenant.customers' }
 ])
-const secondaryNavItems = computed(() => [
+const reservationQueueNavItems = computed(() => [
+  { to: `/stores/${storeId.value}/admin/tables`, labelKey: 'nav.tenant.tables' },
+  { to: `/stores/${storeId.value}/admin/settings`, labelKey: 'nav.tenant.settings' },
   { to: `/stores/${storeId.value}/admin/i18n-catalog`, labelKey: 'nav.tenant.i18nCatalog' },
   { to: `/stores/${storeId.value}/admin/share-template`, labelKey: 'nav.tenant.shareTemplate' },
   { to: `/stores/${storeId.value}/admin/public-booking`, labelKey: 'nav.tenant.publicBooking' },
@@ -65,7 +74,11 @@ async function logoutFromTenantAdmin(): Promise<void> {
           {{ t(item.labelKey) }}
         </RouterLink>
 
-        <section class="nav-group" :aria-label="t('nav.tenant.paymentProductLine')">
+        <section
+          v-if="hasPaymentProductLine"
+          class="nav-group"
+          :aria-label="t('nav.tenant.paymentProductLine')"
+        >
           <strong>{{ t('nav.tenant.paymentProductLine') }}</strong>
           <RouterLink
             v-for="item in paymentNavItems"
@@ -77,14 +90,21 @@ async function logoutFromTenantAdmin(): Promise<void> {
           </RouterLink>
         </section>
 
-        <RouterLink
-          v-for="item in secondaryNavItems"
-          :key="item.to"
-          class="nav-item"
-          :to="item.to"
+        <section
+          v-if="hasReservationQueueProductLine"
+          class="nav-group"
+          :aria-label="t('nav.tenant.reservationQueueProductLine')"
         >
-          {{ t(item.labelKey) }}
-        </RouterLink>
+          <strong>{{ t('nav.tenant.reservationQueueProductLine') }}</strong>
+          <RouterLink
+            v-for="item in reservationQueueNavItems"
+            :key="item.to"
+            class="nav-item nav-item--child"
+            :to="item.to"
+          >
+            {{ t(item.labelKey) }}
+          </RouterLink>
+        </section>
       </nav>
     </div>
 

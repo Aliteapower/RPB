@@ -13,6 +13,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String tenantNav = FrontendSourceSupport.readString(Path.of("src", "components", "tenant-admin", "TenantAdminNav.vue"));
         String staffHome = FrontendSourceSupport.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
         String bottomNav = FrontendSourceSupport.readString(Path.of("src", "components", "staff", "staffBottomNavItems.ts"));
+        String bottomNavComponent = FrontendSourceSupport.readString(Path.of("src", "components", "staff", "StaffBottomNav.vue"));
         String zh = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "zh-CN.ts"));
         String en = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "en-SG.ts"));
 
@@ -29,30 +30,50 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("name: 'payment-display'");
 
         assertThat(tenantNav)
+            .contains("useStoreVisibleApps")
+            .contains("hasPaymentProductLine")
+            .contains("hasReservationQueueProductLine")
             .contains("/admin/payment/settings")
             .contains("/admin/payment/records")
             .contains("nav.tenant.paymentProductLine")
+            .contains("nav.tenant.reservationQueueProductLine")
             .contains("nav.tenant.paymentSettings")
             .contains("nav.tenant.paymentRecords");
         assertThat(staffHome)
+            .contains("useStoreVisibleApps")
+            .contains("paymentEntry")
+            .contains("hasReservationQueue")
+            .contains("v-if=\"hasReservationQueue\"")
+            .contains("staffHome.hints.paymentOnly")
+            .contains("router.replace(paymentQuickPayRoute.value)")
             .contains("payment.intent.create")
             .contains("staffHome.actions.quickPay.label")
             .contains("name: 'payment-quick-pay'");
         assertThat(bottomNav)
             .contains("'payment'")
+            .contains("appKey: 'payment'")
+            .contains("appKey: 'reservation_queue'")
             .contains("nav.staff.payment")
             .contains("payment-quick-pay");
+        assertThat(bottomNavComponent)
+            .contains("useStoreVisibleApps")
+            .contains("hasVisibleApp(item.appKey)")
+            .contains("--staff-nav-items");
         assertThat(zh)
             .contains("paymentProductLine: '收款 / PayNow'")
             .contains("paymentSettings: '基础设置'")
             .contains("paymentRecords: 'Quick Payment Records'")
+            .contains("reservationQueueProductLine: '预约排队叫号'")
             .contains("payment: '收款'")
+            .contains("paymentOnly")
             .contains("quickPay");
         assertThat(en)
             .contains("paymentProductLine: 'Pay / PayNow'")
             .contains("paymentSettings: 'Settings'")
             .contains("paymentRecords: 'Quick Payment Records'")
+            .contains("reservationQueueProductLine: 'Reservation Queue'")
             .contains("payment: 'Pay'")
+            .contains("paymentOnly")
             .contains("quickPay");
     }
 

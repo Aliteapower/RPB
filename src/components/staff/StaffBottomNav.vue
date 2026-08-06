@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
+import { useStoreVisibleApps } from '../../composables/useStoreVisibleApps'
 import {
   staffBottomNavItems,
   type StaffBottomNavTab
@@ -14,21 +15,30 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const currentStoreId = computed(() => props.storeId || undefined)
+const { hasVisibleApp, loaded } = useStoreVisibleApps(currentStoreId)
 const items = computed(() =>
-  staffBottomNavItems.map(item => ({
-    ...item,
-    to: {
-      name: item.routeName,
-      params: {
-        storeId: props.storeId
+  staffBottomNavItems
+    .filter(item => !item.appKey || !loaded.value || hasVisibleApp(item.appKey))
+    .map(item => ({
+      ...item,
+      to: {
+        name: item.routeName,
+        params: {
+          storeId: props.storeId
+        }
       }
-    }
-  }))
+    }))
 )
+const navColumnCount = computed(() => Math.max(items.value.length, 1))
 </script>
 
 <template>
-  <nav class="staff-bottom-nav" :aria-label="t('nav.staff.aria')">
+  <nav
+    class="staff-bottom-nav"
+    :aria-label="t('nav.staff.aria')"
+    :style="{ '--staff-nav-items': String(navColumnCount) }"
+  >
     <RouterLink
       v-for="item in items"
       :key="item.tab"
@@ -49,7 +59,7 @@ const items = computed(() =>
   bottom: 0;
   box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--staff-nav-items), minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
