@@ -55,7 +55,8 @@ export const enSG = {
       reservation_share: 'Reservation share',
       queue: 'Queue',
       call_screen: 'Call screen',
-      reservation_meal_period: 'Reservation meal periods'
+      reservation_meal_period: 'Reservation meal periods',
+      payment: 'PayNow payment'
     },
     categories: {
       cancellation: 'Cancellation',
@@ -68,7 +69,8 @@ export const enSG = {
       template: 'Template',
       display: 'Display copy',
       display_name: 'Display name',
-      restaurant_default: 'Restaurant default'
+      restaurant_default: 'Restaurant default',
+      quick_pay: 'Quick payment'
     },
     textKinds: {
       label: 'Label',
@@ -119,7 +121,9 @@ export const enSG = {
       paymentProductLine: 'Pay / PayNow',
       paymentSettings: 'Settings',
       paymentRecords: 'Quick Payment Records',
+      paymentI18nCatalog: 'PayNow I18n',
       reservationQueueProductLine: 'Reservation Queue',
+      reservationQueueI18nCatalog: 'Reservation Queue I18n',
       i18nCatalog: 'I18n catalog',
       shareTemplate: 'Booking share',
       publicBooking: 'Public booking',

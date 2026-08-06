@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -32,19 +33,23 @@ public class TenantAdminI18nCatalogController {
     }
 
     @GetMapping
-    public ResponseEntity<I18nCatalogResponse> getCatalog(@PathVariable UUID storeId) {
+    public ResponseEntity<I18nCatalogResponse> getCatalog(
+        @PathVariable UUID storeId,
+        @RequestParam(required = false) String productLine
+    ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(I18nCatalogResponse.from(service.tenantCatalog(scope)));
+        return ResponseEntity.ok(I18nCatalogResponse.from(service.tenantCatalog(scope, productLine)));
     }
 
     @PatchMapping
     public ResponseEntity<I18nCatalogResponse> updateCatalog(
         @PathVariable UUID storeId,
+        @RequestParam(required = false) String productLine,
         @RequestBody(required = false) I18nCatalogRequests.TenantUpdateRequest request
     ) {
         StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
         return ResponseEntity.ok(I18nCatalogResponse.from(
-            service.updateTenantCatalog(scope, scopeLevel(request), toCommands(request))
+            service.updateTenantCatalog(scope, scopeLevel(request), productLine, toCommands(request))
         ));
     }
 

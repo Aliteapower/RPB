@@ -247,9 +247,24 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
-      path: '/stores/:storeId/admin/i18n-catalog',
-      name: 'tenant-admin-i18n-catalog',
+      path: '/stores/:storeId/admin/payment/i18n-catalog',
+      name: 'tenant-admin-payment-i18n-catalog',
       component: TenantAdminI18nCatalogPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/reservation-queue/i18n-catalog',
+      name: 'tenant-admin-reservation-queue-i18n-catalog',
+      component: TenantAdminI18nCatalogPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/i18n-catalog',
+      name: 'tenant-admin-i18n-catalog-legacy',
+      redirect: to => ({
+        name: 'tenant-admin-reservation-queue-i18n-catalog',
+        params: { storeId: to.params.storeId }
+      }),
       meta: { requiresTenantAdmin: true }
     },
     {

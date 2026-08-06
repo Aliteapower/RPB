@@ -55,7 +55,8 @@ export const zhCN = {
       reservation_share: '预约分享',
       queue: '排队',
       call_screen: '叫号大屏',
-      reservation_meal_period: '预约餐段'
+      reservation_meal_period: '预约餐段',
+      payment: 'PayNow 收款'
     },
     categories: {
       cancellation: '取消原因',
@@ -68,7 +69,8 @@ export const zhCN = {
       template: '模板',
       display: '展示文案',
       display_name: '展示名称',
-      restaurant_default: '餐厅默认'
+      restaurant_default: '餐厅默认',
+      quick_pay: '快速收款'
     },
     textKinds: {
       label: '标签',
@@ -119,7 +121,9 @@ export const zhCN = {
       paymentProductLine: '收款 / PayNow',
       paymentSettings: '基础设置',
       paymentRecords: 'Quick Payment Records',
+      paymentI18nCatalog: 'PayNow 国际化字典',
       reservationQueueProductLine: '预约排队叫号',
+      reservationQueueI18nCatalog: '预约排队国际化字典',
       i18nCatalog: '国际化字典',
       shareTemplate: '订位分享',
       publicBooking: '公网预约',
