@@ -94,3 +94,18 @@ Ordinary staff accounts are not broadened by this migration.
 
 - Backend rollback can restore the previous JAR, but Flyway will keep V050 recorded.
 - If permission rollback is required, use a separately reviewed SQL migration that deletes only the PayNow permission rows from accounts that should not retain PayNow tenant-admin or branch-manager access.
+
+### Production Deployment
+
+- Production backend deployed commit `97742f6e`.
+- Deployment type: backend-only; frontend bundle was not changed.
+- Backend artifact built from clean worktree `target/deploy-worktree-97742f6e`.
+- Backend JAR SHA-256: `3a52598e33b6b9836fb76336d6b43692848389d09ce5419cf514449bb69e2e1f`.
+- Backend backup: `/opt/rpb/backups/20260806-1456-97742f6e-paynow-v050/reservation-platform.jar`.
+- Flyway applied `V050`; current latest migration is `050|paynow recent tenant admin permissions|true`.
+- Active non-platform tenant-admin missing PayNow permission pairs after V050: `0`.
+- Tenant `pay` active tenant-admin missing PayNow permission pairs after V050: `0`.
+- `rpb-backend` status: `active`; startup ERROR count after deployment: `0`.
+- Local backend `/api/v1/auth/me` returned `401`.
+- Public backend `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+- PayNow settings route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/settings`.
