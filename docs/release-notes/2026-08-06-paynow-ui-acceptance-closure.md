@@ -186,6 +186,22 @@
 - Roll back the backend JAR and frontend bundle to the previous deployed versions.
 - If permission rollback is required after V049 applies, delete only `payment.intent.view` and `payment.intent.create` rows from `auth_account_permissions` for accounts that should not retain PayNow staff collection access.
 
+### Production Deployment
+
+- Production backend and frontend deployed commit `9c21c4ea`.
+- Backend backup: `/opt/rpb/backups/20260806-1107-9c21c4ea-paynow-staff-permissions/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260806-1107-9c21c4ea-paynow-staff-permissions/frontend`.
+- Backend JAR SHA-256: `32686ae427cedfecbb447c81417c99bdf550aabbab1f015c16769956681d6903`.
+- Flyway applied `V049`; current latest migration is `049|paynow existing store staff permissions|t`.
+- Active `store_staff/store_manager` missing PayNow quick-pay permission pairs after V049: `0`.
+- `rpb-backend` status: `active`; startup ERROR count after deployment: `0`.
+- Public `/api/v1/auth/me` returned `401`.
+- Public `/login` returned `200` and loaded frontend asset `/assets/index-BB8Bhxfv.js`.
+- PayNow quick pay route returned `200`: `/stores/20000000-0000-0000-0000-000000000983/payments`.
+- PayNow customer display route returned `200`: `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1`.
+- Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments`.
+- To avoid creating real payment operational records, production Quick Pay write APIs were not invoked.
+
 ## 2026-08-06 Production Deployment
 
 - Production backend and frontend deployed commit `8cca5be2`.
