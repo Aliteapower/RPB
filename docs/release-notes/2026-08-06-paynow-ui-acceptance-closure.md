@@ -131,6 +131,22 @@
 
 - Roll back by redeploying the previous frontend bundle. No schema or backend rollback is required.
 
+### Production Deployment
+
+- Production frontend deployed commit `c7038577`.
+- Deployment type: frontend-only; backend JAR was not changed and Flyway was not run.
+- Frontend artifact built from clean worktree `target/deploy-worktree-c7038577`.
+- Uploaded artifact: `/home/ubuntu/rpb-c7038577-frontend.tgz`.
+- Frontend backup: `/opt/rpb/backups/20260806-1016-c7038577-paynow-display-settings/frontend`.
+- Live entry asset: `/assets/index-TqMnWZ0R.js`.
+- PayNow quick pay asset: `PaymentQuickPayPage-CLRJv5LI.js`.
+- PayNow customer display asset: `PaymentPresentPage-_pcl5Bvw.js`.
+- `rpb-backend` state remained `active`.
+- Server-side `/api/v1/auth/me` returned `401`.
+- Public smoke returned `200` for `/login`, `/stores/20000000-0000-0000-0000-000000000983/payments`, and `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1`.
+- Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments`.
+- To avoid creating real payment operational records, production Quick Pay write APIs were not invoked.
+
 ## 2026-08-06 Production Deployment
 
 - Production backend and frontend deployed commit `8cca5be2`.
