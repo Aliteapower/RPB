@@ -6,6 +6,7 @@ export interface StaffBottomNavItem {
   routeName: string
   symbol: string
   appKey?: 'reservation_queue' | 'payment'
+  openMode?: 'route' | 'popup'
 }
 
 export const staffBottomNavItems: StaffBottomNavItem[] = [
@@ -41,6 +42,7 @@ export const staffBottomNavItems: StaffBottomNavItem[] = [
     labelKey: 'nav.staff.payment',
     routeName: 'payment-quick-pay',
     symbol: '$',
-    appKey: 'payment'
+    appKey: 'payment',
+    openMode: 'popup'
   }
 ]

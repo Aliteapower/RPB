@@ -14,6 +14,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String staffHome = FrontendSourceSupport.readString(Path.of("src", "pages", "StoreStaffHomePage.vue"));
         String bottomNav = FrontendSourceSupport.readString(Path.of("src", "components", "staff", "staffBottomNavItems.ts"));
         String bottomNavComponent = FrontendSourceSupport.readString(Path.of("src", "components", "staff", "StaffBottomNav.vue"));
+        String quickPayPopup = FrontendSourceSupport.readString(Path.of("src", "utils", "paymentQuickPayPopup.ts"));
         String zh = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "zh-CN.ts"));
         String en = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "en-SG.ts"));
 
@@ -45,7 +46,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("hasReservationQueue")
             .contains("v-if=\"hasReservationQueue\"")
             .contains("staffHome.hints.paymentOnly")
-            .contains("router.replace(paymentQuickPayRoute.value)")
+            .contains("openMode: 'popup'")
+            .contains("openQuickPaymentPopup(href)")
+            .doesNotContain("router.replace(paymentQuickPayRoute.value)")
             .contains("payment.intent.create")
             .contains("staffHome.actions.quickPay.label")
             .contains("name: 'payment-quick-pay'");
@@ -54,11 +57,19 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("appKey: 'payment'")
             .contains("appKey: 'reservation_queue'")
             .contains("nav.staff.payment")
-            .contains("payment-quick-pay");
+            .contains("payment-quick-pay")
+            .contains("openMode: 'popup'");
         assertThat(bottomNavComponent)
             .contains("useStoreVisibleApps")
             .contains("hasVisibleApp(item.appKey)")
+            .contains("openQuickPaymentPopup(href)")
+            .contains(":target=\"item.openMode === 'popup' ? '_blank' : undefined\"")
             .contains("--staff-nav-items");
+        assertThat(quickPayPopup)
+            .contains("QUICK_PAYMENT_POPUP_TARGET")
+            .contains("QUICK_PAYMENT_POPUP_FEATURES")
+            .contains("popup=yes")
+            .contains("openQuickPaymentPopup");
         assertThat(zh)
             .contains("paymentProductLine: '收款 / PayNow'")
             .contains("paymentSettings: '基础设置'")

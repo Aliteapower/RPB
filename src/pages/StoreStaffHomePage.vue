@@ -21,6 +21,7 @@ import {
   formatAppGateErrorMessage,
   formatAppGateErrorTitle
 } from '../utils/appGateErrorMessages'
+import { openQuickPaymentPopup } from '../utils/paymentQuickPayPopup'
 
 interface KpiItem {
   key: string
@@ -45,6 +46,7 @@ interface OperationToolbarItem {
   symbolKey: string
   to: RouteLocationRaw
   tone: 'reservation' | 'queue' | 'success' | 'payment'
+  openMode?: 'route' | 'popup'
 }
 
 const route = useRoute()
@@ -135,7 +137,8 @@ const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactTool
         descriptionKey: 'staffHome.actions.quickPay.description',
         symbolKey: 'staffHome.actions.quickPay.symbol',
         to: paymentQuickPayRoute.value,
-        tone: 'payment'
+        tone: 'payment',
+        openMode: 'popup'
       }
     : null,
   canCheckInReservation.value
@@ -325,18 +328,6 @@ watch(
   { immediate: true }
 )
 
-watch(
-  [visibleAppsLoaded, hasReservationQueue, canCreatePaymentIntent],
-  async ([appsLoaded, hasVisibleReservationQueue, canCreatePayment]) => {
-    if (!appsLoaded || hasVisibleReservationQueue || !canCreatePayment) {
-      return
-    }
-
-    await router.replace(paymentQuickPayRoute.value)
-  },
-  { immediate: true }
-)
-
 async function reloadOverview(): Promise<void> {
   await loadOverview(storeId.value, currentBusinessDate.value)
 }
@@ -409,6 +400,22 @@ function compactToolbarItems(actions: Array<OperationToolbarItem | null>): Opera
   return actions.filter((action): action is OperationToolbarItem => action !== null)
 }
 
+function handleOperationClick(
+  event: MouseEvent,
+  item: OperationToolbarItem,
+  href: string,
+  navigate: (event?: MouseEvent) => Promise<unknown> | void
+): void {
+  if (item.openMode !== 'popup' || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    navigate(event)
+    return
+  }
+
+  if (openQuickPaymentPopup(href)) {
+    event.preventDefault()
+  }
+}
+
 function hasReservationQueuePermission(permission: string): boolean {
   return reservationQueuePermissions.value.includes(permission)
 }
@@ -458,15 +465,24 @@ function hasPaymentPermission(permission: string): boolean {
         <RouterLink
           v-for="item in operationToolbarItems"
           :key="item.id"
-          class="operation-tool"
-          :class="`operation-tool--${item.tone}`"
           :to="item.to"
+          custom
+          v-slot="{ href, navigate }"
         >
-          <span class="operation-symbol" aria-hidden="true">{{ t(item.symbolKey) }}</span>
-          <span class="operation-copy">
-            <strong>{{ t(item.labelKey) }}</strong>
-            <em>{{ t(item.descriptionKey) }}</em>
-          </span>
+          <a
+            class="operation-tool"
+            :class="`operation-tool--${item.tone}`"
+            :href="href"
+            :target="item.openMode === 'popup' ? '_blank' : undefined"
+            :rel="item.openMode === 'popup' ? 'noopener' : undefined"
+            @click="event => handleOperationClick(event, item, href, navigate)"
+          >
+            <span class="operation-symbol" aria-hidden="true">{{ t(item.symbolKey) }}</span>
+            <span class="operation-copy">
+              <strong>{{ t(item.labelKey) }}</strong>
+              <em>{{ t(item.descriptionKey) }}</em>
+            </span>
+          </a>
         </RouterLink>
       </nav>
 
