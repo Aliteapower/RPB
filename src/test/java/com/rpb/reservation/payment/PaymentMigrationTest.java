@@ -24,6 +24,7 @@ class PaymentMigrationTest {
     private static final JdbcTemplate JDBC = new JdbcTemplate(dataSource());
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+    private static final UUID EXISTING_TENANT_ADMIN_ACCOUNT_ID = UUID.fromString("30000000-0000-0000-0000-000000000048");
     private static boolean migrationsApplied;
 
     @AfterAll
@@ -51,6 +52,76 @@ class PaymentMigrationTest {
               and amount = 0.00
               and currency = 'SGD'
             """)).isEqualTo(2);
+    }
+
+    @Test
+    void grantsPaymentPermissionsToExistingTenantAdmins() {
+        try (LocalPostgresTestDatabase database = LocalPostgresTestDatabase.start()) {
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource(database));
+            database.applyMigrationsUntil("V047__payment_product_line_foundation.sql");
+            insertExistingTenantAdminWithoutPaymentPermissions(jdbc);
+
+            database.applyMigrationsAfter("V047__payment_product_line_foundation.sql");
+
+            assertThat(countWhere(jdbc, """
+                with required_permissions(permission_code) as (
+                    values
+                        ('payment.settings.manage'),
+                        ('payment.intent.view'),
+                        ('payment.intent.create'),
+                        ('payment.verification.review')
+                )
+                select count(*)
+                from required_permissions permission
+                where not exists (
+                    select 1
+                    from auth_account_permissions existing
+                    where existing.account_id = ?
+                      and existing.permission_code = permission.permission_code
+                      and existing.deleted_at is null
+                )
+                """, EXISTING_TENANT_ADMIN_ACCOUNT_ID)).isZero();
+        }
+    }
+
+    private static void insertExistingTenantAdminWithoutPaymentPermissions(JdbcTemplate jdbc) {
+        ensureStoreScope(jdbc);
+        jdbc.update("""
+            insert into auth_accounts (
+                id,
+                tenant_id,
+                username,
+                display_name,
+                actor_type,
+                status,
+                password_hash,
+                password_algo,
+                default_store_id
+            )
+            values (
+                ?,
+                ?,
+                'paynow-existing-admin',
+                'PayNow Existing Admin',
+                'tenant_admin',
+                'active',
+                '$2a$10$ktA3gOgzus6v0bsJqw53.OerYPoQT6oet7NDdkmNhYYZaKH9ix9Vy',
+                'bcrypt-lowercase-v1',
+                ?
+            )
+            """, EXISTING_TENANT_ADMIN_ACCOUNT_ID, TENANT_ID, STORE_ID);
+        jdbc.update("""
+            insert into auth_account_roles (account_id, role_code)
+            values (?, 'tenant_admin')
+            """, EXISTING_TENANT_ADMIN_ACCOUNT_ID);
+        jdbc.update("""
+            insert into auth_account_permissions (account_id, permission_code)
+            values (?, 'tenant.admin.manage')
+            """, EXISTING_TENANT_ADMIN_ACCOUNT_ID);
+        jdbc.update("""
+            insert into auth_account_store_access (account_id, tenant_id, store_id)
+            values (?, ?, ?)
+            """, EXISTING_TENANT_ADMIN_ACCOUNT_ID, TENANT_ID, STORE_ID);
     }
 
     @Test
@@ -87,15 +158,23 @@ class PaymentMigrationTest {
     }
 
     private static DriverManagerDataSource dataSource() {
+        return dataSource(DATABASE);
+    }
+
+    private static DriverManagerDataSource dataSource(LocalPostgresTestDatabase database) {
         DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setUrl(DATABASE.jdbcUrl());
-        dataSource.setUsername(DATABASE.username());
-        dataSource.setPassword(DATABASE.password());
+        dataSource.setUrl(database.jdbcUrl());
+        dataSource.setUsername(database.username());
+        dataSource.setPassword(database.password());
         return dataSource;
     }
 
     private static int countWhere(String sql, Object... args) {
-        return JDBC.queryForObject(sql, Integer.class, args);
+        return countWhere(JDBC, sql, args);
+    }
+
+    private static int countWhere(JdbcTemplate jdbc, String sql, Object... args) {
+        return jdbc.queryForObject(sql, Integer.class, args);
     }
 
     private static boolean tableExists(String tableName) {
@@ -109,7 +188,11 @@ class PaymentMigrationTest {
     }
 
     private static void ensureStoreScope() {
-        JDBC.update("""
+        ensureStoreScope(JDBC);
+    }
+
+    private static void ensureStoreScope(JdbcTemplate jdbc) {
+        jdbc.update("""
             insert into tenants (
                 id,
                 tenant_code,
@@ -119,7 +202,7 @@ class PaymentMigrationTest {
             values (?, 'payment-test-tenant', 'Payment Test Tenant', 'active')
             on conflict (id) do nothing
             """, TENANT_ID);
-        JDBC.update("""
+        jdbc.update("""
             insert into stores (
                 id,
                 tenant_id,
@@ -185,11 +268,24 @@ class PaymentMigrationTest {
         }
 
         void applyMigrations() {
+            applyMigrations(migration -> true);
+        }
+
+        void applyMigrationsUntil(String inclusiveFileName) {
+            applyMigrations(migration -> migration.getFileName().toString().compareTo(inclusiveFileName) <= 0);
+        }
+
+        void applyMigrationsAfter(String exclusiveFileName) {
+            applyMigrations(migration -> migration.getFileName().toString().compareTo(exclusiveFileName) > 0);
+        }
+
+        private void applyMigrations(java.util.function.Predicate<Path> filter) {
             Path migrationDirectory = Path.of("src", "main", "resources", "db", "migration").toAbsolutePath();
             List<Path> migrations;
             try (Stream<Path> paths = Files.list(migrationDirectory)) {
                 migrations = paths
                     .filter(path -> path.getFileName().toString().endsWith(".sql"))
+                    .filter(filter)
                     .sorted()
                     .toList();
             } catch (IOException exception) {

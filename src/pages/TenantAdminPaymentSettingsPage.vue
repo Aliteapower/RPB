@@ -11,6 +11,7 @@ import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
 import type { PaymentProfileMutation } from '../types/payment'
+import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -182,6 +183,9 @@ function apiErrorText(error: unknown): string {
     auth.clear()
     return gt('generated.tenant-admin-payment-settings.026')
   }
+  if (isAppGateError(error.response.error.code, error.response.error.messageKey)) {
+    return formatAppGateErrorMessage(error.response.error, gt('generated.tenant-admin-payment-settings.025'))
+  }
   if (error.response.error.code === 'FORBIDDEN') {
     return gt('generated.tenant-admin-payment-settings.027')
   }
@@ -192,6 +196,10 @@ function apiErrorText(error: unknown): string {
     return gt('generated.tenant-admin-payment-settings.029')
   }
   return gt('generated.tenant-admin-payment-settings.025')
+}
+
+function isAppGateError(code: string, messageKey: string): boolean {
+  return messageKey.startsWith('appgate.') || code === 'PERMISSION_DENIED' || messageKey === 'appgate.permission_denied'
 }
 </script>
 

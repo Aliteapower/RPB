@@ -66,6 +66,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("getPaymentProfile")
             .contains("updatePaymentProfile")
             .contains("PAYMENT_PROFILE_NOT_FOUND")
+            .contains("formatAppGateErrorMessage")
+            .contains("appgate.permission_denied")
             .contains("TenantAdminNav")
             .doesNotContain("sidecar")
             .doesNotContain("payment_runtime");
