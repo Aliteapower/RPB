@@ -46,6 +46,32 @@
 
 - Roll back backend and frontend artifacts to the previous PayNow UI build. Existing profile rows remain compatible because the new settings live inside optional JSON config.
 
+### Production Deployment
+
+- Production backend and frontend deployed commit `03ad65d3`.
+- Deployment time: 2026-08-06 16:18 CST.
+- Backend artifact built from clean worktree `target/deploy-worktree-03ad65d3`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-03ad65d3`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-03ad65d3-reservation-platform.jar`
+  - `/home/ubuntu/rpb-03ad65d3-frontend.tgz`
+- Backend backup: `/opt/rpb/backups/20260806-1618-03ad65d3-paynow-terminal-settings/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260806-1618-03ad65d3-paynow-terminal-settings/frontend`.
+- Backend JAR SHA-256: `9241c1ec0419b642a53ba0f79314ba6af7ff12a7711241826e021d9bf76c2c76`.
+- Flyway remains at `050|paynow recent tenant admin permissions|true`; no new migration was applied.
+- `rpb-backend` status after restart: `active`.
+- Startup ERROR count after deployment: `0`.
+- Public `/api/v1/auth/me` returned `401`.
+- Public `/login` returned `200` and loaded frontend asset `/assets/index-CemPU017.js`.
+- PayNow settings route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/settings`.
+- PayNow quick pay route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`.
+- PayNow customer display route returned `200`: `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`.
+- Host-prefix smoke returned `200` for `platform.booking.yumstone.sg/login`, `20000000.booking.yumstone.sg/login`, and `20000000.booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`.
+- Protected terminal config endpoint returned `403` without an authenticated payment actor.
+- Protected settings test QR endpoint returned `403` without an authenticated payment settings actor.
+- To avoid creating real payment operational records, production Quick Pay write APIs were not invoked.
+- Full `mvn test` was attempted twice before deployment but exceeded the local execution timeout; the PayNow-focused backend test matrix and frontend production build passed.
+
 ## New
 
 - Added tenant admin PayNow settings route: `/stores/:storeId/admin/payment/settings`.
