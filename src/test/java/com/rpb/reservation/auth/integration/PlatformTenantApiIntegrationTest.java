@@ -501,6 +501,28 @@ class PlatformTenantApiIntegrationTest {
             AppGateRequiredPermission.RESERVATION_TODAY_VIEW
         )).isEqualTo(1);
         assertThat(countWhere("""
+            with required_permissions(permission_code) as (
+                values
+                    ('payment.settings.manage'),
+                    ('payment.intent.view'),
+                    ('payment.intent.create'),
+                    ('payment.verification.review')
+            )
+            select count(*)
+            from required_permissions permission
+            where not exists (
+                select 1
+                from auth_account_permissions existing
+                join auth_accounts account on account.id = existing.account_id
+                where account.tenant_id = ?
+                  and account.username = 'codex-login'
+                  and account.actor_type = 'tenant_admin'
+                  and account.deleted_at is null
+                  and existing.permission_code = permission.permission_code
+                  and existing.deleted_at is null
+            )
+            """, tenantId)).isZero();
+        assertThat(countWhere("""
             select count(*)
             from tenant_host_aliases
             where tenant_id = ?
@@ -690,6 +712,32 @@ class PlatformTenantApiIntegrationTest {
               and role.deleted_at is null
               and permission.deleted_at is null
             """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            with required_permissions(permission_code) as (
+                values
+                    ('payment.settings.manage'),
+                    ('payment.intent.view'),
+                    ('payment.intent.create'),
+                    ('payment.verification.review')
+            )
+            select count(*)
+            from required_permissions permission
+            where not exists (
+                select 1
+                from auth_accounts account
+                join auth_account_roles role on role.account_id = account.id
+                join auth_account_permissions existing on existing.account_id = account.id
+                where account.tenant_id = ?
+                  and account.username = 'codex-branch-a-admin'
+                  and account.actor_type = 'staff'
+                  and account.status = 'active'
+                  and role.role_code = 'store_manager'
+                  and existing.permission_code = permission.permission_code
+                  and account.deleted_at is null
+                  and role.deleted_at is null
+                  and existing.deleted_at is null
+            )
+            """, tenantId)).isZero();
 
         login("codex-branch-admin", "abc123");
         expectLoginRejected("codex-branch-a-admin", "abc123");

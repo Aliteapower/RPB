@@ -59,3 +59,38 @@ Ordinary staff accounts are not broadened by this migration.
 - Backend JAR SHA-256: `7aa87666918619e7e1f4e8843ebf6777c61fc083f9cb3a64ca177c34046a498f`.
 - Backup: `/opt/rpb/backups/20260806-082817-6a8c50d8-paynow-permission-backfill`.
 - Production tenant admin account `30000000-0000-0000-0000-000000000902` now has all four PayNow permissions listed above.
+
+## 2026-08-06 New Tenant Admin Permission Persistence
+
+### Fixed
+
+- New tenants created after V048 now persist PayNow tenant-admin permissions by default, so the default tenant administrator can save PayNow settings without a manual employee-permission adjustment.
+- Platform-created branch store managers now persist PayNow tenant-admin permissions by default, matching their `tenant_admin` role and `tenant.admin.manage` branch-admin model.
+- Added Flyway `V050__paynow_recent_tenant_admin_permissions.sql` to backfill active non-platform tenant-admin accounts created after earlier PayNow permission backfills.
+
+### Permission
+
+- Tenant administrators receive:
+  - `payment.settings.manage`
+  - `payment.intent.view`
+  - `payment.intent.create`
+  - `payment.verification.review`
+- Platform-created branch store managers receive the same PayNow tenant-admin permission set because platform store creation grants them the `tenant_admin` role:
+  - `payment.settings.manage`
+  - `payment.intent.view`
+  - `payment.intent.create`
+  - `payment.verification.review`
+
+### Validation
+
+- PASS: `mvn -q "-Dtest=PaymentMigrationTest,PlatformTenantApiIntegrationTest#creatingTenantBootstrapsDefaultStoreAndTenantAdminLoginScope+platformAdminCreatesBranchStoreManagerWithSeparatePassword" test`
+
+### Risk
+
+- V050 is an idempotent insert-only permission backfill. It does not delete or downgrade permissions.
+- Existing authenticated sessions resolve permissions from `auth_account_permissions` through the session account, so the backfill can take effect without changing session storage.
+
+### Rollback Notes
+
+- Backend rollback can restore the previous JAR, but Flyway will keep V050 recorded.
+- If permission rollback is required, use a separately reviewed SQL migration that deletes only the PayNow permission rows from accounts that should not retain PayNow tenant-admin or branch-manager access.

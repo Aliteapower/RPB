@@ -43,6 +43,9 @@ public class PlatformTenantAdminAccountRepository {
         AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.forEach(
             permission -> ensurePermission(accountId, permission)
         );
+        AppGateRequiredPermission.PAYMENT_TENANT_ADMIN_PERMISSIONS.forEach(
+            permission -> ensurePermission(accountId, permission)
+        );
         if (defaultStoreId != null) {
             ensureStoreAccess(accountId, tenantId, defaultStoreId);
         }

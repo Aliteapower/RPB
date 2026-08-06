@@ -25,6 +25,7 @@ public final class AppGateRequiredPermission {
     public static final String WALKIN_QUEUE_CREATE = "walkin.queue.create";
     public static final String CLEANING_START = "cleaning.start";
     public static final String CLEANING_COMPLETE = "cleaning.complete";
+    public static final String PAYMENT_SETTINGS_MANAGE = "payment.settings.manage";
     public static final String PAYMENT_INTENT_VIEW = "payment.intent.view";
     public static final String PAYMENT_INTENT_CREATE = "payment.intent.create";
     public static final String PAYMENT_VERIFICATION_REVIEW = "payment.verification.review";
@@ -58,6 +59,18 @@ public final class AppGateRequiredPermission {
         PAYMENT_INTENT_VIEW,
         PAYMENT_INTENT_CREATE,
         PAYMENT_VERIFICATION_REVIEW
+    );
+
+    public static final Set<String> PAYMENT_TENANT_ADMIN_PERMISSIONS = Set.of(
+        PAYMENT_SETTINGS_MANAGE,
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_VERIFICATION_REVIEW
+    );
+
+    public static final Set<String> PAYMENT_STAFF_OPERATION_PERMISSIONS = Set.of(
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE
     );
 
     private AppGateRequiredPermission() {

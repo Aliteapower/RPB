@@ -113,6 +113,36 @@ class PaymentMigrationTest {
         }
     }
 
+    @Test
+    void grantsPaymentPermissionsToTenantAdminsCreatedAfterPreviousBackfills() {
+        try (LocalPostgresTestDatabase database = LocalPostgresTestDatabase.start()) {
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource(database));
+            database.applyMigrationsUntil("V049__paynow_existing_store_staff_permissions.sql");
+            insertExistingTenantAdminWithoutPaymentPermissions(jdbc);
+
+            database.applyMigrationsAfter("V049__paynow_existing_store_staff_permissions.sql");
+
+            assertThat(countWhere(jdbc, """
+                with required_permissions(permission_code) as (
+                    values
+                        ('payment.settings.manage'),
+                        ('payment.intent.view'),
+                        ('payment.intent.create'),
+                        ('payment.verification.review')
+                )
+                select count(*)
+                from required_permissions permission
+                where not exists (
+                    select 1
+                    from auth_account_permissions existing
+                    where existing.account_id = ?
+                      and existing.permission_code = permission.permission_code
+                      and existing.deleted_at is null
+                )
+                """, EXISTING_TENANT_ADMIN_ACCOUNT_ID)).isZero();
+        }
+    }
+
     private static void insertExistingTenantAdminWithoutPaymentPermissions(JdbcTemplate jdbc) {
         ensureStoreScope(jdbc);
         jdbc.update("""
