@@ -168,6 +168,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("savePresetEditor")
             .contains("openPresentSettingsEditor")
             .contains("savePresentSettingsEditor")
+            .contains("presentSettingsRecentExpiredHoldSeconds")
+            .contains("recentExpiredHoldSeconds")
             .contains("openPresentWindow")
             .contains("publishPaymentPresentPayload")
             .contains("publishPaymentPresentSettings")
@@ -177,6 +179,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("activePresentPayloadCount")
             .contains("presentCapacityFull")
             .contains("noticeText.value = gt('generated.payment-quick-pay.055')")
+            .contains("Number(presentSettingsRecentExpiredHoldSeconds.value)")
             .contains("const presentMaxPaymentOptions = [1, 2, 3, 4, 5, 6] as const")
             .contains("MAX_PRESENT_PAYMENTS")
             .contains("formatAppGateErrorMessage")
@@ -195,6 +198,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("subscribePaymentPresentSettings")
             .contains("PAYMENT_PRESENT_TTL_SECONDS")
             .contains("readPaymentPresentPayloads")
+            .contains("readPaymentPresentRecent")
             .contains("Waiting for new payment")
             .contains("clearActivePayload")
             .contains("present-grid")
@@ -207,7 +211,11 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("rpb-payment-present")
             .contains("PaymentPresentSettings")
             .contains("export const MAX_PRESENT_PAYMENTS = 6")
+            .contains("export const DEFAULT_RECENT_EXPIRED_HOLD_SECONDS = 20")
             .contains("export type PresentMaxPayments = 1 | 2 | 3 | 4 | 5 | 6")
+            .contains("recentExpiredHoldSeconds: DEFAULT_RECENT_EXPIRED_HOLD_SECONDS")
+            .contains("recentVisibleUntilMs")
+            .contains("prunePaymentPresentRecent")
             .contains("value === 5 || value === 6")
             .contains("readPaymentPresentPayloads")
             .contains("readPaymentPresentSettings")
@@ -215,8 +223,10 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("publishPaymentPresentSettings")
             .contains("120");
         assertThat(generatedZh)
-            .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"");
+            .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"")
+            .contains("\"generated.payment-quick-pay.056\": \"过期后保留秒数\"");
         assertThat(generatedEn)
-            .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"");
+            .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"")
+            .contains("\"generated.payment-quick-pay.056\": \"Keep after expiry (seconds)\"");
     }
 }

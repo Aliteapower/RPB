@@ -1494,6 +1494,7 @@ export const generatedEnSG: Record<string, string> = {
   "generated.payment-quick-pay.053": "End Day",
   "generated.payment-quick-pay.054": "Business day ended: {businessDate}",
   "generated.payment-quick-pay.055": "Waiting for customer payment",
+  "generated.payment-quick-pay.056": "Keep after expiry (seconds)",
   "generated.payment-present.001": "Store {shortId}",
   "generated.payment-present.002": "Default store",
   "generated.payment-present.003": "Quick Payment",

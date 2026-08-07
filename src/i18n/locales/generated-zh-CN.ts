@@ -1494,6 +1494,7 @@ export const generatedZhCN: Record<string, string> = {
   "generated.payment-quick-pay.053": "日终",
   "generated.payment-quick-pay.054": "营业日已日终：{businessDate}",
   "generated.payment-quick-pay.055": "等顾客支付",
+  "generated.payment-quick-pay.056": "过期后保留秒数",
   "generated.payment-present.001": "门店 {shortId}",
   "generated.payment-present.002": "默认门店",
   "generated.payment-present.003": "Quick Payment",

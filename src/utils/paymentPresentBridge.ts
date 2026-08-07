@@ -3,6 +3,7 @@ import { extractPayNowQrPayload } from './paymentQrPayloads'
 
 export const PAYMENT_PRESENT_TTL_SECONDS = 120
 export const MAX_PRESENT_PAYMENTS = 6
+export const DEFAULT_RECENT_EXPIRED_HOLD_SECONDS = 20
 
 const CHANNEL_PREFIX = 'rpb-payment-present'
 const ACTIVE_PREFIX = 'rpb.payment.present.active'
@@ -11,10 +12,12 @@ const PRESET_PREFIX = 'rpb.payment.quickPay.presets'
 const SETTINGS_PREFIX = 'rpb.payment.present.settings'
 const DEFAULT_PRESET_AMOUNTS = ['5', '10', '20', '50', '100', '200']
 const MAX_RECENT_ITEMS = 6
+const MAX_RECENT_EXPIRED_HOLD_SECONDS = 3600
 const DEFAULT_PRESENT_SETTINGS: PaymentPresentSettings = {
   maxPayments: 1,
   qrPerPayment: 1,
-  primaryQr: 'sgqr'
+  primaryQr: 'sgqr',
+  recentExpiredHoldSeconds: DEFAULT_RECENT_EXPIRED_HOLD_SECONDS
 }
 
 export type PresentMaxPayments = 1 | 2 | 3 | 4 | 5 | 6
@@ -49,6 +52,7 @@ export interface PaymentPresentSettings {
   maxPayments: PresentMaxPayments
   qrPerPayment: PresentQrPerPayment
   primaryQr: PresentPrimaryQr
+  recentExpiredHoldSeconds: number
 }
 
 export interface QuickPayTerminalConfig {
@@ -229,6 +233,7 @@ export function savePaymentPresentSettings(
     .filter(payload => isPaymentPresentPayloadActive(payload))
     .slice(0, next.maxPayments)
   safeSetJson(activeStorageKey(storeId, terminalCode), activePayloads)
+  prunePaymentPresentRecent(storeId, terminalCode, next)
   return next
 }
 
@@ -286,13 +291,34 @@ export function subscribePaymentPresentSettings(
 }
 
 export function readPaymentPresentRecent(storeId: string, terminalCode: string): PaymentPresentRecentItem[] {
+  return prunePaymentPresentRecent(storeId, terminalCode, readPaymentPresentSettings(storeId, terminalCode))
+}
+
+export function recentVisibleUntilMs(
+  item: PaymentPresentRecentItem,
+  settings: PaymentPresentSettings = DEFAULT_PRESENT_SETTINGS
+): number {
+  return item.createdAtMs + (PAYMENT_PRESENT_TTL_SECONDS + settings.recentExpiredHoldSeconds) * 1000
+}
+
+export function prunePaymentPresentRecent(
+  storeId: string,
+  terminalCode: string,
+  settings: PaymentPresentSettings = readPaymentPresentSettings(storeId, terminalCode),
+  nowMs = Date.now()
+): PaymentPresentRecentItem[] {
   const value = safeGet(recentStorageKey(storeId, terminalCode))
   if (!value) {
     return []
   }
   try {
     const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed.map(parseRecentItem).filter(isPresentRecentItem).slice(0, MAX_RECENT_ITEMS) : []
+    const items = Array.isArray(parsed) ? parsed.map(parseRecentItem).filter(isPresentRecentItem).slice(0, MAX_RECENT_ITEMS) : []
+    const visible = items.filter(item => recentVisibleUntilMs(item, settings) > nowMs)
+    if (visible.length !== items.length) {
+      safeSetJson(recentStorageKey(storeId, terminalCode), visible)
+    }
+    return visible
   } catch {
     return []
   }
@@ -445,7 +471,8 @@ function normalizePaymentPresentSettings(value: unknown): PaymentPresentSettings
   return {
     maxPayments: normalizeMaxPayments(maxPayments),
     qrPerPayment: 1,
-    primaryQr: 'sgqr'
+    primaryQr: 'sgqr',
+    recentExpiredHoldSeconds: normalizeRecentExpiredHoldSeconds(source.recentExpiredHoldSeconds)
   }
 }
 
@@ -454,6 +481,14 @@ function normalizeMaxPayments(value: number): PresentMaxPayments {
     return value
   }
   return 1
+}
+
+function normalizeRecentExpiredHoldSeconds(value: unknown): number {
+  const numberValue = Number(value ?? DEFAULT_RECENT_EXPIRED_HOLD_SECONDS)
+  if (!Number.isFinite(numberValue)) {
+    return DEFAULT_RECENT_EXPIRED_HOLD_SECONDS
+  }
+  return Math.max(0, Math.min(Math.trunc(numberValue), MAX_RECENT_EXPIRED_HOLD_SECONDS))
 }
 
 function normalizePresetAmounts(values: unknown): string[] {

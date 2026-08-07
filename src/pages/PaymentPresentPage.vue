@@ -29,7 +29,8 @@ const activePayloads = ref<PaymentPresentPayload[]>([])
 const presentSettings = ref<PaymentPresentSettings>({
   maxPayments: 1,
   qrPerPayment: 1,
-  primaryQr: 'sgqr'
+  primaryQr: 'sgqr',
+  recentExpiredHoldSeconds: 20
 })
 const recentItems = ref<PaymentPresentRecentItem[]>([])
 const nowMs = ref(Date.now())
@@ -55,6 +56,7 @@ onMounted(() => {
   timer = window.setInterval(() => {
     nowMs.value = Date.now()
     filterExpiredActivePayloads()
+    refreshRecent()
   }, 1000)
 })
 
@@ -96,6 +98,7 @@ function clearActivePayload(): void {
 function applyIncomingSettings(settings: PaymentPresentSettings): void {
   presentSettings.value = settings
   activePayloads.value = activePayloads.value.slice(0, settings.maxPayments)
+  refreshRecent()
 }
 
 function filterExpiredActivePayloads(): void {

@@ -61,10 +61,12 @@ const presetEditorText = ref('')
 const presentSettings = ref<PaymentPresentSettings>({
   maxPayments: 1,
   qrPerPayment: 1,
-  primaryQr: 'sgqr'
+  primaryQr: 'sgqr',
+  recentExpiredHoldSeconds: 20
 })
 const presentSettingsEditorOpen = ref(false)
 const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
+const presentSettingsRecentExpiredHoldSeconds = ref(20)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
 const activePresentPayloadCount = ref(0)
 const businessDayLoading = ref(false)
@@ -109,7 +111,10 @@ onMounted(() => {
   }
   reloadLocalPaymentState()
   resetPresentCapacityTracking()
-  presentCapacityTimer = window.setInterval(refreshPresentCapacity, 1000)
+  presentCapacityTimer = window.setInterval(() => {
+    refreshPresentCapacity()
+    refreshRecent()
+  }, 1000)
   void loadPaymentBusinessDay()
   void loadQuickPayProfileDefaults()
 })
@@ -148,13 +153,14 @@ function reloadLocalPaymentState(): void {
     presentSettings.value = {
       maxPayments: 1,
       qrPerPayment: 1,
-      primaryQr: 'sgqr'
+      primaryQr: 'sgqr',
+      recentExpiredHoldSeconds: 20
     }
     return
   }
   amountPresets.value = readQuickPayPresetAmounts(storeId.value)
   presentSettings.value = readPaymentPresentSettings(storeId.value, normalizedTerminalCode.value)
-  recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
+  refreshRecent()
   refreshPresentCapacity()
 }
 
@@ -309,6 +315,7 @@ function savePresetEditor(): void {
 
 function openPresentSettingsEditor(): void {
   presentSettingsMaxPayments.value = presentSettings.value.maxPayments
+  presentSettingsRecentExpiredHoldSeconds.value = presentSettings.value.recentExpiredHoldSeconds
   presentSettingsEditorOpen.value = true
 }
 
@@ -319,9 +326,11 @@ function savePresentSettingsEditor(): void {
   presentSettings.value = publishPaymentPresentSettings(storeId.value, normalizedTerminalCode.value, {
     maxPayments: presentSettingsMaxPayments.value,
     qrPerPayment: 1,
-    primaryQr: 'sgqr'
+    primaryQr: 'sgqr',
+    recentExpiredHoldSeconds: Number(presentSettingsRecentExpiredHoldSeconds.value)
   })
   presentSettingsEditorOpen.value = false
+  refreshRecent()
   refreshPresentCapacity()
 }
 
@@ -362,7 +371,7 @@ async function submitQuickPay(): Promise<void> {
     businessDayStatus.value = 'open'
     openedBusinessDate.value = response.session.businessDate
     publishPaymentPresentPayload(buildPaymentPresentPayload(response, storeId.value, normalizedTerminalCode.value))
-    recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
+    refreshRecent()
     refreshPresentCapacity()
     noticeText.value = gt('generated.payment-quick-pay.028', { displayNumber: response.session.displayNumber })
     amountText.value = ''
@@ -394,6 +403,10 @@ function refreshPresentCapacity(): void {
     return
   }
   applyPresentPayloadCapacity(readPaymentPresentPayloads(storeId.value, normalizedTerminalCode.value))
+}
+
+function refreshRecent(): void {
+  recentItems.value = storeId.value ? readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value) : []
 }
 
 function applyPresentPayloadCapacity(payloads: PaymentPresentPayload[]): void {
@@ -633,6 +646,18 @@ function apiErrorText(error: unknown): string {
             <span>{{ option }}</span>
           </label>
         </fieldset>
+
+        <label class="settings-number-field">
+          <span>{{ gt('generated.payment-quick-pay.056') }}</span>
+          <input
+            v-model.number="presentSettingsRecentExpiredHoldSeconds"
+            inputmode="numeric"
+            max="3600"
+            min="0"
+            step="1"
+            type="number"
+          />
+        </label>
 
         <dl class="fixed-qr-settings">
           <div>
@@ -1039,6 +1064,10 @@ textarea {
   color: #0f172a;
   font-size: 0.86rem;
   font-weight: 900;
+}
+
+.settings-number-field {
+  max-width: 220px;
 }
 
 .fixed-qr-settings {
