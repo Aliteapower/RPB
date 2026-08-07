@@ -36,8 +36,9 @@ PayNow 中，`D:\payment_runtime` 的价值是业务流程证据：快速收款�
 6. 实现租户后台、员工工作台、必要的顾客展示页。
 7. 同时处理既有账号权限 backfill 和未来账号默认权限。
 8. 补齐 migration、service、controller、UI contract、权限拒绝场景测试。
-9. 从干净 worktree 的精确 commit 构建和部署。
-10. 写发布说明，记录提交、备份、Flyway、烟测、风险和回滚方式。
+9. 按产品线重构租户后台菜单、员工入口和国际化字典入口。
+10. 从干净 worktree 的精确 commit 构建和部署。
+11. 写发布说明，记录提交、备份、Flyway、烟测、风险和回滚方式。
 
 ## 正式设计文档清单
 
@@ -184,6 +185,87 @@ PayNow 可复用经验：`payment_runtime` 最值得借鉴的是员工交互模�
 
 后台配置和员工运行时配置要拆开 API。PayNow 后续优化里，员工端需要读取 quick-pay prefix、daily start number、preset amounts，但不能直接复用租户后台 profile API，因为后台 API 带有手机号/UEN、商户名称和 `payment.settings.manage` 权限。正确做法是提供窄接口，例如 `/payments/intents/terminal-config`，只暴露终端运行所需字段，并用 `payment.intent.create` 保护。
 
+## 租户后台菜单产品线化
+
+租户后台菜单不要按历史功能平铺，也不要把所有基础设置混在同一组里。新增产品线后，后台菜单应先按产品线分大类，再在产品线内分子类。
+
+推荐结构：
+
+- 租户资料、员工管理、顾客管理等租户级基础能力可以保留为通用菜单。
+- 预约排队叫号作为一个产品线大类，内部放桌号管理、基础设置、订位分享、公网预约、叫号屏配置、预约排队国际化字典等子类。
+- PayNow 作为一个产品线大类，内部放基础设置、Quick Payment Records、PayNow 国际化字典等子类。
+- 以后新增 POS、会员、库存、账单、预约增强等产品线，也按同样的大类和子类方式挂载。
+
+显示规则：
+
+- 菜单可见性以租户订阅、门店 app 激活、App Gate 权限共同决定。
+- 一个租户只开通 PayNow 时，租户后台只显示 PayNow 产品线相关菜单，不显示预约排队叫号菜单。
+- 一个租户只开通预约排队叫号时，不显示 PayNow 菜单。
+- 同一租户的不同门店可以因为门店 app 激活状态不同而看到不同产品线入口。
+- 菜单显隐必须由持久化产品线/门店 app 状态驱动，不能写死某个租户或门店。
+
+子类设计：
+
+- 产品线设置页只放该产品线自己的基础配置。
+- 产品线报表页只查该产品线自己的运营数据。
+- 产品线国际化入口只管理该产品线自己的业务文案。
+- 产品线运行时入口，例如员工收款、POS 下单、排队叫号，应从员工工作台或底部导航进入，不和后台设置入口混在一起。
+
+PayNow 参考：
+
+- 后台大类：`payment` / `收款 / PayNow`。
+- 后台子类：
+  - `/stores/:storeId/admin/payment/settings`
+  - `/stores/:storeId/admin/payment/records`
+  - `/stores/:storeId/admin/payment/i18n-catalog`
+- 员工运行时：
+  - `/stores/:storeId/payments`
+  - `/stores/:storeId/payments/present/:terminalCode`
+  - `/stores/:storeId/payments/display/:sessionNo`
+
+预约排队叫号参考：
+
+- 后台大类：`reservation_queue` / `预约排队叫号`。
+- 后台子类：
+  - `/stores/:storeId/admin/tables`
+  - `/stores/:storeId/admin/settings`
+  - `/stores/:storeId/admin/share-template`
+  - `/stores/:storeId/admin/public-booking`
+  - `/stores/:storeId/admin/call-screen`
+  - `/stores/:storeId/admin/reservation-queue/i18n-catalog`
+
+国际化菜单边界：
+
+- 每个产品线应有自己的国际化菜单入口。
+- 不要共用一个“国际化字典”菜单再让用户自己分辨 namespace。
+- 前端入口要带产品线 scope，例如 `productLine=payment` 或 `productLine=reservation_queue`。
+- 后端也要按产品线过滤可编辑 namespace，不能只做菜单拆分。
+- 保存时必须校验 key 是否属于当前产品线，避免 PayNow 入口改到预约排队叫号文案。
+- 旧共享路由可以保留 redirect，但不能继续作为主菜单入口。
+
+PayNow 国际化边界参考：
+
+- route：`/stores/:storeId/admin/payment/i18n-catalog`。
+- API scope：`productLine=payment`。
+- namespace：`payment`。
+- category：`quick_pay`。
+- Flyway seed：PayNow 自己的 tenant-editable i18n keys，例如 quick payment 提示文案和展示等待文案。
+
+预约排队叫号国际化边界参考：
+
+- route：`/stores/:storeId/admin/reservation-queue/i18n-catalog`。
+- API scope：`productLine=reservation_queue`。
+- namespace 白名单包括 `reason`、`public_booking`、`reservation_share`、`queue`、`call_screen`、`reservation_meal_period`。
+
+实现检查点：
+
+- `TenantAdminNav` 按产品线大类渲染，不把不同产品线子菜单混到同一个数组里。
+- `useStoreVisibleApps` 或等价能力来自后端持久化状态，不用租户 code 特判。
+- router route name 要体现产品线，例如 `tenant-admin-payment-i18n-catalog`。
+- 旧 route 要有清晰兼容策略，例如 redirect 到所属产品线。
+- UI source test 覆盖菜单分组、路由、文案 key、scope 参数。
+- service/controller test 覆盖产品线 scope 过滤和跨产品线 key 拒绝。
+
 ## 测试矩阵
 
 发布前至少覆盖：
@@ -197,6 +279,8 @@ PayNow 可复用经验：`payment_runtime` 最值得借鉴的是员工交互模�
 - Provider：payload/adapter 输出稳定。
 - Controller：App Gate 注解和错误码。
 - UI/source：路由、API、共享组件接线正确。
+- UI/source：租户后台菜单按产品线分组，未开通产品线不可见。
+- UI/source：产品线国际化入口带正确 scope。
 - Permission denied：权限拒绝时 UI 显示明确原因。
 - Frontend build：前端 bundle 编译通过。
 
@@ -274,6 +358,10 @@ PayNow 生产 smoke 没有执行真实收款写操作，因为没有受控测试
 - 不要把前端同浏览器状态误当成跨设备同步。
 - 不要把产品订阅、门店启用、运行时动作权限混成一个概念。
 - 不要把 provider payload 逻辑写进 POS、预约或页面组件。
+- 不要把不同产品线的租户后台菜单混在同一个功能列表里。先产品线大类，再产品线内子类。
+- 不要把 PayNow 国际化字典和预约排队叫号国际化字典共用一个后台入口。
+- 不要只拆前端菜单，不拆后端 i18n scope。菜单拆了但 API 仍返回全量字典，产品线边界仍然是假的。
+- 不要只修复某个租户的菜单可见性。产品线菜单显隐必须对未来新增租户、新增门店持续生效。
 - 不要让员工端读取后台完整配置 API。把运行时默认配置拆成窄 DTO，避免泄露 merchant profile。
 - 不要接受 PayNow 手机号裸存。手机号输入可接受 8 位本地号，但保存和生成 SGQR 前必须规范化为 `+65xxxxxxxx`。
 - 不要用真实业务收款单测试配置页。配置页测试码应生成独立 0.10 QR，不写入 payment intent/session。
@@ -321,6 +409,10 @@ API:
 
 Frontend:
 - admin settings route:
+- admin product-line menu group:
+- admin submenus:
+- admin i18n route:
+- admin i18n productLine scope:
 - staff workflow route:
 - customer/display route:
 - navigation entry:
@@ -339,6 +431,8 @@ Tests:
 - provider:
 - controller:
 - UI/source validation:
+- tenant admin product-line menu:
+- product-line i18n scope:
 - permission denied:
 - frontend build:
 
@@ -361,6 +455,8 @@ Deployment:
 - 产品线 seed 和 App Gate entry 已部署。
 - 既有账号和未来账号权限都正确。
 - 租户/门店 app 激活已验证。
+- 租户后台菜单按产品线显示已验证。
+- 产品线国际化入口和后端 scope 已验证。
 - 后端 focused tests 通过。
 - 前端 build 通过。
 - 权限拒绝有明确用户提示。
