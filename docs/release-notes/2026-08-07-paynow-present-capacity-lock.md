@@ -40,3 +40,21 @@
 
 - Roll back by redeploying the previous frontend bundle.
 - No database rollback, backend restart, or permission rollback is required for this change.
+
+## Production Deployment
+
+- Deployed commit: `e6d47893`
+- Deployment type: frontend static bundle only.
+- Backup directory: `/opt/rpb/backups/20260807-1630-e6d47893-paynow-present-capacity-lock-frontend`
+- Deployed assets:
+  - `index-D7SqFVez.js`
+  - `PaymentQuickPayPage-DqFzO7z4.js`
+  - `paymentPresentBridge-Rf8-e90Y.js`
+- Smoke checks:
+  - `/login`: HTTP 200 and references `assets/index-D7SqFVez.js`
+  - `/assets/index-D7SqFVez.js`: HTTP 200
+  - `/assets/PaymentQuickPayPage-DqFzO7z4.js`: HTTP 200
+  - `/assets/paymentPresentBridge-Rf8-e90Y.js`: HTTP 200
+  - `/stores/20000000-0000-0000-0000-000000000983/payments`: HTTP 200
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1`: HTTP 200
+  - Backend service status after frontend deploy: `active`
