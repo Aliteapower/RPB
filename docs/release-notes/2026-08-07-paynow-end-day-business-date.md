@@ -37,3 +37,24 @@
 
 - Roll back to the previous backend jar and frontend bundle.
 - Existing `payment_business_days` rows can remain in place; the previous released code can still read and open business days.
+
+## Production Deployment
+
+- Deployment date: 2026-08-07.
+- Deployed commit: `5639442c`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-5639442c.jar`
+  - `/home/ubuntu/rpb-5639442c-frontend.tgz`
+- Backend backup: `/opt/rpb/backups/20260807-1556-5639442c-paynow-end-day-business-date/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260807-1556-5639442c-paynow-end-day-business-date/frontend`.
+- Flyway latest: `052`; no new migration was applied.
+- `rpb-backend`: `active / running`, PID `3904000`.
+- Smoke checks:
+  - `https://booking.yumstone.sg/login` returned `200` and loaded `/assets/index-yxEC1cUy.js`.
+  - `https://booking.yumstone.sg/assets/index-yxEC1cUy.js` returned `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - `https://booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `https://booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - Unauthenticated `POST /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/business-day/end-day` returned `403`, confirming the protected route is present behind App Gate/session security.
+  - Backend error log since application startup returned no entries.
