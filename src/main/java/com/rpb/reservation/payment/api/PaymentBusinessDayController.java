@@ -52,6 +52,14 @@ public class PaymentBusinessDayController {
         return ResponseEntity.ok(PaymentBusinessDayResponse.from(service.openToday(scope(storeId, actor), actor)));
     }
 
+    @PostMapping("/end-day")
+    @RequireAppGate(appKey = "payment", permission = INTENT_CREATE_PERMISSION)
+    public ResponseEntity<PaymentBusinessDayResponse> endBusinessDay(@PathVariable UUID storeId) {
+        CurrentActor actor = currentActorProvider.currentActor()
+            .orElseThrow(() -> new PaymentApiException(PaymentApiErrorCode.UNAUTHENTICATED));
+        return ResponseEntity.ok(PaymentBusinessDayResponse.from(service.endDay(scope(storeId, actor), actor)));
+    }
+
     @ExceptionHandler(PaymentApiException.class)
     public ResponseEntity<PaymentApiErrorResponse> handleApiException(PaymentApiException exception) {
         return apiError(exception.code());

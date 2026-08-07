@@ -46,7 +46,15 @@ public class PaymentBusinessDayService {
     @Transactional
     public PaymentBusinessDay openToday(StoreScope scope) {
         Objects.requireNonNull(scope, "payment_scope_required");
-        return repository.openBusinessDay(scope, today(), OffsetDateTime.now(clock));
+        return repository.findOpenBusinessDay(scope)
+            .orElseGet(() -> repository.openBusinessDay(scope, today(), OffsetDateTime.now(clock)));
+    }
+
+    @Transactional
+    public PaymentBusinessDay endDay(StoreScope scope, CurrentActor actor) {
+        validateActor(scope, actor);
+        return repository.closeOpenBusinessDay(scope, OffsetDateTime.now(clock))
+            .orElseGet(() -> new PaymentBusinessDay(today(), STATUS_NOT_OPEN, null, null));
     }
 
     @Transactional

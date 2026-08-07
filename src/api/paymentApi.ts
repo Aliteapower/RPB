@@ -99,6 +99,13 @@ export async function openPaymentBusinessDay(
   return requestJson(businessDayEndpoint(storeId), { method: 'POST', fetcher })
 }
 
+export async function endPaymentBusinessDay(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentBusinessDayResponse> {
+  return requestJson(`${businessDayEndpoint(storeId)}/end-day`, { method: 'POST', fetcher })
+}
+
 export async function getPaymentSession(
   storeId: string,
   sessionNo: string,

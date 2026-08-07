@@ -29,6 +29,8 @@ public interface PaymentIntentRepository {
 
     PaymentBusinessDay openBusinessDay(StoreScope scope, LocalDate businessDate, OffsetDateTime openedAt);
 
+    Optional<PaymentBusinessDay> closeOpenBusinessDay(StoreScope scope, OffsetDateTime closedAt);
+
     PaymentIntentCreateResult createIntentWithSession(
         StoreScope scope,
         PaymentIntentDraft intent,

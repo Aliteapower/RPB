@@ -144,6 +144,65 @@ class PaymentIntentServiceTest {
     }
 
     @Test
+    void endDayClosesCurrentBusinessDayBeforeNextQuickPayOpensToday() {
+        when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfile()));
+        repository.openBusinessDay = new PaymentBusinessDay(
+            LocalDate.parse("2026-08-04"),
+            "open",
+            OffsetDateTime.parse("2026-08-04T16:30:00Z"),
+            null
+        );
+        PaymentBusinessDayService businessDayService = new PaymentBusinessDayService(
+            repository,
+            Clock.fixed(Instant.parse("2026-08-05T00:05:00Z"), ZoneOffset.UTC)
+        );
+
+        PaymentBusinessDay closed = businessDayService.endDay(scope, actor);
+
+        assertThat(closed.businessDate()).isEqualTo(LocalDate.parse("2026-08-04"));
+        assertThat(closed.status()).isEqualTo("closed");
+        assertThat(closed.closedAt()).isEqualTo(OffsetDateTime.parse("2026-08-05T00:05:00Z"));
+        assertThat(repository.closedBusinessDate).isEqualTo(LocalDate.parse("2026-08-04"));
+
+        PaymentIntentCreateResult result = service.createQuickPay(scope, new PaymentIntentCreateCommand(
+            "quick-pay-after-end-day",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("9.00"),
+            "SGD",
+            "COUNTER-1",
+            "Alice",
+            null,
+            "{}"
+        ), actor);
+
+        assertThat(result.session().businessDate()).isEqualTo(LocalDate.parse("2026-08-05"));
+        assertThat(repository.openedBusinessDate).isEqualTo(LocalDate.parse("2026-08-05"));
+        assertThat(repository.allocatedBusinessDate).isEqualTo(LocalDate.parse("2026-08-05"));
+    }
+
+    @Test
+    void openTodayReturnsCurrentOpenBusinessDayUntilEndDayIsDone() {
+        repository.openBusinessDay = new PaymentBusinessDay(
+            LocalDate.parse("2026-08-04"),
+            "open",
+            OffsetDateTime.parse("2026-08-04T16:30:00Z"),
+            null
+        );
+        PaymentBusinessDayService businessDayService = new PaymentBusinessDayService(
+            repository,
+            Clock.fixed(Instant.parse("2026-08-05T00:05:00Z"), ZoneOffset.UTC)
+        );
+
+        PaymentBusinessDay businessDay = businessDayService.openToday(scope, actor);
+
+        assertThat(businessDay.businessDate()).isEqualTo(LocalDate.parse("2026-08-04"));
+        assertThat(businessDay.status()).isEqualTo("open");
+        assertThat(repository.openedBusinessDate).isNull();
+    }
+
+    @Test
     void appliesQuickPayReferencePrefixAndDailyStartNumberFromProfileConfig() {
         when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfileWithConfig(
             "{\"quickPay\":{\"referencePrefix\":\"AB\",\"dailyStartNumber\":10,\"presetAmounts\":[5,10,20]}}"
@@ -307,6 +366,7 @@ class PaymentIntentServiceTest {
         private PaymentSession session;
         private PaymentBusinessDay openBusinessDay;
         private LocalDate openedBusinessDate;
+        private LocalDate closedBusinessDate;
         private LocalDate allocatedBusinessDate;
         private List<QuickPayRecord> quickPayRecords = List.of();
         private QuickPayRecordQuery lastRecordQuery;
@@ -350,6 +410,22 @@ class PaymentIntentServiceTest {
             openedBusinessDate = businessDate;
             openBusinessDay = new PaymentBusinessDay(businessDate, "open", openedAt, null);
             return openBusinessDay;
+        }
+
+        @Override
+        public Optional<PaymentBusinessDay> closeOpenBusinessDay(StoreScope scope, OffsetDateTime closedAt) {
+            if (openBusinessDay == null) {
+                return Optional.empty();
+            }
+            closedBusinessDate = openBusinessDay.businessDate();
+            PaymentBusinessDay closed = new PaymentBusinessDay(
+                openBusinessDay.businessDate(),
+                "closed",
+                openBusinessDay.openedAt(),
+                closedAt
+            );
+            openBusinessDay = null;
+            return Optional.of(closed);
         }
 
         @Override

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   createPaymentIntent,
+  endPaymentBusinessDay,
   getPaymentBusinessDay,
   getQuickPayTerminalConfig,
   openPaymentBusinessDay,
@@ -63,6 +64,7 @@ const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
 const businessDayLoading = ref(false)
 const openingBusinessDay = ref(false)
+const endingBusinessDay = ref(false)
 const businessDayStatus = ref<PaymentBusinessDayStatus>('not_open')
 const openedBusinessDate = ref('')
 let presentWindow: Window | null = null
@@ -88,7 +90,8 @@ const businessDayStatusLabel = computed(() => {
   }
   return gt('generated.payment-quick-pay.049')
 })
-const showOpenTodayButton = computed(() => !businessDayOpen.value || displayedBusinessDate.value !== currentBusinessDate.value)
+const showOpenTodayButton = computed(() => !businessDayOpen.value)
+const showEndDayButton = computed(() => businessDayOpen.value)
 
 onMounted(() => {
   try {
@@ -196,6 +199,25 @@ async function openBusinessDayToday(): Promise<void> {
     errorText.value = apiErrorText(error)
   } finally {
     openingBusinessDay.value = false
+  }
+}
+
+async function endBusinessDay(): Promise<void> {
+  if (!storeId.value || endingBusinessDay.value) {
+    return
+  }
+  endingBusinessDay.value = true
+  errorText.value = ''
+  noticeText.value = ''
+  try {
+    const response = await endPaymentBusinessDay(storeId.value)
+    businessDayStatus.value = response.status
+    openedBusinessDate.value = response.businessDate
+    noticeText.value = gt('generated.payment-quick-pay.054', { businessDate: response.businessDate })
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    endingBusinessDay.value = false
   }
 }
 
@@ -440,6 +462,15 @@ function apiErrorText(error: unknown): string {
             >
               {{ openingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.048') }}
             </button>
+            <button
+              v-if="showEndDayButton"
+              type="button"
+              class="display-button business-day-end-button"
+              :disabled="endingBusinessDay"
+              @click="endBusinessDay"
+            >
+              {{ endingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.053') }}
+            </button>
           </div>
         </section>
 
@@ -682,6 +713,12 @@ label span,
 .business-day-open-button {
   background: #0f766e;
   border-color: #0f766e;
+  color: #ffffff;
+}
+
+.business-day-end-button {
+  background: #b91c1c;
+  border-color: #b91c1c;
   color: #ffffff;
 }
 

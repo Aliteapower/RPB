@@ -84,17 +84,24 @@ class PaymentIntentControllerTest {
             UUID.class,
             PaymentBusinessDayRequest.class
         );
+        Method endDayMethod = PaymentBusinessDayController.class.getMethod("endBusinessDay", UUID.class);
 
         GetMapping getMapping = getMethod.getAnnotation(GetMapping.class);
         PostMapping postMapping = postMethod.getAnnotation(PostMapping.class);
+        PostMapping endDayMapping = endDayMethod.getAnnotation(PostMapping.class);
         RequireAppGate getGate = getMethod.getAnnotation(RequireAppGate.class);
         RequireAppGate postGate = postMethod.getAnnotation(RequireAppGate.class);
+        RequireAppGate endDayGate = endDayMethod.getAnnotation(RequireAppGate.class);
 
         assertThat(getMapping).isNotNull();
         assertThat(postMapping).isNotNull();
+        assertThat(endDayMapping).isNotNull();
+        assertThat(endDayMapping.value()).containsExactly("/end-day");
         assertThat(getGate).isNotNull();
         assertThat(postGate).isNotNull();
+        assertThat(endDayGate).isNotNull();
         assertThat(getGate.permission()).isEqualTo("payment.intent.create");
         assertThat(postGate.permission()).isEqualTo("payment.intent.create");
+        assertThat(endDayGate.permission()).isEqualTo("payment.intent.create");
     }
 }

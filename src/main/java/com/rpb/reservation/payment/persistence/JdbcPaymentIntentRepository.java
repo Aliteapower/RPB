@@ -297,6 +297,28 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
     }
 
     @Override
+    public Optional<PaymentBusinessDay> closeOpenBusinessDay(StoreScope scope, OffsetDateTime closedAt) {
+        return jdbc.query(
+            """
+            update payment_business_days
+            set
+                status = 'closed',
+                closed_at = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and status = 'open'
+            returning business_date, status, opened_at, closed_at
+            """,
+            (rs, rowNum) -> mapBusinessDay(rs),
+            closedAt,
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).stream().findFirst();
+    }
+
+    @Override
     @Transactional
     public PaymentIntentCreateResult createIntentWithSession(
         StoreScope scope,

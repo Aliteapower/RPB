@@ -31,7 +31,7 @@
 ## Risk
 
 - Migration is additive. Existing payment sessions keep their current `business_date`; new Quick Pay sessions use the open payment business day.
-- Reopening today closes any other open payment business day for the same tenant and store.
+- Superseded on 2026-08-07 by the end-day controlled rule: opening today no longer switches away from an existing open payment business day.
 
 ## Rollback Notes
 
