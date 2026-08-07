@@ -230,6 +230,7 @@ class PaymentMigrationTest {
         assertThat(tableExists("payment_method_profiles")).isTrue();
         assertThat(tableExists("payment_intents")).isTrue();
         assertThat(tableExists("payment_sessions")).isTrue();
+        assertThat(tableExists("payment_business_days")).isTrue();
         assertThat(tableExists("payment_display_counters")).isTrue();
         assertThat(tableExists("payment_proofs")).isTrue();
         assertThat(tableExists("payment_ocr_results")).isTrue();
@@ -254,6 +255,44 @@ class PaymentMigrationTest {
             values (?, ?, 'PIT-TEST', 'quick_pay', 'paynow', -1.00, 'SGD', 'QP-TEST', 'pending', 'intent-negative-amount')
             """, TENANT_ID, STORE_ID))
             .hasMessageContaining("ck_payment_intents_amount");
+    }
+
+    @Test
+    void paymentBusinessDaysAreStoreScopedAndOnlyOneCanBeOpenPerStore() {
+        applyMigrationsOnce();
+        ensureStoreScope();
+
+        JDBC.update("""
+            insert into payment_business_days (
+                tenant_id,
+                store_id,
+                business_date,
+                status
+            )
+            values (?, ?, '2026-08-07', 'open')
+            """, TENANT_ID, STORE_ID);
+
+        assertThatThrownBy(() -> JDBC.update("""
+            insert into payment_business_days (
+                tenant_id,
+                store_id,
+                business_date,
+                status
+            )
+            values (?, ?, '2026-08-08', 'open')
+            """, TENANT_ID, STORE_ID))
+            .hasMessageContaining("ux_payment_business_days_open_scope");
+
+        assertThatThrownBy(() -> JDBC.update("""
+            insert into payment_business_days (
+                tenant_id,
+                store_id,
+                business_date,
+                status
+            )
+            values (?, ?, '2026-08-09', 'bad')
+            """, TENANT_ID, STORE_ID))
+            .hasMessageContaining("ck_payment_business_days_status");
     }
 
     private static DriverManagerDataSource dataSource() {

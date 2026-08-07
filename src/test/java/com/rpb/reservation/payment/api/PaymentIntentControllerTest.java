@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 
 class PaymentIntentControllerTest {
 
@@ -73,5 +74,27 @@ class PaymentIntentControllerTest {
         assertThat(gate).isNotNull();
         assertThat(gate.appKey()).isEqualTo("payment");
         assertThat(gate.permission()).isEqualTo("payment.intent.view");
+    }
+
+    @Test
+    void paymentBusinessDayEndpointsRequirePaymentCreatePermission() throws NoSuchMethodException {
+        Method getMethod = PaymentBusinessDayController.class.getMethod("getBusinessDay", UUID.class);
+        Method postMethod = PaymentBusinessDayController.class.getMethod(
+            "openBusinessDay",
+            UUID.class,
+            PaymentBusinessDayRequest.class
+        );
+
+        GetMapping getMapping = getMethod.getAnnotation(GetMapping.class);
+        PostMapping postMapping = postMethod.getAnnotation(PostMapping.class);
+        RequireAppGate getGate = getMethod.getAnnotation(RequireAppGate.class);
+        RequireAppGate postGate = postMethod.getAnnotation(RequireAppGate.class);
+
+        assertThat(getMapping).isNotNull();
+        assertThat(postMapping).isNotNull();
+        assertThat(getGate).isNotNull();
+        assertThat(postGate).isNotNull();
+        assertThat(getGate.permission()).isEqualTo("payment.intent.create");
+        assertThat(postGate.permission()).isEqualTo("payment.intent.create");
     }
 }

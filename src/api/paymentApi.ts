@@ -2,6 +2,7 @@ import type {
   PaymentApiErrorResponse,
   PaymentIntentCreateRequest,
   PaymentIntentCreateResponse,
+  PaymentBusinessDayResponse,
   PaymentProfileMutation,
   PaymentProfileResponse,
   PaymentProfileTestQrResponse,
@@ -84,6 +85,20 @@ export async function getQuickPayRecords(
   return requestJson(`${intentEndpoint(storeId)}/quick-pay-records${suffix}`, { method: 'GET', fetcher })
 }
 
+export async function getPaymentBusinessDay(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentBusinessDayResponse> {
+  return requestJson(businessDayEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function openPaymentBusinessDay(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentBusinessDayResponse> {
+  return requestJson(businessDayEndpoint(storeId), { method: 'POST', fetcher })
+}
+
 export async function getPaymentSession(
   storeId: string,
   sessionNo: string,
@@ -101,6 +116,10 @@ function profileEndpoint(storeId: string): string {
 
 function intentEndpoint(storeId: string): string {
   return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/intents`
+}
+
+function businessDayEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/business-day`
 }
 
 async function requestJson<T>(

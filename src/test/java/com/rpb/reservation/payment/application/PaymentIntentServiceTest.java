@@ -50,6 +50,10 @@ class PaymentIntentServiceTest {
             profileService,
             repository,
             new PayNowQrPayloadBuilder(),
+            new PaymentBusinessDayService(
+                repository,
+                Clock.fixed(Instant.parse("2026-08-05T04:10:00Z"), ZoneOffset.UTC)
+            ),
             Clock.fixed(Instant.parse("2026-08-05T04:10:00Z"), ZoneOffset.UTC)
         );
     }
@@ -57,6 +61,12 @@ class PaymentIntentServiceTest {
     @Test
     void createsQuickPayIntentSessionReferenceAndQrPayload() {
         when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfile()));
+        repository.openBusinessDay = new PaymentBusinessDay(
+            LocalDate.parse("2026-08-04"),
+            "open",
+            OffsetDateTime.parse("2026-08-04T16:30:00Z"),
+            null
+        );
 
         PaymentIntentCreateResult result = service.createQuickPay(scope, new PaymentIntentCreateCommand(
             "quick-pay-20260805-001",
@@ -77,9 +87,60 @@ class PaymentIntentServiceTest {
         assertThat(result.intent().intentNo()).isEqualTo("PIT-202608-0001");
         assertThat(result.intent().paymentReference()).startsWith("QP-202608-0001-");
         assertThat(result.session().displayNumber()).isEqualTo(1);
+        assertThat(result.session().businessDate()).isEqualTo(LocalDate.parse("2026-08-04"));
         assertThat(result.session().sessionNo()).startsWith("PRS-");
         assertThat(result.session().qrPayloadsJson()).contains(result.intent().paymentReference());
         assertThat(result.nextDisplayNumber()).isEqualTo(2);
+    }
+
+    @Test
+    void createsQuickPayAgainstLatestOpenBusinessDayAcrossCalendarDate() {
+        when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfile()));
+        repository.openBusinessDay = new PaymentBusinessDay(
+            LocalDate.parse("2026-08-04"),
+            "open",
+            OffsetDateTime.parse("2026-08-04T16:30:00Z"),
+            null
+        );
+
+        PaymentIntentCreateResult result = service.createQuickPay(scope, new PaymentIntentCreateCommand(
+            "quick-pay-cross-date",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("8.00"),
+            "SGD",
+            "COUNTER-1",
+            "Alice",
+            null,
+            "{}"
+        ), actor);
+
+        assertThat(result.session().businessDate()).isEqualTo(LocalDate.parse("2026-08-04"));
+        assertThat(repository.allocatedBusinessDate).isEqualTo(LocalDate.parse("2026-08-04"));
+        assertThat(repository.openedBusinessDate).isNull();
+    }
+
+    @Test
+    void autoOpensTodayWhenNoBusinessDayIsOpenSoQrCreationStillSucceeds() {
+        when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfile()));
+
+        PaymentIntentCreateResult result = service.createQuickPay(scope, new PaymentIntentCreateCommand(
+            "quick-pay-auto-open",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("9.00"),
+            "SGD",
+            "COUNTER-1",
+            "Alice",
+            null,
+            "{}"
+        ), actor);
+
+        assertThat(result.session().businessDate()).isEqualTo(LocalDate.parse("2026-08-05"));
+        assertThat(repository.openedBusinessDate).isEqualTo(LocalDate.parse("2026-08-05"));
+        assertThat(repository.allocatedBusinessDate).isEqualTo(LocalDate.parse("2026-08-05"));
     }
 
     @Test
@@ -244,6 +305,9 @@ class PaymentIntentServiceTest {
 
     private static final class InMemoryPaymentIntentRepository implements PaymentIntentRepository {
         private PaymentSession session;
+        private PaymentBusinessDay openBusinessDay;
+        private LocalDate openedBusinessDate;
+        private LocalDate allocatedBusinessDate;
         private List<QuickPayRecord> quickPayRecords = List.of();
         private QuickPayRecordQuery lastRecordQuery;
 
@@ -272,7 +336,20 @@ class PaymentIntentServiceTest {
 
         @Override
         public int allocateDisplayNumber(StoreScope scope, java.time.LocalDate businessDate, Integer requestedDisplayNumber) {
+            allocatedBusinessDate = businessDate;
             return requestedDisplayNumber == null ? 1 : requestedDisplayNumber;
+        }
+
+        @Override
+        public Optional<PaymentBusinessDay> findOpenBusinessDay(StoreScope scope) {
+            return Optional.ofNullable(openBusinessDay);
+        }
+
+        @Override
+        public PaymentBusinessDay openBusinessDay(StoreScope scope, LocalDate businessDate, OffsetDateTime openedAt) {
+            openedBusinessDate = businessDate;
+            openBusinessDay = new PaymentBusinessDay(businessDate, "open", openedAt, null);
+            return openBusinessDay;
         }
 
         @Override

@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   createPaymentIntent,
+  getPaymentBusinessDay,
   getQuickPayTerminalConfig,
+  openPaymentBusinessDay,
   PaymentApiError
 } from '../api/paymentApi'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
@@ -13,7 +15,7 @@ import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
-import type { PaymentIntentCreateResponse } from '../types/payment'
+import type { PaymentBusinessDayStatus, PaymentIntentCreateResponse } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 import {
   buildPaymentPresentPayload,
@@ -59,8 +61,13 @@ const presentSettings = ref<PaymentPresentSettings>({
 const presentSettingsEditorOpen = ref(false)
 const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
+const businessDayLoading = ref(false)
+const openingBusinessDay = ref(false)
+const businessDayStatus = ref<PaymentBusinessDayStatus>('not_open')
+const openedBusinessDate = ref('')
 let presentWindow: Window | null = null
 let profileLoadSequence = 0
+let businessDayLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => storeId.value ? gt('generated.payment-quick-pay.001', { shortId: storeId.value.slice(0, 8) }) : gt('generated.payment-quick-pay.002'))
@@ -70,6 +77,18 @@ const amountDisplay = computed(() => amountText.value || '0.00')
 const canCreate = computed(() => Number.isFinite(numericAmount.value) && numericAmount.value > 0 && !creating.value)
 const displayNumberText = computed(() => createdResult.value ? String(createdResult.value.nextDisplayNumber) : gt('generated.payment-quick-pay.026'))
 const normalizedTerminalCode = computed(() => normalizeOptionalText(terminalCode.value) || 'T1')
+const displayedBusinessDate = computed(() => openedBusinessDate.value || currentBusinessDate.value)
+const businessDayOpen = computed(() => businessDayStatus.value === 'open')
+const businessDayStatusLabel = computed(() => {
+  if (businessDayStatus.value === 'open') {
+    return gt('generated.payment-quick-pay.032')
+  }
+  if (businessDayStatus.value === 'closed') {
+    return gt('generated.payment-quick-pay.050')
+  }
+  return gt('generated.payment-quick-pay.049')
+})
+const showOpenTodayButton = computed(() => !businessDayOpen.value || displayedBusinessDate.value !== currentBusinessDate.value)
 
 onMounted(() => {
   try {
@@ -78,6 +97,7 @@ onMounted(() => {
     terminalCode.value = 'T1'
   }
   reloadLocalPaymentState()
+  void loadPaymentBusinessDay()
   void loadQuickPayProfileDefaults()
 })
 
@@ -86,6 +106,7 @@ watch([storeId, normalizedTerminalCode], () => {
 })
 
 watch(storeId, () => {
+  void loadPaymentBusinessDay()
   void loadQuickPayProfileDefaults()
 })
 
@@ -128,6 +149,53 @@ async function loadQuickPayProfileDefaults(): Promise<void> {
     amountPresets.value = readQuickPayPresetAmounts(currentStoreId, config.presetAmounts)
   } catch {
     // Keep the terminal usable with local/default presets if settings are unavailable.
+  }
+}
+
+async function loadPaymentBusinessDay(): Promise<void> {
+  const currentStoreId = storeId.value
+  const sequence = ++businessDayLoadSequence
+  if (!currentStoreId) {
+    businessDayStatus.value = 'not_open'
+    openedBusinessDate.value = ''
+    return
+  }
+
+  businessDayLoading.value = true
+  try {
+    const response = await getPaymentBusinessDay(currentStoreId)
+    if (sequence !== businessDayLoadSequence) {
+      return
+    }
+    businessDayStatus.value = response.status
+    openedBusinessDate.value = response.businessDate
+  } catch (error) {
+    if (error instanceof PaymentApiError && (error.status === 401 || error.status === 403 || error.response.error.code === 'PERMISSION_DENIED')) {
+      errorText.value = apiErrorText(error)
+    }
+  } finally {
+    if (sequence === businessDayLoadSequence) {
+      businessDayLoading.value = false
+    }
+  }
+}
+
+async function openBusinessDayToday(): Promise<void> {
+  if (!storeId.value || openingBusinessDay.value) {
+    return
+  }
+  openingBusinessDay.value = true
+  errorText.value = ''
+  noticeText.value = ''
+  try {
+    const response = await openPaymentBusinessDay(storeId.value)
+    businessDayStatus.value = response.status
+    openedBusinessDate.value = response.businessDate
+    noticeText.value = gt('generated.payment-quick-pay.052', { businessDate: response.businessDate })
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    openingBusinessDay.value = false
   }
 }
 
@@ -241,6 +309,8 @@ async function submitQuickPay(): Promise<void> {
       })
     })
     createdResult.value = response
+    businessDayStatus.value = 'open'
+    openedBusinessDate.value = response.session.businessDate
     publishPaymentPresentPayload(buildPaymentPresentPayload(response, storeId.value, normalizedTerminalCode.value))
     recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
     noticeText.value = gt('generated.payment-quick-pay.028', { displayNumber: response.session.displayNumber })
@@ -352,10 +422,24 @@ function apiErrorText(error: unknown): string {
       </div>
 
       <form class="calculator-panel" @submit.prevent="submitQuickPay">
-        <section class="business-day-card">
+        <section class="business-day-card" :class="{ 'business-day-card--not-open': !businessDayOpen }">
           <div>
             <strong>{{ gt('generated.payment-quick-pay.031') }}</strong>
-            <span>{{ currentBusinessDate }} · {{ gt('generated.payment-quick-pay.032') }}</span>
+            <span>{{ displayedBusinessDate }} · {{ businessDayStatusLabel }}</span>
+          </div>
+          <div class="business-day-actions">
+            <button type="button" class="display-button" :disabled="businessDayLoading" @click="loadPaymentBusinessDay">
+              {{ businessDayLoading ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.047') }}
+            </button>
+            <button
+              v-if="showOpenTodayButton"
+              type="button"
+              class="display-button business-day-open-button"
+              :disabled="openingBusinessDay"
+              @click="openBusinessDayToday"
+            >
+              {{ openingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.048') }}
+            </button>
           </div>
         </section>
 
@@ -564,15 +648,41 @@ label span,
 }
 
 .business-day-card {
+  align-items: center;
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
   border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
   padding: 10px;
 }
 
-.business-day-card div {
+.business-day-card > div:first-child {
   display: grid;
   gap: 2px;
+}
+
+.business-day-card--not-open {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.business-day-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.business-day-actions .display-button {
+  min-width: 78px;
+}
+
+.business-day-open-button {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
 }
 
 .display-no {
@@ -862,6 +972,19 @@ textarea {
   .terminal-meta,
   .recent-grid {
     grid-template-columns: 1fr;
+  }
+
+  .business-day-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .business-day-actions {
+    justify-content: stretch;
+  }
+
+  .business-day-actions .display-button {
+    flex: 1 1 0;
   }
 }
 </style>

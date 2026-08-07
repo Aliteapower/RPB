@@ -1,6 +1,7 @@
 package com.rpb.reservation.payment.persistence;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.payment.application.PaymentBusinessDay;
 import com.rpb.reservation.payment.application.PaymentIntent;
 import com.rpb.reservation.payment.application.PaymentIntentCreateResult;
 import com.rpb.reservation.payment.application.PaymentIntentDraft;
@@ -11,6 +12,7 @@ import com.rpb.reservation.payment.application.QuickPayRecordQuery;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -230,6 +232,71 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
     }
 
     @Override
+    public Optional<PaymentBusinessDay> findOpenBusinessDay(StoreScope scope) {
+        return jdbc.query(
+            """
+            select business_date, status, opened_at, closed_at
+            from payment_business_days
+            where tenant_id = ?
+              and store_id = ?
+              and status = 'open'
+            order by opened_at desc nulls last, created_at desc
+            limit 1
+            """,
+            (rs, rowNum) -> mapBusinessDay(rs),
+            scope.tenantId().value(),
+            scope.storeId().value()
+        ).stream().findFirst();
+    }
+
+    @Override
+    public PaymentBusinessDay openBusinessDay(StoreScope scope, LocalDate businessDate, OffsetDateTime openedAt) {
+        jdbc.update(
+            """
+            update payment_business_days
+            set
+                status = 'closed',
+                closed_at = ?,
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and status = 'open'
+              and business_date <> ?
+            """,
+            openedAt,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            businessDate
+        );
+        return jdbc.query(
+            """
+            insert into payment_business_days (
+                tenant_id,
+                store_id,
+                business_date,
+                status,
+                opened_at
+            )
+            values (?, ?, ?, 'open', ?)
+            on conflict (tenant_id, store_id, business_date) do update
+            set
+                status = 'open',
+                opened_at = coalesce(payment_business_days.opened_at, excluded.opened_at),
+                closed_at = null,
+                updated_at = now(),
+                version = payment_business_days.version + 1
+            returning business_date, status, opened_at, closed_at
+            """,
+            (rs, rowNum) -> mapBusinessDay(rs),
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            businessDate,
+            openedAt
+        ).stream().findFirst().orElseThrow();
+    }
+
+    @Override
     @Transactional
     public PaymentIntentCreateResult createIntentWithSession(
         StoreScope scope,
@@ -375,6 +442,15 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
             rs.getString("cashier_name"),
             rs.getObject("created_at", java.time.OffsetDateTime.class),
             rs.getObject("expires_at", java.time.OffsetDateTime.class)
+        );
+    }
+
+    private static PaymentBusinessDay mapBusinessDay(ResultSet rs) throws SQLException {
+        return new PaymentBusinessDay(
+            rs.getObject("business_date", LocalDate.class),
+            rs.getString("status"),
+            rs.getObject("opened_at", OffsetDateTime.class),
+            rs.getObject("closed_at", OffsetDateTime.class)
         );
     }
 

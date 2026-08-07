@@ -2,6 +2,7 @@ export type PaymentMethod = 'paynow'
 export type PaymentProfileStatus = 'active' | 'disabled'
 export type PayNowType = 'mobile' | 'uen'
 export type PaymentIntentSourceType = 'quick_pay' | 'reservation' | 'queue' | 'pos'
+export type PaymentBusinessDayStatus = 'open' | 'closed' | 'not_open'
 
 export interface PaymentProfile {
   id: string
@@ -102,6 +103,14 @@ export interface PaymentIntentCreateResponse {
   intent: PaymentIntent
   session: PaymentSession
   nextDisplayNumber: number
+}
+
+export interface PaymentBusinessDayResponse {
+  success: true
+  businessDate: string
+  status: PaymentBusinessDayStatus
+  openedAt: string | null
+  closedAt: string | null
 }
 
 export interface QuickPayTerminalConfig {

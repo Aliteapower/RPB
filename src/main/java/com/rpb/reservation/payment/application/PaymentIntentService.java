@@ -32,26 +32,30 @@ public class PaymentIntentService {
     private final PaymentMethodProfileService profileService;
     private final PaymentIntentRepository repository;
     private final PayNowQrPayloadBuilder qrPayloadBuilder;
+    private final PaymentBusinessDayService businessDayService;
     private final Clock clock;
 
     @Autowired
     public PaymentIntentService(
         PaymentMethodProfileService profileService,
         PaymentIntentRepository repository,
-        PayNowQrPayloadBuilder qrPayloadBuilder
+        PayNowQrPayloadBuilder qrPayloadBuilder,
+        PaymentBusinessDayService businessDayService
     ) {
-        this(profileService, repository, qrPayloadBuilder, Clock.systemUTC());
+        this(profileService, repository, qrPayloadBuilder, businessDayService, Clock.systemUTC());
     }
 
     PaymentIntentService(
         PaymentMethodProfileService profileService,
         PaymentIntentRepository repository,
         PayNowQrPayloadBuilder qrPayloadBuilder,
+        PaymentBusinessDayService businessDayService,
         Clock clock
     ) {
         this.profileService = Objects.requireNonNull(profileService, "payment_profile_service_required");
         this.repository = Objects.requireNonNull(repository, "payment_intent_repository_required");
         this.qrPayloadBuilder = Objects.requireNonNull(qrPayloadBuilder, "paynow_qr_payload_builder_required");
+        this.businessDayService = Objects.requireNonNull(businessDayService, "payment_business_day_service_required");
         this.clock = Objects.requireNonNull(clock, "payment_clock_required");
     }
 
@@ -122,7 +126,7 @@ public class PaymentIntentService {
         PaymentQuickPayConfig quickPayConfig = PaymentQuickPayConfig.fromJson(profile.configJson());
         String periodText = period.format(PERIOD_FORMATTER);
         String intentNo = "PIT-" + periodText + "-" + "%04d".formatted(sequence);
-        LocalDate businessDate = LocalDate.now(clock);
+        LocalDate businessDate = businessDayService.currentOrOpenToday(scope).businessDate();
         int allocatedDisplayNumber = repository.allocateDisplayNumber(scope, businessDate, command.requestedDisplayNumber());
         int displayNumber = command.requestedDisplayNumber() == null
             ? allocatedDisplayNumber + quickPayConfig.dailyStartNumber()
