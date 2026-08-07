@@ -42,3 +42,23 @@
 
 - Roll back by redeploying the previous frontend bundle.
 - No database rollback, backend restart, or permission rollback is required.
+
+## Production Deployment
+
+- Deployed commit: `dd3047a5`
+- Deployment type: frontend static bundle only.
+- Backup directory: `/opt/rpb/backups/20260807-2001-dd3047a5-paynow-recent-display-retention-frontend`
+- Deployed assets:
+  - `index-CkWma_wy.js`
+  - `PaymentQuickPayPage-BvLuMRCn.js`
+  - `PaymentPresentPage-orUhXMtp.js`
+  - `paymentPresentBridge-aXUsMoKW.js`
+- Smoke checks:
+  - `/login`: HTTP 200 and references `assets/index-CkWma_wy.js`
+  - `/assets/index-CkWma_wy.js`: HTTP 200
+  - `/assets/PaymentQuickPayPage-BvLuMRCn.js`: HTTP 200
+  - `/assets/PaymentPresentPage-orUhXMtp.js`: HTTP 200
+  - `/assets/paymentPresentBridge-aXUsMoKW.js`: HTTP 200
+  - `/stores/20000000-0000-0000-0000-000000000983/payments`: HTTP 200
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1`: HTTP 200
+  - Backend service status after frontend deploy: `active`
