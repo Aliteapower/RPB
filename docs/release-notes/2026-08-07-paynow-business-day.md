@@ -36,3 +36,24 @@
 ## Rollback Notes
 
 - Roll back the application code first, then drop `payment_business_days` only if no released code still depends on the table.
+
+## Production Deployment
+
+- Deployment date: 2026-08-07.
+- Deployed commit: `b3eb127b`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-b3eb127b`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-b3eb127b`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-b3eb127b.jar`
+  - `/home/ubuntu/rpb-b3eb127b-frontend.tgz`
+- Backend backup: `/opt/rpb/backups/20260807-1505-b3eb127b-paynow-business-day/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260807-1506-b3eb127b-paynow-business-day-frontend/frontend`.
+- Flyway latest: `052|payment business days|t`.
+- `rpb-backend`: `active / running`, PID `3889661`.
+- Smoke checks:
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - `https://booking.yumstone.sg/login` returned `200` and loaded `/assets/index-BFmXI35v.js`.
+  - `https://booking.yumstone.sg/assets/index-BFmXI35v.js` returned `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments` returned `200`.
+- Full `mvn test` was attempted before deployment but exceeded the 5-minute local execution timeout; the PayNow-focused backend test matrix, `npm run build`, and clean deploy worktree package/build passed.
