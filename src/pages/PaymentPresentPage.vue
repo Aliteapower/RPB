@@ -173,8 +173,7 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
 
           <DownloadableQrCode
             :description="gt('generated.payment-present.008')"
-            :download-label="gt('generated.payment-present.009')"
-            :file-name="`${payload.sessionNo}.png`"
+            :show-download="false"
             :size="320"
             :title="gt('generated.payment-present.010')"
             :value="payload.qrPayload"

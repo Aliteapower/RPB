@@ -183,7 +183,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("Waiting for new payment")
             .contains("clearActivePayload")
             .contains("present-grid")
-            .contains("DownloadableQrCode");
+            .contains("DownloadableQrCode")
+            .contains(":show-download=\"false\"")
+            .doesNotContain(":download-label=\"gt('generated.payment-present.009')\"");
         assertThat(presentBridge)
             .contains("BroadcastChannel")
             .contains("localStorage")

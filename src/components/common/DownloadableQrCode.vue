@@ -16,9 +16,11 @@ const props = withDefaults(defineProps<{
   fileName?: string
   size?: number
   downloadLabel?: string
+  showDownload?: boolean
 }>(), {
   description: '',
   fileName: 'qr-code.png',
+  showDownload: true,
   size: 220
 })
 
@@ -99,6 +101,7 @@ function downloadQrCodePng(): void {
     <p v-if="renderError" class="downloadable-qr-code__error" role="alert">{{ renderError }}</p>
 
     <button
+      v-if="showDownload"
       class="downloadable-qr-code__download"
       type="button"
       :disabled="!canDownload"
