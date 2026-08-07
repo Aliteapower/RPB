@@ -2,7 +2,7 @@ import type { PaymentIntentCreateResponse } from '../types/payment'
 import { extractPayNowQrPayload } from './paymentQrPayloads'
 
 export const PAYMENT_PRESENT_TTL_SECONDS = 120
-export const MAX_PRESENT_PAYMENTS = 4
+export const MAX_PRESENT_PAYMENTS = 6
 
 const CHANNEL_PREFIX = 'rpb-payment-present'
 const ACTIVE_PREFIX = 'rpb.payment.present.active'
@@ -17,7 +17,7 @@ const DEFAULT_PRESENT_SETTINGS: PaymentPresentSettings = {
   primaryQr: 'sgqr'
 }
 
-export type PresentMaxPayments = 1 | 2 | 3 | 4
+export type PresentMaxPayments = 1 | 2 | 3 | 4 | 5 | 6
 export type PresentQrPerPayment = 1
 export type PresentPrimaryQr = 'sgqr'
 
@@ -450,7 +450,7 @@ function normalizePaymentPresentSettings(value: unknown): PaymentPresentSettings
 }
 
 function normalizeMaxPayments(value: number): PresentMaxPayments {
-  if (value === 2 || value === 3 || value === 4) {
+  if (value === 2 || value === 3 || value === 4 || value === 5 || value === 6) {
     return value
   }
   return 1

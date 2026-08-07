@@ -108,6 +108,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String display = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentDisplayPage.vue"));
         String present = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentPresentPage.vue"));
         String presentBridge = FrontendSourceSupport.readString(Path.of("src", "utils", "paymentPresentBridge.ts"));
+        String generatedZh = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "generated-zh-CN.ts"));
+        String generatedEn = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "generated-en-SG.ts"));
         String staffRepository = FrontendSourceSupport.readString(Path.of("src", "main", "java", "com", "rpb", "reservation", "tenantadmin", "persistence", "TenantAdminStaffRepository.java"));
 
         assertThat(api)
@@ -169,7 +171,13 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("openPresentWindow")
             .contains("publishPaymentPresentPayload")
             .contains("publishPaymentPresentSettings")
+            .contains("readPaymentPresentPayloads")
             .contains("readPaymentPresentSettings")
+            .contains("isPaymentPresentPayloadActive")
+            .contains("activePresentPayloadCount")
+            .contains("presentCapacityFull")
+            .contains("noticeText.value = gt('generated.payment-quick-pay.055')")
+            .contains("const presentMaxPaymentOptions = [1, 2, 3, 4, 5, 6] as const")
             .contains("MAX_PRESENT_PAYMENTS")
             .contains("formatAppGateErrorMessage")
             .contains("appgate.permission_denied")
@@ -198,11 +206,17 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("localStorage")
             .contains("rpb-payment-present")
             .contains("PaymentPresentSettings")
-            .contains("MAX_PRESENT_PAYMENTS")
+            .contains("export const MAX_PRESENT_PAYMENTS = 6")
+            .contains("export type PresentMaxPayments = 1 | 2 | 3 | 4 | 5 | 6")
+            .contains("value === 5 || value === 6")
             .contains("readPaymentPresentPayloads")
             .contains("readPaymentPresentSettings")
             .contains("savePaymentPresentSettings")
             .contains("publishPaymentPresentSettings")
             .contains("120");
+        assertThat(generatedZh)
+            .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"");
+        assertThat(generatedEn)
+            .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"");
     }
 }

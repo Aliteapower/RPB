@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -20,21 +20,25 @@ import type { PaymentBusinessDayStatus, PaymentIntentCreateResponse } from '../t
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 import {
   buildPaymentPresentPayload,
+  isPaymentPresentPayloadActive,
   MAX_PRESENT_PAYMENTS,
   parsePresetAmountText,
   paymentPresentUrl,
   publishPaymentPresentPayload,
   publishPaymentPresentSettings,
+  readPaymentPresentPayloads,
   readPaymentPresentRecent,
   readPaymentPresentSettings,
   readQuickPayPresetAmounts,
   saveQuickPayPresetAmounts,
+  subscribePaymentPresentPayloads,
+  type PaymentPresentPayload,
   type PaymentPresentSettings,
   type PaymentPresentRecentItem
 } from '../utils/paymentPresentBridge'
 
 const amountKeys = ['7', '8', '9', 'backspace', '4', '5', '6', 'clear', '1', '2', '3', '00', '0', '.']
-const presentMaxPaymentOptions = [1, 2, 3, 4] as const
+const presentMaxPaymentOptions = [1, 2, 3, 4, 5, 6] as const
 const terminalStorageKey = 'rpb.payment.quickPay.terminalCode'
 
 const route = useRoute()
@@ -62,12 +66,15 @@ const presentSettings = ref<PaymentPresentSettings>({
 const presentSettingsEditorOpen = ref(false)
 const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
+const activePresentPayloadCount = ref(0)
 const businessDayLoading = ref(false)
 const openingBusinessDay = ref(false)
 const endingBusinessDay = ref(false)
 const businessDayStatus = ref<PaymentBusinessDayStatus>('not_open')
 const openedBusinessDate = ref('')
 let presentWindow: Window | null = null
+let unsubscribePresentPayloads: (() => void) | null = null
+let presentCapacityTimer: number | null = null
 let profileLoadSequence = 0
 let businessDayLoadSequence = 0
 
@@ -76,7 +83,8 @@ const storeLabel = computed(() => storeId.value ? gt('generated.payment-quick-pa
 const cashierName = computed(() => auth.user?.username || null)
 const numericAmount = computed(() => Number(amountText.value))
 const amountDisplay = computed(() => amountText.value || '0.00')
-const canCreate = computed(() => Number.isFinite(numericAmount.value) && numericAmount.value > 0 && !creating.value)
+const presentCapacityFull = computed(() => activePresentPayloadCount.value >= presentSettings.value.maxPayments)
+const canCreate = computed(() => Number.isFinite(numericAmount.value) && numericAmount.value > 0 && !creating.value && !presentCapacityFull.value)
 const displayNumberText = computed(() => createdResult.value ? String(createdResult.value.nextDisplayNumber) : gt('generated.payment-quick-pay.026'))
 const normalizedTerminalCode = computed(() => normalizeOptionalText(terminalCode.value) || 'T1')
 const displayedBusinessDate = computed(() => openedBusinessDate.value || currentBusinessDate.value)
@@ -100,12 +108,24 @@ onMounted(() => {
     terminalCode.value = 'T1'
   }
   reloadLocalPaymentState()
+  resetPresentCapacityTracking()
+  presentCapacityTimer = window.setInterval(refreshPresentCapacity, 1000)
   void loadPaymentBusinessDay()
   void loadQuickPayProfileDefaults()
 })
 
+onBeforeUnmount(() => {
+  unsubscribePresentPayloads?.()
+  unsubscribePresentPayloads = null
+  if (presentCapacityTimer) {
+    window.clearInterval(presentCapacityTimer)
+    presentCapacityTimer = null
+  }
+})
+
 watch([storeId, normalizedTerminalCode], () => {
   reloadLocalPaymentState()
+  resetPresentCapacityTracking()
 })
 
 watch(storeId, () => {
@@ -135,6 +155,7 @@ function reloadLocalPaymentState(): void {
   amountPresets.value = readQuickPayPresetAmounts(storeId.value)
   presentSettings.value = readPaymentPresentSettings(storeId.value, normalizedTerminalCode.value)
   recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
+  refreshPresentCapacity()
 }
 
 async function loadQuickPayProfileDefaults(): Promise<void> {
@@ -301,9 +322,16 @@ function savePresentSettingsEditor(): void {
     primaryQr: 'sgqr'
   })
   presentSettingsEditorOpen.value = false
+  refreshPresentCapacity()
 }
 
 async function submitQuickPay(): Promise<void> {
+  refreshPresentCapacity()
+  if (presentCapacityFull.value) {
+    errorText.value = ''
+    noticeText.value = gt('generated.payment-quick-pay.055')
+    return
+  }
   if (!canCreate.value || !storeId.value) {
     return
   }
@@ -335,12 +363,46 @@ async function submitQuickPay(): Promise<void> {
     openedBusinessDate.value = response.session.businessDate
     publishPaymentPresentPayload(buildPaymentPresentPayload(response, storeId.value, normalizedTerminalCode.value))
     recentItems.value = readPaymentPresentRecent(storeId.value, normalizedTerminalCode.value)
+    refreshPresentCapacity()
     noticeText.value = gt('generated.payment-quick-pay.028', { displayNumber: response.session.displayNumber })
     amountText.value = ''
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     creating.value = false
+  }
+}
+
+function resetPresentCapacityTracking(): void {
+  unsubscribePresentPayloads?.()
+  unsubscribePresentPayloads = null
+  activePresentPayloadCount.value = 0
+  if (!storeId.value) {
+    return
+  }
+  unsubscribePresentPayloads = subscribePaymentPresentPayloads(
+    storeId.value,
+    normalizedTerminalCode.value,
+    applyPresentPayloadCapacity
+  )
+  refreshPresentCapacity()
+}
+
+function refreshPresentCapacity(): void {
+  if (!storeId.value) {
+    activePresentPayloadCount.value = 0
+    return
+  }
+  applyPresentPayloadCapacity(readPaymentPresentPayloads(storeId.value, normalizedTerminalCode.value))
+}
+
+function applyPresentPayloadCapacity(payloads: PaymentPresentPayload[]): void {
+  activePresentPayloadCount.value = payloads
+    .filter(payload => isPaymentPresentPayloadActive(payload))
+    .slice(0, presentSettings.value.maxPayments)
+    .length
+  if (!presentCapacityFull.value && noticeText.value === gt('generated.payment-quick-pay.055')) {
+    noticeText.value = ''
   }
 }
 
@@ -518,7 +580,8 @@ function apiErrorText(error: unknown): string {
         </div>
 
         <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
-        <p v-if="noticeText" class="notice-banner">{{ noticeText }}</p>
+        <p v-if="presentCapacityFull" class="notice-banner">{{ gt('generated.payment-quick-pay.055') }}</p>
+        <p v-if="noticeText && noticeText !== gt('generated.payment-quick-pay.055')" class="notice-banner">{{ noticeText }}</p>
 
         <button class="primary-button" type="submit" :disabled="!canCreate">
           {{ creating ? gt('generated.payment-quick-pay.016') : gt('generated.payment-quick-pay.017') }}
