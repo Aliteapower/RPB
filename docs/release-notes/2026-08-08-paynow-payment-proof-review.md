@@ -231,3 +231,42 @@
   - Current QuickPay, Present, Proof Review, Records, paymentPresentBridge, API, index, and i18n assets returned `200`.
   - Live Present bundle contains `paymentReference` and no longer contains the old `payload.intentNo` Ref binding.
 - Rollback: restore `/opt/rpb/app/reservation-platform.jar` and `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1503-2237df55-paynow-daily-reference`, then restart `rpb-backend` and reload nginx.
+
+## 2026-08-08 Already Confirmed Proof Review Patch
+
+- Root cause confirmed from production data: receipt `QP202608080017GQVQ` was OCR-read successfully, matched amount `1.00`, and had already moved to `paid / paid`; subsequent scans no longer had an active pending candidate and therefore appeared as `no_match`.
+- Payment Proof Review now performs a historical same-store, same-business-day, same-terminal lookup after active candidate matching fails.
+- If the extracted Ref and amount match a unique already-paid Quick Payment, the scan result returns `already_confirmed` instead of `no_match`.
+- The mobile Proof Review UI displays `已确认` / `Already confirmed` and allows the same close action as an auto-confirmed proof.
+- No database migration, permission change, or environment variable change is required.
+
+### Already Confirmed Proof Review Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `4d3ed496`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-4d3ed496`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-4d3ed496`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-4d3ed496.jar`
+  - `/home/ubuntu/rpb-4d3ed496-frontend.tgz`
+- Production backup: `/opt/rpb/backups/20260808-1523-4d3ed496-paynow-already-confirmed-proof`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1523-4d3ed496-paynow-already-confirmed-proof`.
+- Backend JAR SHA-256: `3ee0c6e6ef95ca82c3632ffd6f63307d68d60b68e8f4d18844970c71d482ee07`.
+- `rpb-backend`: `active / running`, PID `60301`; recent deployment log `ERROR` count: `0`.
+- Verification:
+  - `mvn -q "-Dtest=PaymentReferenceGeneratorTest,PaymentReferencePatternTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewServiceTest,PaymentIntentServiceTest,PaymentProofReviewControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+  - `mvn -q -DskipTests package`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/proof-review` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - unauthenticated proof candidates endpoint returned `403`.
+  - `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/scan` returned `405`.
+  - Current Proof Review, QuickPay, Present, Records, API, and i18n assets returned `200`.
+  - Live Proof Review bundle contains `already_confirmed`.
+- Rollback: restore `/opt/rpb/app/reservation-platform.jar` and `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1523-4d3ed496-paynow-already-confirmed-proof`, then restart `rpb-backend` and reload nginx.
