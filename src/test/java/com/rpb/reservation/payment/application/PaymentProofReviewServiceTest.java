@@ -206,6 +206,37 @@ class PaymentProofReviewServiceTest {
     }
 
     @Test
+    void returnsAlreadyConfirmedWhenReceiptMatchesPaidCandidate() {
+        PaymentProofCandidate candidate = candidate(
+            "QP202608080017GQVQ",
+            new BigDecimal("1.00"),
+            "paid",
+            "paid"
+        );
+        repository.historicalCandidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP202608080017GQVQ",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.6500"),
+            "讯息 QP202608080017GQVQ 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-already-paid"), actor);
+
+        assertThat(result.outcome()).isEqualTo("already_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("QP202608080017GQVQ");
+        assertThat(result.expectedAmount()).isEqualByComparingTo("1.00");
+        assertThat(result.checks().reference()).isEqualTo("match");
+        assertThat(result.checks().amount()).isEqualTo("match");
+        assertThat(repository.confirmedIntentId).isNull();
+        assertThat(repository.createdProofStatus).isNull();
+    }
+
+    @Test
     void noMatchWhenReferenceIsMissing() {
         ocr.fields = new PaymentProofOcrFields(
             null,
@@ -280,6 +311,10 @@ class PaymentProofReviewServiceTest {
     }
 
     private PaymentProofCandidate candidate(String reference, BigDecimal amount) {
+        return candidate(reference, amount, "pending", "pending");
+    }
+
+    private PaymentProofCandidate candidate(String reference, BigDecimal amount, String intentStatus, String sessionStatus) {
         return new PaymentProofCandidate(
             UUID.fromString("50000000-0000-0000-0000-000000000001"),
             UUID.fromString("60000000-0000-0000-0000-000000000001"),
@@ -290,8 +325,8 @@ class PaymentProofReviewServiceTest {
             reference,
             amount,
             "SGD",
-            "pending",
-            "pending",
+            intentStatus,
+            sessionStatus,
             "T1",
             "Alice",
             OffsetDateTime.parse("2026-08-08T04:10:00Z"),
@@ -311,6 +346,7 @@ class PaymentProofReviewServiceTest {
     private static final class InMemoryPaymentProofReviewRepository implements PaymentProofReviewRepository {
         private Optional<PaymentProofCandidate> candidate = Optional.empty();
         private Optional<PaymentProofCandidate> additionalCandidate = Optional.empty();
+        private Optional<PaymentProofCandidate> historicalCandidate = Optional.empty();
         private UUID confirmedIntentId;
         private String createdProofStatus;
         private String createdVerificationStatus;
@@ -338,6 +374,20 @@ class PaymentProofReviewServiceTest {
             String terminalCode
         ) {
             List<PaymentProofCandidate> matches = Stream.concat(candidate.stream(), additionalCandidate.stream())
+                .filter(value -> paymentReferences.contains(value.paymentReference()))
+                .toList();
+            return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PaymentProofCandidate> findUniqueCandidateByReferences(
+            StoreScope scope,
+            List<String> paymentReferences,
+            LocalDate businessDate,
+            String terminalCode
+        ) {
+            List<PaymentProofCandidate> matches = Stream.of(candidate, additionalCandidate, historicalCandidate)
+                .flatMap(Optional::stream)
                 .filter(value -> paymentReferences.contains(value.paymentReference()))
                 .toList();
             return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();

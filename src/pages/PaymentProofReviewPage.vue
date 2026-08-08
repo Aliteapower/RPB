@@ -251,7 +251,7 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
       businessDate: businessDate.value,
       terminalCode: normalizedTerminalCode.value
     })
-    if (scanResult.value.outcome === 'auto_confirmed') {
+    if (scanResult.value.outcome === 'auto_confirmed' || scanResult.value.outcome === 'already_confirmed') {
       stopScanner()
       await loadCandidates()
     } else if (fromCamera && scanResult.value.outcome === 'needs_review') {
@@ -278,6 +278,9 @@ function outcomeLabel(outcome: string | null | undefined): string {
   if (outcome === 'auto_confirmed') {
     return gt('generated.payment-proof-review.017')
   }
+  if (outcome === 'already_confirmed') {
+    return gt('generated.payment-proof-review.039')
+  }
   if (outcome === 'needs_review') {
     return gt('generated.payment-proof-review.018')
   }
@@ -285,7 +288,7 @@ function outcomeLabel(outcome: string | null | undefined): string {
 }
 
 function outcomeClass(outcome: string | null | undefined): string {
-  if (outcome === 'auto_confirmed') {
+  if (outcome === 'auto_confirmed' || outcome === 'already_confirmed') {
     return 'result-panel--good'
   }
   if (outcome === 'needs_review') {
@@ -472,7 +475,7 @@ function apiErrorText(error: unknown): string {
           <span>{{ matchedCandidate.paymentReference }}</span>
         </article>
 
-        <button v-if="scanResult.outcome === 'auto_confirmed'" class="primary-button" type="button" @click="closeReview">
+        <button v-if="scanResult.outcome === 'auto_confirmed' || scanResult.outcome === 'already_confirmed'" class="primary-button" type="button" @click="closeReview">
           {{ gt('generated.payment-proof-review.028') }}
         </button>
       </section>

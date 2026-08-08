@@ -212,7 +212,7 @@ export interface PaymentProofChecks {
 
 export interface PaymentProofScanResponse {
   success: true
-  outcome: 'auto_confirmed' | 'needs_review' | 'no_match'
+  outcome: 'auto_confirmed' | 'already_confirmed' | 'needs_review' | 'no_match'
   replayed: boolean
   intentId: string | null
   sessionId: string | null

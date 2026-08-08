@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,6 +88,12 @@ public class PaymentProofReviewService {
             command.terminalCode()
         )
             .map(candidate -> matchedResult(scope, command, actor, fileDigest, fields, extractedRef, candidate))
+            .or(() -> repository.findUniqueCandidateByReferences(
+                scope,
+                referenceVariants,
+                command.businessDate(),
+                command.terminalCode()
+            ).flatMap(candidate -> alreadyConfirmedResult(fields, extractedRef, candidate)))
             .orElseGet(() -> repository.createNoMatchResult(
                 scope,
                 command,
@@ -95,6 +102,38 @@ public class PaymentProofReviewService {
                 actor.actorId(),
                 fileDigest
             ));
+    }
+
+    private Optional<PaymentProofScanResult> alreadyConfirmedResult(
+        PaymentProofOcrFields fields,
+        String extractedRef,
+        PaymentProofCandidate candidate
+    ) {
+        String referenceCheck = PaymentReferencePattern.matches(extractedRef, candidate.paymentReference())
+            ? "match"
+            : "mismatch";
+        String amountCheck = amountMatches(fields.extractedAmount(), candidate.amount())
+            ? "match"
+            : (fields.extractedAmount() == null ? "missing" : "mismatch");
+        if (!"match".equals(referenceCheck)
+            || !"match".equals(amountCheck)
+            || !"paid".equals(candidate.intentStatus())
+            || !"paid".equals(candidate.sessionStatus())) {
+            return Optional.empty();
+        }
+        return Optional.of(new PaymentProofScanResult(
+            true,
+            false,
+            "already_confirmed",
+            candidate.intentId(),
+            candidate.sessionId(),
+            null,
+            null,
+            candidate.paymentReference(),
+            candidate.amount(),
+            fields,
+            new PaymentProofChecks(referenceCheck, amountCheck)
+        ));
     }
 
     private PaymentProofScanResult matchedResult(

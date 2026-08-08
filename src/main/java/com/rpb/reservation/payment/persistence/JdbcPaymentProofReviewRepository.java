@@ -80,7 +80,7 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
 
     @Override
     public List<PaymentProofCandidate> findCandidates(StoreScope scope, LocalDate businessDate, String terminalCode, int limit) {
-        StringBuilder sql = candidateSql();
+        StringBuilder sql = candidateSql(true);
         List<Object> args = candidateArgs(scope);
         appendCandidateFilters(sql, args, businessDate, terminalCode);
         sql.append(" order by s.created_at desc limit ?");
@@ -95,10 +95,30 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
         LocalDate businessDate,
         String terminalCode
     ) {
+        return findUniqueCandidateByReferences(scope, paymentReferences, businessDate, terminalCode, true);
+    }
+
+    @Override
+    public Optional<PaymentProofCandidate> findUniqueCandidateByReferences(
+        StoreScope scope,
+        List<String> paymentReferences,
+        LocalDate businessDate,
+        String terminalCode
+    ) {
+        return findUniqueCandidateByReferences(scope, paymentReferences, businessDate, terminalCode, false);
+    }
+
+    private Optional<PaymentProofCandidate> findUniqueCandidateByReferences(
+        StoreScope scope,
+        List<String> paymentReferences,
+        LocalDate businessDate,
+        String terminalCode,
+        boolean activeOnly
+    ) {
         if (paymentReferences == null || paymentReferences.isEmpty()) {
             return Optional.empty();
         }
-        StringBuilder sql = candidateSql();
+        StringBuilder sql = candidateSql(activeOnly);
         List<Object> args = candidateArgs(scope);
         appendCandidateFilters(sql, args, businessDate, terminalCode);
         sql.append(" and upper(i.payment_reference) in (")
@@ -159,8 +179,8 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
         return PaymentProofScanResult.noMatch(false, fields, checks);
     }
 
-    private StringBuilder candidateSql() {
-        return new StringBuilder("""
+    private StringBuilder candidateSql(boolean activeOnly) {
+        StringBuilder sql = new StringBuilder("""
             select
                 i.id as intent_id,
                 s.id as session_id,
@@ -185,9 +205,14 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
             where i.tenant_id = ?
               and i.store_id = ?
               and i.source_type = 'quick_pay'
+            """);
+        if (activeOnly) {
+            sql.append("""
               and i.status in ('pending', 'awaiting_verification')
               and s.status in ('pending', 'awaiting_verification')
             """);
+        }
+        return sql;
     }
 
     private List<Object> candidateArgs(StoreScope scope) {

@@ -220,6 +220,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("generated.payment-proof-review.037")
             .contains("generated.payment-proof-review.038")
             .contains("auto_confirmed")
+            .contains("already_confirmed")
             .contains("generated.payment-proof-review.028")
             .contains("active-tab=\"payment\"")
             .doesNotContain("sidecar")
@@ -270,9 +271,13 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"")
             .contains("\"generated.payment-quick-pay.056\": \"过期后保留秒数\"")
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
+        assertThat(generatedZh)
+            .contains("\"generated.payment-proof-review.039\": \"已确认\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"")
             .contains("\"generated.payment-quick-pay.056\": \"Keep after expiry (seconds)\"")
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
+        assertThat(generatedEn)
+            .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"");
     }
 }

@@ -1534,6 +1534,7 @@ export const generatedEnSG: Record<string, string> = {
   "generated.payment-proof-review.036": "Stop scan",
   "generated.payment-proof-review.037": "Take photo",
   "generated.payment-proof-review.038": "Upload photo",
+  "generated.payment-proof-review.039": "Already confirmed",
   "generated.payment-present.001": "Store {shortId}",
   "generated.payment-present.002": "Default store",
   "generated.payment-present.003": "Quick Payment",

@@ -27,6 +27,13 @@ public interface PaymentProofReviewRepository {
         String terminalCode
     );
 
+    Optional<PaymentProofCandidate> findUniqueCandidateByReferences(
+        StoreScope scope,
+        List<String> paymentReferences,
+        LocalDate businessDate,
+        String terminalCode
+    );
+
     PaymentProofScanResult createMatchedProofAndMaybeConfirm(
         StoreScope scope,
         PaymentProofCandidate candidate,
