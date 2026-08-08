@@ -301,3 +301,35 @@
   - Live QuickPay bundle contains `rpb-paynow-proof-review` and `popup=yes,width=520,height=900`.
   - Live i18n bundle contains `回单校验`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1612-ada31ab1-paynow-proof-review-popup/frontend` or switch back to `/opt/rpb/frontend.previous-20260808-1612-ada31ab1-paynow-proof-review-popup`, then reload nginx.
+
+## 2026-08-08 QuickPay Focused Input Layout Patch
+
+- Quick Payment now collapses terminal and business-day controls behind a compact `收款设置` / `Payment settings` strip by default.
+- The amount display and keypad move closer to the top of the payment page, keeping the cashier input flow focused.
+- The customer display settings dialog now scrolls inside the modal and keeps its action buttons above the bottom navigation/safe area.
+- No backend, API, database, permission, or environment variable change is required.
+
+### QuickPay Focused Input Layout Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `8cc0d140`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-8cc0d140`.
+- Uploaded artifact: `/home/ubuntu/rpb-8cc0d140-frontend.tgz`.
+- Production backup: `/opt/rpb/backups/20260808-1712-8cc0d140-quickpay-focused-input`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1712-8cc0d140-quickpay-focused-input`.
+- Backend JAR was not changed and `rpb-backend` was not restarted.
+- Verification:
+  - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+  - `git diff --check`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - Current QuickPay JS/CSS and i18n assets returned `200`.
+  - Live QuickPay bundle contains `payment-options-toggle`.
+  - Live QuickPay CSS contains `calc(112px + env(safe-area-inset-bottom))` and `max-height: calc(100dvh - 150px)`.
+  - Live i18n bundle contains `收款设置` and `展开`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1712-8cc0d140-quickpay-focused-input/frontend` or switch back to `/opt/rpb/frontend.previous-20260808-1712-8cc0d140-quickpay-focused-input`, then reload nginx.
