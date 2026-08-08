@@ -161,3 +161,35 @@
 - Existing separated references remain accepted by Payment Proof Review through compact and separated lookup variants, with automatic matching limited to one unique active candidate.
 - Requested or automatically allocated display numbers above `9999` now return the stable `REQUEST_INVALID` business error before reference generation.
 - No database migration, permission change, or PayNow QR payload schema change is required.
+
+### OCR-Safe Reference Format Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `bb489acc`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-bb489acc`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-bb489acc`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-bb489acc.jar`
+  - `/home/ubuntu/rpb-bb489acc-frontend.tgz`
+- Production backup: `/opt/rpb/backups/20260808-1442-bb489acc-paynow-ocr-safe-reference`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1442-bb489acc-paynow-ocr-safe-reference`.
+- Backend JAR SHA-256: `2CE773221286833F935B679A6435C17BB88FA1222B8A7B7C7B4C9E729E4687C4`.
+- `rpb-backend`: `active / running`, PID `48978`.
+- OCR runtime confirmed:
+  - `tesseract 5.3.4`
+  - languages: `eng`, `chi_sim`, `osd`
+- Verification:
+  - `mvn -q "-Dtest=PaymentReferenceGeneratorTest,PaymentReferencePatternTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewServiceTest,PaymentIntentServiceTest,PaymentProofReviewControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+  - `mvn -q -DskipTests package`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/proof-review` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - unauthenticated proof candidates endpoint returned `403`.
+  - `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/scan` returned `405`.
+  - Current QuickPay, Present, Proof Review, Records, API, index, and i18n assets returned `200`.
