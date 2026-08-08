@@ -9,13 +9,22 @@ public final class PaymentReferencePattern {
         "\\b([A-Z0-9]{2,8}-\\d{6}-\\d{3,6}(?:-[A-Z0-9]{3,8})?)\\b",
         Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern SYSTEM_REFERENCE_WITH_OCR_SPACES = Pattern.compile(
+        "\\b([A-Z0-9]{2,8}\\s*-\\s*\\d{6}\\s*-\\s*\\d(?:\\s*\\d){2,5}(?:\\s*-\\s*[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
+        Pattern.CASE_INSENSITIVE
+    );
 
     private PaymentReferencePattern() {
     }
 
     public static Optional<String> extractSystemReference(String rawText) {
         String normalizedText = normalizeForSearch(rawText);
-        Matcher matcher = SYSTEM_REFERENCE.matcher(normalizedText);
+        return extractWith(SYSTEM_REFERENCE_WITH_OCR_SPACES, normalizedText)
+            .or(() -> extractWith(SYSTEM_REFERENCE, normalizedText));
+    }
+
+    private static Optional<String> extractWith(Pattern pattern, String text) {
+        Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
             String candidate = normalize(matcher.group(1));
             if (!candidate.isBlank()) {

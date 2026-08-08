@@ -2,8 +2,10 @@ package com.rpb.reservation.payment.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.rpb.reservation.payment.application.PaymentProofOcrExpected;
 import com.rpb.reservation.payment.domain.PaymentReferencePattern;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class TesseractPaymentProofOcrAdapterTest {
@@ -39,6 +41,61 @@ class TesseractPaymentProofOcrAdapterTest {
         assertThat(PaymentReferencePattern.extractSystemReference(raw)).contains("HT-202605-0012");
         assertThat(TesseractPaymentProofOcrAdapter.extractAmount(raw, new BigDecimal("0.10")))
             .contains(new BigDecimal("0.10"));
+    }
+
+    @Test
+    void parserExtractsReferenceWhenOcrAddsSpacesInsideSerial() {
+        String raw = """
+            讯息
+            QP-202608-001 3-2KZ6
+            您已支付 1.00 SGD
+            """;
+
+        assertThat(PaymentReferencePattern.extractSystemReference(raw)).contains("QP-202608-0013-2KZ6");
+        assertThat(TesseractPaymentProofOcrAdapter.extractAmount(raw, new BigDecimal("1.00")))
+            .contains(new BigDecimal("1.00"));
+    }
+
+    @Test
+    void selectsBestOcrAttemptWhenSparseModeFindsExactExpectedReference() {
+        List<String> attempts = List.of(
+            """
+                您 已 支付 1.00 SGD
+                QP-202608-0013-2K7
+                """,
+            """
+                您
+                已 支付 1.00 SGD
+                讯息
+                QP-202608-001 3-2KZ6
+                """
+        );
+
+        assertThat(TesseractPaymentProofOcrAdapter.selectBestFields(
+            attempts,
+            new PaymentProofOcrExpected("QP-202608-0013-2KZ6", new BigDecimal("1.00"))
+        ).extractedReference()).isEqualTo("QP-202608-0013-2KZ6");
+    }
+
+    @Test
+    void selectsMoreCompleteReferenceWhenNoExpectedReferenceIsAvailable() {
+        List<String> attempts = List.of(
+            """
+                您 已 支付 1.00 SGD
+                QP-202608-0013-2K7
+                """,
+            """
+                您
+                已 支付 1.00 SGD
+                讯息
+                QP-202608-001 3-2KZ6
+                """
+        );
+
+        assertThat(TesseractPaymentProofOcrAdapter.selectBestFields(
+            attempts,
+            new PaymentProofOcrExpected(null, null)
+        ).extractedReference()).isEqualTo("QP-202608-0013-2KZ6");
     }
 
     @Test

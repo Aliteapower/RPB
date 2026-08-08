@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -30,11 +30,18 @@ const businessDate = ref('')
 const candidates = ref<PaymentProofCandidate[]>([])
 const loadingCandidates = ref(false)
 const scanning = ref(false)
+const scannerActive = ref(false)
+const cameraStarting = ref(false)
+const cameraError = ref('')
 const errorText = ref('')
 const selectedFile = ref<File | null>(null)
 const previewUrl = ref('')
 const scanResult = ref<PaymentProofScanResponse | null>(null)
+const videoRef = ref<HTMLVideoElement | null>(null)
 let candidateSequence = 0
+let scannerStream: MediaStream | null = null
+let scannerTimer: number | undefined
+let liveScanInFlight = false
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => storeId.value ? gt('generated.payment-proof-review.001', { shortId: storeId.value.slice(0, 8) }) : gt('generated.payment-proof-review.002'))
@@ -60,6 +67,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopScanner()
   revokePreview()
 })
 
@@ -121,18 +129,122 @@ async function submitScan(): Promise<void> {
   if (!storeId.value || !selectedFile.value || scanning.value) {
     return
   }
-  scanning.value = true
+  await submitProofImage(selectedFile.value, false)
+}
+
+async function startScanner(): Promise<void> {
+  if (scannerActive.value || cameraStarting.value || !storeId.value) {
+    return
+  }
+  cameraStarting.value = true
+  cameraError.value = ''
   errorText.value = ''
   scanResult.value = null
   try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    })
+    scannerStream = stream
+    scannerActive.value = true
+    await nextTick()
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream
+      await videoRef.value.play()
+    }
+    scannerTimer = window.setInterval(() => {
+      void scanFrame()
+    }, 1800)
+    void scanFrame()
+  } catch {
+    cameraError.value = gt('generated.payment-proof-review.035')
+    stopScanner()
+  } finally {
+    cameraStarting.value = false
+  }
+}
+
+function stopScanner(): void {
+  if (scannerTimer !== undefined) {
+    window.clearInterval(scannerTimer)
+    scannerTimer = undefined
+  }
+  if (scannerStream) {
+    scannerStream.getTracks().forEach(track => track.stop())
+    scannerStream = null
+  }
+  if (videoRef.value) {
+    videoRef.value.srcObject = null
+  }
+  scannerActive.value = false
+}
+
+async function scanFrame(): Promise<void> {
+  if (!scannerActive.value || scanning.value || liveScanInFlight || !storeId.value) {
+    return
+  }
+  liveScanInFlight = true
+  try {
+    const frame = await captureFrameBlob()
+    if (frame) {
+      await submitProofImage(new File([frame], 'payment-proof-frame.jpg', { type: 'image/jpeg' }), true)
+    }
+  } finally {
+    liveScanInFlight = false
+  }
+}
+
+async function captureFrameBlob(): Promise<Blob | null> {
+  const video = videoRef.value
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    return null
+  }
+  const sourceWidth = video.videoWidth
+  const sourceHeight = video.videoHeight
+  const cropWidth = Math.round(sourceWidth * 0.9)
+  const cropHeight = Math.round(sourceHeight * 0.86)
+  const sourceX = Math.round((sourceWidth - cropWidth) / 2)
+  const sourceY = Math.round((sourceHeight - cropHeight) / 2)
+  const maxWidth = 1280
+  const scale = Math.min(1, maxWidth / cropWidth)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(cropWidth * scale))
+  canvas.height = Math.max(1, Math.round(cropHeight * scale))
+  const context = canvas.getContext('2d')
+  if (!context) {
+    return null
+  }
+  context.drawImage(video, sourceX, sourceY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height)
+  return new Promise(resolve => {
+    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.88)
+  })
+}
+
+async function submitProofImage(image: File, fromCamera: boolean): Promise<void> {
+  if (!storeId.value || scanning.value) {
+    return
+  }
+  scanning.value = true
+  errorText.value = ''
+  if (!fromCamera) {
+    scanResult.value = null
+  }
+  try {
     scanResult.value = await scanPaymentProof(storeId.value, {
-      image: selectedFile.value,
+      image,
       idempotencyKey: createIdempotencyKey(),
       businessDate: businessDate.value,
       terminalCode: normalizedTerminalCode.value
     })
     if (scanResult.value.outcome === 'auto_confirmed') {
+      stopScanner()
       await loadCandidates()
+    } else if (fromCamera && scanResult.value.outcome === 'needs_review') {
+      stopScanner()
     }
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -262,6 +374,22 @@ function apiErrorText(error: unknown): string {
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
 
       <section class="scan-panel">
+        <div class="camera-scanner" :class="{ 'camera-scanner--active': scannerActive }">
+          <video v-show="scannerActive" ref="videoRef" autoplay muted playsinline></video>
+          <div class="scanner-placeholder" v-show="!scannerActive">
+            {{ gt('generated.payment-proof-review.031') }}
+          </div>
+          <div class="scan-frame">
+            <span>{{ scannerActive ? gt('generated.payment-proof-review.032') : gt('generated.payment-proof-review.033') }}</span>
+          </div>
+        </div>
+
+        <button class="primary-button" type="button" :disabled="cameraStarting || scanning" @click="scannerActive ? stopScanner() : startScanner()">
+          {{ cameraStarting ? gt('generated.payment-proof-review.034') : scannerActive ? gt('generated.payment-proof-review.036') : gt('generated.payment-proof-review.031') }}
+        </button>
+
+        <p v-if="cameraError" class="empty-line">{{ cameraError }}</p>
+
         <label class="upload-target">
           <input accept="image/png,image/jpeg,image/webp" capture="environment" type="file" @change="onFileSelected" />
           <span>{{ selectedFile ? selectedFile.name : gt('generated.payment-proof-review.010') }}</span>
@@ -467,6 +595,55 @@ input {
 .scan-panel {
   display: grid;
   gap: 10px;
+}
+
+.camera-scanner {
+  aspect-ratio: 3 / 4;
+  background: #0f172a;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  display: grid;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.camera-scanner video,
+.scanner-placeholder {
+  grid-area: 1 / 1;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.scanner-placeholder {
+  align-items: center;
+  color: #e2e8f0;
+  display: flex;
+  font-weight: 900;
+  justify-content: center;
+  padding: 18px;
+  text-align: center;
+}
+
+.scan-frame {
+  align-items: end;
+  border: 3px solid rgba(20, 184, 166, 0.9);
+  border-radius: 8px;
+  display: flex;
+  inset: 7% 5%;
+  justify-content: center;
+  pointer-events: none;
+  position: absolute;
+}
+
+.scan-frame span {
+  background: rgba(15, 23, 42, 0.78);
+  border-radius: 6px 6px 0 0;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 6px 10px;
 }
 
 .upload-target {

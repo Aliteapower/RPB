@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
+    private static final List<String> PAGE_SEGMENTATION_MODES = List.of("6", "11", "4");
     private static final Pattern AMOUNT_PATTERN = Pattern.compile(
         "(?:SGD|S\\$|\\$)\\s*([0-9OoIl]{1,3}(?:,[0-9OoIl]{3})*(?:[.,][0-9OoIl]{1,2})?)|"
             + "([0-9OoIl]{1,3}(?:,[0-9OoIl]{3})*(?:[.,][0-9OoIl]{1,2})?)\\s*(?:SGD|S6D|SG)",
@@ -40,7 +43,47 @@ public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
 
     @Override
     public PaymentProofOcrFields extract(Path file, PaymentProofOcrExpected expected) {
-        String rawText = runTesseract(file);
+        List<String> rawTexts = new ArrayList<>();
+        PaymentServiceException lastFailure = null;
+        for (String pageSegmentationMode : PAGE_SEGMENTATION_MODES) {
+            try {
+                String rawText = runTesseract(file, pageSegmentationMode);
+                if (!rawText.isBlank()) {
+                    rawTexts.add(rawText);
+                }
+            } catch (PaymentServiceException exception) {
+                lastFailure = exception;
+            }
+        }
+        if (rawTexts.isEmpty()) {
+            if (lastFailure != null) {
+                throw lastFailure;
+            }
+            throw new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_OCR_UNAVAILABLE);
+        }
+        return selectBestFields(rawTexts, expected);
+    }
+
+    static PaymentProofOcrFields selectBestFields(List<String> rawTexts, PaymentProofOcrExpected expected) {
+        List<PaymentProofOcrFields> attempts = new ArrayList<>();
+        int index = 0;
+        for (String rawText : rawTexts) {
+            index += 1;
+            attempts.add(parseFields(rawText, expected, "{\"selectedAttempt\":" + index + "}"));
+        }
+        if (rawTexts.size() > 1) {
+            attempts.add(parseFields(String.join("\n", rawTexts), expected, "{\"selectedAttempt\":\"combined\"}"));
+        }
+        return attempts.stream()
+            .max(Comparator.comparing(fields -> selectionScore(fields, expected)))
+            .orElseGet(() -> parseFields("", expected, "{}"));
+    }
+
+    private static PaymentProofOcrFields parseFields(
+        String rawText,
+        PaymentProofOcrExpected expected,
+        String rawJson
+    ) {
         String extractedReference = PaymentReferencePattern.extractSystemReference(rawText).orElse(null);
         BigDecimal extractedAmount = extractAmount(rawText, expected == null ? null : expected.expectedAmount()).orElse(null);
         boolean successDetected = successDetected(rawText);
@@ -53,7 +96,7 @@ public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
             successDetected,
             confidence,
             rawText,
-            "{}"
+            rawJson
         );
     }
 
@@ -96,7 +139,7 @@ public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
         return SUCCESS_KEYWORDS.stream().anyMatch(lower::contains);
     }
 
-    private static String runTesseract(Path file) {
+    private static String runTesseract(Path file, String pageSegmentationMode) {
         String command = System.getenv("PAYMENT_OCR_TESSERACT_CMD");
         if (command == null || command.isBlank()) {
             command = "tesseract";
@@ -110,7 +153,7 @@ public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
             "--oem",
             "1",
             "--psm",
-            "6"
+            pageSegmentationMode
         );
         try {
             Process process = builder.start();
@@ -131,6 +174,29 @@ public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
             Thread.currentThread().interrupt();
             throw new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_OCR_UNAVAILABLE);
         }
+    }
+
+    private static BigDecimal selectionScore(PaymentProofOcrFields fields, PaymentProofOcrExpected expected) {
+        BigDecimal score = fields.confidence();
+        if (expected != null
+            && expected.expectedReference() != null
+            && PaymentReferencePattern.normalize(expected.expectedReference()).equals(PaymentReferencePattern.normalize(fields.extractedReference()))) {
+            score = score.add(new BigDecimal("1.00"));
+        }
+        if (expected != null
+            && expected.expectedAmount() != null
+            && fields.extractedAmount() != null
+            && fields.extractedAmount().compareTo(expected.expectedAmount().setScale(2, RoundingMode.HALF_UP)) == 0) {
+            score = score.add(new BigDecimal("0.35"));
+        }
+        if (fields.extractedReference() != null && fields.extractedAmount() != null) {
+            score = score.add(new BigDecimal("0.20"));
+        }
+        if (fields.extractedReference() != null) {
+            int referenceLength = Math.min(40, fields.extractedReference().length());
+            score = score.add(new BigDecimal(referenceLength).movePointLeft(3));
+        }
+        return score;
     }
 
     private static BigDecimal confidence(

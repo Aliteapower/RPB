@@ -48,3 +48,16 @@
   - Unauthenticated `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/candidates` returned `403`, confirming the proof-review API is protected.
   - Host-prefix proof-review route returned `200`: `https://20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments/proof-review`.
 - Backend startup logs show Flyway applied V053 and `ReservationPlatformApplication` started.
+
+## 2026-08-08 Scan Accuracy Patch
+
+- Reproduced the failed mobile photo sample against the production OCR runtime.
+- Root cause:
+  - The upload flow encouraged taking a photo of the browser/page, so address bar, RPB controls, bottom nav, tilt, and screen moire entered the image.
+  - Tesseract `--psm 6` read the amount but misread the Ref check code in the sample as `QP-202608-0013-2K7`.
+  - Tesseract `--psm 11` read the correct check code but inserted a space inside the serial: `QP-202608-001 3-2KZ6`.
+- Patch:
+  - Payment Proof Review now includes a camera scanner that opens the environment camera, captures the centered scan frame, and submits frames automatically until a receipt is matched or needs review.
+  - File upload remains available as fallback.
+  - OCR extraction now retries multiple page segmentation modes and chooses the best parsed fields.
+  - Ref parsing accepts OCR spaces inside a system Ref without joining unrelated amount or page text.
