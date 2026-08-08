@@ -2,10 +2,17 @@ package com.rpb.reservation.appgate.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class PayNowPaymentUiAcceptanceValidationTest {
+
+    @Test
+    void quickPayCreationUsesPaymentReferenceGenerator() throws Exception {
+        assertThat(Files.readString(Path.of("src/main/java/com/rpb/reservation/payment/application/PaymentIntentService.java")))
+            .contains("PaymentReferenceGenerator.generate");
+    }
 
     @Test
     void tenantAdminStaffQuickPayAndDisplayEntriesAreWired() throws Exception {

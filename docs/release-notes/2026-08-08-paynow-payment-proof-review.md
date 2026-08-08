@@ -151,3 +151,11 @@
   - unauthenticated proof candidates endpoint returned `403`.
   - `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/scan` returned `405`.
   - Live frontend bundle contains `photoInputRef`, `albumInputRef`, `拍照识别`, `上传照片识别`, `Take photo`, and `Upload photo`.
+
+## 2026-08-08 OCR-Safe Reference Format Patch
+
+- New PayNow payment references use compact separator-free format such as `QP2026080013ACDE`.
+- The 4-character check segment uses OCR-safe letters from `ACDEFGHJKMNPQRTVWXY`.
+- The check segment excludes `O`, `I`, `L`, `B`, `S`, `Z`, and digits to reduce screen-to-screen OCR confusion.
+- Existing separated references remain accepted by Payment Proof Review.
+- No database migration, permission change, or PayNow QR payload schema change is required.
