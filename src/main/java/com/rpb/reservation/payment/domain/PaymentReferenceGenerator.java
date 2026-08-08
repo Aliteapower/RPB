@@ -7,7 +7,7 @@ import java.util.zip.CRC32;
 
 public final class PaymentReferenceGenerator {
     private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
-    private static final char[] ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
+    private static final char[] CHECK_ALPHABET = "ACDEFGHJKMNPQRTVWXY".toCharArray();
 
     private PaymentReferenceGenerator() {
     }
@@ -17,8 +17,9 @@ public final class PaymentReferenceGenerator {
         if (period == null || sequence <= 0 || sequence > 999999) {
             throw new IllegalArgumentException("payment_reference_sequence_invalid");
         }
-        String base = cleanPrefix + "-" + period.format(PERIOD_FORMATTER) + "-" + "%04d".formatted(sequence);
-        return base + "-" + checksum(base);
+        String sequenceText = "%04d".formatted(sequence);
+        String base = cleanPrefix + period.format(PERIOD_FORMATTER) + sequenceText;
+        return base + checksum(base);
     }
 
     private static String normalizePrefix(String prefix) {
@@ -35,8 +36,8 @@ public final class PaymentReferenceGenerator {
         long value = crc.getValue();
         char[] out = new char[4];
         for (int i = 3; i >= 0; i--) {
-            out[i] = ALPHABET[(int) (value % ALPHABET.length)];
-            value = value / ALPHABET.length;
+            out[i] = CHECK_ALPHABET[(int) (value % CHECK_ALPHABET.length)];
+            value = value / CHECK_ALPHABET.length;
         }
         return new String(out);
     }

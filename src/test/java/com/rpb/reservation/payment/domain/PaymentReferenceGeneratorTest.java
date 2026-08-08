@@ -9,17 +9,26 @@ import org.junit.jupiter.api.Test;
 class PaymentReferenceGeneratorTest {
 
     @Test
-    void generatesPrefixPeriodSequenceAndCheckSegment() {
+    void generatesCompactReferenceWithOcrSafeCheckSegment() {
         String result = PaymentReferenceGenerator.generate("QP", YearMonth.of(2026, 8), 40);
 
-        assertThat(result).matches("QP-202608-0040-[A-Z0-9]{4}");
+        assertThat(result).matches("QP2026080040[ACDEFGHJKMNPQRTVWXY]{4}");
+        assertThat(result).doesNotContain("-", ".", "O", "I", "L", "B", "S", "Z");
     }
 
     @Test
-    void supportsPitPrefixForCanonicalReference() {
+    void supportsPitPrefixForCompactReference() {
         String result = PaymentReferenceGenerator.generate("PIT", YearMonth.of(2026, 8), 21);
 
-        assertThat(result).matches("PIT-202608-0021-[A-Z0-9]{4}");
+        assertThat(result).matches("PIT2026080021[ACDEFGHJKMNPQRTVWXY]{4}");
+    }
+
+    @Test
+    void compactReferenceIsDeterministicForSameInputs() {
+        String first = PaymentReferenceGenerator.generate("QP", YearMonth.of(2026, 8), 13);
+        String second = PaymentReferenceGenerator.generate("qp", YearMonth.of(2026, 8), 13);
+
+        assertThat(second).isEqualTo(first);
     }
 
     @Test
