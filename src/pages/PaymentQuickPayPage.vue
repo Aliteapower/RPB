@@ -75,6 +75,7 @@ const endingBusinessDay = ref(false)
 const businessDayStatus = ref<PaymentBusinessDayStatus>('not_open')
 const openedBusinessDate = ref('')
 let presentWindow: Window | null = null
+let proofReviewWindow: Window | null = null
 let unsubscribePresentPayloads: (() => void) | null = null
 let presentCapacityTimer: number | null = null
 let profileLoadSequence = 0
@@ -102,12 +103,6 @@ const businessDayStatusLabel = computed(() => {
 })
 const showOpenTodayButton = computed(() => !businessDayOpen.value)
 const showEndDayButton = computed(() => businessDayOpen.value)
-const proofReviewRoute = computed(() => ({
-  name: 'payment-proof-review',
-  params: {
-    storeId: storeId.value
-  }
-}))
 
 onMounted(() => {
   try {
@@ -445,6 +440,25 @@ function openPresentWindow(): void {
   }
 }
 
+function openProofReviewWindow(): void {
+  if (!storeId.value) {
+    return
+  }
+  const href = router.resolve({
+    name: 'payment-proof-review',
+    params: {
+      storeId: storeId.value
+    }
+  }).href || `/stores/${storeId.value}/payments/proof-review`
+  const target = `rpb-paynow-proof-review-${storeId.value}`
+  proofReviewWindow = window.open(href, target, 'popup=yes,width=520,height=900') || proofReviewWindow
+  try {
+    proofReviewWindow?.focus()
+  } catch {
+    // Some browsers block focusing named windows; the review page remains available.
+  }
+}
+
 function limitCurrencyDecimals(value: string): string {
   const cleaned = value.replace(/[^\d.]/g, '')
   const firstDot = cleaned.indexOf('.')
@@ -502,9 +516,9 @@ function apiErrorText(error: unknown): string {
     >
       <template #action>
         <div class="topbar-actions">
-          <RouterLink class="display-button topbar-link" :to="proofReviewRoute">
+          <button class="display-button" type="button" @click="openProofReviewWindow">
             {{ gt('generated.payment-quick-pay.057') }}
-          </RouterLink>
+          </button>
           <button class="display-button" type="button" @click="openPresentWindow">
             {{ gt('generated.payment-quick-pay.029') }}
           </button>
@@ -714,12 +728,6 @@ function apiErrorText(error: unknown): string {
   font-weight: 900;
   min-height: 34px;
   padding: 0 10px;
-}
-
-.topbar-link {
-  align-items: center;
-  display: inline-flex;
-  text-decoration: none;
 }
 
 .topbar-actions {

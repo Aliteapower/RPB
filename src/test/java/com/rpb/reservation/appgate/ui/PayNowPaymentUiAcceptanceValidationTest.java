@@ -201,6 +201,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("formatAppGateErrorMessage")
             .contains("appgate.permission_denied")
             .contains("payment-proof-review")
+            .contains("openProofReviewWindow")
+            .contains("rpb-paynow-proof-review")
+            .contains("popup=yes,width=520,height=900")
             .contains("active-tab=\"payment\"");
         assertThat(proofReview)
             .contains("getPaymentProofCandidates")
@@ -270,7 +273,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
         assertThat(generatedZh)
             .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"")
             .contains("\"generated.payment-quick-pay.056\": \"过期后保留秒数\"")
-            .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
+            .contains("\"generated.payment-quick-pay.057\": \"回单校验\"")
+            .contains("\"generated.payment-proof-review.003\": \"回单校验\"")
+            .contains("\"generated.payment-proof-review.006\": \"回单校验\"");
         assertThat(generatedZh)
             .contains("\"generated.payment-proof-review.039\": \"已确认\"");
         assertThat(generatedEn)
