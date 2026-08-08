@@ -270,3 +270,34 @@
   - Current Proof Review, QuickPay, Present, Records, API, and i18n assets returned `200`.
   - Live Proof Review bundle contains `already_confirmed`.
 - Rollback: restore `/opt/rpb/app/reservation-platform.jar` and `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1523-4d3ed496-paynow-already-confirmed-proof`, then restart `rpb-backend` and reload nginx.
+
+## 2026-08-08 Proof Review Popup Label Patch
+
+- Quick Payment now opens Payment Proof Review in a named popup window instead of navigating away from the terminal page.
+- The Chinese label for Payment Proof Review is now `回单校验` in the Quick Payment entry, the Proof Review top status, and the Proof Review page title.
+- English labels remain `Payment Proof Review`.
+- No backend, API, database, permission, or environment variable change is required.
+
+### Proof Review Popup Label Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `ada31ab1`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-ada31ab1`.
+- Uploaded artifact: `/home/ubuntu/rpb-ada31ab1-frontend.tgz`.
+- Production backup: `/opt/rpb/backups/20260808-1612-ada31ab1-paynow-proof-review-popup`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1612-ada31ab1-paynow-proof-review-popup`.
+- Backend JAR was not changed and `rpb-backend` was not restarted.
+- Verification:
+  - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+  - `git diff --check`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - Current QuickPay, Proof Review, and i18n assets returned `200`.
+  - Live QuickPay bundle contains `rpb-paynow-proof-review` and `popup=yes,width=520,height=900`.
+  - Live i18n bundle contains `回单校验`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1612-ada31ab1-paynow-proof-review-popup/frontend` or switch back to `/opt/rpb/frontend.previous-20260808-1612-ada31ab1-paynow-proof-review-popup`, then reload nginx.
