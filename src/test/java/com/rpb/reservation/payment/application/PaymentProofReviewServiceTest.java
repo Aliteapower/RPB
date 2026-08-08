@@ -70,6 +70,51 @@ class PaymentProofReviewServiceTest {
     }
 
     @Test
+    void autoConfirmsCompactReferenceWhenExtractedReferenceAndAmountMatch() {
+        PaymentProofCandidate candidate = candidate("QP2026080013ACDE", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP2026080013ACDE",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 QP2026080013ACDE 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-001"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("QP2026080013ACDE");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+        assertThat(repository.createdProofStatus).isEqualTo("confirmed");
+        assertThat(repository.createdVerificationStatus).isEqualTo("confirmed");
+    }
+
+    @Test
+    void autoConfirmsCompactReferenceWhenOcrAddsSeparators() {
+        PaymentProofCandidate candidate = candidate("QP2026080013ACDE", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP.202608.0013.ACDE",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9200"),
+            "讯息 QP.202608.0013.ACDE 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-002"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+    }
+
+    @Test
     void noMatchWhenReferenceIsMissing() {
         ocr.fields = new PaymentProofOcrFields(
             null,
