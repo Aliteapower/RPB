@@ -37,4 +37,11 @@ class PaymentReferenceGeneratorTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("payment_reference_prefix_invalid");
     }
+
+    @Test
+    void rejectsSequenceThatExceedsFourDigits() {
+        assertThatThrownBy(() -> PaymentReferenceGenerator.generate("QP", YearMonth.of(2026, 8), 10000))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("payment_reference_sequence_invalid");
+    }
 }

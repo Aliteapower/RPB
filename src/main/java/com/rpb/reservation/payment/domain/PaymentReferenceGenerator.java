@@ -14,7 +14,7 @@ public final class PaymentReferenceGenerator {
 
     public static String generate(String prefix, YearMonth period, int sequence) {
         String cleanPrefix = normalizePrefix(prefix);
-        if (period == null || sequence <= 0 || sequence > 999999) {
+        if (period == null || sequence <= 0 || sequence > 9999) {
             throw new IllegalArgumentException("payment_reference_sequence_invalid");
         }
         String sequenceText = "%04d".formatted(sequence);
