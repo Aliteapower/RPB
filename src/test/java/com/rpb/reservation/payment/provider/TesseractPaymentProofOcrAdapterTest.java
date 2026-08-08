@@ -65,6 +65,27 @@ class TesseractPaymentProofOcrAdapterTest {
     }
 
     @Test
+    void parserExtractsCompactReferenceFromReceiptText() {
+        String raw = """
+            您已支付 1.00 SGD
+            讯息
+            QP2026080013ACDE
+            交易编号：2608080118181271
+            """;
+
+        assertThat(PaymentReferencePattern.extractSystemReference(raw))
+            .contains("QP2026080013ACDE");
+    }
+
+    @Test
+    void parserExtractsCompactReferenceWhenOcrAddsDotsAndSpaces() {
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP.202608.0013.ACDE 您已支付 1.00 SGD"))
+            .contains("QP2026080013ACDE");
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP 202608 0013 ACDE 您已支付 1.00 SGD"))
+            .contains("QP2026080013ACDE");
+    }
+
+    @Test
     void selectsBestOcrAttemptWhenSparseModeFindsExactExpectedReference() {
         List<String> attempts = List.of(
             """

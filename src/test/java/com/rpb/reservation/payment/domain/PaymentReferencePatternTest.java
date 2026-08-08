@@ -33,6 +33,29 @@ class PaymentReferencePatternTest {
     }
 
     @Test
+    void extractsCompactOcrSafeReferenceFromChineseBankReceiptText() {
+        String raw = """
+            您已支付 1.00 SGD
+            讯息
+            QP2026080013ACDE
+            交易编号：2608080118181271
+            """;
+
+        assertThat(PaymentReferencePattern.extractSystemReference(raw))
+            .contains("QP2026080013ACDE");
+    }
+
+    @Test
+    void extractsCompactReferenceWhenOcrAddsSeparators() {
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP2026080013.ACDE 您已支付 1.00 SGD"))
+            .contains("QP2026080013ACDE");
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP 202608 0013 ACDE 您已支付 1.00 SGD"))
+            .contains("QP2026080013ACDE");
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP.202608.0013.ACDE 您已支付 1.00 SGD"))
+            .contains("QP2026080013ACDE");
+    }
+
+    @Test
     void ignoresLongBankTransactionIdWithoutSystemRefShape() {
         String raw = "Transaction ID 20260517TRBUSGSSGBRT7474840 amount SGD 0.10";
 
@@ -43,5 +66,11 @@ class PaymentReferencePatternTest {
     void normalizesCaseWhitespaceAndHyphenSpacing() {
         assertThat(PaymentReferencePattern.normalize(" qp - 202608 - 0040 - 87d0 "))
             .isEqualTo("QP-202608-0040-87D0");
+    }
+
+    @Test
+    void normalizesCompactReferenceSeparators() {
+        assertThat(PaymentReferencePattern.normalize(" qp.202608.0013.acde "))
+            .isEqualTo("QP2026080013ACDE");
     }
 }
