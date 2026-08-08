@@ -108,3 +108,46 @@
 - Patch:
   - Ref parser now treats `.` as an OCR separator only inside a valid system Ref structure, normalizing it back to `-`.
   - Payment Proof Review now has separate actions for camera capture and photo upload, so staff can explicitly upload a bank receipt screenshot from the phone album.
+
+### Upload And Dot-Separator OCR Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `86d302f7`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-86d302f7`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-86d302f7`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-86d302f7.jar`
+  - `/home/ubuntu/rpb-86d302f7-frontend.tgz`
+- Production backup: `/opt/rpb/backups/20260808-1239-86d302f7-paynow-proof-upload-dot-ref`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1239-86d302f7-paynow-proof-upload-dot-ref`.
+- Backend JAR SHA-256: `AE5D6CFC183E1DFB10A5C1731922DC9BF4DC2F3DAE55F4ABAC4CE24CB7A8FE1D`.
+- `rpb-backend`: `active / running`, PID `18320`.
+- OCR runtime confirmed:
+  - `tesseract 5.3.4`
+  - languages: `eng`, `chi_sim`, `osd`
+- Verification:
+  - `mvn -q "-Dtest=TesseractPaymentProofOcrAdapterTest" test`
+  - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
+  - `mvn -q "-Dtest=PaymentReferencePatternTest,PaymentReferenceGeneratorTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewServiceTest,PaymentProofReviewControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm ci`
+  - `npm run build`
+  - `mvn -q -DskipTests package`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentQuickPayPage-DRDQb2oP.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentPresentPage-DB30Z1Kk.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentProofReviewPage-BKzYuXt6.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentProofReviewPage-CsLbw1mw.css` returned `200`.
+  - `https://booking.yumstone.sg/assets/TenantAdminPaymentRecordsPage-Caxa8AMM.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/api-QY9D9Ijj.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/index-BJ2xox1m.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/i18n-B4EanLIg.js` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/proof-review` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - unauthenticated proof candidates endpoint returned `403`.
+  - `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/scan` returned `405`.
+  - Live frontend bundle contains `photoInputRef`, `albumInputRef`, `拍照识别`, `上传照片识别`, `Take photo`, and `Upload photo`.
