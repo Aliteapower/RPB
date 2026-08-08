@@ -176,6 +176,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("showOpenTodayButton")
             .contains("const showOpenTodayButton = computed(() => !businessDayOpen.value)")
             .contains("showEndDayButton")
+            .contains("paymentOptionsOpen")
+            .contains("payment-options-toggle")
+            .contains("payment-options-panel")
             .doesNotContain("displayedBusinessDate.value !== currentBusinessDate.value")
             .contains("sourceType: 'quick_pay'")
             .contains("appendAmountToken")
@@ -204,6 +207,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("openProofReviewWindow")
             .contains("rpb-paynow-proof-review")
             .contains("popup=yes,width=520,height=900")
+            .contains("calc(112px + env(safe-area-inset-bottom))")
+            .contains("max-height: calc(100dvh - 150px)")
             .contains("active-tab=\"payment\"");
         assertThat(proofReview)
             .contains("getPaymentProofCandidates")
@@ -274,6 +279,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"")
             .contains("\"generated.payment-quick-pay.056\": \"过期后保留秒数\"")
             .contains("\"generated.payment-quick-pay.057\": \"回单校验\"")
+            .contains("\"generated.payment-quick-pay.058\": \"收款设置\"")
+            .contains("\"generated.payment-quick-pay.059\": \"展开\"")
+            .contains("\"generated.payment-quick-pay.060\": \"收起\"")
             .contains("\"generated.payment-proof-review.003\": \"回单校验\"")
             .contains("\"generated.payment-proof-review.006\": \"回单校验\"");
         assertThat(generatedZh)
@@ -281,6 +289,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
         assertThat(generatedEn)
             .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"")
             .contains("\"generated.payment-quick-pay.056\": \"Keep after expiry (seconds)\"")
+            .contains("\"generated.payment-quick-pay.058\": \"Payment settings\"")
+            .contains("\"generated.payment-quick-pay.059\": \"Expand\"")
+            .contains("\"generated.payment-quick-pay.060\": \"Collapse\"")
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"");

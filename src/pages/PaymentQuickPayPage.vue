@@ -58,6 +58,7 @@ const createdResult = ref<PaymentIntentCreateResponse | null>(null)
 const amountPresets = ref<string[]>([])
 const presetEditorOpen = ref(false)
 const presetEditorText = ref('')
+const paymentOptionsOpen = ref(false)
 const presentSettings = ref<PaymentPresentSettings>({
   maxPayments: 1,
   qrPerPayment: 1,
@@ -530,48 +531,63 @@ function apiErrorText(error: unknown): string {
     </StaffHomeTopBar>
 
     <section class="payment-body">
-      <div class="terminal-meta">
-        <div>
-          <span>{{ gt('generated.payment-quick-pay.014') }}</span>
-          <strong>{{ normalizedTerminalCode }}</strong>
+      <section class="payment-options-shell">
+        <button
+          class="payment-options-toggle"
+          type="button"
+          :aria-expanded="paymentOptionsOpen"
+          @click="paymentOptionsOpen = !paymentOptionsOpen"
+        >
+          <span>{{ gt('generated.payment-quick-pay.058') }}</span>
+          <strong>{{ normalizedTerminalCode }} · {{ displayedBusinessDate }} · {{ businessDayStatusLabel }}</strong>
+          <em>{{ paymentOptionsOpen ? gt('generated.payment-quick-pay.060') : gt('generated.payment-quick-pay.059') }}</em>
+        </button>
+
+        <div v-if="paymentOptionsOpen" class="payment-options-panel">
+          <div class="terminal-meta">
+            <div>
+              <span>{{ gt('generated.payment-quick-pay.014') }}</span>
+              <strong>{{ normalizedTerminalCode }}</strong>
+            </div>
+            <label>
+              <span>{{ gt('generated.payment-quick-pay.030') }}</span>
+              <input v-model.trim="terminalCode" maxlength="32" />
+            </label>
+          </div>
+
+          <section class="business-day-card" :class="{ 'business-day-card--not-open': !businessDayOpen }">
+            <div>
+              <strong>{{ gt('generated.payment-quick-pay.031') }}</strong>
+              <span>{{ displayedBusinessDate }} · {{ businessDayStatusLabel }}</span>
+            </div>
+            <div class="business-day-actions">
+              <button type="button" class="display-button" :disabled="businessDayLoading" @click="loadPaymentBusinessDay">
+                {{ businessDayLoading ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.047') }}
+              </button>
+              <button
+                v-if="showOpenTodayButton"
+                type="button"
+                class="display-button business-day-open-button"
+                :disabled="openingBusinessDay"
+                @click="openBusinessDayToday"
+              >
+                {{ openingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.048') }}
+              </button>
+              <button
+                v-if="showEndDayButton"
+                type="button"
+                class="display-button business-day-end-button"
+                :disabled="endingBusinessDay"
+                @click="endBusinessDay"
+              >
+                {{ endingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.053') }}
+              </button>
+            </div>
+          </section>
         </div>
-        <label>
-          <span>{{ gt('generated.payment-quick-pay.030') }}</span>
-          <input v-model.trim="terminalCode" maxlength="32" />
-        </label>
-      </div>
+      </section>
 
       <form class="calculator-panel" @submit.prevent="submitQuickPay">
-        <section class="business-day-card" :class="{ 'business-day-card--not-open': !businessDayOpen }">
-          <div>
-            <strong>{{ gt('generated.payment-quick-pay.031') }}</strong>
-            <span>{{ displayedBusinessDate }} · {{ businessDayStatusLabel }}</span>
-          </div>
-          <div class="business-day-actions">
-            <button type="button" class="display-button" :disabled="businessDayLoading" @click="loadPaymentBusinessDay">
-              {{ businessDayLoading ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.047') }}
-            </button>
-            <button
-              v-if="showOpenTodayButton"
-              type="button"
-              class="display-button business-day-open-button"
-              :disabled="openingBusinessDay"
-              @click="openBusinessDayToday"
-            >
-              {{ openingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.048') }}
-            </button>
-            <button
-              v-if="showEndDayButton"
-              type="button"
-              class="display-button business-day-end-button"
-              :disabled="endingBusinessDay"
-              @click="endBusinessDay"
-            >
-              {{ endingBusinessDay ? gt('generated.payment-quick-pay.051') : gt('generated.payment-quick-pay.053') }}
-            </button>
-          </div>
-        </section>
-
         <div class="display-no">
           <span>{{ gt('generated.payment-quick-pay.033') }}</span>
           <strong>{{ displayNumberText }}</strong>
@@ -747,11 +763,57 @@ function apiErrorText(error: unknown): string {
 
 .terminal-meta,
 .calculator-panel,
+.payment-options-shell,
 .recent-panel,
 .preset-editor {
   background: #ffffff;
   border: 1px solid #d6e4e2;
   border-radius: 8px;
+}
+
+.payment-options-shell {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.payment-options-toggle {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe6ef;
+  border-radius: 6px;
+  color: #0f172a;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  min-height: 40px;
+  padding: 7px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.payment-options-toggle span,
+.payment-options-toggle em {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.payment-options-toggle strong {
+  font-size: 0.82rem;
+  font-weight: 950;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-options-panel {
+  display: grid;
+  gap: 8px;
 }
 
 .terminal-meta {
@@ -1027,24 +1089,31 @@ textarea {
   background: rgba(15, 23, 42, 0.42);
   display: flex;
   inset: 0;
-  padding: 16px;
+  overflow-y: auto;
+  padding: 16px 16px calc(112px + env(safe-area-inset-bottom));
   position: fixed;
-  z-index: 30;
+  z-index: 50;
 }
 
 .preset-editor {
   display: grid;
   gap: 12px;
   margin: 0 auto;
+  max-height: calc(100dvh - 150px);
   max-width: 520px;
+  overflow-y: auto;
   padding: 14px;
   width: 100%;
 }
 
 .editor-actions {
+  background: #ffffff;
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  position: sticky;
+  bottom: 0;
+  padding-top: 4px;
 }
 
 .settings-help {
@@ -1122,8 +1191,13 @@ textarea {
 
 @media (max-width: 560px) {
   .terminal-meta,
+  .payment-options-toggle,
   .recent-grid {
     grid-template-columns: 1fr;
+  }
+
+  .payment-options-toggle strong {
+    text-align: left;
   }
 
   .business-day-card {
