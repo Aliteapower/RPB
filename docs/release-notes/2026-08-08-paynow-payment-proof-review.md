@@ -193,3 +193,41 @@
   - unauthenticated proof candidates endpoint returned `403`.
   - `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/scan` returned `405`.
   - Current QuickPay, Present, Proof Review, Records, API, index, and i18n assets returned `200`.
+
+## 2026-08-08 Daily OCR-Safe Reference Patch
+
+- New Quick Payment PayNow references now use `prefix + yyyyMMdd + 4-digit display number + 4-letter OCR-safe check`, for example `QP202608080013YGDN`.
+- Present display Ref now shows the customer-facing `paymentReference`, not the internal `PIT-yyyyMM-sequence` intent number.
+- Payment Proof Review continues to accept already-issued monthly compact references such as `QP2026080015AEDD` and separated legacy variants for active candidate matching.
+- No database migration, permission change, or environment variable change is required.
+
+### Daily OCR-Safe Reference Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `2237df55`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-2237df55`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-2237df55`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-2237df55.jar`
+  - `/home/ubuntu/rpb-2237df55-frontend.tgz`
+- Production backup: `/opt/rpb/backups/20260808-1503-2237df55-paynow-daily-reference`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1503-2237df55-paynow-daily-reference`.
+- Backend JAR SHA-256: `8984cf255ad4fd60886aa3deb17d5daf1a0a0b03f65c5195129c6d9865564d39`.
+- `rpb-backend`: `active / running`, PID `54662`; recent deployment log `ERROR` count: `0`.
+- Verification:
+  - `mvn -q "-Dtest=PaymentReferenceGeneratorTest,PaymentReferencePatternTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewServiceTest,PaymentIntentServiceTest,PaymentProofReviewControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+  - `mvn -q -DskipTests package`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/proof-review` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - unauthenticated proof candidates endpoint returned `403`.
+  - `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/scan` returned `405`.
+  - Current QuickPay, Present, Proof Review, Records, paymentPresentBridge, API, index, and i18n assets returned `200`.
+  - Live Present bundle contains `paymentReference` and no longer contains the old `payload.intentNo` Ref binding.
+- Rollback: restore `/opt/rpb/app/reservation-platform.jar` and `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1503-2237df55-paynow-daily-reference`, then restart `rpb-backend` and reload nginx.
