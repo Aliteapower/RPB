@@ -44,6 +44,7 @@ class PaymentMigrationTest {
               and status = 'active'
               and default_entry_route = '/stores/:storeId/payments'
               and jsonb_exists(config_json -> 'entryPermissions', 'payment.intent.create')
+              and jsonb_exists(config_json -> 'entryPermissions', 'payment.proof.review')
             """)).isEqualTo(1);
 
         assertThat(countWhere("""
@@ -70,7 +71,8 @@ class PaymentMigrationTest {
                         ('payment.settings.manage'),
                         ('payment.intent.view'),
                         ('payment.intent.create'),
-                        ('payment.verification.review')
+                        ('payment.verification.review'),
+                        ('payment.proof.review')
                 )
                 select count(*)
                 from required_permissions permission
@@ -128,7 +130,8 @@ class PaymentMigrationTest {
                         ('payment.settings.manage'),
                         ('payment.intent.view'),
                         ('payment.intent.create'),
-                        ('payment.verification.review')
+                        ('payment.verification.review'),
+                        ('payment.proof.review')
                 )
                 select count(*)
                 from required_permissions permission
@@ -457,7 +460,14 @@ class PaymentMigrationTest {
         }
 
         private void init() {
-            run(command("initdb"), "-A", "trust", "-U", username(), "-D", dataDirectory.toString());
+            run(
+                command("initdb"),
+                "-A", "trust",
+                "-U", username(),
+                "--encoding", "UTF8",
+                "--locale", "C",
+                "-D", dataDirectory.toString()
+            );
         }
 
         private void startServer() {

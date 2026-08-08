@@ -1,6 +1,7 @@
 package com.rpb.reservation.payment.application;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.payment.domain.PaymentReferenceGenerator;
 import com.rpb.reservation.payment.persistence.PaymentIntentRepository;
 import com.rpb.reservation.payment.provider.PayNowQrPayloadBuilder;
 import com.rpb.reservation.payment.provider.PayNowQrPayloadRequest;
@@ -131,7 +132,7 @@ public class PaymentIntentService {
         int displayNumber = command.requestedDisplayNumber() == null
             ? allocatedDisplayNumber + quickPayConfig.dailyStartNumber()
             : allocatedDisplayNumber;
-        String paymentReference = quickPayConfig.referencePrefix() + "-" + periodText + "-" + "%04d".formatted(displayNumber) + "-" + shortToken();
+        String paymentReference = PaymentReferenceGenerator.generate(quickPayConfig.referencePrefix(), period, displayNumber);
         String qrPayload = qrPayloadBuilder.build(new PayNowQrPayloadRequest(
             profile.paynowType(),
             profile.paynowMobile(),

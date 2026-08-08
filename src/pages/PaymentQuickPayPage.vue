@@ -102,6 +102,12 @@ const businessDayStatusLabel = computed(() => {
 })
 const showOpenTodayButton = computed(() => !businessDayOpen.value)
 const showEndDayButton = computed(() => businessDayOpen.value)
+const proofReviewRoute = computed(() => ({
+  name: 'payment-proof-review',
+  params: {
+    storeId: storeId.value
+  }
+}))
 
 onMounted(() => {
   try {
@@ -496,6 +502,9 @@ function apiErrorText(error: unknown): string {
     >
       <template #action>
         <div class="topbar-actions">
+          <RouterLink class="display-button topbar-link" :to="proofReviewRoute">
+            {{ gt('generated.payment-quick-pay.057') }}
+          </RouterLink>
           <button class="display-button" type="button" @click="openPresentWindow">
             {{ gt('generated.payment-quick-pay.029') }}
           </button>
@@ -705,6 +714,12 @@ function apiErrorText(error: unknown): string {
   font-weight: 900;
   min-height: 34px;
   padding: 0 10px;
+}
+
+.topbar-link {
+  align-items: center;
+  display: inline-flex;
+  text-decoration: none;
 }
 
 .topbar-actions {

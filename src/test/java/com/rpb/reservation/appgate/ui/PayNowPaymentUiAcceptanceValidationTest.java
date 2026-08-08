@@ -27,6 +27,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("name: 'tenant-admin-payment-i18n-catalog'")
             .contains("path: '/stores/:storeId/payments'")
             .contains("name: 'payment-quick-pay'")
+            .contains("path: '/stores/:storeId/payments/proof-review'")
+            .contains("name: 'payment-proof-review'")
             .contains("path: '/stores/:storeId/payments/present/:terminalCode'")
             .contains("name: 'payment-present'")
             .contains("path: '/stores/:storeId/payments/display/:sessionNo'")
@@ -105,6 +107,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String settings = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentSettingsPage.vue"));
         String records = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentRecordsPage.vue"));
         String quickPay = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentQuickPayPage.vue"));
+        String proofReview = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentProofReviewPage.vue"));
         String display = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentDisplayPage.vue"));
         String present = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentPresentPage.vue"));
         String presentBridge = FrontendSourceSupport.readString(Path.of("src", "utils", "paymentPresentBridge.ts"));
@@ -116,8 +119,12 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("/tenant-admin/payment/profile")
             .contains("/payments/intents")
             .contains("/payments/business-day")
+            .contains("/payments/proof-review")
             .contains("/quick-pay-records")
             .contains("/sessions/")
+            .contains("getPaymentProofCandidates")
+            .contains("scanPaymentProof")
+            .contains("requestMultipart")
             .contains("getPaymentBusinessDay")
             .contains("openPaymentBusinessDay")
             .contains("endPaymentBusinessDay")
@@ -128,6 +135,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("PaymentIntentCreateRequest")
             .contains("PaymentBusinessDayResponse")
             .contains("PaymentBusinessDayStatus")
+            .contains("PaymentProofScanResponse")
+            .contains("PaymentProofCandidate")
             .contains("PaymentSession");
         assertThat(settings)
             .contains("getPaymentProfile")
@@ -184,10 +193,23 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("MAX_PRESENT_PAYMENTS")
             .contains("formatAppGateErrorMessage")
             .contains("appgate.permission_denied")
+            .contains("payment-proof-review")
             .contains("active-tab=\"payment\"");
+        assertThat(proofReview)
+            .contains("getPaymentProofCandidates")
+            .contains("scanPaymentProof")
+            .contains("generated.payment-proof-review.006")
+            .contains("accept=\"image/png,image/jpeg,image/webp\"")
+            .contains("capture=\"environment\"")
+            .contains("auto_confirmed")
+            .contains("generated.payment-proof-review.028")
+            .contains("active-tab=\"payment\"")
+            .doesNotContain("sidecar")
+            .doesNotContain("payment_runtime");
         assertThat(staffRepository)
             .contains("\"payment.intent.view\"")
-            .contains("\"payment.intent.create\"");
+            .contains("\"payment.intent.create\"")
+            .contains("\"payment.proof.review\"");
         assertThat(display)
             .contains("getPaymentSession")
             .contains("DownloadableQrCode")
@@ -224,9 +246,11 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("120");
         assertThat(generatedZh)
             .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"")
-            .contains("\"generated.payment-quick-pay.056\": \"过期后保留秒数\"");
+            .contains("\"generated.payment-quick-pay.056\": \"过期后保留秒数\"")
+            .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"")
-            .contains("\"generated.payment-quick-pay.056\": \"Keep after expiry (seconds)\"");
+            .contains("\"generated.payment-quick-pay.056\": \"Keep after expiry (seconds)\"")
+            .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
     }
 }

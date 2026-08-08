@@ -165,6 +165,71 @@ export interface QuickPayRecordsResponse {
   summary: QuickPayRecordSummary
 }
 
+export interface PaymentProofCandidate {
+  intentId: string
+  sessionId: string
+  intentNo: string
+  sessionNo: string
+  displayNumber: number
+  businessDate: string
+  amount: string
+  currency: string
+  paymentReference: string
+  intentStatus: string
+  sessionStatus: string
+  terminalCode: string | null
+  cashierName: string | null
+  createdAt: string
+  expiresAt: string
+}
+
+export interface PaymentProofCandidatesQuery {
+  businessDate?: string
+  terminalCode?: string
+  limit?: number
+}
+
+export interface PaymentProofCandidatesResponse {
+  success: true
+  businessDate: string | null
+  candidates: PaymentProofCandidate[]
+}
+
+export interface PaymentProofOcrResult {
+  extractedReference: string | null
+  extractedAmount: string | null
+  extractedPaidAt: string | null
+  bankCode: string | null
+  successDetected: boolean
+  confidence: string | null
+}
+
+export interface PaymentProofChecks {
+  reference: string
+  amount: string
+}
+
+export interface PaymentProofScanResponse {
+  success: true
+  outcome: 'auto_confirmed' | 'needs_review' | 'no_match'
+  replayed: boolean
+  intentId: string | null
+  sessionId: string | null
+  proofId: string | null
+  verificationId: string | null
+  paymentReference: string | null
+  expectedAmount: string | null
+  ocr: PaymentProofOcrResult | null
+  checks: PaymentProofChecks | null
+}
+
+export interface PaymentProofScanRequest {
+  image: File
+  idempotencyKey: string
+  businessDate?: string
+  terminalCode?: string
+}
+
 export interface PaymentApiErrorResponse {
   success: false
   error: {

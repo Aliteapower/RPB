@@ -15,6 +15,7 @@ const PlatformTenantFormPage = () => import('../pages/PlatformTenantFormPage.vue
 const PlatformTenantsPage = () => import('../pages/PlatformTenantsPage.vue')
 const PaymentDisplayPage = () => import('../pages/PaymentDisplayPage.vue')
 const PaymentPresentPage = () => import('../pages/PaymentPresentPage.vue')
+const PaymentProofReviewPage = () => import('../pages/PaymentProofReviewPage.vue')
 const PaymentQuickPayPage = () => import('../pages/PaymentQuickPayPage.vue')
 const PublicBookingPage = () => import('../pages/PublicBookingPage.vue')
 const QueueCallPage = () => import('../pages/QueueCallPage.vue')
@@ -156,6 +157,11 @@ export const router = createRouter({
       path: '/stores/:storeId/payments',
       name: 'payment-quick-pay',
       component: PaymentQuickPayPage
+    },
+    {
+      path: '/stores/:storeId/payments/proof-review',
+      name: 'payment-proof-review',
+      component: PaymentProofReviewPage
     },
     {
       path: '/stores/:storeId/payments/present/:terminalCode',

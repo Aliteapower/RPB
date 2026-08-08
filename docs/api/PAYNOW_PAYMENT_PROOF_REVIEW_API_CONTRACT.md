@@ -1,0 +1,158 @@
+# PayNow Payment Proof Review API Contract
+
+## Purpose
+
+Payment Proof Review lets a payment-enabled store employee upload or capture a PayNow bank receipt screenshot. RPB extracts the RPB-generated Ref and amount, matches them to one active Quick Pay intent in the same tenant/store, and auto-confirms only when both values match.
+
+## Ref Definition
+
+`Ref` is `payment_intents.payment_reference`.
+
+Accepted RPB reference patterns:
+
+- `PIT-202608-0021`
+- `QP-202608-0040-87D0`
+- `AB12-202608-123456-Z9X7`
+
+Ref extraction must ignore bank transaction identifiers such as `Transaction ID`, `Transaction Ref`, `交易编号`, and long non-hyphenated bank ids.
+
+## Endpoints
+
+### GET /api/v1/stores/{storeId}/payments/proof-review/candidates
+
+Permission: `payment.proof.review`
+
+Query:
+
+- `businessDate`: optional ISO date. Defaults to current open payment business day.
+- `terminalCode`: optional exact terminal code.
+- `limit`: optional integer, default `80`, min `1`, max `200`.
+
+Response:
+
+```json
+{
+  "success": true,
+  "businessDate": "2026-08-08",
+  "candidates": [
+    {
+      "intentId": "50000000-0000-0000-0000-000000000001",
+      "sessionId": "60000000-0000-0000-0000-000000000001",
+      "intentNo": "PIT-202608-0021",
+      "sessionNo": "PRS-ABCDEF1234567890",
+      "displayNumber": 21,
+      "paymentReference": "PIT-202608-0021",
+      "amount": "0.10",
+      "currency": "SGD",
+      "intentStatus": "pending",
+      "sessionStatus": "pending",
+      "terminalCode": "T1",
+      "cashierName": "Alice",
+      "createdAt": "2026-08-08T04:10:00Z",
+      "expiresAt": "2026-08-08T04:12:00Z"
+    }
+  ]
+}
+```
+
+### POST /api/v1/stores/{storeId}/payments/proof-review/scan
+
+Permission: `payment.proof.review`
+
+Request: `multipart/form-data`
+
+- `image`: required file, one of `.png`, `.jpg`, `.jpeg`, `.webp`.
+- `idempotencyKey`: required string.
+- `terminalCode`: optional string.
+- `businessDate`: optional ISO date.
+
+Auto-confirm response:
+
+```json
+{
+  "success": true,
+  "outcome": "auto_confirmed",
+  "replayed": false,
+  "intentId": "50000000-0000-0000-0000-000000000001",
+  "sessionId": "60000000-0000-0000-0000-000000000001",
+  "proofId": "70000000-0000-0000-0000-000000000001",
+  "verificationId": "80000000-0000-0000-0000-000000000001",
+  "paymentReference": "PIT-202608-0021",
+  "expectedAmount": "0.10",
+  "ocr": {
+    "extractedReference": "PIT-202608-0021",
+    "extractedAmount": "0.10",
+    "bankCode": "ocbc",
+    "successDetected": true,
+    "confidence": "0.9600"
+  },
+  "checks": {
+    "reference": "match",
+    "amount": "match"
+  }
+}
+```
+
+Review response:
+
+```json
+{
+  "success": true,
+  "outcome": "needs_review",
+  "replayed": false,
+  "intentId": "50000000-0000-0000-0000-000000000001",
+  "sessionId": "60000000-0000-0000-0000-000000000001",
+  "proofId": "70000000-0000-0000-0000-000000000001",
+  "verificationId": "80000000-0000-0000-0000-000000000001",
+  "paymentReference": "PIT-202608-0021",
+  "expectedAmount": "0.10",
+  "ocr": {
+    "extractedReference": "PIT-202608-0021",
+    "extractedAmount": null,
+    "bankCode": "ocbc",
+    "successDetected": true,
+    "confidence": "0.7100"
+  },
+  "checks": {
+    "reference": "match",
+    "amount": "missing"
+  }
+}
+```
+
+No-match response:
+
+```json
+{
+  "success": true,
+  "outcome": "no_match",
+  "replayed": false,
+  "ocr": {
+    "extractedReference": null,
+    "extractedAmount": "0.10",
+    "bankCode": "ocbc",
+    "successDetected": true,
+    "confidence": "0.5200"
+  },
+  "checks": {
+    "reference": "missing",
+    "amount": "not_checked"
+  }
+}
+```
+
+## Error Codes
+
+| HTTP | Code | Meaning |
+|---:|---|---|
+| 400 | `REQUEST_INVALID` | Missing idempotency key, invalid file type, invalid business date, or malformed request. |
+| 400 | `PAYMENT_OCR_UNAVAILABLE` | OCR adapter is not configured or failed before text extraction. |
+| 401 | `UNAUTHENTICATED` | No current actor. |
+| 403 | `FORBIDDEN` | Actor lacks store access or App Gate permission. |
+| 409 | `PAYMENT_INTENT_STATE_CONFLICT` | Matched intent is paid, cancelled, failed, or no longer confirmable. |
+| 409 | `IDEMPOTENCY_CONFLICT` | Same idempotency key was used with a different file digest or scope. |
+| 500 | `PERSISTENCE_ERROR` | Database operation failed. |
+
+## Idempotency
+
+`idempotencyKey` is scoped by tenant. A replay with the same scope and file digest returns the original result with `replayed = true`. A replay with a different file digest returns `IDEMPOTENCY_CONFLICT`.

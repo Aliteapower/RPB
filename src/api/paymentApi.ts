@@ -6,6 +6,10 @@ import type {
   PaymentProfileMutation,
   PaymentProfileResponse,
   PaymentProfileTestQrResponse,
+  PaymentProofCandidatesQuery,
+  PaymentProofCandidatesResponse,
+  PaymentProofScanRequest,
+  PaymentProofScanResponse,
   QuickPayRecordsQuery,
   QuickPayRecordsResponse,
   QuickPayTerminalConfigResponse,
@@ -85,6 +89,39 @@ export async function getQuickPayRecords(
   return requestJson(`${intentEndpoint(storeId)}/quick-pay-records${suffix}`, { method: 'GET', fetcher })
 }
 
+export async function getPaymentProofCandidates(
+  storeId: string,
+  query: PaymentProofCandidatesQuery = {},
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofCandidatesResponse> {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    const text = String(value ?? '').trim()
+    if (text) {
+      params.set(key, text)
+    }
+  })
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return requestJson(`${proofReviewEndpoint(storeId)}/candidates${suffix}`, { method: 'GET', fetcher })
+}
+
+export async function scanPaymentProof(
+  storeId: string,
+  request: PaymentProofScanRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofScanResponse> {
+  const form = new FormData()
+  form.set('image', request.image)
+  form.set('idempotencyKey', request.idempotencyKey)
+  if (request.businessDate?.trim()) {
+    form.set('businessDate', request.businessDate.trim())
+  }
+  if (request.terminalCode?.trim()) {
+    form.set('terminalCode', request.terminalCode.trim())
+  }
+  return requestMultipart(`${proofReviewEndpoint(storeId)}/scan`, form, fetcher)
+}
+
 export async function getPaymentBusinessDay(
   storeId: string,
   fetcher?: PaymentFetcher
@@ -129,6 +166,10 @@ function businessDayEndpoint(storeId: string): string {
   return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/business-day`
 }
 
+function proofReviewEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/proof-review`
+}
+
 async function requestJson<T>(
   endpoint: string,
   options: {
@@ -146,11 +187,39 @@ async function requestJson<T>(
   }
 
   const payload = await readJson(response)
-  if (!response.ok || isPaymentApiErrorResponse(payload)) {
-    throw new PaymentApiError(
-      response.status,
-      isPaymentApiErrorResponse(payload) ? payload : unknownError(response.status)
-    )
+  const apiError = normalizePaymentApiErrorResponse(payload)
+  if (!response.ok || apiError) {
+    throw new PaymentApiError(response.status, apiError ?? unknownError(response.status))
+  }
+
+  return payload as T
+}
+
+async function requestMultipart<T>(endpoint: string, body: FormData, fetcher?: PaymentFetcher): Promise<T> {
+  let response: TextResponse
+
+  try {
+    const sender = fetcher ?? resolveFetch()
+    if (sender) {
+      response = await sender(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json'
+        },
+        body
+      })
+    } else {
+      response = await xhrMultipartRequest(endpoint, body)
+    }
+  } catch {
+    throw new PaymentApiError(0, unknownError())
+  }
+
+  const payload = await readJson(response)
+  const apiError = normalizePaymentApiErrorResponse(payload)
+  if (!response.ok || apiError) {
+    throw new PaymentApiError(response.status, apiError ?? unknownError(response.status))
   }
 
   return payload as T
@@ -220,6 +289,25 @@ function xhrRequest(
   })
 }
 
+function xhrMultipartRequest(endpoint: string, body: FormData): Promise<TextResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', endpoint, true)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: async () => xhr.responseText
+      })
+    }
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
+    xhr.send(body)
+  })
+}
+
 async function readJson(response: TextResponse): Promise<unknown> {
   const text = await response.text()
   if (!text) {
@@ -233,17 +321,37 @@ async function readJson(response: TextResponse): Promise<unknown> {
   }
 }
 
-function isPaymentApiErrorResponse(payload: unknown): payload is PaymentApiErrorResponse {
+function normalizePaymentApiErrorResponse(payload: unknown): PaymentApiErrorResponse | null {
   if (!payload || typeof payload !== 'object') {
-    return false
+    return null
   }
 
   const candidate = payload as Partial<PaymentApiErrorResponse>
-  return (
+  if (
     candidate.success === false &&
     typeof candidate.error?.code === 'string' &&
     typeof candidate.error.messageKey === 'string'
-  )
+  ) {
+    return candidate as PaymentApiErrorResponse
+  }
+
+  const flat = payload as {
+    success?: unknown
+    code?: unknown
+    message?: unknown
+  }
+  if (flat.success === false && typeof flat.code === 'string') {
+    return {
+      success: false,
+      error: {
+        code: flat.code,
+        messageKey: typeof flat.message === 'string' ? flat.message : flat.code,
+        details: {}
+      }
+    }
+  }
+
+  return null
 }
 
 function unknownError(httpStatus?: number): PaymentApiErrorResponse {
