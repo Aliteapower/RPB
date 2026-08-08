@@ -129,9 +129,14 @@ public class PaymentIntentService {
         String intentNo = "PIT-" + periodText + "-" + "%04d".formatted(sequence);
         LocalDate businessDate = businessDayService.currentOrOpenToday(scope).businessDate();
         int allocatedDisplayNumber = repository.allocateDisplayNumber(scope, businessDate, command.requestedDisplayNumber());
-        int displayNumber = command.requestedDisplayNumber() == null
-            ? allocatedDisplayNumber + quickPayConfig.dailyStartNumber()
+        long computedDisplayNumber = command.requestedDisplayNumber() == null
+            ? (long) allocatedDisplayNumber + quickPayConfig.dailyStartNumber()
             : allocatedDisplayNumber;
+        if (computedDisplayNumber > Integer.MAX_VALUE
+            || !PaymentReferenceGenerator.isValidSequence((int) computedDisplayNumber)) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        int displayNumber = (int) computedDisplayNumber;
         String paymentReference = PaymentReferenceGenerator.generate(quickPayConfig.referencePrefix(), period, displayNumber);
         String qrPayload = qrPayloadBuilder.build(new PayNowQrPayloadRequest(
             profile.paynowType(),
@@ -182,7 +187,9 @@ public class PaymentIntentService {
             || !METHOD_PAYNOW.equals(command.method())
             || command.amount() == null
             || command.amount().compareTo(BigDecimal.ZERO) <= 0
-            || !CURRENCY_SGD.equals(command.currency())) {
+            || !CURRENCY_SGD.equals(command.currency())
+            || (command.requestedDisplayNumber() != null
+                && !PaymentReferenceGenerator.isValidSequence(command.requestedDisplayNumber()))) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         }
     }

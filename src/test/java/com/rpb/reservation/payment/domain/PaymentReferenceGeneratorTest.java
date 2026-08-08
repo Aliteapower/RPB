@@ -28,7 +28,15 @@ class PaymentReferenceGeneratorTest {
         String first = PaymentReferenceGenerator.generate("QP", YearMonth.of(2026, 8), 13);
         String second = PaymentReferenceGenerator.generate("qp", YearMonth.of(2026, 8), 13);
 
+        assertThat(first).isEqualTo("QP2026080013AAHP");
         assertThat(second).isEqualTo(first);
+    }
+
+    @Test
+    void validatesCompactReferencePeriodSequenceAndCheckSegment() {
+        assertThat(PaymentReferenceGenerator.isValidCompactReference("QP2026080013AAHP")).isTrue();
+        assertThat(PaymentReferenceGenerator.isValidCompactReference("QP2026080013AAHA")).isFalse();
+        assertThat(PaymentReferenceGenerator.isValidCompactReference("QP2026130013FYHC")).isFalse();
     }
 
     @Test

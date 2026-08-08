@@ -85,7 +85,7 @@ class PaymentIntentServiceTest {
         assertThat(result.replayed()).isFalse();
         assertThat(result.intent().sourceType()).isEqualTo("quick_pay");
         assertThat(result.intent().intentNo()).isEqualTo("PIT-202608-0001");
-        assertThat(result.intent().paymentReference()).matches("QP-202608-0001-[A-Z0-9]{4}");
+        assertThat(result.intent().paymentReference()).matches("QP2026080001[ACDEFGHJKMNPQRTVWXY]{4}");
         assertThat(result.session().displayNumber()).isEqualTo(1);
         assertThat(result.session().businessDate()).isEqualTo(LocalDate.parse("2026-08-04"));
         assertThat(result.session().sessionNo()).startsWith("PRS-");
@@ -221,9 +221,52 @@ class PaymentIntentServiceTest {
             "{}"
         ), actor);
 
-        assertThat(result.intent().paymentReference()).matches("AB-202608-0011-[A-Z0-9]{4}");
+        assertThat(result.intent().paymentReference()).matches("AB2026080011[ACDEFGHJKMNPQRTVWXY]{4}");
         assertThat(result.session().displayNumber()).isEqualTo(11);
         assertThat(result.nextDisplayNumber()).isEqualTo(12);
+    }
+
+    @Test
+    void rejectsRequestedDisplayNumberAboveCompactReferenceLimitWithBusinessError() {
+        assertThatThrownBy(() -> service.createQuickPay(scope, new PaymentIntentCreateCommand(
+            "quick-pay-display-overflow-requested",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("5.00"),
+            "SGD",
+            "COUNTER-1",
+            "Alice",
+            10000,
+            "{}"
+        ), actor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting("code")
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void rejectsAutomaticDisplayNumberOverflowWithBusinessError() {
+        when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfileWithConfig(
+            "{\"quickPay\":{\"referencePrefix\":\"QP\",\"dailyStartNumber\":9999}}"
+        )));
+        repository.allocatedDisplayNumber = 1;
+
+        assertThatThrownBy(() -> service.createQuickPay(scope, new PaymentIntentCreateCommand(
+            "quick-pay-display-overflow-auto",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("5.00"),
+            "SGD",
+            "COUNTER-1",
+            "Alice",
+            null,
+            "{}"
+        ), actor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting("code")
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
     }
 
     @Test
@@ -370,6 +413,7 @@ class PaymentIntentServiceTest {
         private LocalDate allocatedBusinessDate;
         private List<QuickPayRecord> quickPayRecords = List.of();
         private QuickPayRecordQuery lastRecordQuery;
+        private int allocatedDisplayNumber = 1;
 
         @Override
         public Optional<PaymentIntentCreateResult> findCreateResultByIdempotencyKey(StoreScope scope, String idempotencyKey) {
@@ -397,7 +441,7 @@ class PaymentIntentServiceTest {
         @Override
         public int allocateDisplayNumber(StoreScope scope, java.time.LocalDate businessDate, Integer requestedDisplayNumber) {
             allocatedBusinessDate = businessDate;
-            return requestedDisplayNumber == null ? 1 : requestedDisplayNumber;
+            return requestedDisplayNumber == null ? allocatedDisplayNumber : requestedDisplayNumber;
         }
 
         @Override

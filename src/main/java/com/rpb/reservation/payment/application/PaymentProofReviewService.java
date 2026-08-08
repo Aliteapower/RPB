@@ -68,7 +68,8 @@ public class PaymentProofReviewService {
     ) {
         PaymentProofOcrFields fields = extract(command);
         String extractedRef = PaymentReferencePattern.normalize(fields.extractedReference());
-        if (extractedRef.isBlank()) {
+        List<String> referenceVariants = PaymentReferencePattern.lookupVariants(extractedRef);
+        if (referenceVariants.isEmpty()) {
             return repository.createNoMatchResult(
                 scope,
                 command,
@@ -79,7 +80,12 @@ public class PaymentProofReviewService {
             );
         }
 
-        return repository.findActiveCandidateByReference(scope, extractedRef, command.businessDate(), command.terminalCode())
+        return repository.findUniqueActiveCandidateByReferences(
+            scope,
+            referenceVariants,
+            command.businessDate(),
+            command.terminalCode()
+        )
             .map(candidate -> matchedResult(scope, command, actor, fileDigest, fields, extractedRef, candidate))
             .orElseGet(() -> repository.createNoMatchResult(
                 scope,
@@ -100,7 +106,7 @@ public class PaymentProofReviewService {
         String extractedRef,
         PaymentProofCandidate candidate
     ) {
-        String referenceCheck = extractedRef.equals(PaymentReferencePattern.normalize(candidate.paymentReference()))
+        String referenceCheck = PaymentReferencePattern.matches(extractedRef, candidate.paymentReference())
             ? "match"
             : "mismatch";
         String amountCheck = amountMatches(fields.extractedAmount(), candidate.amount())

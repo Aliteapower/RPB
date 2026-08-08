@@ -3,18 +3,28 @@ package com.rpb.reservation.payment.domain;
 import java.nio.charset.StandardCharsets;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 
 public final class PaymentReferenceGenerator {
-    private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
+    private static final int MAX_SEQUENCE = 9999;
+    private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("uuuuMM")
+        .withResolverStyle(ResolverStyle.STRICT);
     private static final char[] CHECK_ALPHABET = "ACDEFGHJKMNPQRTVWXY".toCharArray();
+    private static final Pattern COMPACT_REFERENCE = Pattern.compile(
+        "([A-Z0-9]{2,8})(\\d{6})(\\d{4})([ACDEFGHJKMNPQRTVWXY]{4})"
+    );
 
     private PaymentReferenceGenerator() {
     }
 
     public static String generate(String prefix, YearMonth period, int sequence) {
         String cleanPrefix = normalizePrefix(prefix);
-        if (period == null || sequence <= 0 || sequence > 9999) {
+        if (period == null || !isValidSequence(sequence)) {
             throw new IllegalArgumentException("payment_reference_sequence_invalid");
         }
         String sequenceText = "%04d".formatted(sequence);
@@ -22,8 +32,27 @@ public final class PaymentReferenceGenerator {
         return base + checksum(base);
     }
 
+    public static boolean isValidSequence(int sequence) {
+        return sequence > 0 && sequence <= MAX_SEQUENCE;
+    }
+
+    public static boolean isValidCompactReference(String value) {
+        String reference = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        Matcher matcher = COMPACT_REFERENCE.matcher(reference);
+        if (!matcher.matches() || !isValidSequence(Integer.parseInt(matcher.group(3)))) {
+            return false;
+        }
+        try {
+            YearMonth.parse(matcher.group(2), PERIOD_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            return false;
+        }
+        String base = reference.substring(0, reference.length() - 4);
+        return checksum(base).equals(matcher.group(4));
+    }
+
     private static String normalizePrefix(String prefix) {
-        String clean = prefix == null ? "" : prefix.trim().toUpperCase();
+        String clean = prefix == null ? "" : prefix.trim().toUpperCase(Locale.ROOT);
         if (!clean.matches("[A-Z0-9]{2,8}")) {
             throw new IllegalArgumentException("payment_reference_prefix_invalid");
         }

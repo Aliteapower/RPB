@@ -69,20 +69,28 @@ class TesseractPaymentProofOcrAdapterTest {
         String raw = """
             您已支付 1.00 SGD
             讯息
-            QP2026080013ACDE
+            QP2026080013AAHP
             交易编号：2608080118181271
             """;
 
         assertThat(PaymentReferencePattern.extractSystemReference(raw))
-            .contains("QP2026080013ACDE");
+            .contains("QP2026080013AAHP");
     }
 
     @Test
     void parserExtractsCompactReferenceWhenOcrAddsDotsAndSpaces() {
-        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP.202608.0013.ACDE 您已支付 1.00 SGD"))
-            .contains("QP2026080013ACDE");
-        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP 202608 0013 ACDE 您已支付 1.00 SGD"))
-            .contains("QP2026080013ACDE");
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP.202608.0013.AAHP 您已支付 1.00 SGD"))
+            .contains("QP2026080013AAHP");
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP 202608 0013 AAHP 您已支付 1.00 SGD"))
+            .contains("QP2026080013AAHP");
+    }
+
+    @Test
+    void parserSkipsCompactShapedBankTransactionIdBeforeValidReference() {
+        String raw = "Transaction ID TR2608080118ACDE Ref QP2026080013AAHP";
+
+        assertThat(PaymentReferencePattern.extractSystemReference(raw))
+            .contains("QP2026080013AAHP");
     }
 
     @Test

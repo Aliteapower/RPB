@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -88,17 +89,22 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
     }
 
     @Override
-    public Optional<PaymentProofCandidate> findActiveCandidateByReference(
+    public Optional<PaymentProofCandidate> findUniqueActiveCandidateByReferences(
         StoreScope scope,
-        String paymentReference,
+        List<String> paymentReferences,
         LocalDate businessDate,
         String terminalCode
     ) {
+        if (paymentReferences == null || paymentReferences.isEmpty()) {
+            return Optional.empty();
+        }
         StringBuilder sql = candidateSql();
         List<Object> args = candidateArgs(scope);
         appendCandidateFilters(sql, args, businessDate, terminalCode);
-        sql.append(" and upper(i.payment_reference) = upper(?) order by s.created_at desc limit 2");
-        args.add(paymentReference);
+        sql.append(" and upper(i.payment_reference) in (")
+            .append(String.join(", ", Collections.nCopies(paymentReferences.size(), "upper(?)")))
+            .append(") order by s.created_at desc limit 2");
+        args.addAll(paymentReferences);
         List<PaymentProofCandidate> rows = jdbc.query(sql.toString(), (rs, rowNum) -> mapCandidate(rs), args.toArray());
         return rows.size() == 1 ? Optional.of(rows.get(0)) : Optional.empty();
     }

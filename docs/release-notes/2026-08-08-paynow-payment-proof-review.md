@@ -154,8 +154,10 @@
 
 ## 2026-08-08 OCR-Safe Reference Format Patch
 
-- New PayNow payment references use compact separator-free format such as `QP2026080013ACDE`.
+- New PayNow payment references use compact separator-free format such as `QP2026080013AAHP`.
 - The 4-character check segment uses OCR-safe letters from `ACDEFGHJKMNPQRTVWXY`.
 - The check segment excludes `O`, `I`, `L`, `B`, `S`, `Z`, and digits to reduce screen-to-screen OCR confusion.
-- Existing separated references remain accepted by Payment Proof Review.
+- Compact OCR candidates are accepted only when their `yyyyMM`, four-digit sequence, and CRC-derived check segment are valid; invalid compact-shaped transaction IDs are skipped while extraction continues.
+- Existing separated references remain accepted by Payment Proof Review through compact and separated lookup variants, with automatic matching limited to one unique active candidate.
+- Requested or automatically allocated display numbers above `9999` now return the stable `REQUEST_INVALID` business error before reference generation.
 - No database migration, permission change, or PayNow QR payload schema change is required.

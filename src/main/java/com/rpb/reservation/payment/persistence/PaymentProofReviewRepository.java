@@ -20,9 +20,9 @@ public interface PaymentProofReviewRepository {
 
     List<PaymentProofCandidate> findCandidates(StoreScope scope, LocalDate businessDate, String terminalCode, int limit);
 
-    Optional<PaymentProofCandidate> findActiveCandidateByReference(
+    Optional<PaymentProofCandidate> findUniqueActiveCandidateByReferences(
         StoreScope scope,
-        String paymentReference,
+        List<String> paymentReferences,
         LocalDate businessDate,
         String terminalCode
     );
