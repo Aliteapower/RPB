@@ -61,3 +61,41 @@
   - File upload remains available as fallback.
   - OCR extraction now retries multiple page segmentation modes and chooses the best parsed fields.
   - Ref parsing accepts OCR spaces inside a system Ref without joining unrelated amount or page text.
+
+### Scan Accuracy Patch Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `7af0bf9d`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-7af0bf9d`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-7af0bf9d`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-7af0bf9d.jar`
+  - `/home/ubuntu/rpb-7af0bf9d-frontend.tgz`
+- Production backup: `/opt/rpb/backups/20260808-1156-7af0bf9d-paynow-proof-scan-accuracy`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260808-1156-7af0bf9d-paynow-proof-scan-accuracy`.
+- Backend JAR SHA-256: `B908E7AAF4BEE9C254C21C4AFE5785DDA18E54DDB82A6D0C18C1914269935767`.
+- `rpb-backend`: `active / running`, PID `6393`.
+- Flyway current schema: `053`; no migration necessary.
+- OCR runtime confirmed:
+  - `tesseract 5.3.4`
+  - languages: `eng`, `chi_sim`, `osd`
+- Verification:
+  - `mvn -q "-Dtest=PaymentReferencePatternTest,PaymentReferenceGeneratorTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewServiceTest,PaymentProofReviewControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm ci`
+  - `npm run build`
+  - `mvn -q -DskipTests package`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200` and loaded `/assets/index-DSIu7fNL.js`.
+  - `https://booking.yumstone.sg/assets/PaymentQuickPayPage-DvwNsFO0.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentPresentPage-BatqzUOB.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentProofReviewPage-By4r_Ef4.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/TenantAdminPaymentRecordsPage-BXjHHGeB.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/api-DlUiuggT.js` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000983/payments/proof-review` returned `200`.
+  - `/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records` returned `200`.
+  - `/api/v1/auth/me` returned `401`.
+  - unauthenticated proof candidates endpoint returned `403`.
+  - Host-prefix proof-review route returned `200`.
