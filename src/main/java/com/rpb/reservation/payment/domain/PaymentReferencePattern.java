@@ -10,29 +10,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class PaymentReferencePattern {
+    private static final String REFERENCE_DATE = "\\d{6}(?:\\d{2})?";
     private static final String OCR_SAFE_CHECK = "[ACDEFGHJKMNPQRTVWXY]{4}";
     private static final Pattern COMPACT_SYSTEM_REFERENCE = Pattern.compile(
-        "\\b([A-Z0-9]{2,8}\\d{6}\\d{4}" + OCR_SAFE_CHECK + ")\\b",
-        Pattern.CASE_INSENSITIVE
-    );
-    private static final Pattern COMPACT_REFERENCE_SEGMENTS = Pattern.compile(
-        "^([A-Z0-9]{2,8})-?(\\d{6})-?(\\d{4})-?(" + OCR_SAFE_CHECK + ")$",
+        "\\b([A-Z0-9]{2,8}" + REFERENCE_DATE + "\\d{4}" + OCR_SAFE_CHECK + ")\\b",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern COMPACT_SYSTEM_REFERENCE_WITH_OCR_SEPARATORS = Pattern.compile(
-        "\\b([A-Z0-9]{2,8}(?:\\s*[-.]?\\s*)\\d{6}(?:\\s*[-.]?\\s*)\\d{4}(?:\\s*[-.]?\\s*)[ACDEFGHJKMNPQRTVWXY](?:\\s*[ACDEFGHJKMNPQRTVWXY]){3})\\b",
+        "\\b([A-Z0-9]{2,8}(?:\\s*[-.]?\\s*)" + REFERENCE_DATE + "(?:\\s*[-.]?\\s*)\\d{4}(?:\\s*[-.]?\\s*)[ACDEFGHJKMNPQRTVWXY](?:\\s*[ACDEFGHJKMNPQRTVWXY]){3})\\b",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SYSTEM_REFERENCE = Pattern.compile(
-        "\\b([A-Z0-9]{2,8}-\\d{6}-\\d{3,6}(?:-[A-Z0-9]{3,8})?)\\b",
+        "\\b([A-Z0-9]{2,8}-" + REFERENCE_DATE + "-\\d{3,6}(?:-[A-Z0-9]{3,8})?)\\b",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SYSTEM_REFERENCE_WITH_OCR_SPACES = Pattern.compile(
-        "\\b([A-Z0-9]{2,8}(?:\\s*[-.]\\s*|\\s+)\\d{6}(?:\\s*[-.]\\s*|\\s+)\\d(?:\\s*\\d){2,5}(?:(?:\\s*[-.]\\s*|\\s+)[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
+        "\\b([A-Z0-9]{2,8}(?:\\s*[-.]\\s*|\\s+)" + REFERENCE_DATE + "(?:\\s*[-.]\\s*|\\s+)\\d(?:\\s*\\d){2,5}(?:(?:\\s*[-.]\\s*|\\s+)[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern LEGACY_SYSTEM_REFERENCE_WITH_SPACES = Pattern.compile(
-        "^([A-Z0-9]{2,8})\\s+(\\d{6})\\s+(\\d(?:\\s*\\d){2,5})(?:\\s+([A-Z0-9](?:\\s*[A-Z0-9]){2,7}))?$",
+        "^([A-Z0-9]{2,8})\\s+(" + REFERENCE_DATE + ")\\s+(\\d(?:\\s*\\d){2,5})(?:\\s+([A-Z0-9](?:\\s*[A-Z0-9]){2,7}))?$",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -74,11 +71,14 @@ public final class PaymentReferencePattern {
         Set<String> variants = new LinkedHashSet<>();
         variants.add(normalized);
         String compact = normalized.replace("-", "");
-        Matcher matcher = COMPACT_REFERENCE_SEGMENTS.matcher(compact);
-        if (matcher.matches()) {
+        PaymentReferenceGenerator.compactReferenceParts(compact).ifPresent(parts -> {
             variants.add(compact);
-            variants.add(String.join("-", matcher.group(1), matcher.group(2), matcher.group(3), matcher.group(4)));
-        }
+            variants.add(String.join("-", parts.prefix(), parts.dateSegment(), parts.sequenceText(), parts.checkSegment()));
+        });
+        looseCompactReferenceParts(compact).ifPresent(parts -> {
+            variants.add(compact);
+            variants.add(String.join("-", parts.prefix(), parts.dateSegment(), parts.sequenceText(), parts.checkSegment()));
+        });
         return List.copyOf(variants);
     }
 
@@ -117,6 +117,40 @@ public final class PaymentReferencePattern {
 
     private static boolean isValidCompactCandidate(String candidate) {
         return PaymentReferenceGenerator.isValidCompactReference(candidate.replace("-", ""));
+    }
+
+    private static Optional<PaymentReferenceGenerator.CompactReferenceParts> looseCompactReferenceParts(String value) {
+        return looseCompactReferenceParts(value, 8)
+            .or(() -> looseCompactReferenceParts(value, 6));
+    }
+
+    private static Optional<PaymentReferenceGenerator.CompactReferenceParts> looseCompactReferenceParts(
+        String value,
+        int dateLength
+    ) {
+        String compact = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        int checkStart = compact.length() - 4;
+        int sequenceStart = checkStart - 4;
+        int dateStart = sequenceStart - dateLength;
+        if (dateStart < 2 || dateStart > 8) {
+            return Optional.empty();
+        }
+        String prefix = compact.substring(0, dateStart);
+        String dateSegment = compact.substring(dateStart, sequenceStart);
+        String sequenceText = compact.substring(sequenceStart, checkStart);
+        String checkSegment = compact.substring(checkStart);
+        if (!prefix.matches("[A-Z0-9]{2,8}")
+            || !dateSegment.matches(REFERENCE_DATE)
+            || !sequenceText.matches("\\d{4}")
+            || !checkSegment.matches(OCR_SAFE_CHECK)) {
+            return Optional.empty();
+        }
+        return Optional.of(new PaymentReferenceGenerator.CompactReferenceParts(
+            prefix,
+            dateSegment,
+            sequenceText,
+            checkSegment
+        ));
     }
 
     private static String normalizeHyphens(String value) {

@@ -137,7 +137,7 @@ public class PaymentIntentService {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         }
         int displayNumber = (int) computedDisplayNumber;
-        String paymentReference = PaymentReferenceGenerator.generate(quickPayConfig.referencePrefix(), period, displayNumber);
+        String paymentReference = PaymentReferenceGenerator.generate(quickPayConfig.referencePrefix(), businessDate, displayNumber);
         String qrPayload = qrPayloadBuilder.build(new PayNowQrPayloadRequest(
             profile.paynowType(),
             profile.paynowMobile(),

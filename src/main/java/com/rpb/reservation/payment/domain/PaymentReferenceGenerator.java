@@ -1,25 +1,34 @@
 package com.rpb.reservation.payment.domain;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Optional;
 import java.util.zip.CRC32;
 
 public final class PaymentReferenceGenerator {
     private static final int MAX_SEQUENCE = 9999;
+    private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("uuuuMMdd")
+        .withResolverStyle(ResolverStyle.STRICT);
     private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("uuuuMM")
         .withResolverStyle(ResolverStyle.STRICT);
     private static final char[] CHECK_ALPHABET = "ACDEFGHJKMNPQRTVWXY".toCharArray();
-    private static final Pattern COMPACT_REFERENCE = Pattern.compile(
-        "([A-Z0-9]{2,8})(\\d{6})(\\d{4})([ACDEFGHJKMNPQRTVWXY]{4})"
-    );
 
     private PaymentReferenceGenerator() {
+    }
+
+    public static String generate(String prefix, LocalDate businessDate, int sequence) {
+        String cleanPrefix = normalizePrefix(prefix);
+        if (businessDate == null || !isValidSequence(sequence)) {
+            throw new IllegalArgumentException("payment_reference_sequence_invalid");
+        }
+        String sequenceText = "%04d".formatted(sequence);
+        String base = cleanPrefix + businessDate.format(DAY_FORMATTER) + sequenceText;
+        return base + checksum(base);
     }
 
     public static String generate(String prefix, YearMonth period, int sequence) {
@@ -37,18 +46,55 @@ public final class PaymentReferenceGenerator {
     }
 
     public static boolean isValidCompactReference(String value) {
+        return compactReferenceParts(value).isPresent();
+    }
+
+    static Optional<CompactReferenceParts> compactReferenceParts(String value) {
         String reference = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
-        Matcher matcher = COMPACT_REFERENCE.matcher(reference);
-        if (!matcher.matches() || !isValidSequence(Integer.parseInt(matcher.group(3)))) {
-            return false;
+        if (!reference.matches("[A-Z0-9]{2,8}\\d{10}(?:\\d{2})?[ACDEFGHJKMNPQRTVWXY]{4}")) {
+            return Optional.empty();
         }
+        return compactReferenceParts(reference, 8)
+            .or(() -> compactReferenceParts(reference, 6));
+    }
+
+    private static Optional<CompactReferenceParts> compactReferenceParts(String reference, int dateLength) {
+        int checkStart = reference.length() - 4;
+        int sequenceStart = checkStart - 4;
+        int dateStart = sequenceStart - dateLength;
+        if (dateStart < 2 || dateStart > 8) {
+            return Optional.empty();
+        }
+        String prefix = reference.substring(0, dateStart);
+        String dateSegment = reference.substring(dateStart, sequenceStart);
+        String sequenceText = reference.substring(sequenceStart, checkStart);
+        String checkSegment = reference.substring(checkStart);
+        if (!prefix.matches("[A-Z0-9]{2,8}") || !isValidSequence(Integer.parseInt(sequenceText))) {
+            return Optional.empty();
+        }
+        if (!isValidDateSegment(dateSegment)) {
+            return Optional.empty();
+        }
+        String base = reference.substring(0, checkStart);
+        return checksum(base).equals(checkSegment)
+            ? Optional.of(new CompactReferenceParts(prefix, dateSegment, sequenceText, checkSegment))
+            : Optional.empty();
+    }
+
+    private static boolean isValidDateSegment(String dateSegment) {
         try {
-            YearMonth.parse(matcher.group(2), PERIOD_FORMATTER);
+            if (dateSegment.length() == 8) {
+                LocalDate.parse(dateSegment, DAY_FORMATTER);
+                return true;
+            }
+            if (dateSegment.length() == 6) {
+                YearMonth.parse(dateSegment, PERIOD_FORMATTER);
+                return true;
+            }
         } catch (DateTimeParseException exception) {
             return false;
         }
-        String base = reference.substring(0, reference.length() - 4);
-        return checksum(base).equals(matcher.group(4));
+        return false;
     }
 
     private static String normalizePrefix(String prefix) {
@@ -69,5 +115,8 @@ public final class PaymentReferenceGenerator {
             value = value / CHECK_ALPHABET.length;
         }
         return new String(out);
+    }
+
+    record CompactReferenceParts(String prefix, String dateSegment, String sequenceText, String checkSegment) {
     }
 }

@@ -155,7 +155,7 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
           <header class="payment-head">
             <div class="present-ref">
               <span>{{ gt('generated.payment-present.005') }}</span>
-              <strong>{{ payload.intentNo }}</strong>
+              <strong>{{ payload.paymentReference }}</strong>
             </div>
             <div class="present-amount">
               <span>{{ payload.currency }}</span>

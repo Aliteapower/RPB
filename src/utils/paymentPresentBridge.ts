@@ -29,6 +29,7 @@ export interface PaymentPresentPayload {
   terminalCode: string
   sessionNo: string
   intentNo: string
+  paymentReference: string
   displayNumber: number
   businessDate: string
   status: string
@@ -41,6 +42,7 @@ export interface PaymentPresentPayload {
 export interface PaymentPresentRecentItem {
   sessionNo: string
   intentNo: string
+  paymentReference: string
   displayNumber: number
   amount: string
   currency: string
@@ -89,6 +91,7 @@ export function buildPaymentPresentPayload(
     terminalCode: normalizeTerminalCode(terminalCode),
     sessionNo: response.session.sessionNo,
     intentNo: response.intent.intentNo,
+    paymentReference: response.intent.paymentReference,
     displayNumber: response.session.displayNumber,
     businessDate: response.session.businessDate,
     status: response.session.status || response.intent.status || 'pending',
@@ -328,6 +331,7 @@ export function pushPaymentPresentRecent(payload: PaymentPresentPayload): Paymen
   const item: PaymentPresentRecentItem = {
     sessionNo: payload.sessionNo,
     intentNo: payload.intentNo,
+    paymentReference: payload.paymentReference,
     displayNumber: payload.displayNumber,
     amount: payload.amount,
     currency: payload.currency,
@@ -405,6 +409,7 @@ function parsePaymentPresentPayload(value: unknown): PaymentPresentPayload | nul
     terminalCode: normalizeTerminalCode(String(source.terminalCode || '')),
     sessionNo: String(source.sessionNo || ''),
     intentNo: String(source.intentNo || ''),
+    paymentReference: String(source.paymentReference || source.intentNo || ''),
     displayNumber: Number(source.displayNumber || 0),
     businessDate: String(source.businessDate || ''),
     status: String(source.status || 'pending'),
@@ -452,6 +457,7 @@ function parseRecentItem(value: unknown): PaymentPresentRecentItem | null {
   const item: PaymentPresentRecentItem = {
     sessionNo: String(source.sessionNo || ''),
     intentNo: String(source.intentNo || ''),
+    paymentReference: String(source.paymentReference || source.intentNo || ''),
     displayNumber: Number(source.displayNumber || 0),
     amount: String(source.amount || ''),
     currency: String(source.currency || 'SGD'),

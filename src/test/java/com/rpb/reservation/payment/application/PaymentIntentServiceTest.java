@@ -85,7 +85,8 @@ class PaymentIntentServiceTest {
         assertThat(result.replayed()).isFalse();
         assertThat(result.intent().sourceType()).isEqualTo("quick_pay");
         assertThat(result.intent().intentNo()).isEqualTo("PIT-202608-0001");
-        assertThat(result.intent().paymentReference()).matches("QP2026080001[ACDEFGHJKMNPQRTVWXY]{4}");
+        assertThat(result.intent().paymentReference()).matches("QP202608040001[ACDEFGHJKMNPQRTVWXY]{4}");
+        assertThat(result.intent().paymentReference()).isEqualTo("QP202608040001XRTD");
         assertThat(result.session().displayNumber()).isEqualTo(1);
         assertThat(result.session().businessDate()).isEqualTo(LocalDate.parse("2026-08-04"));
         assertThat(result.session().sessionNo()).startsWith("PRS-");
@@ -221,7 +222,7 @@ class PaymentIntentServiceTest {
             "{}"
         ), actor);
 
-        assertThat(result.intent().paymentReference()).matches("AB2026080011[ACDEFGHJKMNPQRTVWXY]{4}");
+        assertThat(result.intent().paymentReference()).matches("AB202608050011[ACDEFGHJKMNPQRTVWXY]{4}");
         assertThat(result.session().displayNumber()).isEqualTo(11);
         assertThat(result.nextDisplayNumber()).isEqualTo(12);
     }

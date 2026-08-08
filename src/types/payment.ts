@@ -43,6 +43,7 @@ export interface PaymentIntent {
   method: PaymentMethod
   amount: string
   currency: string
+  paymentReference: string
   status: string
   terminalCode: string | null
   cashierName: string | null

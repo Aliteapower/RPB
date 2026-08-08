@@ -72,23 +72,23 @@ class PaymentProofReviewServiceTest {
 
     @Test
     void autoConfirmsCompactReferenceWhenExtractedReferenceAndAmountMatch() {
-        PaymentProofCandidate candidate = candidate("QP2026080013AAHP", new BigDecimal("1.00"));
+        PaymentProofCandidate candidate = candidate("QP202608080013YGDN", new BigDecimal("1.00"));
         repository.candidate = Optional.of(candidate);
         ocr.fields = new PaymentProofOcrFields(
-            "QP2026080013AAHP",
+            "QP202608080013YGDN",
             new BigDecimal("1.00"),
             null,
             "ocbc",
             true,
             new BigDecimal("0.9600"),
-            "讯息 QP2026080013AAHP 您已支付 1.00 SGD",
+            "讯息 QP202608080013YGDN 您已支付 1.00 SGD",
             "{}"
         );
 
         PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-001"), actor);
 
         assertThat(result.outcome()).isEqualTo("auto_confirmed");
-        assertThat(result.paymentReference()).isEqualTo("QP2026080013AAHP");
+        assertThat(result.paymentReference()).isEqualTo("QP202608080013YGDN");
         assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
         assertThat(repository.createdProofStatus).isEqualTo("confirmed");
         assertThat(repository.createdVerificationStatus).isEqualTo("confirmed");
@@ -96,22 +96,44 @@ class PaymentProofReviewServiceTest {
 
     @Test
     void autoConfirmsCompactReferenceWhenOcrAddsSeparators() {
-        PaymentProofCandidate candidate = candidate("QP2026080013AAHP", new BigDecimal("1.00"));
+        PaymentProofCandidate candidate = candidate("QP202608080013YGDN", new BigDecimal("1.00"));
         repository.candidate = Optional.of(candidate);
         ocr.fields = new PaymentProofOcrFields(
-            "QP.202608.0013.AAHP",
+            "QP.20260808.0013.YGDN",
             new BigDecimal("1.00"),
             null,
             "ocbc",
             true,
             new BigDecimal("0.9200"),
-            "讯息 QP.202608.0013.AAHP 您已支付 1.00 SGD",
+            "讯息 QP.20260808.0013.YGDN 您已支付 1.00 SGD",
             "{}"
         );
 
         PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-002"), actor);
 
         assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+    }
+
+    @Test
+    void autoConfirmsPreviouslyIssuedMonthCompactReference() {
+        PaymentProofCandidate candidate = candidate("QP2026080015AEDD", new BigDecimal("2.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP2026080015AEDD",
+            new BigDecimal("2.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9300"),
+            "讯息 QP2026080015AEDD 您已支付 2.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-legacy-month-001"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("QP2026080015AEDD");
         assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
     }
 
