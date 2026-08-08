@@ -12,3 +12,39 @@
 
 - `mvn -q "-Dtest=PaymentReferencePatternTest,PaymentReferenceGeneratorTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewServiceTest,JdbcPaymentProofReviewRepositoryTest,PaymentProofReviewControllerTest,PaymentProofReviewMigrationTest,PaymentMigrationTest,PaymentIntentServiceTest,PaymentIntentControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`
 - `npm run build`
+
+## Production Deployment
+
+- Deployment date: 2026-08-08.
+- Deployed commit: `09190935`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Backend artifact built from clean worktree `target/deploy-worktree-09190935`.
+- Frontend artifact built from clean worktree `target/deploy-worktree-09190935`.
+- Uploaded artifacts:
+  - `/home/ubuntu/rpb-09190935.jar`
+  - `/home/ubuntu/rpb-09190935-frontend.tgz`
+- Backend backup: `/opt/rpb/backups/20260808-1114-09190935-paynow-proof-review/reservation-platform.jar`.
+- Frontend backup: `/opt/rpb/backups/20260808-1114-09190935-paynow-proof-review/frontend`.
+- Backend JAR SHA-256: `570EC2C51E796210FF75D74A5D551F0CFED2A777135FC041FAD803CE1111894B`.
+- Flyway latest: `053|paynow payment proof review permissions|true`.
+- `rpb-backend`: `active / running`, PID `4187696`.
+- OCR runtime installed on production host:
+  - `/usr/bin/tesseract`
+  - `tesseract 5.3.4`
+  - languages: `eng`, `chi_sim`
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200` and loaded `/assets/index-B8R5LVlL.js`.
+  - `https://booking.yumstone.sg/assets/index-B8R5LVlL.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentQuickPayPage-DeKdfmR8.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentPresentPage-VPj0iUIs.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/PaymentProofReviewPage-BthRpO9S.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/TenantAdminPaymentRecordsPage-fPeRA0jh.js` returned `200`.
+  - `https://booking.yumstone.sg/assets/api-C-7tmKP9.js` returned `200`.
+  - `https://booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments` returned `200`.
+  - `https://booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments/present/T1` returned `200`.
+  - `https://booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments/proof-review` returned `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/admin/payment/records` returned `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me` returned `401`.
+  - Unauthenticated `GET /api/v1/stores/20000000-0000-0000-0000-000000000983/payments/proof-review/candidates` returned `403`, confirming the proof-review API is protected.
+  - Host-prefix proof-review route returned `200`: `https://20000000.booking.yumstone.sg/stores/20000000-0000-0000-0000-000000000983/payments/proof-review`.
+- Backend startup logs show Flyway applied V053 and `ReservationPlatformApplication` started.
