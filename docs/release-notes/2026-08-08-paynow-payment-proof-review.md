@@ -99,3 +99,12 @@
   - `/api/v1/auth/me` returned `401`.
   - unauthenticated proof candidates endpoint returned `403`.
   - Host-prefix proof-review route returned `200`.
+
+## 2026-08-08 Upload And Dot-Separator OCR Patch
+
+- Reproduced the new samples against production Tesseract:
+  - Direct bank screenshot sample reads `QP-202608-0013-2KZ6` and `1.00 SGD`.
+  - Browser/photo sample can read the same Ref as `QP-202608-0013.2Kz6` or `QP-202608.0013.2Kz6`.
+- Patch:
+  - Ref parser now treats `.` as an OCR separator only inside a valid system Ref structure, normalizing it back to `-`.
+  - Payment Proof Review now has separate actions for camera capture and photo upload, so staff can explicitly upload a bank receipt screenshot from the phone album.

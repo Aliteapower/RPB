@@ -38,6 +38,8 @@ const selectedFile = ref<File | null>(null)
 const previewUrl = ref('')
 const scanResult = ref<PaymentProofScanResponse | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
+const photoInputRef = ref<HTMLInputElement | null>(null)
+const albumInputRef = ref<HTMLInputElement | null>(null)
 let candidateSequence = 0
 let scannerStream: MediaStream | null = null
 let scannerTimer: number | undefined
@@ -117,12 +119,21 @@ async function loadCandidates(): Promise<void> {
 function onFileSelected(event: Event): void {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] || null
+  input.value = ''
   selectedFile.value = file
   scanResult.value = null
   revokePreview()
   if (file) {
     previewUrl.value = URL.createObjectURL(file)
   }
+}
+
+function openPhotoCapture(): void {
+  photoInputRef.value?.click()
+}
+
+function openAlbumPicker(): void {
+  albumInputRef.value?.click()
 }
 
 async function submitScan(): Promise<void> {
@@ -390,10 +401,32 @@ function apiErrorText(error: unknown): string {
 
         <p v-if="cameraError" class="empty-line">{{ cameraError }}</p>
 
-        <label class="upload-target">
-          <input accept="image/png,image/jpeg,image/webp" capture="environment" type="file" @change="onFileSelected" />
-          <span>{{ selectedFile ? selectedFile.name : gt('generated.payment-proof-review.010') }}</span>
-        </label>
+        <div class="upload-actions">
+          <button class="secondary-button" type="button" :disabled="scanning" @click="openPhotoCapture">
+            {{ gt('generated.payment-proof-review.037') }}
+          </button>
+          <button class="secondary-button" type="button" :disabled="scanning" @click="openAlbumPicker">
+            {{ gt('generated.payment-proof-review.038') }}
+          </button>
+        </div>
+
+        <input
+          ref="photoInputRef"
+          accept="image/png,image/jpeg,image/webp"
+          capture="environment"
+          class="file-input"
+          type="file"
+          @change="onFileSelected"
+        />
+        <input
+          ref="albumInputRef"
+          accept="image/png,image/jpeg,image/webp"
+          class="file-input"
+          type="file"
+          @change="onFileSelected"
+        />
+
+        <p class="selected-file">{{ selectedFile ? selectedFile.name : gt('generated.payment-proof-review.010') }}</p>
 
         <img v-if="previewUrl" class="preview-image" :src="previewUrl" alt="" />
 
@@ -646,25 +679,47 @@ input {
   padding: 6px 10px;
 }
 
-.upload-target {
+.upload-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.secondary-button {
   align-items: center;
-  border: 1px dashed #94a3b8;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
   border-radius: 8px;
   color: #0f172a;
   cursor: pointer;
-  display: grid;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.82rem;
   font-weight: 900;
-  justify-items: center;
+  justify-content: center;
   min-height: 76px;
   padding: 12px;
   text-align: center;
 }
 
-.upload-target input {
+.file-input {
   height: 1px;
   opacity: 0;
   position: absolute;
   width: 1px;
+}
+
+.selected-file {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 850;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  text-align: center;
 }
 
 .preview-image {

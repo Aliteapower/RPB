@@ -10,7 +10,7 @@ public final class PaymentReferencePattern {
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SYSTEM_REFERENCE_WITH_OCR_SPACES = Pattern.compile(
-        "\\b([A-Z0-9]{2,8}\\s*-\\s*\\d{6}\\s*-\\s*\\d(?:\\s*\\d){2,5}(?:\\s*-\\s*[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
+        "\\b([A-Z0-9]{2,8}\\s*[-.]\\s*\\d{6}\\s*[-.]\\s*\\d(?:\\s*\\d){2,5}(?:\\s*[-.]\\s*[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -37,7 +37,7 @@ public final class PaymentReferencePattern {
     public static String normalize(String value) {
         String text = value == null ? "" : value.trim().toUpperCase();
         text = normalizeHyphens(text);
-        text = text.replaceAll("\\s*-\\s*", "-");
+        text = text.replaceAll("\\s*[-.]\\s*", "-");
         text = text.replaceAll("\\s+", "");
         text = text.replaceAll("^[^A-Z0-9]+|[^A-Z0-9]+$", "");
         return text;

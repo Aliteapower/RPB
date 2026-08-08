@@ -1532,6 +1532,8 @@ export const generatedZhCN: Record<string, string> = {
   "generated.payment-proof-review.034": "打开摄像头中",
   "generated.payment-proof-review.035": "无法打开摄像头，请允许浏览器使用相机或改用上传",
   "generated.payment-proof-review.036": "停止扫描",
+  "generated.payment-proof-review.037": "拍照识别",
+  "generated.payment-proof-review.038": "上传照片识别",
   "generated.payment-present.001": "门店 {shortId}",
   "generated.payment-present.002": "默认门店",
   "generated.payment-present.003": "Quick Payment",

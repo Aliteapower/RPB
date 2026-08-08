@@ -1532,6 +1532,8 @@ export const generatedEnSG: Record<string, string> = {
   "generated.payment-proof-review.034": "Opening camera",
   "generated.payment-proof-review.035": "Unable to open the camera. Allow browser camera access or use upload.",
   "generated.payment-proof-review.036": "Stop scan",
+  "generated.payment-proof-review.037": "Take photo",
+  "generated.payment-proof-review.038": "Upload photo",
   "generated.payment-present.001": "Store {shortId}",
   "generated.payment-present.002": "Default store",
   "generated.payment-present.003": "Quick Payment",

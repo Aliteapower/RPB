@@ -57,6 +57,14 @@ class TesseractPaymentProofOcrAdapterTest {
     }
 
     @Test
+    void parserExtractsReferenceWhenOcrReadsSeparatorsAsDots() {
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP-202608-0013.2Kz6 您已支付 1.00 SGD"))
+            .contains("QP-202608-0013-2KZ6");
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP-202608.0013.2Kz6 您已支付 1.00 SGD"))
+            .contains("QP-202608-0013-2KZ6");
+    }
+
+    @Test
     void selectsBestOcrAttemptWhenSparseModeFindsExactExpectedReference() {
         List<String> attempts = List.of(
             """
