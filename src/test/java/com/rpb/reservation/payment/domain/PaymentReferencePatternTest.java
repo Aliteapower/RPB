@@ -33,6 +33,12 @@ class PaymentReferencePatternTest {
     }
 
     @Test
+    void extractsLegacyReferenceWhenOcrUsesSpacesBetweenSegments() {
+        assertThat(PaymentReferencePattern.extractSystemReference("讯息 QP 202608 0013 2KZ6 您已支付 1.00 SGD"))
+            .contains("QP-202608-0013-2KZ6");
+    }
+
+    @Test
     void extractsCompactOcrSafeReferenceFromChineseBankReceiptText() {
         String raw = """
             您已支付 1.00 SGD
@@ -66,6 +72,18 @@ class PaymentReferencePatternTest {
     void normalizesCaseWhitespaceAndHyphenSpacing() {
         assertThat(PaymentReferencePattern.normalize(" qp - 202608 - 0040 - 87d0 "))
             .isEqualTo("QP-202608-0040-87D0");
+    }
+
+    @Test
+    void keepsHyphensForExplicitlySeparatedLegacyReference() {
+        assertThat(PaymentReferencePattern.normalize("QP-202608-0013-ACDE"))
+            .isEqualTo("QP-202608-0013-ACDE");
+    }
+
+    @Test
+    void normalizesLegacyReferenceWhenOcrUsesSpacesBetweenSegments() {
+        assertThat(PaymentReferencePattern.normalize("qp 202608 0013 2kz6"))
+            .isEqualTo("QP-202608-0013-2KZ6");
     }
 
     @Test

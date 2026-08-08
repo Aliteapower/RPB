@@ -19,7 +19,11 @@ public final class PaymentReferencePattern {
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SYSTEM_REFERENCE_WITH_OCR_SPACES = Pattern.compile(
-        "\\b([A-Z0-9]{2,8}\\s*[-.]\\s*\\d{6}\\s*[-.]\\s*\\d(?:\\s*\\d){2,5}(?:\\s*[-.]\\s*[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
+        "\\b([A-Z0-9]{2,8}(?:\\s*[-.]\\s*|\\s+)\\d{6}(?:\\s*[-.]\\s*|\\s+)\\d(?:\\s*\\d){2,5}(?:(?:\\s*[-.]\\s*|\\s+)[A-Z0-9](?:\\s*[A-Z0-9]){2,7})?)\\b",
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern LEGACY_SYSTEM_REFERENCE_WITH_SPACES = Pattern.compile(
+        "^([A-Z0-9]{2,8})\\s+(\\d{6})\\s+(\\d(?:\\s*\\d){2,5})(?:\\s+([A-Z0-9](?:\\s*[A-Z0-9]){2,7}))?$",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -48,11 +52,21 @@ public final class PaymentReferencePattern {
     public static String normalize(String value) {
         String text = value == null ? "" : value.trim().toUpperCase();
         text = normalizeHyphens(text);
+        boolean hasExplicitHyphen = text.contains("-");
         String separatorNormalized = text.replaceAll("\\s*[-.]\\s*", "-").replaceAll("\\s+", "");
         separatorNormalized = separatorNormalized.replaceAll("^[^A-Z0-9]+|[^A-Z0-9]+$", "");
         String compactCandidate = separatorNormalized.replace("-", "");
-        if (COMPACT_SYSTEM_REFERENCE.matcher(compactCandidate).matches()) {
+        if (!hasExplicitHyphen && COMPACT_SYSTEM_REFERENCE.matcher(compactCandidate).matches()) {
             return compactCandidate;
+        }
+        Matcher legacyWithSpaces = LEGACY_SYSTEM_REFERENCE_WITH_SPACES.matcher(text);
+        if (legacyWithSpaces.matches()) {
+            String normalized = legacyWithSpaces.group(1) + "-" + legacyWithSpaces.group(2) + "-"
+                + legacyWithSpaces.group(3).replaceAll("\\s+", "");
+            if (legacyWithSpaces.group(4) != null) {
+                normalized += "-" + legacyWithSpaces.group(4).replaceAll("\\s+", "");
+            }
+            return normalized;
         }
         return separatorNormalized;
     }
