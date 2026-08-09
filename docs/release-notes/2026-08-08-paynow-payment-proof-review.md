@@ -333,3 +333,28 @@
   - Live QuickPay CSS contains `calc(112px + env(safe-area-inset-bottom))` and `max-height: calc(100dvh - 150px)`.
   - Live i18n bundle contains `收款设置` and `展开`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260808-1712-8cc0d140-quickpay-focused-input/frontend` or switch back to `/opt/rpb/frontend.previous-20260808-1712-8cc0d140-quickpay-focused-input`, then reload nginx.
+
+## 2026-08-09 Proof Review Success Audio Patch
+
+- 回单校验扫码返回 `auto_confirmed` 或 `already_confirmed` 后，浏览器使用语音播报 `收款 {Display No} 成功`；如果无法匹配 Display No，则播报 `收款成功`。
+- 成功结果卡片的操作按钮改为 `关闭并扫下一笔`，点击后清空当前结果、刷新待验证列表，并重新打开扫码器，方便连续处理下一张银行回单。
+- No backend, API, database, permission, or environment variable change is required.
+
+### Proof Review Success Audio Patch Deployment
+
+- Deployment date: 2026-08-09.
+- Deployed commit: `b9e40065`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Uploaded artifact: `/tmp/rpb-b9e40065-frontend.tgz`.
+- Production backup: `/opt/rpb/backups/20260809-1027-b9e40065-proof-review-success-audio-frontend`.
+- Backend JAR was not changed and `rpb-backend` was not restarted.
+- Verification:
+  - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`：3 tests，0 failures，0 errors
+  - `npm run build`：passed
+  - `git diff --check`：passed with CRLF warnings only
+- Production smoke:
+  - `https://booking.yumstone.sg/login` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000001/payments` returned `200`.
+  - `/stores/20000000-0000-0000-0000-000000000001/payments/proof-review` returned `200`.
+  - `PaymentProofReviewPage-C9qBrRxx.js`, `PaymentQuickPayPage-Fafxi6Pj.js`, and `i18n-DXmxVrrm.js` returned `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260809-1027-b9e40065-proof-review-success-audio-frontend/frontend.tgz`, then reload nginx.
