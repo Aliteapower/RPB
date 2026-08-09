@@ -79,3 +79,17 @@
   - `/stores/20000000-0000-0000-0000-000000000001/payments`：200
   - `/stores/20000000-0000-0000-0000-000000000001/payments/proof-review`：200
   - `PaymentPresentPage-Cg6VkvBA.js`、`PaymentProofReviewPage-Ri-leWIw.js`、`PaymentQuickPayPage-B5qBbMyK.js`：200
+
+## Deployment Update: Confirmed Recent Removal
+
+- 功能提交：`9f362432 fix: remove confirmed paynow recent item`
+- 变更：Quick Payment 手动确认成功后，从 Quick Payment 与顾客展示屏的 Recent Display Numbers 队列移除该单，不再显示 `paid` 卡片等待保留时间结束。
+- 验证：
+  - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`：3 tests，0 failures，0 errors
+  - `npm run build`：通过
+- 前端生产备份：`/opt/rpb/backups/20260809-1020-9f362432-paynow-confirm-remove-recent-frontend`
+- 线上 smoke：
+  - `/login`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments/present/T1`：200
+  - `paymentPresentBridge-CUqysdMh.js`、`PaymentQuickPayPage-BjLBwMLb.js`、`PaymentPresentPage-DmtHub_W.js`：200
