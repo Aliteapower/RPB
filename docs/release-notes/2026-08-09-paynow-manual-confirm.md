@@ -50,3 +50,16 @@
   - `/stores/20000000-0000-0000-0000-000000000001/payments/proof-review`：200
   - `PaymentQuickPayPage-C2vFzTOL.js`、`paymentPresentBridge-DYcbGADv.js`、`api-DakOu-cN.js`：200
   - unauthenticated manual-confirm endpoint：403 `PERMISSION_DENIED`，确认路由已上线且受 App Gate 保护
+
+## Deployment Update: Recent Ref Display
+
+- 功能提交：`1b14d087 fix: show quickpay recent ref`
+- 变更：Quick Payment 的 Recent Display Numbers 卡片显示该单 Ref，便于员工核对回单。
+- 验证：
+  - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`：3 tests，0 failures，0 errors
+  - `npm run build`：通过
+- 前端生产备份：`/opt/rpb/backups/20260809-0918-1b14d087-quickpay-recent-ref-frontend`
+- 线上 smoke：
+  - `/login`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments`：200
+  - `PaymentQuickPayPage-BN4bqWSe.js`、`PaymentQuickPayPage-cC4WPumi.css`：200
