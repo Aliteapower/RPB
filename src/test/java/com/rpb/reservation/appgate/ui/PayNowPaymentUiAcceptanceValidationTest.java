@@ -362,4 +362,25 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-proof-review.041\": \"Payment confirmed\"")
             .contains("\"generated.payment-proof-review.028\": \"Close and scan next\"");
     }
+
+    @Test
+    void payNowProofTemplatePlatformLibraryApiAndTypesAreWired() throws Exception {
+        String api = FrontendSourceSupport.readString(Path.of("src", "api", "paymentApi.ts"));
+        String types = FrontendSourceSupport.readString(Path.of("src", "types", "payment.ts"));
+
+        assertThat(api)
+            .contains("getPlatformPaymentProofTemplates")
+            .contains("createPlatformPaymentProofTemplate")
+            .contains("updatePlatformPaymentProofTemplate")
+            .contains("suggestPlatformPaymentProofTemplateRule")
+            .contains("getPlatformPaymentProofTemplateContributions")
+            .contains("acceptPlatformPaymentProofTemplateContribution")
+            .contains("rejectPlatformPaymentProofTemplateContribution")
+            .contains("getPaymentProofTemplateContributions")
+            .contains("submitPaymentProofTemplateContribution")
+            .contains("suggestPaymentProofTemplateRule");
+        assertThat(types)
+            .contains("PaymentProofTemplateContribution")
+            .contains("PaymentProofTemplateRuleSuggestionResponse");
+    }
 }

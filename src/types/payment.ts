@@ -294,6 +294,74 @@ export interface PaymentProofTemplateTestScanResponse {
   } | null
 }
 
+export interface PaymentProofTemplateContribution {
+  id: string
+  tenantId: string
+  storeId: string | null
+  sourceTemplateId: string | null
+  platformTemplateId: string | null
+  bankCode: string
+  bankName: string
+  locale: string
+  templateName: string
+  layoutJson: string
+  sampleFileName: string | null
+  sampleContentType: string | null
+  sampleFileDigest: string | null
+  sampleRawText: string | null
+  sampleOcrReference: string | null
+  sampleOcrAmount: string | null
+  status: 'submitted' | 'accepted' | 'rejected' | 'withdrawn'
+  reviewNote: string | null
+  version: number
+  createdAt: string
+  updatedAt: string
+  reviewedAt: string | null
+}
+
+export interface PaymentProofTemplateContributionMutation {
+  sourceTemplateId?: string | null
+  bankCode: string
+  bankName: string
+  locale: string
+  templateName: string
+  layoutJson: string
+  sampleFileName?: string | null
+  sampleContentType?: string | null
+  sampleFileDigest?: string | null
+  sampleRawText?: string | null
+  sampleOcrReference?: string | null
+  sampleOcrAmount?: string | null
+}
+
+export interface PaymentProofTemplateContributionReviewRequest {
+  platformTemplateId?: string | null
+  reviewNote?: string | null
+  version: number
+}
+
+export interface PaymentProofTemplateContributionsResponse {
+  success: true
+  contributions: PaymentProofTemplateContribution[]
+}
+
+export interface PaymentProofTemplateContributionResponse {
+  success: true
+  contribution: PaymentProofTemplateContribution
+}
+
+export interface PaymentProofTemplateRuleSuggestionResponse {
+  success: true
+  suggestion: {
+    bankCode: string
+    bankName: string
+    locale: string
+    templateName: string
+    suggestedLayoutJson: string
+    ocr: PaymentProofTemplateTestScanResponse['ocr']
+  }
+}
+
 export interface PaymentApiErrorResponse {
   success: false
   error: {

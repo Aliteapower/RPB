@@ -16,6 +16,11 @@ import type {
   PaymentProofTemplateResponse,
   PaymentProofTemplatesResponse,
   PaymentProofTemplateTestScanResponse,
+  PaymentProofTemplateContributionMutation,
+  PaymentProofTemplateContributionResponse,
+  PaymentProofTemplateContributionsResponse,
+  PaymentProofTemplateContributionReviewRequest,
+  PaymentProofTemplateRuleSuggestionResponse,
   QuickPayRecordsQuery,
   QuickPayRecordsResponse,
   QuickPayTerminalConfigResponse,
@@ -179,6 +184,105 @@ export async function testScanPaymentProofTemplate(
   return requestMultipart(`${proofTemplatesEndpoint(storeId)}/test-scan`, form, fetcher)
 }
 
+export async function getPlatformPaymentProofTemplates(
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplatesResponse> {
+  return requestJson(platformProofTemplatesEndpoint(), { method: 'GET', fetcher })
+}
+
+export async function createPlatformPaymentProofTemplate(
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(platformProofTemplatesEndpoint(), { method: 'POST', body: request, fetcher })
+}
+
+export async function updatePlatformPaymentProofTemplate(
+  templateId: string,
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(`${platformProofTemplatesEndpoint()}/${encodeURIComponent(templateId)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function suggestPlatformPaymentProofTemplateRule(
+  image: File,
+  metadata: { bankCode?: string; bankName?: string; locale?: string } = {},
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateRuleSuggestionResponse> {
+  return requestPaymentProofTemplateRuleSuggestion(
+    `${platformProofTemplatesEndpoint()}/rule-suggestions`,
+    image,
+    metadata,
+    fetcher
+  )
+}
+
+export async function getPlatformPaymentProofTemplateContributions(
+  status?: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionsResponse> {
+  const suffix = status?.trim() ? `?status=${encodeURIComponent(status.trim())}` : ''
+  return requestJson(`${platformProofTemplateContributionsEndpoint()}${suffix}`, { method: 'GET', fetcher })
+}
+
+export async function acceptPlatformPaymentProofTemplateContribution(
+  contributionId: string,
+  request: PaymentProofTemplateContributionReviewRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionResponse> {
+  return requestJson(`${platformProofTemplateContributionsEndpoint()}/${encodeURIComponent(contributionId)}/accept`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function rejectPlatformPaymentProofTemplateContribution(
+  contributionId: string,
+  request: PaymentProofTemplateContributionReviewRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionResponse> {
+  return requestJson(`${platformProofTemplateContributionsEndpoint()}/${encodeURIComponent(contributionId)}/reject`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function getPaymentProofTemplateContributions(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionsResponse> {
+  return requestJson(proofTemplateContributionsEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function submitPaymentProofTemplateContribution(
+  storeId: string,
+  request: PaymentProofTemplateContributionMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionResponse> {
+  return requestJson(proofTemplateContributionsEndpoint(storeId), { method: 'POST', body: request, fetcher })
+}
+
+export async function suggestPaymentProofTemplateRule(
+  storeId: string,
+  image: File,
+  metadata: { bankCode?: string; bankName?: string; locale?: string } = {},
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateRuleSuggestionResponse> {
+  return requestPaymentProofTemplateRuleSuggestion(
+    `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-template-rule-suggestions`,
+    image,
+    metadata,
+    fetcher
+  )
+}
+
 export async function getPaymentBusinessDay(
   storeId: string,
   fetcher?: PaymentFetcher
@@ -229,6 +333,34 @@ function proofReviewEndpoint(storeId: string): string {
 
 function proofTemplatesEndpoint(storeId: string): string {
   return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-templates`
+}
+
+function platformProofTemplatesEndpoint(): string {
+  return '/api/v1/platform/payment/proof-templates'
+}
+
+function platformProofTemplateContributionsEndpoint(): string {
+  return '/api/v1/platform/payment/proof-template-contributions'
+}
+
+function proofTemplateContributionsEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-template-contributions`
+}
+
+function requestPaymentProofTemplateRuleSuggestion(
+  endpoint: string,
+  image: File,
+  metadata: { bankCode?: string; bankName?: string; locale?: string },
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateRuleSuggestionResponse> {
+  const form = new FormData()
+  form.set('image', image)
+  Object.entries(metadata).forEach(([key, value]) => {
+    if (value?.trim()) {
+      form.set(key, value.trim())
+    }
+  })
+  return requestMultipart(endpoint, form, fetcher)
 }
 
 async function requestJson<T>(
