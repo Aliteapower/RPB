@@ -239,8 +239,14 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("generated.payment-proof-review.006")
             .contains("accept=\"image/png,image/jpeg,image/webp\"")
             .contains("capture=\"environment\"")
+            .contains("successfulDisplayNumber")
+            .contains("speakPaymentSuccess")
+            .contains("SpeechSynthesisUtterance")
+            .contains("prepareNextScan")
             .contains("generated.payment-proof-review.037")
             .contains("generated.payment-proof-review.038")
+            .contains("generated.payment-proof-review.040")
+            .contains("generated.payment-proof-review.041")
             .contains("auto_confirmed")
             .contains("already_confirmed")
             .contains("generated.payment-proof-review.028")
@@ -306,7 +312,10 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-proof-review.003\": \"回单校验\"")
             .contains("\"generated.payment-proof-review.006\": \"回单校验\"");
         assertThat(generatedZh)
-            .contains("\"generated.payment-proof-review.039\": \"已确认\"");
+            .contains("\"generated.payment-proof-review.039\": \"已确认\"")
+            .contains("\"generated.payment-proof-review.040\": \"收款 {displayNumber} 成功\"")
+            .contains("\"generated.payment-proof-review.041\": \"收款成功\"")
+            .contains("\"generated.payment-proof-review.028\": \"关闭并扫下一笔\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-quick-pay.055\": \"Waiting for customer payment\"")
             .contains("\"generated.payment-quick-pay.056\": \"Keep after expiry (seconds)\"")
@@ -318,6 +327,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-quick-pay.063\": \"Payment manually confirmed: {displayNumber}\"")
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
         assertThat(generatedEn)
-            .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"");
+            .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"")
+            .contains("\"generated.payment-proof-review.040\": \"Payment {displayNumber} confirmed\"")
+            .contains("\"generated.payment-proof-review.041\": \"Payment confirmed\"")
+            .contains("\"generated.payment-proof-review.028\": \"Close and scan next\"");
     }
 }

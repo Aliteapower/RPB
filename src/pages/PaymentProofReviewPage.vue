@@ -37,6 +37,7 @@ const errorText = ref('')
 const selectedFile = ref<File | null>(null)
 const previewUrl = ref('')
 const scanResult = ref<PaymentProofScanResponse | null>(null)
+const successfulDisplayNumber = ref<number | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const photoInputRef = ref<HTMLInputElement | null>(null)
 const albumInputRef = ref<HTMLInputElement | null>(null)
@@ -77,6 +78,7 @@ onBeforeUnmount(() => {
 
 watch(storeId, () => {
   scanResult.value = null
+  successfulDisplayNumber.value = null
   void loadCandidates()
 })
 
@@ -130,6 +132,7 @@ function onFileSelected(event: Event): void {
   input.value = ''
   selectedFile.value = file
   scanResult.value = null
+  successfulDisplayNumber.value = null
   revokePreview()
   if (file) {
     previewUrl.value = URL.createObjectURL(file)
@@ -159,6 +162,7 @@ async function startScanner(): Promise<void> {
   cameraError.value = ''
   errorText.value = ''
   scanResult.value = null
+  successfulDisplayNumber.value = null
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
@@ -251,24 +255,41 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
   errorText.value = ''
   if (!fromCamera) {
     scanResult.value = null
+    successfulDisplayNumber.value = null
   }
   try {
-    scanResult.value = await scanPaymentProof(storeId.value, {
+    const result = await scanPaymentProof(storeId.value, {
       image,
       idempotencyKey: createIdempotencyKey(),
       businessDate: businessDate.value,
       terminalCode: normalizedTerminalCode.value
     })
-    if (scanResult.value.outcome === 'auto_confirmed' || scanResult.value.outcome === 'already_confirmed') {
+    scanResult.value = result
+    if (result.outcome === 'auto_confirmed' || result.outcome === 'already_confirmed') {
+      successfulDisplayNumber.value = resolveSuccessfulDisplayNumber(result)
+      speakPaymentSuccess(successfulDisplayNumber.value)
       stopScanner()
       await loadCandidates()
-    } else if (fromCamera && scanResult.value.outcome === 'needs_review') {
+    } else if (fromCamera && result.outcome === 'needs_review') {
       stopScanner()
     }
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     scanning.value = false
+  }
+}
+
+function prepareNextScan(): void {
+  scanResult.value = null
+  selectedFile.value = null
+  successfulDisplayNumber.value = null
+  errorText.value = ''
+  cameraError.value = ''
+  revokePreview()
+  void loadCandidates()
+  if (!scannerActive.value && !cameraStarting.value) {
+    void startScanner()
   }
 }
 
@@ -293,6 +314,30 @@ function outcomeLabel(outcome: string | null | undefined): string {
     return gt('generated.payment-proof-review.018')
   }
   return gt('generated.payment-proof-review.019')
+}
+
+function resolveSuccessfulDisplayNumber(result: PaymentProofScanResponse): number | null {
+  const candidate = candidates.value.find(value => {
+    if (result.sessionId && value.sessionId === result.sessionId) {
+      return true
+    }
+    return Boolean(result.paymentReference && value.paymentReference === result.paymentReference)
+  })
+  return candidate?.displayNumber || null
+}
+
+function speakPaymentSuccess(displayNumber: number | null): void {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    return
+  }
+  const message = displayNumber
+    ? gt('generated.payment-proof-review.040', { displayNumber })
+    : gt('generated.payment-proof-review.041')
+  const utterance = new SpeechSynthesisUtterance(message)
+  utterance.lang = /[\u3400-\u9fff]/.test(message) ? 'zh-CN' : 'en-SG'
+  utterance.rate = 1
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(utterance)
 }
 
 function outcomeClass(outcome: string | null | undefined): string {
@@ -483,7 +528,7 @@ function apiErrorText(error: unknown): string {
           <span>{{ matchedCandidate.paymentReference }}</span>
         </article>
 
-        <button v-if="scanResult.outcome === 'auto_confirmed' || scanResult.outcome === 'already_confirmed'" class="primary-button" type="button" @click="closeReview">
+        <button v-if="scanResult.outcome === 'auto_confirmed' || scanResult.outcome === 'already_confirmed'" class="primary-button" type="button" @click="prepareNextScan">
           {{ gt('generated.payment-proof-review.028') }}
         </button>
       </section>
