@@ -104,6 +104,7 @@ export const enSG = {
       billing: 'Tenant billing',
       profile: 'Platform profile',
       productLines: 'Product lines',
+      paymentProofTemplates: 'PayNow Proof Templates',
       i18nCatalog: 'I18n catalog',
       callScreenSeed: 'Call screen templates',
       mealPeriodSeed: 'Reservation meal periods',

@@ -104,6 +104,7 @@ export const zhCN = {
       billing: '租户计费',
       profile: '平台资料',
       productLines: '产品线',
+      paymentProofTemplates: 'PayNow 回单样式库',
       i18nCatalog: '国际化字典',
       callScreenSeed: '叫号模板',
       mealPeriodSeed: '预约餐段',

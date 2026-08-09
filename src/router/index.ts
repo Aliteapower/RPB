@@ -6,6 +6,7 @@ const CleaningCompletePage = () => import('../pages/CleaningCompletePage.vue')
 const LoginPage = () => import('../pages/LoginPage.vue')
 const PlatformCallScreenSeedPage = () => import('../pages/PlatformCallScreenSeedPage.vue')
 const PlatformI18nCatalogPage = () => import('../pages/PlatformI18nCatalogPage.vue')
+const PlatformPaymentProofTemplatesPage = () => import('../pages/PlatformPaymentProofTemplatesPage.vue')
 const PlatformProductLinesPage = () => import('../pages/PlatformProductLinesPage.vue')
 const PlatformProfilePage = () => import('../pages/PlatformProfilePage.vue')
 const PlatformReservationMealPeriodSeedPage = () => import('../pages/PlatformReservationMealPeriodSeedPage.vue')
@@ -129,6 +130,12 @@ export const router = createRouter({
       path: '/platform/i18n/catalog',
       name: 'platform-i18n-catalog',
       component: PlatformI18nCatalogPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
+      path: '/platform/payment/proof-templates',
+      name: 'platform-payment-proof-templates',
+      component: PlatformPaymentProofTemplatesPage,
       meta: { requiresPlatformAdmin: true }
     },
     {

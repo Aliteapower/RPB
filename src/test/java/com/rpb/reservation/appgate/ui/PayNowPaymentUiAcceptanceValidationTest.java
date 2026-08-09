@@ -385,4 +385,21 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("suggestedLayoutJson: string")
             .doesNotContain("suggestion: {");
     }
+
+    @Test
+    void platformPayNowProofTemplateLibraryPageIsWired() throws Exception {
+        String page = FrontendSourceSupport.readString(Path.of("src", "pages", "PlatformPaymentProofTemplatesPage.vue"));
+        String router = FrontendSourceSupport.readString(Path.of("src", "router", "index.ts"));
+
+        assertThat(page)
+            .contains("PlatformAdminNav")
+            .contains("getPlatformPaymentProofTemplates")
+            .contains("suggestPlatformPaymentProofTemplateRule")
+            .contains("acceptPlatformPaymentProofTemplateContribution")
+            .contains("rejectPlatformPaymentProofTemplateContribution")
+            .contains("PayNow 回单样式库");
+        assertThat(router)
+            .contains("PlatformPaymentProofTemplatesPage")
+            .contains("platform-payment-proof-templates");
+    }
 }
