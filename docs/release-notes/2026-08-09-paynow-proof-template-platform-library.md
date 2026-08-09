@@ -19,12 +19,13 @@
 ## Rollback Notes
 
 - Restore backend jar and frontend bundle.
-- If schema rollback is required, delete contribution rows and drop `payment_proof_template_contributions`.
+- Remove `platform.payment_proof_template.manage` rows from `auth_account_permissions` so the rolled-back application does not retain the retired platform capability.
+- If schema rollback is required, delete contribution rows and drop `payment_proof_template_contributions` after the application rollback.
 
 ## Validation
 
-- `mvn "-Dtest=PaymentProofTemplatePlatformMigrationTest,PaymentProofTemplateRuleSuggestionTest,PaymentProofTemplateContributionServiceTest,PlatformPaymentProofTemplateControllerTest,PaymentProofTemplateContributionControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`: passed, 20 tests with 0 failures and 0 errors.
-- `mvn "-Dtest=PaymentProofTemplateServiceTest,PaymentProofReviewServiceTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewControllerTest" test`: passed, 26 tests with 0 failures and 0 errors.
+- `mvn "-Dtest=PaymentProofTemplatePlatformMigrationTest,PaymentProofTemplateRuleSuggestionTest,PaymentProofTemplateContributionServiceTest,PlatformPaymentProofTemplateControllerTest,PaymentProofTemplateContributionControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`: passed, 27 tests with 0 failures and 0 errors.
+- `mvn "-Dtest=PaymentProofTemplateServiceTest,PaymentProofReviewServiceTest,TesseractPaymentProofOcrAdapterTest,PaymentProofReviewControllerTest" test`: passed, 27 tests with 0 failures and 0 errors.
 - `mvn "-Dtest=PaymentMigrationTest,PaymentProofTemplateMigrationTest,PaymentProofTemplatePlatformMigrationTest" test`: passed, 8 tests with 0 failures and 0 errors.
 - `npm run build`: passed (`vue-tsc --noEmit && vite build`).
 - `git diff --check`: passed with no whitespace errors.

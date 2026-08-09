@@ -4,7 +4,8 @@ import java.util.UUID;
 
 public record PaymentProofTemplateContributionReviewCommand(
     UUID platformTemplateId,
+    Integer targetTemplateVersion,
     String reviewNote,
-    int version
+    Integer version
 ) {
 }

@@ -38,7 +38,7 @@ class PaymentProofTemplateContributionServiceTest {
 
         PaymentProofTemplateContribution accepted = service.acceptContribution(
             submitted.id(),
-            new PaymentProofTemplateContributionReviewCommand(null, "accepted", submitted.version()),
+            new PaymentProofTemplateContributionReviewCommand(null, null, "accepted", submitted.version()),
             platformActor()
         );
 
@@ -54,7 +54,7 @@ class PaymentProofTemplateContributionServiceTest {
 
         assertThatThrownBy(() -> service.acceptContribution(
             submitted.id(),
-            new PaymentProofTemplateContributionReviewCommand(null, "bad actor", submitted.version()),
+            new PaymentProofTemplateContributionReviewCommand(null, null, "bad actor", submitted.version()),
             tenantActor()
         )).isInstanceOf(PaymentServiceException.class);
     }
@@ -65,7 +65,7 @@ class PaymentProofTemplateContributionServiceTest {
 
         assertThatThrownBy(() -> service.acceptContribution(
             submitted.id(),
-            new PaymentProofTemplateContributionReviewCommand(UUID.randomUUID(), "wrong scope", submitted.version()),
+            new PaymentProofTemplateContributionReviewCommand(UUID.randomUUID(), 0, "wrong scope", submitted.version()),
             platformActor()
         )).isInstanceOf(PaymentServiceException.class);
     }
@@ -77,7 +77,7 @@ class PaymentProofTemplateContributionServiceTest {
 
         service.acceptContribution(
             submitted.id(),
-            new PaymentProofTemplateContributionReviewCommand(existing.id(), "apply contribution", submitted.version()),
+            new PaymentProofTemplateContributionReviewCommand(existing.id(), existing.version(), "apply contribution", submitted.version()),
             platformActor()
         );
 
@@ -86,6 +86,91 @@ class PaymentProofTemplateContributionServiceTest {
         assertThat(updated.layoutJson()).contains("OCBC");
         assertThat(updated.status()).isEqualTo("active");
         assertThat(updated.version()).isEqualTo(existing.version() + 1);
+    }
+
+    @Test
+    void acceptingIntoExistingPlatformTemplateRequiresTargetVersion() {
+        PaymentProofTemplate existing = repository.addPlatformTemplate("Previous template", "inactive", "{\"matchKeywords\":[\"OLD\"]}");
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+
+        assertThatThrownBy(() -> service.acceptContribution(
+            submitted.id(),
+            new PaymentProofTemplateContributionReviewCommand(existing.id(), null, "apply contribution", submitted.version()),
+            platformActor()
+        )).isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void staleTargetTemplateVersionReturnsVersionConflict() {
+        PaymentProofTemplate existing = repository.addPlatformTemplate("Previous template", "inactive", "{\"matchKeywords\":[\"OLD\"]}");
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+
+        assertThatThrownBy(() -> service.acceptContribution(
+            submitted.id(),
+            new PaymentProofTemplateContributionReviewCommand(existing.id(), existing.version() - 1, "apply contribution", submitted.version()),
+            platformActor()
+        )).isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.VERSION_CONFLICT);
+
+        assertThat(repository.findPlatformTemplates().getFirst()).isEqualTo(existing);
+        assertThat(repository.findPlatformContributions(null).getFirst().status()).isEqualTo("submitted");
+    }
+
+    @Test
+    void contributionSubmissionRejectsMalformedRegexRules() {
+        PaymentProofTemplateContributionCommand command = contributionCommandWithLayout(
+            "{\"matchKeywords\":[\"OCBC\"],\"referencePatterns\":[\"[\"]}"
+        );
+
+        assertThatThrownBy(() -> service.submitContribution(scope(), command, tenantActor()))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void platformTemplateCreateRejectsMalformedRegexRules() {
+        PaymentProofTemplateCommand command = new PaymentProofTemplateCommand(
+            "ocbc", "OCBC", "zh-CN", "Broken rule", "active", 20,
+            "{\"matchKeywords\":[\"OCBC\"],\"amountPatterns\":[\"[\"]}", 0
+        );
+
+        assertThatThrownBy(() -> service.createPlatformTemplate(command, platformActor()))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void contributionAcceptanceRevalidatesPersistedRulePatterns() {
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+        repository.replaceContributionLayout(submitted.id(), "{\"matchKeywords\":[\"OCBC\"],\"amountPatterns\":[\"[\"]}");
+
+        assertThatThrownBy(() -> service.acceptContribution(
+            submitted.id(),
+            new PaymentProofTemplateContributionReviewCommand(null, null, "accepted", submitted.version()),
+            platformActor()
+        )).isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+
+        assertThat(repository.platformTemplates).isEmpty();
+    }
+
+    @Test
+    void rejectContributionRequiresNonBlankReviewNote() {
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+
+        assertThatThrownBy(() -> service.rejectContribution(
+            submitted.id(),
+            new PaymentProofTemplateContributionReviewCommand(null, null, "  ", submitted.version()),
+            platformActor()
+        )).isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
     }
 
     @Test
@@ -112,11 +197,11 @@ class PaymentProofTemplateContributionServiceTest {
     void acceptedContributionCannotBeRejected() {
         PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
         PaymentProofTemplateContribution accepted = service.acceptContribution(
-            submitted.id(), new PaymentProofTemplateContributionReviewCommand(null, "accepted", submitted.version()), platformActor()
+            submitted.id(), new PaymentProofTemplateContributionReviewCommand(null, null, "accepted", submitted.version()), platformActor()
         );
 
         assertThatThrownBy(() -> service.rejectContribution(
-            accepted.id(), new PaymentProofTemplateContributionReviewCommand(null, "too late", accepted.version()), platformActor()
+            accepted.id(), new PaymentProofTemplateContributionReviewCommand(null, null, "too late", accepted.version()), platformActor()
         )).isInstanceOf(PaymentServiceException.class)
             .extracting(error -> ((PaymentServiceException) error).code())
             .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
@@ -127,7 +212,7 @@ class PaymentProofTemplateContributionServiceTest {
         PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
 
         assertThatThrownBy(() -> service.rejectContribution(
-            submitted.id(), new PaymentProofTemplateContributionReviewCommand(null, "stale", submitted.version() + 1), platformActor()
+            submitted.id(), new PaymentProofTemplateContributionReviewCommand(null, null, "stale", submitted.version() + 1), platformActor()
         )).isInstanceOf(PaymentServiceException.class)
             .extracting(error -> ((PaymentServiceException) error).code())
             .isEqualTo(PaymentServiceErrorCode.VERSION_CONFLICT);
@@ -160,13 +245,19 @@ class PaymentProofTemplateContributionServiceTest {
     }
 
     private static PaymentProofTemplateContributionCommand contributionCommand() {
+        return contributionCommandWithLayout(
+            "{\"matchKeywords\":[\"OCBC\"],\"successKeywords\":[\"Payment successful\"]}"
+        );
+    }
+
+    private static PaymentProofTemplateContributionCommand contributionCommandWithLayout(String layoutJson) {
         return new PaymentProofTemplateContributionCommand(
             TENANT_TEMPLATE_ID,
             "ocbc",
             "OCBC",
             "zh-CN",
             "OCBC new receipt",
-            "{\"matchKeywords\":[\"OCBC\"],\"successKeywords\":[\"Payment successful\"]}",
+            layoutJson,
             "receipt.jpg",
             "image/jpeg",
             "digest",
@@ -326,6 +417,23 @@ class PaymentProofTemplateContributionServiceTest {
             );
             platformTemplates.add(template);
             return template;
+        }
+
+        private void replaceContributionLayout(UUID contributionId, String layoutJson) {
+            PaymentProofTemplateContribution contribution = contributions.stream()
+                .filter(value -> value.id().equals(contributionId))
+                .findFirst()
+                .orElseThrow();
+            PaymentProofTemplateContribution replacement = new PaymentProofTemplateContribution(
+                contribution.id(), contribution.tenantId(), contribution.storeId(), contribution.sourceTemplateId(),
+                contribution.platformTemplateId(), contribution.bankCode(), contribution.bankName(), contribution.locale(),
+                contribution.templateName(), layoutJson, contribution.sampleFileName(), contribution.sampleContentType(),
+                contribution.sampleFileDigest(), contribution.sampleRawText(), contribution.sampleOcrReference(),
+                contribution.sampleOcrAmount(), contribution.status(), contribution.reviewNote(), contribution.submittedBy(),
+                contribution.reviewedBy(), contribution.createdAt(), contribution.updatedAt(), contribution.reviewedAt(),
+                contribution.version()
+            );
+            contributions.set(contributions.indexOf(contribution), replacement);
         }
     }
 }

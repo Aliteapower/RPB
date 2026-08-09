@@ -136,9 +136,13 @@ public class PaymentProofTemplateService {
         validatePlatformActor(actor);
         validateReviewCommand(contributionId, command);
         PaymentProofTemplateContribution contribution = submittedContribution(contributionId, command.version());
+        validateLayoutJson(contribution.layoutJson());
         UUID requestedPlatformTemplateId = command.platformTemplateId();
         UUID platformTemplateId;
         if (requestedPlatformTemplateId == null) {
+            if (command.targetTemplateVersion() != null) {
+                throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+            }
             platformTemplateId = repository.createPlatformTemplate(
                 new PaymentProofTemplateCommand(
                     contribution.bankCode(), contribution.bankName(), contribution.locale(), contribution.templateName(),
@@ -151,11 +155,14 @@ public class PaymentProofTemplateService {
                 .filter(template -> template.id().equals(requestedPlatformTemplateId))
                 .findFirst()
                 .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID));
+            if (command.targetTemplateVersion() == null || command.targetTemplateVersion() < 0) {
+                throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+            }
             platformTemplateId = repository.updatePlatformTemplate(
                 selectedTemplate.id(),
                 new PaymentProofTemplateCommand(
                     contribution.bankCode(), contribution.bankName(), contribution.locale(), contribution.templateName(),
-                    "active", selectedTemplate.priority(), contribution.layoutJson(), selectedTemplate.version()
+                    "active", selectedTemplate.priority(), contribution.layoutJson(), command.targetTemplateVersion()
                 )
             ).id();
         }
@@ -172,6 +179,9 @@ public class PaymentProofTemplateService {
     ) {
         validatePlatformActor(actor);
         validateReviewCommand(contributionId, command);
+        if (isBlank(command.reviewNote())) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
         submittedContribution(contributionId, command.version());
         return repository.rejectContribution(contributionId, actor.actorId(), trim(command.reviewNote()), command.version());
     }
@@ -380,7 +390,7 @@ public class PaymentProofTemplateService {
             || isBlank(command.bankName())
             || isBlank(command.templateName())
             || !List.of("active", "inactive", "draft").contains(trimLower(command.status()))
-            || !validJson(command.layoutJson())) {
+            || !validLayoutJson(command.layoutJson())) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         }
         return new PaymentProofTemplateCommand(
@@ -402,7 +412,7 @@ public class PaymentProofTemplateService {
             || isBlank(command.bankCode())
             || isBlank(command.bankName())
             || isBlank(command.templateName())
-            || !validJson(command.layoutJson())
+            || !validLayoutJson(command.layoutJson())
             || (command.sampleContentType() != null && !allowedContentType(command.sampleContentType()))
             || (command.sampleOcrAmount() != null && command.sampleOcrAmount().signum() <= 0)) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
@@ -417,7 +427,13 @@ public class PaymentProofTemplateService {
     }
 
     private static void validateReviewCommand(UUID contributionId, PaymentProofTemplateContributionReviewCommand command) {
-        if (contributionId == null || command == null || command.version() < 0) {
+        if (contributionId == null || command == null || command.version() == null || command.version() < 0) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private static void validateLayoutJson(String layoutJson) {
+        if (!validLayoutJson(layoutJson)) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         }
     }
@@ -534,13 +550,36 @@ public class PaymentProofTemplateService {
         return keywords.stream().map(String::toLowerCase).anyMatch(lower::contains);
     }
 
-    private static boolean validJson(String value) {
+    private static boolean validLayoutJson(String value) {
         try {
-            OBJECT_MAPPER.readTree(value == null || value.isBlank() ? "{}" : value);
-            return true;
+            JsonNode root = OBJECT_MAPPER.readTree(value == null || value.isBlank() ? "{}" : value);
+            return root != null
+                && root.isObject()
+                && validStringArray(root.get("matchKeywords"), false)
+                && validStringArray(root.get("successKeywords"), false)
+                && validStringArray(root.get("referencePatterns"), true)
+                && validStringArray(root.get("amountPatterns"), true);
         } catch (Exception exception) {
             return false;
         }
+    }
+
+    private static boolean validStringArray(JsonNode node, boolean compilePatterns) {
+        if (node == null) {
+            return true;
+        }
+        if (!node.isArray()) {
+            return false;
+        }
+        for (JsonNode item : node) {
+            if (!item.isTextual() || item.textValue().isBlank()) {
+                return false;
+            }
+            if (compilePatterns) {
+                compile(item.textValue());
+            }
+        }
+        return true;
     }
 
     private static String fileDigest(byte[] bytes) {

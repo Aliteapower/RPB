@@ -17,7 +17,8 @@ import { useAuthSessionStore } from '../stores/authSession'
 import type {
   PaymentProofTemplate,
   PaymentProofTemplateContribution,
-  PaymentProofTemplateMutation
+  PaymentProofTemplateMutation,
+  PaymentProofTemplateRuleSuggestionResponse
 } from '../types/payment'
 
 const auth = useAuthSessionStore()
@@ -32,6 +33,7 @@ const successText = ref('')
 const statusFilter = ref<'all' | PaymentProofTemplate['status']>('all')
 const templates = ref<PaymentProofTemplate[]>([])
 const contributions = ref<PaymentProofTemplateContribution[]>([])
+const suggestionOcr = ref<PaymentProofTemplateRuleSuggestionResponse['ocr']>(null)
 const selected = ref<PaymentProofTemplate | null>(null)
 const sampleInput = ref<HTMLInputElement | null>(null)
 const reviewNotes = reactive<Record<string, string>>({})
@@ -82,6 +84,7 @@ async function loadAll(): Promise<void> {
 
 function selectTemplate(template: PaymentProofTemplate): void {
   selected.value = template
+  suggestionOcr.value = null
   Object.assign(form, {
     bankCode: template.bankCode,
     bankName: template.bankName,
@@ -96,6 +99,7 @@ function selectTemplate(template: PaymentProofTemplate): void {
 
 function startNewTemplate(): void {
   selected.value = null
+  suggestionOcr.value = null
   Object.assign(form, {
     bankCode: 'ocbc',
     bankName: 'OCBC',
@@ -156,6 +160,7 @@ async function suggestRule(event: Event): Promise<void> {
       templateName: response.templateName || form.templateName,
       layoutJson: formatJson(response.suggestedLayoutJson)
     })
+    suggestionOcr.value = response.ocr
     successText.value = gt('generated.platform-payment-proof-templates.015')
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -168,13 +173,21 @@ async function reviewContribution(contribution: PaymentProofTemplateContribution
   if (reviewingContributionId.value) {
     return
   }
+  const reviewNote = reviewNotes[contribution.id]?.trim() || null
+  if (decision === 'reject' && !reviewNote) {
+    errorText.value = gt('generated.platform-payment-proof-templates.022')
+    return
+  }
+  const platformTemplateId = reviewTargets[contribution.id] || null
+  const targetTemplate = templates.value.find(template => template.id === platformTemplateId)
   reviewingContributionId.value = contribution.id
   errorText.value = ''
   successText.value = ''
   try {
     const request = {
-      platformTemplateId: reviewTargets[contribution.id] || null,
-      reviewNote: reviewNotes[contribution.id]?.trim() || null,
+      platformTemplateId,
+      targetTemplateVersion: targetTemplate?.version ?? null,
+      reviewNote,
       version: contribution.version
     }
     if (decision === 'accept') {
@@ -318,6 +331,14 @@ function apiErrorText(error: unknown): string {
             <button class="secondary-button" type="button" :disabled="suggesting" @click="sampleInput?.click()">{{ suggesting ? gt('generated.platform-payment-proof-templates.002') : gt('generated.platform-payment-proof-templates.026') }}</button>
             <input ref="sampleInput" accept="image/png,image/jpeg,image/webp" hidden type="file" @change="suggestRule" />
           </div>
+          <article v-if="suggestionOcr" class="ocr-evidence">
+            <dl>
+              <dt>Ref</dt><dd>{{ suggestionOcr?.extractedReference || '-' }}</dd>
+              <dt>Amount</dt><dd>{{ suggestionOcr?.extractedAmount || '-' }}</dd>
+              <dt>Confidence</dt><dd>{{ suggestionOcr?.confidence || '-' }}</dd>
+            </dl>
+            <pre>{{ suggestionOcr?.rawText || '-' }}</pre>
+          </article>
         </form>
       </div>
 
@@ -340,7 +361,7 @@ function apiErrorText(error: unknown): string {
             <input v-model="reviewNotes[contribution.id]" :placeholder="gt('generated.platform-payment-proof-templates.031')" maxlength="500" />
             <div class="review-actions">
               <button class="primary-button" type="button" :disabled="Boolean(reviewingContributionId)" @click="reviewContribution(contribution, 'accept')">{{ gt('generated.platform-payment-proof-templates.032') }}</button>
-              <button class="danger-button" type="button" :disabled="Boolean(reviewingContributionId)" @click="reviewContribution(contribution, 'reject')">{{ gt('generated.platform-payment-proof-templates.033') }}</button>
+              <button class="danger-button" type="button" :disabled="Boolean(reviewingContributionId) || !reviewNotes[contribution.id]?.trim()" @click="reviewContribution(contribution, 'reject')">{{ gt('generated.platform-payment-proof-templates.033') }}</button>
             </div>
           </div>
         </div>
@@ -385,7 +406,10 @@ textarea { line-height: 1.45; resize: vertical; }
 .contribution-panel { max-width: 1180px; }
 .contribution-row { border-top: 1px solid #dbe3ea; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); padding-top: 14px; }
 .contribution-summary, .review-controls { display: grid; gap: 8px; min-width: 0; }
-.contribution-summary pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; margin: 0; max-height: 140px; overflow: auto; padding: 8px; white-space: pre-wrap; }
+.contribution-summary pre, .ocr-evidence pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; margin: 0; max-height: 140px; overflow: auto; padding: 8px; white-space: pre-wrap; }
+.ocr-evidence { border-top: 1px solid #dbe3ea; display: grid; gap: 10px; padding-top: 12px; }
+.ocr-evidence dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; margin: 0; }
+.ocr-evidence dd { margin: 0; overflow-wrap: anywhere; }
 .review-actions { justify-content: flex-start; }
 .empty-line { color: #64748b; margin: 0; }
 @media (max-width: 980px) { .platform-shell, .template-workspace, .field-grid, .contribution-row { grid-template-columns: 1fr; } .page-heading { align-items: stretch; flex-direction: column; } }

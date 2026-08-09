@@ -2,6 +2,7 @@ package com.rpb.reservation.payment.api;
 
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -42,6 +44,20 @@ class PlatformPaymentProofTemplateControllerTest {
         mockMvc.perform(get("/api/v1/platform/payment/proof-templates"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void platformTemplatePatchRequiresVersion() throws Exception {
+        currentActorProvider.setCurrentActor(platformActorWith("platform.payment_proof_template.manage"));
+
+        mockMvc.perform(patch("/api/v1/platform/payment/proof-templates/{templateId}", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"bankCode":"ocbc","bankName":"OCBC","locale":"zh-CN","templateName":"OCBC receipt",
+                     "status":"active","priority":20,"layoutJson":"{}"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("REQUEST_INVALID"));
     }
 
     private static CurrentActor tenantActorWith(String permission) {

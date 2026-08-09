@@ -64,7 +64,7 @@ public class PlatformPaymentProofTemplateController {
         @RequestBody(required = false) PaymentProofTemplateRequest request
     ) {
         CurrentActor actor = requirePlatformActor();
-        if (request == null) {
+        if (request == null || request.version() == null) {
             throw new PaymentApiException(PaymentApiErrorCode.REQUEST_INVALID);
         }
         return ResponseEntity.ok(PaymentProofTemplateResponses.SingleResponse.from(

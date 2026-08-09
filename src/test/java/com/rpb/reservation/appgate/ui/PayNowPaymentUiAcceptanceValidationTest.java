@@ -390,6 +390,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("PaymentProofTemplateContribution")
             .contains("PaymentProofTemplateRuleSuggestionResponse")
             .contains("suggestedLayoutJson: string")
+            .contains("targetTemplateVersion?: number | null")
+            .doesNotContain("contribution: PaymentProofTemplateContribution")
             .doesNotContain("suggestion: {");
     }
 
@@ -404,9 +406,17 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("suggestPlatformPaymentProofTemplateRule")
             .contains("acceptPlatformPaymentProofTemplateContribution")
             .contains("rejectPlatformPaymentProofTemplateContribution")
+            .contains("suggestionOcr.value = response.ocr")
+            .contains("suggestionOcr?.rawText")
+            .contains("targetTemplateVersion")
+            .contains("decision === 'reject'")
             .contains("const refreshedSelected = templates.value.find(template => template.id === selected.value?.id)")
             .contains("selectTemplate(refreshedSelected)")
             .contains("PayNow 回单样式库");
+        String tenantPage = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentProofTemplatesPage.vue"));
+        assertThat(tenantPage)
+            .contains("contributionFor(template)?.status")
+            .contains("contributionFor(template)?.reviewNote");
         assertThat(router)
             .contains("PlatformPaymentProofTemplatesPage")
             .contains("platform-payment-proof-templates");

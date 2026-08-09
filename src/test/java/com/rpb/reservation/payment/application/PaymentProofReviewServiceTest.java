@@ -71,6 +71,30 @@ class PaymentProofReviewServiceTest {
     }
 
     @Test
+    void doesNotAutoConfirmWhenExtractedAmountDiffersByOneCent() {
+        PaymentProofCandidate candidate = candidate("PIT-202608-0022", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "PIT-202608-0022",
+            new BigDecimal("1.01"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 PIT-202608-0022 您已支付 1.01 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-amount-boundary"), actor);
+
+        assertThat(result.outcome()).isEqualTo("needs_review");
+        assertThat(result.checks().amount()).isEqualTo("mismatch");
+        assertThat(repository.confirmedIntentId).isNull();
+        assertThat(repository.createdProofStatus).isEqualTo("matched");
+        assertThat(repository.createdVerificationStatus).isEqualTo("pending");
+    }
+
+    @Test
     void autoConfirmsCompactReferenceWhenExtractedReferenceAndAmountMatch() {
         PaymentProofCandidate candidate = candidate("QP202608080013YGDN", new BigDecimal("1.00"));
         repository.candidate = Optional.of(candidate);

@@ -6,6 +6,8 @@ Payment Proof Review lets a payment-enabled store employee upload or capture a P
 
 The PayNow proof template library improves extraction accuracy by letting RPB maintain platform seed templates and letting tenants add store-facing receipt samples. Template matching may improve OCR fields, but it must not bypass the final Ref uniqueness and amount equality checks.
 
+Amount equality is exact numeric equality with no tolerance; decimal scale alone does not make equal monetary values different.
+
 ## Ref Definition
 
 `Ref` is `payment_intents.payment_reference`.
@@ -21,6 +23,13 @@ Ref extraction must ignore bank transaction identifiers such as `Transaction ID`
 ## Endpoints
 
 ## Platform Proof Template Library
+
+### Authorization and scope
+
+- Platform endpoints require a `platform_admin` actor with `platform.payment_proof_template.manage`.
+- Tenant endpoints require `payment.proof_template.manage`, matching tenant identity, and access to `{storeId}`.
+- Tenant list and submit queries are tenant-scoped. A tenant cannot read another tenant's contributions or submit a platform/foreign tenant template as `sourceTemplateId`.
+- Platform rule suggestions and contribution reviews do not create payment proofs or verifications and do not mutate payment intent/session state.
 
 Platform admins manage shared PayNow bank receipt OCR templates under:
 
@@ -39,6 +48,195 @@ Tenant admins contribute missing templates under:
 - `POST /api/v1/stores/{storeId}/tenant-admin/payment/proof-template-rule-suggestions`
 
 Rule suggestions never mutate payment intent/session/proof verification state.
+
+### Template request and response schemas
+
+Template create/PATCH request:
+
+```json
+{
+  "bankCode": "ocbc",
+  "bankName": "OCBC",
+  "locale": "zh-CN",
+  "templateName": "OCBC PayNow",
+  "status": "active",
+  "priority": 20,
+  "layoutJson": "{\"matchKeywords\":[\"OCBC\"],\"referencePatterns\":[\"(?:讯息|Message)\\\\s*[:：]?\\\\s*([A-Z0-9.-]{10,32})\"],\"amountPatterns\":[\"您已支付\\\\s*([0-9OoIl,.]+)\\\\s*SGD\"]}",
+  "version": 3
+}
+```
+
+`version` is required for platform PATCH and must equal the current template version; it may be omitted on create. Tenant PATCH clients also send the current version for optimistic locking. A missing platform PATCH version returns `REQUEST_INVALID`; a stale supplied version returns `VERSION_CONFLICT`.
+
+`layoutJson` must decode to a JSON object. When present, `matchKeywords`, `successKeywords`, `referencePatterns`, and `amountPatterns` must be arrays of nonblank strings. Every reference/amount pattern must compile as a Java regular expression. Invalid shape or regex returns `REQUEST_INVALID` before a template can be created, updated, or activated through contribution acceptance.
+
+Template mutation response:
+
+```json
+{
+  "success": true,
+  "template": {
+    "id": "30000000-0000-0000-0000-000000000001",
+    "tenantId": null,
+    "bankCode": "ocbc",
+    "bankName": "OCBC",
+    "locale": "zh-CN",
+    "templateName": "OCBC PayNow",
+    "source": "platform_seed",
+    "status": "active",
+    "priority": 20,
+    "version": 4,
+    "layoutJson": "{}",
+    "createdAt": "2026-08-09T00:00:00Z",
+    "updatedAt": "2026-08-09T01:00:00Z"
+  }
+}
+```
+
+List responses use `{ "success": true, "templates": [...] }`.
+
+### Rule suggestions
+
+Both rule-suggestion endpoints consume `multipart/form-data`:
+
+- `image`: required nonempty PNG, JPEG, or WebP.
+- `bankCode`: required.
+- `bankName`: required.
+- `locale`: optional, defaults to `zh-CN`.
+
+Response:
+
+```json
+{
+  "success": true,
+  "bankCode": "ocbc",
+  "bankName": "OCBC",
+  "locale": "zh-CN",
+  "templateName": "OCBC PayNow",
+  "suggestedLayoutJson": "{\"matchKeywords\":[\"OCBC\"]}",
+  "ocr": {
+    "extractedReference": "QP202608090017GQVQ",
+    "extractedAmount": 1.00,
+    "bankCode": "ocbc",
+    "successDetected": true,
+    "confidence": 0.7100,
+    "rawText": "OCBC\n您已支付 1.00 SGD\n讯息\nQP202608090017GQVQ"
+  }
+}
+```
+
+Sample image bytes are temporary extraction input and are not stored in the database.
+
+### Tenant contributions
+
+`POST /api/v1/stores/{storeId}/tenant-admin/payment/proof-template-contributions` request:
+
+```json
+{
+  "sourceTemplateId": "50000000-0000-0000-0000-000000000003",
+  "bankCode": "ocbc",
+  "bankName": "OCBC",
+  "locale": "zh-CN",
+  "templateName": "OCBC new receipt",
+  "layoutJson": "{\"matchKeywords\":[\"OCBC\"]}",
+  "sampleFileName": "receipt.jpg",
+  "sampleContentType": "image/jpeg",
+  "sampleFileDigest": "sha256-hex",
+  "sampleRawText": "OCBC raw OCR text",
+  "sampleOcrReference": "QP202608090017GQVQ",
+  "sampleOcrAmount": 1.00
+}
+```
+
+The source template is optional, but when supplied it must be a tenant-owned template visible in the current tenant/store scope. `sampleOcrAmount`, when supplied, must be positive. `sampleContentType`, when supplied, must be PNG, JPEG, or WebP. The request carries metadata/OCR evidence only; it has no image-bytes field.
+
+Contribution create and review mutations return the contribution as a flat body, not under a `contribution` property:
+
+```json
+{
+  "id": "90000000-0000-0000-0000-000000000001",
+  "tenantId": "10000000-0000-0000-0000-000000000003",
+  "storeId": "20000000-0000-0000-0000-000000000003",
+  "sourceTemplateId": "50000000-0000-0000-0000-000000000003",
+  "platformTemplateId": null,
+  "bankCode": "ocbc",
+  "bankName": "OCBC",
+  "locale": "zh-CN",
+  "templateName": "OCBC new receipt",
+  "layoutJson": "{\"matchKeywords\":[\"OCBC\"]}",
+  "sampleFileName": "receipt.jpg",
+  "sampleContentType": "image/jpeg",
+  "sampleFileDigest": "sha256-hex",
+  "sampleRawText": "OCBC raw OCR text",
+  "sampleOcrReference": "QP202608090017GQVQ",
+  "sampleOcrAmount": 1.00,
+  "status": "submitted",
+  "reviewNote": null,
+  "submittedBy": "30000000-0000-0000-0000-000000000003",
+  "reviewedBy": null,
+  "createdAt": "2026-08-09T00:00:00Z",
+  "updatedAt": "2026-08-09T00:00:00Z",
+  "reviewedAt": null,
+  "version": 0
+}
+```
+
+Contribution list responses use `{ "success": true, "contributions": [...] }`. The tenant list includes all outcomes so tenants can observe acceptance/rejection and `reviewNote`. The platform list accepts optional `status`; supported values are `submitted`, `accepted`, `rejected`, and `withdrawn`.
+
+### Contribution review
+
+Accept into a new platform template:
+
+```json
+{
+  "platformTemplateId": null,
+  "targetTemplateVersion": null,
+  "reviewNote": "Accepted as a new OCBC rule",
+  "version": 0
+}
+```
+
+Accept into an existing platform template:
+
+```json
+{
+  "platformTemplateId": "30000000-0000-0000-0000-000000000001",
+  "targetTemplateVersion": 3,
+  "reviewNote": "Apply the tenant evidence",
+  "version": 0
+}
+```
+
+Reject:
+
+```json
+{
+  "platformTemplateId": null,
+  "targetTemplateVersion": null,
+  "reviewNote": "Reference pattern captures the bank transaction id",
+  "version": 0
+}
+```
+
+`version` is always required and is the current contribution version. `targetTemplateVersion` is required when `platformTemplateId` selects an existing template and must equal that template's current version. A reject requires a nonblank `reviewNote`. Missing required versions/notes return `REQUEST_INVALID`; stale contribution or target-template versions return `VERSION_CONFLICT`.
+
+Allowed review transitions:
+
+| Current status | Command | Result |
+|---|---|---|
+| `submitted` | accept | `accepted`; creates or updates one platform template and records `platformTemplateId` |
+| `submitted` | reject with nonblank note | `rejected` |
+| `accepted`, `rejected`, or `withdrawn` | accept/reject | `REQUEST_INVALID`; terminal outcomes are not reviewed again |
+
+### Template/contribution errors
+
+| HTTP | Code | Applies when |
+|---:|---|---|
+| 400 | `REQUEST_INVALID` | Missing/invalid request, malformed layout shape/regex, invalid image metadata, blank reject note, missing required version, invalid status transition, or foreign/invalid source or target template. |
+| 401 | `UNAUTHENTICATED` | No current actor. |
+| 403 | `FORBIDDEN` | Platform role/permission is absent, or tenant/store scope/permission is absent. |
+| 409 | `VERSION_CONFLICT` | Contribution, platform template, or tenant template optimistic version is stale. |
+| 500 | `PERSISTENCE_ERROR` | Database operation fails. |
 
 ### GET /api/v1/stores/{storeId}/tenant-admin/payment/proof-templates
 

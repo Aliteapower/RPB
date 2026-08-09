@@ -336,6 +336,7 @@ export interface PaymentProofTemplateContributionMutation {
 
 export interface PaymentProofTemplateContributionReviewRequest {
   platformTemplateId?: string | null
+  targetTemplateVersion?: number | null
   reviewNote?: string | null
   version: number
 }
@@ -345,10 +346,7 @@ export interface PaymentProofTemplateContributionsResponse {
   contributions: PaymentProofTemplateContribution[]
 }
 
-export interface PaymentProofTemplateContributionResponse {
-  success: true
-  contribution: PaymentProofTemplateContribution
-}
+export type PaymentProofTemplateContributionResponse = PaymentProofTemplateContribution
 
 export interface PaymentProofTemplateRuleSuggestionResponse {
   success: true

@@ -210,9 +210,10 @@ function contributionFor(template: PaymentProofTemplate): PaymentProofTemplateCo
 }
 
 function submissionLabel(template: PaymentProofTemplate): string {
-  return contributionFor(template)?.status === 'submitted'
+  const status = contributionFor(template)?.status
+  return status === 'submitted'
     ? gt('generated.tenant-admin-payment-proof-templates.037')
-    : ''
+    : status || ''
 }
 
 async function submitSelectedToPlatform(): Promise<void> {
@@ -365,6 +366,7 @@ function apiErrorText(error: unknown): string {
               <span>{{ template.bankName }}</span>
               <strong>{{ template.templateName }}</strong>
               <small>{{ formatSource(template) }} · {{ template.status }} · {{ template.locale }}<template v-if="submissionLabel(template)"> · {{ submissionLabel(template) }}</template></small>
+              <small v-if="contributionFor(template)?.reviewNote" class="review-note">{{ contributionFor(template)?.reviewNote }}</small>
             </button>
           </section>
 

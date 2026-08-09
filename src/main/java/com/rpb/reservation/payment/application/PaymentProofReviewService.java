@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PaymentProofReviewService {
-    private static final BigDecimal AMOUNT_TOLERANCE = new BigDecimal("0.01");
     private static final List<String> ALLOWED_CONTENT_TYPES = List.of("image/png", "image/jpeg", "image/webp");
 
     private final PaymentProofReviewRepository repository;
@@ -221,7 +220,7 @@ public class PaymentProofReviewService {
         if (extracted == null || expected == null) {
             return false;
         }
-        return extracted.subtract(expected).abs().compareTo(AMOUNT_TOLERANCE) <= 0;
+        return extracted.compareTo(expected) == 0;
     }
 
     private static void validateActor(StoreScope scope, CurrentActor actor) {
