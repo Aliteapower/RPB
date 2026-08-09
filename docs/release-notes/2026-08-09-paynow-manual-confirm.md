@@ -63,3 +63,19 @@
   - `/login`：200
   - `/stores/20000000-0000-0000-0000-000000000001/payments`：200
   - `PaymentQuickPayPage-BN4bqWSe.js`、`PaymentQuickPayPage-cC4WPumi.css`：200
+
+## Deployment Update: Confirmed Pending Display
+
+- 功能提交：`f5b45e4a fix: stop confirmed paynow pending display`
+- 变更：
+  - Quick Payment 的 Recent Display Numbers 在手动确认后不再显示倒计时，只保留已更新的状态。
+  - 回单校验弹窗重新获得焦点时刷新待验证收款列表，避免其他窗口手动确认后仍显示为 pending。
+- 验证：
+  - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`：3 tests，0 failures，0 errors
+  - `npm run build`：通过
+- 前端生产备份：`/opt/rpb/backups/20260809-0930-f5b45e4a-paynow-confirmed-pending-display-frontend`
+- 线上 smoke：
+  - `/login`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments/proof-review`：200
+  - `PaymentPresentPage-Cg6VkvBA.js`、`PaymentProofReviewPage-Ri-leWIw.js`、`PaymentQuickPayPage-B5qBbMyK.js`：200
