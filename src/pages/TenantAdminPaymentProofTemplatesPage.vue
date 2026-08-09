@@ -4,9 +4,11 @@ import { useRoute } from 'vue-router'
 
 import {
   createPaymentProofTemplate,
+  getPaymentProofTemplateContributions,
   getPaymentProofTemplates,
   PaymentApiError,
-  testScanPaymentProofTemplate,
+  submitPaymentProofTemplateContribution,
+  suggestPaymentProofTemplateRule,
   updatePaymentProofTemplate
 } from '../api/paymentApi'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
@@ -14,6 +16,7 @@ import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
 import type {
   PaymentProofTemplate,
+  PaymentProofTemplateContribution,
   PaymentProofTemplateMutation,
   PaymentProofTemplateTestScanResponse
 } from '../types/payment'
@@ -26,9 +29,11 @@ const { gt } = useGeneratedText()
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
+const submitting = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const templates = ref<PaymentProofTemplate[]>([])
+const contributions = ref<PaymentProofTemplateContribution[]>([])
 const selected = ref<PaymentProofTemplate | null>(null)
 const testResult = ref<PaymentProofTemplateTestScanResponse | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -61,20 +66,33 @@ const sortedTemplates = computed(() => [...templates.value].sort((a, b) => {
   }
   return a.priority - b.priority || a.bankCode.localeCompare(b.bankCode)
 }))
+const platformTemplates = computed(() => sortedTemplates.value.filter(template => template.source === 'platform_seed'))
+const tenantTemplates = computed(() => sortedTemplates.value.filter(template => template.source !== 'platform_seed'))
 
 onMounted(() => {
   void loadTemplates()
 })
 
-async function loadTemplates(): Promise<void> {
+async function loadTemplates(preserveSavedText = false): Promise<void> {
   loading.value = true
   errorText.value = ''
-  savedText.value = ''
+  if (!preserveSavedText) {
+    savedText.value = ''
+  }
   try {
-    const response = await getPaymentProofTemplates(storeId.value)
-    templates.value = response.templates
-    if (!selected.value && response.templates.length) {
-      selectTemplate(response.templates[0])
+    const [templateResponse, contributionResponse] = await Promise.all([
+      getPaymentProofTemplates(storeId.value),
+      getPaymentProofTemplateContributions(storeId.value)
+    ])
+    templates.value = templateResponse.templates
+    contributions.value = contributionResponse.contributions
+    const refreshedSelected = templateResponse.templates.find(template => template.id === selected.value?.id)
+    if (refreshedSelected) {
+      selectTemplate(refreshedSelected)
+    } else if (selected.value) {
+      selected.value = null
+    } else if (templateResponse.templates.length) {
+      selectTemplate(templateResponse.templates[0])
     }
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -148,7 +166,7 @@ async function saveTemplate(): Promise<void> {
       ? await updatePaymentProofTemplate(storeId.value, selected.value.id, payload)
       : await createPaymentProofTemplate(storeId.value, payload)
     savedText.value = gt('generated.tenant-admin-payment-proof-templates.019')
-    await loadTemplates()
+    await loadTemplates(true)
     selectTemplate(response.template)
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -157,7 +175,7 @@ async function saveTemplate(): Promise<void> {
   }
 }
 
-async function testSelectedFile(event: Event): Promise<void> {
+async function suggestFromSelectedFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -168,13 +186,53 @@ async function testSelectedFile(event: Event): Promise<void> {
   errorText.value = ''
   testResult.value = null
   try {
-    testResult.value = await testScanPaymentProofTemplate(storeId.value, file)
+    const response = await suggestPaymentProofTemplateRule(storeId.value, file, {
+      bankCode: form.bankCode,
+      bankName: form.bankName,
+      locale: form.locale
+    })
+    form.layoutJson = formatJson(response.suggestedLayoutJson)
+    testResult.value = { success: true, template: selected.value, ocr: response.ocr }
     savedText.value = gt('generated.tenant-admin-payment-proof-templates.020')
-    await loadTemplates()
   } catch (error) {
     errorText.value = apiErrorText(error)
   } finally {
     testing.value = false
+  }
+}
+
+function contributionFor(template: PaymentProofTemplate): PaymentProofTemplateContribution | null {
+  return contributions.value.find(contribution => contribution.sourceTemplateId === template.id) || null
+}
+
+function submissionLabel(template: PaymentProofTemplate): string {
+  return contributionFor(template)?.status === 'submitted'
+    ? gt('generated.tenant-admin-payment-proof-templates.037')
+    : ''
+}
+
+async function submitSelectedToPlatform(): Promise<void> {
+  if (!selected.value || selected.value.source === 'platform_seed' || submitting.value || contributionFor(selected.value)?.status === 'submitted') {
+    return
+  }
+  submitting.value = true
+  errorText.value = ''
+  savedText.value = ''
+  try {
+    await submitPaymentProofTemplateContribution(storeId.value, {
+      sourceTemplateId: selected.value.id,
+      bankCode: selected.value.bankCode,
+      bankName: selected.value.bankName,
+      locale: selected.value.locale,
+      templateName: selected.value.templateName,
+      layoutJson: selected.value.layoutJson
+    })
+    savedText.value = gt('generated.tenant-admin-payment-proof-templates.032')
+    await loadTemplates(true)
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -193,12 +251,12 @@ function normalizedMutation(): PaymentProofTemplateMutation {
 
 function formatSource(template: PaymentProofTemplate | null): string {
   if (!template) {
-    return gt('generated.tenant-admin-payment-proof-templates.007')
+    return gt('generated.tenant-admin-payment-proof-templates.034')
   }
   if (template.source === 'platform_seed') {
-    return gt('generated.tenant-admin-payment-proof-templates.006')
+    return gt('generated.tenant-admin-payment-proof-templates.033')
   }
-  return gt('generated.tenant-admin-payment-proof-templates.007')
+  return gt('generated.tenant-admin-payment-proof-templates.034')
 }
 
 function formatJson(value: string): string {
@@ -269,23 +327,42 @@ function apiErrorText(error: unknown): string {
         <section class="template-list" aria-label="回单样式库">
           <header>
             <strong>{{ gt('generated.tenant-admin-payment-proof-templates.004') }}</strong>
-            <button type="button" :disabled="loading" @click="loadTemplates">
+            <button type="button" :disabled="loading" @click="loadTemplates()">
               {{ loading ? gt('generated.tenant-admin-payment-proof-templates.026') : gt('generated.tenant-admin-payment-proof-templates.005') }}
             </button>
           </header>
 
-          <button
-            v-for="template in sortedTemplates"
-            :key="template.id"
-            class="template-row"
-            :class="{ active: selected?.id === template.id }"
-            type="button"
-            @click="selectTemplate(template)"
-          >
-            <span>{{ template.bankName }}</span>
-            <strong>{{ template.templateName }}</strong>
-            <small>{{ formatSource(template) }} · {{ template.status }} · {{ template.locale }}</small>
-          </button>
+          <section v-if="platformTemplates.length" class="template-group">
+            <span class="template-group-label">{{ gt('generated.tenant-admin-payment-proof-templates.033') }}</span>
+            <button
+              v-for="template in platformTemplates"
+              :key="template.id"
+              class="template-row"
+              :class="{ active: selected?.id === template.id }"
+              type="button"
+              @click="selectTemplate(template)"
+            >
+              <span>{{ template.bankName }}</span>
+              <strong>{{ template.templateName }}</strong>
+              <small>{{ formatSource(template) }} · {{ template.status }} · {{ template.locale }}</small>
+            </button>
+          </section>
+
+          <section v-if="tenantTemplates.length" class="template-group">
+            <span class="template-group-label">{{ gt('generated.tenant-admin-payment-proof-templates.034') }}</span>
+            <button
+              v-for="template in tenantTemplates"
+              :key="template.id"
+              class="template-row"
+              :class="{ active: selected?.id === template.id }"
+              type="button"
+              @click="selectTemplate(template)"
+            >
+              <span>{{ template.bankName }}</span>
+              <strong>{{ template.templateName }}</strong>
+              <small>{{ formatSource(template) }} · {{ template.status }} · {{ template.locale }}<template v-if="submissionLabel(template)"> · {{ submissionLabel(template) }}</template></small>
+            </button>
+          </section>
 
           <p v-if="!loading && !templates.length" class="empty-line">
             {{ gt('generated.tenant-admin-payment-proof-templates.027') }}
@@ -305,6 +382,15 @@ function apiErrorText(error: unknown): string {
               @click="copyPlatformSeed"
             >
               {{ gt('generated.tenant-admin-payment-proof-templates.008') }}
+            </button>
+            <button
+              v-else-if="selected"
+              class="secondary-link"
+              type="button"
+              :disabled="submitting || contributionFor(selected)?.status === 'submitted'"
+              @click="submitSelectedToPlatform"
+            >
+              {{ contributionFor(selected)?.status === 'submitted' ? gt('generated.tenant-admin-payment-proof-templates.037') : gt('generated.tenant-admin-payment-proof-templates.035') }}
             </button>
           </header>
 
@@ -349,14 +435,14 @@ function apiErrorText(error: unknown): string {
               {{ saving ? gt('generated.tenant-admin-payment-proof-templates.026') : gt('generated.tenant-admin-payment-proof-templates.016') }}
             </button>
             <button class="secondary-link" type="button" :disabled="testing" @click="fileInput?.click()">
-              {{ testing ? gt('generated.tenant-admin-payment-proof-templates.026') : gt('generated.tenant-admin-payment-proof-templates.017') }}
+              {{ testing ? gt('generated.tenant-admin-payment-proof-templates.026') : gt('generated.tenant-admin-payment-proof-templates.036') }}
             </button>
             <input
               ref="fileInput"
               accept="image/png,image/jpeg,image/webp"
               hidden
               type="file"
-              @change="testSelectedFile"
+              @change="suggestFromSelectedFile"
             />
           </div>
 
@@ -493,6 +579,17 @@ button:disabled {
 
 .template-list {
   align-content: start;
+}
+
+.template-group {
+  display: grid;
+  gap: 8px;
+}
+
+.template-group-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .template-row {
