@@ -179,7 +179,7 @@ async function suggestFromSelectedFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file || testing.value) {
+  if (!file || testing.value || !editable.value) {
     return
   }
   testing.value = true
@@ -434,7 +434,7 @@ function apiErrorText(error: unknown): string {
             <button class="primary-button" type="submit" :disabled="!editable || saving">
               {{ saving ? gt('generated.tenant-admin-payment-proof-templates.026') : gt('generated.tenant-admin-payment-proof-templates.016') }}
             </button>
-            <button class="secondary-link" type="button" :disabled="testing" @click="fileInput?.click()">
+            <button class="secondary-link" type="button" :disabled="!editable || testing" @click="fileInput?.click()">
               {{ testing ? gt('generated.tenant-admin-payment-proof-templates.026') : gt('generated.tenant-admin-payment-proof-templates.036') }}
             </button>
             <input
