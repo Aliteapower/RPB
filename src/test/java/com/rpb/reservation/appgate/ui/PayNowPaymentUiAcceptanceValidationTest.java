@@ -197,6 +197,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("confirmRecentPayment")
             .contains("manuallyConfirmingSessionNo")
             .contains("item.sessionNo === manuallyConfirmingSessionNo")
+            .contains("item.paymentReference")
+            .contains("recent-reference")
             .contains("confirmPaymentPresentPayment")
             .contains("openPresentWindow")
             .contains("publishPaymentPresentPayload")

@@ -687,6 +687,7 @@ function apiErrorText(error: unknown): string {
             <div>
               <span>{{ item.currency }} {{ item.amount }}</span>
               <small>{{ item.status }}</small>
+              <small class="recent-reference" :title="item.paymentReference">Ref {{ item.paymentReference }}</small>
             </div>
             <button
               v-if="isManualConfirmableRecent(item)"
@@ -1121,6 +1122,16 @@ textarea {
 .recent-card span {
   font-size: 0.84rem;
   font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-reference {
+  color: #0f766e;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
