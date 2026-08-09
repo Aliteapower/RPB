@@ -58,3 +58,30 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `https://booking.yumstone.sg/api/v1/platform/payment/proof-templates`: `401`.
   - `PlatformPaymentProofTemplatesPage-CTDGNnjM.js`, `TenantAdminPaymentProofTemplatesPage-COdhbrCv.js`, `PaymentProofReviewPage-9A4yJzuR.js`, `PaymentQuickPayPage-BBB4VFjV.js`, `api-Cb-eKb-b.js`, `i18n-tHxvIumk.js`, and `index-CPHhLHfg.js`: `200`.
+
+## Frontend-Only Follow-Up: Proof Auto-Close
+
+- Deployed commit: `677db79a fix: auto close paynow proof confirmations`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-09.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验页在 `auto_confirmed` / `already_confirmed` 后播放“收款 N 成功”语音。
+  - 扫描模式下自动清理成功结果并继续扫下一笔。
+  - 自动确认成功会清理对应 Quick Payment 本地展示记录，顾客展示屏/收银页不再保留已确认记录或 pending 倒计时。
+  - QuickPay 最近列表只保留 `pending` / `awaiting_verification`，人工 `确认` 按钮仍作为待核验单兜底，不会把自动确认误记为手工确认。
+- Production frontend backup: `/opt/rpb/backups/20260809-1756-677db79a-paynow-proof-auto-close-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260809-1756-677db79a-paynow-proof-auto-close`.
+- Clean deploy worktree: `target/deploy-worktree-677db79a`.
+- Validation:
+  - `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - `npm ci`: completed.
+  - `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active / running`, PID `439209`, recent `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`, loaded `/assets/index-DWXWf2pH.js`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-h5YBDsQt.js`, `PaymentQuickPayPage-CnsYZJoV.js`, `PaymentPresentPage-CdJqFuyV.js`, and `paymentPresentBridge-Gm3BQeSq.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260809-1756-677db79a-paynow-proof-auto-close-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260809-1756-677db79a-paynow-proof-auto-close`, then reload nginx.
