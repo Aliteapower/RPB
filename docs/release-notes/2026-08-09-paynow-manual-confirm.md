@@ -35,3 +35,18 @@
 
 - 回滚本次应用版本即可移除前端按钮和后端 endpoint。
 - 已手工确认产生的 `paid` 状态和 `source_confirmed` 事件属于真实收款操作记录，回滚代码不会自动反向修改数据。
+
+## Deployment
+
+- 功能提交：`6cc06fbd fix: add paynow manual confirm`
+- 验证：
+  - `mvn "-Dtest=PaymentIntentServiceTest,PaymentIntentControllerTest,PayNowPaymentUiAcceptanceValidationTest" test`：25 tests，0 failures，0 errors
+  - `npm run build`：通过
+  - `mvn -q -DskipTests package`：通过
+- 生产备份：`/opt/rpb/backups/20260809-0904-6cc06fbd-paynow-manual-confirm`
+- 线上 smoke：
+  - `/login`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments`：200
+  - `/stores/20000000-0000-0000-0000-000000000001/payments/proof-review`：200
+  - `PaymentQuickPayPage-C2vFzTOL.js`、`paymentPresentBridge-DYcbGADv.js`、`api-DakOu-cN.js`：200
+  - unauthenticated manual-confirm endpoint：403 `PERMISSION_DENIED`，确认路由已上线且受 App Gate 保护
