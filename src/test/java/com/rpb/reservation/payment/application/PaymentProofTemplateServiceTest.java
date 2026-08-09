@@ -150,5 +150,39 @@ class PaymentProofTemplateServiceTest {
         ) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public List<PaymentProofTemplate> findPlatformTemplates() { return List.of(); }
+
+        @Override
+        public PaymentProofTemplate createPlatformTemplate(PaymentProofTemplateCommand command, UUID actorId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public PaymentProofTemplate updatePlatformTemplate(UUID templateId, PaymentProofTemplateCommand command) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public PaymentProofTemplateContribution createContribution(StoreScope scope, PaymentProofTemplateContributionCommand command, UUID actorId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<PaymentProofTemplateContribution> findTenantContributions(StoreScope scope) { return List.of(); }
+
+        @Override
+        public List<PaymentProofTemplateContribution> findPlatformContributions(String status) { return List.of(); }
+
+        @Override
+        public PaymentProofTemplateContribution acceptContribution(UUID contributionId, UUID platformTemplateId, UUID actorId, String reviewNote, int version) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public PaymentProofTemplateContribution rejectContribution(UUID contributionId, UUID actorId, String reviewNote, int version) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

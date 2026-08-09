@@ -2,6 +2,8 @@ package com.rpb.reservation.payment.api;
 
 import com.rpb.reservation.payment.application.PaymentProofOcrFields;
 import com.rpb.reservation.payment.application.PaymentProofTemplate;
+import com.rpb.reservation.payment.application.PaymentProofTemplateContribution;
+import com.rpb.reservation.payment.application.PaymentProofTemplateRuleSuggestion;
 import com.rpb.reservation.payment.application.PaymentProofTemplateTestScanResult;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -40,6 +42,73 @@ public final class PaymentProofTemplateResponses {
                 true,
                 result.template() == null ? null : TemplateResponse.from(result.template()),
                 OcrResponse.from(result.ocr())
+            );
+        }
+    }
+
+    public record RuleSuggestionResponse(
+        boolean success,
+        String bankCode,
+        String bankName,
+        String locale,
+        String templateName,
+        String suggestedLayoutJson,
+        OcrResponse ocr
+    ) {
+        public static RuleSuggestionResponse from(PaymentProofTemplateRuleSuggestion suggestion) {
+            return new RuleSuggestionResponse(
+                true,
+                suggestion.bankCode(),
+                suggestion.bankName(),
+                suggestion.locale(),
+                suggestion.templateName(),
+                suggestion.suggestedLayoutJson(),
+                OcrResponse.from(suggestion.ocr())
+            );
+        }
+    }
+
+    public record ContributionListResponse(boolean success, List<ContributionResponse> contributions) {
+        public static ContributionListResponse from(List<PaymentProofTemplateContribution> contributions) {
+            return new ContributionListResponse(true, contributions.stream().map(ContributionResponse::from).toList());
+        }
+    }
+
+    public record ContributionResponse(
+        UUID id,
+        UUID tenantId,
+        UUID storeId,
+        UUID sourceTemplateId,
+        UUID platformTemplateId,
+        String bankCode,
+        String bankName,
+        String locale,
+        String templateName,
+        String layoutJson,
+        String sampleFileName,
+        String sampleContentType,
+        String sampleFileDigest,
+        String sampleRawText,
+        String sampleOcrReference,
+        BigDecimal sampleOcrAmount,
+        String status,
+        String reviewNote,
+        UUID submittedBy,
+        UUID reviewedBy,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt,
+        OffsetDateTime reviewedAt,
+        int version
+    ) {
+        static ContributionResponse from(PaymentProofTemplateContribution contribution) {
+            return new ContributionResponse(
+                contribution.id(), contribution.tenantId(), contribution.storeId(), contribution.sourceTemplateId(),
+                contribution.platformTemplateId(), contribution.bankCode(), contribution.bankName(), contribution.locale(),
+                contribution.templateName(), contribution.layoutJson(), contribution.sampleFileName(),
+                contribution.sampleContentType(), contribution.sampleFileDigest(), contribution.sampleRawText(),
+                contribution.sampleOcrReference(), contribution.sampleOcrAmount(), contribution.status(), contribution.reviewNote(),
+                contribution.submittedBy(), contribution.reviewedBy(), contribution.createdAt(), contribution.updatedAt(),
+                contribution.reviewedAt(), contribution.version()
             );
         }
     }

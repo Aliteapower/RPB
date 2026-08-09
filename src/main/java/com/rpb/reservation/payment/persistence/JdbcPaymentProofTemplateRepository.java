@@ -3,6 +3,8 @@ package com.rpb.reservation.payment.persistence;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.payment.application.PaymentProofTemplate;
 import com.rpb.reservation.payment.application.PaymentProofTemplateCommand;
+import com.rpb.reservation.payment.application.PaymentProofTemplateContribution;
+import com.rpb.reservation.payment.application.PaymentProofTemplateContributionCommand;
 import com.rpb.reservation.payment.application.PaymentProofTemplateSample;
 import com.rpb.reservation.payment.application.PaymentProofTemplateSampleCommand;
 import com.rpb.reservation.payment.application.PaymentServiceErrorCode;
@@ -167,6 +169,156 @@ public class JdbcPaymentProofTemplateRepository implements PaymentProofTemplateR
         ).stream().findFirst().orElseThrow();
     }
 
+    @Override
+    public List<PaymentProofTemplate> findPlatformTemplates() {
+        return jdbc.query(
+            """
+            select id, tenant_id, bank_code, bank_name, locale, template_name, source, status,
+                   priority, version, layout_json::text as layout_json, created_at, updated_at
+            from payment_proof_templates
+            where tenant_id is null
+            order by priority asc, bank_code asc, template_name asc
+            """,
+            JdbcPaymentProofTemplateRepository::mapTemplate
+        );
+    }
+
+    @Override
+    public PaymentProofTemplate createPlatformTemplate(PaymentProofTemplateCommand command, UUID actorId) {
+        return jdbc.query(
+            """
+            insert into payment_proof_templates (
+                tenant_id, bank_code, bank_name, locale, template_name, source, status,
+                priority, layout_json, created_by, version
+            ) values (null, ?, ?, ?, ?, 'platform_seed', ?, ?, ?::jsonb, ?, 0)
+            returning id, tenant_id, bank_code, bank_name, locale, template_name, source, status,
+                      priority, version, layout_json::text as layout_json, created_at, updated_at
+            """,
+            JdbcPaymentProofTemplateRepository::mapTemplate,
+            command.bankCode(), command.bankName(), command.locale(), command.templateName(), command.status(),
+            command.priority(), command.layoutJson(), actorId
+        ).stream().findFirst().orElseThrow();
+    }
+
+    @Override
+    public PaymentProofTemplate updatePlatformTemplate(UUID templateId, PaymentProofTemplateCommand command) {
+        return jdbc.query(
+            """
+            update payment_proof_templates
+            set bank_code = ?, bank_name = ?, locale = ?, template_name = ?, status = ?, priority = ?,
+                layout_json = ?::jsonb, updated_at = now(), version = version + 1
+            where id = ? and tenant_id is null and version = ?
+            returning id, tenant_id, bank_code, bank_name, locale, template_name, source, status,
+                      priority, version, layout_json::text as layout_json, created_at, updated_at
+            """,
+            JdbcPaymentProofTemplateRepository::mapTemplate,
+            command.bankCode(), command.bankName(), command.locale(), command.templateName(), command.status(),
+            command.priority(), command.layoutJson(), templateId, command.version()
+        ).stream().findFirst().orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.VERSION_CONFLICT));
+    }
+
+    @Override
+    public PaymentProofTemplateContribution createContribution(
+        StoreScope scope,
+        PaymentProofTemplateContributionCommand command,
+        UUID actorId
+    ) {
+        return jdbc.query(
+            """
+            insert into payment_proof_template_contributions (
+                tenant_id, store_id, source_template_id, bank_code, bank_name, locale, template_name, layout_json,
+                sample_file_name, sample_content_type, sample_file_digest, sample_ocr_reference, sample_ocr_amount,
+                sample_raw_text, submitted_by
+            ) values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+            returning id, tenant_id, store_id, source_template_id, platform_template_id, bank_code, bank_name, locale,
+                      template_name, layout_json::text as layout_json, sample_file_name, sample_content_type,
+                      sample_file_digest, sample_raw_text, sample_ocr_reference, sample_ocr_amount, status, review_note,
+                      submitted_by, reviewed_by, created_at, updated_at, reviewed_at, version
+            """,
+            JdbcPaymentProofTemplateRepository::mapContribution,
+            scope.tenantId().value(), scope.storeId().value(), command.sourceTemplateId(), command.bankCode(),
+            command.bankName(), command.locale(), command.templateName(), command.layoutJson(), command.sampleFileName(),
+            command.sampleContentType(), command.sampleFileDigest(), command.sampleOcrReference(), command.sampleOcrAmount(),
+            command.sampleRawText(), actorId
+        ).stream().findFirst().orElseThrow();
+    }
+
+    @Override
+    public List<PaymentProofTemplateContribution> findTenantContributions(StoreScope scope) {
+        return jdbc.query(
+            """
+            select id, tenant_id, store_id, source_template_id, platform_template_id, bank_code, bank_name, locale,
+                   template_name, layout_json::text as layout_json, sample_file_name, sample_content_type,
+                   sample_file_digest, sample_raw_text, sample_ocr_reference, sample_ocr_amount, status, review_note,
+                   submitted_by, reviewed_by, created_at, updated_at, reviewed_at, version
+            from payment_proof_template_contributions
+            where tenant_id = ?
+            order by created_at desc
+            """,
+            JdbcPaymentProofTemplateRepository::mapContribution,
+            scope.tenantId().value()
+        );
+    }
+
+    @Override
+    public List<PaymentProofTemplateContribution> findPlatformContributions(String status) {
+        String query = """
+            select id, tenant_id, store_id, source_template_id, platform_template_id, bank_code, bank_name, locale,
+                   template_name, layout_json::text as layout_json, sample_file_name, sample_content_type,
+                   sample_file_digest, sample_raw_text, sample_ocr_reference, sample_ocr_amount, status, review_note,
+                   submitted_by, reviewed_by, created_at, updated_at, reviewed_at, version
+            from payment_proof_template_contributions
+            """;
+        if (status == null || status.isBlank()) {
+            return jdbc.query(query + " order by created_at desc", JdbcPaymentProofTemplateRepository::mapContribution);
+        }
+        return jdbc.query(
+            query + " where status = ? order by created_at desc",
+            JdbcPaymentProofTemplateRepository::mapContribution,
+            status
+        );
+    }
+
+    @Override
+    public PaymentProofTemplateContribution acceptContribution(
+        UUID contributionId,
+        UUID platformTemplateId,
+        UUID actorId,
+        String reviewNote,
+        int version
+    ) {
+        return reviewContribution(contributionId, platformTemplateId, actorId, reviewNote, version, "accepted");
+    }
+
+    @Override
+    public PaymentProofTemplateContribution rejectContribution(UUID contributionId, UUID actorId, String reviewNote, int version) {
+        return reviewContribution(contributionId, null, actorId, reviewNote, version, "rejected");
+    }
+
+    private PaymentProofTemplateContribution reviewContribution(
+        UUID contributionId,
+        UUID platformTemplateId,
+        UUID actorId,
+        String reviewNote,
+        int version,
+        String status
+    ) {
+        return jdbc.query(
+            """
+            update payment_proof_template_contributions
+            set status = ?, platform_template_id = ?, reviewed_by = ?, reviewed_at = now(), review_note = ?,
+                updated_at = now(), version = version + 1
+            where id = ? and status = 'submitted' and version = ?
+            returning id, tenant_id, store_id, source_template_id, platform_template_id, bank_code, bank_name, locale,
+                      template_name, layout_json::text as layout_json, sample_file_name, sample_content_type,
+                      sample_file_digest, sample_raw_text, sample_ocr_reference, sample_ocr_amount, status, review_note,
+                      submitted_by, reviewed_by, created_at, updated_at, reviewed_at, version
+            """,
+            JdbcPaymentProofTemplateRepository::mapContribution,
+            status, platformTemplateId, actorId, reviewNote, contributionId, version
+        ).stream().findFirst().orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.VERSION_CONFLICT));
+    }
+
     private static PaymentProofTemplate mapTemplate(ResultSet rs, int rowNum) throws SQLException {
         return new PaymentProofTemplate(
             rs.getObject("id", UUID.class),
@@ -196,6 +348,20 @@ public class JdbcPaymentProofTemplateRepository implements PaymentProofTemplateR
             rs.getBigDecimal("ocr_amount"),
             rs.getString("raw_text"),
             rs.getObject("created_at", java.time.OffsetDateTime.class)
+        );
+    }
+
+    private static PaymentProofTemplateContribution mapContribution(ResultSet rs, int rowNum) throws SQLException {
+        return new PaymentProofTemplateContribution(
+            rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class), rs.getObject("store_id", UUID.class),
+            rs.getObject("source_template_id", UUID.class), rs.getObject("platform_template_id", UUID.class),
+            rs.getString("bank_code"), rs.getString("bank_name"), rs.getString("locale"), rs.getString("template_name"),
+            rs.getString("layout_json"), rs.getString("sample_file_name"), rs.getString("sample_content_type"),
+            rs.getString("sample_file_digest"), rs.getString("sample_raw_text"), rs.getString("sample_ocr_reference"),
+            rs.getBigDecimal("sample_ocr_amount"), rs.getString("status"), rs.getString("review_note"),
+            rs.getObject("submitted_by", UUID.class), rs.getObject("reviewed_by", UUID.class),
+            rs.getObject("created_at", java.time.OffsetDateTime.class), rs.getObject("updated_at", java.time.OffsetDateTime.class),
+            rs.getObject("reviewed_at", java.time.OffsetDateTime.class), rs.getInt("version")
         );
     }
 }

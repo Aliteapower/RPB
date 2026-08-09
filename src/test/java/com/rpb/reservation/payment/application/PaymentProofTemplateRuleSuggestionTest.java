@@ -151,5 +151,38 @@ class PaymentProofTemplateRuleSuggestionTest {
             writeAttempted = true;
             throw new AssertionError("rule suggestion must not persist templates");
         }
+
+        @Override
+        public List<PaymentProofTemplate> findPlatformTemplates() { return List.of(); }
+
+        @Override
+        public PaymentProofTemplate createPlatformTemplate(PaymentProofTemplateCommand command, UUID actorId) { return write(); }
+
+        @Override
+        public PaymentProofTemplate updatePlatformTemplate(UUID templateId, PaymentProofTemplateCommand command) { return write(); }
+
+        @Override
+        public PaymentProofTemplateContribution createContribution(StoreScope scope, PaymentProofTemplateContributionCommand command, UUID actorId) {
+            writeAttempted = true;
+            throw new AssertionError("rule suggestion must not persist contributions");
+        }
+
+        @Override
+        public List<PaymentProofTemplateContribution> findTenantContributions(StoreScope scope) { return List.of(); }
+
+        @Override
+        public List<PaymentProofTemplateContribution> findPlatformContributions(String status) { return List.of(); }
+
+        @Override
+        public PaymentProofTemplateContribution acceptContribution(UUID contributionId, UUID platformTemplateId, UUID actorId, String reviewNote, int version) {
+            writeAttempted = true;
+            throw new AssertionError("rule suggestion must not review contributions");
+        }
+
+        @Override
+        public PaymentProofTemplateContribution rejectContribution(UUID contributionId, UUID actorId, String reviewNote, int version) {
+            writeAttempted = true;
+            throw new AssertionError("rule suggestion must not review contributions");
+        }
     }
 }

@@ -78,6 +78,96 @@ public class PaymentProofTemplateService {
         return repository.updateTenantTemplate(scope, templateId, normalized(command));
     }
 
+    @Transactional(readOnly = true)
+    public List<PaymentProofTemplate> listPlatformTemplates(CurrentActor actor) {
+        validatePlatformActor(actor);
+        return repository.findPlatformTemplates();
+    }
+
+    @Transactional
+    public PaymentProofTemplate createPlatformTemplate(PaymentProofTemplateCommand command, CurrentActor actor) {
+        validatePlatformActor(actor);
+        return repository.createPlatformTemplate(normalized(command), actor.actorId());
+    }
+
+    @Transactional
+    public PaymentProofTemplate updatePlatformTemplate(
+        UUID templateId,
+        PaymentProofTemplateCommand command,
+        CurrentActor actor
+    ) {
+        validatePlatformActor(actor);
+        if (templateId == null) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        return repository.updatePlatformTemplate(templateId, normalized(command));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentProofTemplateContribution> listTenantContributions(StoreScope scope, CurrentActor actor) {
+        validateTenantTemplateActor(scope, actor);
+        return repository.findTenantContributions(scope);
+    }
+
+    @Transactional
+    public PaymentProofTemplateContribution submitContribution(
+        StoreScope scope,
+        PaymentProofTemplateContributionCommand command,
+        CurrentActor actor
+    ) {
+        validateTenantTemplateActor(scope, actor);
+        return repository.createContribution(scope, normalizedContribution(command), actor.actorId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentProofTemplateContribution> listPlatformContributions(String status, CurrentActor actor) {
+        validatePlatformActor(actor);
+        return repository.findPlatformContributions(trimLower(status));
+    }
+
+    @Transactional
+    public PaymentProofTemplateContribution acceptContribution(
+        UUID contributionId,
+        PaymentProofTemplateContributionReviewCommand command,
+        CurrentActor actor
+    ) {
+        validatePlatformActor(actor);
+        validateReviewCommand(contributionId, command);
+        UUID requestedPlatformTemplateId = command.platformTemplateId();
+        UUID platformTemplateId;
+        if (requestedPlatformTemplateId == null) {
+            PaymentProofTemplateContribution contribution = repository.findPlatformContributions("submitted").stream()
+                .filter(candidate -> candidate.id().equals(contributionId))
+                .findFirst()
+                .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID));
+            platformTemplateId = repository.createPlatformTemplate(
+                new PaymentProofTemplateCommand(
+                    contribution.bankCode(), contribution.bankName(), contribution.locale(), contribution.templateName(),
+                    "active", 100, contribution.layoutJson(), 0
+                ),
+                actor.actorId()
+            ).id();
+        } else if (repository.findPlatformTemplates().stream().noneMatch(template -> template.id().equals(requestedPlatformTemplateId))) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        } else {
+            platformTemplateId = requestedPlatformTemplateId;
+        }
+        return repository.acceptContribution(
+            contributionId, platformTemplateId, actor.actorId(), trim(command.reviewNote()), command.version()
+        );
+    }
+
+    @Transactional
+    public PaymentProofTemplateContribution rejectContribution(
+        UUID contributionId,
+        PaymentProofTemplateContributionReviewCommand command,
+        CurrentActor actor
+    ) {
+        validatePlatformActor(actor);
+        validateReviewCommand(contributionId, command);
+        return repository.rejectContribution(contributionId, actor.actorId(), trim(command.reviewNote()), command.version());
+    }
+
     @Transactional
     public PaymentProofTemplateTestScanResult testScan(
         StoreScope scope,
@@ -297,6 +387,33 @@ public class PaymentProofTemplateService {
         );
     }
 
+    private static PaymentProofTemplateContributionCommand normalizedContribution(
+        PaymentProofTemplateContributionCommand command
+    ) {
+        if (command == null
+            || isBlank(command.bankCode())
+            || isBlank(command.bankName())
+            || isBlank(command.templateName())
+            || !validJson(command.layoutJson())
+            || (command.sampleContentType() != null && !allowedContentType(command.sampleContentType()))
+            || (command.sampleOcrAmount() != null && command.sampleOcrAmount().signum() <= 0)) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        return new PaymentProofTemplateContributionCommand(
+            command.sourceTemplateId(), trimLower(command.bankCode()), trim(command.bankName()),
+            trim(command.locale()) == null ? "zh-CN" : trim(command.locale()), trim(command.templateName()),
+            command.layoutJson().trim(), trim(command.sampleFileName()), trimLower(command.sampleContentType()),
+            trim(command.sampleFileDigest()), trim(command.sampleOcrReference()), command.sampleOcrAmount(),
+            trim(command.sampleRawText())
+        );
+    }
+
+    private static void validateReviewCommand(UUID contributionId, PaymentProofTemplateContributionReviewCommand command) {
+        if (contributionId == null || command == null || command.version() < 0) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
     private static Optional<String> extractByPatterns(String rawText, List<String> patterns) {
         for (String pattern : patterns) {
             Matcher matcher = compile(pattern).matcher(rawText == null ? "" : rawText);
@@ -407,6 +524,21 @@ public class PaymentProofTemplateService {
             || actor.tenantId() == null
             || !actor.tenantId().equals(scope.tenantId().value())
             || !actor.canAccessStore(scope.storeId().value())) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private static void validateTenantTemplateActor(StoreScope scope, CurrentActor actor) {
+        validateActor(scope, actor);
+        if (!actor.hasPermission("payment.proof_template.manage")) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private static void validatePlatformActor(CurrentActor actor) {
+        if (actor == null
+            || !actor.roles().contains("platform_admin")
+            || !actor.hasPermission("platform.payment_proof_template.manage")) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         }
     }
