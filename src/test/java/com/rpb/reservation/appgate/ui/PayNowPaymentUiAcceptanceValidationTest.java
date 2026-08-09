@@ -291,6 +291,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("savePaymentPresentSettings")
             .contains("publishPaymentPresentSettings")
             .contains("confirmPaymentPresentPayment")
+            .contains("const next = recent.filter(item => item.sessionNo !== sessionNo)")
             .contains("120");
         assertThat(generatedZh)
             .contains("\"generated.payment-quick-pay.055\": \"等顾客支付\"")

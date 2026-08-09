@@ -347,8 +347,7 @@ export function pushPaymentPresentRecent(payload: PaymentPresentPayload): Paymen
 export function confirmPaymentPresentPayment(
   storeId: string,
   terminalCode: string,
-  sessionNo: string,
-  status = 'paid'
+  sessionNo: string
 ): PaymentPresentRecentItem[] {
   const normalizedTerminal = normalizeTerminalCode(terminalCode)
   const activePayloads = readPaymentPresentPayloads(storeId, normalizedTerminal)
@@ -356,7 +355,7 @@ export function confirmPaymentPresentPayment(
   safeSetJson(activeStorageKey(storeId, normalizedTerminal), activePayloads)
 
   const recent = readPaymentPresentRecent(storeId, normalizedTerminal)
-  const next = recent.map(item => item.sessionNo === sessionNo ? { ...item, status } : item)
+  const next = recent.filter(item => item.sessionNo !== sessionNo)
   safeSetJson(recentStorageKey(storeId, normalizedTerminal), next)
   postPaymentPresentMessage(storeId, normalizedTerminal, {
     kind: 'payloads',
