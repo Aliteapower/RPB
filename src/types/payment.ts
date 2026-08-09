@@ -352,14 +352,12 @@ export interface PaymentProofTemplateContributionResponse {
 
 export interface PaymentProofTemplateRuleSuggestionResponse {
   success: true
-  suggestion: {
-    bankCode: string
-    bankName: string
-    locale: string
-    templateName: string
-    suggestedLayoutJson: string
-    ocr: PaymentProofTemplateTestScanResponse['ocr']
-  }
+  bankCode: string
+  bankName: string
+  locale: string
+  templateName: string
+  suggestedLayoutJson: string
+  ocr: PaymentProofTemplateTestScanResponse['ocr']
 }
 
 export interface PaymentApiErrorResponse {

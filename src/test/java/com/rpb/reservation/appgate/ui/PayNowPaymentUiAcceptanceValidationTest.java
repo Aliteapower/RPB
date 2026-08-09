@@ -381,6 +381,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("suggestPaymentProofTemplateRule");
         assertThat(types)
             .contains("PaymentProofTemplateContribution")
-            .contains("PaymentProofTemplateRuleSuggestionResponse");
+            .contains("PaymentProofTemplateRuleSuggestionResponse")
+            .contains("suggestedLayoutJson: string")
+            .doesNotContain("suggestion: {");
     }
 }
