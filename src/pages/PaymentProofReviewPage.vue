@@ -15,6 +15,7 @@ import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { PaymentProofCandidate, PaymentProofScanResponse } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
+import { confirmPaymentPresentPayment } from '../utils/paymentPresentBridge'
 
 const terminalStorageKey = 'rpb.payment.quickPay.terminalCode'
 
@@ -44,6 +45,7 @@ const albumInputRef = ref<HTMLInputElement | null>(null)
 let candidateSequence = 0
 let scannerStream: MediaStream | null = null
 let scannerTimer: number | undefined
+let successAutoAdvanceTimer: number | undefined
 let liveScanInFlight = false
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
@@ -72,6 +74,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshCandidatesOnFocus)
+  clearSuccessAutoAdvance()
   stopScanner()
   revokePreview()
 })
@@ -251,6 +254,7 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
   if (!storeId.value || scanning.value) {
     return
   }
+  clearSuccessAutoAdvance()
   scanning.value = true
   errorText.value = ''
   if (!fromCamera) {
@@ -266,10 +270,15 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
     })
     scanResult.value = result
     if (result.outcome === 'auto_confirmed' || result.outcome === 'already_confirmed') {
-      successfulDisplayNumber.value = resolveSuccessfulDisplayNumber(result)
+      const successfulCandidate = resolveSuccessfulCandidate(result)
+      successfulDisplayNumber.value = successfulCandidate?.displayNumber || null
+      if (successfulCandidate?.sessionNo) {
+        confirmPaymentPresentPayment(storeId.value, normalizedTerminalCode.value, successfulCandidate.sessionNo)
+      }
       speakPaymentSuccess(successfulDisplayNumber.value)
       stopScanner()
       await loadCandidates()
+      scheduleSuccessAutoAdvance(fromCamera)
     } else if (fromCamera && result.outcome === 'needs_review') {
       stopScanner()
     }
@@ -281,6 +290,7 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
 }
 
 function prepareNextScan(): void {
+  clearSuccessAutoAdvance()
   scanResult.value = null
   selectedFile.value = null
   successfulDisplayNumber.value = null
@@ -291,6 +301,23 @@ function prepareNextScan(): void {
   if (!scannerActive.value && !cameraStarting.value) {
     void startScanner()
   }
+}
+
+function scheduleSuccessAutoAdvance(fromCamera: boolean): void {
+  if (!fromCamera) {
+    return
+  }
+  successAutoAdvanceTimer = window.setTimeout(() => {
+    prepareNextScan()
+  }, 1800)
+}
+
+function clearSuccessAutoAdvance(): void {
+  if (successAutoAdvanceTimer === undefined) {
+    return
+  }
+  window.clearTimeout(successAutoAdvanceTimer)
+  successAutoAdvanceTimer = undefined
 }
 
 function closeReview(): void {
@@ -316,14 +343,13 @@ function outcomeLabel(outcome: string | null | undefined): string {
   return gt('generated.payment-proof-review.019')
 }
 
-function resolveSuccessfulDisplayNumber(result: PaymentProofScanResponse): number | null {
-  const candidate = candidates.value.find(value => {
+function resolveSuccessfulCandidate(result: PaymentProofScanResponse): PaymentProofCandidate | null {
+  return candidates.value.find(value => {
     if (result.sessionId && value.sessionId === result.sessionId) {
       return true
     }
     return Boolean(result.paymentReference && value.paymentReference === result.paymentReference)
-  })
-  return candidate?.displayNumber || null
+  }) || null
 }
 
 function speakPaymentSuccess(displayNumber: number | null): void {

@@ -23,6 +23,7 @@ import {
   buildPaymentPresentPayload,
   confirmPaymentPresentPayment,
   isPaymentPresentPayloadActive,
+  isPaymentPresentRecentPending,
   MAX_PRESENT_PAYMENTS,
   parsePresetAmountText,
   paymentPresentUrl,
@@ -413,7 +414,7 @@ async function confirmRecentPayment(item: PaymentPresentRecentItem): Promise<voi
 }
 
 function isManualConfirmableRecent(item: PaymentPresentRecentItem): boolean {
-  return item.status === 'pending' || item.status === 'awaiting_verification'
+  return isPaymentPresentRecentPending(item)
 }
 
 function resetPresentCapacityTracking(): void {

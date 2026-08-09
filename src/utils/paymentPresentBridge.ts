@@ -209,7 +209,11 @@ export function clearPaymentPresentPayloads(storeId: string, terminalCode: strin
 }
 
 export function isPaymentPresentPayloadActive(payload: PaymentPresentPayload, nowMs = Date.now()): boolean {
-  return nowMs - payload.createdAtMs < PAYMENT_PRESENT_TTL_SECONDS * 1000
+  return isPaymentPresentRecentPending(payload) && nowMs - payload.createdAtMs < PAYMENT_PRESENT_TTL_SECONDS * 1000
+}
+
+export function isPaymentPresentRecentPending(item: Pick<PaymentPresentRecentItem, 'status'>): boolean {
+  return item.status === 'pending' || item.status === 'awaiting_verification'
 }
 
 export function paymentPresentSecondsRemaining(payload: PaymentPresentPayload, nowMs = Date.now()): number {
@@ -318,6 +322,7 @@ export function prunePaymentPresentRecent(
     const parsed = JSON.parse(value)
     const items = Array.isArray(parsed) ? parsed.map(parseRecentItem).filter(isPresentRecentItem).slice(0, MAX_RECENT_ITEMS) : []
     const visible = items.filter(item => recentVisibleUntilMs(item, settings) > nowMs)
+      .filter(isPaymentPresentRecentPending)
     if (visible.length !== items.length) {
       safeSetJson(recentStorageKey(storeId, terminalCode), visible)
     }

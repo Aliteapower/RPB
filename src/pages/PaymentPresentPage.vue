@@ -8,6 +8,7 @@ import { useStoreContextStore } from '../stores/storeContext'
 import {
   clearPaymentPresentPayload,
   isPaymentPresentPayloadActive,
+  isPaymentPresentRecentPending,
   MAX_PRESENT_PAYMENTS,
   paymentPresentSecondsRemaining,
   PAYMENT_PRESENT_TTL_SECONDS,
@@ -134,7 +135,7 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
 }
 
 function isPendingRecent(item: PaymentPresentRecentItem): boolean {
-  return item.status === 'pending' || item.status === 'awaiting_verification'
+  return isPaymentPresentRecentPending(item)
 }
 </script>
 
