@@ -20,6 +20,26 @@ Ref extraction must ignore bank transaction identifiers such as `Transaction ID`
 
 ## Endpoints
 
+## Platform Proof Template Library
+
+Platform admins manage shared PayNow bank receipt OCR templates under:
+
+- `GET /api/v1/platform/payment/proof-templates`
+- `POST /api/v1/platform/payment/proof-templates`
+- `PATCH /api/v1/platform/payment/proof-templates/{templateId}`
+- `POST /api/v1/platform/payment/proof-templates/rule-suggestions`
+- `GET /api/v1/platform/payment/proof-template-contributions`
+- `POST /api/v1/platform/payment/proof-template-contributions/{contributionId}/accept`
+- `POST /api/v1/platform/payment/proof-template-contributions/{contributionId}/reject`
+
+Tenant admins contribute missing templates under:
+
+- `GET /api/v1/stores/{storeId}/tenant-admin/payment/proof-template-contributions`
+- `POST /api/v1/stores/{storeId}/tenant-admin/payment/proof-template-contributions`
+- `POST /api/v1/stores/{storeId}/tenant-admin/payment/proof-template-rule-suggestions`
+
+Rule suggestions never mutate payment intent/session/proof verification state.
+
 ### GET /api/v1/stores/{storeId}/tenant-admin/payment/proof-templates
 
 Permission: `payment.proof_template.manage`
