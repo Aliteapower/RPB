@@ -116,7 +116,9 @@ public class PaymentProofTemplateService {
         CurrentActor actor
     ) {
         validateTenantTemplateActor(scope, actor);
-        return repository.createContribution(scope, normalizedContribution(command), actor.actorId());
+        PaymentProofTemplateContributionCommand normalized = normalizedContribution(command);
+        validateContributionSource(scope, normalized.sourceTemplateId());
+        return repository.createContribution(scope, normalized, actor.actorId());
     }
 
     @Transactional(readOnly = true)
@@ -133,13 +135,10 @@ public class PaymentProofTemplateService {
     ) {
         validatePlatformActor(actor);
         validateReviewCommand(contributionId, command);
+        PaymentProofTemplateContribution contribution = submittedContribution(contributionId, command.version());
         UUID requestedPlatformTemplateId = command.platformTemplateId();
         UUID platformTemplateId;
         if (requestedPlatformTemplateId == null) {
-            PaymentProofTemplateContribution contribution = repository.findPlatformContributions("submitted").stream()
-                .filter(candidate -> candidate.id().equals(contributionId))
-                .findFirst()
-                .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID));
             platformTemplateId = repository.createPlatformTemplate(
                 new PaymentProofTemplateCommand(
                     contribution.bankCode(), contribution.bankName(), contribution.locale(), contribution.templateName(),
@@ -147,10 +146,18 @@ public class PaymentProofTemplateService {
                 ),
                 actor.actorId()
             ).id();
-        } else if (repository.findPlatformTemplates().stream().noneMatch(template -> template.id().equals(requestedPlatformTemplateId))) {
-            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         } else {
-            platformTemplateId = requestedPlatformTemplateId;
+            PaymentProofTemplate selectedTemplate = repository.findPlatformTemplates().stream()
+                .filter(template -> template.id().equals(requestedPlatformTemplateId))
+                .findFirst()
+                .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID));
+            platformTemplateId = repository.updatePlatformTemplate(
+                selectedTemplate.id(),
+                new PaymentProofTemplateCommand(
+                    contribution.bankCode(), contribution.bankName(), contribution.locale(), contribution.templateName(),
+                    "active", selectedTemplate.priority(), contribution.layoutJson(), selectedTemplate.version()
+                )
+            ).id();
         }
         return repository.acceptContribution(
             contributionId, platformTemplateId, actor.actorId(), trim(command.reviewNote()), command.version()
@@ -165,6 +172,7 @@ public class PaymentProofTemplateService {
     ) {
         validatePlatformActor(actor);
         validateReviewCommand(contributionId, command);
+        submittedContribution(contributionId, command.version());
         return repository.rejectContribution(contributionId, actor.actorId(), trim(command.reviewNote()), command.version());
     }
 
@@ -412,6 +420,31 @@ public class PaymentProofTemplateService {
         if (contributionId == null || command == null || command.version() < 0) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         }
+    }
+
+    private void validateContributionSource(StoreScope scope, UUID sourceTemplateId) {
+        if (sourceTemplateId == null) {
+            return;
+        }
+        PaymentProofTemplate sourceTemplate = repository.findTemplateForTenant(scope, sourceTemplateId)
+            .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID));
+        if (!sourceTemplate.tenantOwned() || !scope.tenantId().value().equals(sourceTemplate.tenantId())) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+    }
+
+    private PaymentProofTemplateContribution submittedContribution(UUID contributionId, int version) {
+        PaymentProofTemplateContribution contribution = repository.findPlatformContributions(null).stream()
+            .filter(candidate -> candidate.id().equals(contributionId))
+            .findFirst()
+            .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID));
+        if (!"submitted".equals(contribution.status())) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        if (contribution.version() != version) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.VERSION_CONFLICT);
+        }
+        return contribution;
     }
 
     private static Optional<String> extractByPatterns(String rawText, List<String> patterns) {

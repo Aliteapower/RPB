@@ -316,7 +316,19 @@ public class JdbcPaymentProofTemplateRepository implements PaymentProofTemplateR
             """,
             JdbcPaymentProofTemplateRepository::mapContribution,
             status, platformTemplateId, actorId, reviewNote, contributionId, version
-        ).stream().findFirst().orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.VERSION_CONFLICT));
+        ).stream().findFirst().orElseThrow(() -> reviewFailure(contributionId));
+    }
+
+    private PaymentServiceException reviewFailure(UUID contributionId) {
+        ContributionReviewState current = jdbc.query(
+            "select status, version from payment_proof_template_contributions where id = ?",
+            (rs, rowNum) -> new ContributionReviewState(rs.getString("status"), rs.getInt("version")),
+            contributionId
+        ).stream().findFirst().orElse(null);
+        if (current == null || !"submitted".equals(current.status())) {
+            return new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        return new PaymentServiceException(PaymentServiceErrorCode.VERSION_CONFLICT);
     }
 
     private static PaymentProofTemplate mapTemplate(ResultSet rs, int rowNum) throws SQLException {
@@ -363,5 +375,8 @@ public class JdbcPaymentProofTemplateRepository implements PaymentProofTemplateR
             rs.getObject("created_at", java.time.OffsetDateTime.class), rs.getObject("updated_at", java.time.OffsetDateTime.class),
             rs.getObject("reviewed_at", java.time.OffsetDateTime.class), rs.getInt("version")
         );
+    }
+
+    private record ContributionReviewState(String status, int version) {
     }
 }

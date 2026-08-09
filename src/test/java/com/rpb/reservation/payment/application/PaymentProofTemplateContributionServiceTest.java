@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 class PaymentProofTemplateContributionServiceTest {
     private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000003");
+    private static final UUID OTHER_TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000004");
     private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000003");
     private static final UUID TENANT_ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000003");
     private static final UUID PLATFORM_ACTOR_ID = UUID.fromString("40000000-0000-0000-0000-000000000003");
@@ -69,6 +70,69 @@ class PaymentProofTemplateContributionServiceTest {
         )).isInstanceOf(PaymentServiceException.class);
     }
 
+    @Test
+    void acceptingIntoExistingPlatformTemplateUpdatesItsContributionFields() {
+        PaymentProofTemplate existing = repository.addPlatformTemplate("Previous template", "inactive", "{\"matchKeywords\":[\"OLD\"]}");
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+
+        service.acceptContribution(
+            submitted.id(),
+            new PaymentProofTemplateContributionReviewCommand(existing.id(), "apply contribution", submitted.version()),
+            platformActor()
+        );
+
+        PaymentProofTemplate updated = repository.findPlatformTemplates().getFirst();
+        assertThat(updated.templateName()).isEqualTo("OCBC new receipt");
+        assertThat(updated.layoutJson()).contains("OCBC");
+        assertThat(updated.status()).isEqualTo("active");
+        assertThat(updated.version()).isEqualTo(existing.version() + 1);
+    }
+
+    @Test
+    void platformTemplateCannotBeSubmittedAsContributionSource() {
+        repository.sourceTemplate = template(TENANT_TEMPLATE_ID, null, "platform_seed");
+
+        assertThatThrownBy(() -> service.submitContribution(scope(), contributionCommand(), tenantActor()))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void foreignTemplateCannotBeSubmittedAsContributionSource() {
+        repository.sourceTemplate = template(TENANT_TEMPLATE_ID, OTHER_TENANT_ID, "tenant_custom");
+
+        assertThatThrownBy(() -> service.submitContribution(scope(), contributionCommand(), tenantActor()))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void acceptedContributionCannotBeRejected() {
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+        PaymentProofTemplateContribution accepted = service.acceptContribution(
+            submitted.id(), new PaymentProofTemplateContributionReviewCommand(null, "accepted", submitted.version()), platformActor()
+        );
+
+        assertThatThrownBy(() -> service.rejectContribution(
+            accepted.id(), new PaymentProofTemplateContributionReviewCommand(null, "too late", accepted.version()), platformActor()
+        )).isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void staleSubmittedContributionReviewReturnsVersionConflict() {
+        PaymentProofTemplateContribution submitted = service.submitContribution(scope(), contributionCommand(), tenantActor());
+
+        assertThatThrownBy(() -> service.rejectContribution(
+            submitted.id(), new PaymentProofTemplateContributionReviewCommand(null, "stale", submitted.version() + 1), platformActor()
+        )).isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.VERSION_CONFLICT);
+    }
+
     private static StoreScope scope() {
         return new StoreScope(new TenantId(TENANT_ID), new StoreId(STORE_ID));
     }
@@ -112,9 +176,17 @@ class PaymentProofTemplateContributionServiceTest {
         );
     }
 
+    private static PaymentProofTemplate template(UUID id, UUID tenantId, String source) {
+        return new PaymentProofTemplate(
+            id, tenantId, "ocbc", "OCBC", "zh-CN", "Tenant source", source, "active", 100, 0,
+            "{\"matchKeywords\":[\"OCBC\"]}", OffsetDateTime.now(), OffsetDateTime.now()
+        );
+    }
+
     private static final class InMemoryTemplateRepository implements PaymentProofTemplateRepository {
         private final List<PaymentProofTemplate> platformTemplates = new ArrayList<>();
         private final List<PaymentProofTemplateContribution> contributions = new ArrayList<>();
+        private PaymentProofTemplate sourceTemplate = template(TENANT_TEMPLATE_ID, TENANT_ID, "tenant_custom");
 
         @Override
         public List<PaymentProofTemplate> findEffectiveTemplates(StoreScope scope) {
@@ -133,7 +205,10 @@ class PaymentProofTemplateContributionServiceTest {
 
         @Override
         public Optional<PaymentProofTemplate> findTemplateForTenant(StoreScope scope, UUID templateId) {
-            return Optional.empty();
+            if (!sourceTemplate.id().equals(templateId)) {
+                return Optional.empty();
+            }
+            return Optional.of(sourceTemplate);
         }
 
         @Override
@@ -168,7 +243,17 @@ class PaymentProofTemplateContributionServiceTest {
 
         @Override
         public PaymentProofTemplate updatePlatformTemplate(UUID templateId, PaymentProofTemplateCommand command) {
-            throw new UnsupportedOperationException();
+            PaymentProofTemplate current = platformTemplates.stream()
+                .filter(template -> template.id().equals(templateId) && template.version() == command.version())
+                .findFirst()
+                .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.VERSION_CONFLICT));
+            PaymentProofTemplate updated = new PaymentProofTemplate(
+                current.id(), null, command.bankCode(), command.bankName(), command.locale(), command.templateName(),
+                "platform_seed", command.status(), command.priority(), current.version() + 1, command.layoutJson(),
+                current.createdAt(), OffsetDateTime.now()
+            );
+            platformTemplates.set(platformTemplates.indexOf(current), updated);
+            return updated;
         }
 
         @Override
@@ -221,7 +306,26 @@ class PaymentProofTemplateContributionServiceTest {
 
         @Override
         public PaymentProofTemplateContribution rejectContribution(UUID contributionId, UUID actorId, String reviewNote, int version) {
-            throw new UnsupportedOperationException();
+            PaymentProofTemplateContribution current = contributions.stream()
+                .filter(value -> value.id().equals(contributionId) && value.version() == version).findFirst().orElseThrow();
+            PaymentProofTemplateContribution rejected = new PaymentProofTemplateContribution(
+                current.id(), current.tenantId(), current.storeId(), current.sourceTemplateId(), null,
+                current.bankCode(), current.bankName(), current.locale(), current.templateName(), current.layoutJson(),
+                current.sampleFileName(), current.sampleContentType(), current.sampleFileDigest(), current.sampleRawText(),
+                current.sampleOcrReference(), current.sampleOcrAmount(), "rejected", reviewNote, current.submittedBy(), actorId,
+                current.createdAt(), OffsetDateTime.now(), OffsetDateTime.now(), current.version() + 1
+            );
+            contributions.set(contributions.indexOf(current), rejected);
+            return rejected;
+        }
+
+        private PaymentProofTemplate addPlatformTemplate(String templateName, String status, String layoutJson) {
+            PaymentProofTemplate template = new PaymentProofTemplate(
+                UUID.randomUUID(), null, "old", "Old Bank", "en-SG", templateName, "platform_seed", status,
+                75, 4, layoutJson, OffsetDateTime.now(), OffsetDateTime.now()
+            );
+            platformTemplates.add(template);
+            return template;
         }
     }
 }
