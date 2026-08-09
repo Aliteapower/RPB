@@ -132,6 +132,10 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
   const remaining = Math.max(0, Math.ceil((item.createdAtMs + PAYMENT_PRESENT_TTL_SECONDS * 1000 - nowMs.value) / 1000))
   return remaining > 0 ? `${remaining}s` : gt('generated.payment-present.015')
 }
+
+function isPendingRecent(item: PaymentPresentRecentItem): boolean {
+  return item.status === 'pending' || item.status === 'awaiting_verification'
+}
 </script>
 
 <template>
@@ -196,7 +200,7 @@ function recentSecondsText(item: PaymentPresentRecentItem): string {
             <div>
               <span>{{ item.currency }} {{ item.amount }}</span>
               <small>{{ item.status }}</small>
-              <small>{{ recentSecondsText(item) }}</small>
+              <small v-if="isPendingRecent(item)">{{ recentSecondsText(item) }}</small>
             </div>
           </article>
         </div>

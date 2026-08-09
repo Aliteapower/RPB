@@ -65,10 +65,12 @@ onMounted(() => {
     terminalCode.value = 'T1'
   }
   businessDate.value = currentBusinessDate.value
+  window.addEventListener('focus', refreshCandidatesOnFocus)
   void loadCandidates()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('focus', refreshCandidatesOnFocus)
   stopScanner()
   revokePreview()
 })
@@ -85,6 +87,12 @@ watch(terminalCode, value => {
     // Keep the in-memory terminal code if local storage is unavailable.
   }
 })
+
+function refreshCandidatesOnFocus(): void {
+  if (!document.hidden) {
+    void loadCandidates()
+  }
+}
 
 async function loadCandidates(): Promise<void> {
   const currentStoreId = storeId.value
