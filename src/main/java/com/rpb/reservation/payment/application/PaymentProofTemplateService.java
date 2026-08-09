@@ -2,6 +2,7 @@ package com.rpb.reservation.payment.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.payment.domain.PaymentReferencePattern;
@@ -17,7 +18,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,6 +112,33 @@ public class PaymentProofTemplateService {
     }
 
     @Transactional(readOnly = true)
+    public PaymentProofTemplateRuleSuggestion suggestRule(
+        StoreScope scope,
+        String fileName,
+        String contentType,
+        byte[] fileBytes,
+        String bankCode,
+        String bankName,
+        String locale,
+        CurrentActor actor
+    ) {
+        validateActor(scope, actor);
+        return suggest(fileName, contentType, fileBytes, bankCode, bankName, locale);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentProofTemplateRuleSuggestion suggestPlatformRule(
+        String fileName,
+        String contentType,
+        byte[] fileBytes,
+        String bankCode,
+        String bankName,
+        String locale
+    ) {
+        return suggest(fileName, contentType, fileBytes, bankCode, bankName, locale);
+    }
+
+    @Transactional(readOnly = true)
     public PaymentProofOcrFields enhance(StoreScope scope, PaymentProofOcrFields fields) {
         if (scope == null || fields == null || isBlank(fields.rawText())) {
             return fields;
@@ -168,6 +198,82 @@ public class PaymentProofTemplateService {
                 }
             }
         }
+    }
+
+    private PaymentProofTemplateRuleSuggestion suggest(
+        String fileName,
+        String contentType,
+        byte[] fileBytes,
+        String bankCode,
+        String bankName,
+        String locale
+    ) {
+        if (ocrAdapter == null || fileBytes == null || fileBytes.length == 0 || !allowedContentType(contentType)) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        PaymentProofOcrFields fields = extract(fileName, fileBytes);
+        String normalizedBankCode = firstNonBlank(trimLower(bankCode), trimLower(fields.bankCode()));
+        String normalizedBankName = firstNonBlank(trim(bankName), normalizedBankCode == null ? null : normalizedBankCode.toUpperCase(Locale.ROOT));
+        String normalizedLocale = trim(locale) == null ? "zh-CN" : trim(locale);
+        if (isBlank(normalizedBankCode) || isBlank(normalizedBankName)) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        return new PaymentProofTemplateRuleSuggestion(
+            normalizedBankCode,
+            normalizedBankName,
+            normalizedLocale,
+            normalizedBankName + " PayNow",
+            suggestedLayoutJson(fields.rawText(), normalizedBankCode, fields),
+            fields
+        );
+    }
+
+    private static String suggestedLayoutJson(String rawText, String bankCode, PaymentProofOcrFields fields) {
+        ObjectNode root = OBJECT_MAPPER.createObjectNode();
+        ArrayNode matchKeywords = root.putArray("matchKeywords");
+        stableKeywords(rawText, bankCode).forEach(matchKeywords::add);
+        ArrayNode successKeywords = root.putArray("successKeywords");
+        stableSuccessKeywords(rawText, fields).forEach(successKeywords::add);
+        ArrayNode referencePatterns = root.putArray("referencePatterns");
+        referencePatterns.add("(?:讯息|信息|Message|Comment|Ref|Reference)\\s*[:：]?\\s*\\\"?([A-Z0-9.-]{10,32})\\\"?");
+        ArrayNode amountPatterns = root.putArray("amountPatterns");
+        amountPatterns.add("(?:您已支付|You(?:'ve)? sent|Payment successful|paid|sent)\\s*(?:S\\$|SGD|\\$)?\\s*([0-9OoIl,.]+)");
+        amountPatterns.add("(?:SGD|S\\$|\\$)\\s*([0-9OoIl,.]+)");
+        root.putArray("referenceRoi").add(0.0).add(0.30).add(1.0).add(0.66);
+        root.putArray("amountRoi").add(0.0).add(0.15).add(1.0).add(0.42);
+        try {
+            return OBJECT_MAPPER.writeValueAsString(root);
+        } catch (Exception exception) {
+            throw new IllegalStateException("payment_proof_template_rule_json_required", exception);
+        }
+    }
+
+    private static List<String> stableKeywords(String rawText, String bankCode) {
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        if (!isBlank(bankCode)) {
+            values.add(bankCode.toUpperCase(Locale.ROOT));
+        }
+        String text = rawText == null ? "" : rawText.toLowerCase(Locale.ROOT);
+        for (String keyword : List.of("PayNow", "OCBC", "DBS", "UOB", "POSB")) {
+            if (text.contains(keyword.toLowerCase(Locale.ROOT))) {
+                values.add(keyword);
+            }
+        }
+        return List.copyOf(values);
+    }
+
+    private static List<String> stableSuccessKeywords(String rawText, PaymentProofOcrFields fields) {
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        String text = rawText == null ? "" : rawText.toLowerCase(Locale.ROOT);
+        for (String keyword : List.of("您已支付", "You've sent", "You have sent", "Payment successful")) {
+            if (text.contains(keyword.toLowerCase(Locale.ROOT))) {
+                values.add(keyword);
+            }
+        }
+        if (values.isEmpty() && fields.successDetected()) {
+            values.add("Payment successful");
+        }
+        return List.copyOf(values);
     }
 
     private static PaymentProofTemplateCommand normalized(PaymentProofTemplateCommand command) {
