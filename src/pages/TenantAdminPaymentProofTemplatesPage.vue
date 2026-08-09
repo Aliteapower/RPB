@@ -182,6 +182,7 @@ async function suggestFromSelectedFile(event: Event): Promise<void> {
   if (!file || testing.value || !editable.value) {
     return
   }
+  const templateId = selected.value?.id
   testing.value = true
   errorText.value = ''
   testResult.value = null
@@ -191,6 +192,9 @@ async function suggestFromSelectedFile(event: Event): Promise<void> {
       bankName: form.bankName,
       locale: form.locale
     })
+    if (selected.value?.id !== templateId || !editable.value) {
+      return
+    }
     form.layoutJson = formatJson(response.suggestedLayoutJson)
     testResult.value = { success: true, template: selected.value, ocr: response.ocr }
     savedText.value = gt('generated.tenant-admin-payment-proof-templates.020')

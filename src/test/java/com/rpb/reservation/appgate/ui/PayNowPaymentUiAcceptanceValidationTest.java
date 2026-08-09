@@ -181,6 +181,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("suggestPaymentProofTemplateRule")
             .contains("!editable || testing")
             .contains("testing.value || !editable.value")
+            .contains("const templateId = selected.value?.id")
+            .contains("selected.value?.id !== templateId || !editable.value")
             .contains("回单样式库")
             .contains("已引用平台模板")
             .contains("租户自定义")
