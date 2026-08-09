@@ -53,3 +53,18 @@ Permission and tenant-isolation coverage remains in the existing platform/tenant
 ## Remaining Risk
 
 None identified beyond the existing repository-wide Maven deprecation warnings and Mockito dynamic-agent warning, neither introduced by this change.
+
+## Scoped Re-review Follow-up
+
+### Persisted malformed regex isolation
+
+The scoped re-review finding was confirmed. Although write-time validation rejects new malformed patterns, `extractByPatterns` and `extractAmountByPatterns` still compiled every persisted pattern without exception isolation. A malformed active legacy row could therefore throw `PatternSyntaxException` and abort proof-template enhancement.
+
+Both scan-time extraction loops now catch `PatternSyntaxException` per persisted pattern and continue to the next pattern. If no valid template pattern extracts a value, the existing OCR/system-reference fallback remains available. Strict write-time compilation is unchanged.
+
+Regression `PaymentProofTemplateServiceTest.enhancementSkipsMalformedPersistedPatternsAndContinuesWithValidPatterns` uses an active persisted template with malformed first reference/amount patterns and valid second patterns. It failed with `PatternSyntaxException` before the fix and now extracts the reference and amount successfully.
+
+Focused validation:
+
+- `mvn "-Dtest=PaymentProofTemplateServiceTest,PaymentProofReviewServiceTest" test`: passed, 15 tests with 0 failures and 0 errors.
+- `git diff --check`: passed with no whitespace errors.

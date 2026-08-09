@@ -86,6 +86,37 @@ class PaymentProofTemplateServiceTest {
         assertThat(service.enhance(scope, original)).isSameAs(original);
     }
 
+    @Test
+    void enhancementSkipsMalformedPersistedPatternsAndContinuesWithValidPatterns() {
+        repository.templates.add(template(
+            UUID.fromString("30000000-0000-0000-0000-000000000003"),
+            null,
+            "platform_seed",
+            "ocbc",
+            10,
+            """
+            {"matchKeywords":["OCBC"],"referencePatterns":["[","(PIT-\\\\d{6}-\\\\d{4})"],"amountPatterns":["[","SGD\\\\s*([0-9.]+)"]}
+            """
+        ));
+
+        PaymentProofOcrFields enhanced = service.enhance(
+            scope,
+            new PaymentProofOcrFields(
+                null,
+                null,
+                null,
+                null,
+                true,
+                new BigDecimal("0.3000"),
+                "OCBC\nRef PIT-202608-0021\nPaid SGD 1.00",
+                "{}"
+            )
+        );
+
+        assertThat(enhanced.extractedReference()).isEqualTo("PIT-202608-0021");
+        assertThat(enhanced.extractedAmount()).isEqualByComparingTo("1.00");
+    }
+
     private static PaymentProofTemplate template(
         UUID id,
         UUID tenantId,

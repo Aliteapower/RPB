@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -465,7 +466,12 @@ public class PaymentProofTemplateService {
 
     private static Optional<String> extractByPatterns(String rawText, List<String> patterns) {
         for (String pattern : patterns) {
-            Matcher matcher = compile(pattern).matcher(rawText == null ? "" : rawText);
+            Matcher matcher;
+            try {
+                matcher = compile(pattern).matcher(rawText == null ? "" : rawText);
+            } catch (PatternSyntaxException ignored) {
+                continue;
+            }
             if (matcher.find()) {
                 String value = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group();
                 if (!isBlank(value)) {
@@ -478,7 +484,12 @@ public class PaymentProofTemplateService {
 
     private static Optional<BigDecimal> extractAmountByPatterns(String rawText, List<String> patterns) {
         for (String pattern : patterns) {
-            Matcher matcher = compile(pattern).matcher(rawText == null ? "" : rawText);
+            Matcher matcher;
+            try {
+                matcher = compile(pattern).matcher(rawText == null ? "" : rawText);
+            } catch (PatternSyntaxException ignored) {
+                continue;
+            }
             if (matcher.find()) {
                 String value = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group();
                 Optional<BigDecimal> parsed = parseAmount(value);
