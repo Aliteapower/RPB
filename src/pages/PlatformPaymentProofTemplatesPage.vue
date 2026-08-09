@@ -65,7 +65,12 @@ async function loadAll(): Promise<void> {
     ])
     templates.value = templateResponse.templates
     contributions.value = contributionResponse.contributions
-    if (!selected.value && templates.value.length) {
+    const refreshedSelected = templates.value.find(template => template.id === selected.value?.id)
+    if (refreshedSelected) {
+      selectTemplate(refreshedSelected)
+    } else if (selected.value) {
+      selected.value = null
+    } else if (templates.value.length) {
       selectTemplate(templates.value[0])
     }
   } catch (error) {

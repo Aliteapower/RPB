@@ -397,6 +397,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("suggestPlatformPaymentProofTemplateRule")
             .contains("acceptPlatformPaymentProofTemplateContribution")
             .contains("rejectPlatformPaymentProofTemplateContribution")
+            .contains("const refreshedSelected = templates.value.find(template => template.id === selected.value?.id)")
+            .contains("selectTemplate(refreshedSelected)")
             .contains("PayNow 回单样式库");
         assertThat(router)
             .contains("PlatformPaymentProofTemplatesPage")
