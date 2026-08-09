@@ -2,6 +2,7 @@ package com.rpb.reservation.payment.api;
 
 import com.rpb.reservation.payment.application.PaymentIntent;
 import com.rpb.reservation.payment.application.PaymentIntentCreateResult;
+import com.rpb.reservation.payment.application.PaymentManualConfirmResult;
 import com.rpb.reservation.payment.application.PaymentQuickPayConfig;
 import com.rpb.reservation.payment.application.PaymentSession;
 import com.rpb.reservation.payment.application.QuickPayRecord;
@@ -93,6 +94,24 @@ public final class PaymentIntentResponses {
                 session.qrPayloadsJson(),
                 session.expiresAt(),
                 session.version()
+            );
+        }
+    }
+
+    public record ManualConfirmResponse(
+        boolean success,
+        boolean replayed,
+        boolean alreadyConfirmed,
+        IntentResponse intent,
+        SessionResponse session
+    ) {
+        public static ManualConfirmResponse from(PaymentManualConfirmResult result) {
+            return new ManualConfirmResponse(
+                result.success(),
+                result.replayed(),
+                result.alreadyConfirmed(),
+                IntentResponse.from(result.intent()),
+                SessionResponse.from(result.session())
             );
         }
     }

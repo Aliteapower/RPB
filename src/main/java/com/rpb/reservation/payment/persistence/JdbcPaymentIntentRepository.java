@@ -5,6 +5,7 @@ import com.rpb.reservation.payment.application.PaymentBusinessDay;
 import com.rpb.reservation.payment.application.PaymentIntent;
 import com.rpb.reservation.payment.application.PaymentIntentCreateResult;
 import com.rpb.reservation.payment.application.PaymentIntentDraft;
+import com.rpb.reservation.payment.application.PaymentManualConfirmResult;
 import com.rpb.reservation.payment.application.PaymentSession;
 import com.rpb.reservation.payment.application.PaymentSessionDraft;
 import com.rpb.reservation.payment.application.QuickPayRecord;
@@ -177,6 +178,73 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
         sql.append(" order by i.created_at desc, s.created_at desc limit ?");
         args.add(query.limit());
         return jdbc.query(sql.toString(), (rs, rowNum) -> mapQuickPayRecord(rs), args.toArray());
+    }
+
+    @Override
+    @Transactional
+    public Optional<PaymentManualConfirmResult> manualConfirmQuickPay(
+        StoreScope scope,
+        String sessionNo,
+        String idempotencyKey,
+        UUID actorId,
+        String terminalCode
+    ) {
+        Optional<PaymentManualConfirmResult> replayed = findManualConfirmResultByEvent(scope, idempotencyKey)
+            .map(PaymentManualConfirmResult::asReplay);
+        if (replayed.isPresent()) {
+            return replayed;
+        }
+
+        Optional<PaymentManualConfirmResult> current = findQuickPayIntentSession(scope, sessionNo, false, false);
+        if (current.isEmpty()) {
+            return Optional.empty();
+        }
+        PaymentManualConfirmResult candidate = current.get();
+        if ("paid".equals(candidate.intent().status()) && "paid".equals(candidate.session().status())) {
+            insertManualConfirmEvent(scope, candidate.intent().id(), candidate.session().id(), actorId, idempotencyKey, terminalCode, true);
+            return Optional.of(new PaymentManualConfirmResult(true, false, true, candidate.intent(), candidate.session()));
+        }
+        if (!isManualConfirmableStatus(candidate.intent().status()) || !isManualConfirmableStatus(candidate.session().status())) {
+            return Optional.empty();
+        }
+
+        int intents = jdbc.update(
+            """
+            update payment_intents
+            set status = 'paid',
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and id = ?
+              and source_type = 'quick_pay'
+              and status in ('pending', 'awaiting_verification')
+            """,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            candidate.intent().id()
+        );
+        int sessions = jdbc.update(
+            """
+            update payment_sessions
+            set status = 'paid',
+                updated_at = now(),
+                version = version + 1
+            where tenant_id = ?
+              and store_id = ?
+              and id = ?
+              and status in ('pending', 'awaiting_verification')
+            """,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            candidate.session().id()
+        );
+        if (intents == 0 || sessions == 0) {
+            return Optional.empty();
+        }
+
+        insertManualConfirmEvent(scope, candidate.intent().id(), candidate.session().id(), actorId, idempotencyKey, terminalCode, false);
+        return findQuickPayIntentSession(scope, sessionNo, false, false);
     }
 
     @Override
@@ -409,6 +477,153 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
         return mapIntent(rs);
     }
 
+    private Optional<PaymentManualConfirmResult> findManualConfirmResultByEvent(StoreScope scope, String idempotencyKey) {
+        return jdbc.query(
+            """
+            select
+                i.id as intent_id,
+                i.tenant_id as intent_tenant_id,
+                i.store_id as intent_store_id,
+                i.intent_no,
+                i.source_type,
+                i.source_id,
+                i.method,
+                i.amount,
+                i.currency,
+                i.payment_reference,
+                i.status as intent_status,
+                i.expires_at as intent_expires_at,
+                i.version as intent_version,
+                s.id as session_id,
+                s.tenant_id as session_tenant_id,
+                s.store_id as session_store_id,
+                s.intent_id as session_intent_id,
+                s.session_no,
+                s.display_number,
+                s.business_date,
+                s.status as session_status,
+                s.qr_payloads_json::text as qr_payloads_json,
+                s.expires_at as session_expires_at,
+                s.version as session_version,
+                coalesce((e.event_payload ->> 'alreadyConfirmed')::boolean, false) as already_confirmed
+            from payment_events e
+            join payment_intents i
+              on i.tenant_id = e.tenant_id
+             and i.store_id = e.store_id
+             and i.id = e.intent_id
+            join payment_sessions s
+              on s.tenant_id = e.tenant_id
+             and s.store_id = e.store_id
+             and s.id = e.session_id
+            where e.tenant_id = ?
+              and e.store_id = ?
+              and e.event_type = 'source_confirmed'
+              and e.idempotency_key = ?
+            limit 1
+            """,
+            (rs, rowNum) -> new PaymentManualConfirmResult(
+                true,
+                false,
+                rs.getBoolean("already_confirmed"),
+                mapIntent(rs),
+                mapSession(rs)
+            ),
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            manualConfirmEventKey(idempotencyKey)
+        ).stream().findFirst();
+    }
+
+    private Optional<PaymentManualConfirmResult> findQuickPayIntentSession(
+        StoreScope scope,
+        String sessionNo,
+        boolean replayed,
+        boolean alreadyConfirmed
+    ) {
+        return jdbc.query(
+            """
+            select
+                i.id as intent_id,
+                i.tenant_id as intent_tenant_id,
+                i.store_id as intent_store_id,
+                i.intent_no,
+                i.source_type,
+                i.source_id,
+                i.method,
+                i.amount,
+                i.currency,
+                i.payment_reference,
+                i.status as intent_status,
+                i.expires_at as intent_expires_at,
+                i.version as intent_version,
+                s.id as session_id,
+                s.tenant_id as session_tenant_id,
+                s.store_id as session_store_id,
+                s.intent_id as session_intent_id,
+                s.session_no,
+                s.display_number,
+                s.business_date,
+                s.status as session_status,
+                s.qr_payloads_json::text as qr_payloads_json,
+                s.expires_at as session_expires_at,
+                s.version as session_version
+            from payment_sessions s
+            join payment_intents i
+              on i.tenant_id = s.tenant_id
+             and i.store_id = s.store_id
+             and i.id = s.intent_id
+            where s.tenant_id = ?
+              and s.store_id = ?
+              and s.session_no = ?
+              and i.source_type = 'quick_pay'
+            limit 1
+            """,
+            (rs, rowNum) -> new PaymentManualConfirmResult(
+                true,
+                replayed,
+                alreadyConfirmed,
+                mapIntent(rs),
+                mapSession(rs)
+            ),
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            sessionNo
+        ).stream().findFirst();
+    }
+
+    private void insertManualConfirmEvent(
+        StoreScope scope,
+        UUID intentId,
+        UUID sessionId,
+        UUID actorId,
+        String idempotencyKey,
+        String terminalCode,
+        boolean alreadyConfirmed
+    ) {
+        jdbc.update(
+            """
+            insert into payment_events (
+                tenant_id,
+                store_id,
+                intent_id,
+                session_id,
+                event_type,
+                actor_user_id,
+                idempotency_key,
+                event_payload
+            ) values (?, ?, ?, ?, 'source_confirmed', ?, ?, ?::jsonb)
+            on conflict do nothing
+            """,
+            scope.tenantId().value(),
+            scope.storeId().value(),
+            intentId,
+            sessionId,
+            actorId,
+            manualConfirmEventKey(idempotencyKey),
+            manualConfirmPayload(terminalCode, alreadyConfirmed)
+        );
+    }
+
     private static PaymentIntent mapIntent(ResultSet rs) throws SQLException {
         return new PaymentIntent(
             rs.getObject("intent_id", UUID.class),
@@ -478,5 +693,23 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private static boolean isManualConfirmableStatus(String status) {
+        return "pending".equals(status) || "awaiting_verification".equals(status);
+    }
+
+    private static String manualConfirmEventKey(String idempotencyKey) {
+        return idempotencyKey + ":source_confirmed";
+    }
+
+    private static String manualConfirmPayload(String terminalCode, boolean alreadyConfirmed) {
+        return """
+            {"channel":"staff_quick_pay_manual","terminalCode":"%s","alreadyConfirmed":%s}
+            """.formatted(jsonEscape(terminalCode == null ? "" : terminalCode), alreadyConfirmed).trim();
+    }
+
+    private static String jsonEscape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

@@ -20,4 +20,10 @@ public final class PaymentIntentRequests {
         String metadataJson
     ) {
     }
+
+    public record ManualConfirmRequest(
+        String idempotencyKey,
+        String terminalCode
+    ) {
+    }
 }

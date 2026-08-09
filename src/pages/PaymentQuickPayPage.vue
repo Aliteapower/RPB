@@ -7,6 +7,7 @@ import {
   endPaymentBusinessDay,
   getPaymentBusinessDay,
   getQuickPayTerminalConfig,
+  manualConfirmQuickPay,
   openPaymentBusinessDay,
   PaymentApiError
 } from '../api/paymentApi'
@@ -20,6 +21,7 @@ import type { PaymentBusinessDayStatus, PaymentIntentCreateResponse } from '../t
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 import {
   buildPaymentPresentPayload,
+  confirmPaymentPresentPayment,
   isPaymentPresentPayloadActive,
   MAX_PRESENT_PAYMENTS,
   parsePresetAmountText,
@@ -69,6 +71,7 @@ const presentSettingsEditorOpen = ref(false)
 const presentSettingsMaxPayments = ref<PaymentPresentSettings['maxPayments']>(1)
 const presentSettingsRecentExpiredHoldSeconds = ref(20)
 const recentItems = ref<PaymentPresentRecentItem[]>([])
+const manuallyConfirmingSessionNo = ref('')
 const activePresentPayloadCount = ref(0)
 const businessDayLoading = ref(false)
 const openingBusinessDay = ref(false)
@@ -384,6 +387,35 @@ async function submitQuickPay(): Promise<void> {
   }
 }
 
+async function confirmRecentPayment(item: PaymentPresentRecentItem): Promise<void> {
+  if (!storeId.value || manuallyConfirmingSessionNo.value || !isManualConfirmableRecent(item)) {
+    return
+  }
+  if (!window.confirm(gt('generated.payment-quick-pay.062'))) {
+    return
+  }
+  manuallyConfirmingSessionNo.value = item.sessionNo
+  errorText.value = ''
+  noticeText.value = ''
+  try {
+    await manualConfirmQuickPay(storeId.value, item.sessionNo, {
+      idempotencyKey: createManualConfirmIdempotencyKey(item.sessionNo),
+      terminalCode: normalizedTerminalCode.value
+    })
+    recentItems.value = confirmPaymentPresentPayment(storeId.value, normalizedTerminalCode.value, item.sessionNo)
+    refreshPresentCapacity()
+    noticeText.value = gt('generated.payment-quick-pay.063', { displayNumber: item.displayNumber })
+  } catch (error) {
+    errorText.value = apiErrorText(error)
+  } finally {
+    manuallyConfirmingSessionNo.value = ''
+  }
+}
+
+function isManualConfirmableRecent(item: PaymentPresentRecentItem): boolean {
+  return item.status === 'pending' || item.status === 'awaiting_verification'
+}
+
 function resetPresentCapacityTracking(): void {
   unsubscribePresentPayloads?.()
   unsubscribePresentPayloads = null
@@ -475,6 +507,10 @@ function createIdempotencyKey(): string {
   return `quick-pay-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+function createManualConfirmIdempotencyKey(sessionNo: string): string {
+  return `manual-confirm-${sessionNo}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 function normalizeOptionalText(value: string): string | null {
   const normalized = value.trim()
   return normalized || null
@@ -502,6 +538,9 @@ function apiErrorText(error: unknown): string {
   }
   if (error.response.error.code === 'REQUEST_INVALID') {
     return gt('generated.payment-quick-pay.008')
+  }
+  if (error.response.error.code === 'PAYMENT_INTENT_STATE_CONFLICT') {
+    return gt('generated.payment-quick-pay.064')
   }
   return gt('generated.payment-quick-pay.003')
 }
@@ -649,6 +688,15 @@ function apiErrorText(error: unknown): string {
               <span>{{ item.currency }} {{ item.amount }}</span>
               <small>{{ item.status }}</small>
             </div>
+            <button
+              v-if="isManualConfirmableRecent(item)"
+              class="recent-confirm-button"
+              type="button"
+              :disabled="item.sessionNo === manuallyConfirmingSessionNo"
+              @click="confirmRecentPayment(item)"
+            >
+              {{ gt('generated.payment-quick-pay.061') }}
+            </button>
           </article>
         </div>
         <p v-else class="recent-empty">-</p>
@@ -1076,6 +1124,27 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recent-confirm-button {
+  background: #0f766e;
+  border: 0;
+  border-radius: 7px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 950;
+  margin-left: auto;
+  min-height: 34px;
+  min-width: 62px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.recent-confirm-button:disabled {
+  cursor: default;
+  opacity: 0.58;
 }
 
 .recent-empty {

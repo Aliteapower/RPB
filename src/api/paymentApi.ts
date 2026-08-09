@@ -2,6 +2,8 @@ import type {
   PaymentApiErrorResponse,
   PaymentIntentCreateRequest,
   PaymentIntentCreateResponse,
+  PaymentManualConfirmRequest,
+  PaymentManualConfirmResponse,
   PaymentBusinessDayResponse,
   PaymentProfileMutation,
   PaymentProfileResponse,
@@ -87,6 +89,19 @@ export async function getQuickPayRecords(
   })
   const suffix = params.toString() ? `?${params.toString()}` : ''
   return requestJson(`${intentEndpoint(storeId)}/quick-pay-records${suffix}`, { method: 'GET', fetcher })
+}
+
+export async function manualConfirmQuickPay(
+  storeId: string,
+  sessionNo: string,
+  request: PaymentManualConfirmRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentManualConfirmResponse> {
+  return requestJson(`${intentEndpoint(storeId)}/sessions/${encodeURIComponent(sessionNo)}/manual-confirm`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
 }
 
 export async function getPaymentProofCandidates(

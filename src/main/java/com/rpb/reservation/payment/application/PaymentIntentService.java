@@ -83,6 +83,20 @@ public class PaymentIntentService {
             .orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_SESSION_NOT_FOUND));
     }
 
+    @Transactional
+    public PaymentManualConfirmResult manualConfirmQuickPay(StoreScope scope, PaymentManualConfirmCommand command, CurrentActor actor) {
+        Objects.requireNonNull(scope, "payment_scope_required");
+        validateActor(scope, actor);
+        PaymentManualConfirmCommand normalized = normalized(command);
+        return repository.manualConfirmQuickPay(
+            scope,
+            normalized.sessionNo(),
+            normalized.idempotencyKey(),
+            actor.actorId(),
+            normalized.terminalCode()
+        ).orElseThrow(() -> new PaymentServiceException(PaymentServiceErrorCode.PAYMENT_INTENT_STATE_CONFLICT));
+    }
+
     @Transactional(readOnly = true)
     public PaymentQuickPayConfig findTerminalConfig(StoreScope scope, CurrentActor actor) {
         Objects.requireNonNull(scope, "payment_scope_required");
@@ -209,6 +223,17 @@ public class PaymentIntentService {
             trim(command.cashierName()),
             command.requestedDisplayNumber(),
             isBlank(command.metadataJson()) ? "{}" : command.metadataJson().trim()
+        );
+    }
+
+    private static PaymentManualConfirmCommand normalized(PaymentManualConfirmCommand command) {
+        if (command == null || isBlank(command.sessionNo()) || isBlank(command.idempotencyKey())) {
+            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
+        }
+        return new PaymentManualConfirmCommand(
+            trim(command.sessionNo()),
+            trim(command.idempotencyKey()),
+            trim(command.terminalCode())
         );
     }
 

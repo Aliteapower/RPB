@@ -106,6 +106,19 @@ export interface PaymentIntentCreateResponse {
   nextDisplayNumber: number
 }
 
+export interface PaymentManualConfirmRequest {
+  idempotencyKey: string
+  terminalCode?: string | null
+}
+
+export interface PaymentManualConfirmResponse {
+  success: true
+  replayed: boolean
+  alreadyConfirmed: boolean
+  intent: PaymentIntent
+  session: PaymentSession
+}
+
 export interface PaymentBusinessDayResponse {
   success: true
   businessDate: string

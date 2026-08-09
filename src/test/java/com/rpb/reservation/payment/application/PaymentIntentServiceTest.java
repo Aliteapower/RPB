@@ -281,6 +281,50 @@ class PaymentIntentServiceTest {
     }
 
     @Test
+    void manuallyConfirmsPendingQuickPaySessionAsPaid() {
+        PaymentManualConfirmResult confirmed = sampleManualConfirmResult(false, false, "paid", "paid");
+        repository.manualConfirmResult = Optional.of(confirmed);
+
+        PaymentManualConfirmResult result = service.manualConfirmQuickPay(scope, new PaymentManualConfirmCommand(
+            " PRS-ABCDEF1234567890 ",
+            " manual-confirm-001 ",
+            " T1 "
+        ), actor);
+
+        assertThat(result).isEqualTo(confirmed);
+        assertThat(repository.lastManualConfirmSessionNo).isEqualTo("PRS-ABCDEF1234567890");
+        assertThat(repository.lastManualConfirmIdempotencyKey).isEqualTo("manual-confirm-001");
+        assertThat(repository.lastManualConfirmTerminalCode).isEqualTo("T1");
+        assertThat(repository.lastManualConfirmActorId).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    void rejectsBlankManualConfirmIdempotencyKey() {
+        assertThatThrownBy(() -> service.manualConfirmQuickPay(scope, new PaymentManualConfirmCommand(
+            "PRS-ABCDEF1234567890",
+            " ",
+            "T1"
+        ), actor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting("code")
+            .isEqualTo(PaymentServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
+    void rejectsManualConfirmWhenRepositoryCannotConfirmSession() {
+        repository.manualConfirmResult = Optional.empty();
+
+        assertThatThrownBy(() -> service.manualConfirmQuickPay(scope, new PaymentManualConfirmCommand(
+            "PRS-ABCDEF1234567890",
+            "manual-confirm-missing",
+            "T1"
+        ), actor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting("code")
+            .isEqualTo(PaymentServiceErrorCode.PAYMENT_INTENT_STATE_CONFLICT);
+    }
+
+    @Test
     void returnsTerminalConfigWithoutExposingPayNowMerchantDetails() {
         when(profileService.findEffectiveProfile(scope)).thenReturn(Optional.of(activeUenProfileWithConfig(
             "{\"quickPay\":{\"referencePrefix\":\"AB\",\"dailyStartNumber\":3,\"presetAmounts\":[1,2.5]}}"
@@ -406,6 +450,43 @@ class PaymentIntentServiceTest {
         );
     }
 
+    private PaymentManualConfirmResult sampleManualConfirmResult(
+        boolean replayed,
+        boolean alreadyConfirmed,
+        String intentStatus,
+        String sessionStatus
+    ) {
+        PaymentIntent intent = new PaymentIntent(
+            UUID.fromString("50000000-0000-0000-0000-000000000001"),
+            TENANT_ID,
+            STORE_ID,
+            "PIT-202608-0001",
+            "quick_pay",
+            null,
+            "paynow",
+            new BigDecimal("18.80"),
+            "SGD",
+            "QP202608050007XRTD",
+            intentStatus,
+            OffsetDateTime.parse("2026-08-05T04:12:00Z"),
+            1
+        );
+        PaymentSession session = new PaymentSession(
+            UUID.fromString("60000000-0000-0000-0000-000000000001"),
+            TENANT_ID,
+            STORE_ID,
+            intent.id(),
+            "PRS-ABCDEF1234567890",
+            7,
+            LocalDate.parse("2026-08-05"),
+            sessionStatus,
+            "{\"version\":1,\"payloads\":{\"paynow\":{\"payload\":\"000201\"}}}",
+            OffsetDateTime.parse("2026-08-05T04:12:00Z"),
+            1
+        );
+        return new PaymentManualConfirmResult(true, replayed, alreadyConfirmed, intent, session);
+    }
+
     private static final class InMemoryPaymentIntentRepository implements PaymentIntentRepository {
         private PaymentSession session;
         private PaymentBusinessDay openBusinessDay;
@@ -415,6 +496,11 @@ class PaymentIntentServiceTest {
         private List<QuickPayRecord> quickPayRecords = List.of();
         private QuickPayRecordQuery lastRecordQuery;
         private int allocatedDisplayNumber = 1;
+        private Optional<PaymentManualConfirmResult> manualConfirmResult = Optional.empty();
+        private String lastManualConfirmSessionNo;
+        private String lastManualConfirmIdempotencyKey;
+        private String lastManualConfirmTerminalCode;
+        private UUID lastManualConfirmActorId;
 
         @Override
         public Optional<PaymentIntentCreateResult> findCreateResultByIdempotencyKey(StoreScope scope, String idempotencyKey) {
@@ -432,6 +518,21 @@ class PaymentIntentServiceTest {
         public List<QuickPayRecord> findQuickPayRecords(StoreScope scope, QuickPayRecordQuery query) {
             lastRecordQuery = query;
             return quickPayRecords;
+        }
+
+        @Override
+        public Optional<PaymentManualConfirmResult> manualConfirmQuickPay(
+            StoreScope scope,
+            String sessionNo,
+            String idempotencyKey,
+            UUID actorId,
+            String terminalCode
+        ) {
+            lastManualConfirmSessionNo = sessionNo;
+            lastManualConfirmIdempotencyKey = idempotencyKey;
+            lastManualConfirmTerminalCode = terminalCode;
+            lastManualConfirmActorId = actorId;
+            return manualConfirmResult;
         }
 
         @Override

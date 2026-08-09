@@ -344,6 +344,27 @@ export function pushPaymentPresentRecent(payload: PaymentPresentPayload): Paymen
   return next
 }
 
+export function confirmPaymentPresentPayment(
+  storeId: string,
+  terminalCode: string,
+  sessionNo: string,
+  status = 'paid'
+): PaymentPresentRecentItem[] {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const activePayloads = readPaymentPresentPayloads(storeId, normalizedTerminal)
+    .filter(payload => payload.sessionNo !== sessionNo && isPaymentPresentPayloadActive(payload))
+  safeSetJson(activeStorageKey(storeId, normalizedTerminal), activePayloads)
+
+  const recent = readPaymentPresentRecent(storeId, normalizedTerminal)
+  const next = recent.map(item => item.sessionNo === sessionNo ? { ...item, status } : item)
+  safeSetJson(recentStorageKey(storeId, normalizedTerminal), next)
+  postPaymentPresentMessage(storeId, normalizedTerminal, {
+    kind: 'payloads',
+    payloads: activePayloads
+  })
+  return next
+}
+
 export function readQuickPayPresetAmounts(storeId: string, defaultValues = DEFAULT_PRESET_AMOUNTS): string[] {
   const parsed = safeGet(presetStorageKey(storeId))
   if (!parsed) {

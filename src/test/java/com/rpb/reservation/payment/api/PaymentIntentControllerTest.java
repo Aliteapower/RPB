@@ -77,6 +77,25 @@ class PaymentIntentControllerTest {
     }
 
     @Test
+    void manualConfirmQuickPayRequiresPaymentCreatePermission() throws NoSuchMethodException {
+        Method method = PaymentIntentController.class.getMethod(
+            "manualConfirmQuickPay",
+            UUID.class,
+            String.class,
+            PaymentIntentRequests.ManualConfirmRequest.class
+        );
+
+        PostMapping mapping = method.getAnnotation(PostMapping.class);
+        RequireAppGate gate = method.getAnnotation(RequireAppGate.class);
+
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.value()).containsExactly("/sessions/{sessionNo}/manual-confirm");
+        assertThat(gate).isNotNull();
+        assertThat(gate.appKey()).isEqualTo("payment");
+        assertThat(gate.permission()).isEqualTo("payment.intent.create");
+    }
+
+    @Test
     void paymentBusinessDayEndpointsRequirePaymentCreatePermission() throws NoSuchMethodException {
         Method getMethod = PaymentBusinessDayController.class.getMethod("getBusinessDay", UUID.class);
         Method postMethod = PaymentBusinessDayController.class.getMethod(

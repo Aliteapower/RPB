@@ -3,6 +3,7 @@ package com.rpb.reservation.payment.api;
 import com.rpb.reservation.appgate.guard.RequireAppGate;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.payment.application.PaymentIntentCreateCommand;
+import com.rpb.reservation.payment.application.PaymentManualConfirmCommand;
 import com.rpb.reservation.payment.application.PaymentIntentService;
 import com.rpb.reservation.payment.application.PaymentServiceErrorCode;
 import com.rpb.reservation.payment.application.PaymentServiceException;
@@ -71,6 +72,27 @@ public class PaymentIntentController {
         StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
         return ResponseEntity.ok(PaymentIntentResponses.SessionResponse.from(
             service.findSessionByNo(scope, sessionNo, actor)
+        ));
+    }
+
+    @PostMapping("/sessions/{sessionNo}/manual-confirm")
+    @RequireAppGate(appKey = "payment", permission = INTENT_CREATE_PERMISSION)
+    public ResponseEntity<PaymentIntentResponses.ManualConfirmResponse> manualConfirmQuickPay(
+        @PathVariable UUID storeId,
+        @PathVariable String sessionNo,
+        @RequestBody(required = false) PaymentIntentRequests.ManualConfirmRequest request
+    ) {
+        if (request == null) {
+            throw new PaymentApiException(PaymentApiErrorCode.REQUEST_INVALID);
+        }
+        CurrentActor actor = currentActorProvider.currentActor()
+            .orElseThrow(() -> new PaymentApiException(PaymentApiErrorCode.UNAUTHENTICATED));
+        if (actor.tenantId() == null || !actor.canAccessStore(storeId)) {
+            throw new PaymentApiException(PaymentApiErrorCode.FORBIDDEN);
+        }
+        StoreScope scope = new StoreScope(new TenantId(actor.tenantId()), new StoreId(storeId));
+        return ResponseEntity.ok(PaymentIntentResponses.ManualConfirmResponse.from(
+            service.manualConfirmQuickPay(scope, toCommand(sessionNo, request), actor)
         ));
     }
 
@@ -146,6 +168,14 @@ public class PaymentIntentController {
             request.cashierName(),
             request.requestedDisplayNumber(),
             request.metadataJson()
+        );
+    }
+
+    private static PaymentManualConfirmCommand toCommand(String sessionNo, PaymentIntentRequests.ManualConfirmRequest request) {
+        return new PaymentManualConfirmCommand(
+            sessionNo,
+            request.idempotencyKey(),
+            request.terminalCode()
         );
     }
 
