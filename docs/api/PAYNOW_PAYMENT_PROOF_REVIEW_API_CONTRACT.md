@@ -4,6 +4,8 @@
 
 Payment Proof Review lets a payment-enabled store employee upload or capture a PayNow bank receipt screenshot. RPB extracts the RPB-generated Ref and amount, matches them to one active Quick Pay intent in the same tenant/store, and auto-confirms only when both values match.
 
+The PayNow proof template library improves extraction accuracy by letting RPB maintain platform seed templates and letting tenants add store-facing receipt samples. Template matching may improve OCR fields, but it must not bypass the final Ref uniqueness and amount equality checks.
+
 ## Ref Definition
 
 `Ref` is `payment_intents.payment_reference`.
@@ -17,6 +19,80 @@ Accepted RPB reference patterns:
 Ref extraction must ignore bank transaction identifiers such as `Transaction ID`, `Transaction Ref`, `交易编号`, and long non-hyphenated bank ids.
 
 ## Endpoints
+
+### GET /api/v1/stores/{storeId}/tenant-admin/payment/proof-templates
+
+Permission: `payment.proof_template.manage`
+
+Returns active/inactive platform seed templates and tenant custom templates visible to the store's tenant.
+
+### POST /api/v1/stores/{storeId}/tenant-admin/payment/proof-templates
+
+Permission: `payment.proof_template.manage`
+
+Creates a tenant custom template. Platform seed templates are read-only for tenants.
+
+Request:
+
+```json
+{
+  "bankCode": "ocbc",
+  "bankName": "OCBC",
+  "locale": "zh-CN",
+  "templateName": "OCBC tenant PayNow",
+  "status": "active",
+  "priority": 20,
+  "layoutJson": "{\"matchKeywords\":[\"OCBC\"],\"referencePatterns\":[\"(?:讯息|Message)\\\\s*[:：]?\\\\s*([A-Z0-9.-]{10,32})\"],\"amountPatterns\":[\"您已支付\\\\s*([0-9OoIl,.]+)\\\\s*SGD\"]}",
+  "version": 0
+}
+```
+
+### PATCH /api/v1/stores/{storeId}/tenant-admin/payment/proof-templates/{templateId}
+
+Permission: `payment.proof_template.manage`
+
+Updates a tenant-owned proof template. Updating a platform seed through the tenant endpoint returns a conflict or invalid request.
+
+### POST /api/v1/stores/{storeId}/tenant-admin/payment/proof-templates/test-scan
+
+Permission: `payment.proof_template.manage`
+
+Request: `multipart/form-data`
+
+- `image`: required file, one of `.png`, `.jpg`, `.jpeg`, `.webp`.
+
+Response:
+
+```json
+{
+  "success": true,
+  "template": {
+    "id": "30000000-0000-0000-0000-000000000001",
+    "tenantId": null,
+    "bankCode": "ocbc",
+    "bankName": "OCBC",
+    "locale": "zh-CN",
+    "templateName": "OCBC Chinese PayNow",
+    "source": "platform_seed",
+    "status": "active",
+    "priority": 10,
+    "version": 0,
+    "layoutJson": "{}",
+    "createdAt": "2026-08-09T00:00:00Z",
+    "updatedAt": "2026-08-09T00:00:00Z"
+  },
+  "ocr": {
+    "extractedReference": "QP202608090017GQVQ",
+    "extractedAmount": 1.00,
+    "bankCode": "ocbc",
+    "successDetected": true,
+    "confidence": 0.7100,
+    "rawText": "OCBC\n您已支付 1.00 SGD\n讯息\nQP202608090017GQVQ"
+  }
+}
+```
+
+`test-scan` records a template sample for tuning only. It must not create payment proofs, verifications, or update payment intent/session state.
 
 ### GET /api/v1/stores/{storeId}/payments/proof-review/candidates
 
@@ -156,3 +232,5 @@ No-match response:
 ## Idempotency
 
 `idempotencyKey` is scoped by tenant. A replay with the same scope and file digest returns the original result with `replayed = true`. A replay with a different file digest returns `IDEMPOTENCY_CONFLICT`.
+
+Template library create/update calls are ordinary admin mutations guarded by optimistic `version` on update. `test-scan` is diagnostic and non-confirming; repeated uploads may create additional template sample audit rows.

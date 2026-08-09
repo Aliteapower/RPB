@@ -121,6 +121,7 @@ export const zhCN = {
       paymentProductLine: '收款 / PayNow',
       paymentSettings: '基础设置',
       paymentRecords: 'Quick Payment Records',
+      paymentProofTemplates: '回单样式库',
       paymentI18nCatalog: 'PayNow 国际化字典',
       reservationQueueProductLine: '预约排队叫号',
       reservationQueueI18nCatalog: '预约排队国际化字典',

@@ -12,6 +12,10 @@ import type {
   PaymentProofCandidatesResponse,
   PaymentProofScanRequest,
   PaymentProofScanResponse,
+  PaymentProofTemplateMutation,
+  PaymentProofTemplateResponse,
+  PaymentProofTemplatesResponse,
+  PaymentProofTemplateTestScanResponse,
   QuickPayRecordsQuery,
   QuickPayRecordsResponse,
   QuickPayTerminalConfigResponse,
@@ -137,6 +141,44 @@ export async function scanPaymentProof(
   return requestMultipart(`${proofReviewEndpoint(storeId)}/scan`, form, fetcher)
 }
 
+export async function getPaymentProofTemplates(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplatesResponse> {
+  return requestJson(proofTemplatesEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function createPaymentProofTemplate(
+  storeId: string,
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(proofTemplatesEndpoint(storeId), { method: 'POST', body: request, fetcher })
+}
+
+export async function updatePaymentProofTemplate(
+  storeId: string,
+  templateId: string,
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(`${proofTemplatesEndpoint(storeId)}/${encodeURIComponent(templateId)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function testScanPaymentProofTemplate(
+  storeId: string,
+  image: File,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateTestScanResponse> {
+  const form = new FormData()
+  form.set('image', image)
+  return requestMultipart(`${proofTemplatesEndpoint(storeId)}/test-scan`, form, fetcher)
+}
+
 export async function getPaymentBusinessDay(
   storeId: string,
   fetcher?: PaymentFetcher
@@ -183,6 +225,10 @@ function businessDayEndpoint(storeId: string): string {
 
 function proofReviewEndpoint(storeId: string): string {
   return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/proof-review`
+}
+
+function proofTemplatesEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-templates`
 }
 
 async function requestJson<T>(

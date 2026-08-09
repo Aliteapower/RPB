@@ -285,6 +285,9 @@ function isAppGateError(code: string, messageKey: string): boolean {
           <RouterLink class="quick-pay-link" :to="{ name: 'tenant-admin-payment-records', params: { storeId } }">
             {{ gt('generated.tenant-admin-payment-settings.045') }}
           </RouterLink>
+          <RouterLink class="quick-pay-link" :to="{ name: 'tenant-admin-payment-proof-templates', params: { storeId } }">
+            {{ gt('generated.tenant-admin-payment-proof-templates.001') }}
+          </RouterLink>
           <RouterLink class="quick-pay-link" :to="{ name: 'payment-quick-pay', params: { storeId } }">
             {{ gt('generated.tenant-admin-payment-settings.003') }}
           </RouterLink>

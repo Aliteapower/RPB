@@ -38,6 +38,7 @@ const reservationQueueNavItems = computed(() => [
 const paymentNavItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/payment/settings`, labelKey: 'nav.tenant.paymentSettings' },
   { to: `/stores/${storeId.value}/admin/payment/records`, labelKey: 'nav.tenant.paymentRecords' },
+  { to: `/stores/${storeId.value}/admin/payment/proof-templates`, labelKey: 'nav.tenant.paymentProofTemplates' },
   { to: `/stores/${storeId.value}/admin/payment/i18n-catalog`, labelKey: 'nav.tenant.paymentI18nCatalog' }
 ])
 

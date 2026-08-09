@@ -244,6 +244,56 @@ export interface PaymentProofScanRequest {
   terminalCode?: string
 }
 
+export interface PaymentProofTemplate {
+  id: string
+  tenantId: string | null
+  bankCode: string
+  bankName: string
+  locale: string
+  templateName: string
+  source: 'platform_seed' | 'tenant_custom' | 'tenant_override'
+  status: 'draft' | 'active' | 'inactive'
+  priority: number
+  version: number
+  layoutJson: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PaymentProofTemplateMutation {
+  bankCode: string
+  bankName: string
+  locale: string
+  templateName: string
+  status: 'draft' | 'active' | 'inactive'
+  priority: number
+  layoutJson: string
+  version?: number | null
+}
+
+export interface PaymentProofTemplatesResponse {
+  success: true
+  templates: PaymentProofTemplate[]
+}
+
+export interface PaymentProofTemplateResponse {
+  success: true
+  template: PaymentProofTemplate
+}
+
+export interface PaymentProofTemplateTestScanResponse {
+  success: true
+  template: PaymentProofTemplate | null
+  ocr: {
+    extractedReference: string | null
+    extractedAmount: string | null
+    bankCode: string | null
+    successDetected: boolean
+    confidence: string | null
+    rawText: string | null
+  } | null
+}
+
 export interface PaymentApiErrorResponse {
   success: false
   error: {

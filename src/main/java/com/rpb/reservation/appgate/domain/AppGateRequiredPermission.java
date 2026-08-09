@@ -30,6 +30,7 @@ public final class AppGateRequiredPermission {
     public static final String PAYMENT_INTENT_CREATE = "payment.intent.create";
     public static final String PAYMENT_VERIFICATION_REVIEW = "payment.verification.review";
     public static final String PAYMENT_PROOF_REVIEW = "payment.proof.review";
+    public static final String PAYMENT_PROOF_TEMPLATE_MANAGE = "payment.proof_template.manage";
 
     public static final Set<String> RESERVATION_QUEUE_ENTRY_PERMISSIONS = Set.of(
         RESERVATION_CREATE,
@@ -60,7 +61,8 @@ public final class AppGateRequiredPermission {
         PAYMENT_INTENT_VIEW,
         PAYMENT_INTENT_CREATE,
         PAYMENT_VERIFICATION_REVIEW,
-        PAYMENT_PROOF_REVIEW
+        PAYMENT_PROOF_REVIEW,
+        PAYMENT_PROOF_TEMPLATE_MANAGE
     );
 
     public static final Set<String> PAYMENT_TENANT_ADMIN_PERMISSIONS = Set.of(

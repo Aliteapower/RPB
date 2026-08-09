@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,10 +27,21 @@ public class PaymentProofReviewService {
 
     private final PaymentProofReviewRepository repository;
     private final PaymentProofOcrAdapter ocrAdapter;
+    private final PaymentProofTemplateService templateService;
 
     public PaymentProofReviewService(PaymentProofReviewRepository repository, PaymentProofOcrAdapter ocrAdapter) {
+        this(repository, ocrAdapter, null);
+    }
+
+    @Autowired
+    public PaymentProofReviewService(
+        PaymentProofReviewRepository repository,
+        PaymentProofOcrAdapter ocrAdapter,
+        PaymentProofTemplateService templateService
+    ) {
         this.repository = Objects.requireNonNull(repository, "payment_proof_review_repository_required");
         this.ocrAdapter = Objects.requireNonNull(ocrAdapter, "payment_proof_ocr_adapter_required");
+        this.templateService = templateService;
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +79,7 @@ public class PaymentProofReviewService {
         CurrentActor actor,
         String fileDigest
     ) {
-        PaymentProofOcrFields fields = extract(command);
+        PaymentProofOcrFields fields = extract(scope, command);
         String extractedRef = PaymentReferencePattern.normalize(fields.extractedReference());
         List<String> referenceVariants = PaymentReferencePattern.lookupVariants(extractedRef);
         if (referenceVariants.isEmpty()) {
@@ -168,12 +180,13 @@ public class PaymentProofReviewService {
         );
     }
 
-    private PaymentProofOcrFields extract(PaymentProofScanCommand command) {
+    private PaymentProofOcrFields extract(StoreScope scope, PaymentProofScanCommand command) {
         Path tempFile = null;
         try {
             tempFile = Files.createTempFile("rpb-payment-proof-", suffix(command.originalFileName()));
             Files.write(tempFile, command.fileBytes());
-            return ocrAdapter.extract(tempFile, new PaymentProofOcrExpected(null, null));
+            PaymentProofOcrFields fields = ocrAdapter.extract(tempFile, new PaymentProofOcrExpected(null, null));
+            return templateService == null ? fields : templateService.enhance(scope, fields);
         } catch (IOException exception) {
             throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
         } finally {

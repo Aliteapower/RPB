@@ -121,6 +121,7 @@ export const enSG = {
       paymentProductLine: 'Pay / PayNow',
       paymentSettings: 'Settings',
       paymentRecords: 'Quick Payment Records',
+      paymentProofTemplates: 'Proof Templates',
       paymentI18nCatalog: 'PayNow I18n',
       reservationQueueProductLine: 'Reservation Queue',
       reservationQueueI18nCatalog: 'Reservation Queue I18n',

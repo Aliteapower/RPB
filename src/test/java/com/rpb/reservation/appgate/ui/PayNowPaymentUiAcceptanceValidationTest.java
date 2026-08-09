@@ -30,6 +30,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("name: 'tenant-admin-payment-settings'")
             .contains("path: '/stores/:storeId/admin/payment/records'")
             .contains("name: 'tenant-admin-payment-records'")
+            .contains("path: '/stores/:storeId/admin/payment/proof-templates'")
+            .contains("name: 'tenant-admin-payment-proof-templates'")
             .contains("path: '/stores/:storeId/admin/payment/i18n-catalog'")
             .contains("name: 'tenant-admin-payment-i18n-catalog'")
             .contains("path: '/stores/:storeId/payments'")
@@ -47,12 +49,14 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("hasReservationQueueProductLine")
             .contains("/admin/payment/settings")
             .contains("/admin/payment/records")
+            .contains("/admin/payment/proof-templates")
             .contains("/admin/payment/i18n-catalog")
             .contains("/admin/reservation-queue/i18n-catalog")
             .contains("nav.tenant.paymentProductLine")
             .contains("nav.tenant.reservationQueueProductLine")
             .contains("nav.tenant.paymentSettings")
             .contains("nav.tenant.paymentRecords")
+            .contains("nav.tenant.paymentProofTemplates")
             .contains("nav.tenant.paymentI18nCatalog")
             .contains("nav.tenant.reservationQueueI18nCatalog");
         assertThat(staffHome)
@@ -112,6 +116,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String api = FrontendSourceSupport.readString(Path.of("src", "api", "paymentApi.ts"));
         String types = FrontendSourceSupport.readString(Path.of("src", "types", "payment.ts"));
         String settings = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentSettingsPage.vue"));
+        String proofTemplates = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentProofTemplatesPage.vue"));
         String records = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentRecordsPage.vue"));
         String quickPay = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentQuickPayPage.vue"));
         String proofReview = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentProofReviewPage.vue"));
@@ -127,12 +132,17 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("/payments/intents")
             .contains("/payments/business-day")
             .contains("/payments/proof-review")
+            .contains("/tenant-admin/payment/proof-templates")
             .contains("/quick-pay-records")
             .contains("manualConfirmQuickPay")
             .contains("/manual-confirm")
             .contains("/sessions/")
             .contains("getPaymentProofCandidates")
             .contains("scanPaymentProof")
+            .contains("getPaymentProofTemplates")
+            .contains("createPaymentProofTemplate")
+            .contains("updatePaymentProofTemplate")
+            .contains("testScanPaymentProofTemplate")
             .contains("requestMultipart")
             .contains("getPaymentBusinessDay")
             .contains("openPaymentBusinessDay")
@@ -148,6 +158,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("PaymentBusinessDayStatus")
             .contains("PaymentProofScanResponse")
             .contains("PaymentProofCandidate")
+            .contains("PaymentProofTemplate")
+            .contains("PaymentProofTemplateTestScanResponse")
             .contains("PaymentSession");
         assertThat(settings)
             .contains("getPaymentProfile")
@@ -157,6 +169,18 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("appgate.permission_denied")
             .contains("TenantAdminNav")
             .contains("tenant-admin-payment-records")
+            .contains("tenant-admin-payment-proof-templates")
+            .doesNotContain("sidecar")
+            .doesNotContain("payment_runtime");
+        assertThat(proofTemplates)
+            .contains("getPaymentProofTemplates")
+            .contains("createPaymentProofTemplate")
+            .contains("updatePaymentProofTemplate")
+            .contains("testScanPaymentProofTemplate")
+            .contains("回单样式库")
+            .contains("平台种子")
+            .contains("租户自定义")
+            .contains("tenant-admin-payment-settings")
             .doesNotContain("sidecar")
             .doesNotContain("payment_runtime");
         assertThat(records)
@@ -309,6 +333,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-quick-pay.061\": \"确认\"")
             .contains("\"generated.payment-quick-pay.062\": \"确认已收到这笔 PayNow 转账并关单？\"")
             .contains("\"generated.payment-quick-pay.063\": \"已手工确认收款：{displayNumber}\"")
+            .contains("\"generated.tenant-admin-payment-proof-templates.001\": \"回单样式库\"")
+            .contains("\"generated.tenant-admin-payment-proof-templates.006\": \"平台种子\"")
+            .contains("\"generated.tenant-admin-payment-proof-templates.007\": \"租户自定义\"")
             .contains("\"generated.payment-proof-review.003\": \"回单校验\"")
             .contains("\"generated.payment-proof-review.006\": \"回单校验\"");
         assertThat(generatedZh)
@@ -325,6 +352,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-quick-pay.061\": \"Confirm\"")
             .contains("\"generated.payment-quick-pay.062\": \"Confirm this PayNow transfer and close it?\"")
             .contains("\"generated.payment-quick-pay.063\": \"Payment manually confirmed: {displayNumber}\"")
+            .contains("\"generated.tenant-admin-payment-proof-templates.001\": \"Proof template library\"")
+            .contains("\"generated.tenant-admin-payment-proof-templates.006\": \"Platform seed\"")
+            .contains("\"generated.tenant-admin-payment-proof-templates.007\": \"Tenant custom\"")
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"")
