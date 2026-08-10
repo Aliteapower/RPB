@@ -9,10 +9,11 @@ import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
-import type { PaymentBusinessDayStatus, QuickPayRecordSummary } from '../types/payment'
+import type { PaymentBusinessDayStatus, QuickPayRecord, QuickPayRecordSummary } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 
 type PaymentReportMode = 'mine' | 'terminal'
+type ReportDetailStatus = 'paid' | 'pending' | 'awaiting_verification'
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -22,13 +23,17 @@ const { gt } = useGeneratedText()
 
 const reportMode = ref<PaymentReportMode>('mine')
 const reportLoading = ref(false)
+const detailLoading = ref(false)
 const reportErrorText = ref('')
+const detailRecords = ref<QuickPayRecord[]>([])
 const reportSummary = ref<QuickPayRecordSummary>(emptyReportSummary())
+const selectedDetailStatus = ref<ReportDetailStatus>('paid')
 const businessDayLoading = ref(false)
 const businessDayStatus = ref<PaymentBusinessDayStatus>('not_open')
 const openedBusinessDate = ref('')
 let businessDayLoadSequence = 0
 let reportLoadSequence = 0
+let detailLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => storeId.value ? gt('generated.payment-quick-pay.001', { shortId: storeId.value.slice(0, 8) }) : gt('generated.payment-quick-pay.002'))
@@ -54,12 +59,14 @@ const reportContextText = computed(() => gt('generated.payment-quick-pay.072', {
   businessDate: displayedBusinessDate.value,
   scope: reportScopeLabel.value
 }))
+const detailTitle = computed(() => detailStatusLabel(selectedDetailStatus.value))
 
 onMounted(() => {
   loadPersistedReportMode()
   window.addEventListener('focus', refreshReportOnFocus)
   void loadPaymentBusinessDay()
   void loadPaymentReport()
+  void loadReportDetails()
 })
 
 onBeforeUnmount(() => {
@@ -70,21 +77,25 @@ watch([storeId, normalizedTerminalCode], () => {
   loadPersistedReportMode()
   void loadPaymentBusinessDay()
   void loadPaymentReport()
+  void loadReportDetails()
 })
 
 watch(displayedBusinessDate, () => {
   void loadPaymentReport()
+  void loadReportDetails()
 })
 
 watch(cashierName, () => {
   if (reportMode.value === 'mine') {
     void loadPaymentReport()
+    void loadReportDetails()
   }
 })
 
 watch(reportMode, () => {
   savePersistedReportMode()
   void loadPaymentReport()
+  void loadReportDetails()
 })
 
 async function loadPaymentBusinessDay(): Promise<void> {
@@ -153,13 +164,83 @@ async function loadPaymentReport(): Promise<void> {
   }
 }
 
+async function loadReportDetails(): Promise<void> {
+  const currentStoreId = storeId.value
+  const sequence = ++detailLoadSequence
+  if (!currentStoreId) {
+    detailRecords.value = []
+    return
+  }
+  if (reportMode.value === 'mine' && !cashierName.value) {
+    detailRecords.value = []
+    reportErrorText.value = ''
+    return
+  }
+
+  detailLoading.value = true
+  try {
+    const response = await getQuickPayRecords(currentStoreId, {
+      businessDate: displayedBusinessDate.value,
+      status: selectedDetailStatus.value,
+      terminalCode: normalizedTerminalCode.value,
+      cashierName: reportMode.value === 'mine' ? cashierName.value || undefined : undefined,
+      limit: 200
+    })
+    if (sequence !== detailLoadSequence) {
+      return
+    }
+    detailRecords.value = response.records
+  } catch (error) {
+    if (sequence === detailLoadSequence) {
+      detailRecords.value = []
+      reportErrorText.value = reportApiErrorText(error)
+    }
+  } finally {
+    if (sequence === detailLoadSequence) {
+      detailLoading.value = false
+    }
+  }
+}
+
 function refreshReportOnFocus(): void {
   void loadPaymentBusinessDay()
   void loadPaymentReport()
+  void loadReportDetails()
 }
 
 function setReportMode(mode: PaymentReportMode): void {
   reportMode.value = mode
+}
+
+function selectDetailStatus(status: ReportDetailStatus): void {
+  selectedDetailStatus.value = status
+  void loadReportDetails()
+}
+
+function detailStatusLabel(status: ReportDetailStatus): string {
+  if (status === 'paid') {
+    return gt('generated.payment-quick-pay.068')
+  }
+  if (status === 'pending') {
+    return gt('generated.payment-quick-pay.069')
+  }
+  return gt('generated.payment-quick-pay.070')
+}
+
+function dateTime(value: string | null | undefined): string {
+  if (!value) {
+    return '-'
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return '-'
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(parsed)
 }
 
 function loadPersistedReportMode(): void {
@@ -294,22 +375,80 @@ function normalizeOptionalText(value: string): string | null {
         <p v-if="reportErrorText" class="error-banner" role="alert">{{ reportErrorText }}</p>
 
         <div class="report-card-grid" aria-live="polite">
-          <article class="report-card report-card--paid">
+          <button
+            class="report-card report-card--paid"
+            :class="{ active: selectedDetailStatus === 'paid' }"
+            type="button"
+            :aria-pressed="selectedDetailStatus === 'paid'"
+            @click="selectDetailStatus('paid')"
+          >
             <span>{{ gt('generated.payment-quick-pay.068') }}</span>
             <strong>{{ reportMoney(reportSummary.paidAmount, reportSummary.currency) }}</strong>
             <em>{{ gt('generated.payment-quick-pay.071', { count: reportSummary.paidCount }) }}</em>
-          </article>
-          <article class="report-card report-card--pending">
+            <small>{{ gt('generated.payment-quick-pay.076') }}</small>
+          </button>
+          <button
+            class="report-card report-card--pending"
+            :class="{ active: selectedDetailStatus === 'pending' }"
+            type="button"
+            :aria-pressed="selectedDetailStatus === 'pending'"
+            @click="selectDetailStatus('pending')"
+          >
             <span>{{ gt('generated.payment-quick-pay.069') }}</span>
             <strong>{{ reportMoney(reportSummary.pendingAmount, reportSummary.currency) }}</strong>
             <em>{{ gt('generated.payment-quick-pay.071', { count: reportSummary.pendingCount }) }}</em>
-          </article>
-          <article class="report-card report-card--review">
+            <small>{{ gt('generated.payment-quick-pay.076') }}</small>
+          </button>
+          <button
+            class="report-card report-card--review"
+            :class="{ active: selectedDetailStatus === 'awaiting_verification' }"
+            type="button"
+            :aria-pressed="selectedDetailStatus === 'awaiting_verification'"
+            @click="selectDetailStatus('awaiting_verification')"
+          >
             <span>{{ gt('generated.payment-quick-pay.070') }}</span>
             <strong>{{ reportMoney(reportSummary.awaitingVerificationAmount, reportSummary.currency) }}</strong>
             <em>{{ gt('generated.payment-quick-pay.071', { count: reportSummary.awaitingVerificationCount }) }}</em>
-          </article>
+            <small>{{ gt('generated.payment-quick-pay.076') }}</small>
+          </button>
         </div>
+
+        <section class="detail-panel" :aria-label="gt('generated.payment-quick-pay.077', { status: detailTitle })">
+          <header>
+            <h2>{{ gt('generated.payment-quick-pay.077', { status: detailTitle }) }}</h2>
+            <span>{{ gt('generated.payment-quick-pay.071', { count: detailRecords.length }) }}</span>
+          </header>
+
+          <p v-if="detailLoading" class="detail-empty">{{ gt('generated.payment-quick-pay.074') }}</p>
+          <p v-else-if="detailRecords.length === 0" class="detail-empty">{{ gt('generated.payment-quick-pay.078') }}</p>
+
+          <div v-else class="detail-list">
+            <article v-for="record in detailRecords" :key="record.sessionId" class="detail-row">
+              <div class="detail-row-main">
+                <strong>#{{ record.displayNumber }}</strong>
+                <span>{{ reportMoney(record.amount, record.currency) }}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>{{ gt('generated.payment-quick-pay.079') }}</dt>
+                  <dd>{{ record.paymentReference || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>{{ gt('generated.payment-quick-pay.080') }}</dt>
+                  <dd>{{ record.cashierName || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>{{ gt('generated.payment-quick-pay.081') }}</dt>
+                  <dd>{{ dateTime(record.createdAt) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ gt('generated.payment-quick-pay.082') }}</dt>
+                  <dd>{{ record.sessionNo }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
       </section>
     </section>
 
@@ -435,11 +574,14 @@ function normalizeOptionalText(value: string): string | null {
 .report-card {
   border: 1px solid #dbe3ea;
   border-radius: 8px;
+  cursor: pointer;
   display: grid;
   gap: 6px;
+  font: inherit;
   min-height: 92px;
   min-width: 0;
   padding: 12px;
+  text-align: left;
 }
 
 .report-card span {
@@ -464,6 +606,16 @@ function normalizeOptionalText(value: string): string | null {
   font-weight: 850;
 }
 
+.report-card small {
+  color: #0f766e;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.report-card.active {
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.28);
+}
+
 .report-card--paid {
   background: #ecfdf5;
   border-color: #86efac;
@@ -477,6 +629,107 @@ function normalizeOptionalText(value: string): string | null {
 .report-card--review {
   background: #eff6ff;
   border-color: #93c5fd;
+}
+
+.detail-panel {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.detail-panel header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.detail-panel h2 {
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 950;
+  margin: 0;
+}
+
+.detail-panel header span {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.detail-empty {
+  background: #f8fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 850;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-row {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.detail-row-main {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.detail-row-main strong {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.detail-row-main span {
+  color: #0f766e;
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.detail-row dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.detail-row dl div {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.detail-row dt,
+.detail-row dd {
+  font-size: 0.72rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.detail-row dt {
+  color: #64748b;
+}
+
+.detail-row dd {
+  color: #0f172a;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 460px) {

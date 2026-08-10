@@ -120,3 +120,19 @@
   - Production `rpb-backend`: `active`.
   - Production `rpb-backend` recent 8-minute `ERROR` count after deployment: `0`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-2037-c1f80fba-paynow-report-popup-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-2037-c1f80fba-paynow-report-popup-frontend`, then reload nginx.
+
+## Follow-Up: Staff Report Card Detail Query
+
+- Date: 2026-08-10.
+- Scope: frontend-only Quick Payment staff report refinement.
+- New:
+  - The three daily report cards are clickable filters.
+  - Clicking `真实收款`, `待支付`, or `待检验确认` queries the existing quick-pay records endpoint with the matching status and shows the detailed rows below the cards.
+  - Each detail row shows display number, amount, Ref, cashier, created time, and session number.
+- Migration: no database migration.
+- Permission: reuses the existing `payment` App Gate app and `payment.intent.view` permission.
+- Risk: low frontend-only query and layout risk; the backend API contract already supports the `status` filter and PayNow payment creation is unchanged.
+- Validation:
+  - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+- Rollback: revert the card button/detail list additions in `PaymentQuickPayReportPage.vue`, the generated quick-pay report copy keys, and the UI acceptance assertions.
