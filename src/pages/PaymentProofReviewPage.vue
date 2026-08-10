@@ -210,7 +210,7 @@ function stopScanner(): void {
 }
 
 async function scanFrame(): Promise<void> {
-  if (!scannerActive.value || scanning.value || liveScanInFlight || !storeId.value) {
+  if (!scannerActive.value || scanning.value || liveScanInFlight || successAutoAdvanceTimer !== undefined || !storeId.value) {
     return
   }
   liveScanInFlight = true
@@ -279,7 +279,9 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
         confirmPaymentPresentPaymentByReference(storeId.value, normalizedTerminalCode.value, result.paymentReference)
       }
       speakPaymentSuccess(spokenAmount)
-      stopScanner()
+      if (!fromCamera) {
+        stopScanner()
+      }
       await loadCandidates()
       scheduleSuccessAutoAdvance(fromCamera)
     } else if (fromCamera && result.outcome === 'needs_review') {
