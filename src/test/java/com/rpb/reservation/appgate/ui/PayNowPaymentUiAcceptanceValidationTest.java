@@ -38,6 +38,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("name: 'payment-quick-pay'")
             .contains("path: '/stores/:storeId/payments/proof-review'")
             .contains("name: 'payment-proof-review'")
+            .contains("path: '/stores/:storeId/payments/report/:terminalCode'")
+            .contains("name: 'payment-quick-pay-report'")
             .contains("path: '/stores/:storeId/payments/present/:terminalCode'")
             .contains("name: 'payment-present'")
             .contains("path: '/stores/:storeId/payments/display/:sessionNo'")
@@ -119,6 +121,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
         String proofTemplates = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentProofTemplatesPage.vue"));
         String records = FrontendSourceSupport.readString(Path.of("src", "pages", "TenantAdminPaymentRecordsPage.vue"));
         String quickPay = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentQuickPayPage.vue"));
+        String quickPayReport = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentQuickPayReportPage.vue"));
         String proofReview = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentProofReviewPage.vue"));
         String display = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentDisplayPage.vue"));
         String present = FrontendSourceSupport.readString(Path.of("src", "pages", "PaymentPresentPage.vue"));
@@ -250,9 +253,36 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("openProofReviewWindow")
             .contains("rpb-paynow-proof-review")
             .contains("popup=yes,width=520,height=900")
+            .contains("openPaymentReportWindow")
+            .contains("payment-quick-pay-report")
+            .contains("rpb-paynow-report")
             .contains("calc(112px + env(safe-area-inset-bottom))")
             .contains("max-height: calc(100dvh - 150px)")
-            .contains("active-tab=\"payment\"");
+            .contains("active-tab=\"payment\"")
+            .doesNotContain("getQuickPayRecords")
+            .doesNotContain("daily-report-panel");
+        assertThat(quickPayReport)
+            .contains("getQuickPayRecords")
+            .contains("getPaymentBusinessDay")
+            .contains("daily-report-panel")
+            .contains("report-mode-tabs")
+            .contains("reportModeStorageKey")
+            .contains("rpb.payment.quickPay.reportMode")
+            .contains("cashierName: reportMode.value === 'mine'")
+            .contains("limit: 200")
+            .contains("window.addEventListener('focus', refreshReportOnFocus)")
+            .contains("generated.payment-quick-pay.065")
+            .contains("generated.payment-quick-pay.066")
+            .contains("generated.payment-quick-pay.067")
+            .contains("reportMoney(reportSummary.paidAmount")
+            .contains("reportMoney(reportSummary.pendingAmount")
+            .contains("reportMoney(reportSummary.awaitingVerificationAmount")
+            .contains("active-tab=\"payment\"")
+            .contains("payment-quick-pay")
+            .contains("formatAppGateErrorMessage")
+            .contains("appgate.permission_denied")
+            .doesNotContain("createPaymentIntent")
+            .doesNotContain("manualConfirmQuickPay");
         assertThat(proofReview)
             .contains("getPaymentProofCandidates")
             .contains("scanPaymentProof")

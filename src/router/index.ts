@@ -18,6 +18,7 @@ const PaymentDisplayPage = () => import('../pages/PaymentDisplayPage.vue')
 const PaymentPresentPage = () => import('../pages/PaymentPresentPage.vue')
 const PaymentProofReviewPage = () => import('../pages/PaymentProofReviewPage.vue')
 const PaymentQuickPayPage = () => import('../pages/PaymentQuickPayPage.vue')
+const PaymentQuickPayReportPage = () => import('../pages/PaymentQuickPayReportPage.vue')
 const PublicBookingPage = () => import('../pages/PublicBookingPage.vue')
 const QueueCallPage = () => import('../pages/QueueCallPage.vue')
 const QueueDisplayPage = () => import('../pages/QueueDisplayPage.vue')
@@ -170,6 +171,11 @@ export const router = createRouter({
       path: '/stores/:storeId/payments/proof-review',
       name: 'payment-proof-review',
       component: PaymentProofReviewPage
+    },
+    {
+      path: '/stores/:storeId/payments/report/:terminalCode',
+      name: 'payment-quick-pay-report',
+      component: PaymentQuickPayReportPage
     },
     {
       path: '/stores/:storeId/payments/present/:terminalCode',

@@ -78,3 +78,22 @@
   - `PaymentQuickPayPage-CTqV2it7.js`, `api-CAnYWcEo.js`, `PaymentProofReviewPage-DZB7knzh.js`, `PaymentPresentPage-C9rvprU4.js`, and `i18n-Clt2aO_P.js`: `200`.
   - Production `rpb-backend` recent 8-minute `ERROR` count after deployment: `0`.
 - Rollback: restore `/opt/rpb/app/reservation-platform.jar` and `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-2010-056b92f2-paynow-staff-daily-report`, or switch frontend back to `/opt/rpb/frontend.previous-20260810-2010-056b92f2-paynow-staff-daily-report`, then restart `rpb-backend` and reload nginx.
+
+## Follow-Up: Independent Staff Report Page
+
+- Date: 2026-08-10.
+- Scope: frontend-only Quick Payment staff workflow refinement.
+- New:
+  - Quick Payment now opens the daily report through a top-bar `今日收款报表` button.
+  - The report lives on `/stores/{storeId}/payments/report/{terminalCode}` and opens as its own popup/new page for the active terminal.
+  - The report page keeps the existing default of current terminal plus current cashier, with a persisted switch to the whole terminal line.
+- Changed:
+  - The Quick Payment calculator page no longer renders or loads the full report card, so the keypad starts higher on small screens.
+  - The report page refreshes when focused and still has an explicit refresh button.
+- Migration: no database migration.
+- Permission: reuses the existing `payment` App Gate app and `payment.intent.view` permission.
+- Risk: low frontend-only navigation and layout risk; the backend API contract and PayNow payment creation flow are unchanged.
+- Validation:
+  - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
+  - `npm run build`
+- Rollback: revert `PaymentQuickPayReportPage.vue`, the new router entry, and the Quick Payment top-bar report button; restore the previous inline report panel if needed.
