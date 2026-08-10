@@ -229,3 +229,32 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-Cx8PQNZ7.js`, `PaymentProofReviewPage-4473QVaG.css`, `PaymentQuickPayPage-ByY0Gomp.js`, `PaymentPresentPage-C7DyjLX3.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-DC9r3MIA.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1552-0ac5e210-paynow-proof-voice-ref-guard-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1552-0ac5e210-paynow-proof-voice-ref-guard`, then reload nginx.
+
+## Frontend-Only Follow-Up: Matched Proof Amount Voice Priority
+
+- Deployed commit: `2bf6b50e fix: prioritize matched proof amount for voice`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验成功播报金额在 `checks.amount === 'match'` 时优先使用 OCR 识别金额。
+  - 候选单金额和服务端应收金额只作为 OCR 金额缺失时的兜底，避免 display number / 页面其它数字被播为收款金额。
+  - 例如回单显示 `0.13 SGD`、展示号或页面数字为 `20` 时，语音应播“收款 0.13 元成功”。
+- Production frontend backup: `/opt/rpb/backups/20260810-1602-2bf6b50e-paynow-proof-voice-matched-amount-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260810-1602-2bf6b50e-paynow-proof-voice-matched-amount`.
+- Clean deploy worktree: `target/deploy-worktree-2bf6b50e`.
+- Validation:
+  - Main worktree red test: `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test` failed before the fix because `resolveSuccessfulAmount` still preferred candidate / expected amount before matched OCR amount.
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, recent 5-minute `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-Am6EoUUT.js`, `PaymentProofReviewPage-V_jDqo8b.css`, `PaymentQuickPayPage-B2i8ZVM7.js`, `PaymentPresentPage-n24P2EzF.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-DC9r3MIA.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1602-2bf6b50e-paynow-proof-voice-matched-amount-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1602-2bf6b50e-paynow-proof-voice-matched-amount`, then reload nginx.
