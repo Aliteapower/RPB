@@ -279,6 +279,8 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("confirmPaymentPresentPaymentByReference")
             .contains("resolveSuccessfulCandidate")
             .contains("resolveSuccessfulAmount")
+            .contains("return formatSpokenAmount(candidate?.amount || result.ocr?.extractedAmount || null)")
+            .doesNotContain("result.expectedAmount || result.ocr?.extractedAmount || candidate?.amount")
             .contains("formatSpokenAmount")
             .contains("gt('generated.payment-proof-review.040', { amount })")
             .contains("if (!fromCamera) {\n        stopScanner()\n      }")
