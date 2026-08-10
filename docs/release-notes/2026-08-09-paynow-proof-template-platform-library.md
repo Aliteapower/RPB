@@ -142,3 +142,32 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-Dt6Nuk8z.js`, `PaymentQuickPayPage-D6qpTRA7.js`, `PaymentPresentPage-CRyQejiS.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-wAlLMB7z.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1522-3417d01d-paynow-proof-continuous-scanner-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1522-3417d01d-paynow-proof-continuous-scanner`, then reload nginx.
+
+## Frontend-Only Follow-Up: Rescan Manual Review Card
+
+- Deployed commit: `58bfa2d7 fix: keep proof review visible while rescanning`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验 live 扫描在 `needs_review` 时不再关闭摄像头流。
+  - 扫码读不到金额或金额匹配不成功时，结果卡片显示“请人工确认”，并保留已读到的 Ref / 金额 / 应收金额 / 校验标签。
+  - 员工可以继续移动顾客手机或重新对准回单，系统继续读取下一帧；只有自动确认成功才自动进入下一笔。
+- Production frontend backup: `/opt/rpb/backups/20260810-1535-58bfa2d7-paynow-proof-rescan-review-card-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260810-1535-58bfa2d7-paynow-proof-rescan-review-card`.
+- Clean deploy worktree: `target/deploy-worktree-58bfa2d7`.
+- Validation:
+  - Main worktree red test: `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test` failed before the fix because live scanner `needs_review` still stopped the scanner.
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, recent 5-minute `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-BHcX_uZ2.js`, `PaymentProofReviewPage--IwEetT2.css`, `PaymentQuickPayPage-CdkAojnk.js`, `PaymentPresentPage-9XaIspnS.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-DC9r3MIA.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1535-58bfa2d7-paynow-proof-rescan-review-card-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1535-58bfa2d7-paynow-proof-rescan-review-card`, then reload nginx.
