@@ -113,3 +113,32 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-D7COEeS0.js`, `PaymentQuickPayPage-BeEfAaD3.js`, `PaymentPresentPage-Mxf21bz9.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-wAlLMB7z.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1509-eb76e65b-paynow-amount-voice-clear-qr-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1509-eb76e65b-paynow-amount-voice-clear-qr`, then reload nginx.
+
+## Frontend-Only Follow-Up: Continuous Proof Scanner
+
+- Deployed commit: `3417d01d fix: keep paynow proof scanner continuous`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验 live 扫描在自动确认成功后不再关闭摄像头流。
+  - 成功提示期间暂停后续帧提交，避免同一张回单在语音/成功卡片展示期间重复触发。
+  - 成功卡片自动关闭后继续使用当前摄像头流识别下一笔，减少下一单重新开启相机导致无法识别的问题。
+- Production frontend backup: `/opt/rpb/backups/20260810-1522-3417d01d-paynow-proof-continuous-scanner-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260810-1522-3417d01d-paynow-proof-continuous-scanner`.
+- Clean deploy worktree: `target/deploy-worktree-3417d01d`.
+- Validation:
+  - Main worktree red test: `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test` failed before the fix because live scanner success did not pause auto-advance frames.
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, recent 5-minute `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-Dt6Nuk8z.js`, `PaymentQuickPayPage-D6qpTRA7.js`, `PaymentPresentPage-CRyQejiS.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-wAlLMB7z.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1522-3417d01d-paynow-proof-continuous-scanner-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1522-3417d01d-paynow-proof-continuous-scanner`, then reload nginx.
