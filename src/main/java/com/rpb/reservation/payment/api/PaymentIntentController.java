@@ -117,6 +117,7 @@ public class PaymentIntentController {
         @RequestParam(required = false) java.time.LocalDate businessDate,
         @RequestParam(required = false) String status,
         @RequestParam(required = false) String terminalCode,
+        @RequestParam(required = false) String cashierName,
         @RequestParam(name = "q", required = false) String search,
         @RequestParam(required = false, defaultValue = "80") int limit
     ) {
@@ -133,6 +134,7 @@ public class PaymentIntentController {
                     businessDate,
                     status,
                     terminalCode,
+                    cashierName,
                     search,
                     limit
                 ),

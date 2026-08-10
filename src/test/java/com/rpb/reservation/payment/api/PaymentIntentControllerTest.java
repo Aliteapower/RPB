@@ -63,6 +63,7 @@ class PaymentIntentControllerTest {
             String.class,
             String.class,
             String.class,
+            String.class,
             int.class
         );
 

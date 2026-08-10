@@ -239,7 +239,7 @@ public class PaymentIntentService {
 
     private static QuickPayRecordQuery normalized(QuickPayRecordQuery query) {
         QuickPayRecordQuery source = query == null
-            ? new QuickPayRecordQuery(null, null, null, null, 80)
+            ? new QuickPayRecordQuery(null, null, null, null, null, 80)
             : query;
         String status = trimLower(source.status());
         if (!isBlank(status) && !RECORD_STATUSES.contains(status)) {
@@ -250,6 +250,7 @@ public class PaymentIntentService {
             source.businessDate(),
             status,
             trim(source.terminalCode()),
+            trim(source.cashierName()),
             trim(source.search()),
             limit
         );

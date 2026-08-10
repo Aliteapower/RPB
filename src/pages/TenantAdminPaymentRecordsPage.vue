@@ -19,8 +19,11 @@ const records = ref<QuickPayRecord[]>([])
 const summary = ref<QuickPayRecordSummary>({
   count: 0,
   pendingCount: 0,
+  awaitingVerificationCount: 0,
   paidCount: 0,
   totalAmount: '0',
+  pendingAmount: '0',
+  awaitingVerificationAmount: '0',
   paidAmount: '0',
   currency: 'SGD'
 })

@@ -47,10 +47,10 @@ Extend response summary:
     "pendingCount": 1,
     "awaitingVerificationCount": 1,
     "paidCount": 1,
-    "totalAmount": "25.00",
-    "pendingAmount": "5.00",
-    "awaitingVerificationAmount": "8.00",
-    "paidAmount": "12.00",
+    "totalAmount": "25",
+    "pendingAmount": "5",
+    "awaitingVerificationAmount": "8",
+    "paidAmount": "12",
     "currency": "SGD"
   }
 }

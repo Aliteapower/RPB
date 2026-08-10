@@ -363,6 +363,7 @@ class PaymentIntentServiceTest {
             LocalDate.parse("2026-08-05"),
             "PENDING",
             " T1 ",
+            " Alice ",
             " QP-202608 ",
             500
         ), actor);
@@ -372,6 +373,7 @@ class PaymentIntentServiceTest {
             LocalDate.parse("2026-08-05"),
             "pending",
             "T1",
+            "Alice",
             "QP-202608",
             200
         ));
@@ -382,6 +384,7 @@ class PaymentIntentServiceTest {
         assertThatThrownBy(() -> service.findQuickPayRecords(scope, new QuickPayRecordQuery(
             null,
             "unknown",
+            null,
             null,
             null,
             80

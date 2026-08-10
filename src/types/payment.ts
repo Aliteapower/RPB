@@ -159,8 +159,11 @@ export interface QuickPayRecord {
 export interface QuickPayRecordSummary {
   count: number
   pendingCount: number
+  awaitingVerificationCount: number
   paidCount: number
   totalAmount: string
+  pendingAmount: string
+  awaitingVerificationAmount: string
   paidAmount: string
   currency: string
 }
@@ -169,6 +172,7 @@ export interface QuickPayRecordsQuery {
   businessDate?: string
   status?: string
   terminalCode?: string
+  cashierName?: string
   q?: string
   limit?: number
 }

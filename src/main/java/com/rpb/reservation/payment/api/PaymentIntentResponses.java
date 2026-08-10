@@ -149,16 +149,37 @@ public final class PaymentIntentResponses {
             BigDecimal totalAmount = records.stream()
                 .map(QuickPayRecord::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal pendingAmount = records.stream()
+                .filter(record -> "pending".equals(record.intentStatus()))
+                .map(QuickPayRecord::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal awaitingVerificationAmount = records.stream()
+                .filter(record -> "awaiting_verification".equals(record.intentStatus()))
+                .map(QuickPayRecord::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal paidAmount = records.stream()
                 .filter(record -> "paid".equals(record.intentStatus()))
                 .map(QuickPayRecord::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
             long pendingCount = records.stream().filter(record -> "pending".equals(record.intentStatus())).count();
+            long awaitingVerificationCount = records.stream()
+                .filter(record -> "awaiting_verification".equals(record.intentStatus()))
+                .count();
             long paidCount = records.stream().filter(record -> "paid".equals(record.intentStatus())).count();
             return new QuickPayRecordsResponse(
                 true,
                 rows,
-                new QuickPayRecordSummary(records.size(), pendingCount, paidCount, amountText(totalAmount), amountText(paidAmount), "SGD")
+                new QuickPayRecordSummary(
+                    records.size(),
+                    pendingCount,
+                    awaitingVerificationCount,
+                    paidCount,
+                    amountText(totalAmount),
+                    amountText(pendingAmount),
+                    amountText(awaitingVerificationAmount),
+                    amountText(paidAmount),
+                    "SGD"
+                )
             );
         }
     }
@@ -204,8 +225,11 @@ public final class PaymentIntentResponses {
     public record QuickPayRecordSummary(
         int count,
         long pendingCount,
+        long awaitingVerificationCount,
         long paidCount,
         String totalAmount,
+        String pendingAmount,
+        String awaitingVerificationAmount,
         String paidAmount,
         String currency
     ) {

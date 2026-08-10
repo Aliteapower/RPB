@@ -158,6 +158,10 @@ public class JdbcPaymentIntentRepository implements PaymentIntentRepository {
             sql.append(" and s.terminal_code = ?");
             args.add(query.terminalCode());
         }
+        if (!isBlank(query.cashierName())) {
+            sql.append(" and s.cashier_name = ?");
+            args.add(query.cashierName());
+        }
         if (!isBlank(query.search())) {
             sql.append("""
                  and (

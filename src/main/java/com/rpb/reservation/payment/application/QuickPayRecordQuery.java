@@ -6,6 +6,7 @@ public record QuickPayRecordQuery(
     LocalDate businessDate,
     String status,
     String terminalCode,
+    String cashierName,
     String search,
     int limit
 ) {
