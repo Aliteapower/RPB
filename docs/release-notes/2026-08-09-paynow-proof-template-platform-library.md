@@ -85,3 +85,31 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-h5YBDsQt.js`, `PaymentQuickPayPage-CnsYZJoV.js`, `PaymentPresentPage-CdJqFuyV.js`, and `paymentPresentBridge-Gm3BQeSq.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260809-1756-677db79a-paynow-proof-auto-close-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260809-1756-677db79a-paynow-proof-auto-close`, then reload nginx.
+
+## Frontend-Only Follow-Up: Amount Voice And QR Clear
+
+- Deployed commit: `eb76e65b fix: speak paynow amount and clear confirmed qr`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验自动确认后，语音优先播报识别/应收金额，例如“收款 0.1 元成功”，不再只播“收款成功”。
+  - 回单校验确认成功时，若候选单没有 session 编号，会按 Ref 清理 Quick Payment 本地展示记录。
+  - 手动确认和自动确认后都从展示屏 active/recent 本地记录中删除对应二维码，不再显示 `paid` 或继续等倒计时过期。
+- Production frontend backup: `/opt/rpb/backups/20260810-1509-eb76e65b-paynow-amount-voice-clear-qr-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260810-1509-eb76e65b-paynow-amount-voice-clear-qr`.
+- Clean deploy worktree: `target/deploy-worktree-eb76e65b`.
+- Validation:
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, recent 5-minute `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-D7COEeS0.js`, `PaymentQuickPayPage-BeEfAaD3.js`, `PaymentPresentPage-Mxf21bz9.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-wAlLMB7z.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1509-eb76e65b-paynow-amount-voice-clear-qr-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1509-eb76e65b-paynow-amount-voice-clear-qr`, then reload nginx.
