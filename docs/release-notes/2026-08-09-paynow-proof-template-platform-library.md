@@ -287,3 +287,34 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-DDl09_jh.js`, `PaymentProofReviewPage-_hvXWXYH.css`, `PaymentQuickPayPage-Yh2m35_P.js`, `PaymentPresentPage-Clkgebn-.js`, `paymentPresentBridge-D_qdGBDl.js`, and `i18n-DC9r3MIA.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1614-87375fa0-paynow-proof-present-amount-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1614-87375fa0-paynow-proof-present-amount`, then reload nginx.
+
+## Backend Follow-Up: Proof Rescan Auto Confirm
+
+- Deployed commit: `c73bafc2 fix: auto confirm matched proof rescan`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: backend-only; frontend bundle, Flyway migrations, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验第一次识别进入 `awaiting_verification` 后，继续扫描同一笔回单时，如果 Ref 和金额都匹配，会返回 `auto_confirmed`。
+  - 自动确认会把对应 payment intent 和 payment session 从 `pending` 或 `awaiting_verification` 标记为 `paid`。
+  - 前端收到 `auto_confirmed` 后会继续现有成功流程：播报收款金额、关闭 Quick Payment 展示记录并继续扫下一笔。
+- Production backend backup: `/opt/rpb/backups/20260810-1719-c73bafc2-paynow-proof-rescan-auto-confirm-backend.jar`.
+- Clean deploy worktree: `target/deploy-worktree-c73bafc2`.
+- Validation:
+  - Main worktree red test: `mvn "-Dtest=PaymentProofReviewServiceTest" test` failed before the fix because `awaiting_verification` candidate still returned `needs_review`.
+  - Main worktree `mvn "-Dtest=PaymentProofReviewServiceTest" test`: passed, 13 tests with 0 failures and 0 errors.
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Main worktree `mvn -DskipTests package`: passed.
+  - Clean deploy worktree `mvn "-Dtest=PaymentProofReviewServiceTest,PayNowPaymentUiAcceptanceValidationTest" test`: passed, 18 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn -DskipTests package`: passed.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, deployed JAR SHA-256 `d58029890cf7f90a67f18084a0ad741effc3ef1fbbf668d7c2be2ae7df7afcf2`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - Recent production log review found no application startup failure; the only matched `ERROR` text was Tomcat's invalid browser cookie notice.
+- Rollback: restore `/opt/rpb/app/reservation-platform.jar` from `/opt/rpb/backups/20260810-1719-c73bafc2-paynow-proof-rescan-auto-confirm-backend.jar`, then restart `rpb-backend`.
