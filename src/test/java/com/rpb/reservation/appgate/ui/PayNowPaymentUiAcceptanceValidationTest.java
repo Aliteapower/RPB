@@ -275,7 +275,11 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("speakPaymentSuccess")
             .contains("SpeechSynthesisUtterance")
             .contains("confirmPaymentPresentPayment")
+            .contains("confirmPaymentPresentPaymentByReference")
             .contains("resolveSuccessfulCandidate")
+            .contains("resolveSuccessfulAmount")
+            .contains("formatSpokenAmount")
+            .contains("gt('generated.payment-proof-review.040', { amount })")
             .contains("scheduleSuccessAutoAdvance(fromCamera)")
             .contains("clearSuccessAutoAdvance")
             .contains("prepareNextScan")
@@ -334,7 +338,9 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("savePaymentPresentSettings")
             .contains("publishPaymentPresentSettings")
             .contains("confirmPaymentPresentPayment")
+            .contains("confirmPaymentPresentPaymentByReference")
             .contains("const next = recent.filter(item => item.sessionNo !== sessionNo)")
+            .contains("normalizePaymentReference(item.paymentReference)")
             .contains("isPaymentPresentRecentPending")
             .contains(".filter(isPaymentPresentRecentPending)")
             .contains("return isPaymentPresentRecentPending(payload) && nowMs - payload.createdAtMs < PAYMENT_PRESENT_TTL_SECONDS * 1000")
@@ -356,7 +362,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-proof-review.006\": \"回单校验\"");
         assertThat(generatedZh)
             .contains("\"generated.payment-proof-review.039\": \"已确认\"")
-            .contains("\"generated.payment-proof-review.040\": \"收款 {displayNumber} 成功\"")
+            .contains("\"generated.payment-proof-review.040\": \"收款 {amount} 元成功\"")
             .contains("\"generated.payment-proof-review.041\": \"收款成功\"")
             .contains("\"generated.payment-proof-review.028\": \"关闭并扫下一笔\"");
         assertThat(generatedEn)
@@ -374,7 +380,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"")
-            .contains("\"generated.payment-proof-review.040\": \"Payment {displayNumber} confirmed\"")
+            .contains("\"generated.payment-proof-review.040\": \"Payment {amount} confirmed\"")
             .contains("\"generated.payment-proof-review.041\": \"Payment confirmed\"")
             .contains("\"generated.payment-proof-review.028\": \"Close and scan next\"");
     }

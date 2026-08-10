@@ -1542,7 +1542,7 @@ export const generatedZhCN: Record<string, string> = {
   "generated.payment-proof-review.037": "拍照识别",
   "generated.payment-proof-review.038": "上传照片识别",
   "generated.payment-proof-review.039": "已确认",
-  "generated.payment-proof-review.040": "收款 {displayNumber} 成功",
+  "generated.payment-proof-review.040": "收款 {amount} 元成功",
   "generated.payment-proof-review.041": "收款成功",
   "generated.tenant-admin-payment-proof-templates.001": "回单样式库",
   "generated.tenant-admin-payment-proof-templates.002": "返回收款设置",

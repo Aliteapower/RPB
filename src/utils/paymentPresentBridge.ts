@@ -369,6 +369,30 @@ export function confirmPaymentPresentPayment(
   return next
 }
 
+export function confirmPaymentPresentPaymentByReference(
+  storeId: string,
+  terminalCode: string,
+  paymentReference: string | null | undefined
+): PaymentPresentRecentItem[] {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const normalizedReference = normalizePaymentReference(paymentReference)
+  if (!normalizedReference) {
+    return readPaymentPresentRecent(storeId, normalizedTerminal)
+  }
+  const activePayloads = readPaymentPresentPayloads(storeId, normalizedTerminal)
+    .filter(payload => normalizePaymentReference(payload.paymentReference) !== normalizedReference && isPaymentPresentPayloadActive(payload))
+  safeSetJson(activeStorageKey(storeId, normalizedTerminal), activePayloads)
+
+  const recent = readPaymentPresentRecent(storeId, normalizedTerminal)
+  const next = recent.filter(item => normalizePaymentReference(item.paymentReference) !== normalizedReference)
+  safeSetJson(recentStorageKey(storeId, normalizedTerminal), next)
+  postPaymentPresentMessage(storeId, normalizedTerminal, {
+    kind: 'payloads',
+    payloads: activePayloads
+  })
+  return next
+}
+
 export function readQuickPayPresetAmounts(storeId: string, defaultValues = DEFAULT_PRESET_AMOUNTS): string[] {
   const parsed = safeGet(presetStorageKey(storeId))
   if (!parsed) {
@@ -520,6 +544,10 @@ function normalizeRecentExpiredHoldSeconds(value: unknown): number {
     return DEFAULT_RECENT_EXPIRED_HOLD_SECONDS
   }
   return Math.max(0, Math.min(Math.trunc(numberValue), MAX_RECENT_EXPIRED_HOLD_SECONDS))
+}
+
+function normalizePaymentReference(value: string | null | undefined): string {
+  return String(value || '').trim().toUpperCase()
 }
 
 function normalizePresetAmounts(values: unknown): string[] {

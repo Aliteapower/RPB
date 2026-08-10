@@ -15,7 +15,7 @@ import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { PaymentProofCandidate, PaymentProofScanResponse } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
-import { confirmPaymentPresentPayment } from '../utils/paymentPresentBridge'
+import { confirmPaymentPresentPayment, confirmPaymentPresentPaymentByReference } from '../utils/paymentPresentBridge'
 
 const terminalStorageKey = 'rpb.payment.quickPay.terminalCode'
 
@@ -272,10 +272,13 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
     if (result.outcome === 'auto_confirmed' || result.outcome === 'already_confirmed') {
       const successfulCandidate = resolveSuccessfulCandidate(result)
       successfulDisplayNumber.value = successfulCandidate?.displayNumber || null
+      const spokenAmount = resolveSuccessfulAmount(result, successfulCandidate)
       if (successfulCandidate?.sessionNo) {
         confirmPaymentPresentPayment(storeId.value, normalizedTerminalCode.value, successfulCandidate.sessionNo)
+      } else {
+        confirmPaymentPresentPaymentByReference(storeId.value, normalizedTerminalCode.value, result.paymentReference)
       }
-      speakPaymentSuccess(successfulDisplayNumber.value)
+      speakPaymentSuccess(spokenAmount)
       stopScanner()
       await loadCandidates()
       scheduleSuccessAutoAdvance(fromCamera)
@@ -352,12 +355,24 @@ function resolveSuccessfulCandidate(result: PaymentProofScanResponse): PaymentPr
   }) || null
 }
 
-function speakPaymentSuccess(displayNumber: number | null): void {
+function resolveSuccessfulAmount(result: PaymentProofScanResponse, candidate: PaymentProofCandidate | null): string {
+  return formatSpokenAmount(result.expectedAmount || result.ocr?.extractedAmount || candidate?.amount || null)
+}
+
+function formatSpokenAmount(amount: string | number | null | undefined): string {
+  const value = Number(amount ?? 0)
+  if (!Number.isFinite(value) || value <= 0) {
+    return ''
+  }
+  return value.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')
+}
+
+function speakPaymentSuccess(amount: string): void {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
     return
   }
-  const message = displayNumber
-    ? gt('generated.payment-proof-review.040', { displayNumber })
+  const message = amount
+    ? gt('generated.payment-proof-review.040', { amount })
     : gt('generated.payment-proof-review.041')
   const utterance = new SpeechSynthesisUtterance(message)
   utterance.lang = /[\u3400-\u9fff]/.test(message) ? 'zh-CN' : 'en-SG'

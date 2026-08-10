@@ -1542,7 +1542,7 @@ export const generatedEnSG: Record<string, string> = {
   "generated.payment-proof-review.037": "Take photo",
   "generated.payment-proof-review.038": "Upload photo",
   "generated.payment-proof-review.039": "Already confirmed",
-  "generated.payment-proof-review.040": "Payment {displayNumber} confirmed",
+  "generated.payment-proof-review.040": "Payment {amount} confirmed",
   "generated.payment-proof-review.041": "Payment confirmed",
   "generated.tenant-admin-payment-proof-templates.001": "Proof template library",
   "generated.tenant-admin-payment-proof-templates.002": "Back to payment settings",
