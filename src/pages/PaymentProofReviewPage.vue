@@ -356,14 +356,13 @@ function resolveSuccessfulCandidate(result: PaymentProofScanResponse): PaymentPr
 }
 
 function resolveSuccessfulAmount(result: PaymentProofScanResponse, candidate: PaymentProofCandidate | null): string {
-  const amount = candidate?.amount || result.expectedAmount
-  if (amount) {
-    return formatSpokenAmount(amount)
-  }
   if (result.checks?.amount === 'match') {
-    return formatSpokenAmount(result.ocr?.extractedAmount || null)
+    const matchedAmount = formatSpokenAmount(result.ocr?.extractedAmount || null)
+    if (matchedAmount) {
+      return matchedAmount
+    }
   }
-  return ''
+  return formatSpokenAmount(candidate?.amount || result.expectedAmount || null)
 }
 
 function formatSpokenAmount(amount: string | number | null | undefined): string {
