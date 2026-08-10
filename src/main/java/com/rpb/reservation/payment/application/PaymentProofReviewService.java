@@ -165,8 +165,8 @@ public class PaymentProofReviewService {
         PaymentProofChecks checks = new PaymentProofChecks(referenceCheck, amountCheck);
         boolean autoConfirm = "match".equals(referenceCheck)
             && "match".equals(amountCheck)
-            && "pending".equals(candidate.intentStatus())
-            && "pending".equals(candidate.sessionStatus());
+            && isConfirmableStatus(candidate.intentStatus())
+            && isConfirmableStatus(candidate.sessionStatus());
         return repository.createMatchedProofAndMaybeConfirm(
             scope,
             candidate,
@@ -221,6 +221,10 @@ public class PaymentProofReviewService {
             return false;
         }
         return extracted.compareTo(expected) == 0;
+    }
+
+    private static boolean isConfirmableStatus(String status) {
+        return "pending".equals(status) || "awaiting_verification".equals(status);
     }
 
     private static void validateActor(StoreScope scope, CurrentActor actor) {

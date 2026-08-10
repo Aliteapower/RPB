@@ -209,6 +209,36 @@ class PaymentProofReviewServiceTest {
     }
 
     @Test
+    void autoConfirmsAwaitingVerificationCandidateWhenReferenceAndAmountMatchOnRescan() {
+        PaymentProofCandidate candidate = candidate(
+            "QP202608100023DYEQ",
+            new BigDecimal("0.10"),
+            "awaiting_verification",
+            "awaiting_verification"
+        );
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP202608100023DYEQ",
+            new BigDecimal("0.10"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 QP202608100023DYEQ 您已支付 0.10 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-awaiting-rescan-match"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.checks().reference()).isEqualTo("match");
+        assertThat(result.checks().amount()).isEqualTo("match");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+        assertThat(repository.createdProofStatus).isEqualTo("confirmed");
+        assertThat(repository.createdVerificationStatus).isEqualTo("confirmed");
+    }
+
+    @Test
     void doesNotMatchWhenCompactAndLegacyVariantsResolveToDifferentActiveCandidates() {
         repository.candidate = Optional.of(candidate("QP2026080013AAHP", new BigDecimal("1.00")));
         repository.additionalCandidate = Optional.of(candidate("QP-202608-0013-AAHP", new BigDecimal("1.00")));

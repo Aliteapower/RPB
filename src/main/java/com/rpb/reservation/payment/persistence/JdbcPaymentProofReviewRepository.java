@@ -363,7 +363,7 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
             where tenant_id = ?
               and store_id = ?
               and id = ?
-              and status = 'pending'
+              and status in ('pending', 'awaiting_verification')
             """,
             scope.tenantId().value(),
             scope.storeId().value(),
@@ -378,7 +378,7 @@ public class JdbcPaymentProofReviewRepository implements PaymentProofReviewRepos
             where tenant_id = ?
               and store_id = ?
               and intent_id = ?
-              and status = 'pending'
+              and status in ('pending', 'awaiting_verification')
             """,
             scope.tenantId().value(),
             scope.storeId().value(),
