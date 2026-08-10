@@ -171,3 +171,32 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-BHcX_uZ2.js`, `PaymentProofReviewPage--IwEetT2.css`, `PaymentQuickPayPage-CdkAojnk.js`, `PaymentPresentPage-9XaIspnS.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-DC9r3MIA.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1535-58bfa2d7-paynow-proof-rescan-review-card-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1535-58bfa2d7-paynow-proof-rescan-review-card`, then reload nginx.
+
+## Frontend-Only Follow-Up: Proof Voice Amount Source
+
+- Deployed commit: `1d5395a0 fix: speak paynow proof amount from candidate`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验自动确认/已确认后的语音播报金额改为优先使用匹配候选单的 `amount`。
+  - 没有候选单时才使用 OCR 识别金额；不再用 `expectedAmount` 作为语音兜底，避免单号/展示号被读成金额。
+  - 文案仍为“收款 {amount} 元成功”，金额格式继续去掉无意义尾零。
+- Production frontend backup: `/opt/rpb/backups/20260810-1544-1d5395a0-paynow-proof-voice-amount-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260810-1544-1d5395a0-paynow-proof-voice-amount`.
+- Clean deploy worktree: `target/deploy-worktree-1d5395a0`.
+- Validation:
+  - Main worktree red test: `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test` failed before the fix because `resolveSuccessfulAmount` still preferred `expectedAmount`.
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, recent 5-minute `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-D5rNIIzD.js`, `PaymentProofReviewPage-Cp9h0IKT.css`, `PaymentQuickPayPage-oda3e4Zi.js`, `PaymentPresentPage-D84Qh1R2.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-DC9r3MIA.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1544-1d5395a0-paynow-proof-voice-amount-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1544-1d5395a0-paynow-proof-voice-amount`, then reload nginx.
