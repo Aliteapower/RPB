@@ -258,3 +258,32 @@
   - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
   - `PaymentProofReviewPage-Am6EoUUT.js`, `PaymentProofReviewPage-V_jDqo8b.css`, `PaymentQuickPayPage-B2i8ZVM7.js`, `PaymentPresentPage-n24P2EzF.js`, `paymentPresentBridge-CDPRPkDm.js`, and `i18n-DC9r3MIA.js`: `200`.
 - Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1602-2bf6b50e-paynow-proof-voice-matched-amount-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1602-2bf6b50e-paynow-proof-voice-matched-amount`, then reload nginx.
+
+## Frontend-Only Follow-Up: Present Amount Voice and QR Close
+
+- Deployed commit: `87375fa0 fix: use present amount for proof success`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment date: 2026-08-10.
+- Scope: frontend-only; backend JAR, Flyway, App Gate permissions, and API contracts were not changed.
+- Behavior:
+  - 回单校验自动确认/已确认后，会按成功 Ref/session 从 Quick Payment 展示屏本地 active/recent 记录找同一笔收款。
+  - 语音播报优先使用展示屏本地记录的 `amount`，例如展示屏 #21 为 `SGD 0.23` 时播“收款 0.23 元成功”，避免 Ref 后缀或 display number 被当成金额。
+  - 成功后用同一条本地记录的 `sessionNo` 或 Ref 关闭 Quick Payment 展示屏二维码，不再等倒计时过期。
+- Production frontend backup: `/opt/rpb/backups/20260810-1614-87375fa0-paynow-proof-present-amount-frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260810-1614-87375fa0-paynow-proof-present-amount`.
+- Clean deploy worktree: `target/deploy-worktree-87375fa0`.
+- Validation:
+  - Main worktree red test: `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test` failed before the fix because `findPaymentPresentPayment` and the present-record amount/close flow were missing.
+  - Main worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Main worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Clean deploy worktree `npm ci`: completed; npm audit reported the existing 3 high severity findings.
+  - Clean deploy worktree `mvn "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`: passed, 5 tests with 0 failures and 0 errors.
+  - Clean deploy worktree `npm run build`: passed (`vue-tsc --noEmit && vite build`).
+  - Production `rpb-backend`: `active`, recent 5-minute `ERROR` count: `0`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/present/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `PaymentProofReviewPage-DDl09_jh.js`, `PaymentProofReviewPage-_hvXWXYH.css`, `PaymentQuickPayPage-Yh2m35_P.js`, `PaymentPresentPage-Clkgebn-.js`, `paymentPresentBridge-D_qdGBDl.js`, and `i18n-DC9r3MIA.js`: `200`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-1614-87375fa0-paynow-proof-present-amount-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-1614-87375fa0-paynow-proof-present-amount`, then reload nginx.
