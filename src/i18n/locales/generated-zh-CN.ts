@@ -1520,7 +1520,7 @@ export const generatedZhCN: Record<string, string> = {
   "generated.payment-proof-review.015": "应收金额",
   "generated.payment-proof-review.016": "校验",
   "generated.payment-proof-review.017": "已自动确认",
-  "generated.payment-proof-review.018": "需要人工复核",
+  "generated.payment-proof-review.018": "请人工确认",
   "generated.payment-proof-review.019": "未匹配",
   "generated.payment-proof-review.020": "回单验证失败，请稍后重试",
   "generated.payment-proof-review.021": "登录已失效，请重新登录",

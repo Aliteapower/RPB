@@ -291,8 +291,10 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("generated.payment-proof-review.041")
             .contains("auto_confirmed")
             .contains("already_confirmed")
+            .contains("needs_review")
             .contains("generated.payment-proof-review.028")
             .contains("active-tab=\"payment\"")
+            .doesNotContain("fromCamera && result.outcome === 'needs_review'")
             .doesNotContain("sidecar")
             .doesNotContain("payment_runtime");
         assertThat(staffRepository)
@@ -363,6 +365,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-proof-review.003\": \"回单校验\"")
             .contains("\"generated.payment-proof-review.006\": \"回单校验\"");
         assertThat(generatedZh)
+            .contains("\"generated.payment-proof-review.018\": \"请人工确认\"")
             .contains("\"generated.payment-proof-review.039\": \"已确认\"")
             .contains("\"generated.payment-proof-review.040\": \"收款 {amount} 元成功\"")
             .contains("\"generated.payment-proof-review.041\": \"收款成功\"")
@@ -382,6 +385,7 @@ class PayNowPaymentUiAcceptanceValidationTest {
             .contains("\"generated.payment-proof-review.006\": \"Payment Proof Review\"");
         assertThat(generatedEn)
             .contains("\"generated.payment-proof-review.039\": \"Already confirmed\"")
+            .contains("\"generated.payment-proof-review.018\": \"Manual confirmation required\"")
             .contains("\"generated.payment-proof-review.040\": \"Payment {amount} confirmed\"")
             .contains("\"generated.payment-proof-review.041\": \"Payment confirmed\"")
             .contains("\"generated.payment-proof-review.028\": \"Close and scan next\"");

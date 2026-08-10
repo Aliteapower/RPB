@@ -284,8 +284,6 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
       }
       await loadCandidates()
       scheduleSuccessAutoAdvance(fromCamera)
-    } else if (fromCamera && result.outcome === 'needs_review') {
-      stopScanner()
     }
   } catch (error) {
     errorText.value = apiErrorText(error)

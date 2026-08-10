@@ -1520,7 +1520,7 @@ export const generatedEnSG: Record<string, string> = {
   "generated.payment-proof-review.015": "Expected amount",
   "generated.payment-proof-review.016": "Checks",
   "generated.payment-proof-review.017": "Auto confirmed",
-  "generated.payment-proof-review.018": "Needs review",
+  "generated.payment-proof-review.018": "Manual confirmation required",
   "generated.payment-proof-review.019": "No match",
   "generated.payment-proof-review.020": "Unable to verify receipt. Please try again later.",
   "generated.payment-proof-review.021": "Session expired. Please sign in again.",
