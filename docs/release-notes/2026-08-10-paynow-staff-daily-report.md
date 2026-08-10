@@ -97,3 +97,26 @@
   - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
   - `npm run build`
 - Rollback: revert `PaymentQuickPayReportPage.vue`, the new router entry, and the Quick Payment top-bar report button; restore the previous inline report panel if needed.
+
+### Independent Staff Report Page Deployment
+
+- Deployment date: 2026-08-10.
+- Deployed commit: `c1f80fba feat: move paynow daily report to popup page`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment type: frontend static assets only; backend JAR, Flyway migrations, environment variables, and App Gate permission seeds were not changed.
+- Clean deploy worktree: `target/deploy-worktree-c1f80fba`.
+- Uploaded artifact: `/home/ubuntu/rpb-c1f80fba-frontend.tgz`.
+- Frontend tarball SHA-256: `46DECDFB1355F7536684AC53732248FBF9FC8DFC8165895DECDA67F808E61017`.
+- Production frontend backup: `/opt/rpb/backups/20260810-2037-c1f80fba-paynow-report-popup-frontend/frontend`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260810-2037-c1f80fba-paynow-report-popup-frontend`.
+- Public `/login` loaded frontend entry asset `/assets/index-BqfEC5a9.js` and CSS `/assets/index-D26kJdZF.css`.
+- Production smoke:
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/report/T1`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/proof-review`: `200`.
+  - `PaymentQuickPayReportPage-Bgh1qTBx.js`, `PaymentQuickPayReportPage-CCjDm0S8.css`, `PaymentQuickPayPage-G3_hw1j9.js`, `PaymentQuickPayPage-CJYwTm2n.css`, and `api-DyB1w4mK.js`: `200`.
+  - Production `rpb-backend`: `active`.
+  - Production `rpb-backend` recent 8-minute `ERROR` count after deployment: `0`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260810-2037-c1f80fba-paynow-report-popup-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260810-2037-c1f80fba-paynow-report-popup-frontend`, then reload nginx.
