@@ -15,7 +15,12 @@ import { useAuthSessionStore } from '../stores/authSession'
 import { useStoreContextStore } from '../stores/storeContext'
 import type { PaymentProofCandidate, PaymentProofScanResponse } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
-import { confirmPaymentPresentPayment, confirmPaymentPresentPaymentByReference } from '../utils/paymentPresentBridge'
+import {
+  confirmPaymentPresentPayment,
+  confirmPaymentPresentPaymentByReference,
+  findPaymentPresentPayment
+} from '../utils/paymentPresentBridge'
+import type { PaymentPresentPayment } from '../utils/paymentPresentBridge'
 
 const terminalStorageKey = 'rpb.payment.quickPay.terminalCode'
 
@@ -271,12 +276,23 @@ async function submitProofImage(image: File, fromCamera: boolean): Promise<void>
     scanResult.value = result
     if (result.outcome === 'auto_confirmed' || result.outcome === 'already_confirmed') {
       const successfulCandidate = resolveSuccessfulCandidate(result)
-      successfulDisplayNumber.value = successfulCandidate?.displayNumber || null
-      const spokenAmount = resolveSuccessfulAmount(result, successfulCandidate)
-      if (successfulCandidate?.sessionNo) {
-        confirmPaymentPresentPayment(storeId.value, normalizedTerminalCode.value, successfulCandidate.sessionNo)
+      const localPresentPayment = findPaymentPresentPayment(
+        storeId.value,
+        normalizedTerminalCode.value,
+        result.paymentReference || successfulCandidate?.paymentReference,
+        successfulCandidate?.sessionNo
+      )
+      successfulDisplayNumber.value = successfulCandidate?.displayNumber || localPresentPayment?.displayNumber || null
+      const spokenAmount = resolveSuccessfulAmount(result, successfulCandidate, localPresentPayment)
+      const sessionNoToConfirm = successfulCandidate?.sessionNo || localPresentPayment?.sessionNo
+      if (sessionNoToConfirm) {
+        confirmPaymentPresentPayment(storeId.value, normalizedTerminalCode.value, sessionNoToConfirm)
       } else {
-        confirmPaymentPresentPaymentByReference(storeId.value, normalizedTerminalCode.value, result.paymentReference)
+        confirmPaymentPresentPaymentByReference(
+          storeId.value,
+          normalizedTerminalCode.value,
+          result.paymentReference || successfulCandidate?.paymentReference || localPresentPayment?.paymentReference
+        )
       }
       speakPaymentSuccess(spokenAmount)
       if (!fromCamera) {
@@ -355,7 +371,15 @@ function resolveSuccessfulCandidate(result: PaymentProofScanResponse): PaymentPr
   }) || null
 }
 
-function resolveSuccessfulAmount(result: PaymentProofScanResponse, candidate: PaymentProofCandidate | null): string {
+function resolveSuccessfulAmount(
+  result: PaymentProofScanResponse,
+  candidate: PaymentProofCandidate | null,
+  presentPayment: PaymentPresentPayment | null
+): string {
+  const presentAmount = formatSpokenAmount(presentPayment?.amount || null)
+  if (presentAmount) {
+    return presentAmount
+  }
   if (result.checks?.amount === 'match') {
     const matchedAmount = formatSpokenAmount(result.ocr?.extractedAmount || null)
     if (matchedAmount) {

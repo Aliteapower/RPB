@@ -50,6 +50,8 @@ export interface PaymentPresentRecentItem {
   createdAtMs: number
 }
 
+export type PaymentPresentPayment = PaymentPresentPayload | PaymentPresentRecentItem
+
 export interface PaymentPresentSettings {
   maxPayments: PresentMaxPayments
   qrPerPayment: PresentQrPerPayment
@@ -299,6 +301,26 @@ export function subscribePaymentPresentSettings(
 
 export function readPaymentPresentRecent(storeId: string, terminalCode: string): PaymentPresentRecentItem[] {
   return prunePaymentPresentRecent(storeId, terminalCode, readPaymentPresentSettings(storeId, terminalCode))
+}
+
+export function findPaymentPresentPayment(
+  storeId: string,
+  terminalCode: string,
+  paymentReference: string | null | undefined,
+  sessionNo: string | null | undefined = null
+): PaymentPresentPayment | null {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const normalizedReference = normalizePaymentReference(paymentReference)
+  const normalizedSession = String(sessionNo || '').trim()
+  const matchesPayment = (item: Pick<PaymentPresentPayment, 'paymentReference' | 'sessionNo'>): boolean => {
+    if (normalizedSession && item.sessionNo === normalizedSession) {
+      return true
+    }
+    return Boolean(normalizedReference && normalizePaymentReference(item.paymentReference) === normalizedReference)
+  }
+  return readPaymentPresentPayloads(storeId, normalizedTerminal).find(matchesPayment)
+    || readPaymentPresentRecent(storeId, normalizedTerminal).find(matchesPayment)
+    || null
 }
 
 export function recentVisibleUntilMs(
