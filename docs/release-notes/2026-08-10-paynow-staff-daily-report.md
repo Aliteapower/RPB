@@ -136,3 +136,25 @@
   - `mvn -q "-Dtest=PayNowPaymentUiAcceptanceValidationTest" test`
   - `npm run build`
 - Rollback: revert the card button/detail list additions in `PaymentQuickPayReportPage.vue`, the generated quick-pay report copy keys, and the UI acceptance assertions.
+
+### Staff Report Card Detail Query Deployment
+
+- Deployment date: 2026-08-11.
+- Deployed commit: `0f3df812 feat: show paynow report card details`.
+- Branch: `codex/paynow-payment-product-line-staging`.
+- Deployment type: frontend static assets only; backend JAR, Flyway migrations, environment variables, and App Gate permission seeds were not changed.
+- Clean deploy worktree: `target/deploy-worktree-0f3df812`.
+- Uploaded artifact: `/home/ubuntu/rpb-0f3df812-frontend.tgz`.
+- Frontend tarball SHA-256: `8BE2E4B2470F46600B6E9E8985351A3CF25423AF4723EDCA69E2B5CBE315B9E0`.
+- Production frontend backup: `/opt/rpb/backups/20260811-0638-0f3df812-paynow-report-details-frontend/frontend`.
+- Previous frontend kept at `/opt/rpb/frontend.previous-20260811-0638-0f3df812-paynow-report-details-frontend`.
+- Public `/login` loaded frontend entry asset `/assets/index-Hca3u2Za.js` and CSS `/assets/index-D26kJdZF.css`.
+- Production smoke:
+  - `https://booking.yumstone.sg/api/v1/auth/me`: `401`.
+  - `https://booking.yumstone.sg/login`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments`: `200`.
+  - `https://booking.yumstone.sg/stores/d4817b28-cc48-4735-a68f-bc571c3f7989/payments/report/T1`: `200`.
+  - `PaymentQuickPayReportPage-DWRsPnO-.js`, `PaymentQuickPayReportPage-CC229YOZ.css`, `PaymentQuickPayPage-CGuwCvf-.js`, `PaymentQuickPayPage-CJYwTm2n.css`, `api-CpxzK1ap.js`, and `i18n-LFHLp3w4.js`: `200`.
+  - Production `rpb-backend`: `active`.
+  - Production `rpb-backend` recent 10-minute `ERROR` count after deployment: `0`.
+- Rollback: restore `/opt/rpb/frontend` from `/opt/rpb/backups/20260811-0638-0f3df812-paynow-report-details-frontend/frontend` or switch back to `/opt/rpb/frontend.previous-20260811-0638-0f3df812-paynow-report-details-frontend`, then reload nginx.
