@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import StoreSwitcher from '../store/StoreSwitcher.vue'
+import { useStoreVisibleApps } from '../../composables/useStoreVisibleApps'
 import { useAuthSessionStore } from '../../stores/authSession'
 
 const route = useRoute()
@@ -13,16 +14,32 @@ const { t } = useI18n()
 const loggingOut = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || auth.user?.defaultStoreId || auth.user?.storeIds[0] || ''))
-const navItems = computed(() => [
+const currentStoreId = computed(() => storeId.value || undefined)
+const { hasVisibleApp, loaded: visibleAppsLoaded } = useStoreVisibleApps(currentStoreId)
+const hasPaymentProductLine = computed(() =>
+  !visibleAppsLoaded.value || hasVisibleApp('payment')
+)
+const hasReservationQueueProductLine = computed(() =>
+  !visibleAppsLoaded.value || hasVisibleApp('reservation_queue')
+)
+const primaryNavItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/profile`, labelKey: 'nav.tenant.profile' },
   { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },
-  { to: `/stores/${storeId.value}/admin/customers`, labelKey: 'nav.tenant.customers' },
+  { to: `/stores/${storeId.value}/admin/customers`, labelKey: 'nav.tenant.customers' }
+])
+const reservationQueueNavItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/tables`, labelKey: 'nav.tenant.tables' },
   { to: `/stores/${storeId.value}/admin/settings`, labelKey: 'nav.tenant.settings' },
-  { to: `/stores/${storeId.value}/admin/i18n-catalog`, labelKey: 'nav.tenant.i18nCatalog' },
+  { to: `/stores/${storeId.value}/admin/reservation-queue/i18n-catalog`, labelKey: 'nav.tenant.reservationQueueI18nCatalog' },
   { to: `/stores/${storeId.value}/admin/share-template`, labelKey: 'nav.tenant.shareTemplate' },
   { to: `/stores/${storeId.value}/admin/public-booking`, labelKey: 'nav.tenant.publicBooking' },
   { to: `/stores/${storeId.value}/admin/call-screen`, labelKey: 'nav.tenant.callScreen' }
+])
+const paymentNavItems = computed(() => [
+  { to: `/stores/${storeId.value}/admin/payment/settings`, labelKey: 'nav.tenant.paymentSettings' },
+  { to: `/stores/${storeId.value}/admin/payment/records`, labelKey: 'nav.tenant.paymentRecords' },
+  { to: `/stores/${storeId.value}/admin/payment/proof-templates`, labelKey: 'nav.tenant.paymentProofTemplates' },
+  { to: `/stores/${storeId.value}/admin/payment/i18n-catalog`, labelKey: 'nav.tenant.paymentI18nCatalog' }
 ])
 
 async function logoutFromTenantAdmin(): Promise<void> {
@@ -51,13 +68,45 @@ async function logoutFromTenantAdmin(): Promise<void> {
       </div>
       <nav class="nav-list">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in primaryNavItems"
           :key="item.to"
           class="nav-item"
           :to="item.to"
         >
           {{ t(item.labelKey) }}
         </RouterLink>
+
+        <section
+          v-if="hasPaymentProductLine"
+          class="nav-group"
+          :aria-label="t('nav.tenant.paymentProductLine')"
+        >
+          <strong>{{ t('nav.tenant.paymentProductLine') }}</strong>
+          <RouterLink
+            v-for="item in paymentNavItems"
+            :key="item.to"
+            class="nav-item nav-item--child"
+            :to="item.to"
+          >
+            {{ t(item.labelKey) }}
+          </RouterLink>
+        </section>
+
+        <section
+          v-if="hasReservationQueueProductLine"
+          class="nav-group"
+          :aria-label="t('nav.tenant.reservationQueueProductLine')"
+        >
+          <strong>{{ t('nav.tenant.reservationQueueProductLine') }}</strong>
+          <RouterLink
+            v-for="item in reservationQueueNavItems"
+            :key="item.to"
+            class="nav-item nav-item--child"
+            :to="item.to"
+          >
+            {{ t(item.labelKey) }}
+          </RouterLink>
+        </section>
       </nav>
     </div>
 
@@ -134,6 +183,25 @@ async function logoutFromTenantAdmin(): Promise<void> {
   white-space: nowrap;
 }
 
+.nav-group {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.nav-group > strong {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.nav-item--child {
+  min-height: 34px;
+  padding-left: 22px;
+}
+
 .nav-item.router-link-active {
   color: #ffffff;
   background: #0f766e;
@@ -183,6 +251,18 @@ async function logoutFromTenantAdmin(): Promise<void> {
     scrollbar-width: none;
   }
 
+  .nav-group {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    align-items: center;
+    margin-top: 0;
+  }
+
+  .nav-group > strong {
+    padding: 0 4px 0 8px;
+    white-space: nowrap;
+  }
+
   .nav-list::-webkit-scrollbar {
     display: none;
   }
@@ -216,6 +296,10 @@ async function logoutFromTenantAdmin(): Promise<void> {
 
   .nav-item {
     min-height: 36px;
+    padding: 0 11px;
+  }
+
+  .nav-item--child {
     padding: 0 11px;
   }
 

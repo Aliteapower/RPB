@@ -6,6 +6,7 @@ const CleaningCompletePage = () => import('../pages/CleaningCompletePage.vue')
 const LoginPage = () => import('../pages/LoginPage.vue')
 const PlatformCallScreenSeedPage = () => import('../pages/PlatformCallScreenSeedPage.vue')
 const PlatformI18nCatalogPage = () => import('../pages/PlatformI18nCatalogPage.vue')
+const PlatformPaymentProofTemplatesPage = () => import('../pages/PlatformPaymentProofTemplatesPage.vue')
 const PlatformProductLinesPage = () => import('../pages/PlatformProductLinesPage.vue')
 const PlatformProfilePage = () => import('../pages/PlatformProfilePage.vue')
 const PlatformReservationMealPeriodSeedPage = () => import('../pages/PlatformReservationMealPeriodSeedPage.vue')
@@ -13,6 +14,11 @@ const PlatformReservationShareTemplateSeedPage = () => import('../pages/Platform
 const PlatformTenantBillingPage = () => import('../pages/PlatformTenantBillingPage.vue')
 const PlatformTenantFormPage = () => import('../pages/PlatformTenantFormPage.vue')
 const PlatformTenantsPage = () => import('../pages/PlatformTenantsPage.vue')
+const PaymentDisplayPage = () => import('../pages/PaymentDisplayPage.vue')
+const PaymentPresentPage = () => import('../pages/PaymentPresentPage.vue')
+const PaymentProofReviewPage = () => import('../pages/PaymentProofReviewPage.vue')
+const PaymentQuickPayPage = () => import('../pages/PaymentQuickPayPage.vue')
+const PaymentQuickPayReportPage = () => import('../pages/PaymentQuickPayReportPage.vue')
 const PublicBookingPage = () => import('../pages/PublicBookingPage.vue')
 const QueueCallPage = () => import('../pages/QueueCallPage.vue')
 const QueueDisplayPage = () => import('../pages/QueueDisplayPage.vue')
@@ -28,6 +34,9 @@ const TableResourceListPage = () => import('../pages/TableResourceListPage.vue')
 const TenantAdminCallScreenPage = () => import('../pages/TenantAdminCallScreenPage.vue')
 const TenantAdminCustomersPage = () => import('../pages/TenantAdminCustomersPage.vue')
 const TenantAdminI18nCatalogPage = () => import('../pages/TenantAdminI18nCatalogPage.vue')
+const TenantAdminPaymentRecordsPage = () => import('../pages/TenantAdminPaymentRecordsPage.vue')
+const TenantAdminPaymentProofTemplatesPage = () => import('../pages/TenantAdminPaymentProofTemplatesPage.vue')
+const TenantAdminPaymentSettingsPage = () => import('../pages/TenantAdminPaymentSettingsPage.vue')
 const TenantAdminProfilePage = () => import('../pages/TenantAdminProfilePage.vue')
 const TenantAdminPublicBookingPage = () => import('../pages/TenantAdminPublicBookingPage.vue')
 const TenantAdminReservationSharePage = () => import('../pages/TenantAdminReservationSharePage.vue')
@@ -125,6 +134,12 @@ export const router = createRouter({
       meta: { requiresPlatformAdmin: true }
     },
     {
+      path: '/platform/payment/proof-templates',
+      name: 'platform-payment-proof-templates',
+      component: PlatformPaymentProofTemplatesPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
       path: '/platform/call-screen/text-seed',
       name: 'platform-call-screen-text-seed',
       component: PlatformCallScreenSeedPage,
@@ -146,6 +161,31 @@ export const router = createRouter({
       path: '/stores/:storeId/staff',
       name: 'store-staff-home',
       component: StoreStaffHomePage
+    },
+    {
+      path: '/stores/:storeId/payments',
+      name: 'payment-quick-pay',
+      component: PaymentQuickPayPage
+    },
+    {
+      path: '/stores/:storeId/payments/proof-review',
+      name: 'payment-proof-review',
+      component: PaymentProofReviewPage
+    },
+    {
+      path: '/stores/:storeId/payments/report/:terminalCode',
+      name: 'payment-quick-pay-report',
+      component: PaymentQuickPayReportPage
+    },
+    {
+      path: '/stores/:storeId/payments/present/:terminalCode',
+      name: 'payment-present',
+      component: PaymentPresentPage
+    },
+    {
+      path: '/stores/:storeId/payments/display/:sessionNo',
+      name: 'payment-display',
+      component: PaymentDisplayPage
     },
     {
       path: '/stores/:storeId/admin',
@@ -215,9 +255,42 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
-      path: '/stores/:storeId/admin/i18n-catalog',
-      name: 'tenant-admin-i18n-catalog',
+      path: '/stores/:storeId/admin/payment/settings',
+      name: 'tenant-admin-payment-settings',
+      component: TenantAdminPaymentSettingsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/records',
+      name: 'tenant-admin-payment-records',
+      component: TenantAdminPaymentRecordsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/proof-templates',
+      name: 'tenant-admin-payment-proof-templates',
+      component: TenantAdminPaymentProofTemplatesPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/i18n-catalog',
+      name: 'tenant-admin-payment-i18n-catalog',
       component: TenantAdminI18nCatalogPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/reservation-queue/i18n-catalog',
+      name: 'tenant-admin-reservation-queue-i18n-catalog',
+      component: TenantAdminI18nCatalogPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/i18n-catalog',
+      name: 'tenant-admin-i18n-catalog-legacy',
+      redirect: to => ({
+        name: 'tenant-admin-reservation-queue-i18n-catalog',
+        params: { storeId: to.params.storeId }
+      }),
       meta: { requiresTenantAdmin: true }
     },
     {

@@ -25,6 +25,13 @@ public final class AppGateRequiredPermission {
     public static final String WALKIN_QUEUE_CREATE = "walkin.queue.create";
     public static final String CLEANING_START = "cleaning.start";
     public static final String CLEANING_COMPLETE = "cleaning.complete";
+    public static final String PAYMENT_SETTINGS_MANAGE = "payment.settings.manage";
+    public static final String PAYMENT_INTENT_VIEW = "payment.intent.view";
+    public static final String PAYMENT_INTENT_CREATE = "payment.intent.create";
+    public static final String PAYMENT_VERIFICATION_REVIEW = "payment.verification.review";
+    public static final String PAYMENT_PROOF_REVIEW = "payment.proof.review";
+    public static final String PAYMENT_PROOF_TEMPLATE_MANAGE = "payment.proof_template.manage";
+    public static final String PLATFORM_PAYMENT_PROOF_TEMPLATE_MANAGE = "platform.payment_proof_template.manage";
 
     public static final Set<String> RESERVATION_QUEUE_ENTRY_PERMISSIONS = Set.of(
         RESERVATION_CREATE,
@@ -49,6 +56,28 @@ public final class AppGateRequiredPermission {
         WALKIN_QUEUE_CREATE,
         CLEANING_START,
         CLEANING_COMPLETE
+    );
+
+    public static final Set<String> PAYMENT_ENTRY_PERMISSIONS = Set.of(
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_VERIFICATION_REVIEW,
+        PAYMENT_PROOF_REVIEW,
+        PAYMENT_PROOF_TEMPLATE_MANAGE
+    );
+
+    public static final Set<String> PAYMENT_TENANT_ADMIN_PERMISSIONS = Set.of(
+        PAYMENT_SETTINGS_MANAGE,
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_VERIFICATION_REVIEW,
+        PAYMENT_PROOF_REVIEW
+    );
+
+    public static final Set<String> PAYMENT_STAFF_OPERATION_PERMISSIONS = Set.of(
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_PROOF_REVIEW
     );
 
     private AppGateRequiredPermission() {

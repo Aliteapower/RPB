@@ -53,4 +53,23 @@ class I18nCatalogMigrationSourceValidationTest {
             .contains("version = catalog.version + 1")
             .contains("catalog.message is distinct from normalized.normalized_message");
     }
+
+    @Test
+    void paymentProductLineMigrationAddsTenantEditablePayNowCatalogKeys() throws Exception {
+        String migration = Files.readString(Path.of(
+            "src", "main", "resources", "db", "migration", "V051__payment_i18n_catalog_product_line_scope.sql"
+        ));
+
+        assertThat(migration)
+            .contains("payment.quick_pay.customer_scan_notice")
+            .contains("payment.quick_pay.receipt_note")
+            .contains("payment.quick_pay.waiting_message")
+            .contains("'payment',")
+            .contains("'quick_pay'")
+            .contains("array['paymentReference','amount','currency']::text[]")
+            .contains("tenant_editable")
+            .contains("on conflict (i18n_key) do update")
+            .contains("where existing.tenant_id is null")
+            .contains("Waiting for a new PayNow payment.");
+    }
 }

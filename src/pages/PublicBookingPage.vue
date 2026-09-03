@@ -20,6 +20,7 @@ import type {
 import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../components/staff/staffGuestContact'
 import { useGeneratedText } from '../i18n/generatedText'
+import { resolvePublicBookingLoginFlow } from '../utils/publicBookingFlow'
 
 const { gt } = useGeneratedText()
 
@@ -144,15 +145,24 @@ const canProceedToAuth = computed(() => (
   !loading.value &&
   !dateInputErrorText.value
 ))
-const canProceedToContact = computed(() => !!customer.value && !authBusy.value)
+const loginFlow = computed(() => resolvePublicBookingLoginFlow(
+  context.value?.settings.requireCustomerLogin,
+  !!customer.value
+))
+const canProceedToContact = computed(() => loginFlow.value.canEnterContact && !authBusy.value)
 const canSubmit = computed(() => (
   currentStep.value === 3 &&
-  !!customer.value &&
+  loginFlow.value.canEnterContact &&
   !!selectedSlot.value &&
   hasValidPartySize.value &&
   !!isValidSingaporeLocalPhone(bookingForm.phoneLocal) &&
   !submitting.value &&
   !dateInputErrorText.value
+))
+const nextStepText = computed(() => gt(
+  loginFlow.value.nextStepAfterSelection === 2
+    ? 'generated.public-booking.016'
+    : 'generated.public-booking.034'
 ))
 const enabledAuthProviders = computed(() => context.value?.authProviders || [])
 const emailAuthEnabled = computed(() => context.value?.emailAuthEnabled === true)
@@ -463,7 +473,7 @@ function selectPeriod(periodKey: string): void {
 
 function goToAuthStep(): void {
   if (canProceedToAuth.value) {
-    currentStep.value = 2
+    currentStep.value = loginFlow.value.nextStepAfterSelection
   }
 }
 
@@ -478,7 +488,7 @@ function goBackToTimeStep(): void {
 }
 
 function goBackToAuthStep(): void {
-  currentStep.value = 2
+  currentStep.value = loginFlow.value.previousStepFromContact
 }
 
 function publicBookingErrorText(error: unknown): string {
@@ -638,7 +648,7 @@ function clampBookingDate(isoDate: string): string {
 
       <section v-if="currentStep === 'complete'" class="booking-panel booking-complete-panel" :aria-label="gt('generated.public-booking.073')">
         <div class="panel-title">
-          <span>3</span>
+          <span>{{ loginFlow.contactStepNumber }}</span>
           <strong>{{ gt('generated.public-booking.073') }}</strong>
         </div>
 
@@ -720,7 +730,7 @@ function clampBookingDate(isoDate: string): string {
           <input v-model.number="bookingForm.partySize" min="1" max="20" type="number" />
         </label>
 
-        <button class="submit-button" type="button" :disabled="!canProceedToAuth" @click="goToAuthStep"> {{ gt('generated.public-booking.016') }} </button>
+        <button class="submit-button" type="button" :disabled="!canProceedToAuth" @click="goToAuthStep"> {{ nextStepText }} </button>
       </section>
 
       <section v-else-if="currentStep === 2" class="booking-panel" :aria-label="gt('generated.public-booking.017')">
@@ -783,7 +793,7 @@ function clampBookingDate(isoDate: string): string {
 
       <form v-else-if="currentStep === 3" class="booking-panel" :aria-label="gt('generated.public-booking.035')" @submit.prevent="submitBooking">
         <div class="panel-title">
-          <span>3</span>
+          <span>{{ loginFlow.contactStepNumber }}</span>
           <strong>{{ gt('generated.public-booking.036') }}</strong>
         </div>
 

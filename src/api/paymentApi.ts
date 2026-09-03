@@ -1,0 +1,559 @@
+import type {
+  PaymentApiErrorResponse,
+  PaymentIntentCreateRequest,
+  PaymentIntentCreateResponse,
+  PaymentManualConfirmRequest,
+  PaymentManualConfirmResponse,
+  PaymentBusinessDayResponse,
+  PaymentProfileMutation,
+  PaymentProfileResponse,
+  PaymentProfileTestQrResponse,
+  PaymentProofCandidatesQuery,
+  PaymentProofCandidatesResponse,
+  PaymentProofScanRequest,
+  PaymentProofScanResponse,
+  PaymentProofTemplateMutation,
+  PaymentProofTemplateResponse,
+  PaymentProofTemplatesResponse,
+  PaymentProofTemplateTestScanResponse,
+  PaymentProofTemplateContributionMutation,
+  PaymentProofTemplateContributionResponse,
+  PaymentProofTemplateContributionsResponse,
+  PaymentProofTemplateContributionReviewRequest,
+  PaymentProofTemplateRuleSuggestionResponse,
+  QuickPayRecordsQuery,
+  QuickPayRecordsResponse,
+  QuickPayTerminalConfigResponse,
+  PaymentSession
+} from '../types/payment'
+
+type PaymentFetcher = typeof fetch
+
+interface TextResponse {
+  readonly ok: boolean
+  readonly status: number
+  text(): Promise<string>
+}
+
+export class PaymentApiError extends Error {
+  readonly status: number
+  readonly response: PaymentApiErrorResponse
+
+  constructor(status: number, response: PaymentApiErrorResponse) {
+    super(response.error.messageKey)
+    this.name = 'PaymentApiError'
+    this.status = status
+    this.response = response
+  }
+}
+
+export async function getPaymentProfile(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProfileResponse> {
+  return requestJson(profileEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function updatePaymentProfile(
+  storeId: string,
+  request: PaymentProfileMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProfileResponse> {
+  return requestJson(profileEndpoint(storeId), { method: 'PATCH', body: request, fetcher })
+}
+
+export async function generatePaymentProfileTestQr(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProfileTestQrResponse> {
+  return requestJson(`${profileEndpoint(storeId)}/test-qr`, { method: 'POST', fetcher })
+}
+
+export async function createPaymentIntent(
+  storeId: string,
+  request: PaymentIntentCreateRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentIntentCreateResponse> {
+  return requestJson(intentEndpoint(storeId), { method: 'POST', body: request, fetcher })
+}
+
+export async function getQuickPayTerminalConfig(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<QuickPayTerminalConfigResponse> {
+  return requestJson(`${intentEndpoint(storeId)}/terminal-config`, { method: 'GET', fetcher })
+}
+
+export async function getQuickPayRecords(
+  storeId: string,
+  query: QuickPayRecordsQuery = {},
+  fetcher?: PaymentFetcher
+): Promise<QuickPayRecordsResponse> {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    const text = String(value ?? '').trim()
+    if (text) {
+      params.set(key, text)
+    }
+  })
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return requestJson(`${intentEndpoint(storeId)}/quick-pay-records${suffix}`, { method: 'GET', fetcher })
+}
+
+export async function manualConfirmQuickPay(
+  storeId: string,
+  sessionNo: string,
+  request: PaymentManualConfirmRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentManualConfirmResponse> {
+  return requestJson(`${intentEndpoint(storeId)}/sessions/${encodeURIComponent(sessionNo)}/manual-confirm`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function getPaymentProofCandidates(
+  storeId: string,
+  query: PaymentProofCandidatesQuery = {},
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofCandidatesResponse> {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    const text = String(value ?? '').trim()
+    if (text) {
+      params.set(key, text)
+    }
+  })
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return requestJson(`${proofReviewEndpoint(storeId)}/candidates${suffix}`, { method: 'GET', fetcher })
+}
+
+export async function scanPaymentProof(
+  storeId: string,
+  request: PaymentProofScanRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofScanResponse> {
+  const form = new FormData()
+  form.set('image', request.image)
+  form.set('idempotencyKey', request.idempotencyKey)
+  if (request.businessDate?.trim()) {
+    form.set('businessDate', request.businessDate.trim())
+  }
+  if (request.terminalCode?.trim()) {
+    form.set('terminalCode', request.terminalCode.trim())
+  }
+  return requestMultipart(`${proofReviewEndpoint(storeId)}/scan`, form, fetcher)
+}
+
+export async function getPaymentProofTemplates(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplatesResponse> {
+  return requestJson(proofTemplatesEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function createPaymentProofTemplate(
+  storeId: string,
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(proofTemplatesEndpoint(storeId), { method: 'POST', body: request, fetcher })
+}
+
+export async function updatePaymentProofTemplate(
+  storeId: string,
+  templateId: string,
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(`${proofTemplatesEndpoint(storeId)}/${encodeURIComponent(templateId)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function testScanPaymentProofTemplate(
+  storeId: string,
+  image: File,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateTestScanResponse> {
+  const form = new FormData()
+  form.set('image', image)
+  return requestMultipart(`${proofTemplatesEndpoint(storeId)}/test-scan`, form, fetcher)
+}
+
+export async function getPlatformPaymentProofTemplates(
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplatesResponse> {
+  return requestJson(platformProofTemplatesEndpoint(), { method: 'GET', fetcher })
+}
+
+export async function createPlatformPaymentProofTemplate(
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(platformProofTemplatesEndpoint(), { method: 'POST', body: request, fetcher })
+}
+
+export async function updatePlatformPaymentProofTemplate(
+  templateId: string,
+  request: PaymentProofTemplateMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateResponse> {
+  return requestJson(`${platformProofTemplatesEndpoint()}/${encodeURIComponent(templateId)}`, {
+    method: 'PATCH',
+    body: request,
+    fetcher
+  })
+}
+
+export async function suggestPlatformPaymentProofTemplateRule(
+  image: File,
+  metadata: { bankCode?: string; bankName?: string; locale?: string } = {},
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateRuleSuggestionResponse> {
+  return requestPaymentProofTemplateRuleSuggestion(
+    `${platformProofTemplatesEndpoint()}/rule-suggestions`,
+    image,
+    metadata,
+    fetcher
+  )
+}
+
+export async function getPlatformPaymentProofTemplateContributions(
+  status?: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionsResponse> {
+  const suffix = status?.trim() ? `?status=${encodeURIComponent(status.trim())}` : ''
+  return requestJson(`${platformProofTemplateContributionsEndpoint()}${suffix}`, { method: 'GET', fetcher })
+}
+
+export async function acceptPlatformPaymentProofTemplateContribution(
+  contributionId: string,
+  request: PaymentProofTemplateContributionReviewRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionResponse> {
+  return requestJson(`${platformProofTemplateContributionsEndpoint()}/${encodeURIComponent(contributionId)}/accept`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function rejectPlatformPaymentProofTemplateContribution(
+  contributionId: string,
+  request: PaymentProofTemplateContributionReviewRequest,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionResponse> {
+  return requestJson(`${platformProofTemplateContributionsEndpoint()}/${encodeURIComponent(contributionId)}/reject`, {
+    method: 'POST',
+    body: request,
+    fetcher
+  })
+}
+
+export async function getPaymentProofTemplateContributions(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionsResponse> {
+  return requestJson(proofTemplateContributionsEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function submitPaymentProofTemplateContribution(
+  storeId: string,
+  request: PaymentProofTemplateContributionMutation,
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateContributionResponse> {
+  return requestJson(proofTemplateContributionsEndpoint(storeId), { method: 'POST', body: request, fetcher })
+}
+
+export async function suggestPaymentProofTemplateRule(
+  storeId: string,
+  image: File,
+  metadata: { bankCode?: string; bankName?: string; locale?: string } = {},
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateRuleSuggestionResponse> {
+  return requestPaymentProofTemplateRuleSuggestion(
+    `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-template-rule-suggestions`,
+    image,
+    metadata,
+    fetcher
+  )
+}
+
+export async function getPaymentBusinessDay(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentBusinessDayResponse> {
+  return requestJson(businessDayEndpoint(storeId), { method: 'GET', fetcher })
+}
+
+export async function openPaymentBusinessDay(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentBusinessDayResponse> {
+  return requestJson(businessDayEndpoint(storeId), { method: 'POST', fetcher })
+}
+
+export async function endPaymentBusinessDay(
+  storeId: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentBusinessDayResponse> {
+  return requestJson(`${businessDayEndpoint(storeId)}/end-day`, { method: 'POST', fetcher })
+}
+
+export async function getPaymentSession(
+  storeId: string,
+  sessionNo: string,
+  fetcher?: PaymentFetcher
+): Promise<PaymentSession> {
+  return requestJson(`${intentEndpoint(storeId)}/sessions/${encodeURIComponent(sessionNo)}`, {
+    method: 'GET',
+    fetcher
+  })
+}
+
+function profileEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/profile`
+}
+
+function intentEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/intents`
+}
+
+function businessDayEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/business-day`
+}
+
+function proofReviewEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/payments/proof-review`
+}
+
+function proofTemplatesEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-templates`
+}
+
+function platformProofTemplatesEndpoint(): string {
+  return '/api/v1/platform/payment/proof-templates'
+}
+
+function platformProofTemplateContributionsEndpoint(): string {
+  return '/api/v1/platform/payment/proof-template-contributions'
+}
+
+function proofTemplateContributionsEndpoint(storeId: string): string {
+  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/payment/proof-template-contributions`
+}
+
+function requestPaymentProofTemplateRuleSuggestion(
+  endpoint: string,
+  image: File,
+  metadata: { bankCode?: string; bankName?: string; locale?: string },
+  fetcher?: PaymentFetcher
+): Promise<PaymentProofTemplateRuleSuggestionResponse> {
+  const form = new FormData()
+  form.set('image', image)
+  Object.entries(metadata).forEach(([key, value]) => {
+    if (value?.trim()) {
+      form.set(key, value.trim())
+    }
+  })
+  return requestMultipart(endpoint, form, fetcher)
+}
+
+async function requestJson<T>(
+  endpoint: string,
+  options: {
+    method: 'GET' | 'POST' | 'PATCH'
+    body?: unknown
+    fetcher?: PaymentFetcher
+  }
+): Promise<T> {
+  let response: TextResponse
+
+  try {
+    response = await sendRequest(endpoint, options)
+  } catch {
+    throw new PaymentApiError(0, unknownError())
+  }
+
+  const payload = await readJson(response)
+  const apiError = normalizePaymentApiErrorResponse(payload)
+  if (!response.ok || apiError) {
+    throw new PaymentApiError(response.status, apiError ?? unknownError(response.status))
+  }
+
+  return payload as T
+}
+
+async function requestMultipart<T>(endpoint: string, body: FormData, fetcher?: PaymentFetcher): Promise<T> {
+  let response: TextResponse
+
+  try {
+    const sender = fetcher ?? resolveFetch()
+    if (sender) {
+      response = await sender(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json'
+        },
+        body
+      })
+    } else {
+      response = await xhrMultipartRequest(endpoint, body)
+    }
+  } catch {
+    throw new PaymentApiError(0, unknownError())
+  }
+
+  const payload = await readJson(response)
+  const apiError = normalizePaymentApiErrorResponse(payload)
+  if (!response.ok || apiError) {
+    throw new PaymentApiError(response.status, apiError ?? unknownError(response.status))
+  }
+
+  return payload as T
+}
+
+async function sendRequest(
+  endpoint: string,
+  options: {
+    method: 'GET' | 'POST' | 'PATCH'
+    body?: unknown
+    fetcher?: PaymentFetcher
+  }
+): Promise<TextResponse> {
+  const headers = {
+    Accept: 'application/json',
+    ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' })
+  }
+  const fetcher = options.fetcher ?? resolveFetch()
+  const body = options.body === undefined ? undefined : JSON.stringify(options.body)
+
+  if (fetcher) {
+    return fetcher(endpoint, {
+      method: options.method,
+      credentials: 'include',
+      headers,
+      body
+    })
+  }
+
+  return xhrRequest(endpoint, {
+    method: options.method,
+    headers,
+    body
+  })
+}
+
+function resolveFetch(): PaymentFetcher | undefined {
+  const candidate = globalThis.fetch
+  return typeof candidate === 'function' ? candidate.bind(globalThis) : undefined
+}
+
+function xhrRequest(
+  endpoint: string,
+  options: {
+    method: 'GET' | 'POST' | 'PATCH'
+    headers: Record<string, string>
+    body?: string
+  }
+): Promise<TextResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open(options.method, endpoint, true)
+    xhr.withCredentials = true
+    Object.entries(options.headers).forEach(([name, value]) => {
+      xhr.setRequestHeader(name, value)
+    })
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: async () => xhr.responseText
+      })
+    }
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
+    xhr.send(options.body)
+  })
+}
+
+function xhrMultipartRequest(endpoint: string, body: FormData): Promise<TextResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', endpoint, true)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: async () => xhr.responseText
+      })
+    }
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.ontimeout = () => reject(new TypeError('Network request timed out'))
+    xhr.send(body)
+  })
+}
+
+async function readJson(response: TextResponse): Promise<unknown> {
+  const text = await response.text()
+  if (!text) {
+    return null
+  }
+
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return null
+  }
+}
+
+function normalizePaymentApiErrorResponse(payload: unknown): PaymentApiErrorResponse | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const candidate = payload as Partial<PaymentApiErrorResponse>
+  if (
+    candidate.success === false &&
+    typeof candidate.error?.code === 'string' &&
+    typeof candidate.error.messageKey === 'string'
+  ) {
+    return candidate as PaymentApiErrorResponse
+  }
+
+  const flat = payload as {
+    success?: unknown
+    code?: unknown
+    message?: unknown
+  }
+  if (flat.success === false && typeof flat.code === 'string') {
+    return {
+      success: false,
+      error: {
+        code: flat.code,
+        messageKey: typeof flat.message === 'string' ? flat.message : flat.code,
+        details: {}
+      }
+    }
+  }
+
+  return null
+}
+
+function unknownError(httpStatus?: number): PaymentApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code: 'UNKNOWN_ERROR',
+      messageKey: 'payment.unknown_error',
+      details: httpStatus === undefined ? {} : { httpStatus }
+    }
+  }
+}

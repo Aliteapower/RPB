@@ -55,7 +55,8 @@ export const zhCN = {
       reservation_share: '预约分享',
       queue: '排队',
       call_screen: '叫号大屏',
-      reservation_meal_period: '预约餐段'
+      reservation_meal_period: '预约餐段',
+      payment: 'PayNow 收款'
     },
     categories: {
       cancellation: '取消原因',
@@ -68,7 +69,8 @@ export const zhCN = {
       template: '模板',
       display: '展示文案',
       display_name: '展示名称',
-      restaurant_default: '餐厅默认'
+      restaurant_default: '餐厅默认',
+      quick_pay: '快速收款'
     },
     textKinds: {
       label: '标签',
@@ -102,6 +104,7 @@ export const zhCN = {
       billing: '租户计费',
       profile: '平台资料',
       productLines: '产品线',
+      paymentProofTemplates: 'PayNow 回单样式库',
       i18nCatalog: '国际化字典',
       callScreenSeed: '叫号模板',
       mealPeriodSeed: '预约餐段',
@@ -116,6 +119,13 @@ export const zhCN = {
       customers: '顾客管理',
       tables: '桌号管理',
       settings: '基础设置',
+      paymentProductLine: '收款 / PayNow',
+      paymentSettings: '基础设置',
+      paymentRecords: 'Quick Payment Records',
+      paymentProofTemplates: '回单样式库',
+      paymentI18nCatalog: 'PayNow 国际化字典',
+      reservationQueueProductLine: '预约排队叫号',
+      reservationQueueI18nCatalog: '预约排队国际化字典',
       i18nCatalog: '国际化字典',
       shareTemplate: '订位分享',
       publicBooking: '公网预约',
@@ -126,7 +136,8 @@ export const zhCN = {
       home: '首页',
       reservation: '预约',
       queue: '排队',
-      table: '桌台'
+      table: '桌台',
+      payment: '收款'
     }
   },
   login: {
@@ -943,6 +954,7 @@ export const zhCN = {
       refreshing: '刷新中',
       unavailable: '暂不可用',
       home: '首页',
+      payment: '收款',
       available: '应用可用'
     },
     topbar: {
@@ -967,6 +979,11 @@ export const zhCN = {
         label: '排队入座',
         description: '从已叫号票直接安排桌台',
         symbol: '座'
+      },
+      quickPay: {
+        label: '快速收款',
+        description: '输入金额并生成 PayNow 二维码',
+        symbol: '收'
       }
     },
     store: {
@@ -992,6 +1009,8 @@ export const zhCN = {
     hints: {
       unavailable: '今日概览暂不可用',
       loading: '正在读取今日营业数据',
+      paymentOnly: '当前门店只开通收款产品线',
+      noProductLine: '当前门店暂无可用产品线',
       queuePressure: '排队 {groups} 组，优先看等待和已叫号',
       calm: '当前没有排队压力'
     },

@@ -1,0 +1,498 @@
+package com.rpb.reservation.payment.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.payment.persistence.PaymentProofReviewRepository;
+import com.rpb.reservation.store.value.StoreId;
+import com.rpb.reservation.tenant.value.TenantId;
+import com.rpb.reservation.walkin.api.CurrentActor;
+import java.math.BigDecimal;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
+
+class PaymentProofReviewServiceTest {
+    private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
+    private static final UUID STORE_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+    private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
+
+    private final StoreScope scope = new StoreScope(new TenantId(TENANT_ID), new StoreId(STORE_ID));
+    private final CurrentActor actor = CurrentActor.storeStaff(
+        TENANT_ID,
+        ACTOR_ID,
+        "tenant_staff",
+        Set.of("store_staff"),
+        Set.of("payment.proof.review"),
+        Set.of(STORE_ID)
+    );
+    private InMemoryPaymentProofReviewRepository repository;
+    private FakeOcrAdapter ocr;
+    private PaymentProofReviewService service;
+
+    @BeforeEach
+    void setUp() {
+        repository = new InMemoryPaymentProofReviewRepository();
+        ocr = new FakeOcrAdapter();
+        service = new PaymentProofReviewService(repository, ocr);
+    }
+
+    @Test
+    void autoConfirmsWhenExtractedReferenceAndAmountMatchOnePendingIntent() {
+        PaymentProofCandidate candidate = candidate("PIT-202608-0021", new BigDecimal("0.10"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "PIT-202608-0021",
+            new BigDecimal("0.10"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 PIT-202608-0021 您已支付 0.10 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-001"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("PIT-202608-0021");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+        assertThat(repository.createdProofStatus).isEqualTo("confirmed");
+        assertThat(repository.createdVerificationStatus).isEqualTo("confirmed");
+    }
+
+    @Test
+    void doesNotAutoConfirmWhenExtractedAmountDiffersByOneCent() {
+        PaymentProofCandidate candidate = candidate("PIT-202608-0022", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "PIT-202608-0022",
+            new BigDecimal("1.01"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 PIT-202608-0022 您已支付 1.01 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-amount-boundary"), actor);
+
+        assertThat(result.outcome()).isEqualTo("needs_review");
+        assertThat(result.checks().amount()).isEqualTo("mismatch");
+        assertThat(repository.confirmedIntentId).isNull();
+        assertThat(repository.createdProofStatus).isEqualTo("matched");
+        assertThat(repository.createdVerificationStatus).isEqualTo("pending");
+    }
+
+    @Test
+    void autoConfirmsCompactReferenceWhenExtractedReferenceAndAmountMatch() {
+        PaymentProofCandidate candidate = candidate("QP202608080013YGDN", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP202608080013YGDN",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 QP202608080013YGDN 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-001"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("QP202608080013YGDN");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+        assertThat(repository.createdProofStatus).isEqualTo("confirmed");
+        assertThat(repository.createdVerificationStatus).isEqualTo("confirmed");
+    }
+
+    @Test
+    void autoConfirmsCompactReferenceWhenOcrAddsSeparators() {
+        PaymentProofCandidate candidate = candidate("QP202608080013YGDN", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP.20260808.0013.YGDN",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9200"),
+            "讯息 QP.20260808.0013.YGDN 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-002"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+    }
+
+    @Test
+    void autoConfirmsPreviouslyIssuedMonthCompactReference() {
+        PaymentProofCandidate candidate = candidate("QP2026080015AEDD", new BigDecimal("2.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP2026080015AEDD",
+            new BigDecimal("2.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9300"),
+            "讯息 QP2026080015AEDD 您已支付 2.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-legacy-month-001"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("QP2026080015AEDD");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+    }
+
+    @Test
+    void autoConfirmsLegacySafeLetterReferenceWhenOcrUsesSpacesOrDots() {
+        PaymentProofCandidate candidate = candidate("QP-202608-0013-ACDE", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+
+        for (String extractedReference : List.of("QP 202608 0013 ACDE", "QP.202608.0013.ACDE")) {
+            ocr.fields = new PaymentProofOcrFields(
+                extractedReference,
+                new BigDecimal("1.00"),
+                null,
+                "ocbc",
+                true,
+                new BigDecimal("0.9200"),
+                "讯息 " + extractedReference + " 您已支付 1.00 SGD",
+                "{}"
+            );
+
+            PaymentProofScanResult result = service.scanAndMatch(
+                scope,
+                command("proof-legacy-" + extractedReference.charAt(2)),
+                actor
+            );
+
+            assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        }
+    }
+
+    @Test
+    void autoConfirmsStoredCompactReferenceWhenOcrInsertsHyphens() {
+        PaymentProofCandidate candidate = candidate("QP2026080013AAHP", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP-202608-0013-AAHP",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9200"),
+            "讯息 QP-202608-0013-AAHP 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-compact-hyphens"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+    }
+
+    @Test
+    void autoConfirmsAwaitingVerificationCandidateWhenReferenceAndAmountMatchOnRescan() {
+        PaymentProofCandidate candidate = candidate(
+            "QP202608100023DYEQ",
+            new BigDecimal("0.10"),
+            "awaiting_verification",
+            "awaiting_verification"
+        );
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP202608100023DYEQ",
+            new BigDecimal("0.10"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9600"),
+            "讯息 QP202608100023DYEQ 您已支付 0.10 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-awaiting-rescan-match"), actor);
+
+        assertThat(result.outcome()).isEqualTo("auto_confirmed");
+        assertThat(result.checks().reference()).isEqualTo("match");
+        assertThat(result.checks().amount()).isEqualTo("match");
+        assertThat(repository.confirmedIntentId).isEqualTo(candidate.intentId());
+        assertThat(repository.createdProofStatus).isEqualTo("confirmed");
+        assertThat(repository.createdVerificationStatus).isEqualTo("confirmed");
+    }
+
+    @Test
+    void doesNotMatchWhenCompactAndLegacyVariantsResolveToDifferentActiveCandidates() {
+        repository.candidate = Optional.of(candidate("QP2026080013AAHP", new BigDecimal("1.00")));
+        repository.additionalCandidate = Optional.of(candidate("QP-202608-0013-AAHP", new BigDecimal("1.00")));
+        ocr.fields = new PaymentProofOcrFields(
+            "QP 202608 0013 AAHP",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.9200"),
+            "讯息 QP 202608 0013 AAHP 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-ambiguous"), actor);
+
+        assertThat(result.outcome()).isEqualTo("no_match");
+        assertThat(repository.confirmedIntentId).isNull();
+    }
+
+    @Test
+    void returnsAlreadyConfirmedWhenReceiptMatchesPaidCandidate() {
+        PaymentProofCandidate candidate = candidate(
+            "QP202608080017GQVQ",
+            new BigDecimal("1.00"),
+            "paid",
+            "paid"
+        );
+        repository.historicalCandidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP202608080017GQVQ",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.6500"),
+            "讯息 QP202608080017GQVQ 您已支付 1.00 SGD",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-already-paid"), actor);
+
+        assertThat(result.outcome()).isEqualTo("already_confirmed");
+        assertThat(result.paymentReference()).isEqualTo("QP202608080017GQVQ");
+        assertThat(result.expectedAmount()).isEqualByComparingTo("1.00");
+        assertThat(result.checks().reference()).isEqualTo("match");
+        assertThat(result.checks().amount()).isEqualTo("match");
+        assertThat(repository.confirmedIntentId).isNull();
+        assertThat(repository.createdProofStatus).isNull();
+    }
+
+    @Test
+    void noMatchWhenReferenceIsMissing() {
+        ocr.fields = new PaymentProofOcrFields(
+            null,
+            new BigDecimal("0.10"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.5200"),
+            "Transaction ID 2605160110303261 SGD 0.10",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-002"), actor);
+
+        assertThat(result.outcome()).isEqualTo("no_match");
+        assertThat(repository.confirmedIntentId).isNull();
+    }
+
+    @Test
+    void needsReviewWhenReferenceMatchesButAmountDoesNotMatch() {
+        PaymentProofCandidate candidate = candidate("QP-202608-0040-87D0", new BigDecimal("1.00"));
+        repository.candidate = Optional.of(candidate);
+        ocr.fields = new PaymentProofOcrFields(
+            "QP-202608-0040-87D0",
+            new BigDecimal("0.10"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.8600"),
+            "QP-202608-0040-87D0 SGD 0.10",
+            "{}"
+        );
+
+        PaymentProofScanResult result = service.scanAndMatch(scope, command("proof-003"), actor);
+
+        assertThat(result.outcome()).isEqualTo("needs_review");
+        assertThat(result.checks().amount()).isEqualTo("mismatch");
+        assertThat(repository.createdVerificationStatus).isEqualTo("pending");
+        assertThat(repository.confirmedIntentId).isNull();
+    }
+
+    @Test
+    void mapsDuplicateProofIdempotencyKeyToBusinessConflict() {
+        repository.throwDuplicateOnCreate = true;
+        repository.candidate = Optional.of(candidate("QP-202608-0040-87D0", new BigDecimal("1.00")));
+        ocr.fields = new PaymentProofOcrFields(
+            "QP-202608-0040-87D0",
+            new BigDecimal("1.00"),
+            null,
+            "ocbc",
+            true,
+            new BigDecimal("0.8600"),
+            "QP-202608-0040-87D0 SGD 1.00",
+            "{}"
+        );
+
+        assertThatThrownBy(() -> service.scanAndMatch(scope, command("proof-duplicate"), actor))
+            .isInstanceOf(PaymentServiceException.class)
+            .extracting(error -> ((PaymentServiceException) error).code())
+            .isEqualTo(PaymentServiceErrorCode.IDEMPOTENCY_CONFLICT);
+    }
+
+    private PaymentProofScanCommand command(String idempotencyKey) {
+        return new PaymentProofScanCommand(
+            idempotencyKey,
+            "proof.jpg",
+            "image/jpeg",
+            "fake-image".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            LocalDate.parse("2026-08-08"),
+            "T1"
+        );
+    }
+
+    private PaymentProofCandidate candidate(String reference, BigDecimal amount) {
+        return candidate(reference, amount, "pending", "pending");
+    }
+
+    private PaymentProofCandidate candidate(String reference, BigDecimal amount, String intentStatus, String sessionStatus) {
+        return new PaymentProofCandidate(
+            UUID.fromString("50000000-0000-0000-0000-000000000001"),
+            UUID.fromString("60000000-0000-0000-0000-000000000001"),
+            "PIT-202608-0001",
+            "PRS-ABCDEF1234567890",
+            1,
+            LocalDate.parse("2026-08-08"),
+            reference,
+            amount,
+            "SGD",
+            intentStatus,
+            sessionStatus,
+            "T1",
+            "Alice",
+            OffsetDateTime.parse("2026-08-08T04:10:00Z"),
+            OffsetDateTime.parse("2026-08-08T04:12:00Z")
+        );
+    }
+
+    private static final class FakeOcrAdapter implements PaymentProofOcrAdapter {
+        private PaymentProofOcrFields fields;
+
+        @Override
+        public PaymentProofOcrFields extract(Path file, PaymentProofOcrExpected expected) {
+            return fields;
+        }
+    }
+
+    private static final class InMemoryPaymentProofReviewRepository implements PaymentProofReviewRepository {
+        private Optional<PaymentProofCandidate> candidate = Optional.empty();
+        private Optional<PaymentProofCandidate> additionalCandidate = Optional.empty();
+        private Optional<PaymentProofCandidate> historicalCandidate = Optional.empty();
+        private UUID confirmedIntentId;
+        private String createdProofStatus;
+        private String createdVerificationStatus;
+        private boolean throwDuplicateOnCreate;
+
+        @Override
+        public Optional<PaymentProofScanResult> findScanResultByIdempotencyKey(
+            StoreScope scope,
+            String idempotencyKey,
+            String fileDigest
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<PaymentProofCandidate> findCandidates(StoreScope scope, LocalDate businessDate, String terminalCode, int limit) {
+            return candidate.stream().toList();
+        }
+
+        @Override
+        public Optional<PaymentProofCandidate> findUniqueActiveCandidateByReferences(
+            StoreScope scope,
+            List<String> paymentReferences,
+            LocalDate businessDate,
+            String terminalCode
+        ) {
+            List<PaymentProofCandidate> matches = Stream.concat(candidate.stream(), additionalCandidate.stream())
+                .filter(value -> paymentReferences.contains(value.paymentReference()))
+                .toList();
+            return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PaymentProofCandidate> findUniqueCandidateByReferences(
+            StoreScope scope,
+            List<String> paymentReferences,
+            LocalDate businessDate,
+            String terminalCode
+        ) {
+            List<PaymentProofCandidate> matches = Stream.of(candidate, additionalCandidate, historicalCandidate)
+                .flatMap(Optional::stream)
+                .filter(value -> paymentReferences.contains(value.paymentReference()))
+                .toList();
+            return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
+        }
+
+        @Override
+        public PaymentProofScanResult createMatchedProofAndMaybeConfirm(
+            StoreScope scope,
+            PaymentProofCandidate candidate,
+            PaymentProofScanCommand command,
+            PaymentProofOcrFields fields,
+            PaymentProofChecks checks,
+            boolean autoConfirm,
+            UUID actorId,
+            String fileDigest
+        ) {
+            if (throwDuplicateOnCreate) {
+                throw new DuplicateKeyException("duplicate idempotency key");
+            }
+            UUID proofId = UUID.fromString("70000000-0000-0000-0000-000000000001");
+            UUID verificationId = UUID.fromString("80000000-0000-0000-0000-000000000001");
+            createdProofStatus = autoConfirm ? "confirmed" : "matched";
+            createdVerificationStatus = autoConfirm ? "confirmed" : "pending";
+            if (autoConfirm) {
+                confirmedIntentId = candidate.intentId();
+            }
+            return new PaymentProofScanResult(
+                true,
+                false,
+                autoConfirm ? "auto_confirmed" : "needs_review",
+                candidate.intentId(),
+                candidate.sessionId(),
+                proofId,
+                verificationId,
+                candidate.paymentReference(),
+                candidate.amount(),
+                fields,
+                checks
+            );
+        }
+
+        @Override
+        public PaymentProofScanResult createNoMatchResult(
+            StoreScope scope,
+            PaymentProofScanCommand command,
+            PaymentProofOcrFields fields,
+            PaymentProofChecks checks,
+            UUID actorId,
+            String fileDigest
+        ) {
+            return PaymentProofScanResult.noMatch(false, fields, checks);
+        }
+    }
+}

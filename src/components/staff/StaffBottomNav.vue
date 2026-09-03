@@ -3,10 +3,12 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
+import { useStoreVisibleApps } from '../../composables/useStoreVisibleApps'
 import {
   staffBottomNavItems,
   type StaffBottomNavTab
 } from './staffBottomNavItems'
+import { openQuickPaymentPopup } from '../../utils/paymentQuickPayPopup'
 
 const props = defineProps<{
   storeId: string
@@ -14,30 +16,64 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const currentStoreId = computed(() => props.storeId || undefined)
+const { hasVisibleApp, loaded } = useStoreVisibleApps(currentStoreId)
 const items = computed(() =>
-  staffBottomNavItems.map(item => ({
-    ...item,
-    to: {
-      name: item.routeName,
-      params: {
-        storeId: props.storeId
+  staffBottomNavItems
+    .filter(item => !item.appKey || !loaded.value || hasVisibleApp(item.appKey))
+    .map(item => ({
+      ...item,
+      to: {
+        name: item.routeName,
+        params: {
+          storeId: props.storeId
+        }
       }
-    }
-  }))
+    }))
 )
+const navColumnCount = computed(() => Math.max(items.value.length, 1))
+
+function handleNavClick(
+  event: MouseEvent,
+  item: (typeof items.value)[number],
+  href: string,
+  navigate: (event?: MouseEvent) => Promise<unknown> | void
+): void {
+  if (item.openMode !== 'popup' || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    navigate(event)
+    return
+  }
+
+  if (openQuickPaymentPopup(href)) {
+    event.preventDefault()
+  }
+}
 </script>
 
 <template>
-  <nav class="staff-bottom-nav" :aria-label="t('nav.staff.aria')">
+  <nav
+    class="staff-bottom-nav"
+    :aria-label="t('nav.staff.aria')"
+    :style="{ '--staff-nav-items': String(navColumnCount) }"
+  >
     <RouterLink
       v-for="item in items"
       :key="item.tab"
-      class="staff-bottom-nav__item"
-      :class="{ active: activeTab === item.tab }"
       :to="item.to"
+      custom
+      v-slot="{ href, navigate }"
     >
-      <span class="staff-bottom-nav__symbol" aria-hidden="true">{{ item.symbol }}</span>
-      <span class="staff-bottom-nav__label">{{ t(item.labelKey) }}</span>
+      <a
+        class="staff-bottom-nav__item"
+        :class="{ active: activeTab === item.tab }"
+        :href="href"
+        :target="item.openMode === 'popup' ? '_blank' : undefined"
+        :rel="item.openMode === 'popup' ? 'noopener' : undefined"
+        @click="event => handleNavClick(event, item, href, navigate)"
+      >
+        <span class="staff-bottom-nav__symbol" aria-hidden="true">{{ item.symbol }}</span>
+        <span class="staff-bottom-nav__label">{{ t(item.labelKey) }}</span>
+      </a>
     </RouterLink>
   </nav>
 </template>
@@ -49,7 +85,7 @@ const items = computed(() =>
   bottom: 0;
   box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--staff-nav-items), minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 7px 10px calc(7px + env(safe-area-inset-bottom));

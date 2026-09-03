@@ -48,7 +48,7 @@ export function publicBookingUrlForTenant(
     return `${locationLike.origin}/book/${encodeURIComponent(storeId)}`
   }
   if (hostContext.kind === 'tenant' && hostContext.tenantCode === normalizedTenantCode) {
-    return `${locationLike.origin}/book`
+    return `${locationLike.origin}/book/${encodeURIComponent(storeId)}`
   }
   if (isLocalHostname(locationLike.hostname) || isIpHostname(locationLike.hostname)) {
     return `${locationLike.origin}/book/${encodeURIComponent(storeId)}`
@@ -56,7 +56,7 @@ export function publicBookingUrlForTenant(
   const labels = normalizedHostname(locationLike.hostname).split('.')
   const rootHost = hostContext.kind === 'legacy' ? labels.join('.') : labels.slice(1).join('.')
   const port = locationLike.port ? `:${locationLike.port}` : ''
-  return `${locationLike.protocol}//${normalizedTenantCode}.${rootHost}${port}/book`
+  return `${locationLike.protocol}//${normalizedTenantCode}.${rootHost}${port}/book/${encodeURIComponent(storeId)}`
 }
 
 function normalizedHostname(hostname: string): string {

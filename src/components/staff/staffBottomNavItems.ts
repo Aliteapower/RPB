@@ -1,10 +1,12 @@
-export type StaffBottomNavTab = 'home' | 'reservation' | 'queue' | 'table'
+export type StaffBottomNavTab = 'home' | 'reservation' | 'queue' | 'table' | 'payment'
 
 export interface StaffBottomNavItem {
   tab: StaffBottomNavTab
   labelKey: string
   routeName: string
   symbol: string
+  appKey?: 'reservation_queue' | 'payment'
+  openMode?: 'route' | 'popup'
 }
 
 export const staffBottomNavItems: StaffBottomNavItem[] = [
@@ -18,18 +20,29 @@ export const staffBottomNavItems: StaffBottomNavItem[] = [
     tab: 'reservation',
     labelKey: 'nav.staff.reservation',
     routeName: 'reservation-today-view',
-    symbol: '□'
+    symbol: '□',
+    appKey: 'reservation_queue'
   },
   {
     tab: 'queue',
     labelKey: 'nav.staff.queue',
     routeName: 'queue-ticket-list',
-    symbol: '≡'
+    symbol: '≡',
+    appKey: 'reservation_queue'
   },
   {
     tab: 'table',
     labelKey: 'nav.staff.table',
     routeName: 'table-resource-list',
-    symbol: '▦'
+    symbol: '▦',
+    appKey: 'reservation_queue'
+  },
+  {
+    tab: 'payment',
+    labelKey: 'nav.staff.payment',
+    routeName: 'payment-quick-pay',
+    symbol: '$',
+    appKey: 'payment',
+    openMode: 'popup'
   }
 ]

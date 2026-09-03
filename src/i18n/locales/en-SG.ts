@@ -55,7 +55,8 @@ export const enSG = {
       reservation_share: 'Reservation share',
       queue: 'Queue',
       call_screen: 'Call screen',
-      reservation_meal_period: 'Reservation meal periods'
+      reservation_meal_period: 'Reservation meal periods',
+      payment: 'PayNow payment'
     },
     categories: {
       cancellation: 'Cancellation',
@@ -68,7 +69,8 @@ export const enSG = {
       template: 'Template',
       display: 'Display copy',
       display_name: 'Display name',
-      restaurant_default: 'Restaurant default'
+      restaurant_default: 'Restaurant default',
+      quick_pay: 'Quick payment'
     },
     textKinds: {
       label: 'Label',
@@ -102,6 +104,7 @@ export const enSG = {
       billing: 'Tenant billing',
       profile: 'Platform profile',
       productLines: 'Product lines',
+      paymentProofTemplates: 'PayNow Proof Templates',
       i18nCatalog: 'I18n catalog',
       callScreenSeed: 'Call screen templates',
       mealPeriodSeed: 'Reservation meal periods',
@@ -116,6 +119,13 @@ export const enSG = {
       customers: 'Customers',
       tables: 'Tables',
       settings: 'Settings',
+      paymentProductLine: 'Pay / PayNow',
+      paymentSettings: 'Settings',
+      paymentRecords: 'Quick Payment Records',
+      paymentProofTemplates: 'Proof Templates',
+      paymentI18nCatalog: 'PayNow I18n',
+      reservationQueueProductLine: 'Reservation Queue',
+      reservationQueueI18nCatalog: 'Reservation Queue I18n',
       i18nCatalog: 'I18n catalog',
       shareTemplate: 'Booking share',
       publicBooking: 'Public booking',
@@ -126,7 +136,8 @@ export const enSG = {
       home: 'Home',
       reservation: 'Bookings',
       queue: 'Queue',
-      table: 'Tables'
+      table: 'Tables',
+      payment: 'Pay'
     }
   },
   login: {
@@ -943,6 +954,7 @@ export const enSG = {
       refreshing: 'Refreshing',
       unavailable: 'Unavailable',
       home: 'Home',
+      payment: 'Pay',
       available: 'App available'
     },
     topbar: {
@@ -967,6 +979,11 @@ export const enSG = {
         label: 'Seat queue',
         description: 'Seat a called ticket at a table',
         symbol: 'Seat'
+      },
+      quickPay: {
+        label: 'Quick pay',
+        description: 'Enter an amount and show a PayNow QR code',
+        symbol: 'Pay'
       }
     },
     store: {
@@ -992,6 +1009,8 @@ export const enSG = {
     hints: {
       unavailable: 'Today overview is unavailable',
       loading: 'Reading today’s operations',
+      paymentOnly: 'Only the PayNow product line is enabled for this store',
+      noProductLine: 'No product line is available for this store',
       queuePressure: '{groups} queue groups. Check waiting and called tickets first.',
       calm: 'No queue pressure right now'
     },
