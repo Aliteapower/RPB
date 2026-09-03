@@ -30,7 +30,15 @@
 
 ## Deployment
 
-- Frontend-only deployment. Deployment evidence will be recorded after the production switch and verification.
+- Frontend release commit: `41df0502`.
+- Uploaded artifact: `/home/ubuntu/rpb-41df0502-frontend.tgz`.
+- Artifact SHA-256: `5b31f327d53a1c60ff30e85f6f8c86e3359e96d666a3bfe8a92316023c8d548c`.
+- Production frontend backup: `/opt/rpb/backups/20260903-220649-41df0502-public-booking-optional-login-frontend/frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260903-220649-41df0502-public-booking-optional-login`.
+- Live entry asset: `/assets/index-Eh9OHRe-.js`.
+- The Lsc83 Store entry and booking context returned `200`; the context returned persisted `requireCustomerLogin=false`, `emailAuthEnabled=false`, and no OAuth providers.
+- The live public-booking asset contains the configuration-driven login-flow policy. Lsc83 was used only as a production smoke sample; the implementation contains no Store or Tenant identifier.
+- Backend service remained active and `/api/v1/auth/me` returned `401` throughout the frontend-only deployment.
 
 ## Risk
 
