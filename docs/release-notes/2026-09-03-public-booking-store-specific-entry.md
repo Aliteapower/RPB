@@ -27,11 +27,22 @@
 
 - No App Gate, role, or permission change.
 
+## Deployment
+
+- Frontend release commit: `40b6fdf3`.
+- Uploaded artifact: `/home/ubuntu/rpb-40b6fdf3-frontend.tgz`.
+- Artifact SHA-256: `9d75fd7af1d4c11d5c029b116a9a1444b2af93dde9df2d31baecfdb43c02b0e1`.
+- Production frontend backup: `/opt/rpb/backups/20260903-215245-40b6fdf3-public-booking-store-entry-frontend/frontend`.
+- Previous frontend directory: `/opt/rpb/frontend.previous-20260903-215245-40b6fdf3-public-booking-store-entry`.
+- Live entry asset: `/assets/index-WFZusn_o.js`.
+- Public Lsc83 Store entry and booking context returned `200`; the context identified the Jln Sultan Store.
+- Tenant-level `lsc106` booking entry continues to return `409 multiple_enabled_stores` as designed.
+- Backend service remained active and `/api/v1/auth/me` returned `401` throughout the frontend-only deployment.
+
 ## Risk
 
 - Low frontend routing risk. The generated link now uses the existing and already supported `/book/:storeId` route.
 - No Reservation creation, availability, tenant isolation, or Store scope behavior changed.
-- This change is not deployed by this development round.
 
 ## Rollback Notes
 
