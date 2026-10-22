@@ -7,6 +7,7 @@ import com.rpb.reservation.appgate.guard.RequireAppGate;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.dailyledger.application.LedgerCommandService;
+import com.rpb.reservation.dailyledger.application.LedgerBrandingService;
 import com.rpb.reservation.dailyledger.application.LedgerQueryService;
 import com.rpb.reservation.dailyledger.domain.LedgerException;
 import com.rpb.reservation.walkin.api.CurrentActor;
@@ -22,14 +23,21 @@ import org.springframework.web.bind.annotation.*;
 @RequireAppGate(appKey="daily_ledger",permission="daily_ledger.view")
 public class LedgerController {
     private final LedgerQueryService queries;private final LedgerCommandService commands;
-    private final CurrentActorProvider actors;private final ObjectMapper json;
-    public LedgerController(LedgerQueryService queries,LedgerCommandService commands,CurrentActorProvider actors,ObjectMapper json){this.queries=queries;this.commands=commands;this.actors=actors;this.json=json;}
+    private final CurrentActorProvider actors;private final ObjectMapper json;private final LedgerBrandingService branding;
+    public LedgerController(LedgerQueryService queries,LedgerCommandService commands,CurrentActorProvider actors,ObjectMapper json,LedgerBrandingService branding){this.queries=queries;this.commands=commands;this.actors=actors;this.json=json;this.branding=branding;}
     private CurrentActor actor(){return actors.currentActor().orElseThrow(()->new LedgerException("UNAUTHENTICATED",401,"请先登录"));}
     private StoreScope scope(UUID storeId,CurrentActor a){if(a.tenantId()==null)throw new LedgerException("FORBIDDEN",403,"需要租户账号");return new StoreScope(new TenantId(a.tenantId()),storeId);}
     public record SettingsResponse(JsonNode config,JsonNode branding,int version,com.rpb.reservation.dailyledger.application.LedgerStoreDisplay display) {}
-    @GetMapping("/settings") public SettingsResponse settings(@PathVariable UUID storeId){var a=actor();var scope=scope(storeId,a);var s=queries.settings(scope,a);return new SettingsResponse(s.config(),s.branding(),s.version(),queries.display(scope,a));}
+    @GetMapping("/settings") public SettingsResponse settings(@PathVariable UUID storeId){var a=actor();var scope=scope(storeId,a);var s=queries.settings(scope,a);return new SettingsResponse(s.config(),branding.resolve(scope,s.branding()),s.version(),queries.display(scope,a));}
     @PutMapping("/settings") @RequireAppGate(appKey="daily_ledger",permission="daily_ledger.settings.manage")
-    public SettingsResponse settings(@PathVariable UUID storeId,@Valid @RequestBody LedgerRequests.Settings body){var a=actor();var scope=scope(storeId,a);var s=commands.settings(scope,a,body.version(),body.config(),body.branding());return new SettingsResponse(s.config(),s.branding(),s.version(),queries.display(scope,a));}
+    public SettingsResponse settings(@PathVariable UUID storeId,@Valid @RequestBody LedgerRequests.Settings body){var a=actor();var scope=scope(storeId,a);var s=commands.settings(scope,a,body.version(),body.config(),body.branding());return new SettingsResponse(s.config(),branding.resolve(scope,s.branding()),s.version(),queries.display(scope,a));}
+    @GetMapping("/branding/logo/{assetId}")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> logo(@PathVariable UUID storeId,@PathVariable UUID assetId) {
+        var a=actor();var scope=scope(storeId,a);queries.display(scope,a);
+        var content=branding.logo(scope,assetId);
+        return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noCache().cachePrivate())
+            .contentType(org.springframework.http.MediaType.parseMediaType(content.contentType())).contentLength(content.byteSize()).body(content.resource());
+    }
     @GetMapping("/days/{date}") public ObjectNode day(@PathVariable UUID storeId,@PathVariable LocalDate date){var a=actor();return queries.day(scope(storeId,a),date,a);}
     @PutMapping("/days/{date}/records/{period}") @RequireAppGate(appKey="daily_ledger",permission="daily_ledger.write")
     public ObjectNode save(@PathVariable UUID storeId,@PathVariable LocalDate date,@PathVariable String period,@Valid @RequestBody LedgerRequests.Save body){var a=actor();return commands.save(scope(storeId,a),date,period,a,body.version(),body.client_save_id(),body.action(),body.input(json));}

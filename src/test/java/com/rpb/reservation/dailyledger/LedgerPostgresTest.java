@@ -54,6 +54,55 @@ class LedgerPostgresTest {
         queries=new LedgerQueryService(repository,rules,access,JSON);commands=new LedgerCommandService(repository,rules,access,queries,JSON,Clock.fixed(Instant.parse("2026-10-22T01:00:00Z"),ZoneOffset.UTC));
         tx.execute(status->{repository.lockSettings(SCOPE,rules.defaults());var current=repository.settings(SCOPE).orElseThrow();repository.updateSettings(SCOPE,rules.defaults(),JSON.createObjectNode(),current.version());return null;});
     }
+    @Test void oldClientCannotReplaceBrandingThroughLedgerSettings() {
+        var before = repository.settings(SCOPE).orElseThrow();
+        tx.execute(status -> commands.settings(SCOPE, admin, before.version(), before.config(),
+            JSON.createObjectNode().put("store_name", "unexpected override").put("logo_data", "arbitrary URL")));
+        assertThat(repository.settings(SCOPE).orElseThrow().branding()).isEqualTo(before.branding());
+    }
+
+    StoreScope legacyBrandingStore(String code, UUID tenant, String logo) {
+        if (tenant == null) {
+            tenant = UUID.randomUUID();
+            jdbc.update("insert into tenants(id,tenant_code,display_name,status) values(?,?,?,'active')", tenant, code, code);
+        }
+        UUID store = UUID.randomUUID();
+        jdbc.update("insert into stores(id,tenant_id,store_code,display_name,status,timezone,locale,date_format,time_format,currency) values(?,?,?,?,'active','Asia/Singapore','zh-CN','DD-MM-YYYY','HH:mm','SGD')",store,tenant,code,code);
+        var scoped = new StoreScope(new TenantId(tenant),store);
+        repository.lockSettings(scoped,rules.defaults());
+        repository.updateSettings(scoped,rules.defaults(),JSON.createObjectNode().put("store_name",code).put("logo_data",logo),0);
+        return scoped;
+    }
+
+    @Test void adoptionIsScopedAndIdempotentEvenAfterSharedLogoIsCleared() throws Exception {
+        var profiles = mock(com.rpb.reservation.tenantadmin.application.TenantAdminProfileService.class);
+        var profile = mock(com.rpb.reservation.tenantadmin.application.TenantAdminProfile.class);
+        when(profiles.getProfile(any())).thenReturn(profile);
+        var migration = new com.rpb.reservation.dailyledger.migration.LedgerBrandingMigration(jdbc,JSON,profiles);
+        var scoped = tx.execute(status -> legacyBrandingStore("adopt",null,"data:image/png;base64,AQID"));
+        var other = tx.execute(status -> legacyBrandingStore("untouched",null,"data:image/png;base64,BAUG"));
+        assertThat(tx.<Integer>execute(status -> migration.migrate("adopt"))).isEqualTo(1);
+        var file = org.mockito.ArgumentCaptor.forClass(org.springframework.web.multipart.MultipartFile.class);
+        verify(profiles).uploadLogo(eq(scoped),file.capture());
+        assertThat(file.getValue().getBytes()).containsExactly(1,2,3);
+        assertThat(repository.settings(scoped).orElseThrow().branding().path("platform_branding_managed").asBoolean()).isTrue();
+        assertThat(repository.settings(other).orElseThrow().branding().has("platform_branding_managed")).isFalse();
+        clearInvocations(profiles);
+        assertThat(tx.<Integer>execute(status -> migration.migrate("adopt"))).isZero();
+        verify(profiles,never()).uploadLogo(any(),any());
+    }
+
+    @Test void differentGroupStoreLogosAreNotSilentlyCollapsed() {
+        var profiles = mock(com.rpb.reservation.tenantadmin.application.TenantAdminProfileService.class);
+        when(profiles.getProfile(any())).thenReturn(mock(com.rpb.reservation.tenantadmin.application.TenantAdminProfile.class));
+        var first = tx.execute(status -> legacyBrandingStore("ambiguous",null,"data:image/png;base64,AQID"));
+        var second = tx.execute(status -> legacyBrandingStore("other-store",first.tenantId().value(),"data:image/png;base64,BAUG"));
+        var migration = new com.rpb.reservation.dailyledger.migration.LedgerBrandingMigration(jdbc,JSON,profiles);
+        assertThatThrownBy(() -> tx.execute(status -> migration.migrate("ambiguous"))).isInstanceOf(IllegalStateException.class);
+        verify(profiles,never()).uploadLogo(any(),any());
+        assertThat(repository.settings(first).orElseThrow().branding().has("platform_branding_managed")).isFalse();
+        assertThat(repository.settings(second).orElseThrow().branding().has("platform_branding_managed")).isFalse();
+    }
     ObjectNode input(ObjectNode day,String period) {
         ObjectNode in=JSON.createObjectNode();in.set("config_snapshot",day.path("config"));in.set("withdrawal_basis",rules.withdrawalBasis(day.path("config"),day.path("records"),period));return in;
     }

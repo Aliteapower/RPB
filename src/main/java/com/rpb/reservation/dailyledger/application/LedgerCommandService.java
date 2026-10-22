@@ -26,28 +26,13 @@ public class LedgerCommandService {
     @Transactional
     public LedgerRepository.Settings settings(StoreScope s,CurrentActor actor,int version,JsonNode config,JsonNode branding) {
         access.require(s,actor,"daily_ledger.settings.manage");
-        JsonNode normalized=rules.settings(config);validateBranding(branding);
+        JsonNode normalized=rules.settings(config);
         repository.lockSettings(s,rules.defaults());
         var before=queries.currentSettings(s);
-        if(!repository.updateSettings(s,normalized,branding,version))throw LedgerException.conflict("VERSION_CONFLICT","设置已更新，请重新加载");
+        if(!repository.updateSettings(s,normalized,before.branding(),version))throw LedgerException.conflict("VERSION_CONFLICT","设置已更新，请重新加载");
         ObjectNode audit=json.createObjectNode();audit.set("before",json.valueToTree(before));audit.set("after",json.valueToTree(queries.currentSettings(s)));
         repository.audit(s,null,null,"settings",actor.actorId(),repository.actorName(actor.actorId()),audit);
         return queries.currentSettings(s);
-    }
-    private void validateBranding(JsonNode branding) {
-        rules.requireObject(branding);
-        rules.text(branding.path("store_name"),60,true);rules.text(branding.path("store_name_en"),100,false);
-        String logo=rules.text(branding.path("logo_data"),160000,false);
-        if(!logo.isEmpty()) {
-            try {
-                if(!logo.startsWith("data:image/png;base64,"))throw new IllegalArgumentException();
-                byte[] bytes=java.util.Base64.getDecoder().decode(logo.substring(22));
-                byte[] signature={(byte)137,80,78,71,13,10,26,10};
-                if(bytes.length<45||!java.util.Arrays.equals(signature,java.util.Arrays.copyOf(bytes,8)))throw new IllegalArgumentException();
-                var buffer=java.nio.ByteBuffer.wrap(bytes);int width=buffer.getInt(16),height=buffer.getInt(20);
-                if(width<1||height<1||width>256||height>256)throw new IllegalArgumentException();
-            }catch(Exception e){throw LedgerException.invalid("Logo 须为256像素以内 PNG 图片");}
-        }
     }
     @Transactional
     public ObjectNode save(StoreScope s,LocalDate date,String period,CurrentActor actor,int version,String key,String action,JsonNode input) {

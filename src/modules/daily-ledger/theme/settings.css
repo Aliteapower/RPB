@@ -8,9 +8,12 @@
 .daily-ledger .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:25px;padding-top:18px;border-top:1px solid var(--line)}
 .daily-ledger .settings-columns{display:grid;grid-template-columns:1.1fr 1fr .8fr;gap:18px}
 .daily-ledger .settings-columns.two{grid-template-columns:1fr 1fr;gap:30px}
-.daily-ledger .period-settings{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.daily-ledger .period-settings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .daily-ledger .period-settings .switch-label{margin-top:13px}
-.daily-ledger .switch-label{display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:11px;color:#8a9a80;cursor:pointer}
+.daily-ledger .switch-label{display:flex;align-items:flex-start;gap:7px;white-space:normal;font-size:11px;color:#8a9a80;cursor:pointer;min-width:0}
+.daily-ledger .switch-label input{flex-shrink:0}
+.daily-ledger .period-settings>div{min-width:0}
+.daily-ledger .notice>a{margin-inline-start:4px}
 .daily-ledger .setting-item{display:flex;gap:12px;align-items:center;margin-bottom:10px}
 .daily-ledger .setting-item>input{padding:9px 11px;font-size:12px}
 .daily-ledger .subheading{display:flex;align-items:center;justify-content:space-between}
@@ -35,16 +38,5 @@
 @media (max-width:760px){.daily-ledger .modal-actions .button{font-size:11px;padding:11px 13px}
 }
 @media (max-width:760px){.daily-ledger .modal-head .icon-button{height:30px}
-}
-.daily-ledger .brand-settings{padding-bottom:25px;margin-bottom:24px;border-bottom:1px solid #dfe7d9}
-.daily-ledger .brand-settings h3{margin-top:0}
-.daily-ledger .brand-preview{padding:18px;border:1px dashed #b5cbb6;background:#f2f6ef;border-radius:10px;margin:17px 0;color:#214b36;max-width:100%}
-.daily-ledger .brand-settings input[type=file]{width:100%;font-size:12px;padding:11px;background:#f6f9f3}
-.daily-ledger .brand-settings>.small{line-height:1.8}
-.daily-ledger .brand-settings input[type=text]{width:100%}
-.daily-ledger .brand-settings input:not([type]){width:100%}
-@media (max-width:760px){.daily-ledger .brand-preview{padding:15px}
-}
-@media (max-width:760px){.daily-ledger .brand-settings input[type=file]{font-size:11px}
 }
 

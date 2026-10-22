@@ -5,7 +5,18 @@ export function ledgerApi(storeId: string) {
   async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
     const response = await fetch(base + path, { method, credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
     const data = await response.json()
-    if (!response.ok) throw new LedgerApiError(response.status, data.error?.code ?? 'REQUEST_FAILED', data.error?.message ?? data.error?.messageKey ?? '读取或保存失败，请重试')
+    if (!response.ok) {
+      const code = data.error?.code ?? 'REQUEST_FAILED'
+      const stableMessages: Record<string, string> = {
+        VERSION_CONFLICT: '记录已被更新，请重新加载核对，当前输入仍保留',
+        IDEMPOTENCY_CONFLICT: '保存编号已用于其他输入'
+      }
+      const message = stableMessages[code] ?? (response.status === 401 ? '登录已过期，请重新登录'
+        : response.status === 403 ? '无权执行此操作'
+        : response.status >= 500 ? '服务暂时不可用，请稍后重试'
+        : data.error?.message ?? '读取或保存失败，请重试')
+      throw new LedgerApiError(response.status, code, message)
+    }
     return data as T
   }
   return {

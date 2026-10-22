@@ -395,7 +395,7 @@ function apiErrorText(error: unknown): string {
           </div>
         </section>
 
-        <section class="section-panel logo-panel">
+        <section id="tenant-logo" class="section-panel logo-panel">
           <div class="logo-preview" :aria-label="gt('generated.tenant-admin-profile.019')">
             <img v-if="logoPreviewUrl" :src="logoPreviewUrl" :alt="gt('generated.tenant-admin-profile.020')" />
             <span v-else>LOGO</span>

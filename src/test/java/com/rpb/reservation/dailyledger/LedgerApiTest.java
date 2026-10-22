@@ -27,18 +27,34 @@ class LedgerApiTest {
             var queries=mock(LedgerQueryService.class);var gate=mock(AppGateService.class);
             when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("daily_ledger",tenant,store,"daily_ledger.view",reason));
             var provider=(CurrentActorProvider)()->Optional.of(actor);
-            var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,mock(LedgerCommandService.class),provider,json))
+            var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,mock(LedgerCommandService.class),provider,json,mock(LedgerBrandingService.class)))
                 .addInterceptors(new AppGateInterceptor(gate,mock(AppGateDenialAuditService.class),provider,new AppGateApiErrorMapper(),json)).build();
             mvc.perform(get("/api/v1/stores/"+store+"/daily-ledger/settings")).andExpect(status().isForbidden());
+            mvc.perform(get("/api/v1/stores/"+store+"/daily-ledger/branding/logo/"+UUID.randomUUID())).andExpect(status().isForbidden());
             verifyNoInteractions(queries);
         }
+    }
+    @Test void staffLogoReadUsesLedgerViewAndPrivateMediaResponse() throws Exception {
+        var queries=mock(LedgerQueryService.class);var gate=mock(AppGateService.class);var branding=mock(LedgerBrandingService.class);
+        when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("daily_ledger",tenant,store,"daily_ledger.view"));
+        UUID asset=UUID.randomUUID();
+        when(branding.logo(any(),eq(asset))).thenReturn(new com.rpb.reservation.queuedisplay.application.CallScreenMediaContent(
+            new org.springframework.core.io.ByteArrayResource(new byte[]{1,2,3}),"image/png",3));
+        var provider=(CurrentActorProvider)()->Optional.of(actor);
+        var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,mock(LedgerCommandService.class),provider,json,branding))
+            .setControllerAdvice(new LedgerErrorHandler())
+            .addInterceptors(new AppGateInterceptor(gate,mock(AppGateDenialAuditService.class),provider,new AppGateApiErrorMapper(),json)).build();
+        mvc.perform(get("/api/v1/stores/"+store+"/daily-ledger/branding/logo/"+asset)).andExpect(status().isOk())
+            .andExpect(content().contentType("image/png")).andExpect(content().bytes(new byte[]{1,2,3}))
+            .andExpect(header().string("Cache-Control",org.hamcrest.Matchers.containsString("private")));
+        verify(queries).display(any(),eq(actor));
     }
     @Test void settingsResponseHasExplicitEnvelopeAndMutationUsesManagePermission() throws Exception {
         var queries=mock(LedgerQueryService.class);var gate=mock(AppGateService.class);var commands=mock(LedgerCommandService.class);
         when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("daily_ledger",tenant,store,"daily_ledger.view"));
         when(queries.settings(any(),any())).thenReturn(new LedgerRepository.Settings(new LedgerRules(json).defaults(),json.createObjectNode(),2));
         var provider=(CurrentActorProvider)()->Optional.of(actor);
-        var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,commands,provider,json))
+        var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,commands,provider,json,mock(LedgerBrandingService.class)))
             .setControllerAdvice(new LedgerErrorHandler())
             .addInterceptors(new AppGateInterceptor(gate,mock(AppGateDenialAuditService.class),provider,new AppGateApiErrorMapper(),json)).build();
         mvc.perform(get("/api/v1/stores/"+store+"/daily-ledger/settings")).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2)).andExpect(jsonPath("$.config.base_amount").value("500.00"));

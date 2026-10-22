@@ -1,5 +1,6 @@
+import { ledgerMessages } from '../../modules/daily-ledger/locales/en-SG'
 export const enSG = {
-  dailyLedger: { entry: 'Daily Ledger', description: 'Cash counts, handover and history', symbol: '$' },
+  dailyLedger: { messages: ledgerMessages, entry: 'Daily Ledger', description: 'Cash counts, handover and history', symbol: '$' },
   common: {
     actions: {
       login: 'Sign in',

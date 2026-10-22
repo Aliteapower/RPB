@@ -27,8 +27,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class LedgerSeedImporter {
     private final PlatformTenantService tenants;private final ProductSubscriptionService subscriptions;
     private final TenantAdminStaffService staff;private final LedgerRepository ledger;
-    private final LedgerRules rules;private final ObjectMapper json;private final JdbcTemplate jdbc;
-    public LedgerSeedImporter(PlatformTenantService tenants,ProductSubscriptionService subscriptions,TenantAdminStaffService staff,LedgerRepository ledger,LedgerRules rules,ObjectMapper json,JdbcTemplate jdbc){this.tenants=tenants;this.subscriptions=subscriptions;this.staff=staff;this.ledger=ledger;this.rules=rules;this.json=json;this.jdbc=jdbc;}
+    private final LedgerRules rules;private final ObjectMapper json;private final JdbcTemplate jdbc;private final LedgerBrandingMigration brandingMigration;
+    public LedgerSeedImporter(PlatformTenantService tenants,ProductSubscriptionService subscriptions,TenantAdminStaffService staff,LedgerRepository ledger,LedgerRules rules,ObjectMapper json,JdbcTemplate jdbc,LedgerBrandingMigration brandingMigration){this.tenants=tenants;this.subscriptions=subscriptions;this.staff=staff;this.ledger=ledger;this.rules=rules;this.json=json;this.jdbc=jdbc;this.brandingMigration=brandingMigration;}
     public record Result(UUID tenantId,UUID storeId,int days,int records,int audit,String sha256) {}
     @Transactional
     public Result importSnapshot(Path path,String tenantCode,String password) throws Exception {
@@ -73,6 +73,7 @@ public class LedgerSeedImporter {
         subscriptions.purchase(tenant.id(),new ProductSubscriptionCommand("daily-ledger-source-seed-v21","daily_ledger","monthly",null,null,null,"SGD","测试租户开通；原站点迁入，非真实收款",1,null),new PlatformBillingOperator(null,"platform_admin"));
         String sha=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         ledger.audit(scope,null,null,"import",null,"源站点迁移",json.createObjectNode().put("source",source.path("source").asText()).put("source_commit",source.path("sourceCommit").asText()).put("sha256",sha).put("records",recordCount));
+        brandingMigration.migrate(tenantCode);
         return new Result(tenant.id(),storeId,source.path("days").size(),recordCount,source.path("audit").size(),sha);
     }
 }

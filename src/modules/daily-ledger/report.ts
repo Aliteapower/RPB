@@ -24,12 +24,12 @@ export function historyReport(days: LedgerDay[]) {
   })
   return { rows, totals, channels: [...channels.values()], expenseCategories: [...expenseCategories.values()] }
 }
-export function csv(days: LedgerDay[]) {
+export function csv(days: LedgerDay[], text: (source: string) => string = source => source, itemName: (item?: { id: string; name: string }) => string = item => item?.name ?? '') {
   const report = historyReport(days)
-  const rows: unknown[][] = [['日期', '指定统计班次', '盘点现金', '已抽大钞', '非现金收入', '已付现金开支', '保留底钱', '营业额', '现金总交款', '记录员工', '保存时间(UTC)', '记账口径', '现金收入', ...report.channels.map(c => c.name)]]
-  for (const { day, record: r } of report.rows) if (r) rows.push([day.date, day.config.periods.find(p => p.id === day.last_period)?.name, r.totals.cash, r.totals.withdrawn, r.totals.noncash, r.totals.expenses, r.base_amount ?? day.config.base_amount, r.totals.revenue, r.totals.handover, r.saved_by, r.submitted_at ?? r.saved_at, r.accounting_version >= 5 ? '盘点含底钱' : '旧口径盘点不含底钱', money(cents(r.totals.revenue) - cents(r.totals.noncash)), ...report.channels.map(c => r.payments[c.id]?.value ?? '0.00')])
+  const rows: unknown[][] = [[...['日期', '指定统计班次', '盘点现金', '已抽大钞', '非现金收入', '已付现金开支', '保留底钱', '营业额', '现金总交款', '记录员工', '保存时间(UTC)', '记账口径', '现金收入'].map(label => text(label)), ...report.channels.map(c => c.name)]]
+  for (const { day, record: r } of report.rows) if (r) rows.push([day.date, itemName(day.config.periods.find(p => p.id === day.last_period)), r.totals.cash, r.totals.withdrawn, r.totals.noncash, r.totals.expenses, r.base_amount ?? day.config.base_amount, r.totals.revenue, r.totals.handover, r.saved_by, r.submitted_at ?? r.saved_at, text(r.accounting_version >= 5 ? '盘点含底钱' : '旧口径盘点不含底钱'), money(cents(r.totals.revenue) - cents(r.totals.noncash)), ...report.channels.map(c => r.payments[c.id]?.value ?? '0.00')])
   const t = report.totals
-  rows.push(['查询结果合计', '', '', '', money(t.noncash), money(t.expenses), '', money(t.revenue), money(t.handover), '', '', '', money(t.cashIncome), ...report.channels.map(c => money(c.amount))])
+  rows.push([text('查询结果合计'), '', '', '', money(t.noncash), money(t.expenses), '', money(t.revenue), money(t.handover), '', '', '', money(t.cashIncome), ...report.channels.map(c => money(c.amount))])
   const cell = (value: unknown) => { let text = String(value ?? ''); if (/^[=+\-@\t\r\n]/.test(text)) text = "'" + text; return '"' + text.replaceAll('"', '""') + '"' }
   return '\ufeff' + rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n'
 }
