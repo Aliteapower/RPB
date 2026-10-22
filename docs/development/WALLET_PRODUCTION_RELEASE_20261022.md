@@ -37,3 +37,42 @@
 ### Decision
 
 GO：允许按已授权范围提交、构建、备份并发布。实际发布及验证结果见后续记录。
+
+## 生产结果
+
+- 16:42（Asia/Singapore）发布完成；代码与线上 RELEASE_SHA 均为 `e839ec4e0f32f1523d4a51a3aed44d4dc9e3382b`，已推送 `origin/codex/paynow-payment-product-line-staging`。
+- jar SHA-256：`5675dfc396f1bae62cd34a80c6d887663b86668e9c7aeb894a34592321ac345a`；前端 tar SHA-256：`8a594fedc3b2504e2d6b13638f8b8f164727352587123c8b79969a83a452e6ca`。本地制品、上传文件、线上 jar 均校验一致。
+- 已提交 Git archive 的 2082 个源文件逐字节校验；独立目录重新执行 Maven package、npm ci、Vue 类型检查、Vite 生产构建及前端 2 项重试测试成功。Windows tar 对两个中文文档路径报错后，用 Python 按 archive 原字节补齐，并核实其余源文件一致；未更改产品代码或测试基线。
+- Flyway 校验 57 项，仅执行新增 V057，用时约 0.55 秒；旧 56 项迁移记录内容不变。启动使用 default profile，没有启用本地鉴权或导入 profile。
+- `rpb-backend` MainPID=`481084`，InvocationID=`d408bebaf65c4c878414cb2bbee95ece`，多次核对保持 active/running、NRestarts=0；新进程无 error 级日志。
+- `booking.yumstone.sg`、`platform.booking.yumstone.sg`、`sx.booking.yumstone.sg` 登录页均 200 且与构建入口逐字节一致；138 个新构建静态资源全部 200、内容一致，旧资源保留。
+
+## 平台后台与真实业务边界
+
+实际 Chrome 的已登录平台页面 `/platform/settings/product-lines` 刷新后显示四条产品线，包含“储值钱包”、App Key `wallet`、启用状态及默认入口 `/stores/:storeId/wallet`。打开钱包编辑抽屉只读核对：入口选项为钱包，币种 SGD，月/年价格均为 0 且状态停用；关闭抽屉，没有保存设置或定价。
+
+生产核对：钱包订阅、租户授权、门店开关、账户、分录、充值单和消费单均为 0。迁移只新增钱包职责权限：10 个账号获得查看/建单权限，8 个管理员/经理获得核实收款、退款、对账和设置权限；平台管理员钱包资金权限为 0。商业开通仍须有效明确单店订阅，权限回填不会直接放开新交易。
+
+没有新增真实顾客、测试登录身份或资金，没有替商户配置 PayNow，没有执行充值、消费、退款、订阅购买或续费。
+
+## 其他产品线及统一资料核验
+
+- 发布前、切换后及浏览器检查结束，再次比较 **78 张既有表**的完整行数量与指纹，全部一致。包括租户、经营主体、门店、Customer/Auth 身份、支付配置/单据/回单、订位、排队、入座/清台、营业记录及快照、旧订阅/明细/事件、旧产品及价格。
+- 指纹比较对产品目录/价格排除新增 `wallet` 行，对权限排除新增 `wallet.*`，对迁移记录排除 V057；会话、验证码和访问审计等运行时表不作业务不变断言。没有排除或修改旧产品业务字段。
+- 8 项旧接口发布前后状态和响应内容逐字节一致：lcd 租户预约入口 200、lsc106 多店入口 409、lcd/lsc106/lsc83 指定店预约 context 各 200、PayNow terminal-config 匿名 403、营业记录设置匿名 403、auth/me 匿名 401。钱包顾客 me 匿名 401。
+- 既有认证平台会话刷新后可继续读取产品目录和钱包设置。资金闭环、不同主体/租户拒绝、单店到期和兄弟店不互相续期继续复用同代码状态的 PostgreSQL/本地真实浏览器证据；没有通过修改生产订阅或余额来制造验收条件。
+- 上述证据未发现钱包发布导致的旧产品回归；不等同于重新执行所有生产人工流程或修复旧报告中的历史缺口。
+
+## 备份、回滚与保留内容
+
+备份目录 `/opt/rpb/backups/20261022-wallet-e839ec4e-before`：旧 jar、旧 RELEASE_SHA、完整 frontend、完整 `database.dump`（`pg_restore -l` 成功）、`business-before.jsonl`、`business-after.jsonl`、`business-final.jsonl`、`preflight.jsonl`、`wallet-after.jsonl`。新前端另存于 `/opt/rpb/releases/20261022-wallet-e839ec4e`。
+
+当前钱包业务为空。如需应用回退，按上文回滚计划恢复该备份 jar、frontend/index.html 和 RELEASE_SHA，重启并核对旧产品；保留 V057，不覆盖或删除数据库。没有触发自动回滚。
+
+本地原有 `PRODUCT_LINE_ACCESS_BROWSER_ACCEPTANCE_20261022.md` 和私人信息文件保留原样，未提交、未上传；已核对 SHA-256 与发布前一致。钱包原需求文档按原内容纳入本次钱包提交。没有清理其他工作区、分支或本地服务。
+
+## 验证证据
+
+本地忽略目录 `target/`：`wallet-production-deploy.log`、`wallet-production-service-sanitized.log`、`wallet-production-assets.json`、`wallet-public-before.json` / `wallet-public-after.json`、`wallet-production-catalog.jpg`、`wallet-production-catalog-detail.jpg`、`wallet-production-settings.jpg`，以及独立构建和发布脚本。
+
+最终结论：**GO，已完成提交、推送、生产发布及只读验证。** 商业价格和真实租户开通未代为决定；现场实体扫码及线下银行/POS 核实仍需试点验收。
