@@ -42,4 +42,35 @@ GO：按用户授权提交、推送、干净构建、备份和部署。最终结
 
 ## 实际发布结果
 
-待发布完成后补记提交、制品、备份、服务与只读验收证据。
+2026-10-22 约 22:07（Asia/Singapore）完成切换。已提交、推送并部署运行代码 `1658f721d233e7b1ed414c88168533f4a9623812`，分支 `codex/paynow-payment-product-line-staging`。后续发布记录文档提交不改变运行代码版本。
+
+### 制品与备份
+
+- 干净 Git 归档 2,135 个源文件与提交 blob 逐字节校验一致，排除私人资料、本地会话与虚拟夹具。Windows 系统 tar 解中文路径失败及默认 autocrlf 产生换行差异，已改用独立目录、关闭归档换行转换、Python 安全解包后重新验证；未从失败的解包目录构建。
+- 独立目录 Maven package、npm ci、Vue 类型检查、Vite 生产构建及 36 项前端测试通过；后端复用相同业务代码已通过的 206 项验证。npm ci 仍报告 7 项既有高危告警，依赖及锁文件未修改。
+- jar SHA256：`b9b352f1529caa7747d7375768045e4bbb6306697bb31c9bfdbd14366591532c`。
+- 前端包 SHA256：`724de2f9cab3ae556408a8402ed9c7abb3388f0a176a94020beb513740ae378b`。本地制品、上传包与生产 jar 哈希一致。
+- 备份 `/opt/rpb/backups/20261022-wallet-single-1658f721-before` 保存旧 jar、完整前端、版本标记、数据库 dump 和业务指纹。数据库备份约 778KB，已用 pg_restore -l 读取验证。新静态资源存放 `/opt/rpb/releases/20261022-wallet-single-1658f721`。没有触发回滚。
+
+### 服务、权限及其他产品
+
+- 运行版本标记为 `1658f721d233e7b1ed414c88168533f4a9623812`。rpb-backend active/running，MainPID `562377`、InvocationID `46104b4717b449e68f8d696d0f24acd1`、NRestarts 0；启动后至浏览器核对结束保持一致，新进程 ERROR 日志 0。
+- 使用 default profile，没有启用本地鉴权或导入 profile。Flyway 校验 57 项成功，public 已为 V057，无迁移执行或失败。
+- `booking.yumstone.sg`、`platform.booking.yumstone.sg`、`sx.booking.yumstone.sg` 三个入口 HTML 与干净构建一致；169 个静态资源全部 200 且逐字节一致。旧哈希资源保留，没有修改生产配置、nginx、证书或其他服务。
+- 新员工 scan-charges、顾客 payment-codes/status 和出码接口匿名请求均 401；缺少钱包安全头、跨站/同站不同源请求均 403，共 6 项边界检查通过。没有带资金权限执行测试命令。
+- 92 张业务/配置表在切换前、切换后、浏览器核对结束三个快照的行数和指纹完全一致，包括钱包账户/账单/流水、统一租户/顾客、商业订阅和其他产品。排除 6 张会话/验证码/访问审计运行表；auth_accounts 只排除正常登录会变化的 last_login_at、updated_at、version，保留其余业务及安全字段比较。
+- 9 个原接口状态符合预期；预约入口/三家门店 context、PayNow/账本匿名拒绝及员工鉴权等 8 个响应逐字节未变。钱包顾客未登录响应只变 JSON 的 code/message 字段顺序；按旧字段顺序可精确重建旧响应，状态、错误码和值全部相同，已保存独立证明。没有为满足字节对照修改业务代码。
+
+### 线上浏览器只读核对
+
+- 沿用已有应用内浏览器测试顾客会话，刷新 20000000 线上页面读取新资源。
+- 新版付款码页明确显示「出示即授权收银员核对后扣款，无需再次确认」，页面没有签发新码；统一门店「RPB 验收门店」和发行主体「食刻租户」正常。
+- 本人原有 6 笔消费账单正常加载；查看原单 `52bb4e69-692a-4fb8-adf9-650b5a897adb` 保持已完成，钱包 0.01 / 其他 4.99 / 待付 0。没有再次付款。
+- 本次生产验收没有充值、扣款、补付、退款、签发付款码、编辑租户/顾客或修改订阅。资金写入流程沿用本地隔离库虚拟金额和原生 PostgreSQL 测试证据，真实手机镜头仍待现场实拍。
+- 截图 `target/wallet-single-production-code-info.jpg`、`wallet-single-production-old-bill.jpg`；静态/认证证据 `wallet-single-assets-proof.json`、`wallet-single-auth-proof.json`；原接口证据 `wallet-single-public-before.json` / after 及 `wallet-single-public-order-proof.json`；服务及数据快照见同前缀文件。
+
+### 保留内容与结论
+
+原有 `rpb信息.txt` SHA256 `17121CD0A39ED1A14F70901091D92C5501A79F104315708656CC7FF3EF168726` 和未跟踪验收文档 SHA256 `88646E36D7B6C02CD04180FEDB2B0A0B7881FD7929C39EBFA56D8A6511C8F34B` 保持，未提交或上传。其他改动、原始业务数据及本地隔离数据保留。
+
+结论：已提交、推送、部署；服务、版本、制品、备份、静态资源、认证、旧接口及线上只读核对通过。
