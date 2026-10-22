@@ -42,6 +42,8 @@ GET `/me`：本人已有账户、余额、门店公共资料；GET `/accounts/{i
 
 GET `/pending-bills`：本人待确认/补付账单；POST `/bill-code`：校验受限账单码并返回本人账单，不泄露其他顾客资料。
 
+UI 独立账单页的只读增量：员工 GET `/bills`、`/topups` 与顾客 GET `/bills` 接受 `offset=0&status=all`，每页 100，offset 为 0..100000，status 只允许 all/pending/completed/closed，非法参数 400 `WALLET_REQUEST_INVALID`。员工充值详情 GET `/topups/{id}`。默认员工列表兼容；顾客列表在 SQL 中同时按 tenant、store、customer 过滤，包括已结清、已取消及零余额授权的原单，不从资金分录推测账单历史。到期仍可按原权限只读，不增加写权限或跳过身份校验。
+
 POST `/bills/{id}/quote`：本人、当前门店，返回钱包拟扣金额、剩余应付、账户/账单版本和默认 60 秒期限。POST `/bills/{id}/pay`：`quoteId, idempotencyKey`，再次本人校验并原子扣款；客户端不能改金额。零钱包余额不生成零分录。
 
 账单金额 80、可用余额 50：扣 50 后 `partially_paid`，`remaining=30`；补差确认后 `paid`。退款独立，不把已结清单重新变成应付。

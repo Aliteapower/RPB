@@ -28,12 +28,13 @@ public class WalletStaffController {
     @PostMapping("/accounts") public Account open(@PathVariable UUID storeId,@RequestBody AccountRequest body) {var a=identity.staff();return accounts.open(scope(storeId,a),a,body.customerId(),body.idempotencyKey());}
     @GetMapping("/accounts/{id}") public Account account(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return accounts.get(scope(storeId,a),a,id);}
     @GetMapping("/accounts/{id}/entries") public List<Entry> entries(@PathVariable UUID storeId,@PathVariable UUID id,@RequestParam(defaultValue="0") int offset) {var a=identity.staff();return accounts.entries(scope(storeId,a),a,id,offset);}
-    @GetMapping("/topups") public List<Topup> topups(@PathVariable UUID storeId) {var a=identity.staff();return topups.list(scope(storeId,a),a);}
+    @GetMapping("/topups") public List<Topup> topups(@PathVariable UUID storeId,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="all") String status) {var a=identity.staff();return topups.list(scope(storeId,a),a,new WalletHistoryQuery(offset,status));}
+    @GetMapping("/topups/{id}") public Topup topup(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return topups.get(scope(storeId,a),a,id);}
     @PostMapping("/topups") public Topup createTopup(@PathVariable UUID storeId,@RequestBody TopupCreate body) {var a=identity.staff();return topups.create(scope(storeId,a),a,body);}
     @PostMapping("/topups/{id}/confirm") public TopupResult confirm(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody CollectionConfirm body) {var a=identity.staff();return topups.confirm(scope(storeId,a),a,id,body);}
     @PostMapping("/topups/{id}/cancel") public Topup cancelTopup(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key body) {var a=identity.staff();return topups.cancel(scope(storeId,a),a,id,body.idempotencyKey());}
     @GetMapping("/topups/{id}/paynow") public Map<String,String> topupPaynow(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return Map.of("payload",topups.paynowQr(scope(storeId,a),a,id,collection));}
-    @GetMapping("/bills") public List<Bill> bills(@PathVariable UUID storeId) {var a=identity.staff();return checkout.list(scope(storeId,a),a);}
+    @GetMapping("/bills") public List<Bill> bills(@PathVariable UUID storeId,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="all") String status) {var a=identity.staff();return checkout.list(scope(storeId,a),a,new WalletHistoryQuery(offset,status));}
     @GetMapping("/bills/{id}") public Bill bill(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return checkout.get(scope(storeId,a),a,id);}
     @PostMapping("/bills") public Bill createBill(@PathVariable UUID storeId,@RequestBody BillCreate body) {var a=identity.staff();return checkout.create(scope(storeId,a),a,body);}
     @PostMapping("/bills/{id}/code") public PaymentCode billCode(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return authorization.issueBillCode(scope(storeId,a),a,id);}

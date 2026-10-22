@@ -1,6 +1,7 @@
 package com.rpb.reservation.wallet.persistence;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.wallet.application.WalletHistoryQuery;
 import com.rpb.reservation.wallet.domain.*;
 import java.sql.*;
 import java.time.Instant;
@@ -21,7 +22,21 @@ public class WalletBillRepository {
         return jdbc.query("select * from wallet_bills where tenant_id=? and store_id=? and id=?"+(lock?" for update":""),(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),id).stream().findFirst().orElseThrow(WalletException::missing);
     }
     public List<Bill> list(StoreScope scope) {
-        return jdbc.query("select * from wallet_bills where tenant_id=? and store_id=? order by created_at desc,id limit 100",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value());
+        return list(scope,new WalletHistoryQuery(0,"all"));
+    }
+    public List<Bill> list(StoreScope scope,WalletHistoryQuery query) {
+        return jdbc.query("select b.* from wallet_bills b where b.tenant_id=? and b.store_id=?"+filter(query)+" order by b.created_at desc,b.id limit 100 offset ?",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),query.offset());
+    }
+    public List<Bill> customerHistory(StoreScope scope,UUID customer,WalletHistoryQuery query) {
+        return jdbc.query("select b.* from wallet_bills b join wallet_accounts a on a.id=b.account_id and a.tenant_id=b.tenant_id where b.tenant_id=? and b.store_id=? and a.customer_id=?"+filter(query)+" order by b.created_at desc,b.id limit 100 offset ?",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),customer,query.offset());
+    }
+    private String filter(WalletHistoryQuery query) {
+        return switch(query.status()) {
+            case "pending" -> " and not b.closed and b.status<>'paid'";
+            case "completed" -> " and not b.closed and b.status='paid'";
+            case "closed" -> " and b.closed";
+            default -> "";
+        };
     }
     public List<Bill> customerPending(StoreScope scope,UUID customer) {
         return jdbc.query("select b.* from wallet_bills b join wallet_accounts a on a.id=b.account_id and a.tenant_id=b.tenant_id where b.tenant_id=? and b.store_id=? and a.customer_id=? and b.closed=false and b.status<>'paid' order by b.created_at desc,b.id limit 100",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),customer);

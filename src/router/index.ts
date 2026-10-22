@@ -1,3 +1,4 @@
+import { walletRoutes } from '../modules/wallet/routes'
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthSessionStore } from '../stores/authSession'
@@ -54,17 +55,7 @@ const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationS
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    {
-      path: '/stores/:storeId/wallet',
-      name: 'wallet-workbench',
-      component: () => import('../modules/wallet/WalletPage.vue')
-    },
-    {
-      path: '/wallet/:storeId',
-      name: 'wallet-customer',
-      component: () => import('../modules/wallet/WalletCustomerPage.vue'),
-      meta: { public: true }
-    },
+    ...walletRoutes,
     {
       path: '/stores/:storeId/daily-ledger',
       name: 'daily-ledger',

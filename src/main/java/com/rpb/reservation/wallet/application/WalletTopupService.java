@@ -47,6 +47,8 @@ public class WalletTopupService {
         });
     }
     public List<Topup> list(StoreScope scope,CurrentActor actor) {access.staff(scope,actor,"wallet.view",false);return topups.list(scope);}
+    public List<Topup> list(StoreScope scope,CurrentActor actor,WalletHistoryQuery query) {access.staff(scope,actor,"wallet.view",false);return topups.list(scope,query);}
+    public Topup get(StoreScope scope,CurrentActor actor,UUID id) {access.staff(scope,actor,"wallet.view",false);return topups.get(scope,id,false);}
     @Transactional
     public Topup cancel(StoreScope scope,CurrentActor actor,UUID id,String key) {
         access.staff(scope,actor,"wallet.topup.create",false);

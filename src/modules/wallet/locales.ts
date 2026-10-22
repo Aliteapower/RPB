@@ -1,4 +1,8 @@
+import { walletUiZh, walletUiEn } from './uiLocales'
+import { walletScannerZh, walletScannerEn, walletFeedbackZh, walletFeedbackEn } from './scanLocales'
 export const walletZh = {
+  scanner: walletScannerZh, feedback: walletFeedbackZh,
+  ui: walletUiZh,
   loginErrors: { account_disabled: '该顾客账号或关联顾客资料已停用、归档或删除，请联系门店管理员核查原顾客资料。无需重新注册。', code_expired: '验证码已过期，请重新发送验证码。', code_mismatch: '验证码不正确，请核对后重试。' },
   entry: '储值钱包', description: '线下充值、扫码消费与补付', symbol: '钱', customerWallet: '我的钱包',
   loadMore: '加载更早流水',
@@ -36,6 +40,8 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  scanner: walletScannerEn, feedback: walletFeedbackEn,
+  ui: walletUiEn,
   loginErrors: { account_disabled: 'This account or its linked customer is disabled, archived or deleted. Ask the store administrator to check the original customer record. No new registration is needed.', code_expired: 'The verification code has expired. Request a new code.', code_mismatch: 'The verification code is incorrect. Please check and try again.' },
   entry: 'Stored-value wallet', description: 'Offline top-ups, QR payments and split settlement', symbol: '$', customerWallet: 'My wallet',
   loadMore: 'Load earlier entries',

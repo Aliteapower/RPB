@@ -1,6 +1,9 @@
 export class WalletApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); this.name = 'WalletApiError' }
 }
+export function createWalletBill(store: string, accountId: string, amount: string, customerCode: string) {
+  return walletApi(store).command<import('./types').Bill>('/bills', { accountId, amount, ...(customerCode ? { customerCode } : {}) })
+}
 
 export function walletApi(store: string, customer = false) {
   const base = `/api/v1/${customer ? 'public/' : ''}stores/${encodeURIComponent(store)}/wallet`

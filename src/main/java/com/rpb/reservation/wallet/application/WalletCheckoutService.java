@@ -54,6 +54,8 @@ public class WalletCheckoutService {
         });
     }
     public List<Bill> list(StoreScope scope,CurrentActor actor) {access.staff(scope,actor,"wallet.view",false);return bills.list(scope);}
+    public List<Bill> list(StoreScope scope,CurrentActor actor,WalletHistoryQuery query) {access.staff(scope,actor,"wallet.view",false);return bills.list(scope,query);}
+    public List<Bill> customerHistory(StoreScope scope,CustomerAuthPrincipal p,WalletHistoryQuery query) {access.customer(scope,p,false);return bills.customerHistory(scope,p.customerId(),query);}
     public Bill get(StoreScope scope,CurrentActor actor,UUID id) {access.staff(scope,actor,"wallet.view",false);return bills.get(scope,id,false);}
     public List<Bill> pending(StoreScope scope,CustomerAuthPrincipal p) {access.customer(scope,p,false);return bills.customerPending(scope,p.customerId());}
     public Bill ownBill(StoreScope scope,CustomerAuthPrincipal p,UUID id) {access.customer(scope,p,false);var b=bills.get(scope,id,false);access.own(accounts.account(scope,b.accountId(),false),p);return b;}

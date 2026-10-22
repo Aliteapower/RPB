@@ -136,6 +136,49 @@ class WalletPostgresTest {
         assertThatThrownBy(()->tx.execute(s->authorization.bind(scope,actor,two.id(),code.code()))).isInstanceOf(WalletException.class);
         assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(5000);
     }
+    @Test void billHistoryIncludesPaidClosedAndZeroDebitBillsButOnlyForTheCurrentCustomerAndStore() {
+        var a=credit(open(),"1","cash");var settled=pay(bill(a,"1")).bill();
+        var zero=pay(bill(a,"2")).bill(); // zero balance creates no debit entry, but remains a bill
+        var closed=bill(a,"3");tx.execute(s->checkout.cancel(scope,actor,closed.id(),key()));
+        var sibling=UUID.randomUUID();
+        jdbc.update("insert into stores(id,tenant_id,operating_entity_id,store_code,display_name,status,timezone,locale,date_format,time_format,currency) values(?,?,?,'history-sibling','其他门店','active','Asia/Singapore','zh-CN','DD-MM-YYYY','HH:mm','SGD')",sibling,tenant,issuer);
+        jdbc.update("insert into wallet_program_stores(program_id,tenant_id,store_id,operating_entity_id) values(?,?,?,?)",a.programId(),tenant,sibling,issuer);
+        var siblingScope=new StoreScope(new TenantId(tenant),sibling);
+        when(directory.store(siblingScope)).thenReturn(new StoreIdentity(tenant,sibling,issuer,"发行主体","其他门店","test","Asia/Singapore","zh-CN",null));
+        Bill otherStore=tx.execute(s->bills.create(siblingScope,a,100,actorId));
+        var otherCustomer=UUID.randomUUID();
+        jdbc.update("insert into customers(id,tenant_id,customer_code,customer_type,status) values(?,?,'history-other','regular','active')",otherCustomer,tenant);
+        var other=tx.execute(s->accounts.open(scope,accounts.requireProgram(scope,true),otherCustomer));bill(other,"4");
+        var history=checkout.customerHistory(scope,principal,new WalletHistoryQuery(0,"all"));
+        assertThat(history).extracting(Bill::id).containsExactlyInAnyOrder(settled.id(),zero.id(),closed.id());
+        assertThat(checkout.customerHistory(siblingScope,principal,new WalletHistoryQuery(0,"all"))).extracting(Bill::id).containsExactly(otherStore.id());
+        assertThat(checkout.customerHistory(scope,principal,new WalletHistoryQuery(0,"pending"))).extracting(Bill::id).containsExactly(zero.id());
+        assertThat(checkout.customerHistory(scope,principal,new WalletHistoryQuery(0,"completed"))).extracting(Bill::id).containsExactly(settled.id());
+        assertThat(checkout.customerHistory(scope,principal,new WalletHistoryQuery(0,"closed"))).extracting(Bill::id).containsExactly(closed.id());
+        assertThat(checkout.customerHistory(scope,principal,new WalletHistoryQuery(100,"all"))).isEmpty();
+        var wrongTenant=new CustomerAuthPrincipal(UUID.randomUUID(),UUID.randomUUID(),customer,"other@example.com","other");
+        assertThatThrownBy(()->checkout.customerHistory(scope,wrongTenant,new WalletHistoryQuery(0,"all"))).isInstanceOf(WalletException.class);
+        when(gate.evaluateCommercial(any(),any(),any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,AppGateDenyReason.STORE_APP_EXPIRED));
+        assertThat(checkout.customerHistory(scope,principal,new WalletHistoryQuery(0,"all"))).hasSize(3);
+    }
+    @Test void pagedStaffHistoryAndTopupDetailRetainScopeAndRejectInvalidQueryParameters() {
+        var a=open();var pending=create(a,"1","cash");var cancelled=create(a,"2","cash");
+        tx.execute(s->topups.cancel(scope,actor,cancelled.id(),key()));
+        assertThat(topups.get(scope,actor,pending.id())).isEqualTo(pending);
+        assertThat(topups.list(scope,actor,new WalletHistoryQuery(0,"pending"))).extracting(Topup::id).containsExactly(pending.id());
+        assertThat(topups.list(scope,actor,new WalletHistoryQuery(0,"closed"))).extracting(Topup::id).containsExactly(cancelled.id());
+        jdbc.update("insert into wallet_bills(tenant_id,program_id,account_id,store_id,amount_cents,code_hash,created_by) select ?,?,?,?,1,gen_random_uuid()::text,? from generate_series(1,101)",tenant,a.programId(),a.id(),store,actorId);
+        assertThat(checkout.list(scope,actor,new WalletHistoryQuery(0,"all"))).hasSize(100);
+        assertThat(checkout.list(scope,actor,new WalletHistoryQuery(100,"all"))).hasSize(1);
+        assertThatThrownBy(()->new WalletHistoryQuery(-1,"all")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->new WalletHistoryQuery(0,"invalid")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->new WalletHistoryQuery(100001,"all")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->new WalletHistoryQuery(0,null)).isInstanceOf(WalletException.class);
+        var denied=new CurrentActor(tenant,actorId,"staff",Set.of("store_staff"),Set.of(),Set.of(store));
+        assertThatThrownBy(()->topups.get(scope,denied,pending.id())).isInstanceOf(WalletException.class);
+        var otherScope=new StoreScope(new TenantId(UUID.randomUUID()),store);
+        assertThatThrownBy(()->topups.get(otherScope,actor,pending.id())).isInstanceOf(WalletException.class);
+    }
     @Test void expiredOrRegeneratedScansNeverCreateBillsCommandsOrAudit() {
         var a=open();
         var old=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));

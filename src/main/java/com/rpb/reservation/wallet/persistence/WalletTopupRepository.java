@@ -1,6 +1,7 @@
 package com.rpb.reservation.wallet.persistence;
 
 import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.wallet.application.WalletHistoryQuery;
 import com.rpb.reservation.wallet.domain.WalletException;
 import java.sql.*;
 import java.util.*;
@@ -19,7 +20,16 @@ public class WalletTopupRepository {
         return jdbc.query("select * from wallet_topups where tenant_id=? and store_id=? and id=?"+(lock?" for update":""),(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),id).stream().findFirst().orElseThrow(WalletException::missing);
     }
     public List<Topup> list(StoreScope scope) {
-        return jdbc.query("select * from wallet_topups where tenant_id=? and store_id=? order by created_at desc,id limit 100",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value());
+        return list(scope,new WalletHistoryQuery(0,"all"));
+    }
+    public List<Topup> list(StoreScope scope,WalletHistoryQuery query) {
+        String filter=switch(query.status()) {
+            case "pending" -> " and status in ('pending_collection','verified_pending_credit','exception')";
+            case "completed" -> " and status='credited'";
+            case "closed" -> " and status='cancelled'";
+            default -> "";
+        };
+        return jdbc.query("select * from wallet_topups where tenant_id=? and store_id=?"+filter+" order by created_at desc,id limit 100 offset ?",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),query.offset());
     }
     public void status(StoreScope scope,UUID id,String status) {
         jdbc.update("update wallet_topups set status=?,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=?",status,scope.tenantId().value(),scope.storeId().value(),id);
