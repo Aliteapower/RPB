@@ -209,6 +209,10 @@ export const zhCN = {
         title: '产品线订阅已到期',
         message: '请联系平台管理员续费预约排队叫号系统后再使用。'
       },
+      storeAppExpired: {
+        title: '当前门店产品已到期',
+        message: '请联系管理员续费当前门店的产品订阅。'
+      },
       storeAppNotEnabled: {
         title: '当前门店未启用',
         message: '请联系管理员检查门店的预约排队叫号系统配置。'
@@ -604,6 +608,14 @@ export const zhCN = {
         staffHome: {
           label: '门店员工首页',
           description: '预约排队叫号系统默认入口'
+        },
+        payment: {
+          label: 'PayNow 收款',
+          description: '门店 PayNow 支付产品入口'
+        },
+        dailyLedger: {
+          label: '每日营业记录',
+          description: '门店每日营业记录产品入口'
         }
       },
       status: {

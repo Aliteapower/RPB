@@ -209,6 +209,10 @@ export const enSG = {
         title: 'Product subscription has expired',
         message: 'Ask a platform admin to renew the reservation queue product before using it.'
       },
+      storeAppExpired: {
+        title: 'This store product has expired',
+        message: 'Ask an admin to renew the product subscription for this store.'
+      },
       storeAppNotEnabled: {
         title: 'Current store is not enabled',
         message: 'Ask an admin to check this store product configuration.'
@@ -604,6 +608,14 @@ export const enSG = {
         staffHome: {
           label: 'Store staff home',
           description: 'Default entry for the reservation queue product'
+        },
+        payment: {
+          label: 'PayNow collection',
+          description: 'Store PayNow payment product entry'
+        },
+        dailyLedger: {
+          label: 'Daily ledger',
+          description: 'Store daily business ledger entry'
         }
       },
       status: {

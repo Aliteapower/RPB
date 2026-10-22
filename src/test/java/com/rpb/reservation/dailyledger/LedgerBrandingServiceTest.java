@@ -32,8 +32,25 @@ class LedgerBrandingServiceTest {
         var legacy = json.createObjectNode().put("platform_branding_managed", true).put("logo_data", "legacy");
         assertThat(branding.resolve(scope, legacy).path("logo_data").asText()).isEmpty();
     }
-    @Test void unadoptedLegacyLogoRemainsVisibleUntilExplicitMigration() {
-        assertThat(branding.resolve(scope, json.createObjectNode().put("logo_data", "legacy")).path("logo_data").asText()).isEqualTo("legacy");
+    @Test void privateBrandingCannotOverrideClearedSharedProfileAndRemainsAvailableForExplicitMigration() {
+        var legacy = json.createObjectNode().put("logo_data", "legacy").put("store_name_en", "private name");
+        var result = branding.resolve(scope, legacy);
+        assertThat(result.path("logo_data").asText()).isEmpty();
+        assertThat(result.path("store_name_en").asText()).isEmpty();
+        assertThat(legacy.path("logo_data").asText()).isEqualTo("legacy");
+        assertThat(legacy.path("store_name_en").asText()).isEqualTo("private name");
+    }
+
+    @Test void nextReadUsesUpdatedSharedNameAndLogoWithoutUpdatingProductSettings() {
+        var legacy = json.createObjectNode().put("store_name", "旧名称");
+        branding.resolve(scope, legacy);
+        when(profile.displayName()).thenReturn("平台更新名称");
+        UUID asset = UUID.randomUUID();
+        when(profile.logoMediaAssetId()).thenReturn(asset);
+        var updated = branding.resolve(scope, legacy);
+        assertThat(updated.path("store_name").asText()).isEqualTo("平台更新名称");
+        assertThat(updated.path("logo_data").asText()).endsWith(asset.toString());
+        assertThat(legacy.path("store_name").asText()).isEqualTo("旧名称");
     }
     @Test void arbitraryOrOldAssetCannotBeReadThroughLedgerRoute() {
         when(profile.logoMediaAssetId()).thenReturn(UUID.randomUUID());

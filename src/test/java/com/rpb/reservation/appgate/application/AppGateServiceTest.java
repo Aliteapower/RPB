@@ -39,7 +39,8 @@ class AppGateServiceTest {
         platformApps = mock(PlatformAppJpaRepository.class);
         entitlements = mock(TenantAppEntitlementJpaRepository.class);
         storeSettings = mock(StoreAppSettingJpaRepository.class);
-        service = new AppGateService(platformApps, entitlements, storeSettings);
+        service = new AppGateService(platformApps, entitlements, storeSettings,
+            mock(com.rpb.reservation.appgate.persistence.repository.StoreAppSubscriptionRepository.class), java.time.Clock.systemUTC());
         allowPlatformTenantAndStore();
     }
 

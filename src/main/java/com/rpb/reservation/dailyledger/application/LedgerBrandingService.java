@@ -29,9 +29,9 @@ public class LedgerBrandingService {
         var profile = profiles.getProfile(scope);
         String logo = profile.logoMediaAssetId() != null
             ? "/api/v1/stores/" + scope.storeId().value() + "/daily-ledger/branding/logo/" + profile.logoMediaAssetId()
-            : legacy.path("platform_branding_managed").asBoolean(false) ? "" : legacy.path("logo_data").asText("");
+            : "";
         return json.createObjectNode().put("store_name", profile.displayName())
-            .put("store_name_en", legacy.path("store_name_en").asText("")).put("logo_data", logo);
+            .put("store_name_en", "").put("logo_data", logo);
     }
 
     public CallScreenMediaContent logo(StoreScope scope, UUID assetId) {
