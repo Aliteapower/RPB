@@ -1,4 +1,5 @@
 export const zhCN = {
+  dailyLedger: { entry: '每日营业记录', description: '盘点、交班与历史账目', symbol: '账' },
   common: {
     actions: {
       login: '登录',

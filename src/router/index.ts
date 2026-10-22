@@ -55,6 +55,11 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/stores/:storeId/daily-ledger',
+      name: 'daily-ledger',
+      component: () => import('../modules/daily-ledger/DailyLedgerPage.vue')
+    },
+    {
       path: '/login',
       name: 'login',
       component: LoginPage,

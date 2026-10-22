@@ -21,6 +21,8 @@ public class TenantAdminStaffRepository {
     private static final String STAFF_ACCOUNT_TYPE = "staff";
     private static final String TENANT_ADMIN = "tenant_admin";
     private static final List<String> STAFF_PERMISSIONS = List.of(
+        "daily_ledger.view",
+        "daily_ledger.write",
         "reservation.create",
         "reservation.check_in",
         "reservation.seat",

@@ -67,6 +67,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
         <StoreSwitcher class="tenant-store-switcher" surface="tenant-admin" />
       </div>
       <nav class="nav-list">
+        <RouterLink v-if="hasVisibleApp('daily_ledger')" class="nav-item" :to="`/stores/${storeId}/daily-ledger`">{{ t('dailyLedger.entry') }}</RouterLink>
         <RouterLink
           v-for="item in primaryNavItems"
           :key="item.to"

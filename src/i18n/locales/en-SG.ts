@@ -1,4 +1,5 @@
 export const enSG = {
+  dailyLedger: { entry: 'Daily Ledger', description: 'Cash counts, handover and history', symbol: '$' },
   common: {
     actions: {
       login: 'Sign in',

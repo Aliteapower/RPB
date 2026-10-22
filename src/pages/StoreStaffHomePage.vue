@@ -75,7 +75,8 @@ const paymentEntry = computed(() => findVisibleApp('payment'))
 const hasReservationQueue = computed(() =>
   reservationQueueEntry.value !== undefined
 )
-const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined)
+const ledgerEntry = computed(() => findVisibleApp('daily_ledger'))
+const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined)
 const reservationQueuePermissions = computed(() => reservationQueueEntry.value?.permissions ?? [])
 const paymentPermissions = computed(() => paymentEntry.value?.permissions ?? [])
 const canCheckInReservation = computed(() =>
@@ -91,7 +92,7 @@ const canCreatePaymentIntent = computed(() =>
   hasPaymentPermission('payment.intent.create')
 )
 const hasVisibleOperation = computed(
-  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value
+  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value || ledgerEntry.value !== undefined
 )
 const appStatusLabel = computed(() => {
   if (visibleAppsLoading.value || isLoading.value) {
@@ -130,6 +131,10 @@ const paymentQuickPayRoute = computed(() => ({
   }
 }))
 const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactToolbarItems([
+  ledgerEntry.value
+    ? { id: 'daily-ledger', labelKey: 'dailyLedger.entry', descriptionKey: 'dailyLedger.description',
+        symbolKey: 'dailyLedger.symbol', to: ledgerEntry.value.entryRoute, tone: 'success' }
+    : null,
   canCreatePaymentIntent.value
     ? {
         id: 'payment-quick-pay',
@@ -297,7 +302,7 @@ const overviewHint = computed(() => {
   }
 
   if (!hasReservationQueue.value) {
-    return paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
+    return ledgerEntry.value ? t('dailyLedger.description') : paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
   }
 
   if (!overview.value) {

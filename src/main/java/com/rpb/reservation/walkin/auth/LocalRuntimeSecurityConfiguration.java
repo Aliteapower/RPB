@@ -42,6 +42,8 @@ public class LocalRuntimeSecurityConfiguration {
         return http
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/daily-ledger/settings", "/api/v1/stores/*/daily-ledger/days/*", "/api/v1/stores/*/daily-ledger/history", "/api/v1/stores/*/daily-ledger/years", "/api/v1/stores/*/daily-ledger/audit").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/v1/stores/*/daily-ledger/settings", "/api/v1/stores/*/daily-ledger/days/*/records/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/me/apps").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/walk-ins/direct-seating").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/walk-ins/queue").permitAll()

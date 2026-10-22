@@ -3,6 +3,8 @@ package com.rpb.reservation.appgate.domain;
 import java.util.Set;
 
 public final class AppGateRequiredPermission {
+    public static final Set<String> DAILY_LEDGER_ENTRY_PERMISSIONS = Set.of("daily_ledger.view", "daily_ledger.write");
+    public static final Set<String> DAILY_LEDGER_ADMIN_PERMISSIONS = Set.of("daily_ledger.view", "daily_ledger.write", "daily_ledger.settings.manage");
     public static final String RESERVATION_CREATE = "reservation.create";
     public static final String RESERVATION_CHECK_IN = "reservation.check_in";
     public static final String RESERVATION_SEAT = "reservation.seat";

@@ -128,6 +128,10 @@ public class AppGateService {
     }
 
     private static Set<String> entryPermissions(CurrentActor actor, String appKey) {
+        if ("daily_ledger".equals(appKey)) {
+            return AppGateRequiredPermission.DAILY_LEDGER_ENTRY_PERMISSIONS.stream()
+                .filter(actor::hasPermission).collect(Collectors.toUnmodifiableSet());
+        }
         if ("reservation_queue".equals(appKey)) {
             return AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.stream()
                 .filter(actor::hasPermission)
