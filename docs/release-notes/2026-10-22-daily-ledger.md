@@ -2,7 +2,7 @@
 
 ## Version / Date
 
-2026-10-22，本地实现，未发布。
+2026-10-22，已发布代码 `6ddda2816e37`。生产验收见 [发布记录](../development/DAILY_LEDGER_PRODUCTION_RELEASE_20261022.md)。
 
 ## New
 
