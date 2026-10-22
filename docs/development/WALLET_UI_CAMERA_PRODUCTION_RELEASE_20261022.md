@@ -43,4 +43,36 @@ GO：按用户授权提交、构建、备份并发布；实际提交/制品/生�
 
 ## 生产发布与核对结果
 
-待实际发布后补记；不能将上述GO等同于已部署。
+2026-10-22约20:02（Asia/Singapore）完成生产切换，随后完成下述只读核对。
+
+- 已提交、推送并部署运行代码 `c720e198feb1cdce80f80a8c3fd37b4399433664`，分支 `codex/paynow-payment-product-line-staging`。之后的发布记录文档提交不改变运行代码版本。
+- 通过Git archive构建，2125个源文件与归档逐字节校验。独立目录Maven package、npm ci、Vue类型检查、Vite构建及30项前端测试全部通过。与本次提交相同业务代码的189项后端测试已在发布前重新通过。
+- jar SHA256：`40a12fbfb3cffe3b3703627769bf19bc5086b80b33957d74da72c609a000490e`；前端包SHA256：`e084d1dcc46f932a505bcfe91c498cba59b8c4344ba9fa21ae45a18e1f0210f8`。本地制品、上传包及生产jar校验一致。
+- 生产备份 `/opt/rpb/backups/20261022-wallet-ui-c720e198-before` 保存旧jar、完整前端、RELEASE_SHA、经 `pg_restore -l` 读取验证的数据库dump和业务指纹。新资源另存 `/opt/rpb/releases/20261022-wallet-ui-c720e198`。没有触发回滚。
+- `rpb-backend` active/running，MainPID `532577`、InvocationID `e6b759f30c8646c4b8a7a067fea5edd1`、NRestarts0；切换后及浏览器核对结束保持一致。新进程ERROR日志0；default profile启动，没有本地鉴权/导入profile。Flyway校验57项，public已为最新，没有执行迁移。
+- `booking.yumstone.sg`、`platform.booking.yumstone.sg`、`sx.booking.yumstone.sg`三个入口页与干净构建逐字节一致；168个新静态资源全部200且内容一致。旧哈希资源保留。
+- 新增顾客账单历史、员工充值详情及筛选列表匿名请求均401；未实现路由在生产按既有默认安全配置返回404。local/test专用路由白名单仍有独立测试，生产默认认证配置未改。
+
+### 其他产品与数据边界
+
+- 92张业务/配置表在切换前后、只读浏览器核对结束的行数与指纹一致。包括钱包账户、原单、分录、统一租户/顾客、计费和其他产品；仅排除会话、验证码、访问审计等运行时表，`auth_accounts`指纹仅排除正常登录会变的last_login_at、updated_at、version三列，其余业务/安全字段仍比较。
+- 原有8个公开接口及钱包顾客匿名接口状态均符合预期：lcd入口200，lsc106多店入口409，三家指定门店booking context200，PayNow及账本匿名403，员工/钱包顾客匿名401。
+- 首轮严格字节对照发现三家预约context哈希变化：检查跨过20:00，恰为20:00时段的selectable自然从true变false。只将这一布尔值恢复到检查前状态即可逐字节重建原响应并匹配此前SHA256，其他字段未变；其余5个旧接口字节完全一致。没有为通过检查修改预约代码或数据。证据 `target/wallet-ui-release-context-time-proof.json`。
+- 本次线上只读，没有充值、扣款、补付、退款、签发付款码、购买/续费、编辑租户/顾客或重置凭据。没有改变其他项目或服务。
+
+### 线上浏览器核对
+
+Chrome连接不可用，沿用已存在的应用内浏览器测试顾客会话完成，无需重新登录或复制身份凭据。
+
+- 测试租户20000000旧链接 `#receipt=52bb4e69-692a-4fb8-adf9-650b5a897adb` 自动进入新版 `/bills/{id}`，显示原5元账单已完成：钱包0.01、其他4.99、剩余0；页面显示“付款成功”，没有发生新支付。
+- 余额首页显示原余额/冻结0，统一门店“RPB验收门店”、发行主体“食刻租户”保持；出码、扫一扫、账单、流水为独立入口。
+- 新的本人账单列表成功读取5笔原单，已完成和已关闭状态正确，未混入充值/扣款表单。390×844下无横向溢出。
+- 线上截图：`target/wallet-ui-camera-production-success.jpg`、`target/wallet-ui-camera-production-home.jpg`。静态和接口证据：`wallet-ui-camera-assets.json`、`wallet-ui-camera-auth-checks.json`、`wallet-ui-release-public-before.json`/`after.json`；服务证据：`wallet-ui-camera-service-sanitized.log`。
+
+### 剩余限制与保留内容
+
+真实手机摄像头、iPhone/微信授权、镜头切换及补光仍需实机验收；没有将浏览器视口或本地图片解码冒充手机实拍。员工端线上会话本轮未重新登录，代码和资产已发布，资金链路复用相关测试及本地浏览器证据。手机旧标签页需刷新加载新资源。
+
+npm ci仍报告7项既有高危依赖告警；依赖与锁文件未改，本轮未扩大为依赖升级。原有未跟踪验收文档和私人资料哈希保持一致，未提交或上传；本地虚拟会话/数据全部留在忽略目录中。
+
+最终结论：**已提交、推送、部署；服务、资产、认证、兼容接口及只读数据核对通过。**
