@@ -45,6 +45,7 @@ public class PlatformStoreAdminAccountRepository {
         );
         ensurePermission(accountId, TENANT_ADMIN_MANAGE_PERMISSION);
         AppGateRequiredPermission.DAILY_LEDGER_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
+        AppGateRequiredPermission.WALLET_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
         replaceStoreAccess(accountId, tenantId, storeId);
         return true;
     }

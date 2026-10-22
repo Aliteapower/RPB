@@ -76,7 +76,8 @@ const hasReservationQueue = computed(() =>
   reservationQueueEntry.value !== undefined
 )
 const ledgerEntry = computed(() => findVisibleApp('daily_ledger'))
-const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined)
+const walletEntry = computed(() => findVisibleApp('wallet'))
+const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined || walletEntry.value !== undefined)
 const reservationQueuePermissions = computed(() => reservationQueueEntry.value?.permissions ?? [])
 const paymentPermissions = computed(() => paymentEntry.value?.permissions ?? [])
 const canCheckInReservation = computed(() =>
@@ -131,6 +132,9 @@ const paymentQuickPayRoute = computed(() => ({
   }
 }))
 const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactToolbarItems([
+  walletEntry.value
+    ? { id: 'wallet', labelKey: 'wallet.entry', descriptionKey: 'wallet.description', symbolKey: 'wallet.symbol', to: walletEntry.value.entryRoute, tone: 'payment' }
+    : null,
   ledgerEntry.value
     ? { id: 'daily-ledger', labelKey: 'dailyLedger.entry', descriptionKey: 'dailyLedger.description',
         symbolKey: 'dailyLedger.symbol', to: ledgerEntry.value.entryRoute, tone: 'success' }
@@ -302,7 +306,7 @@ const overviewHint = computed(() => {
   }
 
   if (!hasReservationQueue.value) {
-    return ledgerEntry.value ? t('dailyLedger.description') : paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
+    return walletEntry.value ? t('wallet.description') : ledgerEntry.value ? t('dailyLedger.description') : paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
   }
 
   if (!overview.value) {

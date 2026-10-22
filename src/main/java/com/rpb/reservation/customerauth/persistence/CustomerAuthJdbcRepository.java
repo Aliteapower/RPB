@@ -32,6 +32,15 @@ public class CustomerAuthJdbcRepository implements
     }
 
     @Override
+    public java.util.Set<UUID> activeCustomerIds(UUID tenantId, java.util.List<UUID> customerIds) {
+        if (customerIds.isEmpty()) return java.util.Set.of();
+        var args = new java.util.ArrayList<Object>(); args.add(tenantId); args.addAll(customerIds);
+        String placeholders = String.join(",",java.util.Collections.nCopies(customerIds.size(),"?"));
+        return new java.util.HashSet<>(jdbc.query("select distinct customer_id from customer_auth_accounts where tenant_id=? and status='active' and deleted_at is null and customer_id in ("+placeholders+")",
+            (rs,n)->rs.getObject("customer_id",UUID.class),args.toArray()));
+    }
+
+    @Override
     public void createEmailCode(
         UUID id,
         UUID tenantId,

@@ -91,6 +91,7 @@ export interface TenantProductSubscriptionItem {
 }
 
 export interface ProductSubscriptionMutation {
+  storeIds?: string[]
   idempotencyKey: string
   appKey: string
   billingCycle: ProductBillingCycle

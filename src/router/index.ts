@@ -55,6 +55,17 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/stores/:storeId/wallet',
+      name: 'wallet-workbench',
+      component: () => import('../modules/wallet/WalletPage.vue')
+    },
+    {
+      path: '/wallet/:storeId',
+      name: 'wallet-customer',
+      component: () => import('../modules/wallet/WalletCustomerPage.vue'),
+      meta: { public: true }
+    },
+    {
       path: '/stores/:storeId/daily-ledger',
       name: 'daily-ledger',
       component: () => import('../modules/daily-ledger/DailyLedgerPage.vue')

@@ -27,6 +27,13 @@
     "permissions": ["payment.intent.view", "payment.intent.create", "payment.verification.review", "payment.proof.review", "payment.proof_template.manage"]
   },
   {
+    "appKey": "wallet",
+    "value": "/stores/:storeId/wallet",
+    "labelKey": "wallet.entry",
+    "descriptionKey": "wallet.description",
+    "permissions": ["wallet.view", "wallet.topup.create", "wallet.charge.create"]
+  },
+  {
     "appKey": "daily_ledger",
     "value": "/stores/:storeId/daily-ledger",
     "labelKey": "platform.productLines.entryRoutes.dailyLedger.label",

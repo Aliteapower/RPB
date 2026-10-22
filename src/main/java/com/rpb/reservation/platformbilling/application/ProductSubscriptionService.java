@@ -361,6 +361,9 @@ public class ProductSubscriptionService {
         if (command == null || blank(command.idempotencyKey()) || blank(command.appKey()) || blank(command.billingCycle())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
+        // Wallet selected-store commands have their own platform-billing use case and replay contract.
+        if("wallet".equals(command.appKey().trim()) || command.storeIds()!=null)
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         String cycle = command.billingCycle().trim();
         if (!allowedCycles.contains(cycle) && !(allowLegacyGrant && LEGACY_GRANT.equals(cycle))) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);

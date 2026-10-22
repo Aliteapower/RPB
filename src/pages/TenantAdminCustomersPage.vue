@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import {
   archiveCustomer,
@@ -20,6 +21,7 @@ import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
 
 const { gt } = useGeneratedText()
+const { t } = useI18n()
 
 const route = useRoute()
 const auth = useAuthSessionStore()
@@ -233,6 +235,7 @@ function apiErrorText(error: unknown): string {
   if (error.response.error.code === 'CUSTOMER_PHONE_CONFLICT') {
     return gt('generated.tenant-admin-customers.033')
   }
+  if (error.response.error.code === 'CUSTOMER_HAS_RETAINED_ASSETS') return t('wallet.retainedCustomer')
   if (error.response.error.code === 'CUSTOMER_NOT_FOUND') {
     return gt('generated.tenant-admin-customers.034')
   }

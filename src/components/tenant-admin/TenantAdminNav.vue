@@ -68,6 +68,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
       </div>
       <nav class="nav-list">
         <RouterLink v-if="hasVisibleApp('daily_ledger')" class="nav-item" :to="`/stores/${storeId}/daily-ledger`">{{ t('dailyLedger.entry') }}</RouterLink>
+        <RouterLink v-if="hasVisibleApp('wallet')" class="nav-item" :to="`/stores/${storeId}/wallet`">{{ t('wallet.entry') }}</RouterLink>
         <RouterLink
           v-for="item in primaryNavItems"
           :key="item.to"

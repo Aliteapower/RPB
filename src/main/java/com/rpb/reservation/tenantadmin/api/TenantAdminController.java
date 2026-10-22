@@ -436,6 +436,7 @@ public class TenantAdminController {
             case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
             case CUSTOMER_NOT_FOUND -> TenantAdminApiErrorCode.CUSTOMER_NOT_FOUND;
             case CUSTOMER_PHONE_CONFLICT -> TenantAdminApiErrorCode.CUSTOMER_PHONE_CONFLICT;
+            case CUSTOMER_HAS_RETAINED_ASSETS -> TenantAdminApiErrorCode.CUSTOMER_HAS_RETAINED_ASSETS;
             case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
         };
     }

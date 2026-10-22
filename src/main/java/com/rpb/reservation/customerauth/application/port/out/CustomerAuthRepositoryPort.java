@@ -6,6 +6,10 @@ import java.util.UUID;
 
 public interface CustomerAuthRepositoryPort {
 
+    default java.util.Set<UUID> activeCustomerIds(UUID tenantId, java.util.List<UUID> customerIds) {
+        return java.util.Set.of();
+    }
+
     void createEmailCode(
         UUID id,
         UUID tenantId,

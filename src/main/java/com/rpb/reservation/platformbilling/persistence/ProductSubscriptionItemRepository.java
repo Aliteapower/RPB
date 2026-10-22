@@ -21,4 +21,10 @@ public interface ProductSubscriptionItemRepository {
     ProductSubscriptionItem updateStoreItem(ProductSubscriptionItemUpdate update);
 
     void updateStatus(UUID tenantId, UUID subscriptionId, String status);
+
+    default ProductSubscriptionItem insertStoreItem(ProductSubscription subscription, BillableStore store,
+        com.rpb.reservation.platformbilling.application.BillingPeriodCalculation period,
+        String cycle, java.math.BigDecimal unitAmount, java.math.BigDecimal amount) {
+        throw new UnsupportedOperationException("selected store billing unavailable");
+    }
 }

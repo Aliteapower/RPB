@@ -63,6 +63,9 @@ class PlatformTenantProductSubscriptionControllerTest {
     private ProductSubscriptionService subscriptionService;
 
     @MockBean
+    private com.rpb.reservation.platformbilling.application.SelectedStoreBillingService selectedStoreBillingService;
+
+    @MockBean
     private AppGateService appGateService;
 
     @MockBean

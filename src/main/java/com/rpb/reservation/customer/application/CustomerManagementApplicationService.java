@@ -3,6 +3,7 @@ package com.rpb.reservation.customer.application;
 import com.rpb.reservation.common.scope.TenantScope;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
+import com.rpb.reservation.customer.application.port.out.CustomerLifecycleGuard;
 import com.rpb.reservation.customer.domain.Customer;
 import com.rpb.reservation.customer.value.CustomerId;
 import java.util.Objects;
@@ -18,9 +19,15 @@ public class CustomerManagementApplicationService {
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     private final CustomerRepositoryPort customerRepository;
+    private final java.util.List<CustomerLifecycleGuard> lifecycleGuards;
 
     public CustomerManagementApplicationService(CustomerRepositoryPort customerRepository) {
+        this(customerRepository,java.util.List.of());
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public CustomerManagementApplicationService(CustomerRepositoryPort customerRepository,java.util.List<CustomerLifecycleGuard> lifecycleGuards) {
         this.customerRepository = customerRepository;
+        this.lifecycleGuards=java.util.List.copyOf(lifecycleGuards);
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +109,7 @@ public class CustomerManagementApplicationService {
         if (customerRepository.findManagementItem(scope, id).isEmpty()) {
             throw new CustomerManagementException(CustomerManagementError.CUSTOMER_NOT_FOUND);
         }
+        lifecycleGuards.forEach(guard->guard.beforeArchive(scope,id));
         customerRepository.archive(scope, id);
     }
 

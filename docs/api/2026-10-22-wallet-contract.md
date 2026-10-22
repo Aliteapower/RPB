@@ -1,0 +1,60 @@
+# 钱包 API 与数据契约
+
+状态：实现契约。规格：[钱包需求](../development/钱包产品线开发需求.md)。不含线上支付接口。
+
+## 认证、作用域与金额
+
+- 员工路径 `/api/v1/stores/{storeId}/wallet` 使用既有员工会话和动作权限，租户来自 `CurrentActor`，全部对象同时校验租户、门店/计划。
+- 顾客路径 `/api/v1/public/stores/{storeId}/wallet` 使用 `RPB_CUSTOMER_SESSION`，顾客 ID 只取会话；写操作校验同源，不能从正文选其他顾客。
+- 顾客交易以钱包门店商业状态判断，不伪造员工身份；到期本人读取与原单善后独立于新交易授权。
+- 金额为 SGD 十进制字符串，正数且最多两位小数，服务端计算余额与差额。
+- 命令使用非空文本 `idempotencyKey`，绑定租户/身份/动作和摘要；同键同参返回原响应，同键异参 409。成功资金写、幂等响应、审计同事务。
+- 数据库维护正金额、不负余额、同租户复合外键、外部收款引用唯一、充值/消费授权唯一入账和分录只追加约束。
+
+## 员工用例
+
+GET `/context`：统一门店/主体/Logo、计划、账户查询条件、允许渠道和商业状态。
+
+GET/PUT `/collection-profile`：`wallet.settings.manage`，复用 payment 所属的同一门店收款资料。PUT 含 `version,status,paynowType,paynowMobile,paynowUen,merchantName,issuerVerified,idempotencyKey`；启用时必须明确核实收款账户属于当前钱包发行主体。租户默认资料只预填参考，须保存为门店配置；禁止把未注明发行主体的租户默认收款账户直接作为多个钱包主体的收款依据。保留现有 quick-pay 的 configJson。若同店支付产品有效，修改还需 `payment.settings.manage`，界面明示会影响共用收款资料；不授予支付产品订阅。
+
+GET `/customers?query=`：已有已认证顾客查询；GET `/accounts/{accountId}` 与 `/accounts/{accountId}/entries`：在允许计划门店内查询。
+
+PUT `/program`：`version, channels`，发行主体取当前统一门店，配置操作需 `wallet.settings.manage`，不能变更公共资料/订阅。
+
+POST `/accounts`：`customerId, idempotencyKey`，返回原有或零余额账户，验证顾客认证绑定。
+
+POST `/topups`：`accountId, amount, channel, idempotencyKey`，返回待收款单；POST `/topups/{id}/confirm`：`amount, receiptReference, collectionAccount, terminalCode, note, idempotencyKey`，授权员工人工确认后入账。GET `/topups` 查询。取消仅允许未收款单。
+
+POST `/bills`：`accountId, amount, idempotencyKey`，创建消费单。POST `/bills/{id}/code` 单独签发 10 分钟商户账单码。GET `/bills`、`/bills/{id}`：包含支付分摊/剩余应付；POST `/bills/{id}/bind-code`：`code` 绑定顾客动态码（数据库同码同单可重试，禁止改绑）。POST `/payment-codes/resolve`：识别有效未绑定付款码对应的统一顾客，不授权扣款。POST `/bills/{id}/collections`：三渠道线下补差确认，使用与充值一致的凭证字段和权限。
+
+POST `/refunds`：`sourceType(top_up/bill/collection_exception), sourceId, amount, reason, idempotencyKey`，经理权限；POST `/refunds/{id}/confirm`：`partId, receiptReference, idempotencyKey` 确认已完成的原渠道线下退款；POST `/refunds/{id}/cancel` 仅取消未执行退款并释放冻结，已经退钱包的混合退款不允许取消。GET `/refunds` 与 `/reconciliation?start=YYYY-MM-DD&end=YYYY-MM-DD`。
+
+GET/POST `/collection-exceptions`：经理登记迟到、超收或重复实收；正文为 `sourceType(top_up/bill), sourceId, confirmation, reason, idempotencyKey`。confirmation 为完整三渠道核实事实，金额可与原单不同；始终不加余额、不结清原单。以返回的异常凭证 ID 创建 `collection_exception` 退款，仅可退实际异常实收，累计不超额。
+
+PayNow 普通确认必须填写商户银行实际收款 UEN/手机号（`collectionAccount`），服务端与当前门店配置核对，不把空值默认为已核对账户；不匹配时转经理异常复核。资料停用/变更后，经理仍可按原单填写实际收款标识登记异常实收并退回，不能因此增加钱包余额。无有效门店配置时，服务端拒绝新建 PayNow 充值，不只靠前端禁用。
+
+GET `/customers/{id}`、`/customers/{id}/accounts`：只从统一顾客与认证绑定查询；GET `/logo/{assetId}`：只允许当前统一 Logo，清除后旧 URL 返回 404。三渠道确认正文都必须含 `channel, amount, collectionAccount, receiptReference, terminalCode, note, verified=true, idempotencyKey`，渠道不能由客户端伪造为在线回调。
+
+## 顾客用例
+
+GET `/me`：本人已有账户、余额、门店公共资料；GET `/accounts/{id}/entries?offset=0`：本人流水（每页 100）；GET `/bills/{id}`：包括到期后本人原单结果，刷新可恢复。GET `/logo/{assetId}`：复用当前统一 Logo。POST `/payment-codes`：`accountId`，签发 60 秒动态码，重新签发使旧未绑定码失效，不使用业务幂等键。
+
+GET `/pending-bills`：本人待确认/补付账单；POST `/bill-code`：校验受限账单码并返回本人账单，不泄露其他顾客资料。
+
+POST `/bills/{id}/quote`：本人、当前门店，返回钱包拟扣金额、剩余应付、账户/账单版本和默认 60 秒期限。POST `/bills/{id}/pay`：`quoteId, idempotencyKey`，再次本人校验并原子扣款；客户端不能改金额。零钱包余额不生成零分录。
+
+账单金额 80、可用余额 50：扣 50 后 `partially_paid`，`remaining=30`；补差确认后 `paid`。退款独立，不把已结清单重新变成应付。
+
+顾客从当前门店入口出示付款码；如切换门店，使用目标店入口或扫描员工生成的目标账单码完成本人确认。付款码是短时身份绑定媒介，任何门店都不能凭码省略本人金额确认。
+
+## 错误
+
+401 `WALLET_UNAUTHENTICATED`；403 `WALLET_FORBIDDEN`/既有 App Gate 拒绝；404 `WALLET_NOT_FOUND`（包含不可见对象）；400 `WALLET_REQUEST_INVALID`；409 `WALLET_CONFLICT`、`WALLET_IDEMPOTENCY_CONFLICT`、`WALLET_RECEIPT_USED`、`WALLET_AUTHORIZATION_EXPIRED`、`WALLET_QUOTE_STALE`、`WALLET_REFUND_EXCEEDS_LIMIT`、`WALLET_LEDGER_MISMATCH`。返回 `{code,message}`；不把未知资金结果伪装为失败后自动新建交易。
+
+共享顾客停用新增 409 `CUSTOMER_HAS_RETAINED_ASSETS`，通过顾客生命周期扩展端口检查；数据库触发器同时防止绕过应用直接改归属/合并/删除。
+
+## 权限与上线兼容
+
+`wallet.view / wallet.topup.create / wallet.collection.confirm / wallet.charge.create / wallet.refund.manage / wallet.reconcile.view / wallet.settings.manage`。新老员工按职责分配，普通员工不默认确认/退款；产品注册不自动授予商业订阅。
+
+计费购买/续费新增可选 `storeIds`，钱包必填；旧产品缺省保持原语义。钱包首购按选定店，续费仅更新选定已开通店并保留兄弟店。钱包价格模板默认未激活，不隐式免费开通。

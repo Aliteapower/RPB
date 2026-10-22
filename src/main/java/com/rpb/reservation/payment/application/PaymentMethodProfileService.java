@@ -38,6 +38,7 @@ public class PaymentMethodProfileService {
         return repository.findStoreProfile(scope, METHOD_PAYNOW)
             .or(() -> repository.findTenantDefaultProfile(scope.tenantScope(), METHOD_PAYNOW));
     }
+    public Optional<PaymentMethodProfile> findStoreProfile(StoreScope scope) {return repository.findStoreProfile(scope,METHOD_PAYNOW);}
 
     public PaymentProfileTestQr generateSettingsTestQr(StoreScope scope) {
         Objects.requireNonNull(scope, "payment_scope_required");

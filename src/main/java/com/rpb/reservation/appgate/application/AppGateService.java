@@ -92,10 +92,27 @@ public class AppGateService {
 
         StoreAppSubscription subscription = storeSubscriptions.findByTenantAndStore(request.tenantId(), request.storeId())
             .get(request.appKey());
-        AppGateDenyReason storeDenial = subscription == null ? null : subscription.denialAt(now);
+        AppGateDenyReason storeDenial = storeDenial(request.appKey(), subscription, now);
         if (storeDenial != null) return denied(request, storeDenial);
 
         return AppGateDecision.allow(request.appKey(), request.tenantId(), request.storeId(), request.requiredPermission());
+    }
+
+    /** Customer-facing operations share commercial checks without manufacturing an employee actor. */
+    public AppGateDecision evaluateCommercial(String appKey, UUID tenantId, UUID storeId) {
+        var request = new AppGateAccessRequest(appKey,tenantId,storeId,null,null);
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        var app = platformApps.findByAppKey(appKey);
+        if(app.isEmpty() || !ACTIVE.equals(app.get().getStatus())) return denied(request,AppGateDenyReason.APP_DISABLED);
+        var entitlement = entitlements.findByTenantIdAndAppKey(tenantId,appKey);
+        if(entitlement.isEmpty()) return denied(request,AppGateDenyReason.TENANT_APP_NOT_ENABLED);
+        if(isExpired(entitlement.get(),now)) return denied(request,AppGateDenyReason.TENANT_APP_EXPIRED);
+        if(!isEnabledOrValidTrial(entitlement.get())) return denied(request,AppGateDenyReason.TENANT_APP_NOT_ENABLED);
+        var setting=storeSettings.findByTenantIdAndStoreIdAndAppKey(tenantId,storeId,appKey);
+        if(setting.isEmpty() || !setting.get().isEnabled()) return denied(request,AppGateDenyReason.STORE_APP_NOT_ENABLED);
+        var billing=storeSubscriptions.findByTenantAndStore(tenantId,storeId).get(appKey);
+        var reason=storeDenial(appKey,billing,now);
+        return reason==null ? AppGateDecision.allow(appKey,tenantId,storeId,null) : denied(request,reason);
     }
 
     public List<AppGateAppEntry> visibleApps(CurrentActor actor, UUID storeId) {
@@ -114,7 +131,7 @@ public class AppGateService {
             .filter(app -> isTenantAppVisible(tenantApps.get(app.getAppKey()), now))
             .filter(app -> isStoreAppVisible(storeApps.get(app.getAppKey())))
             .filter(app -> !app.getDefaultEntryRoute().isBlank() && ProductLineEntryRegistry.isControlledRoute(app.getDefaultEntryRoute()))
-            .filter(app -> !storeBilling.containsKey(app.getAppKey()) || storeBilling.get(app.getAppKey()).denialAt(now) == null)
+            .filter(app -> storeDenial(app.getAppKey(),storeBilling.get(app.getAppKey()),now) == null)
             .filter(app -> hasAnyEntryPermission(actor, app.getAppKey()))
             .sorted(Comparator.comparingInt(PlatformAppEntity::getSortOrder).thenComparing(PlatformAppEntity::getAppKey))
             .map(app -> toEntry(app, storeId, entryPermissions(actor, app.getAppKey())))
@@ -123,6 +140,12 @@ public class AppGateService {
 
     private static AppGateDecision denied(AppGateAccessRequest request, AppGateDenyReason reason) {
         return AppGateDecision.deny(request.appKey(), request.tenantId(), request.storeId(), request.requiredPermission(), reason);
+    }
+
+    private static AppGateDenyReason storeDenial(String appKey,StoreAppSubscription subscription,OffsetDateTime now) {
+        // Wallet has no legacy tenant-wide grant: every trading store must be explicitly purchased.
+        if(subscription==null) return "wallet".equals(appKey)?AppGateDenyReason.STORE_APP_NOT_ENABLED:null;
+        return subscription.denialAt(now);
     }
 
     private static boolean isEnabledOrValidTrial(TenantAppEntitlementEntity entitlement) {
