@@ -68,7 +68,7 @@ class WalletPostgresTest {
         access=new WalletAccess(gate,directory);accountService=new WalletAccountService(accounts,ledger,commands,access,directory,collectionPort);
         var collections=new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort);
         topups=new WalletTopupService(accounts,ledger,commands,topupRepo,collections,access);
-        checkout=new WalletCheckoutService(accounts,ledger,commands,bills,collections,access);
+        checkout=new WalletCheckoutService(accounts,commands,bills,collections,access,auths,clock);
         authorization=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,clock);
         refunds=new WalletRefundService(accounts,ledger,commands,topupRepo,bills,refundRepo,access);
         tx.execute(s->accountService.configure(scope,actor,new ProgramSettings(null,List.of("cash","paynow","credit_card"),key())));
@@ -135,6 +135,78 @@ class WalletPostgresTest {
         tx.execute(s->authorization.bind(scope,actor,one.id(),code.code()));
         assertThatThrownBy(()->tx.execute(s->authorization.bind(scope,actor,two.id(),code.code()))).isInstanceOf(WalletException.class);
         assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(5000);
+    }
+    @Test void expiredOrRegeneratedScansNeverCreateBillsCommandsOrAudit() {
+        var a=open();
+        var old=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        var fresh=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        assertRejectedScanLeavesNoRows(new BillCreate(a.id(),"5",key(),old.code()));
+        jdbc.update("update wallet_payment_codes set expires_at=? where tenant_id=?",java.sql.Timestamp.from(clock.instant()),tenant);
+        assertRejectedScanLeavesNoRows(new BillCreate(a.id(),"5",key(),fresh.code()));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();
+    }
+    @Test void scanCreatesAndBindsOnceAndReplaysAfterExpiryWithoutDebiting() {
+        var a=credit(open(),"5","cash");var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        var c=new BillCreate(a.id(),"5",key(),code.code());
+        var b=tx.execute(s->checkout.create(scope,actor,c));
+        assertThat(jdbc.queryForObject("select bill_id from wallet_payment_codes where tenant_id=? and account_id=?",UUID.class,tenant,a.id())).isEqualTo(b.id());
+        jdbc.update("update wallet_payment_codes set expires_at=? where tenant_id=?",java.sql.Timestamp.from(clock.instant()),tenant);
+        Bill replay=tx.execute(s->checkout.create(scope,actor,c));assertThat(replay).isEqualTo(b);
+        assertRejectedScanLeavesNoRows(new BillCreate(a.id(),"5",key(),code.code()));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(500);
+        assertThat(b.walletPaidCents()).isZero();
+    }
+    @Test void simultaneousScanCommandsBindOnlyOneBill() throws Exception {
+        var a=open();var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        var start=new CountDownLatch(1);var pool=Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Boolean>> jobs=new ArrayList<>();
+            for(int i=0;i<2;i++)jobs.add(pool.submit(()->{start.await();try{tx.execute(s->checkout.create(scope,actor,new BillCreate(a.id(),"5",key(),code.code())));return true;}catch(WalletException e){return false;}}));
+            start.countDown();int successes=0;for(var job:jobs)if(job.get(15,TimeUnit.SECONDS))successes++;
+            assertThat(successes).isEqualTo(1);
+            assertThat(count("wallet_bills")).isEqualTo(1);
+            assertThat(jdbc.queryForObject("select count(*) from wallet_commands where tenant_id=? and operation='bill.create'",Integer.class,tenant)).isEqualTo(1);
+        } finally {pool.shutdownNow();}
+    }
+    @Test void wrongAccountAndTenantScanCannotLeaveOrders() {
+        var a=open();var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        assertRejectedScanLeavesNoRows(new BillCreate(UUID.randomUUID(),"5",key(),code.code()));
+        var otherCustomer=UUID.randomUUID();
+        jdbc.update("insert into customers(id,tenant_id,customer_code,customer_type,display_name,status) values(?,?,'other','regular','其他顾客','active')",otherCustomer,tenant);
+        var other=tx.execute(s->accounts.open(scope,accounts.requireProgram(scope,true),otherCustomer));
+        assertRejectedScanLeavesNoRows(new BillCreate(other.id(),"5",key(),code.code()));
+        var strangerScope=new StoreScope(new TenantId(UUID.randomUUID()),store);
+        assertThatThrownBy(()->tx.execute(s->checkout.create(strangerScope,actor,new BillCreate(a.id(),"5",key(),code.code())))).isInstanceOf(WalletException.class);
+        assertThat(count("wallet_bills")).isZero();
+        jdbc.update("update wallet_payment_codes set code_hash=? where tenant_id=?",WalletTokens.hash("WP.other"),tenant);
+        assertRejectedScanLeavesNoRows(new BillCreate(a.id(),"5",key(),code.code()));
+    }
+    @Test void scanCreationPreservesExistingManualCommandReplayAndRejectsPermissionsAndCommercialDenials() {
+        var a=open();String idempotency=key();
+        var request=Map.of("accountId",a.id(),"amount","5","idempotencyKey",idempotency);
+        Bill old=tx.execute(s->commands.run(scope,actor.actorId(),"bill.create",idempotency,request,Bill.class,()->bills.create(scope,a,500,actor.actorId())));
+        Bill replay=tx.execute(s->checkout.create(scope,actor,new BillCreate(a.id(),"5",idempotency)));
+        assertThat(replay).isEqualTo(old);
+        var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        var noPermission=new CurrentActor(tenant,actorId,"staff",Set.of("store_staff"),Set.of("wallet.view"),Set.of(store));
+        assertThatThrownBy(()->tx.execute(s->checkout.create(scope,noPermission,new BillCreate(a.id(),"5",key(),code.code())))).isInstanceOf(WalletException.class);
+        when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,"wallet.charge.create",AppGateDenyReason.STORE_APP_EXPIRED));
+        assertRejectedScanLeavesNoRows(new BillCreate(a.id(),"5",key(),code.code()));
+        assertThat(count("wallet_bills")).isEqualTo(1);
+    }
+    @Test void transactionFailureAfterScanRollsBackBindingBillAndCommand() {
+        var a=open();var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));
+        var c=new BillCreate(a.id(),"5",key(),code.code());
+        assertThatThrownBy(()->tx.execute(s->{checkout.create(scope,actor,c);throw new IllegalStateException("after bind");})).isInstanceOf(IllegalStateException.class);
+        assertThat(count("wallet_bills")).isZero();
+        assertThat(jdbc.queryForObject("select bill_id is null from wallet_payment_codes where tenant_id=?",Boolean.class,tenant)).isTrue();
+        Bill retry=tx.execute(s->checkout.create(scope,actor,c));assertThat(retry).isNotNull();
+    }
+    int count(String table){return jdbc.queryForObject("select count(*) from "+table+" where tenant_id=?",Integer.class,tenant);}
+    void assertRejectedScanLeavesNoRows(BillCreate c){
+        int beforeBills=count("wallet_bills"),beforeAudit=count("wallet_audit"),beforeCommands=count("wallet_commands");
+        assertThatThrownBy(()->tx.execute(s->checkout.create(scope,actor,c))).isInstanceOf(WalletException.class);
+        assertThat(count("wallet_bills")).isEqualTo(beforeBills);assertThat(count("wallet_audit")).isEqualTo(beforeAudit);assertThat(count("wallet_commands")).isEqualTo(beforeCommands);
     }
     @Test void refundDoesNotReopenPaidBillAndCannotExceedOriginalPayment() {
         var a=credit(open(),"50","cash");var b=pay(bill(a,"80")).bill();tx.execute(s->checkout.collect(scope,actor,b.id(),confirm("30","paynow",key())));

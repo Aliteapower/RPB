@@ -789,6 +789,13 @@ export const enSG = {
       }
     },
     billing: {
+      storeEligibility: {
+        filter: 'Store scope', allStores: 'All existing stores', unassignedFilter: 'Existing stores without an entity',
+        noStores: 'This tenant has no stores. Create a store in tenant structure.', noActiveStores: 'Existing stores are not active. Enable them in tenant structure.',
+        unassignedStores: 'Existing stores need an operating entity. In tenant structure, filter stores without an entity, edit the existing store and select its entity. No new store is needed.',
+        selectStores: 'Select the stores to open wallet billing for.', noAdditionalStores: 'There are no additional eligible stores. Renew subscribed stores individually in subscription details.',
+        inactivePrice: 'Configure and activate the wallet price template first.', manageStructure: 'Open tenant structure to associate existing stores'
+      },
       page: {
         kicker: 'Tenant management',
         title: 'Subscription / billing'

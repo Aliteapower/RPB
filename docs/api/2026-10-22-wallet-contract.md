@@ -6,6 +6,7 @@
 
 - 员工路径 `/api/v1/stores/{storeId}/wallet` 使用既有员工会话和动作权限，租户来自 `CurrentActor`，全部对象同时校验租户、门店/计划。
 - 顾客路径 `/api/v1/public/stores/{storeId}/wallet` 使用 `RPB_CUSTOMER_SESSION`，顾客 ID 只取会话；写操作校验同源，不能从正文选其他顾客。
+- 统一顾客认证在邮箱/OAuth 登录和已有会话使用时，检查认证账号及绑定的原 Customer 均 active、同租户且未删除。归档/停用/缺失 Customer 的登录返回既有 HTTP 401 `account_disabled`，不消耗有效验证码、不签发会话、不新建替代顾客；旧会话返回未认证。钱包显示明确的资料停用提示。
 - 顾客交易以钱包门店商业状态判断，不伪造员工身份；到期本人读取与原单善后独立于新交易授权。
 - 金额为 SGD 十进制字符串，正数且最多两位小数，服务端计算余额与差额。
 - 命令使用非空文本 `idempotencyKey`，绑定租户/身份/动作和摘要；同键同参返回原响应，同键异参 409。成功资金写、幂等响应、审计同事务。
@@ -25,7 +26,7 @@ POST `/accounts`：`customerId, idempotencyKey`，返回原有或零余额账户
 
 POST `/topups`：`accountId, amount, channel, idempotencyKey`，返回待收款单；POST `/topups/{id}/confirm`：`amount, receiptReference, collectionAccount, terminalCode, note, idempotencyKey`，授权员工人工确认后入账。GET `/topups` 查询。取消仅允许未收款单。
 
-POST `/bills`：`accountId, amount, idempotencyKey`，创建消费单。POST `/bills/{id}/code` 单独签发 10 分钟商户账单码。GET `/bills`、`/bills/{id}`：包含支付分摊/剩余应付；POST `/bills/{id}/bind-code`：`code` 绑定顾客动态码（数据库同码同单可重试，禁止改绑）。POST `/payment-codes/resolve`：识别有效未绑定付款码对应的统一顾客，不授权扣款。POST `/bills/{id}/collections`：三渠道线下补差确认，使用与充值一致的凭证字段和权限。
+POST `/bills`：`accountId, amount, idempotencyKey, customerCode?`，创建消费单。扫码时必须携带 `customerCode`，码校验、建单、绑定、审计和幂等快照同一事务；取得锁后检查时效，过期/已用/不匹配的码不留下账单或快照。同键同参重试返回已绑定原单，即使码随后过期；不同键重用同码返回 409。手工选客省略码保持原行为。POST `/bills/{id}/code` 单独签发 10 分钟商户账单码。GET `/bills`、`/bills/{id}`：包含支付分摊/剩余应付；POST `/bills/{id}/bind-code`：`code` 绑定已有账单（旧接口保留，禁止用于扫码新建单的两阶段流程）。POST `/payment-codes/resolve`：识别有效未绑定付款码对应的统一顾客，不授权扣款。POST `/bills/{id}/collections`：三渠道线下补差确认，使用与充值一致的凭证字段和权限。
 
 POST `/refunds`：`sourceType(top_up/bill/collection_exception), sourceId, amount, reason, idempotencyKey`，经理权限；POST `/refunds/{id}/confirm`：`partId, receiptReference, idempotencyKey` 确认已完成的原渠道线下退款；POST `/refunds/{id}/cancel` 仅取消未执行退款并释放冻结，已经退钱包的混合退款不允许取消。GET `/refunds` 与 `/reconciliation?start=YYYY-MM-DD&end=YYYY-MM-DD`。
 

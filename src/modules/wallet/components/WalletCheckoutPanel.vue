@@ -20,10 +20,12 @@ async function refresh() {
 async function create() {
   const accountId = props.account?.id, scanned = props.customerCode; if (!accountId) return
   await run(async () => {
-    let b = await walletApi(props.store).command<Bill>('/bills', { accountId, amount: amount.value })
-    if (scanned) { b = await walletApi(props.store).post<Bill>(`/bills/${b.id}/bind-code`, { code: scanned }); emit('codeUsed') }
-    selected.value = b; paynow.value = ''; code.value = await walletApi(props.store).post<PaymentCode>(`/bills/${b.id}/code`)
-    await refresh(); emit('changed')
+    const b = await walletApi(props.store).command<Bill>('/bills', { accountId, amount: amount.value, ...(scanned ? { customerCode: scanned } : {}) })
+    if (scanned) emit('codeUsed')
+    selected.value = b; paynow.value = ''; code.value = null; amount.value = ''
+    emit('changed'); await refresh()
+    // Creating the bill succeeded. QR display is a separate, explicitly retryable action.
+    code.value = await walletApi(props.store).post<PaymentCode>(`/bills/${b.id}/code`)
   })
 }
 async function showCode(b: Bill) { await run(async () => { code.value = await walletApi(props.store).post<PaymentCode>(`/bills/${b.id}/code`); selected.value = b; paynow.value = '' }) }

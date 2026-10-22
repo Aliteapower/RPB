@@ -14,6 +14,7 @@ import {
 } from '../api/platformProductLineBillingApi'
 import { listTenantStores, type PlatformStore } from '../api/platformApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
+import { walletBillingWarning } from '../components/platform/storeBillingEligibility'
 import type {
   PlatformProductLine,
   ProductBillingCycle,
@@ -75,6 +76,7 @@ const singleStoreRenewalMode = computed(() => (
 const walletSelectableStores = computed(() => tenantStores.value.filter(store => store.status === 'active' && store.operatingEntityId && (!walletAddStores.value || !storeItemRows.value.some(item => item.storeId === store.id))))
 const quoteStoreCount = computed(() => (singleStoreRenewalMode.value ? (selectedStoreItem.value ? 1 : 0) : form.appKey === 'wallet' ? walletStoreIds.value.filter(id => walletSelectableStores.value.some(s => s.id === id)).length : activeBillableStoreCount.value))
 const billingDisabled = computed(() => quoteStoreCount.value <= 0 || (form.appKey === 'wallet' && selectedPrice.value?.status !== 'active'))
+const walletWarning = computed(() => walletBillingWarning(tenantStores.value, quoteStoreCount.value, walletSelectableStores.value.length, selectedPrice.value?.status === 'active'))
 const storeUnitAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
 const calculatedAmount = computed(() => storeUnitAmount.value * quoteStoreCount.value)
 const durationUnitLabel = computed(() => (
@@ -418,7 +420,8 @@ function apiErrorText(error: unknown): string {
             <span>{{ $t('platform.billing.form.storeCount') }}</span>
             <strong>{{ quoteStoreCount }}</strong>
           </div>
-          <p v-if="billingDisabled" class="warning-text">{{ $t('platform.billing.form.noBillableStores') }}</p>
+          <p v-if="billingDisabled" class="warning-text">{{ form.appKey === 'wallet' ? $t(`platform.billing.storeEligibility.${walletWarning}`) : $t('platform.billing.form.noBillableStores') }}</p>
+          <router-link v-if="form.appKey === 'wallet' && tenantStores.some(store => !store.operatingEntityId)" :to="{ name: 'platform-tenant-edit', params: { tenantId }, hash: '#tenant-structure' }">{{ $t('platform.billing.storeEligibility.manageStructure') }}</router-link>
           <div class="quote-summary">
             <span>{{ $t('platform.billing.form.storeUnitAmount') }}</span>
             <strong>{{ formatAmount(storeUnitAmount) }} {{ selectedCurrency }}</strong>

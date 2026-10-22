@@ -789,6 +789,13 @@ export const zhCN = {
       }
     },
     billing: {
+      storeEligibility: {
+        filter: '门店范围', allStores: '全部已有门店', unassignedFilter: '未关联主体的已有门店',
+        noStores: '租户还没有门店，请到租户结构创建门店。', noActiveStores: '已有门店尚未启用，请到租户结构启用门店。',
+        unassignedStores: '已有门店尚未关联经营主体。请到租户结构，筛选“未关联主体的已有门店”，编辑原门店并选择主体，无需重新建店。',
+        selectStores: '请勾选本次开通的钱包计费门店。', noAdditionalStores: '没有可新增开通的门店；已开通门店请在订阅明细中单店续费。',
+        inactivePrice: '请先配置并启用钱包价格模板。', manageStructure: '前往租户结构，关联已有门店'
+      },
       page: {
         kicker: '租户管理',
         title: '订阅 / 计费'

@@ -9,7 +9,10 @@ public final class WalletCommands {
     public record TopupCreate(UUID accountId,String amount,String channel,String idempotencyKey) {}
     public record CollectionConfirm(String channel,String amount,String collectionAccount,String receiptReference,
                                     String terminalCode,String note,boolean verified,String idempotencyKey) {}
-    public record BillCreate(UUID accountId,String amount,String idempotencyKey) {}
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public record BillCreate(UUID accountId,String amount,String idempotencyKey,String customerCode) {
+        public BillCreate(UUID accountId,String amount,String idempotencyKey) {this(accountId,amount,idempotencyKey,null);}
+    }
     public record Pay(UUID quoteId,String idempotencyKey) {}
     public record RefundCreate(String sourceType,UUID sourceId,String amount,String reason,String idempotencyKey) {}
     public record CollectionException(String sourceType,UUID sourceId,CollectionConfirm confirmation,String reason,String idempotencyKey) {}

@@ -25,6 +25,14 @@ public class WalletAuthorizationRepository {
         if(row.get("bill_id")!=null && !bill.equals(row.get("bill_id"))) throw WalletException.conflict("付款码已经绑定其他账单");
         jdbc.update("update wallet_payment_codes set bill_id=? where id=? and tenant_id=?",bill,row.get("id"),scope.tenantId().value());
     }
+    /** Caller locks the account first, matching payment-code regeneration lock order. */
+    public Instant lockUnboundCode(StoreScope scope,UUID account,String hash) {
+        var rows=jdbc.queryForList("select bill_id,expires_at from wallet_payment_codes where tenant_id=? and account_id=? and code_hash=? for update",scope.tenantId().value(),account,hash);
+        if(rows.isEmpty())throw WalletException.missing();
+        var row=rows.getFirst();
+        if(row.get("bill_id")!=null)throw WalletException.conflict("付款码已经绑定其他账单");
+        return ((Timestamp)row.get("expires_at")).toInstant();
+    }
     public UUID resolve(StoreScope scope,String hash,Instant now) {
         return jdbc.query("select account_id from wallet_payment_codes where tenant_id=? and code_hash=? and expires_at>? and bill_id is null",
             (rs,n)->rs.getObject("account_id",UUID.class),scope.tenantId().value(),hash,Timestamp.from(now)).stream().findFirst().orElseThrow(WalletException::missing);

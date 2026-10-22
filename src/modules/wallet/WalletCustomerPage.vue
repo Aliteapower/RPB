@@ -37,6 +37,7 @@ async function load() {
   }
 }
 async function issue() { const id = account.value?.id; if (!id) return; await run(async () => { code.value = await walletApi(store.value, true).post<PaymentCode>('/payment-codes', { accountId: id }) }) }
+async function authenticated() { needsLogin.value = false; error.value = ''; await load() }
 async function scan(value: string) {
   try {
     const decoded = billCode(value)
@@ -56,7 +57,7 @@ onUnmounted(() => { window.clearInterval(timer); generation++ })
 </script>
 <template>
   <main class="wallet-shell wallet-customer"><header class="wallet-header"><img v-if="home?.context.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/public/stores/${store}/wallet/logo/${home.context.store.logoMediaAssetId}`" alt=""><div><h1>{{ t('wallet.customerWallet') }}</h1><p>{{ home?.context.store.storeName }}</p><small v-if="home">{{ t('wallet.issuer') }}：{{ home.context.store.operatingEntityName }}</small></div><button :disabled="busy" @click="load">{{ t('wallet.refresh') }}</button></header>
-    <p v-if="error" class="wallet-error" role="alert">{{ error }}</p><WalletCustomerLogin v-if="needsLogin" :key="store" :store="store" @authenticated="load" />
+    <p v-if="error" class="wallet-error" role="alert">{{ error }}</p><WalletCustomerLogin v-if="needsLogin" :key="store" :store="store" @authenticated="authenticated" />
     <template v-if="home"><p v-if="home.context.store.contactPhone || home.context.store.address">{{ home.context.store.contactPhone }} · {{ home.context.store.address }}</p><p v-if="!home.context.transactionsEnabled" class="wallet-warning">{{ t('wallet.expired') }}</p>
       <section v-if="account" class="wallet-card"><div class="wallet-balances"><strong>{{ t('wallet.balance') }} {{ money(account.balanceCents) }}</strong><span>{{ t('wallet.available') }} {{ money(account.balanceCents - account.reservedCents) }}</span><span>{{ t('wallet.reserved') }} {{ money(account.reservedCents) }}</span></div>
         <div v-if="home.context.transactionsEnabled" class="wallet-actions"><button :disabled="busy" @click="issue">{{ t('wallet.showMyCode') }}</button><button @click="scanning = !scanning">{{ t('wallet.scanBill') }}</button></div>

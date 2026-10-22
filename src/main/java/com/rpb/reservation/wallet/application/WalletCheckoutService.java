@@ -6,6 +6,7 @@ import com.rpb.reservation.wallet.domain.*;
 import com.rpb.reservation.wallet.persistence.*;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.util.*;
+import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import static com.rpb.reservation.wallet.application.WalletViews.*;
@@ -16,15 +17,27 @@ import static com.rpb.reservation.wallet.application.WalletCommands.*;
 public class WalletCheckoutService {
     private final WalletAccountRepository accounts;private final WalletCommandRepository commands;private final WalletBillRepository bills;
     private final WalletCollectionService collections;private final WalletAccess access;
-    public WalletCheckoutService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,WalletBillRepository bills,WalletCollectionService collections,WalletAccess access) {
-        this.accounts=accounts;this.commands=commands;this.bills=bills;this.collections=collections;this.access=access;
+    private final WalletAuthorizationRepository authorizations;private final Clock clock;
+    public WalletCheckoutService(WalletAccountRepository accounts,WalletCommandRepository commands,WalletBillRepository bills,WalletCollectionService collections,WalletAccess access,WalletAuthorizationRepository authorizations,Clock clock) {
+        this.accounts=accounts;this.commands=commands;this.bills=bills;this.collections=collections;this.access=access;this.authorizations=authorizations;this.clock=clock;
     }
     @Transactional
     public Bill create(StoreScope scope,CurrentActor actor,BillCreate c) {
         access.staff(scope,actor,"wallet.charge.create",true);if(c==null)throw WalletException.invalid();long amount=WalletMoney.cents(c.amount());
         return commands.run(scope,actor.actorId(),"bill.create",c.idempotencyKey(),c,Bill.class,()->{
             accounts.requireProgram(scope,true);var a=accounts.account(scope,c.accountId(),true);accounts.requireActive(a);
-            var bill=bills.create(scope,a,amount,actor.actorId());commands.audit(scope,actor.actorId(),"bill.create",bill.id(),bill);return bill;
+            String codeHash=null;
+            if(c.customerCode()!=null) {
+                codeHash=WalletTokens.required(c.customerCode(),"WP");
+                var expires=authorizations.lockUnboundCode(scope,a.id(),codeHash);
+                if(!expires.isAfter(clock.instant()))throw new WalletException("WALLET_AUTHORIZATION_EXPIRED",409,"付款码已过期，请顾客重新生成并扫码");
+            }
+            var bill=bills.create(scope,a,amount,actor.actorId());
+            if(codeHash!=null) {
+                authorizations.bind(scope,bill.id(),a.id(),codeHash,clock.instant());
+                commands.audit(scope,actor.actorId(),"bill.bind_code",bill.id(),Map.of("accountId",a.id()));
+            }
+            commands.audit(scope,actor.actorId(),"bill.create",bill.id(),bill);return bill;
         });
     }
     @Transactional

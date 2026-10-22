@@ -174,7 +174,7 @@ public class CustomerAuthApplicationService {
                 repository.linkIdentity(tenantId, resolved.id(), normalizedProvider, subject, normalizedEmail, trimToNull(displayName));
                 return resolved;
             });
-        requireActiveAccount(account);
+        requireActiveCustomer(account);
         repository.markEmailVerified(account.id(), trimToNull(displayName));
         return createSession(account, remoteAddr, userAgent);
     }
@@ -184,7 +184,8 @@ public class CustomerAuthApplicationService {
         if (sessionToken == null || sessionToken.isBlank()) {
             return Optional.empty();
         }
-        Optional<CustomerAuthSessionRecord> session = repository.findActiveSessionByHash(hash(sessionToken));
+        Optional<CustomerAuthSessionRecord> session = repository.findActiveSessionByHash(hash(sessionToken))
+            .filter(record -> activeCustomer(record.account()));
         session.ifPresent(record -> repository.touchSession(record.sessionId()));
         return session.map(record -> principal(record.account()));
     }
@@ -198,7 +199,7 @@ public class CustomerAuthApplicationService {
 
     private CustomerAuthAccountRecord accountForEmail(UUID tenantId, String email, String displayName) {
         return repository.findAccountByEmail(tenantId, email)
-            .map(CustomerAuthApplicationService::requireActiveAccount)
+            .map(this::requireActiveCustomer)
             .orElseGet(() -> {
                 TenantScope scope = new TenantScope(new TenantId(tenantId));
                 Customer customer = customerRepository.save(
@@ -222,6 +223,20 @@ public class CustomerAuthApplicationService {
         if (!ACCOUNT_STATUS_ACTIVE.equals(account.status())) {
             throw new CustomerAuthServiceException(CustomerAuthError.ACCOUNT_DISABLED);
         }
+        return account;
+    }
+
+    private boolean activeCustomer(CustomerAuthAccountRecord account) {
+        if (!ACCOUNT_STATUS_ACTIVE.equals(account.status())) return false;
+        TenantScope scope = new TenantScope(new TenantId(account.tenantId()));
+        return customerRepository.findById(scope, new CustomerId(account.customerId()))
+            .filter(customer -> customer.scope().equals(scope) && customer.id().value().equals(account.customerId()))
+            .filter(customer -> ACCOUNT_STATUS_ACTIVE.equals(customer.status())).isPresent();
+    }
+
+    private CustomerAuthAccountRecord requireActiveCustomer(CustomerAuthAccountRecord account) {
+        requireActiveAccount(account);
+        if (!activeCustomer(account)) throw new CustomerAuthServiceException(CustomerAuthError.ACCOUNT_DISABLED);
         return account;
     }
 
