@@ -23,10 +23,11 @@ class WalletApiIdentityTest {
     final WalletAccountService accounts=mock(WalletAccountService.class);
     final WalletCheckoutService checkout=mock(WalletCheckoutService.class);
     final WalletAuthorizationService authorization=mock(WalletAuthorizationService.class);
+    final WalletScanChargeService charges=mock(WalletScanChargeService.class);
     MockMvc mvc;
     @BeforeEach void setup() {
         var identity=new WalletApiIdentity(staff,auth,new CustomerAuthCookieService(false));
-        mvc=MockMvcBuilders.standaloneSetup(new WalletCustomerController(identity,accounts,checkout,authorization),new WalletStaffController(identity,accounts,null,null,null,null,null,null))
+        mvc=MockMvcBuilders.standaloneSetup(new WalletCustomerController(identity,accounts,checkout,authorization),new WalletStaffController(identity,accounts,null,null,null,null,null,null),new WalletScanChargeController(identity,charges))
             .setControllerAdvice(new WalletErrorAdvice()).addFilters(new WalletRequestSecurityFilter()).build();
         when(staff.currentActor()).thenReturn(Optional.empty());when(auth.authenticateSession("valid")).thenReturn(Optional.of(principal));
         when(accounts.ownAccounts(any(),any())).thenReturn(List.of());when(checkout.pending(any(),any())).thenReturn(List.of());
@@ -46,6 +47,14 @@ class WalletApiIdentityTest {
         mvc.perform(get("/api/v1/stores/"+store+"/wallet/context")).andExpect(status().isUnauthorized());
         when(staff.currentActor()).thenReturn(Optional.of(new CurrentActor(null,UUID.randomUUID(),"platform_admin",Set.of("platform_admin"),Set.of("wallet.view"),Set.of(store))));
         mvc.perform(get("/api/v1/stores/"+store+"/wallet/context")).andExpect(status().isForbidden());verifyNoInteractions(accounts);
+    }
+    @Test void scanChargeUsesStaffSessionAndCodeStatusUsesOnlyTheExistingCustomerCookie() throws Exception {
+        mvc.perform(post("/api/v1/stores/"+store+"/wallet/scan-charges").header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
+        mvc.perform(post(path("/payment-codes/status")).header("X-RPB-Wallet","1").contentType("application/json").content("{\"code\":\"invalid\"}")).andExpect(status().isUnauthorized());
+        when(charges.status(any(),any(),any())).thenThrow(com.rpb.reservation.wallet.domain.WalletException.missing());
+        mvc.perform(post(path("/payment-codes/status")).header("X-RPB-Wallet","1").header("X-Test-Tenant-Id",UUID.randomUUID()).cookie(cookie()).contentType("application/json").content("{\"code\":\"invalid\"}")).andExpect(status().isNotFound());
+        verify(charges).status(argThat(s->s.tenantId().value().equals(tenant)&&s.storeId().value().equals(store)),eq(principal),eq("invalid"));
+        verify(charges,never()).charge(any(),any(),any());
     }
     String path(String suffix) {return "/api/v1/public/stores/"+store+"/wallet"+suffix;}
     Cookie cookie() {return new Cookie(CustomerAuthCookieService.COOKIE_NAME,"valid");}

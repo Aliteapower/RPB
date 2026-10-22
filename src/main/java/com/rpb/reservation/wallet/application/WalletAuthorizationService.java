@@ -22,10 +22,16 @@ public class WalletAuthorizationService {
     }
     @Transactional
     public PaymentCode issuePaymentCode(StoreScope scope,CustomerAuthPrincipal principal,UUID accountId) {
+        return issuePaymentCode(scope,principal,accountId,null);
+    }
+    @Transactional
+    public PaymentCode issuePaymentCode(StoreScope scope,CustomerAuthPrincipal principal,UUID accountId,String purpose) {
+        if(purpose!=null && !"merchant_charge".equals(purpose))throw WalletException.invalid();
         access.customer(scope,principal,true);accounts.requireProgram(scope,true);var a=accounts.account(scope,accountId,true);access.own(a,principal);accounts.requireActive(a);
-        String token=WalletTokens.issue("WP");Instant now=clock.instant(),expires=now.plusSeconds(60);
+        boolean charge="merchant_charge".equals(purpose);
+        String token=WalletTokens.issue(charge?"WC":"WP");Instant now=clock.instant(),expires=now.plusSeconds(60);
         authorizations.code(scope,a.id(),WalletTokens.hash(token),now,expires);
-        return new PaymentCode("customer_wallet",token,expires);
+        return new PaymentCode(charge?"customer_charge":"customer_wallet",token,expires);
     }
     @Transactional
     public Bill bind(StoreScope scope,CurrentActor actor,UUID billId,String code) {
@@ -36,7 +42,7 @@ public class WalletAuthorizationService {
     }
     public Account resolve(StoreScope scope,CurrentActor actor,String code) {
         access.staff(scope,actor,"wallet.charge.create",true);accounts.requireProgram(scope,true);
-        var account=accounts.account(scope,authorizations.resolve(scope,WalletTokens.required(code,"WP"),clock.instant()),false);accounts.requireActive(account);return account;
+        var account=accounts.account(scope,authorizations.resolve(scope,WalletTokens.customerCodeHash(code),clock.instant()),false);accounts.requireActive(account);return account;
     }
     @Transactional
     public PaymentCode issueBillCode(StoreScope scope,CurrentActor actor,UUID id) {

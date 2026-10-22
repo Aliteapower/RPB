@@ -38,7 +38,7 @@ GET `/customers/{id}`、`/customers/{id}/accounts`：只从统一顾客与认证
 
 ## 顾客用例
 
-GET `/me`：本人已有账户、余额、门店公共资料；GET `/accounts/{id}/entries?offset=0`：本人流水（每页 100）；GET `/bills/{id}`：包括到期后本人原单结果，刷新可恢复。GET `/logo/{assetId}`：复用当前统一 Logo。POST `/payment-codes`：`accountId`，签发 60 秒动态码，重新签发使旧未绑定码失效，不使用业务幂等键。
+GET `/me`：本人已有账户、余额、门店公共资料；GET `/accounts/{id}/entries?offset=0`：本人流水（每页 100）；GET `/bills/{id}`：包括到期后本人原单结果，刷新可恢复。GET `/logo/{assetId}`：复用当前统一 Logo。POST `/payment-codes`：`accountId, purpose?`，签发 60 秒动态码，重新签发使旧未绑定码失效，不使用业务幂等键。
 
 GET `/pending-bills`：本人待确认/补付账单；POST `/bill-code`：校验受限账单码并返回本人账单，不泄露其他顾客资料。
 
@@ -48,7 +48,7 @@ POST `/bills/{id}/quote`：本人、当前门店，返回钱包拟扣金额、�
 
 账单金额 80、可用余额 50：扣 50 后 `partially_paid`，`remaining=30`；补差确认后 `paid`。退款独立，不把已结清单重新变成应付。
 
-顾客从当前门店入口出示付款码；如切换门店，使用目标店入口或扫描员工生成的目标账单码完成本人确认。付款码是短时身份绑定媒介，任何门店都不能凭码省略本人金额确认。
+顾客从当前门店入口出示付款码；如切换门店，使用目标店入口或扫描员工生成的目标账单码完成本人确认。旧 WP 码仍为短时身份绑定媒介；新 UI 以 `purpose=merchant_charge` 出示 WC 扣款授权码，由有收款权限的员工核对金额后一次确认入账，无需顾客二次确认。顾客扫 WB 商户账单码则由顾客一次确认支付，商户无需再次确认钱包部分。
 
 ## 错误
 
@@ -61,3 +61,7 @@ POST `/bills/{id}/quote`：本人、当前门店，返回钱包拟扣金额、�
 `wallet.view / wallet.topup.create / wallet.collection.confirm / wallet.charge.create / wallet.refund.manage / wallet.reconcile.view / wallet.settings.manage`。新老员工按职责分配，普通员工不默认确认/退款；产品注册不自动授予商业订阅。
 
 计费购买/续费新增可选 `storeIds`，钱包必填；旧产品缺省保持原语义。钱包首购按选定店，续费仅更新选定已开通店并保留兄弟店。钱包价格模板默认未激活，不隐式免费开通。
+
+## 员工扫码一次确认（2026-10-22 更新）
+
+详细请求、状态查询、原单扣款、权限、错误和幂等契约见 [WALLET_SINGLE_CONFIRMATION_20261022.md](../development/WALLET_SINGLE_CONFIRMATION_20261022.md)。新增 POST 员工 /scan-charges 和 POST 顾客 /payment-codes/status，沿用原资金与统一资料边界，无迁移。旧 /bills 不授予直接扣款权。

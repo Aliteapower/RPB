@@ -37,6 +37,11 @@ public class WalletAuthorizationRepository {
         return jdbc.query("select account_id from wallet_payment_codes where tenant_id=? and code_hash=? and expires_at>? and bill_id is null",
             (rs,n)->rs.getObject("account_id",UUID.class),scope.tenantId().value(),hash,Timestamp.from(now)).stream().findFirst().orElseThrow(WalletException::missing);
     }
+    public CodeReference reference(StoreScope scope,String hash) {
+        return jdbc.query("select c.account_id,c.bill_id,b.store_id from wallet_payment_codes c left join wallet_bills b on b.id=c.bill_id and b.tenant_id=c.tenant_id where c.tenant_id=? and c.code_hash=?",
+            (rs,n)->new CodeReference(rs.getObject("account_id",UUID.class),rs.getObject("bill_id",UUID.class),rs.getObject("store_id",UUID.class)),scope.tenantId().value(),hash).stream().findFirst().orElseThrow(WalletException::missing);
+    }
+    public record CodeReference(UUID accountId,UUID billId,UUID storeId) {}
     public Quote quote(StoreScope scope,Bill bill,Account account,long amount,UUID customer,Instant expires) {
         UUID id=UUID.randomUUID();
         jdbc.update("insert into wallet_authorizations(id,tenant_id,bill_id,account_id,amount_cents,account_version,bill_version,customer_id,expires_at) values(?,?,?,?,?,?,?,?,?)",id,scope.tenantId().value(),bill.id(),account.id(),amount,account.version(),bill.version(),customer,Timestamp.from(expires));

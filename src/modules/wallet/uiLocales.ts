@@ -1,6 +1,6 @@
 export const walletUiZh = {
   navigation:'钱包导航', myWallet:'钱包', cashier:'收银台', staffWallet:'钱包收银台', back:'返回', more:'更多', entries:'资金流水',
-  cashierTitle:'发起钱包收款', cashierHint:'扫码或选择顾客，核对金额后由顾客确认。', scanStart:'识别顾客付款码', selectStart:'查找已认证顾客',
+  cashierTitle:'发起钱包收款', cashierHint:'扫顾客码由员工确认扣款，顾客扫账单码由顾客确认支付。', scanStart:'识别顾客付款码', selectStart:'查找已认证顾客',
   customerCollect:'选择顾客收款', customerTopup:'为顾客充值', offlineChannels:'现金 · PayNow · 信用卡', collectRecords:'收款账单',
   recordsHint:'待确认、待补付与已完成', pendingTopups:'待核实充值', pendingTopupsHint:'核对商户实际到账后入账', managementHint:'退款、对账与设置',
   changeCustomer:'更换', rescan:'重新扫码', noAccount:'该顾客尚无本店钱包，请先办理充值开通', scannedIdentity:'已识别付款码；有效期较短，请尽快发起收款。扫码不会直接扣款。',

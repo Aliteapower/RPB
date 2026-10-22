@@ -19,4 +19,7 @@ public final class WalletTokens {
         if(value==null || !value.matches(java.util.regex.Pattern.quote(prefix)+"\\.[A-Za-z0-9_-]{43}")) throw WalletException.invalid();
         return hash(value);
     }
+    public static String customerCodeHash(String value) {
+        return required(value,value!=null && value.startsWith("WC.")?"WC":"WP");
+    }
 }

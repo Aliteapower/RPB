@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class})
+@WebMvcTest({WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
@@ -26,6 +26,7 @@ class WalletLocalRuntimeSecurityTest {
     @MockBean WalletTopupService topups;
     @MockBean WalletCheckoutService checkout;
     @MockBean WalletAuthorizationService authorization;
+    @MockBean WalletScanChargeService charges;
     @MockBean WalletRefundService refunds;
     @MockBean WalletReconciliationService reports;
     @MockBean WalletCollectionPort port;
@@ -52,6 +53,10 @@ class WalletLocalRuntimeSecurityTest {
         for(String path:new String[]{"/context","/collection-profile","/customers/"+id,"/customers/"+id+"/accounts","/logo/"+id,"/collection-exceptions","/topups/"+id,"/bills?status=pending"})mvc.perform(get(staff+path)).andExpect(status().isUnauthorized());
         mvc.perform(put(staff+"/collection-profile").header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
         mvc.perform(post(staff+"/payment-codes/resolve").header("X-RPB-Wallet","1").contentType("application/json").content("{\"code\":\"invalid\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(post(staff+"/scan-charges").header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/public/stores/"+id+"/wallet/payment-codes/status").header("X-RPB-Wallet","1").contentType("application/json").content("{\"code\":\"invalid\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(get(staff+"/scan-charges")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/public/stores/"+id+"/wallet/payment-codes/status")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/public/stores/"+id+"/wallet/bills/"+id)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/public/stores/"+id+"/wallet/bills?status=all")).andExpect(status().isUnauthorized());
         mvc.perform(get(staff+"/internal-debug")).andExpect(status().isForbidden());

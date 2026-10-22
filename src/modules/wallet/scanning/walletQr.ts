@@ -4,7 +4,7 @@ export type WalletQrPurpose = 'customer' | 'bill'
 export function normalizeWalletQr(value: string, purpose: WalletQrPurpose, origin: string): string | null {
   const text = value.trim()
   if (text.length > 4096) return null
-  if (purpose === 'customer') return /^WP\.[A-Za-z0-9_-]{43}$/.test(text) ? text : null
+  if (purpose === 'customer') return /^W[PC]\.[A-Za-z0-9_-]{43}$/.test(text) ? text : null
   if (/^WB\.[A-Za-z0-9_-]{43}$/.test(text)) return text
   try {
     const url = new URL(text)

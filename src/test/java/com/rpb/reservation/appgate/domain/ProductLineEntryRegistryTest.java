@@ -17,10 +17,13 @@ class ProductLineEntryRegistryTest {
 
     @Test void sharedManifestRoutesExistInVueAndAreConsumedByProductEditor() throws Exception {
         String router = Files.readString(Path.of("src/router/index.ts"));
+        // Wallet routes are registered through the module; do not require moving them back into the root.
+        assertThat(router).contains("import { walletRoutes } from '../modules/wallet/routes'", "...walletRoutes");
+        String mountedRoutes = router + Files.readString(Path.of("src/modules/wallet/routes.ts"));
         assertThat(ProductLineEntryRegistry.entries()).extracting(ProductLineEntryRegistry.Entry::appKey).doesNotHaveDuplicates();
         assertThat(ProductLineEntryRegistry.entries()).extracting(ProductLineEntryRegistry.Entry::value).doesNotHaveDuplicates();
         for (var entry : ProductLineEntryRegistry.entries()) {
-            if (!entry.value().isBlank()) assertThat(router).contains("path: '" + entry.value() + "'");
+            if (!entry.value().isBlank()) assertThat(mountedRoutes).contains("path: '" + entry.value() + "'");
         }
         assertThat(Files.readString(Path.of("src/components/platform/product-line/productLineCatalog.ts")))
             .contains("main/resources/product-line-entries.json");

@@ -25,6 +25,7 @@ public final class WalletViews {
     public record Quote(UUID id, UUID billId, UUID accountId, long amountCents, long remainingCents,
                         int accountVersion, int billVersion, Instant expiresAt) {}
     public record PaymentCode(String type, String code, Instant expiresAt) {}
+    public record PaymentCodeStatus(Bill bill) {}
     public record Refund(UUID id, UUID accountId, UUID storeId, UUID topupId, UUID billId, long amountCents,
                          long walletCents, String status, String reason, int version, Instant createdAt, UUID exceptionCollectionId) {}
     public record RefundPart(UUID id, UUID collectionId, String channel, long amountCents,

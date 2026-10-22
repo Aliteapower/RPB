@@ -10,7 +10,7 @@ export interface Entry { id: string; accountId: string; storeId: string; kind: s
 export interface Topup { id: string; programId: string; accountId: string; storeId: string; amountCents: number; channel: Channel; status: string; refundedCents: number; version: number; createdAt: string }
 export interface Bill { id: string; programId: string; accountId: string; storeId: string; amountCents: number; walletPaidCents: number; externalPaidCents: number; status: string; walletApplied: boolean; closed: boolean; refundStatus: string; version: number; createdAt: string }
 export interface Quote { id: string; billId: string; accountId: string; amountCents: number; remainingCents: number; accountVersion: number; billVersion: number; expiresAt: string }
-export interface PaymentCode { type: 'customer_wallet' | 'merchant_bill'; code: string; expiresAt: string }
+export interface PaymentCode { type: 'customer_wallet' | 'customer_charge' | 'merchant_bill'; code: string; expiresAt: string }
 export interface CollectionConfirm { channel: Channel; amount: string; collectionAccount: string; receiptReference: string; terminalCode: string; note: string; verified: boolean }
 export interface Collection { id: string; topupId: string | null; billId: string | null; channel: Channel; amountCents: number; refundedCents: number; receiptReference: string; collectionAccount: string; terminalCode: string; exception: boolean; exceptionReason: string; createdAt: string }
 export interface Refund { id: string; accountId: string; storeId: string; topupId: string | null; billId: string | null; amountCents: number; walletCents: number; status: string; reason: string; version: number; createdAt: string }

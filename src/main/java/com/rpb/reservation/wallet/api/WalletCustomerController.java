@@ -20,10 +20,10 @@ public class WalletCustomerController {
     @GetMapping("/pending-bills") public List<Bill> pending(@PathVariable UUID storeId,HttpServletRequest request) {var p=identity.customer(request);return checkout.pending(identity.scope(p.tenantId(),storeId),p);}
     @GetMapping("/bills") public List<Bill> bills(@PathVariable UUID storeId,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="all") String status,HttpServletRequest request) {var p=identity.customer(request);return checkout.customerHistory(identity.scope(p.tenantId(),storeId),p,new WalletHistoryQuery(offset,status));}
     @GetMapping("/bills/{id}") public Bill receipt(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest request) {var p=identity.customer(request);return checkout.ownBill(identity.scope(p.tenantId(),storeId),p,id);}
-    @PostMapping("/payment-codes") public PaymentCode code(@PathVariable UUID storeId,@RequestBody AccountCode body,HttpServletRequest request) {var p=identity.customer(request);return authorization.issuePaymentCode(identity.scope(p.tenantId(),storeId),p,body.accountId());}
+    @PostMapping("/payment-codes") public PaymentCode code(@PathVariable UUID storeId,@RequestBody AccountCode body,HttpServletRequest request) {var p=identity.customer(request);return authorization.issuePaymentCode(identity.scope(p.tenantId(),storeId),p,body.accountId(),body.purpose());}
     @PostMapping("/bill-code") public Bill scan(@PathVariable UUID storeId,@RequestBody BillCode body,HttpServletRequest request) {var p=identity.customer(request);return authorization.scanBill(identity.scope(p.tenantId(),storeId),p,body.code());}
     @PostMapping("/bills/{id}/quote") public Quote quote(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest request) {var p=identity.customer(request);return authorization.quote(identity.scope(p.tenantId(),storeId),p,id);}
     @PostMapping("/bills/{id}/pay") public Paid pay(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Pay body,HttpServletRequest request) {var p=identity.customer(request);return authorization.pay(identity.scope(p.tenantId(),storeId),p,id,body);}
-    public record AccountCode(UUID accountId) {}
+    public record AccountCode(UUID accountId,String purpose) {}
     public record BillCode(String code) {}
 }

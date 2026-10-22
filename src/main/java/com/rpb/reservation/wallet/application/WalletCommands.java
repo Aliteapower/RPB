@@ -14,6 +14,8 @@ public final class WalletCommands {
         public BillCreate(UUID accountId,String amount,String idempotencyKey) {this(accountId,amount,idempotencyKey,null);}
     }
     public record Pay(UUID quoteId,String idempotencyKey) {}
+    public record ScanCharge(UUID accountId,String amount,String customerCode,Integer expectedAccountVersion,
+                             UUID billId,Integer expectedBillVersion,String idempotencyKey) {}
     public record RefundCreate(String sourceType,UUID sourceId,String amount,String reason,String idempotencyKey) {}
     public record CollectionException(String sourceType,UUID sourceId,CollectionConfirm confirmation,String reason,String idempotencyKey) {}
     public record CollectionSettingsUpdate(Integer version,String status,String paynowType,String paynowMobile,String paynowUen,String merchantName,boolean issuerVerified,String idempotencyKey) {}

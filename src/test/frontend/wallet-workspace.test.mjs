@@ -4,7 +4,7 @@ import { createServer } from 'vite'
 import { createRenderer, h, reactive, ref, nextTick } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
-let vite, historyModule, recordModule, staffModule, customerModule, authModule
+let vite, historyModule, recordModule, staffModule, customerModule, authModule, receiptModule
 const oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldDocument=globalThis.document
 const timers=new Map();let timer=0
 const response=data=>({ok:true,status:200,json:async()=>data})
@@ -24,8 +24,25 @@ before(async()=>{
   staffModule=await vite.ssrLoadModule('/src/modules/wallet/useStaffWallet.ts')
   customerModule=await vite.ssrLoadModule('/src/modules/wallet/useCustomerWallet.ts')
   authModule=await vite.ssrLoadModule('/src/stores/authSession.ts')
+  receiptModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletCodeReceipt.ts')
 })
 after(async()=>{await vite?.close();globalThis.fetch=oldFetch;globalThis.window=oldWindow;globalThis.document=oldDocument})
+test('issued customer code observes its exact settled bill once without querying unrelated pending bills or confirming again',async()=>{
+  const calls=[],receipts=[],code=ref({code:'WC.'+'A'.repeat(43)}),store=ref('A');let bill=null
+  globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return response({bill})}
+  const scope=mount(()=>receiptModule.useWalletCodeReceipt(store,code,async b=>receipts.push(b.id)))
+  const poll=[...timers.values()].at(-1);await poll();await tick();assert.deepEqual(receipts,[])
+  bill={id:'exact-paid-bill',storeId:'A',status:'paid',walletApplied:true};await poll();await tick();await poll();await tick()
+  assert.deepEqual(receipts,['exact-paid-bill']);assert.equal(calls.length,2);assert.ok(calls.every(c=>c.url.endsWith('/payment-codes/status')&&!c.url.includes(code.value.code)))
+  assert.equal(calls[1].body.code,code.value.code);scope.unmount()
+})
+test('a late code receipt cannot navigate after switching store or regenerating the payment code',async()=>{
+  let resolve;const receipts=[],code=ref({code:'WC.'+'A'.repeat(43)}),store=ref('A')
+  globalThis.fetch=async()=>new Promise(r=>{resolve=r})
+  const scope=mount(()=>receiptModule.useWalletCodeReceipt(store,code,async b=>receipts.push(b.id)))
+  const poll=[...timers.values()].at(-1);poll();await tick();store.value='B';code.value={code:'WC.'+'B'.repeat(43)};await tick()
+  resolve(response({bill:{id:'old-private-receipt',storeId:'A'}}));await tick();assert.deepEqual(receipts,[]);scope.unmount()
+})
 test('history filters load immediately and late responses from the previous filter cannot restore old rows',async()=>{
   const requests=[];globalThis.fetch=(url)=>new Promise(resolve=>requests.push({url,resolve}))
   const status=ref('all'),scope=mount(()=>historyModule.useWalletHistory(ref('A'),ref('/bills'),status))

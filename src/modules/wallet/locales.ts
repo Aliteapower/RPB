@@ -1,6 +1,8 @@
 import { walletUiZh, walletUiEn } from './uiLocales'
 import { walletScannerZh, walletScannerEn, walletFeedbackZh, walletFeedbackEn } from './scanLocales'
+import { walletScanChargeZh, walletScanChargeEn } from './scanChargeLocales'
 export const walletZh = {
+  scanCharge: walletScanChargeZh,
   scanner: walletScannerZh, feedback: walletFeedbackZh,
   ui: walletUiZh,
   loginErrors: { account_disabled: '该顾客账号或关联顾客资料已停用、归档或删除，请联系门店管理员核查原顾客资料。无需重新注册。', code_expired: '验证码已过期，请重新发送验证码。', code_mismatch: '验证码不正确，请核对后重试。' },
@@ -21,7 +23,7 @@ export const walletZh = {
   showBillCode: '展示账单码', customerConfirm: '请顾客在本人钱包核对并确认扣款', waitConfirm: '待顾客确认', scanCustomer: '扫顾客付款码',
   scan: '打开摄像头扫码', scanImage: '从二维码图片识别', stopCamera: '停止摄像头', cameraError: '无法使用摄像头，请允许权限、使用 HTTPS，或选择二维码图片。', invalidCode: '二维码无效、类型不符或不属于当前钱包',
   manualCode: '无法扫码时粘贴付款码或账单链接', useCode: '识别', codeExpired: '二维码已过期，请重新生成', codeExpires: '有效至', showMyCode: '出示付款码', regenerate: '重新生成',
-  cashierScanned: '员工扫码只发起交易，扣款前仍需你确认金额。', scanBill: '扫描商户账单码', quote: '查看付款金额', confirmPay: '确认钱包付款', debit: '本次钱包扣款',
+  cashierScanned: walletScanChargeZh.customerConsent, scanBill: '扫描商户账单码', quote: '查看付款金额', confirmPay: '确认钱包付款', debit: '本次钱包扣款',
   quoteExpired: '确认已过期，请重新查看金额', paymentDone: '钱包付款已处理，请核对剩余应付金额。',
   email: '邮箱', code: '验证码', displayName: '姓名', sendCode: '发送验证码', login: '登录已有顾客账号', loginHint: '复用现有顾客登录，不另外注册钱包会员。', sent: '验证码已发送，请查收邮箱。',
   source: '原交易', reference: '交易编号', refund: '申请原单退款', refundReason: '退款原因', refundAmount: '退款金额', refunds: '退款记录', refundParts: '线下退款分项',
@@ -40,6 +42,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  scanCharge: walletScanChargeEn,
   scanner: walletScannerEn, feedback: walletFeedbackEn,
   ui: walletUiEn,
   loginErrors: { account_disabled: 'This account or its linked customer is disabled, archived or deleted. Ask the store administrator to check the original customer record. No new registration is needed.', code_expired: 'The verification code has expired. Request a new code.', code_mismatch: 'The verification code is incorrect. Please check and try again.' },
@@ -55,7 +58,7 @@ export const walletEn = {
   offline: 'Offline collections only. Check PayNow in the merchant bank account and card approval on the external terminal.', receipt: 'Bank transaction / terminal / cash receipt reference', terminal: 'Cashier terminal', collectionAccount: 'Card acquirer merchant ID', note: 'Verification note', attested: 'I have received and verified this payment on the merchant side',
   paynowMissing: 'PayNow is not configured. Cash and credit card remain available.', showPaynow: 'Show PayNow QR', paynowHint: 'Bank transfer only. A scan or screenshot does not credit the wallet.',
   createBill: 'Create bill', bills: 'Bills', walletPaid: 'Wallet paid', otherPaid: 'Other paid', stillDue: 'Still due', settled: 'Paid in full', showBillCode: 'Show bill QR', customerConfirm: 'Ask the customer to review and approve in their wallet', waitConfirm: 'Awaiting customer approval', scanCustomer: 'Scan customer payment code',
-  scan: 'Scan with camera', scanImage: 'Read a QR image', stopCamera: 'Stop camera', cameraError: 'Allow camera access on HTTPS or select a QR image.', invalidCode: 'Invalid, incorrect or out-of-scope wallet QR', manualCode: 'Paste payment code or bill link if scanning is unavailable', useCode: 'Read code', codeExpired: 'Code expired. Generate another.', codeExpires: 'Expires', showMyCode: 'Show payment code', regenerate: 'Generate again', cashierScanned: 'Scanning only starts a transaction. You must still approve the amount.', scanBill: 'Scan merchant bill', quote: 'Review payment', confirmPay: 'Approve wallet payment', debit: 'Wallet debit', quoteExpired: 'Approval expired. Review the amount again.', paymentDone: 'Wallet payment processed. Check any amount still due.',
+  scan: 'Scan with camera', scanImage: 'Read a QR image', stopCamera: 'Stop camera', cameraError: 'Allow camera access on HTTPS or select a QR image.', invalidCode: 'Invalid, incorrect or out-of-scope wallet QR', manualCode: 'Paste payment code or bill link if scanning is unavailable', useCode: 'Read code', codeExpired: 'Code expired. Generate another.', codeExpires: 'Expires', showMyCode: 'Show payment code', regenerate: 'Generate again', cashierScanned: walletScanChargeEn.customerConsent, scanBill: 'Scan merchant bill', quote: 'Review payment', confirmPay: 'Approve wallet payment', debit: 'Wallet debit', quoteExpired: 'Approval expired. Review the amount again.', paymentDone: 'Wallet payment processed. Check any amount still due.',
   email: 'Email', code: 'Verification code', displayName: 'Name', sendCode: 'Send code', login: 'Sign in with existing customer identity', loginHint: 'Uses the existing customer login. No separate wallet membership.', sent: 'Check your email for the verification code.',
   source: 'Original transaction', reference: 'Reference', refund: 'Refund original transaction', refundReason: 'Reason', refundAmount: 'Refund amount', refunds: 'Refunds', refundParts: 'Offline refund portions', confirmRefund: 'Confirm this offline refund', cancelRefund: 'Cancel unexecuted refund', refundAttested: 'The original channel has actually been refunded and the reference is correct', refundHint: 'Wallet payments return to the wallet. External portions require an actual offline refund.',
   cancel: 'Cancel unpaid order', channelsSetting: 'Offline channels for this issuer (shared by programme stores)', configure: 'Activate this store wallet', publicProfile: 'Shared profile', customerEntry: 'Customer wallet', noRights: 'Permission required', start: 'From', end: 'To',
