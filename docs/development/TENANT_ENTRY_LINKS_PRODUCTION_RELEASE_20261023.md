@@ -39,3 +39,61 @@ GO：按用户明确授权执行定向提交、推送、干净构建、备份、
 - Migration / Permission：无迁移、无新权限、无线上配置变更，复用租户管理员范围与 AppGate。
 - Risk：静态二维码改名后需重新下载；访问始终受现有产品、登录、权限和单店到期控制。超长名称中心可能省略，完整名称保留外侧。
 - Rollback：整体回退前后端制品，不回退数据库或覆盖其他改动。
+
+## 实际发布结果
+
+2026-10-23 约 11:05（Asia/Singapore）完成前后端切换。已提交、推送并部署运行代码 `c2a82659f9dadc7d23dc17f579dfc8b9ef2eb770`，分支 `codex/paynow-payment-product-line-staging`。后续仅补记本文档，不改变运行代码版本。
+
+### 制品、备份与服务
+
+- 干净 Git 归档 2,157 个源文件与提交 blob 逐一匹配，排除私人资料和本地夹具；独立目录 Maven package、npm ci、Vue 类型检查、Vite 构建及 46 项前端测试通过。后端核心 24 项复用同一业务代码的当前测试证据；扩展回归的旧路由静态断言失败仍保留说明。
+- npm ci 仍报告既有 7 项高危告警，未变更依赖及锁文件，未扩展为依赖升级。
+- jar SHA256：`69581e6bfc94892851cd68ac3a241e6a715e0df58e885ec5a7791f14d39cbf7c`。
+- 前端包 SHA256：`96907422fd1ebd0bfe5899d896f32c8d9625a48f12bd2f412e5b00ae8c0f6073`。上传包与生产制品校验一致。
+- 备份 `/opt/rpb/backups/20261023-tenant-entry-c2a82659-before` 保存旧 jar、完整前端、RELEASE_SHA、数据库 dump 及业务指纹。数据库 dump 为 797,341 字节，`pg_restore -l` 可读取。新静态资源发布目录 `/opt/rpb/releases/20261023-tenant-entry-c2a82659`，旧哈希资源保留，未触发回滚。
+- rpb-backend active/running，MainPID `746271`，InvocationID `673a46b901c04d3a808baec025c0f44d`，NRestarts=0。就绪后与浏览器验收结束进程一致，新进程 ERROR 日志为 0。
+- default profile；Flyway 57 项校验成功，public 保持 V057，无迁移执行。生产环境文件哈希不变，nginx 配置、nginx/PostgreSQL/Redis/Docker 的 PID、InvocationID、运行状态均与发布前一致。
+- `booking.yumstone.sg`、`platform.booking.yumstone.sg`、`20000000.booking.yumstone.sg`、`sx.booking.yumstone.sg` 四个站点 HTML 与本次干净构建完全一致；172 个静态资源全部 HTTP 200 且逐字节一致。
+- 两个门店的新入口接口匿名请求均为 401 UNAUTHENTICATED，未泄露统一资料。
+
+### 测试租户 20000000 浏览器验收
+
+通过 Chrome 的既有会话只读核验。统一平台租户名为 **食刻租户**，门店为 **RPB 验收门店**（storeId `20000000-0000-0000-0000-000000000983`），与发布前只读数据库查询一致；未把门店名当成租户名。
+
+| 入口 | 结果 |
+|---|---|
+| 顾客钱包 | 打开本门店“我的钱包”，显示同一发行主体与已有余额；未出码或付款 |
+| 在线预约 | 打开本门店预约页，日期、午晚餐时段可读取；未选择提交预约 |
+| 员工工作台 | 登录页预选“员工”，URL 固定本租户和门店；用现有会话访问目标工作台，概览完成加载，钱包、账本、PayNow、预约排队及桌台入口可见 |
+| 钱包收银台 | 登录页预选“员工”；用现有会话访问目标，充值、扫码收款、账单入口正常；未充值或建单 |
+| PayNow 收银 | 登录页预选“员工”；用现有会话访问目标，原终端及营业日设置正常读取，金额 0、生成按钮禁用；未生成收款码或开闭营业日 |
+| 每日营业记录 | 登录页预选“员工”；用现有会话访问目标，盘点表加载，显示“尚未暂存 · 第 0 版”；未输入、保存或提交 |
+| 租户管理后台 | 登录页预选“租户”；用现有会话访问目标资料表单正常，未保存任何设置 |
+
+五个登录入口只检查类别、域名及固定 redirect，没有重复提交登录或操作滑块。目标页面使用既有已授权会话只读核验，不把它描述为新员工登录流程已完整提交。
+
+- 7 类入口在当前门店均为可使用。7 张线上实际生成的 PNG 已完整分块保存并独立解码，结果逐一等于卡片 URL，域名全部为 `https://20000000.booking.yumstone.sg`，门店路径一致。
+- 人工查看 PNG 像素确认中央显示“食刻租户”，外侧完整显示租户、RPB 验收门店、用途及 URL；不是仅验证图片 alt 文本。名称取统一资料，无二维码专用资料副本。
+- 复制按钮显示“网址已复制”。Chrome 工具的剪贴板读取返回空字符串，未据此宣称系统剪贴板粘贴验证通过。
+- 点击 PNG 下载按钮以及调用浏览器下载接口均未收到下载事件；已核对链接、文件名、完整导出 PNG 与像素解码，不把浏览器系统下载事件计为通过。真实手机镜头、打印及光照仍属现场抽验范围。
+- 新入口页面未见控制台错误；未执行任何充值、扣款、补付、退款、预约、账本或资料保存操作。
+
+### 其他产品线与数据保护
+
+- 9 项发布前后公开只读检查语义完全一致：lcd/lsc106 预约入口及 lcd/lsc106/lsc83 门店预约上下文、PayNow/账本匿名边界、员工及顾客钱包身份边界。
+- 92 张业务与配置表在切换前、切换后、浏览器验收结束三个快照的行数和指纹全部一致，包含统一租户/顾客、平台计费/订阅、预约排队/桌台、PayNow、每日账本、钱包账户/充值/账单/流水。
+- 身份会话、验证码、AppGate 拒绝审计和通用审计表排除出严格业务指纹；auth_accounts 只排除登录时间、更新时间及版本，其余字段比较。只读验收允许身份会话正常续期，不覆盖任何业务数据。
+- 原有未跟踪 `PRODUCT_LINE_ACCESS_BROWSER_ACCEPTANCE_20261022.md` 和 `rpb信息.txt` 保留，SHA256 与开始时一致，未纳入提交或制品。未修改私人资料内容。
+
+### 证据索引
+
+- `target/tenant-entry-release-source-proof.json`、`tenant-entry-release-artifacts.json`
+- `target/tenant-entry-clean-package.log`、`tenant-entry-clean-build.log`、`tenant-entry-clean-front-tests.log`
+- `target/tenant-entry-release-deploy.log`、`tenant-entry-release-assets-proof.json`、`tenant-entry-release-final-service.log`
+- `target/tenant-entry-public-before.json`、`tenant-entry-public-after.json`、`tenant-entry-neighbors-before.log`、`tenant-entry-neighbors-after.log`
+- `target/tenant-entry-prod-evidence/exports.json`、`decoded.json`：7 张线上名称二维码及完整解码结果。
+- `target/tenant-entry-prod-evidence/entry-navigation.json`、`workspaces.json`：7 类入口及 5 个目标后台页面的只读核验。
+- `target/tenant-entry-prod-evidence/business-proof.json`、`tenant-entry-business-{before,after,final}.jsonl`：92 表一致证据。
+- `target/tenant-entry-prod-evidence/entry-links-production.png`：线上入口页截图；同目录 PNG 为线上实际二维码。
+
+发布成功，已验证范围内未发现其他产品线回归。上述系统下载与真实手机硬件验收限制保留，不计为已通过。
