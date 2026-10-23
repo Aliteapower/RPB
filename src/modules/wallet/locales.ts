@@ -1,3 +1,4 @@
+import {merchantQrZh,merchantQrEn} from './merchantQrLocales'
 import {transactionsZh,transactionsEn} from './transactions/locales'
 import { marketingZh, marketingEn } from './marketingLocales'
 import { walletUiZh, walletUiEn } from './uiLocales'
@@ -6,6 +7,7 @@ import { walletScanChargeZh, walletScanChargeEn } from './scanChargeLocales'
 import { walletTopupQrZh, walletTopupQrEn } from './topupQrLocales'
 import { personalZh,personalEn } from './personalLocales'
 export const walletZh = {
+  merchantQr:merchantQrZh,
   transactions:transactionsZh,
   personal:personalZh,
   marketing: marketingZh,
@@ -53,6 +55,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  merchantQr:merchantQrEn,
   transactions:transactionsEn,
   personal:personalEn,
   marketing: marketingEn,

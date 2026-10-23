@@ -1,7 +1,7 @@
 import { computed, inject, onUnmounted, provide, ref, watch, type InjectionKey } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { walletApi, WalletApiError } from './api'
-import { billCode } from './format'
+import { merchantCode } from './scanning/walletQr'
 import { customerWalletPath, legacyWalletTarget } from './navigation'
 import type { CustomerHome } from './types'
 
@@ -11,11 +11,12 @@ function createWorkspace() {
   const account=computed(()=>home.value?.accounts[0]??null)
   let generation=0,sequence=0,legacyRunning=false,lastLegacyAttempt=''
   async function scan(value:string,replace=false) {
-    const decoded=billCode(value)
-    if(decoded.store && decoded.store!==store.value){const path=`${customerWalletPath(decoded.store)}#bill=${encodeURIComponent(decoded.code)}`;if(replace)await router.replace(path);else await router.push(path);return}
+    const decoded=merchantCode(value,window.location.origin)
+    if(decoded.store && decoded.store!==store.value){const path=`${customerWalletPath(decoded.store)}#${decoded.kind}=${encodeURIComponent(decoded.code)}`;if(replace)await router.replace(path);else await router.push(path);return}
     const current=generation,id=store.value
-    const bill=await walletApi(id,true).post<{id:string}>('/bill-code',{code:decoded.code})
-    if(current===generation){const path=customerWalletPath(id,`bills/${bill.id}`);if(replace)await router.replace(path);else await router.push(path)}
+    const redemption=decoded.kind==='redeem'
+    const bill=await walletApi(id,true).post<{id:string}>(redemption?'/points-redemption-code':'/bill-code',{code:decoded.code})
+    if(current===generation){const path=customerWalletPath(id,`${redemption?'points-redemptions':'bills'}/${bill.id}`);if(replace)await router.replace(path);else await router.push(path)}
   }
   async function legacy() {
     if(!home.value || legacyRunning)return

@@ -10,5 +10,6 @@ export function legacyWalletTarget(store: string, hash: string) {
   const params = new URLSearchParams(hash.slice(1))
   if (params.get('receipt')) return { type: 'receipt' as const, path: customerWalletPath(store, `bills/${encodeURIComponent(params.get('receipt')!)}`) }
   if (params.get('bill')) return { type: 'scan' as const, store, code: params.get('bill')! }
+  if (params.get('redeem')) return { type: 'scan' as const, store, code: params.get('redeem')! }
   return null
 }

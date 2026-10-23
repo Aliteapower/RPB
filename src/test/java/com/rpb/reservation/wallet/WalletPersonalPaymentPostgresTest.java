@@ -79,6 +79,77 @@ class WalletPersonalPaymentPostgresTest {
         tx.execute(s->accountService.configure(scope,actor,new ProgramSettings(null,List.of("cash","paynow","credit_card"),key())));
     }
     String key(){return UUID.randomUUID().toString();}
+    com.rpb.reservation.wallet.integration.WalletPointsAdapter redemptionPoints;
+    CurrentActor redemptionActor;
+    com.rpb.reservation.wallet.redemption.RedemptionService redemptionService(){
+        tx.execute(s->marketing.offers(scope,actor));jdbc.update("update wallet_marketing_settings set points_enabled=true where tenant_id=?",tenant);
+        var permissions=new HashSet<>(actor.permissions());permissions.addAll(Set.of("wallet.points.view","wallet.points.redeem","wallet.points.grant"));
+        redemptionActor=new CurrentActor(tenant,actorId,"tenant_admin",Set.of("tenant_admin"),permissions,Set.of(store));
+        var points=new com.rpb.reservation.loyalty.application.PointsService(new com.rpb.reservation.loyalty.persistence.PointsRepository(jdbc),new com.rpb.reservation.loyalty.persistence.PointsCommandRepository(jdbc,json));
+        redemptionPoints=new com.rpb.reservation.wallet.integration.WalletPointsAdapter(access,directory,points,jdbc,marketing);
+        tx.execute(s->redemptionPoints.mutate(scope,redemptionActor,customer,"manual_grant",new com.rpb.reservation.loyalty.application.PointsViews.Mutation(100,"测试赠分",null,null,null,null,key())));
+        return new com.rpb.reservation.wallet.redemption.RedemptionService(new com.rpb.reservation.wallet.redemption.RedemptionRepository(jdbc),accounts,commands,access,redemptionPoints,clock);
+    }
+    @Test void merchantPointsCodeOnlyConfirmsForOwnerAndRecordsOneRedemptionWithoutMoney(){
+        var service=redemptionService();var request=tx.execute(s->service.create(scope,redemptionActor,new com.rpb.reservation.wallet.redemption.RedemptionDtos.Create(customer,20,"兑换咖啡",key())));
+        var code=tx.execute(s->service.issue(scope,redemptionActor,request.id()));assertThat(code.code()).startsWith("WR.");
+        var preview=service.scan(scope,principal,code.code());assertThat(preview.balance()).isEqualTo(100);assertThat(preview.status()).isEqualTo("pending");
+        var other=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),UUID.randomUUID(),"other@example.invalid","other");
+        assertThatThrownBy(()->service.scan(scope,other,code.code())).isInstanceOf(WalletException.class);
+        var body=new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(preview.expectedVersion(),key());
+        var result=tx.execute(s->service.confirm(scope,principal,request.id(),body));assertThat(result.status()).isEqualTo("completed");assertThat(result.balance()).isEqualTo(80);assertThat(result.entryId()).isNotNull();
+        assertThat(tx.execute(s->service.confirm(scope,principal,request.id(),body)).entryId()).isEqualTo(result.entryId());
+        assertThat(tx.execute(s->service.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(preview.expectedVersion(),key()))).entryId()).isEqualTo(result.entryId());
+        assertThat(jdbc.queryForObject("select count(*) from loyalty_entries where tenant_id=? and kind='redemption'",Integer.class,tenant)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from wallet_entries where tenant_id=?",Integer.class,tenant)).isZero();
+        assertThat(jdbc.queryForObject("select response::text from wallet_commands where tenant_id=? and operation='points.request.create'",String.class,tenant)).doesNotContain(code.code());
+    }
+
+    @Test void redemptionRefreshExpiryCancelStaleAndDisabledLeaveBalancesIntact(){
+        var service=redemptionService();var request=tx.execute(s->service.create(scope,redemptionActor,new com.rpb.reservation.wallet.redemption.RedemptionDtos.Create(customer,20,"兑换咖啡",key())));
+        var first=tx.execute(s->service.issue(scope,redemptionActor,request.id()));var second=tx.execute(s->service.issue(scope,redemptionActor,request.id()));
+        assertThatThrownBy(()->service.scan(scope,principal,first.code())).isInstanceOf(WalletException.class);
+        var preview=service.scan(scope,principal,second.code());
+        var expired=new com.rpb.reservation.wallet.redemption.RedemptionService(new com.rpb.reservation.wallet.redemption.RedemptionRepository(jdbc),accounts,commands,access,redemptionPoints,Clock.offset(clock,Duration.ofSeconds(121)));
+        assertThatThrownBy(()->tx.execute(s->expired.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(preview.expectedVersion(),key())))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_REDEMPTION_EXPIRED");
+        tx.execute(s->redemptionPoints.mutate(scope,redemptionActor,customer,"manual_grant",new com.rpb.reservation.loyalty.application.PointsViews.Mutation(1,"更新版本",null,null,null,null,key())));
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(preview.expectedVersion(),key())))).isInstanceOf(RuntimeException.class);
+        jdbc.update("update wallet_marketing_settings set points_enabled=false where tenant_id=?",tenant);
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(preview.expectedVersion()+1,key())))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_POINTS_DISABLED");
+        tx.execute(s->service.cancel(scope,redemptionActor,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Cancel(key())));
+        assertThatThrownBy(()->service.scan(scope,principal,second.code())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(s->service.create(scope,actor,new com.rpb.reservation.wallet.redemption.RedemptionDtos.Create(customer,20,"无权出码",key())))).isInstanceOf(WalletException.class);
+        assertThat(redemptionPoints.own(scope,principal).balance()).isEqualTo(101);
+        assertThat(jdbc.queryForObject("select count(*) from loyalty_entries where tenant_id=? and kind='redemption'",Integer.class,tenant)).isZero();
+    }
+    @Test void concurrentRedemptionConfirmationsWithDifferentKeysCreateOneEntry() throws Exception {
+        var service=redemptionService();var request=tx.execute(s->service.create(scope,redemptionActor,new com.rpb.reservation.wallet.redemption.RedemptionDtos.Create(customer,20,"兑换咖啡",key())));
+        var pool=Executors.newFixedThreadPool(2);var start=new CountDownLatch(1);
+        try {
+            Callable<UUID> action=()->{start.await();return tx.execute(s->service.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(request.expectedVersion(),key()))).entryId();};
+            var a=pool.submit(action);var b=pool.submit(action);start.countDown();assertThat(a.get(15,TimeUnit.SECONDS)).isEqualTo(b.get(15,TimeUnit.SECONDS));
+            assertThat(redemptionPoints.own(scope,principal).balance()).isEqualTo(80);
+            assertThat(jdbc.queryForObject("select count(*) from loyalty_entries where tenant_id=? and kind='redemption'",Integer.class,tenant)).isEqualTo(1);
+        } finally {pool.shutdownNow();}
+    }
+
+    @Test void merchantBillCodeUsesExistingCustomerConfirmationPayment(){
+        var a=credit(open(),"100","cash");var b=bill(a,"12");var code=tx.execute(s->authorization.issueBillCode(scope,actor,b.id()));
+        assertThat(authorization.scanBill(scope,principal,code.code()).id()).isEqualTo(b.id());assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(10000);
+        pay(b);assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(8800);
+    }
+    @Test void redemptionCannotCrossScopeOrConfirmAfterFundsOrEntitlementChange(){
+        var service=redemptionService();var request=tx.execute(s->service.create(scope,redemptionActor,new com.rpb.reservation.wallet.redemption.RedemptionDtos.Create(customer,80,"兑换",key())));
+        assertThatThrownBy(()->service.own(new StoreScope(scope.tenantId(),UUID.randomUUID()),principal,request.id())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->service.own(new StoreScope(new TenantId(UUID.randomUUID()),store),principal,request.id())).isInstanceOf(WalletException.class);
+        tx.execute(s->redemptionPoints.mutate(scope,redemptionActor,customer,"redemption",new com.rpb.reservation.loyalty.application.PointsViews.Mutation(50,"其他兑换",null,null,"兑换",request.expectedVersion(),key())));
+        var latest=redemptionPoints.own(scope,principal);
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(latest.version(),key())))).isInstanceOf(RuntimeException.class);
+        when(gate.evaluateCommercial(any(),any(),any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,AppGateDenyReason.STORE_APP_NOT_ENABLED));
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,principal,request.id(),new com.rpb.reservation.wallet.redemption.RedemptionDtos.Confirm(latest.version(),key())))).isInstanceOf(WalletException.class);
+        assertThat(redemptionPoints.own(scope,principal).balance()).isEqualTo(50);
+        assertThat(jdbc.queryForObject("select status from wallet_points_redemption_requests where id=?",String.class,request.id())).isEqualTo("pending");
+    }
     Account open(){return tx.execute(s->accountService.open(scope,actor,customer,key()));}
     Topup create(Account a,String amount,String channel){return tx.execute(s->topups.create(scope,actor,new TopupCreate(a.id(),amount,channel,key())));}
     CollectionConfirm confirm(String amount,String channel,String ref){return new CollectionConfirm(channel,amount,"merchant-account",ref,"T1","商户端已核实",true,key());}

@@ -12,7 +12,7 @@ function createWorkspace() {
   const identifiedCustomerId=ref<string|null>(null),phoneConfirmedCustomerId=ref<string|null>(null)
   const customer = ref<Customer | null>(null), account = ref<Account | null>(null), customerCode = ref(''), customers = ref<Customer[]>([])
   const can = (permission: string) => auth.user?.permissions.includes(permission) === true
-  const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||(route.name==='wallet-topup'&&(route.query.kind==='points'||!can('wallet.topup.create'))&&can('wallet.points.view')))
+  const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||(['wallet-topup','wallet-merchant-code'].includes(String(route.name))&&(route.query.kind==='points'||!(route.name==='wallet-merchant-code'?can('wallet.charge.create'):can('wallet.topup.create')))&&can('wallet.points.view')))
   let generation = 0, selection = 0
   function clear() { selection++; identifiedCustomerId.value=null;phoneConfirmedCustomerId.value=null; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
   async function refresh() {

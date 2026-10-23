@@ -15,12 +15,13 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
+@WebMvcTest({com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
 class WalletLocalRuntimeSecurityTest {
     @Autowired MockMvc mvc;
+    @MockBean com.rpb.reservation.wallet.redemption.RedemptionService redemptions;
     @MockBean WalletApiIdentity identity;
     @MockBean com.rpb.reservation.wallet.transactions.TransactionService transactions;
     @MockBean com.rpb.reservation.wallet.integration.WalletPointsAdapter points;
@@ -93,4 +94,23 @@ class WalletLocalRuntimeSecurityTest {
         }
         verifyNoInteractions(transactions);
     }
+    @Test void merchantRedemptionRoutesRequireIdentityAndOnlyDeclaredMethods() throws Exception {
+        when(identity.staff()).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"login"));
+        when(identity.customer(any())).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"login"));
+        String id="20000000-0000-0000-0000-000000000983",staff="/api/v1/stores/"+id+"/wallet/",customer="/api/v1/public/stores/"+id+"/wallet/";
+        for(String path:new String[]{staff+"points-redemptions/"+id,customer+"points-redemptions/"+id})mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        for(String path:new String[]{staff+"points-redemptions",staff+"points-redemptions/"+id+"/code",staff+"points-redemptions/"+id+"/cancel",customer+"points-redemption-code",customer+"points-redemptions/"+id+"/confirm"})mvc.perform(post(path).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
+        mvc.perform(get(staff+"points-redemptions")).andExpect(status().isForbidden());
+        mvc.perform(post(customer+"points-redemptions/"+id+"/confirm").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        mvc.perform(post(customer+"points-redemptions/"+id+"/confirm").header("X-RPB-Wallet","1").header("Sec-Fetch-Site","cross-site").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        verifyNoInteractions(redemptions);
+    }
+
+    @Test void redemptionPayloadRejectsFractionsUnknownFieldsAndCustomerOverrides() throws Exception {
+        String id="20000000-0000-0000-0000-000000000983",staff="/api/v1/stores/"+id+"/wallet/points-redemptions",customer="/api/v1/public/stores/"+id+"/wallet/points-redemptions/"+id+"/confirm";
+        mvc.perform(post(staff).header("X-RPB-Wallet","1").contentType("application/json").content("{\"quantity\":1.5}")).andExpect(status().isBadRequest());
+        mvc.perform(post(customer).header("X-RPB-Wallet","1").contentType("application/json").content("{\"expectedVersion\":1,\"customerId\":\""+id+"\"}")).andExpect(status().isBadRequest());
+        verifyNoInteractions(redemptions);
+    }
+
 }

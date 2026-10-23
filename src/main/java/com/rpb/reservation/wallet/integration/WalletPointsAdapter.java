@@ -60,4 +60,10 @@ public class WalletPointsAdapter {
   if(!a.canAccessStore(original))throw WalletException.forbidden();
   return points.reverse(b,a.actorId(),entryId,r);
  }
+ /** Called only after a persisted merchant intent is locked and its bound customer explicitly confirms. */
+ @Transactional public Result redeemConfirmed(StoreScope s,CustomerAuthPrincipal p,UUID issuerActor,UUID requestId,int quantity,String description,Integer version){
+  access.customer(s,p,true);var b=binding(s,true);
+  if(!settings.pointsEnabled(s))throw new WalletException("WALLET_POINTS_DISABLED",409,"积分功能尚未启用");
+  return points.mutate(b,issuerActor,p.customerId(),"redemption",new Mutation(quantity,"顾客扫码确认积分兑换",null,"qr:"+requestId,description,version,"qr:"+requestId));
+ }
 }

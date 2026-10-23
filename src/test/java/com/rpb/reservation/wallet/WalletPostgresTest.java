@@ -107,7 +107,8 @@ class WalletPostgresTest {
     @Test void personalIdentityRequiresFreshScopedCodeAndAuthorizedActor(){
         var service=identities(clock);var old=tx.execute(s->service.issue(scope,principal));var fresh=tx.execute(s->service.issue(scope,principal));
         assertThatThrownBy(()->service.resolve(scope,actor,old.code())).isInstanceOf(WalletException.class);
-        assertThatThrownBy(()->identities(Clock.offset(clock,Duration.ofSeconds(61))).resolve(scope,actor,fresh.code())).isInstanceOf(WalletException.class);
+        assertThat(identities(Clock.offset(clock,Duration.ofSeconds(119))).resolve(scope,actor,fresh.code()).id()).isEqualTo(customer);
+        assertThatThrownBy(()->identities(Clock.offset(clock,Duration.ofSeconds(121))).resolve(scope,actor,fresh.code())).isInstanceOf(WalletException.class);
         var denied=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.view"),Set.of(store));assertThatThrownBy(()->service.resolve(scope,denied,fresh.code())).isInstanceOf(WalletException.class);
         var foreign=new StoreScope(new TenantId(UUID.randomUUID()),store);assertThatThrownBy(()->service.resolve(foreign,actor,fresh.code())).isInstanceOf(WalletException.class);
         var anotherStore=new StoreScope(new TenantId(tenant),UUID.randomUUID());assertThatThrownBy(()->service.resolve(anotherStore,actor,fresh.code())).isInstanceOf(WalletException.class);
