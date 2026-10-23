@@ -18,4 +18,14 @@ GO：后端相关 32 项、钱包前端 116 项、Vue 类型检查及构建通�
 
 ## 实际结果
 
-完成后补记提交、备份目录、制品哈希及线上核验结果。
+运行代码提交 `cb400bf7de938d5e85733b513a05353fa565ed78` 已推送至 codex/paynow-payment-product-line-staging；生产前后端 RELEASE_SHA 均为该 SHA。发布完成，无回退。
+
+- 干净 Git 归档 Maven package、npm ci、Vue 类型检查及 Vite 构建全部成功；复用本轮同代码状态的 32 项后端、116 项前端及隔离运行／浏览器证据。npm 存在 7 项既有 high 告警，本轮未更改依赖。
+- jar SHA256 `40b9fccd3358e8f86a177a645f89dceaa5b34dbca6c2e2cc6b4ddaf177d625fa`；前端包 SHA256 `a8614cafcc3467fd68cc830fe5e7e234ccea536713345210f9cf1dde994bb1a5`，上传及安装核验一致。
+- 发布目录 `/opt/rpb/releases/20261023-wallet-code120-cb400bf7`；备份 `/opt/rpb/backups/20261023-wallet-code120-cb400bf7-before`，含原 jar、完整前端、版本及 923530 字节 PostgreSQL dump；pg_restore 目录验证可读。
+- 切换前、切换后及最终 112 张业务／配置表指纹一致，排除会话、动态码、审计及限流等自然变化表，个人授权同意和策略历史纳入核对。Flyway 保持 064／64 项／0 失败，无迁移。
+- 4 个公网域名 HTML 与 183 个静态资源逐字节一致；2 项管理入口匿名拒绝；个人码、个人授权、交易等 32 项匿名／缺标记／跨站保护检查通过；原订位、支付、日账本、身份等 9 项公开接口状态正常。
+- 新进程 PID927854，InvocationID `2dd3d1569e9c494a9cc1af42dd3b0346`，NRestarts0；新进程日志无 ERROR，临时流量隔离规则已移除，最终进程身份稳定。nginx、PostgreSQL、Redis、Docker 的进程／InvocationID／状态／重启数保持不变。
+- 未替真实顾客充值、付款、授权或办理积分；真实手机相册及相机尚未重测。页面应刷新并重新生成个人码，新签发为 120 秒，旧码不会被延长。
+
+本轮制品、日志及公网核验证据在 D:\RPB\target\wallet-code120-*，原接口检查在 target/wallet-personal-public-code120-after*。原有无关修改及私密材料保持未提交；后续发布记录文档提交不改变运行 SHA。
