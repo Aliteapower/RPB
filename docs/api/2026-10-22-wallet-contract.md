@@ -26,6 +26,8 @@ POST `/accounts`：`customerId, idempotencyKey`，返回原有或零余额账户
 
 POST `/topups`：`accountId, amount, channel, idempotencyKey`，返回待收款单；POST `/topups/{id}/confirm`：`amount, receiptReference, collectionAccount, terminalCode, note, idempotencyKey`，授权员工人工确认后入账。GET `/topups` 查询。取消仅允许未收款单。
 
+2026-10-23：仅普通现金充值确认允许 `receiptReference` 缺省、null 或空白；服务端按充值单 ID 生成稳定内部编号 `CASH-TOPUP-{topupId}`，满足原收款凭据非空和唯一约束。用户填写的编号仍按原规则校验和保存。PayNow、信用卡、账单补付和异常收款仍必须填写凭证；金额核对、实际收款勾选、终端、权限、租户／门店隔离及幂等不变，不涉及迁移。重试或重复确认不得重复充值。
+
 POST `/bills`：`accountId, amount, idempotencyKey, customerCode?`，创建消费单。扫码时必须携带 `customerCode`，码校验、建单、绑定、审计和幂等快照同一事务；取得锁后检查时效，过期/已用/不匹配的码不留下账单或快照。同键同参重试返回已绑定原单，即使码随后过期；不同键重用同码返回 409。手工选客省略码保持原行为。POST `/bills/{id}/code` 单独签发 10 分钟商户账单码。GET `/bills`、`/bills/{id}`：包含支付分摊/剩余应付；POST `/bills/{id}/bind-code`：`code` 绑定已有账单（旧接口保留，禁止用于扫码新建单的两阶段流程）。POST `/payment-codes/resolve`：识别有效未绑定付款码对应的统一顾客，不授权扣款。POST `/bills/{id}/collections`：三渠道线下补差确认，使用与充值一致的凭证字段和权限。
 
 POST `/refunds`：`sourceType(top_up/bill/collection_exception), sourceId, amount, reason, idempotencyKey`，经理权限；POST `/refunds/{id}/confirm`：`partId, receiptReference, idempotencyKey` 确认已完成的原渠道线下退款；POST `/refunds/{id}/cancel` 仅取消未执行退款并释放冻结，已经退钱包的混合退款不允许取消。GET `/refunds` 与 `/reconciliation?start=YYYY-MM-DD&end=YYYY-MM-DD`。
@@ -34,7 +36,7 @@ GET/POST `/collection-exceptions`：经理登记迟到、超收或重复实收�
 
 PayNow 普通确认必须填写商户银行实际收款 UEN/手机号（`collectionAccount`），服务端与当前门店配置核对，不把空值默认为已核对账户；不匹配时转经理异常复核。资料停用/变更后，经理仍可按原单填写实际收款标识登记异常实收并退回，不能因此增加钱包余额。无有效门店配置时，服务端拒绝新建 PayNow 充值，不只靠前端禁用。
 
-GET `/customers/{id}`、`/customers/{id}/accounts`：只从租户共享顾客目录查询，不要求事先登录；GET `/logo/{assetId}`：只允许当前统一 Logo，清除后旧 URL 返回 404。三渠道确认正文都必须含 `channel, amount, collectionAccount, receiptReference, terminalCode, note, verified=true, idempotencyKey`，渠道不能由客户端伪造为在线回调。
+GET `/customers/{id}`、`/customers/{id}/accounts`：只从租户共享顾客目录查询，不要求事先登录；GET `/logo/{assetId}`：只允许当前统一 Logo，清除后旧 URL 返回 404。确认正文使用 `channel, amount, collectionAccount, receiptReference, terminalCode, note, verified=true, idempotencyKey`；仅普通现金充值的 receiptReference 可省略，其余渠道／用例要求不变，渠道不能由客户端伪造为在线回调。
 
 ## 顾客用例
 

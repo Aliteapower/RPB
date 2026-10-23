@@ -2,6 +2,8 @@ import { walletUiZh, walletUiEn } from './uiLocales'
 import { walletScannerZh, walletScannerEn, walletFeedbackZh, walletFeedbackEn } from './scanLocales'
 import { walletScanChargeZh, walletScanChargeEn } from './scanChargeLocales'
 export const walletZh = {
+  cashTopupReceipt: '现金收据编号（选填）',
+  cashTopupAttested: '我已实际收到现金并核实充值金额',
   phoneRequired: '请先在租户顾客管理补全手机号，再开通钱包。',
   scanCharge: walletScanChargeZh,
   scanner: walletScannerZh, feedback: walletFeedbackZh,
@@ -43,6 +45,8 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  cashTopupReceipt: 'Cash receipt reference (optional)',
+  cashTopupAttested: 'I have received the cash and verified the top-up amount',
   phoneRequired: 'Add a phone in tenant customer management before opening a wallet.',
   scanCharge: walletScanChargeEn,
   scanner: walletScannerEn, feedback: walletFeedbackEn,

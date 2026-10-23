@@ -240,6 +240,20 @@ class WalletPostgresTest {
         }
         assertThat(a.balanceCents()).isEqualTo(3000);assertThat(ledger.entries(scope,a.id(),0)).hasSize(3);
     }
+    @Test void cashTopupsWithoutPaperReceiptCreditOnceAndKeepDistinctInternalReferences() {
+        var a=open();var first=create(a,"10","cash");
+        var c=confirm("10","cash",null);
+        var result=tx.execute(s->topups.confirm(scope,actor,first.id(),c));
+        TopupResult replay=tx.execute(s->topups.confirm(scope,actor,first.id(),c));assertThat(replay).isEqualTo(result);
+        tx.execute(s->topups.confirm(scope,actor,first.id(),confirm("10","cash","")));
+        var second=create(a,"10","cash");
+        tx.execute(s->topups.confirm(scope,actor,second.id(),confirm("10","cash","  ")));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(2000);
+        assertThat(ledger.entries(scope,a.id(),0)).hasSize(2);
+        assertThat(jdbc.queryForList("select receipt_reference from wallet_collections where tenant_id=? order by receipt_reference",String.class,tenant))
+            .containsExactlyInAnyOrder("CASH-TOPUP-"+first.id(),"CASH-TOPUP-"+second.id());
+    }
+
     @Test void preventsReceiptReuseAcrossDifferentTopupsAndRejectsOcrLikeUnverifiedConfirmation() {
         var a=open();var t=create(a,"50","paynow");var confirmation=confirm("50","paynow","bank-unique");
         tx.execute(s->topups.confirm(scope,actor,t.id(),confirmation));var another=create(a,"50","paynow");
