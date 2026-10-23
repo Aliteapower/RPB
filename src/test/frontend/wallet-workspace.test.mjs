@@ -19,7 +19,7 @@ before(async()=>{
   globalThis.document={visibilityState:'visible'}
   // Bundle the production modules together so their injection keys retain identity without a dev server.
   const {build}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
-  const source=`export * as historyModule from './src/modules/wallet/useWalletHistory.ts';export * as recordModule from './src/modules/wallet/useWalletRecord.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as receiptModule from './src/modules/wallet/useWalletCodeReceipt.ts';export * as codeModule from './src/modules/wallet/useCustomerWalletCode.ts'`
+  const source=`export * as historyModule from './src/modules/wallet/transactions/useTransactions.ts';export * as recordModule from './src/modules/wallet/useWalletRecord.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as receiptModule from './src/modules/wallet/useWalletCodeReceipt.ts';export * as codeModule from './src/modules/wallet/useCustomerWalletCode.ts'`
   const result=await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','pinia']})
   const dir=process.cwd()+'/target/wallet-workspace-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
   ;({historyModule,recordModule,staffModule,customerModule,authModule,receiptModule,codeModule}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
@@ -68,11 +68,11 @@ test('a late code receipt cannot navigate after switching store or regenerating 
 })
 test('history filters load immediately and late responses from the previous filter cannot restore old rows',async()=>{
   const requests=[];globalThis.fetch=(url)=>new Promise(resolve=>requests.push({url,resolve}))
-  const status=ref('all'),scope=mount(()=>historyModule.useWalletHistory(ref('A'),ref('/bills'),status))
-  await tick();status.value='pending';await tick();assert.equal(requests.length,2)
-  requests[1].resolve(response([{id:'current-filter'}]));await tick()
-  requests[0].resolve(response([{id:'stale-filter'}]));await tick()
-  assert.deepEqual(scope.state.rows.value,[{id:'current-filter'}]);assert.equal(scope.state.busy.value,false)
+  const query=ref({status:'all'}),scope=mount(()=>historyModule.useTransactions(ref('A'),query))
+  await tick();query.value={status:'pending'};await tick();assert.equal(requests.length,2)
+  requests[1].resolve(response({items:[{id:'current-filter'}]}));await tick()
+  requests[0].resolve(response({items:[{id:'stale-filter'}]}));await tick()
+  assert.deepEqual(scope.state.data.value.items,[{id:'current-filter'}]);assert.equal(scope.state.busy.value,false)
   scope.unmount()
 })
 

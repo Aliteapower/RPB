@@ -4,7 +4,7 @@ import { createServer } from 'vite'
 import { normalizeWalletQr } from '../../modules/wallet/scanning/walletQr.ts'
 const code='WC.'+'A'.repeat(43),account={id:'account',version:2,balanceCents:500,reservedCents:200}
 let vite,chargePreview,confirmScanCharge,isChargeCode,createScanChargeAttempt
-before(async()=>{vite=await createServer({configFile:false,cacheDir:'target/wallet-charge-test-cache',server:{middlewareMode:true},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]}});({chargePreview,confirmScanCharge,isChargeCode,createScanChargeAttempt}=await vite.ssrLoadModule('/src/modules/wallet/scanCharge.ts'))})
+before(async()=>{vite=await createServer({configFile:false,cacheDir:'target/wallet-charge-test-cache',server:{middlewareMode:true,hmr:false},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]}});({chargePreview,confirmScanCharge,isChargeCode,createScanChargeAttempt}=await vite.ssrLoadModule('/src/modules/wallet/scanCharge.ts'))})
 after(async()=>await vite?.close())
 let originalFetch
 beforeEach(()=>{originalFetch=globalThis.fetch;const storage=new Map();globalThis.sessionStorage={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}})

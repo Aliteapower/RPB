@@ -37,13 +37,13 @@ class WalletMarketingLocalSecurityTest {
  String customer(){return "/api/v1/public/stores/"+id+"/wallet";}
  @BeforeEach void unauthenticated(){when(identity.staff()).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录"));when(identity.customer(any())).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录"));}
  @Test void exactNewStaffRoutesReachIdentityAndNeverBusinessServices()throws Exception{
-  for(String path:new String[]{"/points/context","/marketing/settings","/marketing/campaigns","/marketing/campaigns/"+id,"/topup-offers","/accounts/"+id+"/funding-lots","/customers/"+id+"/points","/customers/"+id+"/points/entries"})mvc.perform(get(staff()+path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
+  for(String path:new String[]{"/points/context","/marketing/settings","/marketing/campaigns","/marketing/campaigns/"+id,"/topup-offers","/accounts/"+id+"/funding-lots","/customers/"+id+"/points"})mvc.perform(get(staff()+path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
   for(String path:new String[]{"/marketing/settings","/marketing/campaigns/"+id+"/draft"})mvc.perform(put(staff()+path).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
   for(String path:new String[]{"/marketing/campaigns","/marketing/campaigns/"+id+"/publish","/marketing/campaigns/"+id+"/disable","/marketing/campaigns/"+id+"/archive","/topup-quotes","/customer-codes/resolve","/charge-previews","/refund-previews","/funding-lots/"+id+"/exit-bonus","/customers/"+id+"/points/grants","/customers/"+id+"/points/deductions","/customers/"+id+"/points/redemptions","/points/entries/"+id+"/reverse"})mvc.perform(post(staff()+path).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
   verifyNoInteractions(marketing,config,self,points,funding,customerIdentity);
  }
  @Test void exactNewCustomerRoutesUseCustomerIdentityAndNoStore()throws Exception{
-  for(String path:new String[]{"/topup-offers","/topups","/topups/"+id,"/topups/"+id+"/paynow","/points","/points/entries"})mvc.perform(get(customer()+path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
+  for(String path:new String[]{"/topup-offers","/topups/"+id,"/topups/"+id+"/paynow","/points"})mvc.perform(get(customer()+path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
   for(String path:new String[]{"/customer-codes","/topup-quotes","/topups","/topups/"+id+"/declare-paid","/topups/"+id+"/cancel"})mvc.perform(post(customer()+path).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
   verifyNoInteractions(marketing,config,self,points,funding,customerIdentity);
  }

@@ -70,6 +70,17 @@ test('disposing a pending camera prevents late attachment and any later start',a
 })
 
 
-test('personal identity QR is accepted only for identity lookup, never for customer debit or bill payment',()=>{
- const identity='WI.'+'A'.repeat(43);assert.equal(normalizeWalletQr(identity,'identity',origin),identity);assert.equal(normalizeWalletQr(code,'identity',origin),code);assert.equal(normalizeWalletQr('WC.'+'A'.repeat(43),'identity',origin),null);assert.equal(normalizeWalletQr(identity,'customer',origin),null);assert.equal(normalizeWalletQr(identity,'bill',origin),null)
+test('personal QR accepts identity and direct personal payment, while legacy debit stays separate',()=>{
+ const identity='WI.'+'A'.repeat(43);assert.equal(normalizeWalletQr(identity,'identity',origin),identity);assert.equal(normalizeWalletQr(code,'identity',origin),code);assert.equal(normalizeWalletQr('WC.'+'A'.repeat(43),'identity',origin),null);assert.equal(normalizeWalletQr(identity,'customer',origin),identity);assert.equal(normalizeWalletQr(identity,'personal',origin),identity);assert.equal(normalizeWalletQr('WC.'+'A'.repeat(43),'personal',origin),null);assert.equal(normalizeWalletQr(identity,'bill',origin),null)
+})
+
+
+test('personal payment scanner states immediate collection while identity keeps read-only guidance',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const source=await readFile(new URL('../../modules/wallet/components/WalletQrScanner.vue',import.meta.url),'utf8')
+ assert.match(source,/purpose==='personal'\?'wallet.personal.scanPrivacy':'wallet.scanner.privacy'/)
+ assert.equal((source.match(/purpose==='identity'\|\|purpose==='personal'\?'wallet.marketing.pastePersonal':'wallet.manualCode'/g)||[]).length,2)
+ const locales=await readFile(new URL('../../modules/wallet/personalLocales.ts',import.meta.url),'utf8')
+ assert.match(locales,/扫码后按已填写金额收款，超限由顾客确认/)
+ assert.doesNotMatch(locales,/扫码不会直接扣款/)
 })

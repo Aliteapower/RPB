@@ -33,6 +33,19 @@ public class WalletCommandRepository {
             return result;
         } catch(com.fasterxml.jackson.core.JsonProcessingException e) {throw new IllegalStateException("wallet serialization failed",e);}
     }
+    /** Serialize recovery with the original command, closing an absent key against late arrival. */
+    public <T> T reconcileOrClose(StoreScope scope,UUID actor,String operation,String key,Class<T> type,Supplier<T> closed) {
+        if(key==null||key.isBlank()||key.length()>100||actor==null)throw WalletException.invalid();
+        jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))",scope.tenantId().value()+":"+actor+":"+operation+":"+key);
+        var rows=jdbc.query("select response::text from wallet_commands where tenant_id=? and principal_id=? and operation=? and idempotency_key=?",(rs,n)->rs.getString(1),scope.tenantId().value(),actor,operation,key);
+        if(!rows.isEmpty())try{return json.readValue(rows.getFirst(),type);}catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException("wallet serialization failed",e);}
+        return run(scope,actor,operation,key,java.util.Map.of("reconciledClosed",true),type,closed);
+    }
+    public <T> T result(StoreScope scope,UUID actor,String operation,String key,Class<T> type) {
+        if(key==null||key.isBlank()||key.length()>100)throw WalletException.invalid();
+        String response=jdbc.query("select response::text from wallet_commands where tenant_id=? and principal_id=? and operation=? and idempotency_key=?",(rs,n)->rs.getString(1),scope.tenantId().value(),actor,operation,key).stream().findFirst().orElseThrow(WalletException::missing);
+        try{return json.readValue(response,type);}catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException("wallet serialization failed",e);}
+    }
     public void audit(StoreScope scope,UUID actor,String action,UUID source,Object details) {
         try {
             jdbc.update("insert into wallet_audit(tenant_id,store_id,actor_id,action,source_id,details) values(?,?,?,?,?,?::jsonb)",

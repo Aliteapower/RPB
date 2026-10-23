@@ -10,5 +10,4 @@ public class WalletPointsCustomerController {
  private final WalletApiIdentity identity;private final WalletPointsAdapter points;
  public WalletPointsCustomerController(WalletApiIdentity identity,WalletPointsAdapter points){this.identity=identity;this.points=points;}
  @GetMapping public Account get(@PathVariable UUID storeId,HttpServletRequest request){var p=identity.customer(request);return points.own(identity.scope(p.tenantId(),storeId),p);}
- @GetMapping("/entries")public List<Entry> entries(@PathVariable UUID storeId,@RequestParam(defaultValue="0")int offset,HttpServletRequest request){var p=identity.customer(request);return points.ownEntries(identity.scope(p.tenantId(),storeId),p,offset);}
 }

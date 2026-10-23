@@ -25,7 +25,9 @@
 .wallet-home-hero h2 { font-size:30px; font-weight:650; }
 .wallet-home-hero>p:not(.wallet-eyebrow) { opacity:.8; font-size:14px; margin-bottom:22px; }
 .wallet-hero-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.wallet-hero-actions.wallet-code-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.wallet-hero-actions.wallet-code-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.wallet-hero-actions.wallet-single-action { grid-template-columns:1fr; }
+.wallet-single-action a { padding:12px; text-align:center; }
 .wallet-hero-actions a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; min-height:112px; border-radius:17px; background:#ffffff16; transition:background .15s; }
 .wallet-hero-actions a:hover { background:#ffffff24; }
 .wallet-hero-actions strong { font-size:16px; font-weight:600; text-align:center; }
@@ -135,3 +137,5 @@ body:has(.wallet-shell) .frontend-locale-switcher { display:none; }
 .wallet-recharge-options{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.wallet-recharge-options button{flex:1;min-width:140px}.wallet-recharge-options button[aria-pressed=true]{border-color:var(--wallet-blue);color:var(--wallet-blue);background:#edf5ff}.wallet-points-record-heading{display:flex;justify-content:space-between;gap:12px}.wallet-points-in{color:#087c62}.wallet-points-out{color:#b64527}.wallet-points-record>span{display:block;color:var(--wallet-muted);font-size:13px}.wallet-points-summary .wallet-record{margin:12px 0 0}.wallet-points-summary .wallet-page-heading h2{font-size:21px}.wallet-points-summary .wallet-page-heading a{color:var(--wallet-blue)}
 
 .wallet-code-actions.wallet-identity-only{grid-template-columns:1fr}
+
+.wallet-transaction-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.wallet-transaction-row{display:block;overflow-wrap:anywhere}.wallet-transaction-row>div{display:flex;justify-content:space-between;gap:12px}.wallet-transaction-row p{margin:6px 0}.wallet-transaction-stats{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px}.wallet-transaction-stats dd{margin:0;text-align:right}.wallet-customer .wallet-bottom-nav{grid-template-columns:repeat(2,1fr)}

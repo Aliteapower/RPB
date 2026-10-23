@@ -18,6 +18,9 @@ public class WalletCustomerIdentityRepository {
   jdbc.update("update wallet_customer_identity_codes set expires_at=? where tenant_id=? and program_id=? and customer_id=? and expires_at>?",Timestamp.from(now),tenant,program,customer,Timestamp.from(now));
   jdbc.update("insert into wallet_customer_identity_codes(tenant_id,program_id,customer_id,code_hash,created_at,expires_at) values(?,?,?,?,?,?)",tenant,program,customer,hash,Timestamp.from(now),Timestamp.from(expiry));
  }
+ public void revokePayments(StoreScope scope,UUID program,UUID customer){
+  jdbc.update("update wallet_customer_identity_codes set payment_enabled=false where tenant_id=? and program_id=? and customer_id=?",scope.tenantId().value(),program,customer);
+ }
  public UUID resolve(StoreScope scope,UUID program,String hash,Instant now){
   return jdbc.query("select customer_id from wallet_customer_identity_codes where tenant_id=? and program_id=? and code_hash=? and expires_at>?",(rs,n)->rs.getObject(1,UUID.class),scope.tenantId().value(),program,hash,Timestamp.from(now)).stream().findFirst().orElseThrow(WalletException::missing);
  }

@@ -7,11 +7,12 @@ import type { Account, Context, Customer } from './types'
 
 function createWorkspace() {
   const route = useRoute(), auth = useAuthSessionStore(), task = useWalletTask()
+  const actorId = computed(() => auth.user?.accountId ?? '')
   const store = computed(() => String(route.params.storeId)), context = ref<Context | null>(null)
   const identifiedCustomerId=ref<string|null>(null)
   const customer = ref<Customer | null>(null), account = ref<Account | null>(null), customerCode = ref(''), customers = ref<Customer[]>([])
   const can = (permission: string) => auth.user?.permissions.includes(permission) === true
-  const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||route.name==='wallet-points'||(route.name==='wallet-topup'&&(route.query.kind==='points'||!can('wallet.topup.create'))&&can('wallet.points.view')))
+  const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||(route.name==='wallet-topup'&&(route.query.kind==='points'||!can('wallet.topup.create'))&&can('wallet.points.view')))
   let generation = 0, selection = 0
   function clear() { selection++; identifiedCustomerId.value=null; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
   async function refresh() {
@@ -70,7 +71,7 @@ function createWorkspace() {
   }, { immediate: true,flush:'sync' })
   const timer = window.setInterval(() => { if (!task.busy.value && document.visibilityState === 'visible') void refresh().catch(e => { task.error.value = String(e.message ?? e) }) }, 5000)
   onUnmounted(() => { generation++; window.clearInterval(timer) })
-  return { store, context, pointsContext, identifiedCustomerId, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, identifyCustomer, ...task }
+  return { store, actorId, context, pointsContext, identifiedCustomerId, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, identifyCustomer, ...task }
 }
 type Workspace = ReturnType<typeof createWorkspace>
 const key: InjectionKey<Workspace> = Symbol('staff-wallet')

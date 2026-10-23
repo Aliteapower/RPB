@@ -71,8 +71,8 @@ onUnmounted(() => { sourceGeneration++; camera.dispose(); document.removeEventLi
     <p v-if="cameraError || imageError" class="wallet-error" role="alert">{{ imageError || cameraError }}</p>
     <details class="wallet-scan-alternatives"><summary>{{ t('wallet.scanner.alternatives') }}</summary>
       <label class="wallet-camera-image">{{ t('wallet.scanImage') }}<input type="file" accept="image/*" :disabled="disabled || readingImage" @change="image"></label>
-      <form class="wallet-scan-manual" @submit.prevent="found(manual)"><input v-model="manual" :placeholder="t(purpose==='identity'?'wallet.marketing.pastePersonal':'wallet.manualCode')" :aria-label="t(purpose==='identity'?'wallet.marketing.pastePersonal':'wallet.manualCode')" maxlength="4096" autocomplete="off" :disabled="disabled || readingImage"><button :disabled="disabled || readingImage || !manual.trim()">{{ t('wallet.useCode') }}</button></form>
+      <form class="wallet-scan-manual" @submit.prevent="found(manual)"><input v-model="manual" :placeholder="t(purpose==='identity'||purpose==='personal'?'wallet.marketing.pastePersonal':'wallet.manualCode')" :aria-label="t(purpose==='identity'||purpose==='personal'?'wallet.marketing.pastePersonal':'wallet.manualCode')" maxlength="4096" autocomplete="off" :disabled="disabled || readingImage"><button :disabled="disabled || readingImage || !manual.trim()">{{ t('wallet.useCode') }}</button></form>
     </details>
-    <small>{{ t('wallet.scanner.privacy') }}</small>
+    <small>{{ t(purpose==='personal'?'wallet.personal.scanPrivacy':'wallet.scanner.privacy') }}</small>
   </section>
 </template>

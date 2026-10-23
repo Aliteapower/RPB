@@ -1,5 +1,9 @@
 # 钱包 API 与数据契约
 
+统一个人码后续契约见 [2026-10-23 个人码付款与恢复](2026-10-23-wallet-personal-payment-contract.md)，旧WC直扣端点已安全关闭；以该补充契约为准。
+
+统一交易查询及旧列表退役见 [2026-10-23 交易记录契约](2026-10-23-wallet-transactions-contract.md)。资金及积分列表均使用 `/transactions`；原业务详情及命令继续保留。
+
 状态：实现契约。规格：[钱包需求](../development/钱包产品线开发需求.md)。不含线上支付接口。
 
 ## 认证、作用域与金额
@@ -18,19 +22,19 @@ GET `/context`：统一门店/主体/Logo、计划、账户查询条件、允许
 
 GET/PUT `/collection-profile`：`wallet.settings.manage`，复用 payment 所属的同一门店收款资料。PUT 含 `version,status,paynowType,paynowMobile,paynowUen,merchantName,issuerVerified,idempotencyKey`；启用时必须明确核实收款账户属于当前钱包发行主体。租户默认资料只预填参考，须保存为门店配置；禁止把未注明发行主体的租户默认收款账户直接作为多个钱包主体的收款依据。保留现有 quick-pay 的 configJson。若同店支付产品有效，修改还需 `payment.settings.manage`，界面明示会影响共用收款资料；不授予支付产品订阅。
 
-GET `/customers?query=`：查询租户共享有效顾客，不以是否拥有登录账号筛选；GET `/accounts/{accountId}` 与 `/accounts/{accountId}/entries`：在允许计划门店内查询。
+GET `/customers?query=`：查询租户共享有效顾客，不以是否拥有登录账号筛选；GET `/accounts/{accountId}`：在允许计划门店内查询账户；流水改用统一 `/transactions`。
 
 PUT `/program`：`version, channels`，发行主体取当前统一门店，配置操作需 `wallet.settings.manage`，不能变更公共资料/订阅。
 
 POST `/accounts`：`customerId, idempotencyKey`，返回原有或零余额账户，验证租户共享有效顾客；新开户须有手机号，缺号返回 409 `CUSTOMER_PHONE_REQUIRED`。历史无号账户保留。顾客登录使用[共享手机号密码登录契约](2026-10-23-shared-customer-phone-auth.md)。
 
-POST `/topups`：`accountId, amount, channel, idempotencyKey`，返回待收款单；POST `/topups/{id}/confirm`：`amount, receiptReference, collectionAccount, terminalCode, note, idempotencyKey`，授权员工人工确认后入账。GET `/topups` 查询。取消仅允许未收款单。
+POST `/topups`：`accountId, amount, channel, idempotencyKey`，返回待收款单；POST `/topups/{id}/confirm`：`amount, receiptReference, collectionAccount, terminalCode, note, idempotencyKey`，授权员工人工确认后入账。GET `/transactions?type=topup` 查询。取消仅允许未收款单。
 
 2026-10-23：仅普通现金充值确认允许 `receiptReference` 缺省、null 或空白；服务端按充值单 ID 生成稳定内部编号 `CASH-TOPUP-{topupId}`，满足原收款凭据非空和唯一约束。用户填写的编号仍按原规则校验和保存。PayNow、信用卡、账单补付和异常收款仍必须填写凭证；金额核对、实际收款勾选、终端、权限、租户／门店隔离及幂等不变，不涉及迁移。重试或重复确认不得重复充值。
 
-POST `/bills`：`accountId, amount, idempotencyKey, customerCode?`，创建消费单。扫码时必须携带 `customerCode`，码校验、建单、绑定、审计和幂等快照同一事务；取得锁后检查时效，过期/已用/不匹配的码不留下账单或快照。同键同参重试返回已绑定原单，即使码随后过期；不同键重用同码返回 409。手工选客省略码保持原行为。POST `/bills/{id}/code` 单独签发 10 分钟商户账单码。GET `/bills`、`/bills/{id}`：包含支付分摊/剩余应付；POST `/bills/{id}/bind-code`：`code` 绑定已有账单（旧接口保留，禁止用于扫码新建单的两阶段流程）。POST `/payment-codes/resolve`：识别有效未绑定付款码对应的统一顾客，不授权扣款。POST `/bills/{id}/collections`：三渠道线下补差确认，使用与充值一致的凭证字段和权限。
+POST `/bills`：`accountId, amount, idempotencyKey, customerCode?`，创建消费单。扫码时必须携带 `customerCode`，码校验、建单、绑定、审计和幂等快照同一事务；取得锁后检查时效，过期/已用/不匹配的码不留下账单或快照。同键同参重试返回已绑定原单，即使码随后过期；不同键重用同码返回 409。手工选客省略码保持原行为。POST `/bills/{id}/code` 单独签发 10 分钟商户账单码。GET `/bills/{id}`：包含支付分摊/剩余应付；POST `/bills/{id}/bind-code`：`code` 绑定已有账单（旧接口保留，禁止用于扫码新建单的两阶段流程）。POST `/payment-codes/resolve`：识别有效未绑定付款码对应的统一顾客，不授权扣款。POST `/bills/{id}/collections`：三渠道线下补差确认，使用与充值一致的凭证字段和权限。
 
-POST `/refunds`：`sourceType(top_up/bill/collection_exception), sourceId, amount, reason, idempotencyKey`，经理权限；POST `/refunds/{id}/confirm`：`partId, receiptReference, idempotencyKey` 确认已完成的原渠道线下退款；POST `/refunds/{id}/cancel` 仅取消未执行退款并释放冻结，已经退钱包的混合退款不允许取消。GET `/refunds` 与 `/reconciliation?start=YYYY-MM-DD&end=YYYY-MM-DD`。
+POST `/refunds`：`sourceType(top_up/bill/collection_exception), sourceId, amount, reason, idempotencyKey`，经理权限；POST `/refunds/{id}/confirm`：`partId, receiptReference, idempotencyKey` 确认已完成的原渠道线下退款；POST `/refunds/{id}/cancel` 仅取消未执行退款并释放冻结，已经退钱包的混合退款不允许取消。GET `/transactions?type=refund` 查询退款，`/refunds/{id}`查询详情，`/reconciliation?start=YYYY-MM-DD&end=YYYY-MM-DD`保留对账。
 
 GET/POST `/collection-exceptions`：经理登记迟到、超收或重复实收；正文为 `sourceType(top_up/bill), sourceId, confirmation, reason, idempotencyKey`。confirmation 为完整三渠道核实事实，金额可与原单不同；始终不加余额、不结清原单。以返回的异常凭证 ID 创建 `collection_exception` 退款，仅可退实际异常实收，累计不超额。
 
@@ -40,11 +44,11 @@ GET `/customers/{id}`、`/customers/{id}/accounts`：只从租户共享顾客目
 
 ## 顾客用例
 
-GET `/me`：本人已有账户、余额、门店公共资料；GET `/accounts/{id}/entries?offset=0`：本人流水（每页 100）；GET `/bills/{id}`：包括到期后本人原单结果，刷新可恢复。GET `/logo/{assetId}`：复用当前统一 Logo。POST `/payment-codes`：`accountId, purpose?`，签发 60 秒动态码，重新签发使旧未绑定码失效，不使用业务幂等键。
+GET `/me`：本人已有账户、余额、门店公共资料；GET `/transactions`：本人统一交易查询；GET `/bills/{id}`：包括到期后本人原单结果，刷新可恢复。GET `/logo/{assetId}`：复用当前统一 Logo。POST `/payment-codes`：`accountId, purpose?`，签发 60 秒动态码，重新签发使旧未绑定码失效，不使用业务幂等键。
 
 GET `/pending-bills`：本人待确认/补付账单；POST `/bill-code`：校验受限账单码并返回本人账单，不泄露其他顾客资料。
 
-UI 独立账单页的只读增量：员工 GET `/bills`、`/topups` 与顾客 GET `/bills` 接受 `offset=0&status=all`，每页 100，offset 为 0..100000，status 只允许 all/pending/completed/closed，非法参数 400 `WALLET_REQUEST_INVALID`。员工充值详情 GET `/topups/{id}`。默认员工列表兼容；顾客列表在 SQL 中同时按 tenant、store、customer 过滤，包括已结清、已取消及零余额授权的原单，不从资金分录推测账单历史。到期仍可按原权限只读，不增加写权限或跳过身份校验。
+旧独立列表 GET `/bills`、`/topups`、`/refunds`、账户流水及积分分录列表已移除，不提供兼容层。筛选、稳定混排分页、全量汇总及只读详情以交易记录契约为准。员工充值详情 GET `/topups/{id}`保留；待付款业务恢复 `/pending-bills`保留。
 
 POST `/bills/{id}/quote`：本人、当前门店，返回钱包拟扣金额、剩余应付、账户/账单版本和默认 60 秒期限。POST `/bills/{id}/pay`：`quoteId, idempotencyKey`，再次本人校验并原子扣款；客户端不能改金额。零钱包余额不生成零分录。
 

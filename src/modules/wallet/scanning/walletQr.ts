@@ -1,11 +1,12 @@
-export type WalletQrPurpose = 'customer' | 'bill' | 'identity'
+export type WalletQrPurpose = 'customer' | 'bill' | 'identity' | 'personal'
 
 /** Shape/type checks only. Expiry, ownership and replay remain server decisions. */
 export function normalizeWalletQr(value: string, purpose: WalletQrPurpose, origin: string): string | null {
   const text = value.trim()
   if (text.length > 4096) return null
   if (purpose === 'identity') return /^W[IP]\.[A-Za-z0-9_-]{43}$/.test(text) ? text : null
-  if (purpose === 'customer') return /^W[PC]\.[A-Za-z0-9_-]{43}$/.test(text) ? text : null
+  if (purpose === 'personal') return /^WI\.[A-Za-z0-9_-]{43}$/.test(text) ? text : null
+  if (purpose === 'customer') return /^W[IPC]\.[A-Za-z0-9_-]{43}$/.test(text) ? text : null
   if (/^WB\.[A-Za-z0-9_-]{43}$/.test(text)) return text
   try {
     const url = new URL(text)

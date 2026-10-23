@@ -65,6 +65,7 @@ public class WalletAuthorizationService {
     public Quote quote(StoreScope scope,CustomerAuthPrincipal principal,UUID id) {
         access.customer(scope,principal,true);accounts.requireProgram(scope,true);var b=bills.get(scope,id,false);var a=accounts.account(scope,b.accountId(),true);access.own(a,principal);accounts.requireActive(a);
         if(b.closed() || b.walletApplied() || b.remainingCents()==0)throw WalletException.conflict("账单已处理，请查看支付结果");
+        bills.requirePersonalFullPayment(scope,b,a);
         var split=funding.preview(scope,a,WalletMoney.debit(a.availableCents(),b.remainingCents()));
         return authorizations.quote(scope,b,a,split.totalCents(),principal.customerId(),clock.instant().plusSeconds(60),split.principalCents(),split.bonusCents());
     }
@@ -77,6 +78,7 @@ public class WalletAuthorizationService {
             if(authorization.consumed() || !q.expiresAt().isAfter(clock.instant()))throw new WalletException("WALLET_AUTHORIZATION_EXPIRED",409,"付款确认已使用或过期");
             if(b.closed() || b.walletApplied() || q.accountVersion()!=a.version() || q.billVersion()!=b.version() || q.amountCents()!=WalletMoney.debit(a.availableCents(),b.remainingCents()))
                 throw new WalletException("WALLET_QUOTE_STALE",409,"余额或账单已变化，请重新查看并确认");
+            bills.requirePersonalFullPayment(scope,b,a);
             var split=funding.debit(scope,a,q.amountCents(),id,principal.customerId());
             bills.walletApplied(scope,b,q.amountCents());funding.billComponents(scope,id,split);authorizations.consume(scope,q.id(),clock.instant());
             commands.audit(scope,principal.customerId(),"bill.wallet_pay",id,Map.of("amountCents",q.amountCents()));

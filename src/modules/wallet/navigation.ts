@@ -2,8 +2,8 @@ import type { Bill } from './types'
 export const staffWalletPath = (store: string, page = '') => `/stores/${encodeURIComponent(store)}/wallet${page ? '/' + page : ''}`
 export const customerWalletPath = (store: string, page = '') => `/wallet/${encodeURIComponent(store)}${page ? '/' + page : ''}`
 export function billStage(bill: Pick<Bill, 'amountCents'|'walletPaidCents'|'externalPaidCents'|'walletApplied'|'closed'>) {
-  if (bill.closed) return 'closed'
   if (bill.amountCents <= bill.walletPaidCents + bill.externalPaidCents) return 'paid'
+  if (bill.closed) return 'closed'
   return bill.walletApplied ? 'due' : 'waiting'
 }
 export function legacyWalletTarget(store: string, hash: string) {

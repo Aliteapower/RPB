@@ -42,15 +42,14 @@ before(async()=>{
  ;({CodePage,TopupPage,customerModule,staffModule,authModule,messages}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
 })
 after(async()=>{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
-test('customer page shows a topup QR immediately and requires explicit action for the charge QR',async()=>{
- const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/me')?{context:{transactionsEnabled:true,store:{operatingEntityName:'Issuer'}},accounts:[{id:'wallet',balanceCents:1000,reservedCents:0}],pendingBills:[]}:{type:url.endsWith('/customer-codes')?'customer_identity':'customer_charge',code:url.endsWith('/customer-codes')?'WI.identity':'WC.consent',expiresAt:'2099-01-01T00:00:00Z'})}
+test('old topup query and default route both show unified personal code without account or payment authorization',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/me')?{context:{transactionsEnabled:true,store:{operatingEntityName:'Issuer'}},accounts:[],pendingBills:[]}:url.endsWith('/personal-payment-consent')?{configured:false,paymentEnabled:false,limitCents:null,policyVersion:0}:{type:'customer_personal',code:'WI.identity',expiresAt:'2099-01-01T00:00:00Z'})}
  const route=reactive({params:{storeId:'A'},query:{purpose:'topup'},hash:''}),view=mount(CodePage,'customer',route);await tick()
- assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WI.identity');assert.match(allText(view.root),/不授权扣款/)
- assert.equal(calls.filter(c=>c.body).length,1)
- route.query={};await tick();assert.equal(nodes(view.root,n=>n.tag==='figure').length,0);assert.equal(calls.filter(c=>c.body).length,1)
- nodes(view.root,n=>n.tag==='button')[0].props.onClick();await tick()
- assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WC.consent');view.unmount()
+ assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WI.identity');assert.match(allText(view.root),/此码可用于钱包付款、充值及积分办理，请当面出示。/);assert.match(allText(view.root),/尚未设置/)
+ assert.equal(calls.filter(c=>c.body).length,1);assert.ok(!calls.some(c=>c.url.endsWith('/payment-codes')||c.url.endsWith('/accounts')))
+ route.query={};await tick();assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WI.identity');assert.equal(calls.filter(c=>c.body).length,1);view.unmount()
 })
+
 test('merchant topup page scans identity, shows customer and enters amount before creating any topup',async()=>{
  const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body&&JSON.parse(options.body)});return response(url.endsWith('/topup-offers')?{campaignId:null,offers:[],channels:['cash'],deductionPolicy:'proportional',selfServiceEnabled:true}:url.endsWith('/context')?{transactionsEnabled:true,program:{channels:['cash']},store:{timezone:'Asia/Singapore'}}:{account:{id:'wallet',balanceCents:1000,reservedCents:0},customer:{id:'guest',displayName:'Test Guest',phone:'+6591234567'}})}
  const view=mount(TopupPage,'staff',reactive({params:{storeId:'A'},query:{scan:'1'},hash:''}));await tick()

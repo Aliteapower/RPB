@@ -31,6 +31,12 @@ public class WalletScanChargeService {
         this.authorizations=authorizations;this.access=access;this.directory=directory;this.clock=clock;this.funding=funding;
     }
 
+    /** Old clients must move to customer quote/pay or refresh the unified personal code. */
+    public Paid legacyChargeUnavailable(StoreScope scope,CurrentActor actor) {
+        access.staff(scope,actor,"wallet.charge.create",true);
+        access.staff(scope,actor,"wallet.collection.confirm",true);
+        throw new WalletException("WALLET_PERSONAL_PAYMENT_CONFIRMATION_REQUIRED",409,"请改用顾客逐笔确认付款，或刷新页面使用统一个人钱包码");
+    }
     @Transactional
     public Paid charge(StoreScope scope,CurrentActor actor,ScanCharge c) {
         access.staff(scope,actor,"wallet.charge.create",true);

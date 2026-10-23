@@ -14,6 +14,11 @@ import static com.rpb.reservation.wallet.application.WalletViews.*;
 public class WalletBillRepository {
     private final JdbcTemplate jdbc;
     public WalletBillRepository(JdbcTemplate jdbc) {this.jdbc=jdbc;}
+    /** Personal-code pending bills require a full, explicitly confirmed wallet payment. */
+    public void requirePersonalFullPayment(StoreScope scope,Bill bill,Account account) {
+        boolean personal=Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from wallet_customer_identity_codes where tenant_id=? and payment_bill_id=?)",Boolean.class,scope.tenantId().value(),bill.id()));
+        if(personal && (bill.remainingCents()!=bill.amountCents()||account.availableCents()<bill.amountCents()))throw new WalletException("WALLET_INSUFFICIENT_FUNDS",409,"本次个人码消费需明确确认全额支付，请核对余额及原账单");
+    }
     public Bill create(StoreScope scope,Account a,long amount,UUID actor) {
         return jdbc.query("insert into wallet_bills(tenant_id,program_id,account_id,store_id,amount_cents,code_hash,created_by) values(?,?,?,?,?,?,?) returning *",
             (rs,n)->row(rs),scope.tenantId().value(),a.programId(),a.id(),scope.storeId().value(),amount,WalletTokens.hash(WalletTokens.issue("WB")),actor).getFirst();

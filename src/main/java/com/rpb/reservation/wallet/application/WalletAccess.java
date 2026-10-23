@@ -26,6 +26,12 @@ public class WalletAccess {
         if(newTransaction) require(commercial(scope));
     }
     public AppGateDecision commercial(StoreScope scope) {return gate.evaluateCommercial("wallet",scope.tenantId().value(),scope.storeId().value());}
+    /** Historical read keeps customer identity validation without requiring an active source store. */
+    public void historicalCustomer(StoreScope scope,CustomerAuthPrincipal principal) {
+        if(principal==null)throw new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录顾客账号");
+        if(!scope.tenantId().value().equals(principal.tenantId()))throw WalletException.forbidden();
+        directory.customer(scope.tenantScope(),principal.customerId());
+    }
     public void own(WalletViews.Account account,CustomerAuthPrincipal principal) {
         if(!account.tenantId().equals(principal.tenantId()) || !account.customerId().equals(principal.customerId())) throw WalletException.missing();
     }

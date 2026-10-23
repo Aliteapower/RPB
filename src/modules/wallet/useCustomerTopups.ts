@@ -1,3 +1,4 @@
+import {useRoute} from 'vue-router'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useCustomerWallet } from './useCustomerWallet'
 import { useTopupOffers } from './useTopupOffers'
@@ -7,6 +8,7 @@ import { rows } from './marketingTypes'
 import type { Topup } from './types'
 
 export function useCustomerTopups() {
+  const route=useRoute()
   const { store, home, refresh: refreshHome } = useCustomerWallet()
   const offer = useTopupOffers(store, true), task = useWalletTask()
   const { offers, selected, channel, quote, expired } = offer
@@ -23,17 +25,6 @@ export function useCustomerTopups() {
     active.value = result
     records.value = [result, ...records.value.filter(r => r.id !== result.id)]
     if (result.status !== 'pending_collection') qr.value = ''
-  }
-  async function history(append = false) {
-    const version = generation, id = store.value
-    await task.run(async () => {
-      const result = rows(await walletApi(id, true).get<Topup[]>(`/topups?offset=${append ? records.value.length : 0}`))
-      if (!current(version)) return
-      records.value = append ? [...records.value, ...result.filter(r => !records.value.some(o => o.id === r.id))] : result
-      ready.value = true; hasMore.value = result.length === 100
-      if (active.value) active.value = records.value.find(r => r.id === active.value?.id) ?? active.value
-      if (active.value?.status !== 'pending_collection') qr.value = ''
-    })
   }
   async function apply() {
     if (!canApply.value || offer.busy.value) return
@@ -86,7 +77,7 @@ export function useCustomerTopups() {
       if (current(version) && active.value?.id === topupId) qr.value = result.payload
     })
   }
-  watch(store, () => { generation++; selection++; records.value = []; active.value = null; qr.value = ''; ready.value = false; void history() }, { immediate: true })
+  watch([store,()=>route.query.topupId], () => { generation++; selection++; records.value = []; active.value = null; qr.value = ''; ready.value = false; if(typeof route.query.topupId==='string')void show({id:route.query.topupId} as Topup) }, { immediate: true })
   onUnmounted(() => { generation++; selection++ })
-  return { store, home, offer, task, offers, selected, channel, quote, expired, canApply, records, active, qr, note, ready, hasMore, timezone, history, apply, action, show, showQr }
+  return { store, home, offer, task, offers, selected, channel, quote, expired, canApply, records, active, qr, note, ready, hasMore, timezone, apply, action, show, showQr }
 }

@@ -15,8 +15,8 @@ test('wallet child navigation preserves its workspace while stores, identities a
 })
 test('operation pages, lists and details have distinct bookmarkable routes with inherited customer authentication', () => {
   const staff=walletRoutes[0], customer=walletRoutes[1]
-  for(const path of ['collect','topup','bills','bills/:billId','topups/:topupId']) assert.ok(staff.children.some(r=>r.path===path))
-  for(const path of ['code','scan','bills','bills/:billId','history']) assert.ok(customer.children.some(r=>r.path===path))
+  for(const path of ['collect','topup','transactions','bills/:billId','topups/:topupId']) assert.ok(staff.children.some(r=>r.path===path))
+  for(const path of ['code','scan','topup','transactions','bills/:billId']) assert.ok(customer.children.some(r=>r.path===path))
   assert.equal(customer.meta.public,true)
   assert.equal(new Set(customer.children.map(r=>r.name)).size,customer.children.length)
 })
@@ -33,6 +33,7 @@ test('zero-balance authorization still shows outstanding payment instead of paid
   assert.equal(billStage({...b,walletPaidCents:100,walletApplied:true}),'due')
   assert.equal(billStage({...b,externalPaidCents:500}),'paid')
   assert.equal(billStage({...b,closed:true}),'closed')
+  assert.equal(billStage({...b,closed:true,externalPaidCents:500}),'paid')
 })
 let originalFetch
 beforeEach(()=>{originalFetch=globalThis.fetch;const values=new Map();globalThis.sessionStorage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)}})
