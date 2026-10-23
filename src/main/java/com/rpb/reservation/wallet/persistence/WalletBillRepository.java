@@ -43,8 +43,8 @@ public class WalletBillRepository {
     }
     public void walletApplied(StoreScope scope,Bill bill,long cents) {
         String status=WalletMoney.status(bill.amountCents(),cents,bill.externalPaidCents());
-        int n=jdbc.update("update wallet_bills set wallet_paid_cents=?,wallet_applied=true,status=?,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=? and version=? and wallet_applied=false and closed=false",
-            cents,status,scope.tenantId().value(),scope.storeId().value(),bill.id(),bill.version());
+        int n=jdbc.update("update wallet_bills set wallet_paid_cents=?,principal_paid_cents=?,bonus_paid_cents=0,wallet_applied=true,status=?,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=? and version=? and wallet_applied=false and closed=false",
+            cents,cents,status,scope.tenantId().value(),scope.storeId().value(),bill.id(),bill.version());
         if(n!=1) throw WalletException.conflict("账单已更新，请勿重复扣款");
     }
     public void externalPaid(StoreScope scope,Bill bill,long cents) {
@@ -64,6 +64,6 @@ public class WalletBillRepository {
         return jdbc.query("select * from wallet_bills where tenant_id=? and store_id=? and code_hash=? and code_expires_at>? and closed=false",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),hash,Timestamp.from(now)).stream().findFirst().orElseThrow(WalletException::missing);
     }
     private Bill row(ResultSet rs)throws SQLException {
-        return new Bill(rs.getObject("id",UUID.class),rs.getObject("program_id",UUID.class),rs.getObject("account_id",UUID.class),rs.getObject("store_id",UUID.class),rs.getLong("amount_cents"),rs.getLong("wallet_paid_cents"),rs.getLong("external_paid_cents"),rs.getString("status"),rs.getBoolean("wallet_applied"),rs.getBoolean("closed"),rs.getString("refund_status"),rs.getInt("version"),rs.getTimestamp("created_at").toInstant());
+        return new Bill(rs.getObject("id",UUID.class),rs.getObject("program_id",UUID.class),rs.getObject("account_id",UUID.class),rs.getObject("store_id",UUID.class),rs.getLong("amount_cents"),rs.getLong("wallet_paid_cents"),rs.getLong("external_paid_cents"),rs.getString("status"),rs.getBoolean("wallet_applied"),rs.getBoolean("closed"),rs.getString("refund_status"),rs.getInt("version"),rs.getTimestamp("created_at").toInstant(),rs.getLong("principal_paid_cents"),rs.getLong("bonus_paid_cents"));
     }
 }

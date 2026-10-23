@@ -23,7 +23,7 @@ public class WalletCustomerController {
     @PostMapping("/payment-codes") public PaymentCode code(@PathVariable UUID storeId,@RequestBody AccountCode body,HttpServletRequest request) {var p=identity.customer(request);return authorization.issuePaymentCode(identity.scope(p.tenantId(),storeId),p,body.accountId(),body.purpose());}
     @PostMapping("/bill-code") public Bill scan(@PathVariable UUID storeId,@RequestBody BillCode body,HttpServletRequest request) {var p=identity.customer(request);return authorization.scanBill(identity.scope(p.tenantId(),storeId),p,body.code());}
     @PostMapping("/bills/{id}/quote") public Quote quote(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest request) {var p=identity.customer(request);return authorization.quote(identity.scope(p.tenantId(),storeId),p,id);}
-    @PostMapping("/bills/{id}/pay") public Paid pay(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Pay body,HttpServletRequest request) {var p=identity.customer(request);return authorization.pay(identity.scope(p.tenantId(),storeId),p,id,body);}
+    @PostMapping("/bills/{id}/pay") public Paid pay(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Pay body,HttpServletRequest request) {var p=identity.customer(request);WalletModelGuard.require(request);return authorization.pay(identity.scope(p.tenantId(),storeId),p,id,body);}
     public record AccountCode(UUID accountId,String purpose) {}
     public record BillCode(String code) {}
 }

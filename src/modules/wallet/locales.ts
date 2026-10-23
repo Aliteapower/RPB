@@ -1,8 +1,10 @@
+import { marketingZh, marketingEn } from './marketingLocales'
 import { walletUiZh, walletUiEn } from './uiLocales'
 import { walletScannerZh, walletScannerEn, walletFeedbackZh, walletFeedbackEn } from './scanLocales'
 import { walletScanChargeZh, walletScanChargeEn } from './scanChargeLocales'
 import { walletTopupQrZh, walletTopupQrEn } from './topupQrLocales'
 export const walletZh = {
+  marketing: marketingZh,
   topupQr: walletTopupQrZh,
   cashTopupReceipt: '现金收据编号（选填）',
   cashTopupAttested: '我已实际收到现金并核实充值金额',
@@ -47,6 +49,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  marketing: marketingEn,
   topupQr: walletTopupQrEn,
   cashTopupReceipt: 'Cash receipt reference (optional)',
   cashTopupAttested: 'I have received the cash and verified the top-up amount',

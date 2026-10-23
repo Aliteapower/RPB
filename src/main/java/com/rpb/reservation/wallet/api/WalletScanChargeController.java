@@ -14,8 +14,8 @@ public class WalletScanChargeController {
     private final WalletScanChargeService charges;
     public WalletScanChargeController(WalletApiIdentity identity,WalletScanChargeService charges) {this.identity=identity;this.charges=charges;}
     @PostMapping("/stores/{storeId}/wallet/scan-charges")
-    public Paid charge(@PathVariable UUID storeId,@RequestBody ScanCharge body) {
-        var actor=identity.staff();return charges.charge(identity.scope(actor.tenantId(),storeId),actor,body);
+    public Paid charge(@PathVariable UUID storeId,@RequestBody ScanCharge body,HttpServletRequest request) {
+        var actor=identity.staff();WalletModelGuard.require(request);return charges.charge(identity.scope(actor.tenantId(),storeId),actor,body);
     }
     @PostMapping("/public/stores/{storeId}/wallet/payment-codes/status")
     public PaymentCodeStatus status(@PathVariable UUID storeId,@RequestBody Code body,HttpServletRequest request) {

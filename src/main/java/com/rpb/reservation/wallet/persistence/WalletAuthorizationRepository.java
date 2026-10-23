@@ -43,13 +43,16 @@ public class WalletAuthorizationRepository {
     }
     public record CodeReference(UUID accountId,UUID billId,UUID storeId) {}
     public Quote quote(StoreScope scope,Bill bill,Account account,long amount,UUID customer,Instant expires) {
+        return quote(scope,bill,account,amount,customer,expires,amount,0);
+    }
+    public Quote quote(StoreScope scope,Bill bill,Account account,long amount,UUID customer,Instant expires,long principal,long bonus) {
         UUID id=UUID.randomUUID();
-        jdbc.update("insert into wallet_authorizations(id,tenant_id,bill_id,account_id,amount_cents,account_version,bill_version,customer_id,expires_at) values(?,?,?,?,?,?,?,?,?)",id,scope.tenantId().value(),bill.id(),account.id(),amount,account.version(),bill.version(),customer,Timestamp.from(expires));
-        return new Quote(id,bill.id(),account.id(),amount,bill.remainingCents()-amount,account.version(),bill.version(),expires);
+        jdbc.update("insert into wallet_authorizations(id,tenant_id,bill_id,account_id,amount_cents,account_version,bill_version,customer_id,expires_at,principal_cents,bonus_cents) values(?,?,?,?,?,?,?,?,?,?,?)",id,scope.tenantId().value(),bill.id(),account.id(),amount,account.version(),bill.version(),customer,Timestamp.from(expires),principal,bonus);
+        return new Quote(id,bill.id(),account.id(),amount,bill.remainingCents()-amount,account.version(),bill.version(),expires,principal,bonus);
     }
     public Authorization authorization(StoreScope scope,UUID id,UUID bill,UUID customer) {
         return jdbc.query("select * from wallet_authorizations where tenant_id=? and id=? and bill_id=? and customer_id=? for update",
-            (rs,n)->new Authorization(new Quote(rs.getObject("id",UUID.class),rs.getObject("bill_id",UUID.class),rs.getObject("account_id",UUID.class),rs.getLong("amount_cents"),0,rs.getInt("account_version"),rs.getInt("bill_version"),rs.getTimestamp("expires_at").toInstant()),rs.getTimestamp("consumed_at")!=null),scope.tenantId().value(),id,bill,customer).stream().findFirst().orElseThrow(WalletException::missing);
+            (rs,n)->new Authorization(new Quote(rs.getObject("id",UUID.class),rs.getObject("bill_id",UUID.class),rs.getObject("account_id",UUID.class),rs.getLong("amount_cents"),0,rs.getInt("account_version"),rs.getInt("bill_version"),rs.getTimestamp("expires_at").toInstant(),rs.getLong("principal_cents"),rs.getLong("bonus_cents")),rs.getTimestamp("consumed_at")!=null),scope.tenantId().value(),id,bill,customer).stream().findFirst().orElseThrow(WalletException::missing);
     }
     public void consume(StoreScope scope,UUID id,Instant now) {
         if(jdbc.update("update wallet_authorizations set consumed_at=? where tenant_id=? and id=? and consumed_at is null",Timestamp.from(now),scope.tenantId().value(),id)!=1) throw WalletException.conflict("授权已使用");

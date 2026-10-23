@@ -15,13 +15,14 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class})
+@WebMvcTest({WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,WalletPointsStaffController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
 class WalletLocalRuntimeSecurityTest {
     @Autowired MockMvc mvc;
     @MockBean WalletApiIdentity identity;
+    @MockBean com.rpb.reservation.wallet.integration.WalletPointsAdapter points;
     @MockBean WalletAccountService accounts;
     @MockBean WalletTopupService topups;
     @MockBean WalletCheckoutService checkout;
@@ -59,6 +60,8 @@ class WalletLocalRuntimeSecurityTest {
         mvc.perform(get("/api/v1/public/stores/"+id+"/wallet/payment-codes/status")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/public/stores/"+id+"/wallet/bills/"+id)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/public/stores/"+id+"/wallet/bills?status=all")).andExpect(status().isUnauthorized());
+        mvc.perform(get(staff+"/points/context")).andExpect(status().isUnauthorized());
+        mvc.perform(post(staff+"/points/context").header("X-RPB-Wallet","1")).andExpect(status().isForbidden());
         mvc.perform(get(staff+"/internal-debug")).andExpect(status().isForbidden());
         mvc.perform(put(staff+"/collection-exceptions").header("X-RPB-Wallet","1")).andExpect(status().isForbidden());
     }

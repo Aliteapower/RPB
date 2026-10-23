@@ -5,6 +5,7 @@ import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.wallet.domain.*;
 import com.rpb.reservation.wallet.persistence.*;
+import com.rpb.reservation.wallet.funding.application.WalletFundingService;
 import java.time.Clock;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -23,11 +24,11 @@ public class WalletScanChargeService {
     private final WalletAuthorizationRepository authorizations;
     private final WalletAccess access;
     private final WalletDirectory directory;
-    private final Clock clock;
+    private final Clock clock;private final WalletFundingService funding;
     public WalletScanChargeService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,
-                                   WalletBillRepository bills,WalletAuthorizationRepository authorizations,WalletAccess access,WalletDirectory directory,Clock clock) {
+                                   WalletBillRepository bills,WalletAuthorizationRepository authorizations,WalletAccess access,WalletDirectory directory,Clock clock,WalletFundingService funding) {
         this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.bills=bills;
-        this.authorizations=authorizations;this.access=access;this.directory=directory;this.clock=clock;
+        this.authorizations=authorizations;this.access=access;this.directory=directory;this.clock=clock;this.funding=funding;
     }
 
     @Transactional
@@ -54,12 +55,9 @@ public class WalletScanChargeService {
             if(!expires.isAfter(clock.instant()))throw new WalletException("WALLET_AUTHORIZATION_EXPIRED",409,"付款码已过期，请顾客重新出示");
             if(b==null)b=bills.create(scope,a,amount,actor.actorId());
             authorizations.bind(scope,b.id(),a.id(),hash,clock.instant());
-            long debit=WalletMoney.debit(a.availableCents(),b.remainingCents()),after=a.balanceCents()-debit;
-            if(debit>0) {
-                accounts.update(a,after,a.reservedCents());
-                ledger.append(scope,a,after,"bill_debit",b.id(),actor.actorId(),null);
-            }
-            bills.walletApplied(scope,b,debit);
+            long debit=WalletMoney.debit(a.availableCents(),b.remainingCents());
+            var split=funding.debit(scope,a,debit,b.id(),actor.actorId());
+            bills.walletApplied(scope,b,debit);funding.billComponents(scope,b.id(),split);
             commands.audit(scope,actor.actorId(),"bill.scan_charge",b.id(),Map.of("accountId",a.id(),"amountCents",debit,"remainingCents",b.remainingCents()-debit));
             return new Paid(bills.get(scope,b.id(),false),accounts.account(scope,a.id(),false));
         });

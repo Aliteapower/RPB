@@ -7,6 +7,7 @@ import { money, dateTime } from '../format'
 import { useStaffWallet } from '../useStaffWallet'
 import { useWalletRecord } from '../useWalletRecord'
 import type { Topup, CollectionConfirm } from '../types'
+import WalletAmountSplit from '../components/WalletAmountSplit.vue'
 import WalletCollectionForm from '../components/WalletCollectionForm.vue'
 import WalletQrDisplay from '../components/WalletQrDisplay.vue'
 import WalletCustomerSummary from '../components/WalletCustomerSummary.vue'
@@ -20,6 +21,7 @@ async function cancel(){await run(async()=>{await walletApi(store.value).command
 </script>
 <template><p v-if="error" class="wallet-error" role="alert">{{ error }}</p><p v-if="!ready && busy" role="status" class="wallet-empty">{{ t('wallet.loading') }}</p>
   <template v-if="topup && context"><section class="wallet-payment-summary"><span class="wallet-status" :data-state="topup.status==='credited'?'paid':topup.status==='cancelled'?'closed':'pending'">{{ t(`wallet.states.${topup.status}`) }}</span><h2>{{ money(topup.amountCents) }}</h2><p>{{ t('wallet.topup') }} · {{ t(`wallet.channels.${topup.channel}`) }}</p></section>
+    <WalletAmountSplit :principal="topup.principalCents??topup.amountCents" :bonus="topup.bonusCents??0" :total="topup.creditTotalCents??topup.amountCents" /><p>{{t('wallet.marketing.origin')}}: {{t(`wallet.marketing.${topup.origin??'legacy_no_campaign'}`)}}</p><p v-if="topup.customerDeclaredPaidAt" class="wallet-warning">{{t('wallet.marketing.declared')}} · {{dateTime(topup.customerDeclaredPaidAt,context.store.timezone)}}</p>
     <WalletCustomerSummary :store="store" :account-id="topup.accountId" />
     <p v-if="topup.status==='pending_collection'" class="wallet-warning">{{ t('wallet.ui.topupNotCredited') }}</p>
     <button v-if="topup.status==='pending_collection' && topup.channel==='paynow' && context.transactionsEnabled" class="wallet-block" :disabled="busy" @click="showQr">{{ t('wallet.showPaynow') }}</button>

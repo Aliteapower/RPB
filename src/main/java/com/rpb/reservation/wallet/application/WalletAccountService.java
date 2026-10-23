@@ -47,7 +47,11 @@ public class WalletAccountService {
         });
     }
     public Account get(StoreScope scope,CurrentActor actor,UUID id) {access.staff(scope,actor,"wallet.view",false);return accounts.account(scope,id,false);}
-    public List<Customer> search(StoreScope scope,CurrentActor actor,String query) {access.staff(scope,actor,"wallet.view",false);return directory.search(scope.tenantScope(),query);}
+    public List<Customer> search(StoreScope scope,CurrentActor actor,String query) {
+        // Points-only customer selection shares the tenant directory, without unlocking money APIs.
+        String permission=actor!=null&&actor.hasPermission("wallet.view")?"wallet.view":"wallet.points.view";
+        access.staff(scope,actor,permission,false);return directory.search(scope.tenantScope(),query);
+    }
     public Customer customer(StoreScope scope,CurrentActor actor,UUID id) {access.staff(scope,actor,"wallet.view",false);return directory.customer(scope.tenantScope(),id);}
     public List<Account> forCustomer(StoreScope scope,CurrentActor actor,UUID id) {customer(scope,actor,id);return accounts.customerAccounts(scope,id);}
     public List<Entry> entries(StoreScope scope,CurrentActor actor,UUID id,int offset) {get(scope,actor,id);return ledger.entries(scope,id,offset);}

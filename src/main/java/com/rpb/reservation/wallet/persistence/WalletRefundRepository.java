@@ -14,8 +14,8 @@ public class WalletRefundRepository {
     private final JdbcTemplate jdbc;
     public WalletRefundRepository(JdbcTemplate jdbc) {this.jdbc=jdbc;}
     public Refund create(StoreScope scope,Account a,UUID topup,UUID bill,long amount,long wallet,String reason,UUID actor,String status) {
-        return jdbc.query("insert into wallet_refunds(tenant_id,program_id,account_id,store_id,topup_id,bill_id,amount_cents,wallet_cents,status,reason,created_by) values(?,?,?,?,?,?,?,?,?,?,?) returning *",
-            (rs,n)->row(rs),scope.tenantId().value(),a.programId(),a.id(),scope.storeId().value(),topup,bill,amount,wallet,status,reason,actor).getFirst();
+        return jdbc.query("insert into wallet_refunds(tenant_id,program_id,account_id,store_id,topup_id,bill_id,amount_cents,wallet_cents,status,reason,created_by,principal_cents) values(?,?,?,?,?,?,?,?,?,?,?,?) returning *",
+            (rs,n)->row(rs),scope.tenantId().value(),a.programId(),a.id(),scope.storeId().value(),topup,bill,amount,wallet,status,reason,actor,wallet).getFirst();
     }
     public Refund get(StoreScope scope,UUID id,boolean lock) {
         return jdbc.query("select * from wallet_refunds where tenant_id=? and store_id=? and id=?"+(lock?" for update":""),(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),id).stream().findFirst().orElseThrow(WalletException::missing);
@@ -54,7 +54,8 @@ public class WalletRefundRepository {
     public void status(StoreScope scope,UUID id,String status,UUID actor) {
         jdbc.update("update wallet_refunds set status=?,confirmed_by=?,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=?",status,actor,scope.tenantId().value(),scope.storeId().value(),id);
     }
+    public void components(StoreScope s,UUID id,long p,long g){jdbc.update("update wallet_refunds set principal_cents=?,bonus_cents=? where tenant_id=? and id=?",p,g,s.tenantId().value(),id);}
     private Refund row(ResultSet rs)throws SQLException {
-        return new Refund(rs.getObject("id",UUID.class),rs.getObject("account_id",UUID.class),rs.getObject("store_id",UUID.class),rs.getObject("topup_id",UUID.class),rs.getObject("bill_id",UUID.class),rs.getLong("amount_cents"),rs.getLong("wallet_cents"),rs.getString("status"),rs.getString("reason"),rs.getInt("version"),rs.getTimestamp("created_at").toInstant(),rs.getObject("exception_collection_id",UUID.class));
+        return new Refund(rs.getObject("id",UUID.class),rs.getObject("account_id",UUID.class),rs.getObject("store_id",UUID.class),rs.getObject("topup_id",UUID.class),rs.getObject("bill_id",UUID.class),rs.getLong("amount_cents"),rs.getLong("wallet_cents"),rs.getString("status"),rs.getString("reason"),rs.getInt("version"),rs.getTimestamp("created_at").toInstant(),rs.getObject("exception_collection_id",UUID.class),rs.getLong("principal_cents"),rs.getLong("bonus_cents"));
     }
 }

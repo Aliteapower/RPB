@@ -29,15 +29,22 @@ public class WalletTopupRepository {
             case "closed" -> " and status='cancelled'";
             default -> "";
         };
-        return jdbc.query("select * from wallet_topups where tenant_id=? and store_id=?"+filter+" order by created_at desc,id limit 100 offset ?",(rs,n)->row(rs),scope.tenantId().value(),scope.storeId().value(),query.offset());
+        var parameters=new ArrayList<Object>();parameters.add(scope.tenantId().value());parameters.add(scope.storeId().value());
+        if(query.origin()!=null){filter+=" and origin=?";parameters.add(query.origin());}
+        if(query.customerId()!=null){filter+=" and customer_id=?";parameters.add(query.customerId());}
+        parameters.add(query.offset());
+        return jdbc.query("select * from wallet_topups where tenant_id=? and store_id=?"+filter+" order by created_at desc,id limit 100 offset ?",(rs,n)->row(rs),parameters.toArray());
     }
     public void status(StoreScope scope,UUID id,String status) {
-        jdbc.update("update wallet_topups set status=?,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=?",status,scope.tenantId().value(),scope.storeId().value(),id);
+        jdbc.update("update wallet_topups set status=?,credited_at=case when ?='credited' then coalesce(credited_at,now()) else credited_at end,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=?",status,status,scope.tenantId().value(),scope.storeId().value(),id);
     }
     public void refunded(StoreScope scope,UUID id,long cents) {
         jdbc.update("update wallet_topups set refunded_cents=refunded_cents+?,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=?",cents,scope.tenantId().value(),scope.storeId().value(),id);
     }
     private Topup row(ResultSet rs)throws SQLException {
-        return new Topup(rs.getObject("id",UUID.class),rs.getObject("program_id",UUID.class),rs.getObject("account_id",UUID.class),rs.getObject("store_id",UUID.class),rs.getLong("amount_cents"),rs.getString("channel"),rs.getString("status"),rs.getLong("refunded_cents"),rs.getInt("version"),rs.getTimestamp("created_at").toInstant());
+        return new Topup(rs.getObject("id",UUID.class),rs.getObject("program_id",UUID.class),rs.getObject("account_id",UUID.class),rs.getObject("store_id",UUID.class),rs.getLong("amount_cents"),rs.getString("channel"),rs.getString("status"),rs.getLong("refunded_cents"),rs.getInt("version"),rs.getTimestamp("created_at").toInstant(),rs.getLong("bonus_cents"),rs.getString("deduction_policy"),rs.getString("origin"),instant(rs,"customer_declared_paid_at"),instant(rs,"credited_at"),snapshot(rs,"offer_snapshot"),snapshot(rs,"policy_snapshot"));
     }
+    private java.time.Instant instant(ResultSet r,String key)throws SQLException{return r.getTimestamp(key)==null?null:r.getTimestamp(key).toInstant();}
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON=new com.fasterxml.jackson.databind.ObjectMapper();
+    private Map<String,Object> snapshot(ResultSet r,String key)throws SQLException{try{return JSON.readValue(r.getString(key),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){});}catch(Exception e){throw new SQLException("invalid wallet snapshot",e);}}
 }

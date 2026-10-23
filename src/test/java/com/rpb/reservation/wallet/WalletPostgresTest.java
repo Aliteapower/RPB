@@ -9,6 +9,9 @@ import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
 import com.rpb.reservation.wallet.application.*;
 import com.rpb.reservation.wallet.domain.*;
 import com.rpb.reservation.wallet.persistence.*;
+import com.rpb.reservation.wallet.funding.application.*;
+import com.rpb.reservation.wallet.funding.persistence.*;
+import com.rpb.reservation.wallet.marketing.*;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.nio.file.*;
 import java.time.*;
@@ -33,6 +36,7 @@ class WalletPostgresTest {
     AppGateService gate; WalletDirectory directory; WalletCollectionPort collectionPort; Clock clock;
     WalletAccountRepository accounts; WalletLedgerRepository ledger; WalletCommandRepository commands;
     WalletTopupRepository topupRepo; WalletBillRepository bills; WalletAuthorizationRepository auths; WalletRefundRepository refundRepo;
+    WalletFundingService funding;WalletMarketingService marketing;
     WalletAccess access; WalletAccountService accountService; WalletTopupService topups; WalletCheckoutService checkout; WalletAuthorizationService authorization; WalletRefundService refunds;
 
     @BeforeAll static void database() throws Exception {
@@ -66,11 +70,12 @@ class WalletPostgresTest {
         accounts=new WalletAccountRepository(jdbc,json); ledger=new WalletLedgerRepository(jdbc); commands=new WalletCommandRepository(jdbc,json);
         topupRepo=new WalletTopupRepository(jdbc); bills=new WalletBillRepository(jdbc);auths=new WalletAuthorizationRepository(jdbc);refundRepo=new WalletRefundRepository(jdbc);
         access=new WalletAccess(gate,directory);accountService=new WalletAccountService(accounts,ledger,commands,access,directory,collectionPort);
+        funding=new WalletFundingService(new WalletFundingRepository(jdbc),accounts,ledger);marketing=new WalletMarketingService(new MarketingRepository(jdbc,json),accounts,access,collectionPort);
         var collections=new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort);
-        topups=new WalletTopupService(accounts,ledger,commands,topupRepo,collections,access);
+        topups=new WalletTopupService(accounts,ledger,commands,topupRepo,collections,access,funding,marketing);
         checkout=new WalletCheckoutService(accounts,commands,bills,collections,access,auths,clock);
-        authorization=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,clock);
-        refunds=new WalletRefundService(accounts,ledger,commands,topupRepo,bills,refundRepo,access);
+        authorization=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,clock,funding);
+        refunds=new WalletRefundService(accounts,ledger,commands,topupRepo,bills,refundRepo,access,funding);
         tx.execute(s->accountService.configure(scope,actor,new ProgramSettings(null,List.of("cash","paynow","credit_card"),key())));
     }
     String key(){return UUID.randomUUID().toString();}
@@ -81,7 +86,7 @@ class WalletPostgresTest {
     Bill bill(Account a,String amount){return tx.execute(s->checkout.create(scope,actor,new BillCreate(a.id(),amount,key())));}
     Paid pay(Bill b){var q=tx.execute(s->authorization.quote(scope,principal,b.id()));return tx.execute(s->authorization.pay(scope,principal,b.id(),new Pay(q.id(),key())));}
 
-    WalletScanChargeService scanner(Clock time) {return new WalletScanChargeService(accounts,ledger,commands,bills,auths,access,directory,time);}
+    WalletScanChargeService scanner(Clock time) {return new WalletScanChargeService(accounts,ledger,commands,bills,auths,access,directory,time,funding);}
     PaymentCode chargeCode(Account a) {return tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"merchant_charge"));}
     ScanCharge charge(Account a,String amount,String code) {return new ScanCharge(a.id(),amount,code,a.version(),null,null,key());}
     void noScanEffects(Account a,long balance,int billCount) {
@@ -111,7 +116,7 @@ class WalletPostgresTest {
         var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));
         var foreign=new StoreScope(new TenantId(UUID.randomUUID()),store);
         assertThatThrownBy(()->authorization.resolve(foreign,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
-        var later=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,Clock.offset(clock,Duration.ofSeconds(60)));
+        var later=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,Clock.offset(clock,Duration.ofSeconds(60)),funding);
         assertThatThrownBy(()->later.resolve(scope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
         jdbc.update("update wallet_accounts set status='frozen' where id=?",a.id());
         assertThatThrownBy(()->authorization.resolve(scope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
@@ -527,16 +532,11 @@ class WalletPostgresTest {
         assertThatThrownBy(()->tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()))).isInstanceOf(WalletException.class);
     }
     @Test void tamperedBalanceCannotBeUsedToSpendUnbackedMoney() {
-        var a=credit(open(),"50","cash");var b=bill(a,"80");jdbc.update("update wallet_accounts set balance_cents=6000 where id=?",a.id());
-        assertThatThrownBy(()->pay(b)).isInstanceOf(WalletException.class);
-        assertThatThrownBy(()->create(a,"1","cash")).isInstanceOf(WalletException.class);
-        assertThatThrownBy(()->bill(a,"1")).isInstanceOf(WalletException.class);
+        var a=credit(open(),"50","cash");var b=bill(a,"80");
+        assertThatThrownBy(()->jdbc.update("update wallet_accounts set balance_cents=6000 where id=?",a.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("update wallet_accounts set balance_cents=6000,principal_balance_cents=6000 where id=?",a.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(5000);
         assertThat(bills.get(scope,b.id(),false).walletPaidCents()).isZero();
-        var exceptionService=new WalletCollectionExceptionService(accounts,topupRepo,bills,new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort),new WalletCollectionRepository(jdbc),commands,access);
-        var receipt=tx.execute(s->exceptionService.record(scope,actor,new CollectionException("bill",b.id(),confirm("5","cash",key()),"缓存异常期间发现独立实收",key())));
-        var r=tx.execute(s->refunds.create(scope,actor,new RefundCreate("collection_exception",receipt.id(),"5","原渠道退回，不动钱包",key())));
-        for(var part:r.parts())tx.execute(s->refunds.confirmPart(scope,actor,r.refund().id(),part.id(),key(),key()));
-        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(6000);assertThat(ledger.entries(scope,a.id(),0)).hasSize(1);
     }
 
     @Test void sharedCustomerArchiveIsRejectedWithAnExplicitDomainReason() {
@@ -625,7 +625,7 @@ class WalletPostgresTest {
 
     @Test void expiredQrAndQuotesFailButSuccessfulPaymentReplayKeepsOriginalResult() {
         var a=credit(open(),"50","cash");var b=bill(a,"20");var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id()));var quote=tx.execute(s->authorization.quote(scope,principal,b.id()));
-        var later=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,Clock.offset(clock,Duration.ofMinutes(2)));
+        var later=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,Clock.offset(clock,Duration.ofMinutes(2)),funding);
         assertThatThrownBy(()->tx.execute(s->later.bind(scope,actor,b.id(),code.code()))).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->tx.execute(s->later.pay(scope,principal,b.id(),new Pay(quote.id(),key())))).isInstanceOf(WalletException.class);
         var command=new Pay(quote.id(),key());var paid=tx.execute(s->authorization.pay(scope,principal,b.id(),command));
@@ -668,4 +668,66 @@ class WalletPostgresTest {
             start.countDown();int success=0;for(var job:jobs)if(job.get(15,TimeUnit.SECONDS))success++;assertThat(success).isEqualTo(1);assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(1000);
         } finally {pool.shutdownNow();}
     }
+    Topup gift(Account a,String principal,String gift,String policy) {
+        var t=create(a,principal,"cash");
+        jdbc.update("update wallet_topups set bonus_cents=?,deduction_policy=? where id=?",WalletMoney.cents(gift),policy,t.id());
+        tx.execute(s->topups.confirm(scope,actor,t.id(),confirm(principal,"cash","")));
+        return topupRepo.get(scope,t.id(),false);
+    }
+    void balances(UUID id,long p,long g,long rp,long rg) {
+        var a=accounts.account(scope,id,false);assertThat(a.principalBalanceCents()).isEqualTo(p);assertThat(a.bonusBalanceCents()).isEqualTo(g);
+        assertThat(a.principalReservedCents()).isEqualTo(rp);assertThat(a.bonusReservedCents()).isEqualTo(rg);assertThat(a.balanceCents()).isEqualTo(p+g);
+    }
+    @Test void campaignProportionalDebitAndPartialRefundRestoreOriginalComponents() {
+        var a=open();gift(a,"100","10","proportional");var paid=pay(bill(a,"55"));
+        assertThat(paid.bill().principalPaidCents()).isEqualTo(5000);assertThat(paid.bill().bonusPaidCents()).isEqualTo(500);balances(a.id(),5000,500,0,0);
+        var r=tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",paid.bill().id(),"11","部分退货",key())));
+        assertThat(r.refund().principalCents()).isEqualTo(1000);assertThat(r.refund().bonusCents()).isEqualTo(100);balances(a.id(),6000,600,0,0);
+        tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",paid.bill().id(),"44","剩余退货",key())));balances(a.id(),10000,1000,0,0);
+    }
+    @Test void principalFirstAndFifoPreserveEachOriginalLotPolicy() {
+        var a=open();gift(a,"100","10","principal_first");gift(a,"300","50","proportional");var paid=pay(bill(a,"165"));
+        assertThat(paid.bill().principalPaidCents()).isEqualTo(14714);assertThat(paid.bill().bonusPaidCents()).isEqualTo(1786);balances(a.id(),25286,4214,0,0);
+        tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",paid.bill().id(),"165","全部退货",key())));balances(a.id(),40000,6000,0,0);
+    }
+    @Test void promotionalExitFreezesBothComponentsCancellationAndCompletionAreAtomic() {
+        var a=open();var t=gift(a,"100","10","proportional");pay(bill(a,"55"));
+        assertThatThrownBy(()->tx.execute(s->refunds.create(scope,actor,new RefundCreate("top_up",t.id(),"10","不可任意退",key())))).isInstanceOf(WalletException.class);
+        var command=new RefundCreate("top_up",t.id(),null,"退出充值",key(),"remaining_lot_exit");
+        var r=tx.execute(s->refunds.create(scope,actor,command));assertThat(r.refund().amountCents()).isEqualTo(5000);assertThat(r.refund().walletCents()).isEqualTo(5500);balances(a.id(),5000,500,5000,500);
+        tx.execute(s->refunds.cancel(scope,actor,r.refund().id(),key()));balances(a.id(),5000,500,0,0);
+        var again=tx.execute(s->refunds.create(scope,actor,new RefundCreate("top_up",t.id(),null,"重新退出",key(),"remaining_lot_exit")));
+        tx.execute(s->refunds.confirmPart(scope,actor,again.refund().id(),again.parts().getFirst().id(),"现金已退",key()));balances(a.id(),0,0,0,0);
+        assertThat(topupRepo.get(scope,t.id(),false).refundedCents()).isEqualTo(5000);
+    }
+    @Test void originalBillRefundAfterLotExitRestoresOnlyConsumedRights() {
+        var a=open();var t=gift(a,"100","10","proportional");var paid=pay(bill(a,"55"));
+        var r=tx.execute(s->refunds.create(scope,actor,new RefundCreate("top_up",t.id(),null,"退出",key(),"remaining_lot_exit")));
+        tx.execute(s->refunds.confirmPart(scope,actor,r.refund().id(),r.parts().getFirst().id(),"退款完成",key()));
+        tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",paid.bill().id(),"55","原消费退回",key())));balances(a.id(),5000,500,0,0);
+    }
+    @Test void bonusOnlyExitDoesNotPretendToReturnCashAndDoesNotBlockConsumedBonusRefund() {
+        var a=open();gift(a,"100","10","principal_first");var paid=pay(bill(a,"100"));balances(a.id(),0,1000,0,0);
+        var lot=funding.lots(scope,accounts.account(scope,a.id(),false)).getFirst();
+        tx.execute(s->funding.exitBonus(scope,accounts.account(scope,a.id(),true),lot.id(),"退出剩余赠送",actorId));balances(a.id(),0,0,0,0);
+        tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",paid.bill().id(),"100","退消费本金",key())));balances(a.id(),10000,0,0,0);
+        assertThat(jdbc.queryForObject("select count(*) from wallet_refunds where tenant_id=? and topup_id is not null",Integer.class,tenant)).isZero();
+    }
+    @Test void stalePreviewCannotReserveChangedComponentsAndOldCashCannotUseNewBonus() {
+        var a=credit(open(),"10","cash");var old=topupRepo.list(scope,new WalletHistoryQuery(0,"all")).getFirst();gift(a,"100","10","proportional");var version=accounts.account(scope,a.id(),false).version();pay(bill(a,"10"));
+        assertThatThrownBy(()->tx.execute(s->refunds.create(scope,actor,new RefundCreate("top_up",old.id(),"10","余额已变",key(),null,version)))).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(s->refunds.create(scope,actor,new RefundCreate("top_up",old.id(),"10","旧充值已消耗",key())))).isInstanceOf(WalletException.class);
+        balances(a.id(),10000,1000,0,0);
+    }
+
+    @Test void mixedTenderRefundPreviewExactlyMatchesCommittedWalletAndCashSplit() {
+        var a=open();gift(a,"100","10","proportional");var paid=pay(bill(a,"220"));
+        tx.execute(s->checkout.collect(scope,actor,paid.bill().id(),confirm("110","cash","mixed-cash-receipt")));
+        var operations=new WalletFundingOperations(access,accounts,topupRepo,bills,refundRepo,funding,commands);
+        var preview=tx.execute(s->operations.refundPreview(scope,actor,new WalletFundingOperations.RefundPreviewRequest("bill",paid.bill().id(),"22",null)));
+        assertThat(preview.walletCents()).isEqualTo(1100);assertThat(preview.principalReturnCents()).isEqualTo(1000);assertThat(preview.bonusReturnCents()).isEqualTo(100);assertThat(preview.externalRefundCents()).isEqualTo(1100);
+        var r=tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",paid.bill().id(),"22","混合收款退回",key(),null,preview.accountVersion())));
+        assertThat(r.refund().walletCents()).isEqualTo(preview.walletCents());assertThat(r.refund().principalCents()).isEqualTo(preview.principalReturnCents());assertThat(r.refund().bonusCents()).isEqualTo(preview.bonusReturnCents());assertThat(r.parts().stream().mapToLong(RefundPart::amountCents).sum()).isEqualTo(preview.externalRefundCents());
+    }
+
 }

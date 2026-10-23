@@ -1,0 +1,10 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import type { OfferSet, TopupQuote } from '../marketingTypes'
+import WalletAmountSplit from './WalletAmountSplit.vue'
+import { dateTime } from '../format'
+defineProps<{offers:OfferSet|null;quote:TopupQuote|null;expired:boolean;busy:boolean;timezone:string;paynowConfigured:boolean;confirmOnly?:boolean}>()
+const selected=defineModel<string>('selected',{required:true}),channel=defineModel<string>('channel',{required:true}),{t}=useI18n()
+defineEmits<{quote:[]}>()
+</script>
+<template><fieldset v-if="offers" :disabled="busy"><legend>{{t('wallet.marketing.select')}}</legend><p v-if="!offers.offers.length" class="wallet-empty">{{t('wallet.marketing.noOffers')}}</p><label v-for="offer in offers.offers" :key="offer.id" class="wallet-offer-option"><input v-model="selected" type="radio" :value="offer.id"><WalletAmountSplit :principal="offer.principalCents" :bonus="offer.bonusCents" :total="offer.creditTotalCents" /></label></fieldset><fieldset v-if="offers" class="wallet-channel-picker" :disabled="busy"><legend>{{t('wallet.channel')}}</legend><label v-for="c in offers.channels" :key="c"><input v-model="channel" type="radio" :value="c" :disabled="c==='paynow'&&!paynowConfigured">{{t(`wallet.channels.${c}`)}}</label><p v-if="offers.channels.includes('paynow')&&!paynowConfigured" class="wallet-warning">{{t('wallet.marketing.paynowSetup')}}</p></fieldset><button v-if="!confirmOnly" type="button" :disabled="busy||!selected||(channel==='paynow'&&!paynowConfigured)" @click="$emit('quote')">{{t('wallet.marketing.quote')}}</button><section v-if="quote&&!confirmOnly" class="wallet-card"><WalletAmountSplit :principal="quote.principalCents" :bonus="quote.bonusCents" :total="quote.creditTotalCents" /><p :class="{'wallet-warning':expired}">{{expired?t('wallet.marketing.expired'):t('wallet.marketing.expires')+' '+dateTime(quote.expiresAt,timezone)}}</p></section></template>

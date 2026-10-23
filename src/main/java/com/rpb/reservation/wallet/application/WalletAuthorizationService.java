@@ -4,6 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
 import com.rpb.reservation.wallet.domain.*;
 import com.rpb.reservation.wallet.persistence.*;
+import com.rpb.reservation.wallet.funding.application.WalletFundingService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.time.*;
 import java.util.*;
@@ -17,8 +18,9 @@ import static com.rpb.reservation.wallet.application.WalletCommands.*;
 public class WalletAuthorizationService {
     private final WalletAccountRepository accounts;private final WalletLedgerRepository ledger;private final WalletCommandRepository commands;
     private final WalletBillRepository bills;private final WalletAuthorizationRepository authorizations;private final WalletAccess access;private final Clock clock;
-    public WalletAuthorizationService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,WalletBillRepository bills,WalletAuthorizationRepository authorizations,WalletAccess access,Clock clock) {
-        this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.bills=bills;this.authorizations=authorizations;this.access=access;this.clock=clock;
+    private final WalletFundingService funding;
+    public WalletAuthorizationService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,WalletBillRepository bills,WalletAuthorizationRepository authorizations,WalletAccess access,Clock clock,WalletFundingService funding) {
+        this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.bills=bills;this.authorizations=authorizations;this.access=access;this.clock=clock;this.funding=funding;
     }
     @Transactional
     public PaymentCode issuePaymentCode(StoreScope scope,CustomerAuthPrincipal principal,UUID accountId) {
@@ -63,7 +65,8 @@ public class WalletAuthorizationService {
     public Quote quote(StoreScope scope,CustomerAuthPrincipal principal,UUID id) {
         access.customer(scope,principal,true);accounts.requireProgram(scope,true);var b=bills.get(scope,id,false);var a=accounts.account(scope,b.accountId(),true);access.own(a,principal);accounts.requireActive(a);
         if(b.closed() || b.walletApplied() || b.remainingCents()==0)throw WalletException.conflict("账单已处理，请查看支付结果");
-        return authorizations.quote(scope,b,a,WalletMoney.debit(a.availableCents(),b.remainingCents()),principal.customerId(),clock.instant().plusSeconds(60));
+        var split=funding.preview(scope,a,WalletMoney.debit(a.availableCents(),b.remainingCents()));
+        return authorizations.quote(scope,b,a,split.totalCents(),principal.customerId(),clock.instant().plusSeconds(60),split.principalCents(),split.bonusCents());
     }
     @Transactional
     public Paid pay(StoreScope scope,CustomerAuthPrincipal principal,UUID id,Pay c) {
@@ -74,9 +77,8 @@ public class WalletAuthorizationService {
             if(authorization.consumed() || !q.expiresAt().isAfter(clock.instant()))throw new WalletException("WALLET_AUTHORIZATION_EXPIRED",409,"付款确认已使用或过期");
             if(b.closed() || b.walletApplied() || q.accountVersion()!=a.version() || q.billVersion()!=b.version() || q.amountCents()!=WalletMoney.debit(a.availableCents(),b.remainingCents()))
                 throw new WalletException("WALLET_QUOTE_STALE",409,"余额或账单已变化，请重新查看并确认");
-            long after=a.balanceCents()-q.amountCents();
-            if(q.amountCents()>0) {accounts.update(a,after,a.reservedCents());ledger.append(scope,a,after,"bill_debit",id,principal.customerId(),null);}
-            bills.walletApplied(scope,b,q.amountCents());authorizations.consume(scope,q.id(),clock.instant());
+            var split=funding.debit(scope,a,q.amountCents(),id,principal.customerId());
+            bills.walletApplied(scope,b,q.amountCents());funding.billComponents(scope,id,split);authorizations.consume(scope,q.id(),clock.instant());
             commands.audit(scope,principal.customerId(),"bill.wallet_pay",id,Map.of("amountCents",q.amountCents()));
             return new Paid(bills.get(scope,id,false),accounts.account(scope,a.id(),false));
         });

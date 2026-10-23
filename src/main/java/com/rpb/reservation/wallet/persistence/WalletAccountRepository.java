@@ -67,8 +67,12 @@ public class WalletAccountRepository {
     }
     public List<UUID> programStores(UUID tenant,UUID program) {return jdbc.query("select store_id from wallet_program_stores where tenant_id=? and program_id=? order by store_id",(rs,n)->rs.getObject("store_id",UUID.class),tenant,program);}
     public void update(Account account,long balance,long reserved) {
+        updateComponents(account,balance,0,reserved,0);
+    }
+    public void updateComponents(Account account,long principal,long bonus,long reservedP,long reservedG) {
+        long balance=Math.addExact(principal,bonus),reserved=Math.addExact(reservedP,reservedG);
         if(balance<0 || reserved<0 || reserved>balance || balance>WalletMoney.MAX_CENTS) throw WalletException.conflict("钱包余额不允许透支或超限");
-        int n=jdbc.update("update wallet_accounts set balance_cents=?,reserved_cents=?,version=version+1,updated_at=now() where tenant_id=? and id=? and version=?",balance,reserved,account.tenantId(),account.id(),account.version());
+        int n=jdbc.update("update wallet_accounts set balance_cents=?,reserved_cents=?,principal_balance_cents=?,bonus_balance_cents=?,principal_reserved_cents=?,bonus_reserved_cents=?,version=version+1,updated_at=now() where tenant_id=? and id=? and version=?",balance,reserved,principal,bonus,reservedP,reservedG,account.tenantId(),account.id(),account.version());
         if(n!=1) throw WalletException.conflict("钱包余额已更新，请刷新");
     }
     public void requireActive(Account account) {
@@ -80,6 +84,6 @@ public class WalletAccountRepository {
         catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
     }
     private Account account(ResultSet rs) throws SQLException {
-        return new Account(rs.getObject("id",UUID.class),rs.getObject("tenant_id",UUID.class),rs.getObject("program_id",UUID.class),rs.getObject("customer_id",UUID.class),rs.getLong("balance_cents"),rs.getLong("reserved_cents"),rs.getString("status"),rs.getInt("version"));
+        return new Account(rs.getObject("id",UUID.class),rs.getObject("tenant_id",UUID.class),rs.getObject("program_id",UUID.class),rs.getObject("customer_id",UUID.class),rs.getLong("balance_cents"),rs.getLong("reserved_cents"),rs.getString("status"),rs.getInt("version"),rs.getLong("principal_balance_cents"),rs.getLong("bonus_balance_cents"),rs.getLong("principal_reserved_cents"),rs.getLong("bonus_reserved_cents"));
     }
 }

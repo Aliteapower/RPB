@@ -14,6 +14,6 @@ const { t } = useI18n(), { store, context, can } = useStaffWallet()
 <div class="wallet-shortcuts">
   <RouterLink v-if="context?.transactionsEnabled && context.program && can('wallet.topup.create')" :to="staffWalletPath(store,'topup')+'?scan=1'"><span class="wallet-shortcut-icon"><WalletIcon name="plus" /></span><strong>{{ t('wallet.topupQr.entry') }}</strong><small>{{ t('wallet.topupQr.entryHint') }}</small></RouterLink>
   <RouterLink :to="staffWalletPath(store,'bills')"><span class="wallet-shortcut-icon"><WalletIcon name="bill" /></span><strong>{{ t('wallet.ui.collectRecords') }}</strong><small>{{ t('wallet.ui.recordsHint') }}</small></RouterLink>
-  <RouterLink :to="staffWalletPath(store,'bills')+'?kind=topup&status=pending'"><span class="wallet-shortcut-icon"><WalletIcon name="history" /></span><strong>{{ t('wallet.ui.pendingTopups') }}</strong><small>{{ t('wallet.ui.pendingTopupsHint') }}</small></RouterLink>
+  <RouterLink :to="staffWalletPath(store,'topups')"><span class="wallet-shortcut-icon"><WalletIcon name="history" /></span><strong>{{ t('wallet.ui.pendingTopups') }}</strong><small>{{ t('wallet.ui.pendingTopupsHint') }}</small></RouterLink>
   <RouterLink :to="staffWalletPath(store,'more')"><span class="wallet-shortcut-icon"><WalletIcon name="settings" /></span><strong>{{ t('wallet.ui.more') }}</strong><small>{{ t('wallet.ui.managementHint') }}</small></RouterLink>
 </div></template>

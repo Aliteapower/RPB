@@ -1,10 +1,9 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServer } from 'vite'
 import { createRenderer, h, reactive, ref, nextTick } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
-let vite, historyModule, recordModule, staffModule, customerModule, authModule, receiptModule, codeModule
+let historyModule, recordModule, staffModule, customerModule, authModule, receiptModule, codeModule
 const oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldDocument=globalThis.document
 const timers=new Map();let timer=0
 const response=data=>({ok:true,status:200,json:async()=>data})
@@ -18,16 +17,14 @@ function mount(setup,route={params:{storeId:'A'},hash:'',query:{}},pinia=createP
 before(async()=>{
   globalThis.window={setInterval:fn=>{timers.set(++timer,fn);return timer},clearInterval:id=>timers.delete(id),location:{origin:'http://127.0.0.1:5178'}}
   globalThis.document={visibilityState:'visible'}
-  vite=await createServer({configFile:false,cacheDir:'target/wallet-ui-test-cache',server:{middlewareMode:true,hmr:false},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]}})
-  historyModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletHistory.ts')
-  recordModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletRecord.ts')
-  staffModule=await vite.ssrLoadModule('/src/modules/wallet/useStaffWallet.ts')
-  customerModule=await vite.ssrLoadModule('/src/modules/wallet/useCustomerWallet.ts')
-  authModule=await vite.ssrLoadModule('/src/stores/authSession.ts')
-  receiptModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletCodeReceipt.ts')
-  codeModule=await vite.ssrLoadModule('/src/modules/wallet/useCustomerWalletCode.ts')
+  // Bundle the production modules together so their injection keys retain identity without a dev server.
+  const {build}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
+  const source=`export * as historyModule from './src/modules/wallet/useWalletHistory.ts';export * as recordModule from './src/modules/wallet/useWalletRecord.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as receiptModule from './src/modules/wallet/useWalletCodeReceipt.ts';export * as codeModule from './src/modules/wallet/useCustomerWalletCode.ts'`
+  const result=await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','pinia']})
+  const dir=process.cwd()+'/target/wallet-workspace-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
+  ;({historyModule,recordModule,staffModule,customerModule,authModule,receiptModule,codeModule}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
 })
-after(async()=>{await vite?.close();globalThis.fetch=oldFetch;globalThis.window=oldWindow;globalThis.document=oldDocument})
+after(async()=>{globalThis.fetch=oldFetch;globalThis.window=oldWindow;globalThis.document=oldDocument})
 test('topup scan identifies a customer without retaining debit authorization or creating financial transactions',async()=>{
   const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body?JSON.parse(options.body):null});return response(url.endsWith('/context')?{transactionsEnabled:true}:{account:{id:'wallet'},customer:{id:'guest'}})}
   const scope=mount(()=>staffModule.provideStaffWallet());await tick()

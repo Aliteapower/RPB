@@ -1,12 +1,11 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServer, transformWithEsbuild } from 'vite'
 import { parse, compileScript } from '@vue/compiler-sfc'
 import { createRenderer, h, nextTick, reactive } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { createI18n } from 'vue-i18n'
-let vite, CodePage, TopupPage, messages, customerModule, staffModule, authModule
+let CodePage, TopupPage, messages, customerModule, staffModule, authModule
 const originalWindow=globalThis.window, originalFetch=globalThis.fetch, originalDocument=globalThis.document, originalDocumentClass=globalThis.Document, originalShadowRoot=globalThis.ShadowRoot
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
 const renderer=createRenderer({
@@ -32,23 +31,17 @@ const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' '
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible'})
  globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
- vite=await createServer({configFile:false,cacheDir:'target/wallet-qr-ui-test-cache',server:{middlewareMode:true,hmr:false},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]},plugins:[{
- name:'test-inline-vue',async transform(source,id){
-  if(id.endsWith('/WalletQrDisplay.vue'))return `import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`
-  if(id.endsWith('/WalletQrScanner.vue'))return `import {h} from 'vue';export default {emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code','WP.'+'A'.repeat(43))},'camera stub')}`
-  if(!id.endsWith('.vue'))return
-  const {descriptor}=parse(source,{filename:id});const script=compileScript(descriptor,{id:'test-'+id,inlineTemplate:true})
-  return transformWithEsbuild(script.content,id+'.ts',{loader:'ts'})
- }
- }]})
- CodePage=(await vite.ssrLoadModule('/src/modules/wallet/pages/WalletCustomerCode.vue')).default
- TopupPage=(await vite.ssrLoadModule('/src/modules/wallet/pages/WalletStaffTopup.vue')).default
- customerModule=await vite.ssrLoadModule('/src/modules/wallet/useCustomerWallet.ts')
- staffModule=await vite.ssrLoadModule('/src/modules/wallet/useStaffWallet.ts')
- authModule=await vite.ssrLoadModule('/src/stores/authSession.ts')
- messages=await vite.ssrLoadModule('/src/modules/wallet/locales.ts')
+ const {build}=await import('esbuild'),{mkdir,writeFile,readFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
+ const source=`export {default as CodePage} from './src/modules/wallet/pages/WalletCustomerCode.vue';export {default as TopupPage} from './src/modules/wallet/pages/WalletStaffTopup.vue';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as messages from './src/modules/wallet/locales.ts'`
+ const result=await build({stdin:{contents:source,loader:'ts',resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-i18n','vue-router','pinia'],plugins:[{name:'real-vue-components',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{
+  if(path.endsWith('WalletQrDisplay.vue'))return {contents:`import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`,loader:'js'}
+  if(path.endsWith('WalletQrScanner.vue'))return {contents:`import {h} from 'vue';export default {emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code','WP.'+'A'.repeat(43))},'camera stub')}`,loader:'js'}
+  const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return {contents:compileScript(descriptor,{id:'test-'+path,inlineTemplate:true}).content,loader:'ts'}
+ })}}]})
+ const dir=process.cwd()+'/target/wallet-topup-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
+ ;({CodePage,TopupPage,customerModule,staffModule,authModule,messages}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
 })
-after(async()=>{await vite?.close();globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
+after(async()=>{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 test('customer page shows a topup QR immediately and requires explicit action for the charge QR',async()=>{
  const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/me')?{context:{transactionsEnabled:true,store:{operatingEntityName:'Issuer'}},accounts:[{id:'wallet',balanceCents:1000,reservedCents:0}],pendingBills:[]}:{type:body.purpose==='topup'?'customer_wallet':'customer_charge',code:body.purpose==='topup'?'WP.identity':'WC.consent',expiresAt:'2099-01-01T00:00:00Z'})}
  const route=reactive({params:{storeId:'A'},query:{purpose:'topup'},hash:''}),view=mount(CodePage,'customer',route);await tick()
@@ -59,7 +52,7 @@ test('customer page shows a topup QR immediately and requires explicit action fo
  assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WC.consent');view.unmount()
 })
 test('merchant topup page scans identity, shows customer and enters amount before creating any topup',async()=>{
- const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body&&JSON.parse(options.body)});return response(url.endsWith('/context')?{transactionsEnabled:true,program:{channels:['cash']}}:{account:{id:'wallet',balanceCents:1000,reservedCents:0},customer:{id:'guest',displayName:'Test Guest',phone:'+6591234567'}})}
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body&&JSON.parse(options.body)});return response(url.endsWith('/topup-offers')?{campaignId:null,offers:[],channels:['cash'],deductionPolicy:'proportional',selfServiceEnabled:true}:url.endsWith('/context')?{transactionsEnabled:true,program:{channels:['cash']},store:{timezone:'Asia/Singapore'}}:{account:{id:'wallet',balanceCents:1000,reservedCents:0},customer:{id:'guest',displayName:'Test Guest',phone:'+6591234567'}})}
  const view=mount(TopupPage,'staff',reactive({params:{storeId:'A'},query:{scan:'1'},hash:''}));await tick()
  nodes(view.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick()
  assert.match(allText(view.root),/Test Guest/);assert.match(allText(view.root),/已扫码选中钱包/)

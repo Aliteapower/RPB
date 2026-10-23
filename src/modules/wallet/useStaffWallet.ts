@@ -10,17 +10,19 @@ function createWorkspace() {
   const store = computed(() => String(route.params.storeId)), context = ref<Context | null>(null)
   const customer = ref<Customer | null>(null), account = ref<Account | null>(null), customerCode = ref(''), customers = ref<Customer[]>([])
   const can = (permission: string) => auth.user?.permissions.includes(permission) === true
+  const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||route.name==='wallet-points')
   let generation = 0, selection = 0
   function clear() { selection++; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
   async function refresh() {
     const current = generation, id = store.value, selected = account.value?.id
-    const result = await walletApi(id).get<Context>('/context').catch(e=>{
+    const pointsOnly=pointsContext.value
+    const result = await walletApi(id).get<Context>(pointsOnly?'/points/context':'/context').catch(e=>{
       if(current===generation && e instanceof WalletApiError && [401,403,404].includes(e.status)){context.value=null;clear()}
       throw e
     })
     if (current !== generation) return
     context.value = result
-    if (selected) {
+    if (selected && !pointsOnly) {
       const latest = await walletApi(id).get<Account>(`/accounts/${selected}`)
       if (current === generation && account.value?.id === selected) account.value = latest
     }
@@ -28,13 +30,13 @@ function createWorkspace() {
   async function search(query: string) {
     await task.run(async () => { const current = generation; const result = await walletApi(store.value).get<Customer[]>(`/customers?query=${encodeURIComponent(query)}`); if (current === generation) customers.value = result })
   }
-  async function choose(value: Customer) {
+  async function choose(value: Customer, openAccount = true) {
     await task.run(async () => {
       const current = generation, request = ++selection, id = store.value
-      const existing = await walletApi(id).get<Account[]>(`/customers/${value.id}/accounts`)
+      const existing = openAccount ? await walletApi(id).get<Account[]>(`/customers/${value.id}/accounts`) : []
       if (current !== generation || request !== selection) return
       let selected = existing[0] ?? null
-      if (!selected && value.phone && context.value?.transactionsEnabled && can('wallet.topup.create')) selected = await walletApi(id).command<Account>('/accounts', { customerId: value.id })
+      if (openAccount && !selected && value.phone && context.value?.transactionsEnabled && can('wallet.topup.create')) selected = await walletApi(id).command<Account>('/accounts', { customerId: value.id })
       if (current !== generation || request !== selection) return
       customer.value = value; account.value = selected; customerCode.value = ''; customers.value = []
     })
@@ -48,11 +50,11 @@ function createWorkspace() {
       return true
     })
   }
-  watch(store, () => {
+  watch([store,pointsContext], () => {
     generation++; clear(); context.value = null;task.error.value=''
     const current=generation
     void refresh().catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
-  }, { immediate: true })
+  }, { immediate: true,flush:'sync' })
   const timer = window.setInterval(() => { if (!task.busy.value && document.visibilityState === 'visible') void refresh().catch(e => { task.error.value = String(e.message ?? e) }) }, 5000)
   onUnmounted(() => { generation++; window.clearInterval(timer) })
   return { store, context, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, ...task }

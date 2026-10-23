@@ -3,6 +3,7 @@ package com.rpb.reservation.wallet.application;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.wallet.domain.*;
 import com.rpb.reservation.wallet.persistence.*;
+import com.rpb.reservation.wallet.funding.application.WalletFundingService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.util.*;
 import org.springframework.stereotype.Service;
@@ -16,35 +17,42 @@ public class WalletRefundService {
     private static final UUID WALLET_TENDER=new UUID(0,0);
     private final WalletAccountRepository accounts;private final WalletLedgerRepository ledger;private final WalletCommandRepository commands;
     private final WalletTopupRepository topups;private final WalletBillRepository bills;private final WalletRefundRepository refunds;private final WalletAccess access;
-    public WalletRefundService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,WalletTopupRepository topups,WalletBillRepository bills,WalletRefundRepository refunds,WalletAccess access) {
-        this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.topups=topups;this.bills=bills;this.refunds=refunds;this.access=access;
+    private final WalletFundingService funding;
+    public WalletRefundService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,WalletTopupRepository topups,WalletBillRepository bills,WalletRefundRepository refunds,WalletAccess access,WalletFundingService funding) {
+        this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.topups=topups;this.bills=bills;this.refunds=refunds;this.access=access;this.funding=funding;
     }
     @Transactional
     public RefundDetail create(StoreScope scope,CurrentActor actor,RefundCreate c) {
         access.staff(scope,actor,"wallet.refund.manage",false);
         if(c==null || c.sourceId()==null || !Set.of("top_up","bill","collection_exception").contains(Objects.toString(c.sourceType(),"")))throw WalletException.invalid();
-        long amount=WalletMoney.cents(c.amount());String reason=WalletMoney.text(c.reason());
+        String reason=WalletMoney.text(c.reason());
+        if(c.mode()!=null && (!"top_up".equals(c.sourceType()) || !"remaining_lot_exit".equals(c.mode())))throw WalletException.invalid();
         return commands.run(scope,actor.actorId(),"refund.create",c.idempotencyKey(),c,RefundDetail.class,()->{
             boolean exception="collection_exception".equals(c.sourceType());var receipt=exception?refunds.collection(scope,c.sourceId()):null;
             if(exception && !receipt.exception())throw WalletException.invalid();
             boolean topup=exception?receipt.topupId()!=null:"top_up".equals(c.sourceType());UUID source=exception?(topup?receipt.topupId():receipt.billId()):c.sourceId();
             UUID accountId=topup?topups.get(scope,source,false).accountId():bills.get(scope,source,false).accountId();
             var a=exception?accounts.lockForExternalRecovery(scope,accountId):accounts.account(scope,accountId,true);if(!exception)accounts.requireActive(a);
+            if(c.expectedAccountVersion()!=null && c.expectedAccountVersion()!=a.version())throw new WalletException("WALLET_ALLOCATION_STALE",409,"余额或退款分项已变化，请重新预览");
             var t=topup?topups.get(scope,source,true):null;var b=topup?null:bills.get(scope,source,true);
             if(topup && !exception && !"credited".equals(t.status()))throw WalletException.conflict("只有已入账充值可以按本金退回；异常实收请选异常凭证退款");
+            long amount="remaining_lot_exit".equals(c.mode())&&topup&&!exception?funding.topupRemainingPrincipal(scope,a,t.id()):WalletMoney.cents(c.amount());
+            if(amount<=0)throw WalletException.conflict("无本金可退，剩余赠送请使用赠送退出");
+            if(topup&&!exception&&t.bonusCents()>0&&!"remaining_lot_exit".equals(c.mode()))throw new WalletException("WALLET_FUNDING_REFUND_NOT_ALLOWED",409,"活动充值需按剩余权益整批退出");
             Map<UUID,Long> available=new LinkedHashMap<>();
             if(!topup && !exception)available.put(WALLET_TENDER,b.walletPaidCents()-refunds.walletAllocated(scope,b.id()));
             var collections=refunds.collections(scope,topup?t.id():null,topup?null:b.id());
             for(var collection:collections)if(exception?collection.id().equals(receipt.id()):!collection.exception())available.put(collection.id(),collection.amountCents()-refunds.collectionAllocated(scope.tenantId().value(),collection.id()));
             var split=WalletMoney.allocate(amount,available);long wallet=exception?0:topup?amount:split.getOrDefault(WALLET_TENDER,0L);
-            if(topup && !exception && a.availableCents()<amount)throw new WalletException("WALLET_REFUND_EXCEEDS_LIMIT",409,"可用余额不足以退回该充值，请先处理已消费本金");
+            var reservation=topup&&!exception?funding.topupRefundPreview(scope,a,t.id(),amount):null;
+            if(reservation!=null)wallet=reservation.totalCents();
             boolean hasExternal=split.entrySet().stream().anyMatch(e->!WALLET_TENDER.equals(e.getKey()) && e.getValue()>0);
             var refund=refunds.create(scope,a,topup?t.id():null,topup?null:b.id(),amount,wallet,reason,actor.actorId(),hasExternal?"pending":"completed");
             if(exception)refunds.exception(scope,refund.id(),receipt.id());
             for(var part:split.entrySet())if(!WALLET_TENDER.equals(part.getKey()) && part.getValue()>0)refunds.addPart(scope,refund.id(),part.getKey(),part.getValue());
-            if(topup && !exception)accounts.update(a,a.balanceCents(),a.reservedCents()+amount);
+            if(topup && !exception) {funding.reserve(scope,a,refund.id(),reservation);refunds.components(scope,refund.id(),reservation.principalCents(),reservation.bonusCents());}
             else if(!exception) {
-                if(wallet>0) {long after=Math.addExact(a.balanceCents(),wallet);accounts.update(a,after,a.reservedCents());ledger.append(scope,a,after,"bill_refund",refund.id(),actor.actorId(),ledger.original(scope.tenantId().value(),"bill_debit",b.id()));}
+                if(wallet>0) {var restored=funding.refundBill(scope,a,b.id(),refund.id(),wallet,actor.actorId());refunds.components(scope,refund.id(),restored.principalCents(),restored.bonusCents());}
                 updateBill(scope,b);
             }
             commands.audit(scope,actor.actorId(),"refund.create",refund.id(),Map.of("sourceId",c.sourceId(),"amountCents",amount,"reason",reason));return detail(scope,refund.id());
@@ -60,9 +68,8 @@ public class WalletRefundService {
             if(!part.completed())refunds.completePart(scope,part,reference);
             if(!"completed".equals(r.status()) && refunds.parts(scope,id).stream().allMatch(RefundPart::completed)) {
                 if(r.topupId()!=null && r.exceptionCollectionId()==null) {
-                    if(a.reservedCents()<r.amountCents())throw WalletException.conflict("退款冻结状态异常");
-                    long after=a.balanceCents()-r.amountCents();accounts.update(a,after,a.reservedCents()-r.amountCents());
-                    ledger.append(scope,a,after,"topup_refund",r.id(),actor.actorId(),ledger.original(scope.tenantId().value(),"topup_credit",r.topupId()));
+                    if(a.reservedCents()<r.walletCents())throw WalletException.conflict("退款冻结状态异常");
+                    funding.finish(scope,a,r.id(),r.topupId(),actor.actorId());
                     topups.refunded(scope,r.topupId(),r.amountCents());
                 }
                 refunds.status(scope,id,"completed",actor.actorId());
@@ -82,7 +89,7 @@ public class WalletRefundService {
         return commands.run(scope,actor.actorId(),"refund.cancel",key,id,RefundDetail.class,()->{
             var initial=refunds.get(scope,id,false);var a=initial.exceptionCollectionId()!=null?accounts.lockForExternalRecovery(scope,initial.accountId()):accounts.account(scope,initial.accountId(),true);lockSource(scope,initial);var r=refunds.get(scope,id,true);
             if(!"pending".equals(r.status()) || refunds.parts(scope,id).stream().anyMatch(RefundPart::completed) || (r.billId()!=null && r.walletCents()>0))throw WalletException.conflict("已有退款完成，不能取消或释放冻结");
-            if(r.topupId()!=null && r.exceptionCollectionId()==null)accounts.update(a,a.balanceCents(),a.reservedCents()-r.amountCents());
+            if(r.topupId()!=null && r.exceptionCollectionId()==null)funding.release(scope,a,r.id());
             refunds.status(scope,id,"cancelled",actor.actorId());if(r.billId()!=null && r.exceptionCollectionId()==null)updateBill(scope,bills.get(scope,r.billId(),false));
             commands.audit(scope,actor.actorId(),"refund.cancel",id,Map.of());return detail(scope,id);
         });

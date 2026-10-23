@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WalletAmountSplit from '../components/WalletAmountSplit.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -31,7 +32,7 @@ async function cancel() { await run(async () => { await walletApi(store.value).c
 <template><p v-if="error" class="wallet-error" role="alert">{{ error }}</p><p v-if="!ready && busy" class="wallet-empty" role="status">{{ t('wallet.loading') }}</p>
   <template v-if="bill && context"><WalletPaymentResult :key="bill.id" :bill="bill" /><section class="wallet-payment-summary"><span class="wallet-status" :data-state="billStage(bill)">{{ t(`wallet.ui.status.${billStage(bill)}`) }}</span><h2>{{ money(bill.amountCents) }}</h2><p>{{ context.store.storeName }}</p><small>{{ t('wallet.issuer') }} · {{ context.store.operatingEntityName }}</small></section>
     <WalletCustomerSummary :store="store" :account-id="bill.accountId" />
-    <dl class="wallet-detail-fields"><dt>{{ t('wallet.walletPaid') }}</dt><dd>{{ money(bill.walletPaidCents) }}</dd><dt>{{ t('wallet.otherPaid') }}</dt><dd>{{ money(bill.externalPaidCents) }}</dd><dt>{{ t('wallet.stillDue') }}</dt><dd :class="{'wallet-due':!bill.closed && remaining(bill)>0}">{{ bill.closed ? '—' : money(remaining(bill)) }}</dd></dl>
+    <WalletAmountSplit :principal="bill.principalPaidCents??bill.walletPaidCents" :bonus="bill.bonusPaidCents??0" /><dl class="wallet-detail-fields"><dt>{{ t('wallet.walletPaid') }}</dt><dd>{{ money(bill.walletPaidCents) }}</dd><dt>{{ t('wallet.otherPaid') }}</dt><dd>{{ money(bill.externalPaidCents) }}</dd><dt>{{ t('wallet.stillDue') }}</dt><dd :class="{'wallet-due':!bill.closed && remaining(bill)>0}">{{ bill.closed ? '—' : money(remaining(bill)) }}</dd></dl>
     <p v-if="bill.refundStatus!=='none'" class="wallet-warning">{{ t(`wallet.states.${bill.refundStatus}`) }}</p>
     <div v-if="!bill.closed && remaining(bill)>0" class="wallet-detail-actions">
       <button v-if="can('wallet.charge.create') && can('wallet.collection.confirm') && context.transactionsEnabled && !bill.walletApplied" class="wallet-primary" :disabled="busy" @click="scanning=!scanning;code=null;paynow='';collecting=false"><WalletIcon name="scan" />{{ t('wallet.scanCharge.existing') }}</button>

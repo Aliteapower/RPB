@@ -2,6 +2,9 @@ package com.rpb.reservation.wallet.api;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.wallet.application.*;
+import com.rpb.reservation.wallet.domain.WalletException;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.servlet.http.HttpServletRequest;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.time.LocalDate;
 import java.util.*;
@@ -28,10 +31,10 @@ public class WalletStaffController {
     @PostMapping("/accounts") public Account open(@PathVariable UUID storeId,@RequestBody AccountRequest body) {var a=identity.staff();return accounts.open(scope(storeId,a),a,body.customerId(),body.idempotencyKey());}
     @GetMapping("/accounts/{id}") public Account account(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return accounts.get(scope(storeId,a),a,id);}
     @GetMapping("/accounts/{id}/entries") public List<Entry> entries(@PathVariable UUID storeId,@PathVariable UUID id,@RequestParam(defaultValue="0") int offset) {var a=identity.staff();return accounts.entries(scope(storeId,a),a,id,offset);}
-    @GetMapping("/topups") public List<Topup> topups(@PathVariable UUID storeId,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="all") String status) {var a=identity.staff();return topups.list(scope(storeId,a),a,new WalletHistoryQuery(offset,status));}
+    @GetMapping("/topups") public List<Topup> topups(@PathVariable UUID storeId,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="all") String status,@RequestParam(required=false) String origin,@RequestParam(required=false) UUID customerId,@RequestParam(required=false) String customer) {var a=identity.staff();UUID selected=customerId;if(customer!=null&&!customer.isBlank()){UUID alias;try{alias=UUID.fromString(customer);}catch(IllegalArgumentException e){throw WalletException.invalid();}if(selected!=null&&!selected.equals(alias))throw WalletException.invalid();selected=alias;}return topups.list(scope(storeId,a),a,new WalletHistoryQuery(offset,status,origin==null||origin.isBlank()?null:origin,selected));}
     @GetMapping("/topups/{id}") public Topup topup(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return topups.get(scope(storeId,a),a,id);}
-    @PostMapping("/topups") public Topup createTopup(@PathVariable UUID storeId,@RequestBody TopupCreate body) {var a=identity.staff();return topups.create(scope(storeId,a),a,body);}
-    @PostMapping("/topups/{id}/confirm") public TopupResult confirm(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody CollectionConfirm body) {var a=identity.staff();return topups.confirm(scope(storeId,a),a,id,body);}
+    @PostMapping("/topups") public Topup createTopup(@PathVariable UUID storeId,@RequestBody JsonNode body) {var a=identity.staff();return topups.create(scope(storeId,a),a,topupCreate(body));}
+    @PostMapping("/topups/{id}/confirm") public TopupResult confirm(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody CollectionConfirm body,HttpServletRequest request) {var a=identity.staff();WalletModelGuard.require(request.getHeader("X-RPB-Wallet-Model"));return topups.confirm(scope(storeId,a),a,id,body);}
     @PostMapping("/topups/{id}/cancel") public Topup cancelTopup(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key body) {var a=identity.staff();return topups.cancel(scope(storeId,a),a,id,body.idempotencyKey());}
     @GetMapping("/topups/{id}/paynow") public Map<String,String> topupPaynow(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return Map.of("payload",topups.paynowQr(scope(storeId,a),a,id,collection));}
     @GetMapping("/bills") public List<Bill> bills(@PathVariable UUID storeId,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="all") String status) {var a=identity.staff();return checkout.list(scope(storeId,a),a,new WalletHistoryQuery(offset,status));}
@@ -46,10 +49,18 @@ public class WalletStaffController {
     @PostMapping("/bills/{id}/cancel") public Bill cancelBill(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key body) {var a=identity.staff();return checkout.cancel(scope(storeId,a),a,id,body.idempotencyKey());}
     @GetMapping("/refunds") public List<Refund> refunds(@PathVariable UUID storeId) {var a=identity.staff();return refunds.list(scope(storeId,a),a);}
     @GetMapping("/refunds/{id}") public RefundDetail refund(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return refunds.get(scope(storeId,a),a,id);}
-    @PostMapping("/refunds") public RefundDetail createRefund(@PathVariable UUID storeId,@RequestBody RefundCreate body) {var a=identity.staff();return refunds.create(scope(storeId,a),a,body);}
-    @PostMapping("/refunds/{id}/confirm") public RefundDetail confirmRefund(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody RefundConfirmation body) {var a=identity.staff();return refunds.confirmPart(scope(storeId,a),a,id,body.partId(),body.receiptReference(),body.idempotencyKey());}
-    @PostMapping("/refunds/{id}/cancel") public RefundDetail cancelRefund(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key body) {var a=identity.staff();return refunds.cancel(scope(storeId,a),a,id,body.idempotencyKey());}
+    @PostMapping("/refunds") public RefundDetail createRefund(@PathVariable UUID storeId,@RequestBody RefundCreate body,HttpServletRequest request) {var a=identity.staff();WalletModelGuard.require(request.getHeader("X-RPB-Wallet-Model"));if(body==null||body.expectedAccountVersion()==null)throw WalletException.invalid();return refunds.create(scope(storeId,a),a,body);}
+    @PostMapping("/refunds/{id}/confirm") public RefundDetail confirmRefund(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody RefundConfirmation body,HttpServletRequest request) {var a=identity.staff();WalletModelGuard.require(request.getHeader("X-RPB-Wallet-Model"));return refunds.confirmPart(scope(storeId,a),a,id,body.partId(),body.receiptReference(),body.idempotencyKey());}
+    @PostMapping("/refunds/{id}/cancel") public RefundDetail cancelRefund(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key body,HttpServletRequest request) {var a=identity.staff();WalletModelGuard.require(request.getHeader("X-RPB-Wallet-Model"));return refunds.cancel(scope(storeId,a),a,id,body.idempotencyKey());}
     @GetMapping("/reconciliation") public Reconciliation report(@PathVariable UUID storeId,@RequestParam LocalDate start,@RequestParam LocalDate end,@RequestParam(defaultValue="store") String group) {var a=identity.staff();return reports.query(scope(storeId,a),a,start,end,group);}
+    private TopupCreate topupCreate(JsonNode body) {
+        if(body==null||!body.isObject())throw singleOffer();
+        var names=body.fieldNames();while(names.hasNext())if(!Set.of("accountId","amount","channel","idempotencyKey","quoteId").contains(names.next()))throw singleOffer();
+        try{var command=new TopupCreate(uuid(body,"accountId"),text(body,"amount"),text(body,"channel"),text(body,"idempotencyKey"),uuid(body,"quoteId"));if(command.accountId()==null || (command.quoteId()!=null&&(body.has("amount")||body.has("channel"))) || (command.quoteId()==null&&(command.amount()==null||command.channel()==null)))throw singleOffer();return command;}catch(IllegalArgumentException e){throw singleOffer();}
+    }
+    private UUID uuid(JsonNode body,String key){String value=text(body,key);return value==null?null:UUID.fromString(value);}
+    private String text(JsonNode body,String key){var value=body.get(key);if(value==null||value.isNull())return null;if(!value.isTextual())throw singleOffer();return value.textValue();}
+    private WalletException singleOffer(){return new WalletException("WALLET_TOPUP_SINGLE_OFFER_REQUIRED",400,"充值仅允许一个报价或普通金额，不允许数量、赠送或身份覆盖字段");}
     public record AccountRequest(UUID customerId,String idempotencyKey) {}
     public record Key(String idempotencyKey) {}
     public record Code(String code) {}
