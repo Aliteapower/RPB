@@ -41,13 +41,13 @@ before(async()=>{
 })
 after(()=>{globalThis.fetch=oldFetch;globalThis.document=oldDocument;globalThis.window=oldWindow})
 const capabilities={money:true,points:true,refunds:true,reversals:true}
-const makePage=(overrides={})=>({items:[],totalCount:321,nextCursor:'cursor-2',summary:{consumptionCents:123400,pointsGranted:800},stores:[{id:'A',name:'甲店',timeZone:'Asia/Singapore'},{id:'B',name:'乙店',timeZone:'America/New_York'}],period:{mode:'month',startDate:'2026-10-01',endDate:'2026-10-31',timeZone:'Asia/Singapore'},capabilities,...overrides})
+const makePage=(overrides={})=>({items:[],totalCount:321,nextCursor:'cursor-2',summary:{consumptionCents:123400,pointsGranted:800},stores:[{id:'A',name:'甲店',timeZone:'Asia/Singapore'},{id:'B',name:'乙店',timeZone:'America/New_York'}],category:overrides.capabilities?.money===false&&overrides.capabilities?.points?'points':'consumption',period:{mode:'month',startDate:'2026-10-01',endDate:'2026-10-31',timeZone:'Asia/Singapore'},capabilities,...overrides})
 const route=(customer=false,extra={})=>reactive({params:{storeId:'A'},meta:{walletWorkspace:customer?'customer':'staff'},query:{},path:customer?'/wallet/A/transactions':'/stores/A/wallet/transactions',fullPath:customer?'/wallet/A/transactions':'/stores/A/wallet/transactions',...extra})
 const row=(overrides={})=>({id:'record',sourceType:'bill',type:'payment',status:'completed',occurredAt:'2026-10-22T12:00:00Z',createdAt:'2025-01-01T00:00:00Z',postedAt:'2026-10-22T12:00:00Z',storeId:'B',storeName:'乙店',timeZone:'Asia/Singapore',currency:'SGD',amountCents:10000,quantity:0,direction:'out',walletDeltaCents:-6000,principalCents:0,bonusCents:0,creditTotalCents:0,walletPaidCents:6000,externalPaidCents:4000,refundStatus:'refunded',...overrides})
 test('URL query retains period, cross-store filters and cursor; customer identity override is stripped',()=>{
  const input={period:'range',startDate:'2025-12-29',endDate:'2026-01-03',type:'refund',status:'completed',reference:'R 1',customerQuery:'名字',targetStoreId:'all',limit:'25',cursor:'bound:cursor',customerId:'victim',year:['2020']}
  const output=query.transactionQuery(input);assert.equal(output.cursor,'bound:cursor');assert.equal(output.endDate,'2026-01-03');assert.equal(output.targetStoreId,'all');assert.equal(output.customerId,undefined);assert.equal(output.year,undefined)
- assert.equal(query.transactionQuery(input,true).customerQuery,undefined);assert.deepEqual(query.transactionQuery({}),{period:'month',type:'all',status:'all'})
+ assert.equal(query.transactionQuery(input,true).customerQuery,undefined);assert.deepEqual(query.transactionQuery({}),{period:'month',type:'all',status:'all',category:'auto',direction:'all'})
 })
 test('safe cross-store return preserves exact filters and pagination while rejecting external and wrong-role addresses',()=>{
  const back='/stores/A/wallet/transactions?period=year&year=2025&targetStoreId=all&cursor=original'
@@ -62,8 +62,24 @@ test('money and points capabilities independently control filters and summaries'
  const points={money:false,points:true,refunds:false,reversals:false};assert.ok(!query.availableTypes(points).includes('payment'));assert.ok(query.availableTypes(points).includes('reversal'));assert.ok(query.summaryKeys(points).every(k=>!k.endsWith('Cents')))
  const money={money:true,points:false,refunds:false,reversals:false};assert.ok(!query.availableTypes(money).includes('points_grant'));assert.ok(query.summaryKeys(money).every(k=>k.endsWith('Cents')))
 })
+
+test('folder switches retain dates and store, reset type and cursor; flow switches reset cursor',()=>{
+ const original={period:'range',startDate:'2025-12-31',endDate:'2026-01-02',targetStoreId:'all',category:'points',type:'points_redemption',direction:'out',cursor:'old'}
+ const folder=query.switchTransactionFilter(original,'topup',true);assert.equal(folder.category,'topup');assert.equal(folder.type,'all');assert.equal(folder.direction,'out');assert.equal(folder.cursor,undefined);assert.equal(folder.startDate,original.startDate);assert.equal(folder.targetStoreId,'all')
+ const flow=query.switchTransactionFilter(original,'in');assert.equal(flow.category,'points');assert.equal(flow.type,'points_redemption');assert.equal(flow.direction,'in');assert.equal(flow.cursor,undefined)
+ assert.deepEqual(query.availableTypes(capabilities,'consumption'),['all','payment','refund']);assert.ok(!query.summaryKeys(capabilities,'topup').includes('pointsGranted'));assert.ok(query.summaryKeys(capabilities,'points').every(k=>!k.endsWith('Cents')))
+ assert.equal(query.transactionQuery({category:'all'}).category,'auto');assert.deepEqual(query.availableCategories({money:false,points:true,refunds:false,reversals:false}),['points'])
+})
+
+test('component has folder tabs and direction buttons, switches by server query without mixed summary',async()=>{
+ const requests=[];globalThis.fetch=async url=>{requests.push(url);const params=new URL('http://local'+url).searchParams,category=params.get('category')==='auto'?'consumption':params.get('category');return response(makePage({category,summary:{consumptionCents:1200,topupPrincipalCents:10000,topupBonusCents:1000,topupCreditCents:11000,pointsGranted:20}}))}
+ const r=route(),scope=mount(Page,r);await tick();assert.match(requests[0],/category=auto/);assert.ok(!text(scope.root).includes('充值本金实收'));assert.ok(!text(scope.root).includes('赠送积分'))
+ nodes(scope.root,n=>n.tag==='button'&&text(n)==='充值')[0].props.onClick();await tick();assert.equal(r.query.category,'topup');assert.equal(r.query.type,'all');assert.match(requests.at(-1),/category=topup/);assert.match(text(scope.root),/充值本金实收/);assert.ok(!text(scope.root).includes('消费原单金额'))
+ nodes(scope.root,n=>n.tag==='button'&&text(n)==='支出')[0].props.onClick();await tick();assert.equal(r.query.direction,'out');assert.match(requests.at(-1),/direction=out/)
+ nodes(scope.root,n=>n.tag==='button'&&text(n)==='积分')[0].props.onClick();await tick();assert.equal(r.query.category,'points');assert.equal(r.query.direction,'out');assert.ok(!text(scope.root).includes('SGD'));assert.match(text(scope.root),/积分增加/);assert.equal(nodes(scope.root,n=>n.tag==='details').length,1);scope.unmount()
+})
 test('component uses one query, server period/full summary, URL pagination and filter reset',async()=>{
- const requests=[];globalThis.fetch=async url=>{requests.push(url);return response(makePage())};const r=route(),scope=mount(Page,r);await tick();assert.equal(requests.length,1);assert.match(requests[0],/transactions\?period=month/);assert.match(text(scope.root),/1,234\.00/);assert.match(text(scope.root),/800 积分/);assert.match(text(scope.root),/321/);assert.match(text(scope.root),/2026-10-01/)
+ const requests=[];globalThis.fetch=async url=>{requests.push(url);return response(makePage())};const r=route(),scope=mount(Page,r);await tick();assert.equal(requests.length,1);assert.match(requests[0],/transactions\?period=month/);assert.match(text(scope.root),/1,234\.00/);assert.doesNotMatch(text(scope.root),/800 积分/);assert.match(text(scope.root),/321/);assert.match(text(scope.root),/2026-10-01/)
  const next=nodes(scope.root,n=>n.tag==='button'&&text(n)==='下一页')[0];next.props.onClick();await tick();assert.equal(r.query.cursor,'cursor-2');assert.match(requests.at(-1),/cursor=cursor-2/)
  const form=nodes(scope.root,n=>n.tag==='form')[0];await form.props.onSubmit({preventDefault(){}});await tick();assert.equal(r.query.cursor,undefined);assert.equal(requests.length,3);scope.unmount()
 })

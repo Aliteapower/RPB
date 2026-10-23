@@ -4,10 +4,10 @@ import com.rpb.reservation.wallet.domain.WalletException;
 import java.time.*;
 import java.util.*;
 
-public record TransactionQuery(String type,String status,String reference,String customerQuery,String targetStoreId,
+public record TransactionQuery(String type,String status,String reference,String customerQuery,String targetStoreId,String category,String direction,
     int limit,String cursor,TransactionViews.Period period) {
     public static TransactionQuery parse(Map<String,String> q,Clock clock,String zone,boolean customer) {
-        Set<String> allowed=Set.of("period","year","month","startDate","endDate","type","status","reference","customerQuery","targetStoreId","limit","cursor");
+        Set<String> allowed=Set.of("period","year","month","startDate","endDate","type","status","reference","customerQuery","targetStoreId","category","direction","limit","cursor");
         if(!allowed.containsAll(q.keySet()) || customer&&q.containsKey("customerQuery"))throw WalletException.invalid();
         try {
             String mode=q.getOrDefault("period","month"); LocalDate today=LocalDate.now(clock.withZone(ZoneId.of(zone))),start,end;
@@ -25,7 +25,9 @@ public record TransactionQuery(String type,String status,String reference,String
             int limit=Integer.parseInt(q.getOrDefault("limit","25"));if(limit<1||limit>100)throw WalletException.invalid();
             String ref=q.getOrDefault("reference","").trim(),search=q.getOrDefault("customerQuery","").trim();
             if(ref.length()>200||search.length()>200||q.getOrDefault("cursor","").length()>2000)throw WalletException.invalid();
-            return new TransactionQuery(type,status,ref,search,q.getOrDefault("targetStoreId",""),limit,q.get("cursor"),new TransactionViews.Period(mode,start,end,zone));
+            String category=q.getOrDefault("category","all"),direction=q.getOrDefault("direction","all");
+            if(!Set.of("all","auto","consumption","topup","points").contains(category)||!Set.of("all","in","out").contains(direction))throw WalletException.invalid();
+            return new TransactionQuery(type,status,ref,search,q.getOrDefault("targetStoreId",""),category,direction,limit,q.get("cursor"),new TransactionViews.Period(mode,start,end,zone));
         } catch(DateTimeException|NumberFormatException|NullPointerException e){throw WalletException.invalid();}
     }
 }

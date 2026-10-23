@@ -20,7 +20,7 @@ public class TransactionRepository {
         return jdbc.query(TransactionProjection.CTE+"select s.id,s.display_name,s.timezone from stores s where s.tenant_id=:tenant and "+where+" order by s.display_name,s.id",p,(r,n)->new Store(r.getObject(1,UUID.class),r.getString(2),r.getString(3)));
     }
     public List<Item> items(String where,MapSqlParameterSource p,boolean customer,int limit) {
-        return jdbc.query(TransactionProjection.CTE+"select * from records where "+where+" order by occurred_at desc,source_type desc,id desc limit "+limit,p,mapper(customer));
+        return jdbc.query(TransactionProjection.CTE+"select *,"+TransactionFilters.flow(customer)+" display_direction from records where "+where+" order by occurred_at desc,source_type desc,id desc limit "+limit,p,mapper(customer));
     }
     public record Totals(long count,Summary summary) {}
     public Totals totals(String where,MapSqlParameterSource p) {
@@ -64,7 +64,7 @@ public class TransactionRepository {
         case "bill_refund"->"钱包退款回存";case "topup_refund"->"退回充值并移除权益";case "bonus_revoke"->"移除赠送权益";
         case "线下实收确认","外部退款完成"->action;default->"交易操作记录";
     };}
-    private RowMapper<Item> mapper(boolean customer) {return (r,n)->new Item(r.getObject("id",UUID.class),r.getString("source_type"),r.getString("type"),r.getString("status"),instant(r,"occurred_at"),instant(r,"created_at"),instant(r,"posted_at"),r.getObject("store_id",UUID.class),r.getString("store_name"),r.getString("time_zone"),r.getString("currency"),r.getLong("amount_cents"),r.getLong("quantity"),r.getString("direction"),r.getLong("wallet_delta"),r.getLong("principal"),r.getLong("bonus"),r.getLong("credit"),r.getLong("wallet_paid"),r.getLong("external_paid"),r.getString("refund_status"),r.getObject("customer_id",UUID.class),r.getString("customer_name"),customer?null:maskPhone(r.getString("customer_phone")),r.getString("summary"),customer?null:r.getString("actor_name"),r.getString("original_source_type"),r.getObject("original_id",UUID.class));}
+    private RowMapper<Item> mapper(boolean customer) {return (r,n)->new Item(r.getObject("id",UUID.class),r.getString("source_type"),r.getString("type"),r.getString("status"),instant(r,"occurred_at"),instant(r,"created_at"),instant(r,"posted_at"),r.getObject("store_id",UUID.class),r.getString("store_name"),r.getString("time_zone"),r.getString("currency"),r.getLong("amount_cents"),r.getLong("quantity"),r.getString("display_direction"),r.getLong("wallet_delta"),r.getLong("principal"),r.getLong("bonus"),r.getLong("credit"),r.getLong("wallet_paid"),r.getLong("external_paid"),r.getString("refund_status"),r.getObject("customer_id",UUID.class),r.getString("customer_name"),customer?null:maskPhone(r.getString("customer_phone")),r.getString("summary"),customer?null:r.getString("actor_name"),r.getString("original_source_type"),r.getObject("original_id",UUID.class));}
     private static String maskPhone(String phone){return phone==null?null:phone.length()<=4?"****":"****"+phone.substring(phone.length()-4);}
     private static Instant instant(ResultSet r,String name)throws SQLException{var t=r.getTimestamp(name);return t==null?null:t.toInstant();}
 }

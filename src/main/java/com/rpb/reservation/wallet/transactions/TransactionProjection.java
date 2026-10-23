@@ -40,7 +40,7 @@ final class TransactionProjection {
             r.principal_cents,r.bonus_cents,0,r.wallet_cents,
             case when r.topup_id is not null then r.amount_cents else r.amount_cents-r.wallet_cents end,
             r.status,r.reason,coalesce(r.confirmed_by,r.created_by),case when r.bill_id is not null then 'bill' else 'topup' end,
-            coalesce(r.bill_id,r.topup_id),r.id::text,'in'
+            coalesce(r.bill_id,r.topup_id),r.id::text,case when r.topup_id is not null and r.exception_collection_id is null then 'out' else 'in' end
           from wallet_refunds r join wallet_accounts a on a.id=r.account_id and a.tenant_id=r.tenant_id where r.tenant_id=:tenant
           union all
           select p.id,'points',case p.kind when 'manual_grant' then 'points_grant' when 'manual_deduct' then 'points_deduct' when 'redemption' then 'points_redemption' else 'reversal' end,

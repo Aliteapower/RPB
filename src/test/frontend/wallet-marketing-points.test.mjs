@@ -49,6 +49,16 @@ before(async()=>{
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
+test('customer recharge names the active campaign and explicitly explains ordinary 1:1 fallback',async()=>{
+ for(const campaign of [true,false]){
+  globalThis.fetch=async url=>response(url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,paynowConfigured:true,store:{timezone:'Asia/Singapore'}}}:url.endsWith('/topup-offers')?{...offers,campaignId:campaign?'campaign':null,campaignName:campaign?'夏日充值礼':null,offers:campaign?offers.offers:[{...offers.offers[0],bonusCents:0,creditTotalCents:10000}]}:[])
+  const scope=mount(CustomerTopups,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick()
+  assert.match(allText(scope.root),campaign?/夏日充值礼/:/普通充值.*1:1/)
+  assert.match(allText(scope.root),campaign?/活动充值.*每次只能选择一档/:/暂无生效的充值活动/)
+  assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('获取报价')).length,0)
+  scope.unmount()
+ }
+})
 function composable(setup){let state;const app=renderer.createApp({setup(){state=setup();return()=>h('div')}});app.mount({children:[]});return{state,unmount:()=>app.unmount()}}
 
 test('quote contains exactly one server offer, no client amounts, and selection change invalidates it',async()=>{

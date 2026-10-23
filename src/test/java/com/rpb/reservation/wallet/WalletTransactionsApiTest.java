@@ -37,6 +37,6 @@ class WalletTransactionsApiTest {
     @Test void strictDateAndFilterValidationRejectsIdentityOverridesAndInvalidLimits(){
         var clock=Clock.fixed(Instant.parse("2026-12-31T18:00:00Z"),ZoneOffset.UTC);
         var q=TransactionQuery.parse(Map.of(),clock,"Asia/Singapore",true);assertThat(q.period().startDate()).isEqualTo(LocalDate.of(2027,1,1));
-        for(var input:List.of(Map.of("customerId",customer.toString()),Map.of("customerQuery","A"),Map.of("limit","101"),Map.of("period","range","startDate","2026-12-31","endDate","2026-01-01"),Map.of("month","13"),Map.of("type","unknown")))assertThatThrownBy(()->TransactionQuery.parse(input,clock,"Asia/Singapore",true)).isInstanceOf(WalletException.class);
+        for(var input:List.of(Map.of("customerId",customer.toString()),Map.of("customerQuery","A"),Map.of("limit","101"),Map.of("period","range","startDate","2026-12-31","endDate","2026-01-01"),Map.of("month","13"),Map.of("type","unknown"),Map.of("category","unknown"),Map.of("direction","unknown")))assertThatThrownBy(()->TransactionQuery.parse(input,clock,"Asia/Singapore",true)).isInstanceOf(WalletException.class);
     }
 }

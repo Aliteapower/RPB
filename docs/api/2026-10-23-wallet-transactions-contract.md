@@ -1,5 +1,7 @@
 # 钱包统一交易只读 API
 
+2026-10-23 分类更新：界面改为消费／充值／积分文件夹及全部／收入／支出筛选，参数、方向口径和分页约束见 [交易分类合约](2026-10-23-wallet-transaction-folders-contract.md)。统一入口和业务详情路由不变。
+
 列表 GET `/api/v1/stores/{storeId}/wallet/transactions`，顾客 GET `/api/v1/public/stores/{storeId}/wallet/transactions`。详情在列表地址追加 `/{sourceType}/{id}`。参数与字段遵循 `docs/superpowers/plans/2026-10-23-wallet-transactions.md`。
 
 明确响应：`capabilities:{money,points,refunds,reversals}`；`period:{mode,startDate,endDate,timeZone}`；`events:[{type,occurredAt,label}]`；`related` 为同权限 Item 数组。sourceType 为 bill/topup/refund/points/money_reversal。points 冲正使用 type=reversal；money_reversal 独立赠送退出也使用 type=reversal，但统计分开。

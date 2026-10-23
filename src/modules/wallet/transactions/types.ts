@@ -6,5 +6,5 @@ export interface Transaction {
  customerId:string|null; customerName:string|null; customerPhone:string|null; summary:string|null; actorName:string|null; originalSourceType:TransactionSource|null; originalId:string|null
 }
 export interface Capabilities {money:boolean;points:boolean;refunds:boolean;reversals:boolean}
-export interface TransactionPage {items:Transaction[];nextCursor:string|null;totalCount:number;summary:Record<string,number>;stores:{id:string;name:string;timeZone:string}[];period:{mode:string;startDate:string;endDate:string;timeZone:string};capabilities:Capabilities}
+export interface TransactionPage {items:Transaction[];nextCursor:string|null;totalCount:number;summary:Record<string,number>;stores:{id:string;name:string;timeZone:string}[];period:{mode:string;startDate:string;endDate:string;timeZone:string};capabilities:Capabilities;category:string}
 export interface TransactionDetail {transaction:Transaction;related:Transaction[];events:{type?:string;kind?:string;occurredAt?:string;at?:string;summary?:string;label?:string}[]}

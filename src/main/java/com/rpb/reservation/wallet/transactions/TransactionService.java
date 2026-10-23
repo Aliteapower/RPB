@@ -42,15 +42,18 @@ public class TransactionService {
         Context c=context(s,actor,customer);
         String zone=c.stores().stream().filter(v->v.id().equals(s.storeId().value())).findFirst().orElseThrow().timeZone();
         var q=TransactionQuery.parse(input,clock,zone,customer!=null);authorizeType(c,q.type());
+        String category=TransactionFilters.category(q.category(),q.type(),c.sources());
         Set<UUID> stores=selectedStores(c,s,q.targetStoreId());
         var p=params(c,stores);String where=security(c)+" and occurred_at >= (cast(:start as date)::timestamp at time zone time_zone) and occurred_at < (cast(:end as date)::timestamp at time zone time_zone)";
         p.addValue("start",q.period().startDate().toString()).addValue("end",q.period().endDate().plusDays(1).toString());
+        where+=" and "+TransactionFilters.folder(category,q.type(),c.sources());
+        if(!q.direction().equals("all")){where+=" and ("+TransactionFilters.flow(customer!=null)+")=:flow";p.addValue("flow",q.direction());}
         if(!q.type().equals("all")){where+=" and type=:type";p.addValue("type",q.type());}
         if(!q.status().equals("all")){where+=" and status=:status";p.addValue("status",q.status());}
         if(!q.reference().isEmpty()){where+=" and position(lower(:reference) in lower(reference))>0";p.addValue("reference",q.reference());}
         if(!q.customerQuery().isEmpty()){where+=" and (position(lower(:search) in lower(customer_name))>0 or position(:search in coalesce(customer_phone,''))>0)";p.addValue("search",q.customerQuery());}
         var totals=repository.totals(where,p);
-        String binding=digest(c.tenant()+"|"+c.customer()+"|"+(actor==null?"":actor.actorId())+"|"+new TreeSet<>(stores)+"|"+c.sources()+"|"+q.period()+"|"+q.type()+"|"+q.status()+"|"+q.reference()+"|"+q.customerQuery());
+        String binding=digest(c.tenant()+"|"+c.customer()+"|"+(actor==null?"":actor.actorId())+"|"+new TreeSet<>(stores)+"|"+c.sources()+"|"+q.period()+"|"+q.type()+"|"+q.status()+"|"+q.reference()+"|"+q.customerQuery()+"|"+category+"|"+q.direction());
         String pageWhere=where;
         if(q.cursor()!=null&&!q.cursor().isBlank()) {
             try {
@@ -62,7 +65,7 @@ public class TransactionService {
         }
         var rows=new ArrayList<>(repository.items(pageWhere,p,customer!=null,q.limit()+1));String next=null;
         if(rows.size()>q.limit()){rows.removeLast();var last=rows.getLast();next=Base64.getUrlEncoder().withoutPadding().encodeToString((binding+"|"+last.occurredAt()+"|"+last.sourceType()+"|"+last.id()).getBytes(StandardCharsets.UTF_8));}
-        return new Page(List.copyOf(rows),next,totals.count(),totals.summary(),c.stores(),q.period(),c.capabilities());
+        return new Page(List.copyOf(rows),next,totals.count(),totals.summary(),c.stores(),q.period(),c.capabilities(),category);
     }
     public Detail detail(StoreScope s,CurrentActor actor,CustomerAuthPrincipal customer,String source,UUID id) {
         Context c=context(s,actor,customer);

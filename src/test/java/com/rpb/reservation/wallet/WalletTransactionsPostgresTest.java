@@ -89,6 +89,21 @@ class WalletTransactionsPostgresTest {
 
     TransactionService query(){return new TransactionService(new TransactionRepository(jdbc),access,Clock.fixed(Instant.parse("2026-10-23T00:00:00Z"),ZoneOffset.UTC));}
     Map<String,String> all(){return Map.of("period","range","startDate","2020-01-01","endDate","2030-12-31");}
+    Map<String,String> folder(String category,String direction){var q=new HashMap<>(all());q.put("category",category);q.put("direction",direction);return q;}
+    @Test void consumptionAndTopupFoldersNeverMixAndDirectionsFollowViewer() {
+        var a=credit(open(),"100","cash");var b=bill(a,"25");pay(b);
+        tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",b.id(),"5","部分退款",key())));
+        var consumption=list(folder("consumption","all"));assertThat(consumption.totalCount()).isEqualTo(2);assertThat(consumption.items()).extracting("sourceType").containsExactlyInAnyOrder("bill","refund");assertThat(consumption.summary().topupPrincipalCents()).isZero();
+        var income=list(folder("consumption","in"));assertThat(income.items()).singleElement().satisfies(i->{assertThat(i.type()).isEqualTo("payment");assertThat(i.direction()).isEqualTo("in");});assertThat(income.summary().consumptionCents()).isEqualTo(2500);
+        var expense=list(folder("consumption","out"));assertThat(expense.items()).singleElement().extracting("sourceType").isEqualTo("refund");assertThat(expense.summary().refundCents()).isEqualTo(500);
+        var customerIncome=tx.execute(s->query().list(scope,null,principal,folder("consumption","in")));assertThat(customerIncome.items()).singleElement().extracting("sourceType").isEqualTo("refund");
+        var topups=list(folder("topup","in"));assertThat(topups.items()).singleElement().extracting("type").isEqualTo("topup");assertThat(topups.summary().topupPrincipalCents()).isEqualTo(10000);assertThat(topups.summary().consumptionCents()).isZero();
+        assertThat(list(folder("topup","out")).items()).isEmpty();
+        var pageQuery=folder("consumption","all");pageQuery.put("limit","1");var page=list(pageQuery);assertThat(page.summary().refundCents()).isEqualTo(500);assertThat(page.nextCursor()).isNotNull();
+        pageQuery.put("cursor",page.nextCursor());pageQuery.put("direction","in");assertThatThrownBy(()->list(pageQuery)).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_REQUEST_INVALID");
+        pageQuery.put("direction","all");pageQuery.put("category","topup");assertThatThrownBy(()->list(pageQuery)).isInstanceOf(WalletException.class);
+        var incompatible=folder("points","all");incompatible.put("type","topup");assertThatThrownBy(()->list(incompatible)).isInstanceOf(WalletException.class);
+    }
     com.rpb.reservation.wallet.transactions.TransactionViews.Page list(Map<String,String> q){return tx.execute(s->query().list(scope,actor,null,q));}
     @Test void businessRowsAreDeduplicatedAndSummaryIsIndependentOfCursorAndLimit() {
         var a=credit(open(),"100","cash");var b=bill(a,"25");pay(b);bill(accounts.account(scope,a.id(),false),"10");
@@ -146,6 +161,9 @@ class WalletTransactionsPostgresTest {
         var page=list(all());assertThat(page.totalCount()).isEqualTo(4);assertThat(page.summary().pointsGranted()).isEqualTo(20);assertThat(page.summary().pointsDeducted()).isEqualTo(5);
         assertThat(page.summary().pointsReversed()).isEqualTo(25);assertThat(page.summary().pointsReversalIn()).isEqualTo(5);assertThat(page.summary().pointsReversalOut()).isEqualTo(20);
         assertThat(page.summary().consumptionCents()).isZero();assertThat(page.items()).allSatisfy(i->assertThat(i.amountCents()).isZero());
+        var incoming=list(folder("points","in"));assertThat(incoming.totalCount()).isEqualTo(2);assertThat(incoming.summary().pointsGranted()).isEqualTo(20);assertThat(incoming.summary().pointsReversalIn()).isEqualTo(5);assertThat(incoming.summary().pointsDeducted()).isZero();
+        var outgoing=list(folder("points","out"));assertThat(outgoing.totalCount()).isEqualTo(2);assertThat(outgoing.summary().pointsDeducted()).isEqualTo(5);assertThat(outgoing.summary().pointsReversalOut()).isEqualTo(20);
+        var auto=folder("auto","all");var onlyPoints=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.points.view"),Set.of(store));assertThat(query().list(scope,onlyPoints,null,auto).category()).isEqualTo("points");
         var reference=new HashMap<>(all());reference.put("reference","REF-POINTS");assertThat(list(reference).items()).singleElement().extracting("id").isEqualTo(grant.entry().id());
         UUID independent=tx.execute(s->pointsService.createProgram(tenant,issuer));var otherBinding=new com.rpb.reservation.loyalty.application.PointsViews.Binding(tenant,issuer,null,store,independent);
         tx.execute(s->pointsService.mutate(otherBinding,actorId,customer,"manual_grant",new com.rpb.reservation.loyalty.application.PointsViews.Mutation(99,"其他产品积分",null,null,null,null,key())));
@@ -242,6 +260,8 @@ class WalletTransactionsPostgresTest {
         var page=list(all());assertThat(page.totalCount()).isEqualTo(2);var item=page.items().stream().filter(i->i.sourceType().equals("refund")).findFirst().orElseThrow();
         assertThat(item.amountCents()).isEqualTo(10000);assertThat(item.externalPaidCents()).isEqualTo(10000);assertThat(item.walletDeltaCents()).isEqualTo(-11000);assertThat(item.bonusCents()).isEqualTo(1000);
         assertThat(page.summary().refundCents()).isEqualTo(10000);assertThat(page.summary().moneyReversalCents()).isZero();assertThat(page.summary().topupCreditCents()).isEqualTo(11000);
+        var directionQuery=folder("topup","out");var customerExit=query().list(scope,null,principal,directionQuery);assertThat(customerExit.items()).singleElement().satisfies(i->{assertThat(i.sourceType()).isEqualTo("refund");assertThat(i.direction()).isEqualTo("out");});
+        assertThat(list(folder("consumption","all")).items()).isEmpty();
     }
     @Test void crossStorePointsReversalOnlyRelatesOriginalWhenItsStoreIsAuthorized() {
         UUID other=UUID.randomUUID();var program=accounts.requireProgram(scope,false).id();

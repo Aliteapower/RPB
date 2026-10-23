@@ -1,9 +1,10 @@
 import type { Transaction, Capabilities } from './types'
-export const queryKeys=['period','year','month','startDate','endDate','type','status','reference','customerQuery','targetStoreId','limit','cursor'] as const
+export const queryKeys=['period','year','month','startDate','endDate','type','status','reference','customerQuery','targetStoreId','category','direction','limit','cursor'] as const
 export function transactionQuery(query:Record<string,unknown>, customer=false):Record<string,string> {
  const result:Record<string,string>={}
  for(const key of queryKeys){const value=query[key];if(typeof value==='string'&&value&&!(customer&&key==='customerQuery'))result[key]=value}
  result.period ||= 'month'; result.type ||= 'all'; result.status ||= 'all'
+ result.category=result.category&&result.category!=='all'?result.category:'auto';result.direction ||= 'all'
  return result
 }
 export function transactionSearch(query:Record<string,unknown>,customer=false){return new URLSearchParams(transactionQuery(query,customer)).toString()}
@@ -21,5 +22,14 @@ export function transactionDetailTarget(row:Transaction,customer:boolean,returnT
  const page=row.sourceType==='bill'?`bills/${row.id}`:!customer&&row.sourceType==='topup'?`topups/${row.id}`:!customer&&row.sourceType==='refund'?`refunds/${row.id}`:`transactions/${row.sourceType}/${row.id}`
  return {path:`${base}/${page}`,query:{returnTo}}
 }
-export function availableTypes(c:Capabilities){return ['all',...(c.money?['payment','topup']:[]),...(c.points?['points_grant','points_deduct','points_redemption']:[]),...(c.refunds?['refund']:[]),...(c.points||c.reversals?['reversal']:[])]}
-export function summaryKeys(c:Capabilities){return [...(c.money?['consumptionCents','walletPaymentCents','externalPaymentCents','topupPrincipalCents','topupBonusCents','topupCreditCents']:[]),...(c.refunds?['refundCents']:[]),...(c.reversals?['moneyReversalCents']:[]),...(c.points?['pointsGranted','pointsDeducted','pointsRedeemed','pointsReversed','pointsReversalIn','pointsReversalOut']:[])]}
+export function availableCategories(c:Capabilities){return [...(c.money||c.refunds?['consumption']:[]),...(c.money||c.refunds||c.reversals?['topup']:[]),...(c.points?['points']:[])]}
+export function effectiveCategory(category:string|undefined,type='all'){return category&&category!=='auto'&&category!=='all'?category:type==='topup'?'topup':type.startsWith('points_')||type==='reversal'?'points':'consumption'}
+export function availableTypes(c:Capabilities,category='all'){
+ const all=['all',...(c.money?['payment','topup']:[]),...(c.points?['points_grant','points_deduct','points_redemption']:[]),...(c.refunds?['refund']:[]),...(c.points||c.reversals?['reversal']:[])]
+ const types=category==='consumption'?['all','payment','refund']:category==='topup'?['all','topup','refund','reversal']:category==='points'?['all','points_grant','points_deduct','points_redemption','reversal']:all
+ return types.filter(type=>all.includes(type))
+}
+export function summaryKeys(c:Capabilities,category='all'){
+ return [...(c.money&&(category==='all'||category==='consumption')?['consumptionCents','walletPaymentCents','externalPaymentCents']:[]),...(c.money&&(category==='all'||category==='topup')?['topupPrincipalCents','topupBonusCents','topupCreditCents']:[]),...(c.refunds&&category!=='points'?['refundCents']:[]),...(c.reversals&&(category==='all'||category==='topup')?['moneyReversalCents']:[]),...(c.points&&(category==='all'||category==='points')?['pointsGranted','pointsDeducted','pointsRedeemed','pointsReversed','pointsReversalIn','pointsReversalOut']:[])]
+}
+export function switchTransactionFilter(query:Record<string,unknown>,value:string,folder=false,customer=false){const next=transactionQuery(query,customer);delete next.cursor;if(folder){next.category=value;next.type='all'}else next.direction=value;return next}

@@ -18,7 +18,7 @@ public final class TransactionViews {
         long topupPrincipalCents,long topupBonusCents,long topupCreditCents,long refundCents,long moneyReversalCents,
         long pointsGranted,long pointsDeducted,long pointsRedeemed,long pointsReversed,long pointsReversalIn,long pointsReversalOut) {}
     public record Page(List<Item> items,String nextCursor,long totalCount,Summary summary,List<Store> stores,
-        Period period,Capabilities capabilities) {}
+        Period period,Capabilities capabilities,String category) {}
     public record Event(String type,Instant occurredAt,String label) {}
     public record Detail(Item transaction,List<Item> related,List<Event> events) {}
 }
