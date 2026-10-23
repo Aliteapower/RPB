@@ -18,4 +18,13 @@ GO：同代码状态钱包前端123项回归、类型检查和构建通过，本
 
 ## 实际结果
 
-发布后补记版本、备份、制品哈希和核验结果。
+运行前端提交 `acb9b206f145b730eaa2d5fec159e73cb4344ae2` 已推送至 codex/paynow-payment-product-line-staging；生产 FRONTEND_RELEASE_SHA 已为该 SHA。后端 RELEASE_SHA 仍为 `cb400bf7de938d5e85733b513a05353fa565ed78`，符合前端单独发布范围。
+
+- 干净 Git 归档 npm ci、Vue 类型检查及 Vite 构建通过，复用同代码状态123项前端测试与隔离浏览器证据。既有7项 npm high告警，本轮未变更依赖。
+- 前端包 SHA256 `fa5335a4abe0d92c5bcd0e3cb3c60041c9a09eba7c541d9bac3f36ba88b5b6bb`，上传及解包前核验一致。
+- 发布目录 `/opt/rpb/releases/20261024-wallet-phone-entry-acb9b206`；备份 `/opt/rpb/backups/20261024-wallet-phone-entry-acb9b206-before`，完整旧前端和旧版本已验证可读。旧assets保留，未触发回退。
+- 4个公网域名HTML和全部184个静态资源逐字节符合本轮构建；2项管理入口匿名拒绝、2项顾客查询匿名401；原订位、支付、日账本、身份等9项接口状态检查通过。
+- 后端jar SHA256仍 `40b9fccd3358e8f86a177a645f89dceaa5b34dbca6c2e2cc6b4ddaf177d625fa`；PID927854、InvocationID `2dd3d1569e9c494a9cc1af42dd3b0346`、NRestarts0保持不变。RPB、nginx、PostgreSQL、Redis、Docker进程／InvocationID／状态／重启数发布前后及最终一致，无服务重启。
+- 无数据库迁移、写入或配置修改；没有替真实顾客授权、充值、付款或办理积分。线上登录后的业务交互与真实手机相机／触控未重测，完整交互证据来自隔离环境。
+
+证据在 D:\RPB\target\wallet-phone-entry-*；原接口检查在 target/wallet-personal-public-phone-entry-after*。无关原有改动、未跟踪验收材料和私密文件保持原状。后续发布记录文档提交不改变运行前端SHA。
