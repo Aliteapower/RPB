@@ -8,11 +8,12 @@ import type { Account, Context, Customer } from './types'
 function createWorkspace() {
   const route = useRoute(), auth = useAuthSessionStore(), task = useWalletTask()
   const store = computed(() => String(route.params.storeId)), context = ref<Context | null>(null)
+  const identifiedCustomerId=ref<string|null>(null)
   const customer = ref<Customer | null>(null), account = ref<Account | null>(null), customerCode = ref(''), customers = ref<Customer[]>([])
   const can = (permission: string) => auth.user?.permissions.includes(permission) === true
   const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||route.name==='wallet-points'||(route.name==='wallet-topup'&&(route.query.kind==='points'||!can('wallet.topup.create'))&&can('wallet.points.view')))
   let generation = 0, selection = 0
-  function clear() { selection++; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
+  function clear() { selection++; identifiedCustomerId.value=null; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
   async function refresh() {
     const current = generation, id = store.value, selected = account.value?.id
     const pointsOnly=pointsContext.value
@@ -38,7 +39,17 @@ function createWorkspace() {
       let selected = existing[0] ?? null
       if (openAccount && !selected && value.phone && context.value?.transactionsEnabled && can('wallet.topup.create')) selected = await walletApi(id).command<Account>('/accounts', { customerId: value.id })
       if (current !== generation || request !== selection) return
+      if(identifiedCustomerId.value!==value.id)identifiedCustomerId.value=null
       customer.value = value; account.value = selected; customerCode.value = ''; customers.value = []
+    })
+  }
+  async function identifyCustomer(code:string){
+    return await task.run(async()=>{
+      const current=generation,request=++selection
+      const result=await walletApi(store.value).post<Customer>('/customer-codes/resolve',{code})
+      if(current!==generation||request!==selection)return
+      identifiedCustomerId.value=result.id;customer.value=result;account.value=null;customerCode.value='';customers.value=[]
+      return true
     })
   }
   async function scan(code: string, purpose?: 'topup') {
@@ -46,19 +57,20 @@ function createWorkspace() {
       const current = generation, request = ++selection
       const result = await walletApi(store.value).post<{ account: Account; customer: Customer }>('/payment-codes/resolve', { code, ...(purpose ? { purpose } : {}) })
       if (current !== generation || request !== selection) return
-      account.value = result.account; customer.value = result.customer; customerCode.value = purpose === 'topup' ? '' : code; customers.value = []
+      identifiedCustomerId.value=null;account.value = result.account; customer.value = result.customer; customerCode.value = purpose === 'topup' ? '' : code; customers.value = []
       return true
     })
   }
   watch([store,pointsContext], ([id,only],old) => {
     const preserved=old?.[0]===id?customer.value:null
-    generation++; clear();customer.value=preserved; context.value = null;task.error.value=''
+    const identity=preserved?.id===identifiedCustomerId.value?identifiedCustomerId.value:null
+    generation++; clear();customer.value=preserved;identifiedCustomerId.value=identity; context.value = null;task.error.value=''
     const current=generation
-    void refresh().then(async()=>{if(current===generation && preserved && !only)await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
+    void refresh().then(async()=>{if(current===generation && preserved && !only && (route.name!=='wallet-topup'||(identity&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
   }, { immediate: true,flush:'sync' })
   const timer = window.setInterval(() => { if (!task.busy.value && document.visibilityState === 'visible') void refresh().catch(e => { task.error.value = String(e.message ?? e) }) }, 5000)
   onUnmounted(() => { generation++; window.clearInterval(timer) })
-  return { store, context, pointsContext, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, ...task }
+  return { store, context, pointsContext, identifiedCustomerId, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, identifyCustomer, ...task }
 }
 type Workspace = ReturnType<typeof createWorkspace>
 const key: InjectionKey<Workspace> = Symbol('staff-wallet')

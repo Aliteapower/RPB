@@ -66,6 +66,7 @@ public class LocalRuntimeSecurityConfiguration {
                     "/api/v1/stores/*/wallet/marketing/campaigns/*/disable",
                     "/api/v1/stores/*/wallet/marketing/campaigns/*/archive",
                     "/api/v1/stores/*/wallet/topup-quotes",
+                    "/api/v1/stores/*/wallet/customer-codes/resolve",
                     "/api/v1/stores/*/wallet/charge-previews",
                     "/api/v1/stores/*/wallet/refund-previews",
                     "/api/v1/stores/*/wallet/funding-lots/*/exit-bonus",
@@ -82,6 +83,7 @@ public class LocalRuntimeSecurityConfiguration {
                     "/api/v1/public/stores/*/wallet/points/entries").permitAll()
                 .requestMatchers(HttpMethod.POST,
                     "/api/v1/public/stores/*/wallet/topup-quotes",
+                    "/api/v1/public/stores/*/wallet/customer-codes",
                     "/api/v1/public/stores/*/wallet/topups",
                     "/api/v1/public/stores/*/wallet/topups/*/declare-paid",
                     "/api/v1/public/stores/*/wallet/topups/*/cancel").permitAll()

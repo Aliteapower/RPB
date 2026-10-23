@@ -43,9 +43,9 @@ before(async()=>{
 })
 after(async()=>{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 test('customer page shows a topup QR immediately and requires explicit action for the charge QR',async()=>{
- const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/me')?{context:{transactionsEnabled:true,store:{operatingEntityName:'Issuer'}},accounts:[{id:'wallet',balanceCents:1000,reservedCents:0}],pendingBills:[]}:{type:body.purpose==='topup'?'customer_wallet':'customer_charge',code:body.purpose==='topup'?'WP.identity':'WC.consent',expiresAt:'2099-01-01T00:00:00Z'})}
+ const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/me')?{context:{transactionsEnabled:true,store:{operatingEntityName:'Issuer'}},accounts:[{id:'wallet',balanceCents:1000,reservedCents:0}],pendingBills:[]}:{type:url.endsWith('/customer-codes')?'customer_identity':'customer_charge',code:url.endsWith('/customer-codes')?'WI.identity':'WC.consent',expiresAt:'2099-01-01T00:00:00Z'})}
  const route=reactive({params:{storeId:'A'},query:{purpose:'topup'},hash:''}),view=mount(CodePage,'customer',route);await tick()
- assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WP.identity');assert.match(allText(view.root),/不授权扣款/)
+ assert.equal(nodes(view.root,n=>n.tag==='figure')[0].props['data-code'],'WI.identity');assert.match(allText(view.root),/不授权扣款/)
  assert.equal(calls.filter(c=>c.body).length,1)
  route.query={};await tick();assert.equal(nodes(view.root,n=>n.tag==='figure').length,0);assert.equal(calls.filter(c=>c.body).length,1)
  nodes(view.root,n=>n.tag==='button')[0].props.onClick();await tick()

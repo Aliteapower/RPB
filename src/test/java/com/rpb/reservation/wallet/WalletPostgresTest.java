@@ -95,6 +95,30 @@ class WalletPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from wallet_commands where tenant_id=? and operation='bill.scan_charge'",Integer.class,tenant)).isZero();
     }
 
+    WalletCustomerIdentityService identities(Clock time){return new WalletCustomerIdentityService(accounts,auths,new WalletCustomerIdentityRepository(jdbc),access,directory,time);}
+    @Test void personalIdentityWorksWithoutMoneyAccountForPointsEmployeeAndDoesNotGrantDebitConsent(){
+        var service=identities(clock);var code=tx.execute(s->service.issue(scope,principal));assertThat(code.code()).startsWith("WI.");
+        var pointsActor=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.points.view"),Set.of(store));
+        assertThat(service.resolve(scope,pointsActor,code.code()).id()).isEqualTo(customer);assertThat(service.resolve(scope,pointsActor,code.code()).id()).isEqualTo(customer);
+        assertThat(jdbc.queryForObject("select count(*) from wallet_accounts where tenant_id=?",Integer.class,tenant)).isZero();assertThat(jdbc.queryForObject("select count(*) from wallet_entries where tenant_id=?",Integer.class,tenant)).isZero();
+        assertThat(jdbc.queryForObject("select code_hash from wallet_customer_identity_codes where tenant_id=?",String.class,tenant)).isEqualTo(com.rpb.reservation.wallet.domain.WalletTokens.hash(code.code()));
+        var a=open();assertThatThrownBy(()->tx.execute(s->scanner(clock).charge(scope,actor,charge(a,"1",code.code())))).isInstanceOf(WalletException.class);noScanEffects(a,0,0);
+    }
+    @Test void personalIdentityRequiresFreshScopedCodeAndAuthorizedActor(){
+        var service=identities(clock);var old=tx.execute(s->service.issue(scope,principal));var fresh=tx.execute(s->service.issue(scope,principal));
+        assertThatThrownBy(()->service.resolve(scope,actor,old.code())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->identities(Clock.offset(clock,Duration.ofSeconds(61))).resolve(scope,actor,fresh.code())).isInstanceOf(WalletException.class);
+        var denied=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.view"),Set.of(store));assertThatThrownBy(()->service.resolve(scope,denied,fresh.code())).isInstanceOf(WalletException.class);
+        var foreign=new StoreScope(new TenantId(UUID.randomUUID()),store);assertThatThrownBy(()->service.resolve(foreign,actor,fresh.code())).isInstanceOf(WalletException.class);
+        var anotherStore=new StoreScope(new TenantId(tenant),UUID.randomUUID());assertThatThrownBy(()->service.resolve(anotherStore,actor,fresh.code())).isInstanceOf(WalletException.class);
+        var a=open();var wp=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));assertThat(service.resolve(scope,actor,wp.code()).id()).isEqualTo(customer);
+        var wc=chargeCode(a);assertThatThrownBy(()->service.resolve(scope,actor,wc.code())).isInstanceOf(WalletException.class);
+        for(var reason:List.of(AppGateDenyReason.STORE_APP_EXPIRED,AppGateDenyReason.TENANT_APP_NOT_ENABLED,AppGateDenyReason.STORE_APP_NOT_ENABLED)){
+            when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,reason));assertThatThrownBy(()->service.resolve(scope,actor,fresh.code())).isInstanceOf(WalletException.class);
+        }
+
+    }
+
     @Test void topupCodeResolvesWithTopupPermissionOnlyWithoutFinancialEffectsOrChargeConsent() {
         var a=open();var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));
         assertThat(code.type()).isEqualTo("customer_wallet");assertThat(code.code()).startsWith("WP.");
@@ -602,6 +626,10 @@ class WalletPostgresTest {
         var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));
         var allStores=new CurrentActor(tenant,actorId,"staff",actor.roles(),actor.permissions(),Set.of(store,sibling,otherStore));
         assertThat(authorization.resolve(siblingScope,allStores,code.code(),"topup").id()).isEqualTo(a.id());
+        var personal=tx.execute(s->identities(clock).issue(scope,principal));
+        assertThat(identities(clock).resolve(siblingScope,allStores,personal.code()).id()).isEqualTo(customer);
+        assertThatThrownBy(()->identities(clock).resolve(otherScope,allStores,personal.code())).isInstanceOf(WalletException.class);
+
         assertThatThrownBy(()->authorization.resolve(otherScope,allStores,code.code(),"topup")).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->authorization.resolve(siblingScope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->accounts.account(otherScope,a.id(),false)).isInstanceOf(WalletException.class);

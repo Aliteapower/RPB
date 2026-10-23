@@ -68,3 +68,8 @@ test('disposing a pending camera prevents late attachment and any later start',a
  const d=deferred(),s=stream();let calls=0;const h=harness(()=>{calls++;return d.promise});const opening=h.camera.start();h.camera.dispose();d.resolve(s);await opening;await h.camera.start()
  assert.equal(s.track.stopped,1);assert.equal(calls,1);assert.equal(h.frames.size,0);assert.deepEqual(h.codes,[])
 })
+
+
+test('personal identity QR is accepted only for identity lookup, never for customer debit or bill payment',()=>{
+ const identity='WI.'+'A'.repeat(43);assert.equal(normalizeWalletQr(identity,'identity',origin),identity);assert.equal(normalizeWalletQr(code,'identity',origin),code);assert.equal(normalizeWalletQr('WC.'+'A'.repeat(43),'identity',origin),null);assert.equal(normalizeWalletQr(identity,'customer',origin),null);assert.equal(normalizeWalletQr(identity,'bill',origin),null)
+})

@@ -5,7 +5,7 @@ import { createRenderer, h, nextTick, reactive } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { createI18n } from 'vue-i18n'
-let RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, PointsPage, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
+let PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, PointsPage, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
 const originalStorage=globalThis.sessionStorage
 const originalWindow=globalThis.window, originalFetch=globalThis.fetch, originalDocument=globalThis.document, originalDocumentClass=globalThis.Document, originalShadowRoot=globalThis.ShadowRoot
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
@@ -24,7 +24,7 @@ function mount(component,kind,route,props={},permissions) {
  const root={children:[]},i18n=createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':{wallet:messages.walletZh}}}),pinia=createPinia()
  authModule.useAuthSessionStore(pinia).user={permissions:permissions??['wallet.view','wallet.topup.create','wallet.points.view','wallet.points.grant','wallet.points.adjust','wallet.points.redeem','wallet.points.reverse']}
  const app=renderer.createApp({setup(){workspace=kind==='customer'?customerModule.provideCustomerWallet():staffModule.provideStaffWallet();return()=>h(component,props)}})
- app.use(pinia);app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async()=>{},replace:async()=>{}})
+ app.use(pinia);app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async()=>{},replace:async target=>{if(target&&typeof target==='object'&&target.query)route.query=target.query}})
  app.component('RouterLink',{props:['to'],setup:props=>()=>h('a',{href:props.to})});app.mount(root)
  return{root,get workspace(){return workspace},unmount:()=>app.unmount()}
 }
@@ -36,16 +36,16 @@ before(async()=>{
  globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
  const storage=new Map();globalThis.sessionStorage={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}
  const {build,transform}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
- const entry=`export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopups.vue';export {default as PointsPage} from './src/modules/wallet/pages/WalletCustomerPoints.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
+ const entry=`export {default as PersonalCode} from './src/modules/wallet/components/WalletPersonalCode.vue';export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopups.vue';export {default as PointsPage} from './src/modules/wallet/pages/WalletCustomerPoints.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
  const result=await build({stdin:{contents:entry,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'vue-runtime-test',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{
-  if(path.endsWith('WalletQrScanner.vue'))return {contents:`import {h} from 'vue';export default {emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code','WC.'+'A'.repeat(43))},'scan')}`,loader:'js'}
+  if(path.endsWith('WalletQrScanner.vue'))return {contents:`import {h} from 'vue';export default {props:['purpose'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code',(p.purpose==='identity'?'WI.':'WC.')+'A'.repeat(43))},'scan')}`,loader:'js'}
   if(path.endsWith('WalletQrDisplay.vue'))return {contents:`import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`,loader:'js'}
   const {readFile}=await import('node:fs/promises');const source=await readFile(path,'utf8'),{descriptor}=parse(source,{filename:path}),script=compileScript(descriptor,{id:'test-'+path,inlineTemplate:true})
   return {contents:script.content,loader:'ts'}
  })}}]})
  const dir='target/wallet-marketing-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
  const loaded=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now())
- ;({RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,PointsPage,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
+ ;({PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,PointsPage,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
@@ -259,24 +259,49 @@ test('customer wallet home shows points balance and signed grant, redemption and
 
 test('unified recharge retains the selected customer when switching to points and back; points mode never opens a wallet',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.endsWith('/points/context')?{...staffContext,program:null}:url.endsWith('/context')?staffContext:url.endsWith('/topup-offers')?{...offers,campaignId:null}:url.endsWith('/accounts')?[funded]:url.includes('/entries')?[]:{accountId:'points',balance:100,version:1})}
- const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{},hash:''}),scope=mount(RechargePage,'staff',route);await tick();await scope.workspace.choose({id:'c',displayName:'测试顾客',phone:'+6581234567'});await tick();const before=calls.length
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{},hash:''}),scope=mount(RechargePage,'staff',route);await tick();await scope.workspace.choose({id:'c',displayName:'测试顾客',phone:'+6581234567'});scope.workspace.identifiedCustomerId.value='c';await tick();const before=calls.length
  route.query.kind='points';await tick();assert.equal(scope.workspace.customer.value.id,'c');assert.match(allText(scope.root),/积分余额: 100/);assert.ok(calls.slice(before).some(u=>u.endsWith('/points/context')));assert.ok(!calls.slice(before).some(u=>u.endsWith('/accounts')))
  route.query.kind='money';await tick();assert.equal(scope.workspace.customer.value.id,'c');assert.ok(scope.workspace.account.value);assert.match(allText(scope.root),/金额（SGD）/);route.params.storeId='B';assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);scope.unmount()
 })
 
 test('points-only user can enter unified recharge without money permissions or APIs and more has no separate points entry',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.endsWith('/points/context')?{...staffContext,program:null}:url.includes('/entries')?[]:{balance:0,version:0})}
- const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{},hash:''}),scope=mount(RechargePage,'staff',route,{},['wallet.points.view','wallet.points.grant']);await tick();await scope.workspace.choose({id:'c',phone:'+6581234567'},false);await tick();assert.match(allText(scope.root),/积分余额: 0/);assert.ok(!calls.some(u=>u.endsWith('/wallet/context')||u.endsWith('/accounts')||u.endsWith('/topup-offers')));scope.unmount()
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{kind:'points'},hash:''}),scope=mount(RechargePage,'staff',route,{},['wallet.points.view','wallet.points.grant']);await tick();await scope.workspace.choose({id:'c',phone:'+6581234567'},false);scope.workspace.identifiedCustomerId.value='c';await tick();assert.match(allText(scope.root),/积分余额: 0/);assert.ok(!calls.some(u=>u.endsWith('/wallet/context')||u.endsWith('/accounts')||u.endsWith('/topup-offers')));scope.unmount()
  const menu=mount(StaffMore,'staff',route,{},['wallet.points.view']);await tick();assert.equal(nodes(menu.root,n=>n.tag==='a'&&n.props.href==='/stores/A/wallet/points').length,0);assert.equal(nodes(menu.root,n=>n.tag==='a'&&n.props.href==='/stores/A/wallet/topup').length,1);menu.unmount()
 })
 
 
 test('wallet viewer without topup permission uses the points context and cannot see money or mutation forms',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.endsWith('/points/context')?{...staffContext,program:null}:url.includes('/entries')?[]:{balance:12,version:1})}
- const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{},hash:''}),{},['wallet.view','wallet.points.view']);await tick();await scope.workspace.choose({id:'c'},false);await tick();assert.match(allText(scope.root),/积分余额: 12/);assert.equal(nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-form').length,0);assert.ok(!calls.some(u=>u.endsWith('/wallet/context')||u.endsWith('/accounts')));scope.unmount()
+ const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{kind:'points'},hash:''}),{},['wallet.view','wallet.points.view']);await tick();await scope.workspace.choose({id:'c'},false);scope.workspace.identifiedCustomerId.value='c';await tick();assert.match(allText(scope.root),/积分余额: 12/);assert.equal(nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-form').length,0);assert.ok(!calls.some(u=>u.endsWith('/wallet/context')||u.endsWith('/accounts')));scope.unmount()
 })
 
 test('points API failure leaves customer funds visible with a retry action',async()=>{
  globalThis.fetch=async url=>url.endsWith('/me')?response({accounts:[{id:'a',balanceCents:4500,reservedCents:0}],pendingBills:[],context:{store:{timezone:'Asia/Singapore'}}}):({ok:false,status:503,json:async()=>({message:'积分暂时不可用'})})
  const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/45.00/);assert.match(allText(scope.root),/积分暂时不可用/);assert.ok(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='刷新').length);scope.unmount()
+})
+
+
+test('recharge starts with personal wallet scan, no member lookup or operations before identification',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/customer-codes/resolve')?{id:'identified',displayName:'扫码顾客',phone:'+6581234567'}:staffContext)}
+ const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{},hash:''}));await tick();assert.equal(nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-search').length,0);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length,0)
+ nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('扫描顾客个人钱包码'))[0].props.onClick();await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.match(allText(scope.root),/扫码顾客/);assert.ok(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length);assert.ok(!calls.some(c=>c.url.endsWith('/accounts')||c.url.endsWith('/topup-offers')));assert.equal(scope.workspace.customerCode.value,'');scope.unmount()
+})
+
+
+test('personal code issues for a customer with no money account and never grants payment consent',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body&&JSON.parse(options.body)});return response(url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:{type:'customer_identity',code:'WI.'+'A'.repeat(43),expiresAt:new Date(Date.now()+60000).toISOString()})}
+ const scope=mount(PersonalCode,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.equal(nodes(scope.root,n=>n.tag==='figure')[0].props['data-code'],'WI.'+'A'.repeat(43));assert.deepEqual(calls.find(c=>c.url.endsWith('/customer-codes')).body,{});assert.ok(!calls.some(c=>c.url.endsWith('/payment-codes')||c.url.endsWith('/accounts')));scope.unmount()
+})
+
+
+test('manually selected customer from another workflow is not treated as scanned identity',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{kind:'points'},hash:''}));await tick();await scope.workspace.choose({id:'manual',displayName:'手工选客'},false);await tick();assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length,0);assert.match(allText(scope.root),/扫描顾客个人钱包码/);assert.doesNotMatch(allText(scope.root),/已扫码识别/);scope.unmount()
+})
+
+
+test('entering scan-first from a manual points selection cannot open a money account before identification',async()=>{
+ const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.endsWith('/points/context')?{...staffContext,program:null}:staffContext)}
+ const route=reactive({name:'wallet-points',params:{storeId:'A'},query:{},hash:''}),scope=mount(RechargePage,'staff',route);await tick();await scope.workspace.choose({id:'manual',phone:'+6581234567'},false);await tick();route.name='wallet-topup';await tick();assert.ok(!calls.some(u=>u.endsWith('/accounts')));assert.match(allText(scope.root),/扫描顾客个人钱包码/);scope.unmount()
 })

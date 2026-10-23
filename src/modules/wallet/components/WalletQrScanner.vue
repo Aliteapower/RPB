@@ -14,7 +14,7 @@ let sourceGeneration = 0
 function normalize(value: string) { return normalizeWalletQr(value, props.purpose, window.location.origin) }
 function found(value: string) {
   const code = normalize(value)
-  if (!code || props.disabled) { imageError.value = t(`wallet.scanner.${props.purpose === 'customer' ? 'wrongCustomer' : 'wrongBill'}`); return }
+  if (!code || props.disabled) { imageError.value = t(`wallet.scanner.${props.purpose === 'bill' ? 'wrongBill' : 'wrongCustomer'}`); return }
   sourceGeneration++; camera.stop(); imageError.value = ''; manual.value = ''; emit('code', code)
 }
 const camera = createWalletCamera({
@@ -23,7 +23,7 @@ const camera = createWalletCamera({
   decode: decoder.video, accept: value => !!normalize(value), onCode: found, onChange: value => { state.value = value }
 })
 const live = computed(() => state.value.phase === 'opening' || state.value.phase === 'scanning')
-const cameraError = computed(() => !state.value.issue ? '' : state.value.issue === 'wrongCode' ? t(`wallet.scanner.${props.purpose === 'customer' ? 'wrongCustomer' : 'wrongBill'}`) : t(`wallet.scanner.issues.${state.value.issue}`))
+const cameraError = computed(() => !state.value.issue ? '' : state.value.issue === 'wrongCode' ? t(`wallet.scanner.${props.purpose === 'bill' ? 'wrongBill' : 'wrongCustomer'}`) : t(`wallet.scanner.issues.${state.value.issue}`))
 const status = computed(() => props.disabled ? t('wallet.scanner.processing') : t(`wallet.scanner.${state.value.phase === 'error' ? 'idle' : state.value.phase}`))
 async function start() { if (props.disabled || readingImage.value) return; sourceGeneration++; imageError.value = ''; await camera.start() }
 function stop() { sourceGeneration++; camera.stop() }
@@ -71,7 +71,7 @@ onUnmounted(() => { sourceGeneration++; camera.dispose(); document.removeEventLi
     <p v-if="cameraError || imageError" class="wallet-error" role="alert">{{ imageError || cameraError }}</p>
     <details class="wallet-scan-alternatives"><summary>{{ t('wallet.scanner.alternatives') }}</summary>
       <label class="wallet-camera-image">{{ t('wallet.scanImage') }}<input type="file" accept="image/*" :disabled="disabled || readingImage" @change="image"></label>
-      <form class="wallet-scan-manual" @submit.prevent="found(manual)"><input v-model="manual" :placeholder="t('wallet.manualCode')" :aria-label="t('wallet.manualCode')" maxlength="4096" autocomplete="off" :disabled="disabled || readingImage"><button :disabled="disabled || readingImage || !manual.trim()">{{ t('wallet.useCode') }}</button></form>
+      <form class="wallet-scan-manual" @submit.prevent="found(manual)"><input v-model="manual" :placeholder="t(purpose==='identity'?'wallet.marketing.pastePersonal':'wallet.manualCode')" :aria-label="t(purpose==='identity'?'wallet.marketing.pastePersonal':'wallet.manualCode')" maxlength="4096" autocomplete="off" :disabled="disabled || readingImage"><button :disabled="disabled || readingImage || !manual.trim()">{{ t('wallet.useCode') }}</button></form>
     </details>
     <small>{{ t('wallet.scanner.privacy') }}</small>
   </section>
