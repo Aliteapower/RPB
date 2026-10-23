@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter,useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { walletApi, WalletApiError } from '../api'
 import { staffWalletPath } from '../navigation'
@@ -12,7 +12,7 @@ import WalletTopupOffers from '../components/WalletTopupOffers.vue'
 import WalletStaffCustomerPicker from '../components/WalletStaffCustomerPicker.vue'
 defineProps<{embedded?:boolean}>()
 const emit=defineEmits<{'busy-change':[busy:boolean]}>()
-const { t } = useI18n(), router = useRouter(), { store, account, context, can } = useStaffWallet()
+const { t } = useI18n(), router = useRouter(), route=useRoute(), { store, account, context, can } = useStaffWallet()
 const offer=useTopupOffers(store,false,computed(()=>account.value?.id)),{offers,selected,quote,expired}=offer
 const { busy, error, run } = useWalletTask(), amount = ref(''), channel = ref<Channel>('cash')
 watch([busy,offer.busy],()=>emit('busy-change',busy.value||offer.busy.value),{immediate:true,flush:'sync'})
@@ -24,7 +24,7 @@ async function create() {
     try {
       const result = await walletApi(id).command<Topup>('/topups',quote.value?{accountId,quoteId:quote.value.quoteId}:{accountId,amount:String(amount.value),channel:channel.value})
       if(id!==store.value)return
-      amount.value='';await router.push(staffWalletPath(id,`topups/${result.id}`))
+      amount.value='';await router.push({path:staffWalletPath(id,`topups/${result.id}`),query:route.query.entry==='phone'?{entry:'phone'}:{}})
     } catch(e) {
       if(e instanceof WalletApiError&&['WALLET_OFFER_CHANGED','WALLET_TOPUP_QUOTE_EXPIRED','WALLET_TOPUP_OFFER_REQUIRED'].includes(e.code))quote.value=null
       throw e

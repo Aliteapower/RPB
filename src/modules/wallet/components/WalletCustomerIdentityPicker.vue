@@ -6,10 +6,10 @@ import { useStaffWallet } from '../useStaffWallet'
 import WalletQrScanner from './WalletQrScanner.vue'
 import WalletIcon from './WalletIcon.vue'
 defineProps<{ disabled?: boolean }>()
-const emit=defineEmits<{clear:[]}>()
+const emit=defineEmits<{clear:[];identified:[]}>()
 const {t}=useI18n(),{customer,identifiedCustomerId,busy,error,clear,identifyCustomer}=useStaffWallet(),scanning=ref(useRoute().query.scan==='1')
 function reset(){clear();error.value='';scanning.value=true;emit('clear')}
-async function scanned(code:string){if(await identifyCustomer(code))scanning.value=false}
+async function scanned(code:string){if(await identifyCustomer(code)){scanning.value=false;emit('identified')}}
 </script>
 <template>
   <section v-if="customer&&customer.id===identifiedCustomerId" class="wallet-customer-chip">

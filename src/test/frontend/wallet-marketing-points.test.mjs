@@ -49,6 +49,43 @@ before(async()=>{
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
+test('phone entry requires candidate confirmation before operations and never opens a funding account while searching',async()=>{
+ const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.includes('/customers?')?[{id:'phone-customer',displayName:'手机号顾客',phone:'+6581234567'}]:staffContext)}
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}),scope=mount(RechargePage,'staff',route);await tick()
+ assert.equal(nodes(scope.root,n=>n.props?.['data-scan']).length,0);const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0];assert.ok(input)
+ input.props['onUpdate:modelValue']('81234567');await tick();await nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick()
+ nodes(scope.root,n=>n.props?.['data-phone-candidate']==='phone-customer')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length,0)
+ await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'phone-customer');assert.equal(scope.workspace.identifiedCustomerId.value,null)
+ assert.ok(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length);assert.ok(!calls.some(u=>u.endsWith('/accounts')||u.endsWith('/topup-offers')));scope.unmount()
+})
+test('cashier hero has three permission-filtered folders and a distinct phone entry',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ const scope=mount(StaffHome,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{},['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create','wallet.points.view']);await tick()
+ assert.equal(nodes(scope.root,n=>n.props?.['data-cashier-tab']).length,3)
+ nodes(scope.root,n=>n.props?.['data-cashier-tab']==='money')[0].props.onClick();await tick();assert.ok(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('scan=1')&&String(n.props.href).includes('kind=money')).length)
+ assert.ok(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('entry=phone')).length);scope.unmount()
+})
+test('phone points-only entry confirms explicitly, cannot use short searches, and clears on a new store',async()=>{
+ const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.includes('/customers?')?[{id:'phone-points',displayName:'积分顾客',phone:'+6581234567'}]:url.endsWith('/points/context')?{...staffContext,program:null}:{balance:10,version:1})}
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}),scope=mount(RechargePage,'staff',route,{},['wallet.points.view','wallet.points.grant']);await tick()
+ const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0],lookup=()=>nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0]
+ input.props['onUpdate:modelValue']('123');await tick();await lookup().props.onSubmit(submitEvent());await tick();assert.ok(!calls.some(u=>u.includes('/customers?')))
+ input.props['onUpdate:modelValue']('81234567');await tick();await lookup().props.onSubmit(submitEvent());await tick();assert.equal(scope.workspace.customer.value,null)
+ nodes(scope.root,n=>n.props?.['data-phone-candidate']==='phone-points')[0].props.onClick();await tick();await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick()
+ await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='积分增减 / 兑换')[0].props.onClick();await tick();assert.match(allText(scope.root),/积分余额: 10/);assert.equal(scope.workspace.phoneConfirmedCustomerId.value,'phone-points');assert.equal(scope.workspace.identifiedCustomerId.value,null)
+ assert.ok(!calls.some(u=>u.endsWith('/wallet/context')||u.endsWith('/accounts')||u.endsWith('/topup-offers')))
+ route.params.storeId='B';await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='积分增减 / 兑换').length,0);scope.unmount()
+})
+test('next customer preserves phone entry without carrying identity or a scan authorization',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ const scope=mount(NextCustomer,'staff',reactive({params:{storeId:'A'},query:{entry:'phone'},hash:''}));await tick();scope.workspace.customer.value={id:'old'};scope.workspace.customerCode.value='not-an-authorization'
+ nodes(scope.root,n=>n.tag==='button')[0].props.onClick();await tick();assert.deepEqual(scope.navigation[0].query,{entry:'phone'});assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.customerCode.value,'');scope.unmount()
+})
+test('hero recharge deep link prepares the account only after a valid identity scan',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push(url);return response(url.endsWith('/customer-codes/resolve')?{id:'scanned-c',displayName:'扫码顾客',phone:'+6581234567'}:url.endsWith('/customers/scanned-c/accounts')?[{...funded,customerId:'scanned-c'}]:url.endsWith('/topup-offers')?offers:staffContext)}
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{scan:'1',kind:'money'},hash:''}),scope=mount(RechargePage,'staff',route);await tick();assert.equal(scope.workspace.account.value,null)
+ nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.equal(scope.workspace.account.value.id,funded.id);assert.ok(calls.some(u=>u.endsWith('/customers/scanned-c/accounts')));scope.unmount()
+})
 test('customer recharge names the active campaign and explicitly explains ordinary 1:1 fallback',async()=>{
  for(const campaign of [true,false]){
   globalThis.fetch=async url=>response(url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,paynowConfigured:true,store:{timezone:'Asia/Singapore'}}}:url.endsWith('/topup-offers')?{...offers,campaignId:campaign?'campaign':null,campaignName:campaign?'夏日充值礼':null,offers:campaign?offers.offers:[{...offers.offers[0],bonusCents:0,creditTotalCents:10000}]}:[])
@@ -399,7 +436,7 @@ test('merchant home has one amount-first payment entry and scan-first top-up hin
  const scope=mount(StaffHome,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{},permissions);await tick()
  const links=nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('/collect'))
  assert.equal(links.length,1);assert.equal(links[0].props.href.endsWith('/collect'),true)
- assert.match(allText(scope.root),/消费收款/);assert.match(allText(scope.root),/先输入消费金额和说明/);assert.match(allText(scope.root),/先扫描个人钱包码，再选择/)
+ assert.match(allText(scope.root),/消费收款/);assert.match(allText(scope.root),/先输入消费金额和说明/);assert.match(allText(scope.root),/输入顾客手机号，核对并确认选中/)
  assert.doesNotMatch(allText(scope.root),/选择顾客收款|识别顾客付款码|员工确认扣款/);scope.unmount()
 })
 

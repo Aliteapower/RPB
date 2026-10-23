@@ -9,12 +9,12 @@ function createWorkspace() {
   const route = useRoute(), auth = useAuthSessionStore(), task = useWalletTask()
   const actorId = computed(() => auth.user?.accountId ?? '')
   const store = computed(() => String(route.params.storeId)), context = ref<Context | null>(null)
-  const identifiedCustomerId=ref<string|null>(null)
+  const identifiedCustomerId=ref<string|null>(null),phoneConfirmedCustomerId=ref<string|null>(null)
   const customer = ref<Customer | null>(null), account = ref<Account | null>(null), customerCode = ref(''), customers = ref<Customer[]>([])
   const can = (permission: string) => auth.user?.permissions.includes(permission) === true
   const pointsContext=computed(()=>(can('wallet.points.view')&&!can('wallet.view'))||(route.name==='wallet-topup'&&(route.query.kind==='points'||!can('wallet.topup.create'))&&can('wallet.points.view')))
   let generation = 0, selection = 0
-  function clear() { selection++; identifiedCustomerId.value=null; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
+  function clear() { selection++; identifiedCustomerId.value=null;phoneConfirmedCustomerId.value=null; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
   async function refresh() {
     const current = generation, id = store.value, selected = account.value?.id
     const pointsOnly=pointsContext.value
@@ -41,6 +41,7 @@ function createWorkspace() {
       if (openAccount && !selected && value.phone && context.value?.transactionsEnabled && can('wallet.topup.create')) selected = await walletApi(id).command<Account>('/accounts', { customerId: value.id })
       if (current !== generation || request !== selection) return
       if(identifiedCustomerId.value!==value.id)identifiedCustomerId.value=null
+      if(phoneConfirmedCustomerId.value!==value.id)phoneConfirmedCustomerId.value=null
       customer.value = value; account.value = selected; customerCode.value = ''; customers.value = []
     })
   }
@@ -62,16 +63,17 @@ function createWorkspace() {
       return true
     })
   }
-  watch([store,pointsContext], ([id,only],old) => {
-    const preserved=old?.[0]===id?customer.value:null
+  watch([store,pointsContext,()=>route.query.entry==='phone'], ([id,only,byPhone],old) => {
+    const preserved=old?.[0]===id&&old?.[2]===byPhone?customer.value:null
     const identity=preserved?.id===identifiedCustomerId.value?identifiedCustomerId.value:null
-    generation++; clear();customer.value=preserved;identifiedCustomerId.value=identity; context.value = null;task.error.value=''
+    const phoneIdentity=preserved?.id===phoneConfirmedCustomerId.value?phoneConfirmedCustomerId.value:null
+    generation++; clear();customer.value=preserved;identifiedCustomerId.value=identity;phoneConfirmedCustomerId.value=phoneIdentity; context.value = null;task.error.value=''
     const current=generation
-    void refresh().then(async()=>{if(current===generation && preserved && !only && (route.name!=='wallet-topup'||(identity&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
+    void refresh().then(async()=>{if(current===generation && preserved && !only && (route.name!=='wallet-topup'||((identity||phoneIdentity)&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
   }, { immediate: true,flush:'sync' })
   const timer = window.setInterval(() => { if (!task.busy.value && document.visibilityState === 'visible') void refresh().catch(e => { task.error.value = String(e.message ?? e) }) }, 5000)
   onUnmounted(() => { generation++; window.clearInterval(timer) })
-  return { store, actorId, context, pointsContext, identifiedCustomerId, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, identifyCustomer, ...task }
+  return { store, actorId, context, pointsContext, identifiedCustomerId,phoneConfirmedCustomerId, customer, account, customerCode, customers, can, clear, refresh, search, choose, scan, identifyCustomer, ...task }
 }
 type Workspace = ReturnType<typeof createWorkspace>
 const key: InjectionKey<Workspace> = Symbol('staff-wallet')
