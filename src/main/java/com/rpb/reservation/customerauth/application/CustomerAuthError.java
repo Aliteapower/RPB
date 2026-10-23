@@ -2,6 +2,8 @@ package com.rpb.reservation.customerauth.application;
 
 public enum CustomerAuthError {
     REQUEST_INVALID,
+    INVALID_CREDENTIALS,
+    RATE_LIMITED,
     ACCOUNT_DISABLED,
     EMAIL_CHANNEL_NOT_CONFIGURED,
     EMAIL_DELIVERY_FAILED,

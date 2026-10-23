@@ -2,6 +2,7 @@ import { walletUiZh, walletUiEn } from './uiLocales'
 import { walletScannerZh, walletScannerEn, walletFeedbackZh, walletFeedbackEn } from './scanLocales'
 import { walletScanChargeZh, walletScanChargeEn } from './scanChargeLocales'
 export const walletZh = {
+  phoneRequired: '请先在租户顾客管理补全手机号，再开通钱包。',
   scanCharge: walletScanChargeZh,
   scanner: walletScannerZh, feedback: walletFeedbackZh,
   ui: walletUiZh,
@@ -12,7 +13,7 @@ export const walletZh = {
   loading: '加载中', refresh: '刷新', close: '关闭', empty: '暂无记录', save: '保存', busy: '处理中，请勿重复操作',
   expired: '当前门店暂不能发起新交易。余额和流水保留，可处理原单核实或退款。', noProgram: '请先开通门店钱包计划，并在统一资料设置经营主体。',
   shared: '门店与品牌资料在平台统一维护；顾客复用现有租户资料。', issuer: '钱包发行主体', balance: '钱包余额', available: '可用余额', reserved: '退款冻结',
-  customer: '顾客', search: '查找已认证顾客（姓名、邮箱或电话）', choose: '选择顾客', noCustomer: '请先选择顾客或扫描顾客付款码', authenticatedOnly: '只可使用已完成顾客登录绑定的现有顾客，未找到时请先让顾客登录。',
+  customer: '顾客', search: '查找租户顾客（手机号、姓名或邮箱）', choose: '选择顾客', noCustomer: '请先选择顾客或扫描顾客付款码', sharedCustomers: '顾客与租户后台统一管理。新顾客请先按手机号建档，无需先登录。',
   topup: '充值', charge: '消费扣款', history: '流水与退款', settings: '钱包设置', report: '对账',
   amount: '金额（SGD）', channel: '收款方式', channels: { cash: '现金', paynow: 'PayNow', credit_card: '信用卡（线下终端）' },
   createTopup: '建立充值单', pendingTopups: '充值记录', confirmCollection: '确认已收款并入账', confirmSupplement: '确认线下补付',
@@ -42,6 +43,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  phoneRequired: 'Add a phone in tenant customer management before opening a wallet.',
   scanCharge: walletScanChargeEn,
   scanner: walletScannerEn, feedback: walletFeedbackEn,
   ui: walletUiEn,
@@ -52,7 +54,7 @@ export const walletEn = {
   loading: 'Loading', refresh: 'Refresh', close: 'Close', empty: 'No records', save: 'Save', busy: 'Processing. Do not submit again.',
   expired: 'New transactions are unavailable at this store. Balances, history and controlled original-order recovery remain available.', noProgram: 'Configure the shared operating entity and activate the store wallet programme first.',
   shared: 'Store, brand and customer identity reuse shared platform records.', issuer: 'Wallet issuer', balance: 'Balance', available: 'Available', reserved: 'Refund reserve',
-  customer: 'Customer', search: 'Find an authenticated customer by name, email or phone', choose: 'Select customer', noCustomer: 'Select a customer or scan their wallet payment code', authenticatedOnly: 'Use an existing authenticated customer. Ask the customer to sign in first if no record is found.',
+  customer: 'Customer', search: 'Find a tenant customer by phone, name or email', choose: 'Select customer', noCustomer: 'Select a customer or scan their wallet payment code', sharedCustomers: 'Customers are shared with tenant administration. Register new customers by phone; signing in first is not required.',
   topup: 'Top up', charge: 'Wallet checkout', history: 'Ledger and refunds', settings: 'Settings', report: 'Reconciliation', amount: 'Amount (SGD)', channel: 'Collection method',
   channels: { cash: 'Cash', paynow: 'PayNow', credit_card: 'Credit card (external terminal)' }, createTopup: 'Create top-up', pendingTopups: 'Top-ups', confirmCollection: 'Confirm received and credit wallet', confirmSupplement: 'Confirm offline payment',
   offline: 'Offline collections only. Check PayNow in the merchant bank account and card approval on the external terminal.', receipt: 'Bank transaction / terminal / cash receipt reference', terminal: 'Cashier terminal', collectionAccount: 'Card acquirer merchant ID', note: 'Verification note', attested: 'I have received and verified this payment on the merchant side',

@@ -1000,7 +1000,7 @@ class TenantAdminApiIntegrationTest {
     }
 
     @Test
-    void tenantAdminMaintainsCustomersWithOptionalPhoneAndArchive() throws Exception {
+    void tenantAdminMaintainsCustomersWithUniquePhoneAndArchive() throws Exception {
         Cookie session = login("20000000");
 
         MvcResult created = mockMvc.perform(post(basePath() + "/customers")
@@ -1009,6 +1009,7 @@ class TenantAdminApiIntegrationTest {
                     {
                       "displayName":"Codex 王小明",
                       "nickname":"先生",
+                      "phoneE164":"+6598880001",
                       "email":"codex-customer-001@example.test"
                     }
                     """)
@@ -1017,7 +1018,7 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.customer.displayName").value("Codex 王小明"))
             .andExpect(jsonPath("$.customer.nickname").value("先生"))
-            .andExpect(jsonPath("$.customer.phoneE164").doesNotExist())
+            .andExpect(jsonPath("$.customer.phoneE164").value("+6598880001"))
             .andExpect(jsonPath("$.customer.email").value("codex-customer-001@example.test"))
             .andReturn();
         UUID customerId = UUID.fromString(objectMapper.readTree(created.getResponse().getContentAsString())

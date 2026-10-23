@@ -52,7 +52,7 @@ public class CustomerManagementApplicationService {
     @Transactional
     public CustomerManagementItem create(TenantScope scope, CustomerManagementCommand command) {
         NormalizedCustomerInput input = normalize(command);
-        ensureHasIdentityHint(input);
+        ensurePhonePresent(input);
         E164Phone phone = parsePhone(input.phoneE164());
         if (phone.isPresent() && customerRepository.findByPhone(scope, phone).isPresent()) {
             throw new CustomerManagementException(CustomerManagementError.CUSTOMER_PHONE_CONFLICT);
@@ -79,7 +79,7 @@ public class CustomerManagementApplicationService {
         Customer existing = customerRepository.findById(scope, new CustomerId(Objects.requireNonNull(customerId)))
             .orElseThrow(() -> new CustomerManagementException(CustomerManagementError.CUSTOMER_NOT_FOUND));
         NormalizedCustomerInput input = normalize(command);
-        ensureHasIdentityHint(input);
+        ensurePhonePresent(input);
         E164Phone phone = parsePhone(input.phoneE164());
         if (phone.isPresent()) {
             customerRepository.findByPhone(scope, phone)
@@ -129,8 +129,8 @@ public class CustomerManagementApplicationService {
         );
     }
 
-    private static void ensureHasIdentityHint(NormalizedCustomerInput input) {
-        if (input.displayName() == null && input.phoneE164() == null && input.email() == null) {
+    private static void ensurePhonePresent(NormalizedCustomerInput input) {
+        if (input.phoneE164() == null) {
             throw new CustomerManagementException(CustomerManagementError.REQUEST_INVALID);
         }
     }

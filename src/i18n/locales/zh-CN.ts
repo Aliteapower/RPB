@@ -1,7 +1,9 @@
 import { ledgerMessages } from '../../modules/daily-ledger/locales/zh-CN'
 import { walletZh } from '../../modules/wallet/locales'
+import { customerAuthZh } from '../../components/customer-auth/locales'
 import { tenantEntryLinksZh } from '../../modules/tenant-entry-links/locales'
 export const zhCN = {
+  customerAuth: customerAuthZh,
   tenantEntryLinks: tenantEntryLinksZh,
   wallet: walletZh,
   dailyLedger: { messages: ledgerMessages, entry: '每日营业记录', description: '盘点、交班与历史账目', symbol: '账' },

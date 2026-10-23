@@ -7,6 +7,10 @@ public record CustomerAuthPrincipal(
     UUID authAccountId,
     UUID customerId,
     String email,
-    String displayName
+    String displayName,
+    String phoneE164
 ) {
+    public CustomerAuthPrincipal(UUID tenantId, UUID authAccountId, UUID customerId, String email, String displayName) {
+        this(tenantId, authAccountId, customerId, email, displayName, null);
+    }
 }

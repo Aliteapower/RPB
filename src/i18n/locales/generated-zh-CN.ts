@@ -1255,7 +1255,7 @@ export const generatedZhCN: Record<string, string> = {
   "generated.tenant-admin-customers.032": "没有租户后台权限",
   "generated.tenant-admin-customers.033": "电话号码已存在",
   "generated.tenant-admin-customers.034": "顾客不存在",
-  "generated.tenant-admin-customers.035": "请填写姓名、电话或电邮",
+  "generated.tenant-admin-customers.035": "请填写有效手机号及顾客资料",
   "generated.tenant-admin-customers.036": "确认归档该顾客？",
   "generated.tenant-admin-customers.037": "已归档",
   "generated.tenant-admin-customers.038": "保存成功",

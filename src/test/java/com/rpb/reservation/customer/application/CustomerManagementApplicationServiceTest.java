@@ -23,19 +23,15 @@ class CustomerManagementApplicationServiceTest {
     );
 
     @Test
-    void createsCustomerWithoutPhoneWhenNameIsPresent() {
+    void rejectsCreatingFormalCustomerWithoutPhone() {
         FakeCustomerRepository repository = new FakeCustomerRepository();
         CustomerManagementApplicationService service = new CustomerManagementApplicationService(repository);
 
-        CustomerManagementItem item = service.create(
+        assertThatThrownBy(() -> service.create(
             SCOPE,
             new CustomerManagementCommand("王小明", "先生", null, null)
-        );
-
-        assertThat(item.displayName()).isEqualTo("王小明");
-        assertThat(item.nickname()).isEqualTo("先生");
-        assertThat(item.phoneE164()).isNull();
-        assertThat(repository.saved).hasSize(1);
+        )).isInstanceOf(CustomerManagementException.class).extracting("code").isEqualTo(CustomerManagementError.REQUEST_INVALID);
+        assertThat(repository.saved).isEmpty();
     }
 
     @Test
@@ -80,6 +76,27 @@ class CustomerManagementApplicationServiceTest {
             .isInstanceOf(CustomerManagementException.class)
             .extracting("code")
             .isEqualTo(CustomerManagementError.REQUEST_INVALID);
+    }
+
+    @Test
+    void explicitIdCannotTakeAnotherCustomersPhone() {
+        FakeCustomerRepository repository = new FakeCustomerRepository();
+        Customer customer = activeCustomer("+6590000001");
+        repository.customers.add(customer);
+        repository.existingByPhone = Optional.of(activeCustomer("+6591234567"));
+        assertThatThrownBy(() -> new CustomerProfileResolver(repository).resolve(SCOPE,
+            new CustomerProfileCommand(customer.id().value(),"Guest",null,"+6591234567",null)))
+            .isInstanceOf(CustomerManagementException.class).extracting("code").isEqualTo(CustomerManagementError.CUSTOMER_PHONE_CONFLICT);
+        assertThat(repository.saved).isEmpty();
+    }
+
+    @Test
+    void cannotClearFormalCustomerPhone() {
+        FakeCustomerRepository repository = new FakeCustomerRepository();
+        Customer customer = activeCustomer("+6590000001");repository.customers.add(customer);
+        assertThatThrownBy(() -> new CustomerManagementApplicationService(repository).update(SCOPE,customer.id().value(),
+            new CustomerManagementCommand("Guest",null,null,null)))
+            .isInstanceOf(CustomerManagementException.class).extracting("code").isEqualTo(CustomerManagementError.REQUEST_INVALID);
     }
 
     @Test

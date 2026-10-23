@@ -1255,7 +1255,7 @@ export const generatedEnSG: Record<string, string> = {
   "generated.tenant-admin-customers.032": "You do not have tenant admin permission",
   "generated.tenant-admin-customers.033": "Phone number already exists",
   "generated.tenant-admin-customers.034": "Customer was not found",
-  "generated.tenant-admin-customers.035": "Enter a name, phone, or email",
+  "generated.tenant-admin-customers.035": "Enter a valid phone number and customer details",
   "generated.tenant-admin-customers.036": "Archive this customer?",
   "generated.tenant-admin-customers.037": "Archived",
   "generated.tenant-admin-customers.038": "Saved",

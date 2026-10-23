@@ -51,7 +51,7 @@ class WalletPostgresTest {
         jdbc.update("insert into tenants(id,tenant_code,display_name,status) values(?,?,?,'active')",tenant,tenant.toString(),"钱包测试");
         jdbc.update("insert into operating_entities(id,tenant_id,entity_code,display_name,status) values(?,?,'issuer','发行主体','active')",issuer,tenant);
         jdbc.update("insert into stores(id,tenant_id,operating_entity_id,store_code,display_name,status,timezone,locale,date_format,time_format,currency) values(?,?,?,'main','测试门店','active','Asia/Singapore','zh-CN','DD-MM-YYYY','HH:mm','SGD')",store,tenant,issuer);
-        jdbc.update("insert into customers(id,tenant_id,customer_code,customer_type,display_name,status) values(?,?,'customer','regular','测试顾客','active')",customer,tenant);
+        jdbc.update("insert into customers(id,tenant_id,customer_code,customer_type,display_name,phone_e164,status) values(?,?,'customer','regular','测试顾客','+6591234567','active')",customer,tenant);
         scope=new StoreScope(new TenantId(tenant),store);
         actor=new CurrentActor(tenant,actorId,"tenant_admin",Set.of("tenant_admin"),Set.of("wallet.view","wallet.topup.create","wallet.charge.create","wallet.collection.confirm","wallet.refund.manage","wallet.reconcile.view","wallet.settings.manage"),Set.of(store));
         principal=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),customer,"test@example.com","测试顾客");
@@ -59,7 +59,7 @@ class WalletPostgresTest {
         gate=mock(AppGateService.class);when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("wallet",tenant,store,"wallet.view"));
         when(gate.evaluateCommercial(any(),any(),any())).thenReturn(AppGateDecision.allow("wallet",tenant,store,null));
         directory=mock(WalletDirectory.class);when(directory.store(scope)).thenReturn(new StoreIdentity(tenant,store,issuer,"发行主体","测试门店","test","Asia/Singapore","zh-CN",null));
-        when(directory.customer(scope.tenantScope(),customer)).thenReturn(new Customer(customer,"customer","测试顾客","test@example.com",null));
+        when(directory.customer(scope.tenantScope(),customer)).thenReturn(new Customer(customer,"customer","测试顾客","test@example.com","+6591234567"));
         collectionPort=mock(WalletCollectionPort.class);when(collectionPort.paynowConfigured(any())).thenReturn(true);
         when(collectionPort.canonicalAccount(any(),any(),any(),any())).thenAnswer(i->i.getArgument(2));
         when(collectionPort.canonicalRecoveryAccount(any(),any(),any(),any())).thenAnswer(i->i.getArgument(2));
@@ -215,6 +215,15 @@ class WalletPostgresTest {
         assertThatThrownBy(()->tx.execute(s->scanner(clock).charge(scope,actor,charge(other,"1",code.code())))).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->tx.execute(s->checkout.create(scope,actor,new BillCreate(a.id(),"1",key(),code.code())))).isInstanceOf(WalletException.class);
         noScanEffects(a,500,0);
+    }
+
+    @Test void newAccountRequiresPhoneWhileExistingLegacyAccountIsPreserved() {
+        when(directory.customer(scope.tenantScope(),customer)).thenReturn(new Customer(customer,"customer","Legacy",null,null));
+        assertThatThrownBy(this::open).isInstanceOf(WalletException.class)
+            .extracting(e -> ((WalletException)e).code()).isEqualTo("CUSTOMER_PHONE_REQUIRED");
+        var legacy=tx.execute(s->accounts.open(scope,accounts.requireProgram(scope,true),customer));
+        assertThat(open().id()).isEqualTo(legacy.id());
+        assertThat(accountService.forCustomer(scope,actor,customer)).extracting(Account::id).containsExactly(legacy.id());
     }
 
     @Test void reusesCustomerAndCreatesOnlyOneZeroBalanceAccount() {

@@ -18,11 +18,11 @@ GET `/context`：统一门店/主体/Logo、计划、账户查询条件、允许
 
 GET/PUT `/collection-profile`：`wallet.settings.manage`，复用 payment 所属的同一门店收款资料。PUT 含 `version,status,paynowType,paynowMobile,paynowUen,merchantName,issuerVerified,idempotencyKey`；启用时必须明确核实收款账户属于当前钱包发行主体。租户默认资料只预填参考，须保存为门店配置；禁止把未注明发行主体的租户默认收款账户直接作为多个钱包主体的收款依据。保留现有 quick-pay 的 configJson。若同店支付产品有效，修改还需 `payment.settings.manage`，界面明示会影响共用收款资料；不授予支付产品订阅。
 
-GET `/customers?query=`：已有已认证顾客查询；GET `/accounts/{accountId}` 与 `/accounts/{accountId}/entries`：在允许计划门店内查询。
+GET `/customers?query=`：查询租户共享有效顾客，不以是否拥有登录账号筛选；GET `/accounts/{accountId}` 与 `/accounts/{accountId}/entries`：在允许计划门店内查询。
 
 PUT `/program`：`version, channels`，发行主体取当前统一门店，配置操作需 `wallet.settings.manage`，不能变更公共资料/订阅。
 
-POST `/accounts`：`customerId, idempotencyKey`，返回原有或零余额账户，验证顾客认证绑定。
+POST `/accounts`：`customerId, idempotencyKey`，返回原有或零余额账户，验证租户共享有效顾客；新开户须有手机号，缺号返回 409 `CUSTOMER_PHONE_REQUIRED`。历史无号账户保留。顾客登录使用[共享手机号密码登录契约](2026-10-23-shared-customer-phone-auth.md)。
 
 POST `/topups`：`accountId, amount, channel, idempotencyKey`，返回待收款单；POST `/topups/{id}/confirm`：`amount, receiptReference, collectionAccount, terminalCode, note, idempotencyKey`，授权员工人工确认后入账。GET `/topups` 查询。取消仅允许未收款单。
 
@@ -34,7 +34,7 @@ GET/POST `/collection-exceptions`：经理登记迟到、超收或重复实收�
 
 PayNow 普通确认必须填写商户银行实际收款 UEN/手机号（`collectionAccount`），服务端与当前门店配置核对，不把空值默认为已核对账户；不匹配时转经理异常复核。资料停用/变更后，经理仍可按原单填写实际收款标识登记异常实收并退回，不能因此增加钱包余额。无有效门店配置时，服务端拒绝新建 PayNow 充值，不只靠前端禁用。
 
-GET `/customers/{id}`、`/customers/{id}/accounts`：只从统一顾客与认证绑定查询；GET `/logo/{assetId}`：只允许当前统一 Logo，清除后旧 URL 返回 404。三渠道确认正文都必须含 `channel, amount, collectionAccount, receiptReference, terminalCode, note, verified=true, idempotencyKey`，渠道不能由客户端伪造为在线回调。
+GET `/customers/{id}`、`/customers/{id}/accounts`：只从租户共享顾客目录查询，不要求事先登录；GET `/logo/{assetId}`：只允许当前统一 Logo，清除后旧 URL 返回 404。三渠道确认正文都必须含 `channel, amount, collectionAccount, receiptReference, terminalCode, note, verified=true, idempotencyKey`，渠道不能由客户端伪造为在线回调。
 
 ## 顾客用例
 

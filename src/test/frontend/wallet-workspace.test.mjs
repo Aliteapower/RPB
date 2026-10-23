@@ -18,7 +18,7 @@ function mount(setup,route={params:{storeId:'A'},hash:'',query:{}},pinia=createP
 before(async()=>{
   globalThis.window={setInterval:fn=>{timers.set(++timer,fn);return timer},clearInterval:id=>timers.delete(id),location:{origin:'http://127.0.0.1:5178'}}
   globalThis.document={visibilityState:'visible'}
-  vite=await createServer({configFile:false,cacheDir:'target/wallet-ui-test-cache',server:{middlewareMode:true},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]}})
+  vite=await createServer({configFile:false,cacheDir:'target/wallet-ui-test-cache',server:{middlewareMode:true,hmr:false},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]}})
   historyModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletHistory.ts')
   recordModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletRecord.ts')
   staffModule=await vite.ssrLoadModule('/src/modules/wallet/useStaffWallet.ts')
@@ -99,4 +99,19 @@ test('legacy merchant links replace history and an expired link is not re-submit
   await scope.state.refresh();await tick()
   assert.equal(calls.filter(p=>p.endsWith('/bill-code')).length,attempts)
   assert.equal(scope.state.error.value,'expired code');scope.unmount()
+})
+
+test('staff selects a shared phone customer without requiring a prior customer login and opens only their account',async()=>{
+  const calls=[]
+  globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body?JSON.parse(options.body):null});if(url.endsWith('/context'))return response({transactionsEnabled:true});if(url.endsWith('/accounts')&&options.method==='GET')return response([]);return response({id:'shared-account',customerId:'shared-customer'})}
+  const pinia=createPinia(),auth=authModule.useAuthSessionStore(pinia);auth.user={permissions:['wallet.view','wallet.topup.create']}
+  const scope=mount(()=>staffModule.provideStaffWallet(),undefined,pinia);await tick()
+  await scope.state.choose({id:'shared-customer',phone:'+6591234567',displayName:'Guest'})
+  assert.equal(scope.state.account.value.id,'shared-account');assert.equal(scope.state.customer.value.id,'shared-customer')
+  assert.ok(calls.some(c=>c.url.endsWith('/accounts')&&c.body?.customerId==='shared-customer'))
+  assert.ok(calls.every(c=>!c.url.includes('customer-auth')))
+  scope.state.clear();const before=calls.length
+  await scope.state.choose({id:'legacy-without-phone',phone:null,displayName:'Legacy'})
+  assert.equal(scope.state.customer.value.id,'legacy-without-phone');assert.equal(scope.state.account.value,null)
+  assert.ok(calls.slice(before).every(c=>!c.body));scope.unmount()
 })

@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
   createPublicBooking,
   getCustomerMe,
   getPublicBookingContext,
-  loginCustomerWithEmail,
-  loginCustomerWithOAuth,
-  requestCustomerEmailCode,
   resolveTenantPublicBookingEntry,
   PublicBookingApiError
 } from '../api/publicBookingApi'
@@ -17,40 +14,15 @@ import type {
   PublicBookingContextResponse,
   PublicBookingTimeSlot
 } from '../types/publicBooking'
+import CustomerPasswordLogin from '../components/customer-auth/CustomerPasswordLogin.vue'
+import CustomerPasswordChange from '../components/customer-auth/CustomerPasswordChange.vue'
 import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import { isValidSingaporeLocalPhone, toSingaporePhoneE164 } from '../components/staff/staffGuestContact'
 import { useGeneratedText } from '../i18n/generatedText'
 import { resolvePublicBookingLoginFlow } from '../utils/publicBookingFlow'
+import { storedPhoneToCountryLocal } from '../utils/countryPhone'
 
 const { gt } = useGeneratedText()
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (options: { client_id: string; callback: (response: { credential?: string }) => void }) => void
-          renderButton: (parent: HTMLElement, options: {
-            shape?: 'rectangular' | 'pill' | 'circle' | 'square'
-            size?: 'large' | 'medium' | 'small'
-            text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
-            theme?: 'outline' | 'filled_blue' | 'filled_black'
-            type?: 'standard' | 'icon'
-            width?: number
-          }) => void
-        }
-      }
-    }
-    FB?: {
-      init: (options: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void
-      login: (
-        callback: (response: { authResponse?: Record<string, string | undefined> }) => void,
-        options: { scope: string }
-      ) => void
-    }
-    fbAsyncInit?: () => void
-  }
-}
 
 type BookingStep = 1 | 2 | 3 | 'complete'
 
@@ -70,18 +42,6 @@ const selectedStartAt = ref('')
 const selectedPeriodKey = ref('all')
 const dateInputErrorText = ref('')
 const customer = ref<CustomerAuthPrincipal | null>(null)
-const googleSignInButton = ref<HTMLElement | null>(null)
-const googleIdentityClientId = ref('')
-const googleButtonRenderedClientId = ref('')
-const googleButtonRenderedTarget = ref<HTMLElement | null>(null)
-
-const authForm = reactive({
-  email: '',
-  code: '',
-  displayName: '',
-  devCode: ''
-})
-
 const bookingForm = reactive({
   partySize: 2,
   customerName: '',
@@ -164,9 +124,7 @@ const nextStepText = computed(() => gt(
     ? 'generated.public-booking.016'
     : 'generated.public-booking.034'
 ))
-const enabledAuthProviders = computed(() => context.value?.authProviders || [])
-const emailAuthEnabled = computed(() => context.value?.emailAuthEnabled === true)
-const hasConfiguredLoginMethod = computed(() => emailAuthEnabled.value || enabledAuthProviders.value.length > 0)
+
 const whatsappContactUrl = computed(() => {
   const digits = (context.value?.store.whatsappBusinessPhoneE164 || '').replace(/\D/g, '')
   return digits ? `https://wa.me/${digits}` : ''
@@ -200,6 +158,7 @@ watch(customer, principal => {
   if (!principal) {
     return
   }
+  if (principal.phoneE164) bookingForm.phoneLocal = storedPhoneToCountryLocal(principal.phoneE164)
   if (!bookingForm.customerEmail.trim()) {
     bookingForm.customerEmail = principal.email || ''
   }
@@ -218,17 +177,10 @@ watch(slotsByPeriod, () => {
   }
 })
 
-watch(
-  () => [currentStep.value, providerClientId('google'), customer.value?.customerId || ''],
-  () => {
-    void renderGoogleSignInButton()
-  },
-  { flush: 'post' }
-)
-
 async function loadCustomer(): Promise<void> {
   try {
-    const response = await getCustomerMe()
+    if (!(await resolvePublicBookingEntry())) return
+    const response = await getCustomerMe(undefined, storeId.value)
     customer.value = response.principal
   } catch {
     customer.value = null
@@ -270,153 +222,10 @@ async function resolvePublicBookingEntry(): Promise<boolean> {
   }
 }
 
-async function sendEmailCode(): Promise<void> {
-  if (authBusy.value || !storeId.value || !emailAuthEnabled.value || !authForm.email.trim()) {
-    return
-  }
-  authBusy.value = true
-  errorText.value = ''
-  statusText.value = ''
-  try {
-    const response = await requestCustomerEmailCode(storeId.value, authForm.email)
-    authForm.email = response.email
-    authForm.devCode = response.devCode || ''
-    statusText.value = response.devCode ? gt('generated.public-booking.048') : gt('generated.public-booking.049')
-  } catch (error) {
-    errorText.value = publicBookingErrorText(error)
-  } finally {
-    authBusy.value = false
-  }
-}
-
-async function loginWithEmail(): Promise<void> {
-  if (authBusy.value || !storeId.value || !emailAuthEnabled.value || !authForm.email.trim() || !authForm.code.trim()) {
-    return
-  }
-  authBusy.value = true
-  errorText.value = ''
-  try {
-    const response = await loginCustomerWithEmail(
-      storeId.value,
-      authForm.email,
-      authForm.code,
-      authForm.displayName
-    )
-    customer.value = response.principal
-    statusText.value = gt('generated.public-booking.050')
-    currentStep.value = 3
-  } catch (error) {
-    errorText.value = publicBookingErrorText(error)
-  } finally {
-    authBusy.value = false
-  }
-}
-
-async function startOAuthLogin(provider: 'google' | 'facebook'): Promise<void> {
-  if (authBusy.value) {
-    return
-  }
-  const clientId = providerClientId(provider)
-  if (!clientId) {
-    errorText.value = gt('generated.public-booking.051')
-    return
-  }
-  if (provider === 'google') {
-    await renderGoogleSignInButton()
-  } else {
-    await startFacebookLogin(clientId)
-  }
-}
-
-function handleGoogleCredential(response: { credential?: string }): void {
-  if (!response.credential) {
-    errorText.value = gt('generated.public-booking.052')
-    return
-  }
-  void completeOAuthLogin('google', response.credential)
-}
-
-async function renderGoogleSignInButton(): Promise<void> {
-  const clientId = providerClientId('google')
-  if (currentStep.value !== 2 || customer.value || !clientId) {
-    return
-  }
-  await nextTick()
-  const target = googleSignInButton.value
-  if (!target) {
-    return
-  }
-  try {
-    await loadScript('google-identity-services', 'https://accounts.google.com/gsi/client')
-    const googleIdentity = window.google?.accounts.id
-    if (!googleIdentity) {
-      throw new Error('google_identity_unavailable')
-    }
-    if (googleIdentityClientId.value !== clientId) {
-      googleIdentity.initialize({ client_id: clientId, callback: handleGoogleCredential })
-      googleIdentityClientId.value = clientId
-      googleButtonRenderedClientId.value = ''
-      googleButtonRenderedTarget.value = null
-    }
-    if (
-      googleButtonRenderedClientId.value === clientId &&
-      googleButtonRenderedTarget.value === target &&
-      target.childElementCount > 0
-    ) {
-      return
-    }
-    target.replaceChildren()
-    window.google?.accounts.id.renderButton(target, {
-      shape: 'rectangular',
-      size: 'large',
-      text: 'signin_with',
-      theme: 'outline',
-      type: 'standard',
-      width: 280
-    })
-    googleButtonRenderedClientId.value = clientId
-    googleButtonRenderedTarget.value = target
-  } catch {
-    errorText.value = gt('generated.public-booking.053')
-  }
-}
-
-async function startFacebookLogin(appId: string): Promise<void> {
-  authBusy.value = true
-  errorText.value = ''
-  try {
-    await loadFacebookSdk(appId)
-    window.FB?.login((response) => {
-      const token = response.authResponse?.[`access${'Token'}`] || ''
-      if (!token) {
-        authBusy.value = false
-        errorText.value = gt('generated.public-booking.054')
-        return
-      }
-      void completeOAuthLogin('facebook', token)
-    }, { scope: 'email,public_profile' })
-  } catch {
-    errorText.value = gt('generated.public-booking.055')
-    authBusy.value = false
-  }
-}
-
-async function completeOAuthLogin(provider: 'google' | 'facebook', token: string): Promise<void> {
-  authBusy.value = true
-  errorText.value = ''
-  try {
-    if (!storeId.value) {
-      return
-    }
-    const response = await loginCustomerWithOAuth(storeId.value, provider, token)
-    customer.value = response.principal
-    statusText.value = gt('generated.public-booking.056')
-    currentStep.value = 3
-  } catch (error) {
-    errorText.value = publicBookingErrorText(error)
-  } finally {
-    authBusy.value = false
-  }
+function passwordAuthenticated(principal: CustomerAuthPrincipal): void {
+  customer.value = principal
+  statusText.value = gt('generated.public-booking.050')
+  currentStep.value = 3
 }
 
 async function submitBooking(): Promise<void> {
@@ -531,40 +340,6 @@ function publicBookingErrorText(error: unknown): string {
 function nullableText(value: string): string | null {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
-}
-
-function providerClientId(provider: 'google' | 'facebook'): string {
-  return enabledAuthProviders.value.find((item) => item.provider === provider)?.clientId || ''
-}
-
-function loadScript(id: string, src: string): Promise<void> {
-  if (document.getElementById(id)) {
-    return Promise.resolve()
-  }
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.id = id
-    script.src = src
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('script_load_failed'))
-    document.head.appendChild(script)
-  })
-}
-
-function loadFacebookSdk(appId: string): Promise<void> {
-  if (window.FB) {
-    window.FB.init({ appId, cookie: true, xfbml: false, version: 'v21.0' })
-    return Promise.resolve()
-  }
-  return new Promise((resolve, reject) => {
-    window.fbAsyncInit = () => {
-      window.FB?.init({ appId, cookie: true, xfbml: false, version: 'v21.0' })
-      resolve()
-    }
-    loadScript('facebook-jssdk', 'https://connect.facebook.net/en_US/sdk.js').catch(reject)
-  })
 }
 
 function todayDate(): string {
@@ -740,50 +515,11 @@ function clampBookingDate(isoDate: string): string {
         </div>
 
         <div v-if="customer" class="customer-chip">
-          <span>{{ customer.email }}</span>
+          <span>{{ customer.displayName || customer.email }}</span>
           <strong>{{ gt('generated.public-booking.019') }}</strong>
         </div>
 
-        <template v-else>
-          <p v-if="!hasConfiguredLoginMethod" class="quiet-line">{{ gt('generated.public-booking.020') }}</p>
-
-          <section v-if="emailAuthEnabled" class="auth-method-panel" :aria-label="gt('generated.public-booking.021')">
-            <strong>{{ gt('generated.public-booking.022') }}</strong>
-            <p class="quiet-line">{{ gt('generated.public-booking.023') }}</p>
-            <div class="auth-grid">
-              <label>
-                <span>{{ gt('generated.public-booking.024') }}</span>
-                <input v-model="authForm.email" autocomplete="email" type="email" />
-              </label>
-              <label>
-                <span>{{ gt('generated.public-booking.025') }}</span>
-                <input v-model="authForm.displayName" autocomplete="name" />
-              </label>
-            </div>
-            <button class="secondary-button" type="button" :disabled="authBusy" @click="sendEmailCode"> {{ gt('generated.public-booking.026') }} </button>
-            <label>
-              <span>{{ gt('generated.public-booking.027') }}</span>
-              <input v-model="authForm.code" inputmode="numeric" />
-            </label>
-            <p v-if="authForm.devCode" class="quiet-line">{{ gt('generated.public-booking.028') }} {{ authForm.devCode }}</p>
-            <button class="primary-button" type="button" :disabled="authBusy" @click="loginWithEmail"> {{ gt('generated.public-booking.029') }} </button>
-          </section>
-
-          <div v-if="enabledAuthProviders.length" class="auth-actions" :aria-label="gt('generated.public-booking.030')">
-            <div
-              v-if="providerClientId('google')"
-              ref="googleSignInButton"
-              class="google-sign-in-button"
-              :aria-label="gt('generated.public-booking.031')"
-            ></div>
-            <button
-              v-if="providerClientId('facebook')"
-              type="button"
-              :disabled="authBusy"
-              @click="startOAuthLogin('facebook')"
-            > {{ gt('generated.public-booking.032') }} </button>
-          </div>
-        </template>
+        <CustomerPasswordLogin v-else :key="storeId" :store="storeId" @authenticated="passwordAuthenticated" />
 
         <div class="step-actions">
           <button class="secondary-button" type="button" @click="goBackToTimeStep">{{ gt('generated.public-booking.033') }}</button>
@@ -821,6 +557,7 @@ function clampBookingDate(isoDate: string): string {
         <CountryPhoneField
           v-model="bookingForm.phoneLocal"
           :label="gt('generated.public-booking.037')"
+          :disabled="!!customer?.phoneE164"
           model-format="local"
         />
 
@@ -836,6 +573,7 @@ function clampBookingDate(isoDate: string): string {
           </button>
         </div>
       </form>
+      <CustomerPasswordChange v-if="customer" :key="storeId + customer.customerId" />
     </section>
   </main>
 </template>

@@ -1,7 +1,7 @@
 package com.rpb.reservation.wallet.integration;
 
 import com.rpb.reservation.common.scope.*;
-import com.rpb.reservation.customerauth.application.CustomerIdentityQuery;
+import com.rpb.reservation.customer.application.CustomerDirectoryQuery;
 import com.rpb.reservation.platform.application.SharedStoreIdentityQuery;
 import com.rpb.reservation.tenantadmin.application.TenantAdminProfileService;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
@@ -15,8 +15,8 @@ import static com.rpb.reservation.wallet.application.WalletViews.*;
 public class SharedWalletDirectory implements WalletDirectory {
     private final SharedStoreIdentityQuery stores;
     private final TenantAdminProfileService profiles;
-    private final CustomerIdentityQuery customers;
-    public SharedWalletDirectory(SharedStoreIdentityQuery stores,TenantAdminProfileService profiles,CustomerIdentityQuery customers) {
+    private final CustomerDirectoryQuery customers;
+    public SharedWalletDirectory(SharedStoreIdentityQuery stores,TenantAdminProfileService profiles,CustomerDirectoryQuery customers) {
         this.stores=stores;this.profiles=profiles;this.customers=customers;
     }
     public StoreIdentity store(StoreScope scope) {
@@ -26,7 +26,7 @@ public class SharedWalletDirectory implements WalletDirectory {
     }
     public Customer customer(TenantScope scope,UUID id) {
         if(id==null) throw WalletException.invalid();
-        var c=customers.authenticated(scope,id).orElseThrow(WalletException::missing);
+        var c=customers.active(scope,id).orElseThrow(WalletException::missing);
         return new Customer(c.id(),c.customerCode(),c.displayName(),c.email(),c.phoneE164());
     }
     public List<Customer> search(TenantScope scope,String query) {

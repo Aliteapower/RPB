@@ -138,7 +138,7 @@ async function submitCustomer(): Promise<void> {
   }
 
   const payload = customerPayload()
-  if (!payload.displayName && !payload.phoneE164 && !payload.email) {
+  if (!payload.phoneE164) {
     errorText.value = gt('generated.tenant-admin-customers.035')
     return
   }
@@ -258,6 +258,8 @@ function apiErrorText(error: unknown): string {
         </div>
       </header>
 
+      <p class="shared-customer-note">{{ t('customerAuth.sharedHint') }}</p>
+
       <ErpQueryToolbar
         v-model:keyword="keyword"
         :placeholder="gt('generated.tenant-admin-customers.003')"
@@ -374,6 +376,7 @@ function apiErrorText(error: unknown): string {
               :label="gt('generated.tenant-admin-customers.011')"
               name="phoneE164"
               model-format="e164"
+              required
             />
 
             <label>

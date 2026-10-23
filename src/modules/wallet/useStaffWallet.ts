@@ -34,7 +34,7 @@ function createWorkspace() {
       const existing = await walletApi(id).get<Account[]>(`/customers/${value.id}/accounts`)
       if (current !== generation || request !== selection) return
       let selected = existing[0] ?? null
-      if (!selected && context.value?.transactionsEnabled && can('wallet.topup.create')) selected = await walletApi(id).command<Account>('/accounts', { customerId: value.id })
+      if (!selected && value.phone && context.value?.transactionsEnabled && can('wallet.topup.create')) selected = await walletApi(id).command<Account>('/accounts', { customerId: value.id })
       if (current !== generation || request !== selection) return
       customer.value = value; account.value = selected; customerCode.value = ''; customers.value = []
     })

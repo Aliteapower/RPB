@@ -240,6 +240,11 @@ public class CustomerAuthApplicationService {
         return account;
     }
 
+    @Transactional
+    public CustomerAuthLoginResult loginAccount(CustomerAuthAccountRecord account, String remoteAddr, String userAgent) {
+        return createSession(requireActiveCustomer(account), remoteAddr, userAgent);
+    }
+
     private CustomerAuthLoginResult createSession(CustomerAuthAccountRecord account, String remoteAddr, String userAgent) {
         String sessionToken = newSessionToken();
         Instant expiresAt = Instant.now().plus(SESSION_TTL);
@@ -254,13 +259,15 @@ public class CustomerAuthApplicationService {
         return new CustomerAuthLoginResult(principal(account), sessionToken, expiresAt);
     }
 
-    private static CustomerAuthPrincipal principal(CustomerAuthAccountRecord account) {
+    private CustomerAuthPrincipal principal(CustomerAuthAccountRecord account) {
+        var customer = customerRepository.findById(new TenantScope(new TenantId(account.tenantId())),new CustomerId(account.customerId()));
         return new CustomerAuthPrincipal(
             account.tenantId(),
             account.id(),
             account.customerId(),
             account.email(),
-            account.displayName()
+            customer.map(Customer::displayName).orElse(account.displayName()),
+            customer.map(c -> c.phone().value()).orElse(null)
         );
     }
 

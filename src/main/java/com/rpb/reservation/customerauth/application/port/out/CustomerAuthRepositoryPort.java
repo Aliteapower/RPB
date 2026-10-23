@@ -31,6 +31,10 @@ public interface CustomerAuthRepositoryPort {
 
     Optional<CustomerAuthAccountRecord> findAccountByEmail(UUID tenantId, String email);
 
+    default Optional<CustomerAuthAccountRecord> findAccountByCustomerId(UUID tenantId, UUID customerId) {
+        return Optional.empty();
+    }
+
     Optional<CustomerAuthAccountRecord> findAccountByIdentity(UUID tenantId, String provider, String providerSubject);
 
     CustomerAuthAccountRecord createAccount(UUID accountId, UUID tenantId, UUID customerId, String email, String displayName);

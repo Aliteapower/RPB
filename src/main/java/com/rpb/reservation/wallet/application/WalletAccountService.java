@@ -38,7 +38,10 @@ public class WalletAccountService {
     }
     @Transactional
     public Account open(StoreScope scope,CurrentActor actor,UUID customer,String key) {
-        access.staff(scope,actor,"wallet.topup.create",true);directory.customer(scope.tenantScope(),customer);
+        access.staff(scope,actor,"wallet.topup.create",true);
+        var profile=directory.customer(scope.tenantScope(),customer);
+        if ((profile.phone()==null || profile.phone().isBlank()) && accounts.customerAccounts(scope,customer).isEmpty())
+            throw new WalletException("CUSTOMER_PHONE_REQUIRED",409,"请先在统一顾客管理补全手机号");
         return commands.run(scope,actor.actorId(),"account.open",key,customer,Account.class,()->{
             var a=accounts.open(scope,accounts.requireProgram(scope,true),customer);commands.audit(scope,actor.actorId(),"account.open",a.id(),Map.of("customerId",customer));return a;
         });
