@@ -32,3 +32,39 @@
 - 私有数据库副本rpb_wallet_rehearsal_20261023演练V059–V062通过；副本只允许postgres连接，未启动应用或执行业务。备份/opt/rpb/backups/20261023-wallet-marketing-rehearsal/database.dump可读。
 - 对V058原有列生成固定投影指纹，迁移前后完全一致；仅排除运行时会话/审计/限流、账号登录时间、明确失效的旧未消费授权有效期以及预期新增的七项角色权限。钱包2账户/93000分=本金93000+赠送0，2个历史池，冻结0。
 - GO，按已授权范围发布。正式切换临时阻断nginx到本应用8080的访问，停止本服务后备份最终数据库；就绪与数据核对完成后再开放。该临时规则只作用于nginx用户访问本机RPB端口，不重启或改动nginx配置，失败保持阻断以防新业务写入。
+
+
+## 实际生产发布结果
+
+2026-10-23 17:44（Asia/Singapore）完成切换，17:46后最终稳定性与数据检查通过。运行代码提交 `379b6d419f8050e4b8c79d7869c9bd5c58e4f0a0`，已推送至 `codex/paynow-payment-product-line-staging`；后续提交仅补充发布文档，不变更运行制品。
+
+### 制品与备份
+
+- 2255个干净归档文件逐个与提交Git blob一致；独立Maven package、npm ci、Vue类型检查和Vite生产构建通过。jar内V059–V062与演练及提交SQL逐字节一致。
+- jar SHA256 `a99fd91796fa3b3a4ece0af1ae866b5f8c764a1346f7ff1fa4151e01d5bbbfc8`；前端压缩包SHA256 `5c78d69dcecae00de03e4f426c96296df899250ec6f0cdc2224858e68eefac64`。上传文件、发布目录与运行jar一致。
+- 发布目录 `/opt/rpb/releases/20261023-wallet-marketing-379b6d41`。停机边界备份 `/opt/rpb/backups/20261023-wallet-marketing-379b6d41-before` 含旧jar、完整前端、RELEASE_SHA和数据库dump（807055字节，pg_restore目录验证可读）。未触发回滚。
+- 本次未修改依赖或锁文件；npm ci仍报告7项既有high告警，不自动升级无关依赖。
+
+### 迁移、业务与权限
+
+- Flyway验证62项成功，实际执行V059–V062共4项，当前V062、0失败。新应用日志无ERROR。
+- 92张V058既有业务/配置表在停机备份前、迁移后恢复访问前及最终核对，固定旧列投影指纹完全一致；排除项与演练相同。旧未消费授权按设计失效，新角色权限按迁移追加。
+- 钱包2账户总余额93000分=本金93000+赠送0，冻结0；2个历史资金池金额一致，组件/资金池不一致账户0。未执行生产充值、扣款、退款或积分操作。
+- 七项新权限各授予8个已有管理员/门店经理账号，普通员工未自动授权。自动开启的自助/积分配置0，已发布活动0；四档种子将在商户进入营销配置时以草稿初始化，需自行发布。
+- 临时访问规则只阻断nginx用户到本机RPB的8080访问；停机备份、迁移、数据核对、前端切换及就绪检查完成后已精确移除，没有修改nginx配置或重启相邻服务。
+
+### 服务与公网
+
+- rpb-backend active/running，MainPID `843251`、InvocationID `b297c9030cb64029b8b0f750af7096f9`、NRestarts 0；就绪及最终观察进程身份相同，内部/api/v1/auth/me返回401。
+- nginx、PostgreSQL、Redis、Docker的状态、PID、InvocationID、重启数与发布前完全一致。
+- 4个公网域名HTML、186个静态资源逐字节匹配构建，旧静态资源保留；2家门店管理入口匿名保持401。既有9项公开接口状态及JSON语义完全一致。
+- 新营销/资金/积分/顾客申请接口15项匿名及CSRF检查通过：12项GET/POST同源无会话返回401，写接口缺钱包头、cross-site和same-site各返回403。无会话GET本身是401，不能误用写接口的403断言；发布验证脚本已按既有安全契约修正，业务代码未修改。
+- 最终通用组件核对SQL已按PostgreSQL的record和sum(bigint)返回numeric规则显式统一类型后执行，0不一致；该修正只涉及只读验证脚本。
+
+### 证据与工作区
+
+`D:\RPB\target`中wallet-marketing前缀保存源码blob证明、制品清单、176项后端回归、干净构建、生产副本演练、部署日志、92表前后/最终指纹、公开接口、186资源及15项权限证明；最终服务证明为wallet-marketing-final-production-proof.log。
+
+原未跟踪PRODUCT_LINE_ACCESS_BROWSER_ACCEPTANCE_20261022.md、WALLET_QR_END_TO_END_ACCEPTANCE_20261023.md及rpb信息.txt均保留，不提交或上传。前者SHA256 `88646E36D7B6C02CD04180FEDB2B0A0B7881FD7929C39EBFA56D8A6511C8F34B`，信息文件SHA256 `17121CD0A39ED1A14F70901091D92C5501A79F104315708656CC7FF3EF168726` 保持。
+
+结论：已提交、推送并部署；备份、迁移、制品、权限、业务数据、服务稳定性及相邻边界验证通过。实际银行转账与手机摄像头现场验收仍不在本次生产只读验证范围。
