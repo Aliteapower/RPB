@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WalletNextCustomer from '../components/WalletNextCustomer.vue'
 import WalletTransactionEvidence from '../transactions/WalletTransactionEvidence.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -29,6 +30,6 @@ async function cancel(){await run(async()=>{await walletApi(store.value).command
     <section v-if="qr && topup.status==='pending_collection'" class="wallet-card"><WalletQrDisplay :value="qr" /><p>{{ t('wallet.paynowHint') }}</p></section>
     <WalletCollectionForm v-if="can('wallet.collection.confirm') && topup.status==='pending_collection'" :key="topup.id" :amount-cents="topup.amountCents" :fixed-channel="topup.channel" :channels="[topup.channel]" :paynow-configured="context.paynowConfigured" :busy="busy" topup @confirm="confirm" />
     <button v-if="can('wallet.topup.create') && topup.status==='pending_collection'" class="wallet-link-button" :disabled="busy" @click="cancel">{{ t('wallet.cancel') }}</button>
-    <WalletTransactionEvidence :store="store" source-type="topup" :id="topup.id" /><details class="wallet-reference"><summary>{{ t('wallet.ui.transactionInfo') }}</summary><p>{{ t('wallet.reference') }} {{ topup.id }}</p><p>{{ dateTime(topup.createdAt,context.store.timezone) }}</p></details>
+    <WalletNextCustomer v-if="topup.status==='credited'||topup.status==='cancelled'" :disabled="busy" /><WalletTransactionEvidence :store="store" source-type="topup" :id="topup.id" /><details class="wallet-reference"><summary>{{ t('wallet.ui.transactionInfo') }}</summary><p>{{ t('wallet.reference') }} {{ topup.id }}</p><p>{{ dateTime(topup.createdAt,context.store.timezone) }}</p></details>
   </template>
 </template>

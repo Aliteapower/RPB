@@ -5,7 +5,7 @@ import { createRenderer, h, nextTick, reactive } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { createI18n } from 'vue-i18n'
-let StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
+let NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
 const originalStorage=globalThis.sessionStorage
 const originalWindow=globalThis.window, originalFetch=globalThis.fetch, originalDocument=globalThis.document, originalDocumentClass=globalThis.Document, originalShadowRoot=globalThis.ShadowRoot
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
@@ -20,13 +20,13 @@ const renderer=createRenderer({
 function nodes(root,predicate){let out=[];if(predicate(root))out.push(root);for(const c of root.children||[])out.push(...nodes(c,predicate));return out}
 
 function mount(component,kind,route,props={},permissions) {
- let workspace;
+ let workspace;const navigation=[];
  const root={children:[]},i18n=createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':{wallet:messages.walletZh}}}),pinia=createPinia()
  authModule.useAuthSessionStore(pinia).user={accountId:'cashier-A',permissions:permissions??['wallet.view','wallet.topup.create','wallet.points.view','wallet.points.grant','wallet.points.adjust','wallet.points.redeem','wallet.points.reverse']}
  const app=renderer.createApp({setup(){workspace=kind==='customer'?customerModule.provideCustomerWallet():staffModule.provideStaffWallet();return()=>h(component,props)}})
- app.use(pinia);app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async()=>{},replace:async target=>{if(target&&typeof target==='object'&&target.query)route.query=target.query}})
+ app.use(pinia);app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target)},replace:async target=>{if(target&&typeof target==='object'&&target.query)route.query=target.query}})
  app.component('RouterLink',{props:['to'],setup:(props,{slots})=>()=>h('a',{href:props.to},slots.default?.())});app.mount(root)
- return{root,get auth(){return authModule.useAuthSessionStore(pinia)},get workspace(){return workspace},unmount:()=>app.unmount()}
+ return{root,navigation,get auth(){return authModule.useAuthSessionStore(pinia)},get workspace(){return workspace},unmount:()=>app.unmount()}
 }
 const response=body=>({ok:true,status:200,json:async()=>body})
 const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' ')
@@ -36,7 +36,7 @@ before(async()=>{
  globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
  const storage=new Map();globalThis.sessionStorage={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}
  const {build,transform}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
- const entry=`export {default as StaffHome} from './src/modules/wallet/pages/WalletStaffHome.vue';export * as personalCodeModule from './src/modules/wallet/usePersonalCode.ts';export {default as PersonalCode} from './src/modules/wallet/components/WalletPersonalCode.vue';export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopup.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
+ const entry=`export {default as NextCustomer} from './src/modules/wallet/components/WalletNextCustomer.vue';export {default as StaffHome} from './src/modules/wallet/pages/WalletStaffHome.vue';export * as personalCodeModule from './src/modules/wallet/usePersonalCode.ts';export {default as PersonalCode} from './src/modules/wallet/components/WalletPersonalCode.vue';export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopup.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
  const result=await build({stdin:{contents:entry,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'vue-runtime-test',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{
   if(path.endsWith('WalletQrScanner.vue'))return {contents:`import {h} from 'vue';export default {props:['purpose'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code',((p.purpose==='identity'||p.purpose==='personal')?'WI.':'WC.')+'A'.repeat(43))},'scan')}`,loader:'js'}
   if(path.endsWith('WalletQrDisplay.vue'))return {contents:`import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`,loader:'js'}
@@ -45,7 +45,7 @@ before(async()=>{
  })}}]})
  const dir='target/wallet-marketing-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
  const loaded=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now())
- ;({StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
+ ;({NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
@@ -84,7 +84,7 @@ test('customer without funding account can select an offer and create a request 
  const radio=nodes(scope.root,n=>n.tag==='input'&&n.props.value==='offer')[0];radio.listeners.change({target:radio});await tick()
  assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('获取报价')).length,0)
  const confirm=nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('确认充值'))[0];assert.equal(confirm.props.disabled,false)
- confirm.props.onClick();await new Promise(r=>setTimeout(r,30));await tick()
+ await confirm.props.onClick();await tick()
  const request=calls.find(c=>c.url.endsWith('/topups')&&c.body);assert.ok(request);assert.deepEqual(Object.keys(request.body).sort(),['idempotencyKey','quoteId']);assert.equal(request.body.quoteId,'quote')
  assert.match(allText(scope.root),/等待商户核实|到店交付现金/)
  nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('我已付款'))[0].props.onClick();await new Promise(r=>setTimeout(r,10));await tick();assert.ok(calls.some(c=>c.url.endsWith('/declare-paid')));assert.match(allText(scope.root),/顾客已声明付款/)
@@ -303,6 +303,16 @@ test('personal code issues for a customer with no money account and never grants
  const scope=mount(PersonalCode,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.equal(nodes(scope.root,n=>n.tag==='figure')[0].props['data-code'],'WI.'+'A'.repeat(43));assert.deepEqual(calls.find(c=>c.url.endsWith('/personal-codes')).body,{});assert.ok(!calls.some(c=>c.url.endsWith('/payment-codes')||c.url.endsWith('/accounts')));scope.unmount()
 })
 
+test('recharge scans consecutive customers and clears the previous wallet and operation',async()=>{
+ let count=0;globalThis.fetch=async url=>response(url.endsWith('/customer-codes/resolve')?{id:'customer-'+(++count),displayName:'顾客'+count}:staffContext)
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{scan:'1'},hash:''}),scope=mount(RechargePage,'staff',route);await tick()
+ nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'customer-1')
+ route.query={kind:'money'};scope.workspace.account.value={id:'old-account'};await tick()
+ nodes(scope.root,n=>n.tag==='button'&&allText(n)==='扫下一位顾客')[0].props.onClick();await tick()
+ assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(route.query.kind,undefined)
+ nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'customer-2');assert.equal(scope.workspace.account.value,null);scope.unmount()
+})
+
 
 test('manually selected customer from another workflow is not treated as scanned identity',async()=>{
  globalThis.fetch=async()=>response(staffContext)
@@ -327,7 +337,7 @@ test('personal code acceptance sends exact current policy, renews after payment,
 
 test('unset personal limit keeps identity usable and offers customer authorization',async()=>{
  const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body&&JSON.parse(options.body)});return response(url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:url.endsWith('/personal-payment-consent')?{configured:false,policyVersion:0,limitCents:null,paymentEnabled:false}:{type:'customer_personal',code:'WI.'+'A'.repeat(43),expiresAt:'2099-01-01T00:00:00Z'})}
- const scope=mount(PersonalCode,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/尚未设置/);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='同意并启用')[0].props.disabled,true);assert.equal(nodes(scope.root,n=>n.tag==='figure').length,1);assert.ok(!calls.some(c=>c.body?.accepted));scope.unmount()
+ const scope=mount(PersonalCode,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/尚未设置/);assert.match(allText(scope.root),/支付上限设置.*尚未启用/);assert.ok(allText(scope.root).indexOf('支付上限设置')<allText(scope.root).indexOf('120 秒'));assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='同意并启用')[0].props.disabled,true);assert.equal(nodes(scope.root,n=>n.tag==='figure').length,1);assert.ok(!calls.some(c=>c.body?.accepted));scope.unmount()
 })
 
 test('authorized customer sees no repeated approval form; editing amount clears the prior check',async()=>{
@@ -375,4 +385,16 @@ test('cashier login change keeps original pending key, blocks recovery and ignor
  const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'actor-change'},query:{},hash:''}),{},permissions);await tick();enterNumber(scope.root,5);await tick();nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();const saved=sessionStorage.getItem('rpb.wallet.personal-attempt.actor-change');assert.ok(saved)
  scope.auth.user={...scope.auth.user,accountId:'cashier-B'};await tick();assert.match(allText(scope.root),/原收银员账号/);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('查询 / 重试原交易'))[0].props.disabled,true)
  release(response({status:'paid',bill:{id:'old'}}));await tick();assert.equal(sessionStorage.getItem('rpb.wallet.personal-attempt.actor-change'),saved);assert.match(allText(scope.root),/原收银员账号/);assert.equal(commands,1);scope.unmount()
+})
+
+
+test('settled result next customer clears identity and navigates to a fresh scan; busy cannot switch',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ for(const collect of [false,true]){
+  const props=reactive({collect,disabled:true}),scope=mount(NextCustomer,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),props);await tick()
+  scope.workspace.customer.value={id:'previous'};scope.workspace.identifiedCustomerId.value='previous';scope.workspace.account.value={id:'previous-wallet'}
+  const button=nodes(scope.root,n=>n.tag==='button')[0];button.props.onClick();assert.equal(scope.workspace.customer.value.id,'previous');assert.equal(scope.navigation.length,0)
+  props.disabled=false;await tick();button.props.onClick();await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.identifiedCustomerId.value,null)
+  assert.equal(scope.navigation[0].path,collect?'/stores/A/wallet/collect':'/stores/A/wallet/topup');assert.deepEqual(scope.navigation[0].query,collect?{}:{scan:'1'});scope.unmount()
+ }
 })

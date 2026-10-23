@@ -122,6 +122,22 @@ class WalletPersonalPaymentPostgresTest {
         var code=tx.execute(s->p.issue(scope,principal));assertThat(code.paymentEnabled()).isFalse();assertThat(code.type()).isEqualTo("customer_personal");
         assertThat(jdbc.queryForObject("select count(*) from wallet_accounts where tenant_id=?",Integer.class,tenant)).isZero();
     }
+    @Test void personalCodeLives120SecondsAndRepeatedIdentityReadsNeverConsumeIt() {
+        var p=personal();var code=tx.execute(s->p.issue(scope,principal));
+        assertThat(Duration.between(clock.instant(),code.expiresAt())).isEqualTo(Duration.ofSeconds(120));
+        var codes=new WalletCustomerIdentityRepository(jdbc);var program=accounts.requireProgram(scope,true).id();
+        assertThat(codes.resolve(scope,program,WalletTokens.hash(code.code()),clock.instant().plusSeconds(119))).isEqualTo(customer);
+        assertThat(codes.resolve(scope,program,WalletTokens.hash(code.code()),clock.instant().plusSeconds(119))).isEqualTo(customer);
+        assertThatThrownBy(()->codes.resolve(scope,program,WalletTokens.hash(code.code()),clock.instant().plusSeconds(120)))
+          .isInstanceOf(WalletException.class).extracting(e->((WalletException)e).code()).isEqualTo("WALLET_PERSONAL_CODE_EXPIRED");
+        var fresh=tx.execute(s->p.issue(scope,principal));
+        assertThatThrownBy(()->codes.resolve(scope,program,WalletTokens.hash(code.code()),clock.instant()))
+          .isInstanceOf(WalletException.class).extracting(e->((WalletException)e).code()).isEqualTo("WALLET_PERSONAL_CODE_EXPIRED");
+        assertThat(codes.resolve(scope,program,WalletTokens.hash(fresh.code()),clock.instant())).isEqualTo(customer);
+        var other=new StoreScope(new TenantId(UUID.randomUUID()),store);
+        assertThatThrownBy(()->codes.resolve(other,program,WalletTokens.hash(fresh.code()),clock.instant()))
+          .isInstanceOf(WalletException.class).extracting(e->((WalletException)e).code()).isEqualTo("WALLET_NOT_FOUND");
+    }
     @Test void oneCodePaysOnceWithExactRetryAndHashOnlyPersistence() {
         consent(5000);var a=credit(open(),"100","cash");var p=personal();var code=tx.execute(s->p.issue(scope,principal));
         var identity=new WalletCustomerIdentityService(accounts,auths,new WalletCustomerIdentityRepository(jdbc),access,directory,clock);
@@ -267,7 +283,7 @@ class WalletPersonalPaymentPostgresTest {
         consent(5000);var p=personal();var code=tx.execute(s->p.issue(scope,principal));
         assertThatThrownBy(()->tx.execute(s->p.charge(scope,actor,new com.rpb.reservation.wallet.personalpayment.PersonalPaymentDtos.ScanCharge(code.code(),"1",null,key())))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_ACCOUNT_REQUIRED");
         var a=credit(open(),"100","cash");
-        var later=new com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentService(accounts,bills,commands,new com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentRepository(jdbc),new WalletCustomerIdentityRepository(jdbc),access,directory,funding,Clock.offset(clock,Duration.ofSeconds(61)));
+        var later=new com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentService(accounts,bills,commands,new com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentRepository(jdbc),new WalletCustomerIdentityRepository(jdbc),access,directory,funding,Clock.offset(clock,Duration.ofSeconds(121)));
         assertThatThrownBy(()->tx.execute(s->later.charge(scope,actor,new com.rpb.reservation.wallet.personalpayment.PersonalPaymentDtos.ScanCharge(code.code(),"1",null,key())))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_PERSONAL_CODE_EXPIRED");
         jdbc.update("update wallet_accounts set status='frozen' where id=?",a.id());
         assertThatThrownBy(()->tx.execute(s->p.charge(scope,actor,new com.rpb.reservation.wallet.personalpayment.PersonalPaymentDtos.ScanCharge(code.code(),"1",null,key())))).isInstanceOf(WalletException.class);
@@ -287,7 +303,7 @@ class WalletPersonalPaymentPostgresTest {
             var blocker=pool.submit(()->tx.execute(s->{accounts.account(scope,a.id(),true);locked.countDown();try{if(!release.await(15,TimeUnit.SECONDS))throw new IllegalStateException("release timeout");}catch(InterruptedException e){throw new IllegalStateException(e);}return true;}));
             assertThat(locked.await(10,TimeUnit.SECONDS)).isTrue();
             var scan=pool.submit(()->{try{tx.execute(s->service.charge(scope,actor,new com.rpb.reservation.wallet.personalpayment.PersonalPaymentDtos.ScanCharge(issued.code(),"1",null,key())));return "paid";}catch(WalletException e){return e.code();}});
-            assertThat(requestingAccount.await(10,TimeUnit.SECONDS)).isTrue();now.set(clock.instant().plusSeconds(61));release.countDown();
+            assertThat(requestingAccount.await(10,TimeUnit.SECONDS)).isTrue();now.set(clock.instant().plusSeconds(121));release.countDown();
             assertThat(blocker.get(15,TimeUnit.SECONDS)).isTrue();assertThat(scan.get(15,TimeUnit.SECONDS)).isEqualTo("WALLET_PERSONAL_CODE_EXPIRED");
             assertThat(bills.list(scope)).isEmpty();assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(10000);
         } finally {release.countDown();pool.shutdownNow();}

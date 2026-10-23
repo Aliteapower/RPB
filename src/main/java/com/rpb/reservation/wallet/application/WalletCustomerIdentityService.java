@@ -20,7 +20,7 @@ public class WalletCustomerIdentityService {
  public WalletCustomerIdentityService(WalletAccountRepository accounts,WalletAuthorizationRepository legacy,WalletCustomerIdentityRepository codes,WalletAccess access,WalletDirectory directory,Clock clock){this.accounts=accounts;this.legacy=legacy;this.codes=codes;this.access=access;this.directory=directory;this.clock=clock;}
  @Transactional public PaymentCode issue(StoreScope scope,CustomerAuthPrincipal principal){
   access.customer(scope,principal,true);var program=accounts.requireProgram(scope,true);
-  String token=WalletTokens.issue("WI");var now=clock.instant();var expiry=now.plusSeconds(60);
+  String token=WalletTokens.issue("WI");var now=clock.instant();var expiry=now.plusSeconds(WalletTokens.PERSONAL_CODE_LIFETIME_SECONDS);
   codes.issue(scope,program.id(),principal.customerId(),WalletTokens.hash(token),now,expiry);
   return new PaymentCode("customer_identity",token,expiry);
  }

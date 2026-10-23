@@ -5,6 +5,7 @@ import java.security.*;
 import java.util.*;
 
 public final class WalletTokens {
+    public static final long PERSONAL_CODE_LIFETIME_SECONDS=120;
     private static final SecureRandom RANDOM=new SecureRandom();
     private WalletTokens() {}
     public static String issue(String prefix) {

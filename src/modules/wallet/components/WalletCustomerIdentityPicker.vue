@@ -8,13 +8,13 @@ import WalletIcon from './WalletIcon.vue'
 defineProps<{ disabled?: boolean }>()
 const emit=defineEmits<{clear:[]}>()
 const {t}=useI18n(),{customer,identifiedCustomerId,busy,error,clear,identifyCustomer}=useStaffWallet(),scanning=ref(useRoute().query.scan==='1')
-function reset(){clear();scanning.value=true;emit('clear')}
+function reset(){clear();error.value='';scanning.value=true;emit('clear')}
 async function scanned(code:string){if(await identifyCustomer(code))scanning.value=false}
 </script>
 <template>
   <section v-if="customer&&customer.id===identifiedCustomerId" class="wallet-customer-chip">
     <div class="wallet-avatar"><WalletIcon name="user" /></div><div><strong>{{customer.displayName||customer.customerCode}}</strong><small>{{customer.phone||customer.customerCode}}</small><small>{{t('wallet.marketing.identityReady')}}</small></div>
-    <button :disabled="busy||disabled" @click="reset">{{t('wallet.ui.rescan')}}</button>
+    <button :disabled="busy||disabled" @click="reset">{{t('wallet.personal.nextCustomer')}}</button>
   </section>
   <section v-else class="wallet-card">
     <p>{{t('wallet.marketing.scanFirst')}}</p>

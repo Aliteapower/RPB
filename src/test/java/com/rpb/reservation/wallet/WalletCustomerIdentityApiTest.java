@@ -24,6 +24,11 @@ class WalletCustomerIdentityApiTest {
  MockMvc mvc;
  @BeforeEach void setup(){mvc=MockMvcBuilders.standaloneSetup(new WalletCustomerIdentityController(identity,service)).setControllerAdvice(new WalletErrorAdvice()).addFilters(new WalletRequestSecurityFilter()).build();when(identity.staff()).thenReturn(actor);when(identity.customer(any())).thenReturn(principal);when(identity.scope(tenant,store)).thenReturn(scope);}
  String path(boolean publicPath){return "/api/v1/"+(publicPath?"public/":"")+"stores/"+store+"/wallet/customer-codes";}
+ @Test void expiredImageReturnsActionableConflictRatherThanMissingRecord()throws Exception{
+  String code="WI."+"A".repeat(43);when(service.resolve(scope,actor,code)).thenThrow(new com.rpb.reservation.wallet.domain.WalletException("WALLET_PERSONAL_CODE_EXPIRED",409,"个人码已过期或已刷新，请顾客重新出示"));
+  mvc.perform(post(path(false)+"/resolve").header("X-RPB-Wallet","1").contentType("application/json").content("{\"code\":\""+code+"\"}"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WALLET_PERSONAL_CODE_EXPIRED"));
+ }
  @Test void identifiesOnlyCustomerWithoutExposingAccountOrFinancialAuthority()throws Exception{
   String code="WI."+"A".repeat(43);when(service.resolve(scope,actor,code)).thenReturn(new WalletViews.Customer(customer,"C","test",null,"+6581234567"));
   mvc.perform(post(path(false)+"/resolve").header("X-RPB-Wallet","1").contentType("application/json").content("{\"code\":\""+code+"\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(customer.toString())).andExpect(jsonPath("$.account").doesNotExist()).andExpect(jsonPath("$.balanceCents").doesNotExist());

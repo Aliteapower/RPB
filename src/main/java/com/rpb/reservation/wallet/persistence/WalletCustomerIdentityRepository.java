@@ -22,6 +22,10 @@ public class WalletCustomerIdentityRepository {
   jdbc.update("update wallet_customer_identity_codes set payment_enabled=false where tenant_id=? and program_id=? and customer_id=?",scope.tenantId().value(),program,customer);
  }
  public UUID resolve(StoreScope scope,UUID program,String hash,Instant now){
-  return jdbc.query("select customer_id from wallet_customer_identity_codes where tenant_id=? and program_id=? and code_hash=? and expires_at>?",(rs,n)->rs.getObject(1,UUID.class),scope.tenantId().value(),program,hash,Timestamp.from(now)).stream().findFirst().orElseThrow(WalletException::missing);
+  var rows=jdbc.query("select customer_id,expires_at from wallet_customer_identity_codes where tenant_id=? and program_id=? and code_hash=?",(rs,n)->new Identity(rs.getObject(1,UUID.class),rs.getTimestamp(2).toInstant()),scope.tenantId().value(),program,hash);
+  var code=rows.stream().findFirst().orElseThrow(WalletException::missing);
+  if(!code.expiresAt().isAfter(now))throw new WalletException("WALLET_PERSONAL_CODE_EXPIRED",409,"个人码已过期或已刷新，请顾客重新出示当前个人钱包码；相册旧图片不能继续使用");
+  return code.customerId();
  }
+ private record Identity(UUID customerId,Instant expiresAt) {}
 }

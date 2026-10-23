@@ -38,7 +38,7 @@ public class WalletPersonalPaymentService {
  }
  @Transactional public PersonalCode issue(StoreScope s,CustomerAuthPrincipal customer){
   access.customer(s,customer,true);var program=accounts.requireProgram(s,true);personal.lockProgram(s,program.id());personal.lockIdentity(s,program.id(),customer.customerId());
-  var consent=personal.consent(s,program.id(),customer.customerId());String token=WalletTokens.issue("WI");var now=clock.instant();var expires=now.plusSeconds(60);
+  var consent=personal.consent(s,program.id(),customer.customerId());String token=WalletTokens.issue("WI");var now=clock.instant();var expires=now.plusSeconds(WalletTokens.PERSONAL_CODE_LIFETIME_SECONDS);
   identities.issue(s,program.id(),customer.customerId(),WalletTokens.hash(token),now,expires);personal.snapshot(s,WalletTokens.hash(token),consent);
   return new PersonalCode("customer_personal",token,expires,consent.paymentEnabled(),consent.limitCents(),consent.consentedLimitCents(),consent.policyVersion());
  }

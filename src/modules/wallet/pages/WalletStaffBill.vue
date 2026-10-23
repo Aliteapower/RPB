@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WalletNextCustomer from '../components/WalletNextCustomer.vue'
 import WalletTransactionEvidence from '../transactions/WalletTransactionEvidence.vue'
 import WalletAmountSplit from '../components/WalletAmountSplit.vue'
 import { computed, ref, watch } from 'vue'
@@ -43,7 +44,7 @@ async function cancel() { await run(async () => { await walletApi(store.value).c
     <section v-if="code && !bill.walletApplied && !bill.closed" class="wallet-card"><WalletQrDisplay :value="customerUrl" :expires-at="code.expiresAt" /><p class="wallet-center">{{ t('wallet.customerConfirm') }}</p><a :href="customerUrl" target="_blank" rel="noreferrer">{{ t('wallet.customerEntry') }}</a></section>
     <section v-if="paynow && !bill.closed && remaining(bill)>0" class="wallet-card"><WalletQrDisplay :value="paynow" /><p>{{ t('wallet.paynowHint') }}</p></section>
     <WalletCollectionForm v-if="collecting && canCollect" :key="bill.id" :amount-cents="remaining(bill)" :channels="context.program?.channels ?? []" :paynow-configured="context.paynowConfigured" :busy="busy" @confirm="collect" />
-    <WalletTransactionEvidence :store="store" source-type="bill" :id="bill.id" /><details class="wallet-reference"><summary>{{ t('wallet.ui.transactionInfo') }}</summary><p>{{ t('wallet.reference') }} {{ bill.id }}</p><p>{{ dateTime(bill.createdAt,context.store.timezone) }}</p></details>
+    <WalletNextCustomer v-if="bill.closed||remaining(bill)===0" :disabled="busy" collect /><WalletTransactionEvidence :store="store" source-type="bill" :id="bill.id" /><details class="wallet-reference"><summary>{{ t('wallet.ui.transactionInfo') }}</summary><p>{{ t('wallet.reference') }} {{ bill.id }}</p><p>{{ dateTime(bill.createdAt,context.store.timezone) }}</p></details>
     <RouterLink v-if="can('wallet.refund.manage') && bill.walletPaidCents+bill.externalPaidCents>0" :to="{path:staffWalletPath(store,'refund-create'),query:{sourceType:'bill',sourceId:bill.id}}" class="wallet-secondary-link">{{ t('wallet.refund') }}</RouterLink>
   </template>
 </template>
