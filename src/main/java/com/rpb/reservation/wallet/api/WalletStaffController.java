@@ -24,7 +24,7 @@ public class WalletStaffController {
     @GetMapping("/customers") public List<Customer> customers(@PathVariable UUID storeId,@RequestParam(defaultValue="") String query) {var a=identity.staff();return accounts.search(scope(storeId,a),a,query);}
     @GetMapping("/customers/{id}") public Customer customer(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return accounts.customer(scope(storeId,a),a,id);}
     @GetMapping("/customers/{id}/accounts") public List<Account> customerAccounts(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return accounts.forCustomer(scope(storeId,a),a,id);}
-    @PostMapping("/payment-codes/resolve") public Map<String,Object> resolveCode(@PathVariable UUID storeId,@RequestBody Code body) {var a=identity.staff();var s=scope(storeId,a);var account=authorization.resolve(s,a,body.code());return Map.of("account",account,"customer",accounts.customer(s,a,account.customerId()));}
+    @PostMapping("/payment-codes/resolve") public Map<String,Object> resolveCode(@PathVariable UUID storeId,@RequestBody ResolveCode body) {var a=identity.staff();var s=scope(storeId,a);var account=authorization.resolve(s,a,body.code(),body.purpose());return Map.of("account",account,"customer",accounts.customer(s,a,account.customerId()));}
     @PostMapping("/accounts") public Account open(@PathVariable UUID storeId,@RequestBody AccountRequest body) {var a=identity.staff();return accounts.open(scope(storeId,a),a,body.customerId(),body.idempotencyKey());}
     @GetMapping("/accounts/{id}") public Account account(@PathVariable UUID storeId,@PathVariable UUID id) {var a=identity.staff();return accounts.get(scope(storeId,a),a,id);}
     @GetMapping("/accounts/{id}/entries") public List<Entry> entries(@PathVariable UUID storeId,@PathVariable UUID id,@RequestParam(defaultValue="0") int offset) {var a=identity.staff();return accounts.entries(scope(storeId,a),a,id,offset);}
@@ -53,5 +53,6 @@ public class WalletStaffController {
     public record AccountRequest(UUID customerId,String idempotencyKey) {}
     public record Key(String idempotencyKey) {}
     public record Code(String code) {}
+    public record ResolveCode(String code,String purpose) {}
     public record RefundConfirmation(UUID partId,String receiptReference,String idempotencyKey) {}
 }

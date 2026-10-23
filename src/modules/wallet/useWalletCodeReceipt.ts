@@ -8,7 +8,7 @@ export function useWalletCodeReceipt(store: Ref<string>, code: Ref<PaymentCode|n
   watch([store,code],()=>{generation++;done=false;error.value=''})
   async function check(){
     const issued=code.value,current=generation,id=store.value
-    if(!issued || running || done || document.visibilityState!=='visible')return
+    if(!issued || !issued.code.startsWith('WC.') || running || done || document.visibilityState!=='visible')return
     running=true
     try {
       const result=await walletApi(id,true).post<{bill:Bill|null}>('/payment-codes/status',{code:issued.code})

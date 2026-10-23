@@ -27,7 +27,7 @@ class WalletApiIdentityTest {
     MockMvc mvc;
     @BeforeEach void setup() {
         var identity=new WalletApiIdentity(staff,auth,new CustomerAuthCookieService(false));
-        mvc=MockMvcBuilders.standaloneSetup(new WalletCustomerController(identity,accounts,checkout,authorization),new WalletStaffController(identity,accounts,null,null,null,null,null,null),new WalletScanChargeController(identity,charges))
+        mvc=MockMvcBuilders.standaloneSetup(new WalletCustomerController(identity,accounts,checkout,authorization),new WalletStaffController(identity,accounts,null,null,authorization,null,null,null),new WalletScanChargeController(identity,charges))
             .setControllerAdvice(new WalletErrorAdvice()).addFilters(new WalletRequestSecurityFilter()).build();
         when(staff.currentActor()).thenReturn(Optional.empty());when(auth.authenticateSession("valid")).thenReturn(Optional.of(principal));
         when(accounts.ownAccounts(any(),any())).thenReturn(List.of());when(checkout.pending(any(),any())).thenReturn(List.of());
@@ -55,6 +55,15 @@ class WalletApiIdentityTest {
         mvc.perform(post(path("/payment-codes/status")).header("X-RPB-Wallet","1").header("X-Test-Tenant-Id",UUID.randomUUID()).cookie(cookie()).contentType("application/json").content("{\"code\":\"invalid\"}")).andExpect(status().isNotFound());
         verify(charges).status(argThat(s->s.tenantId().value().equals(tenant)&&s.storeId().value().equals(store)),eq(principal),eq("invalid"));
         verify(charges,never()).charge(any(),any(),any());
+    }
+    @Test void topupPurposeUsesCustomerCookieAndStaffSessionWithoutTrustingTenantHeaders() throws Exception {
+        mvc.perform(post(path("/payment-codes")).header("X-RPB-Wallet","1").cookie(cookie()).contentType("application/json").content("{\"accountId\":\""+customer+"\",\"purpose\":\"topup\"}")).andExpect(status().isOk());
+        verify(authorization).issuePaymentCode(argThat(s->s.tenantId().value().equals(tenant)),eq(principal),eq(customer),eq("topup"));
+        var actor=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),Set.of("wallet.view","wallet.topup.create"),Set.of(store));
+        when(staff.currentActor()).thenReturn(Optional.of(actor));
+        when(authorization.resolve(any(),any(),any(),any())).thenThrow(com.rpb.reservation.wallet.domain.WalletException.missing());
+        mvc.perform(post("/api/v1/stores/"+store+"/wallet/payment-codes/resolve").header("X-RPB-Wallet","1").header("X-Test-Tenant-Id",UUID.randomUUID()).contentType("application/json").content("{\"code\":\"WP.invalid\",\"purpose\":\"topup\"}")).andExpect(status().isNotFound());
+        verify(authorization).resolve(argThat(s->s.tenantId().value().equals(tenant)),eq(actor),eq("WP.invalid"),eq("topup"));
     }
     String path(String suffix) {return "/api/v1/public/stores/"+store+"/wallet"+suffix;}
     Cookie cookie() {return new Cookie(CustomerAuthCookieService.COOKIE_NAME,"valid");}

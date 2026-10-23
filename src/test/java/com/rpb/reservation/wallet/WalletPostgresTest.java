@@ -90,6 +90,38 @@ class WalletPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from wallet_commands where tenant_id=? and operation='bill.scan_charge'",Integer.class,tenant)).isZero();
     }
 
+    @Test void topupCodeResolvesWithTopupPermissionOnlyWithoutFinancialEffectsOrChargeConsent() {
+        var a=open();var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));
+        assertThat(code.type()).isEqualTo("customer_wallet");assertThat(code.code()).startsWith("WP.");
+        var cashier=new CurrentActor(tenant,actorId,"staff",Set.of("store_staff"),Set.of("wallet.view","wallet.topup.create"),Set.of(store));
+        for(int i=0;i<2;i++)assertThat(authorization.resolve(scope,cashier,code.code(),"topup").id()).isEqualTo(a.id());
+        assertThatThrownBy(()->authorization.resolve(scope,cashier,code.code())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->authorization.resolve(scope,actor,code.code(),"unknown")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(s->scanner(clock).charge(scope,actor,charge(a,"1",code.code())))).isInstanceOf(WalletException.class);
+        noScanEffects(a,0,0);assertThat(ledger.entries(scope,a.id(),0)).isEmpty();assertThat(topupRepo.list(scope,new WalletHistoryQuery(0,"all"))).isEmpty();
+        var t=create(a,"10","cash");var c=confirm("10","cash","");
+        var result=tx.execute(s->topups.confirm(scope,actor,t.id(),c));
+        TopupResult replay=tx.execute(s->topups.confirm(scope,actor,t.id(),c));assertThat(replay).isEqualTo(result);
+        assertThat(result.account().balanceCents()).isEqualTo(1000);assertThat(ledger.entries(scope,a.id(),0)).hasSize(1);
+    }
+    @Test void resolvingPaymentCodeForTopupDoesNotConsumeItAndTopupCodesStillEnforceScopeAndExpiry() {
+        var a=credit(open(),"5","cash");var charge=chargeCode(a);
+        assertThat(authorization.resolve(scope,actor,charge.code(),"topup").id()).isEqualTo(a.id());
+        assertThat(tx.execute(s->scanner(clock).charge(scope,actor,charge(a,"1",charge.code()))).account().balanceCents()).isEqualTo(400);
+        var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));
+        var foreign=new StoreScope(new TenantId(UUID.randomUUID()),store);
+        assertThatThrownBy(()->authorization.resolve(foreign,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
+        var later=new WalletAuthorizationService(accounts,ledger,commands,bills,auths,access,Clock.offset(clock,Duration.ofSeconds(60)));
+        assertThatThrownBy(()->later.resolve(scope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
+        jdbc.update("update wallet_accounts set status='frozen' where id=?",a.id());
+        assertThatThrownBy(()->authorization.resolve(scope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
+        jdbc.update("update wallet_accounts set status='active' where id=?",a.id());
+        for(var reason:List.of(AppGateDenyReason.STORE_APP_EXPIRED,AppGateDenyReason.TENANT_APP_NOT_ENABLED,AppGateDenyReason.APP_DISABLED)) {
+            when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,reason));
+            assertThatThrownBy(()->authorization.resolve(scope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
+        }
+        assertThat(ledger.entries(scope,a.id(),0)).hasSize(2);assertThat(bills.list(scope)).hasSize(1);
+    }
     @Test void merchantScanConfirmationImmediatelySettlesAndCustomerSeesTheSameReceiptWithoutConfirming() {
         var a=credit(open(),"50","cash");var code=chargeCode(a);assertThat(code.code()).startsWith("WC.");
         assertThat(scanner(clock).status(scope,principal,code.code()).bill()).isNull();
@@ -567,6 +599,11 @@ class WalletPostgresTest {
         var siblingScope=new StoreScope(new TenantId(tenant),sibling);var otherScope=new StoreScope(new TenantId(tenant),otherStore);
         tx.execute(s->accounts.configure(siblingScope,issuer,List.of("cash"),null));tx.execute(s->accounts.configure(otherScope,otherIssuer,List.of("cash"),null));
         assertThat(accounts.customerAccounts(siblingScope,customer).getFirst().id()).isEqualTo(a.id());assertThat(accounts.account(siblingScope,a.id(),false).balanceCents()).isEqualTo(5000);
+        var code=tx.execute(s->authorization.issuePaymentCode(scope,principal,a.id(),"topup"));
+        var allStores=new CurrentActor(tenant,actorId,"staff",actor.roles(),actor.permissions(),Set.of(store,sibling,otherStore));
+        assertThat(authorization.resolve(siblingScope,allStores,code.code(),"topup").id()).isEqualTo(a.id());
+        assertThatThrownBy(()->authorization.resolve(otherScope,allStores,code.code(),"topup")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->authorization.resolve(siblingScope,actor,code.code(),"topup")).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->accounts.account(otherScope,a.id(),false)).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->accounts.account(new StoreScope(new TenantId(UUID.randomUUID()),store),a.id(),false)).isInstanceOf(WalletException.class);
         assertThatThrownBy(()->jdbc.update("insert into wallet_program_stores(program_id,tenant_id,store_id,operating_entity_id) values(?,?,?,?)",a.programId(),tenant,otherStore,issuer)).isInstanceOf(org.springframework.dao.DataAccessException.class);

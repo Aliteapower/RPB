@@ -4,7 +4,7 @@ import { createServer } from 'vite'
 import { createRenderer, h, reactive, ref, nextTick } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
-let vite, historyModule, recordModule, staffModule, customerModule, authModule, receiptModule
+let vite, historyModule, recordModule, staffModule, customerModule, authModule, receiptModule, codeModule
 const oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldDocument=globalThis.document
 const timers=new Map();let timer=0
 const response=data=>({ok:true,status:200,json:async()=>data})
@@ -25,8 +25,34 @@ before(async()=>{
   customerModule=await vite.ssrLoadModule('/src/modules/wallet/useCustomerWallet.ts')
   authModule=await vite.ssrLoadModule('/src/stores/authSession.ts')
   receiptModule=await vite.ssrLoadModule('/src/modules/wallet/useWalletCodeReceipt.ts')
+  codeModule=await vite.ssrLoadModule('/src/modules/wallet/useCustomerWalletCode.ts')
 })
 after(async()=>{await vite?.close();globalThis.fetch=oldFetch;globalThis.window=oldWindow;globalThis.document=oldDocument})
+test('topup scan identifies a customer without retaining debit authorization or creating financial transactions',async()=>{
+  const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body?JSON.parse(options.body):null});return response(url.endsWith('/context')?{transactionsEnabled:true}:{account:{id:'wallet'},customer:{id:'guest'}})}
+  const scope=mount(()=>staffModule.provideStaffWallet());await tick()
+  assert.equal(await scope.state.scan('WC.'+'A'.repeat(43),'topup'),true)
+  assert.equal(scope.state.account.value.id,'wallet');assert.equal(scope.state.customerCode.value,'')
+  assert.deepEqual(calls.filter(c=>c.body).map(c=>c.body),[{code:'WC.'+'A'.repeat(43),purpose:'topup'}])
+  scope.state.clear();await scope.state.scan('WC.'+'B'.repeat(43));assert.equal(scope.state.customerCode.value,'WC.'+'B'.repeat(43));scope.unmount()
+})
+test('customer topup code auto issues while charge code requires action and late codes cannot cross purpose or store',async()=>{
+  const requests=[],store=ref('A'),account=ref({id:'wallet'}),purpose=ref('topup'),enabled=ref(true)
+  globalThis.fetch=(url,options)=>new Promise(resolve=>requests.push({url,body:JSON.parse(options.body),resolve}))
+  const scope=mount(()=>codeModule.useCustomerWalletCode(store,account,purpose,enabled));await tick()
+  assert.equal(requests.length,1);assert.deepEqual(requests[0].body,{accountId:'wallet',purpose:'topup'})
+  purpose.value='merchant_charge';await tick();assert.equal(requests.length,1)
+  requests[0].resolve(response({type:'customer_wallet',code:'old-topup'}));await tick();assert.equal(scope.state.code.value,null)
+  const issue=scope.state.issue();await tick();assert.equal(requests[1].body.purpose,'merchant_charge')
+  store.value='B';await tick();requests[1].resolve(response({code:'old-charge'}));await issue;assert.equal(scope.state.code.value,null)
+  purpose.value='topup';await tick();requests[2].resolve(response({type:'customer_wallet',code:'current-topup'}));await tick();assert.equal(scope.state.code.value.code,'current-topup')
+  enabled.value=false;await tick();assert.equal(scope.state.code.value,null);scope.unmount()
+})
+test('topup identity code never polls payment authorization status',async()=>{
+  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response({bill:null})}
+  const scope=mount(()=>receiptModule.useWalletCodeReceipt(ref('A'),ref({type:'customer_wallet',code:'WP.'+'A'.repeat(43)}),async()=>assert.fail('topup cannot navigate to a charge receipt')))
+  await [...timers.values()].at(-1)();await tick();assert.deepEqual(calls,[]);scope.unmount()
+})
 test('issued customer code observes its exact settled bill once without querying unrelated pending bills or confirming again',async()=>{
   const calls=[],receipts=[],code=ref({code:'WC.'+'A'.repeat(43)}),store=ref('A');let bill=null
   globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return response({bill})}

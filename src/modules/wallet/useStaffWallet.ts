@@ -39,12 +39,13 @@ function createWorkspace() {
       customer.value = value; account.value = selected; customerCode.value = ''; customers.value = []
     })
   }
-  async function scan(code: string) {
-    await task.run(async () => {
+  async function scan(code: string, purpose?: 'topup') {
+    return await task.run(async () => {
       const current = generation, request = ++selection
-      const result = await walletApi(store.value).post<{ account: Account; customer: Customer }>('/payment-codes/resolve', { code })
+      const result = await walletApi(store.value).post<{ account: Account; customer: Customer }>('/payment-codes/resolve', { code, ...(purpose ? { purpose } : {}) })
       if (current !== generation || request !== selection) return
-      account.value = result.account; customer.value = result.customer; customerCode.value = code; customers.value = []
+      account.value = result.account; customer.value = result.customer; customerCode.value = purpose === 'topup' ? '' : code; customers.value = []
+      return true
     })
   }
   watch(store, () => {
