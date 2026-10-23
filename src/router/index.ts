@@ -262,6 +262,12 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
+      path: '/stores/:storeId/admin/entry-links',
+      name: 'tenant-admin-entry-links',
+      component: () => import('../modules/tenant-entry-links/TenantEntryLinksPage.vue'),
+      meta: { requiresTenantAdmin: true }
+    },
+    {
       path: '/stores/:storeId/admin/payment/settings',
       name: 'tenant-admin-payment-settings',
       component: TenantAdminPaymentSettingsPage,

@@ -8,6 +8,7 @@ import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type { AuthLoginEntry, AuthStoreAccess, AuthUser, SliderCaptchaChallenge } from '../types/auth'
 import { resolveLoginHostContext } from '../utils/hostContext'
+import { initialLoginEntry, entryTenantCode } from '../utils/loginEntry'
 
 type LoginEntryId = 'platform-admin' | 'tenant-admin' | 'tenant-staff'
 
@@ -76,7 +77,7 @@ const initialEntry = loginEntries.find(entry => entry.id === initialLoginEntryId
 const selectedEntryId = ref<LoginEntryId>(initialEntry.id)
 const username = ref(defaultLoginUsername(initialEntry))
 const employeeUsername = ref(defaultEmployeeUsername(initialEntry))
-const tenantCode = ref(hostContext.kind === 'tenant' ? hostContext.tenantCode : (initialEntry.tenantCode ?? '20000000'))
+const tenantCode = ref(entryTenantCode(hostContext.kind, hostContext.tenantCode, route.query.tenantCode, initialEntry.tenantCode ?? '20000000'))
 const password = ref('')
 const captcha = ref<SliderCaptchaChallenge | null>(null)
 const captchaX = ref(0)
@@ -163,7 +164,7 @@ function selectEntry(entry: LoginEntry): void {
   selectedEntryId.value = entry.id
   username.value = defaultLoginUsername(entry)
   employeeUsername.value = defaultEmployeeUsername(entry)
-  tenantCode.value = hostContext.kind === 'tenant' ? hostContext.tenantCode : (entry.tenantCode ?? '')
+  tenantCode.value = entryTenantCode(hostContext.kind, hostContext.tenantCode, route.query.tenantCode, entry.tenantCode ?? '')
   password.value = ''
   pendingStoreSelection.value = false
   selectedStoreId.value = ''
@@ -410,13 +411,7 @@ function fallbackStoreLabel(storeId: string): string {
 }
 
 function initialLoginEntryId(): LoginEntryId {
-  if (hostContext.kind === 'platform') {
-    return 'platform-admin'
-  }
-  if (hostContext.kind === 'tenant') {
-    return 'tenant-admin'
-  }
-  return 'tenant-staff'
+  return initialLoginEntry(hostContext.kind, route.query.entry)
 }
 
 function defaultLoginUsername(entry: LoginEntry): string {
@@ -447,7 +442,7 @@ function applyRememberedAccount(entry: LoginEntry): void {
     username.value = remembered.username
   }
   if (hostContext.kind !== 'tenant' && remembered.tenantCode) {
-    tenantCode.value = remembered.tenantCode
+    tenantCode.value = entryTenantCode(hostContext.kind, hostContext.tenantCode, route.query.tenantCode, remembered.tenantCode)
   }
 }
 

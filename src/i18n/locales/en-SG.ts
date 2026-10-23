@@ -1,6 +1,8 @@
 import { ledgerMessages } from '../../modules/daily-ledger/locales/en-SG'
 import { walletEn } from '../../modules/wallet/locales'
+import { tenantEntryLinksEn } from '../../modules/tenant-entry-links/locales'
 export const enSG = {
+  tenantEntryLinks: tenantEntryLinksEn,
   wallet: walletEn,
   dailyLedger: { messages: ledgerMessages, entry: 'Daily Ledger', description: 'Cash counts, handover and history', symbol: '$' },
   common: {

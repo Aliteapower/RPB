@@ -24,6 +24,7 @@ const hasReservationQueueProductLine = computed(() =>
 )
 const primaryNavItems = computed(() => [
   { to: `/stores/${storeId.value}/admin/profile`, labelKey: 'nav.tenant.profile' },
+  { to: `/stores/${storeId.value}/admin/entry-links`, labelKey: 'tenantEntryLinks.title' },
   { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },
   { to: `/stores/${storeId.value}/admin/customers`, labelKey: 'nav.tenant.customers' }
 ])
