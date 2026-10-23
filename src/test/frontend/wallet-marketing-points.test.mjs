@@ -212,16 +212,40 @@ test('exception receipt refund requires a preview and submits the preview accoun
 
 const debitCode='WC.'+'A'.repeat(43),funded={id:'funded',version:2,balanceCents:11000,reservedCents:0}
 const permissions=['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create']
-function enterNumber(root,value){const input=nodes(root,n=>n.tag==='input'&&n.props.type==='number')[0];input.value=String(value);input.listeners.input({target:input});return input}
+async function enterNumber(root,value){const input=nodes(root,n=>n.tag==='input'&&n.props.type==='number')[0];if(input){input.value=String(value);input.listeners.input({target:input});return input}const key=value=>nodes(root,n=>n.props?.['data-amount-key']===value)[0];key('clear').props.onClick();await tick();for(const digit of String(value)){key(digit).props.onClick();await tick()}return key('1')}
+test('wallet collection uses a permanent keypad, decimals and presets before scanning',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,body:options?.body&&JSON.parse(options.body)});return response(staffContext)}
+ const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'keypad-store'},query:{},hash:''}),{},permissions);await tick()
+ const key=value=>nodes(scope.root,n=>n.props?.['data-amount-key']===value)[0],display=()=>allText(nodes(scope.root,n=>n.tag==='output')[0])
+ assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='number').length,0);assert.match(display(),/0\.00/)
+ assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('扫描个人钱包码并收款'))[0].props.disabled,true)
+ for(const value of ['1','2','.','3','4','5']){key(value).props.onClick();await tick()}assert.match(display(),/12\.34/)
+ key('backspace').props.onClick();await tick();assert.match(display(),/12\.30/);key('clear').props.onClick();await tick();assert.match(display(),/0\.00/)
+ key('5').props.onClick();await tick();key('00').props.onClick();await tick();assert.match(display(),/500\.00/)
+ nodes(scope.root,n=>n.props?.['data-amount-preset']==='20')[0].props.onClick();await tick();assert.match(display(),/20\.00/)
+ await enterNumber(scope.root,'999999999999');assert.match(display(),/99999999999\.00/)
+ assert.ok(!calls.some(c=>c.body));nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();assert.equal(key('1').props.disabled,true);scope.unmount()
+})
+test('wallet keypad edits the existing per-store presets inline without starting payment',async()=>{
+ const storage=globalThis.window.localStorage,map=new Map();globalThis.window.localStorage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v)}
+ globalThis.fetch=async()=>response(staffContext)
+ let scope
+ try{
+  scope=mount(StaffCollect,'staff',reactive({params:{storeId:'preset-keypad'},query:{},hash:''}),{},permissions);await tick()
+  nodes(scope.root,n=>n.tag==='button'&&allText(n)==='编辑')[0].props.onClick();await tick();const input=nodes(scope.root,n=>n.tag==='textarea')[0];input.props['onUpdate:modelValue']('15, 35.50');await tick();nodes(scope.root,n=>n.tag==='button'&&allText(n)==='保存')[0].props.onClick();await tick()
+  assert.ok(nodes(scope.root,n=>n.props?.['data-amount-preset']==='35.5').length||nodes(scope.root,n=>n.props?.['data-amount-preset']==='35.50').length);assert.ok(map.size>0);scope.unmount();scope=null
+  scope=mount(StaffCollect,'staff',reactive({params:{storeId:'preset-keypad'},query:{},hash:''}),{},permissions);await tick();assert.ok(nodes(scope.root,n=>n.props?.['data-amount-preset']==='15').length)
+ }finally{scope?.unmount();globalThis.window.localStorage=storage}
+})
 const submitEvent=()=>({preventDefault(){}})
 test('staff payment requires a fresh scan after amount, ignores prior customer and queries an uncertain result',async()=>{
  const calls=[];let resolveWrite
  globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});if(url.endsWith('/personal-scan-charges'))return new Promise((resolve,reject)=>{resolveWrite=()=>reject(Error('response lost'))});if(url.includes('/personal-scan-charges/result'))return response({status:'paid',bill:{id:'paid'}});return response(staffContext)}
- const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'fresh-scan'},query:{},hash:''}),{},permissions);await tick();scope.workspace.account.value={...funded};scope.workspace.customerCode.value=debitCode;enterNumber(scope.root,55);await tick()
+ const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'fresh-scan'},query:{},hash:''}),{},permissions);await tick();scope.workspace.account.value={...funded};scope.workspace.customerCode.value=debitCode;await enterNumber(scope.root,55);await tick()
  assert.equal(calls.filter(c=>c.body).length,0)
  const form=nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0];form.props.onSubmit(submitEvent());await tick();const scanner=nodes(scope.root,n=>n.props?.['data-scan'])[0];scanner.props.onClick();scanner.props.onClick();await tick();assert.equal(calls.filter(c=>c.url.endsWith('/personal-scan-charges')).length,1)
  const body=calls.find(c=>c.url.endsWith('/personal-scan-charges')).body;assert.equal(body.customerCode,'WI.'+'A'.repeat(43));assert.equal(body.accountId,undefined);assert.equal(body.customerId,undefined);assert.equal(body.amount,'55')
- resolveWrite();await tick();assert.match(allText(scope.root),/结果尚未确认/);assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='number')[0].props.disabled,true)
+ resolveWrite();await tick();assert.match(allText(scope.root),/结果尚未确认/);assert.equal(nodes(scope.root,n=>n.props?.['data-amount-key']==='1')[0].props.disabled,true)
  await nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('查询 / 重试原交易'))[0].props.onClick();await tick();assert.equal(calls.filter(c=>c.url.endsWith('/personal-scan-charges')).length,1);assert.ok(calls.some(c=>c.url.includes('/result?idempotencyKey='+body.idempotencyKey)));scope.unmount()
 })
 
@@ -240,7 +264,7 @@ test('existing bill previews remaining amount but confirms original bill amount 
 })
 test('ordinary topup number input is sent as a JSON decimal string',async()=>{
  const calls=[];globalThis.fetch=async(url,options)=>{const body=options?.body&&JSON.parse(options.body);calls.push({url,body});return response(url.endsWith('/topup-offers')?{...offers,campaignId:null}:url.endsWith('/topups')?{id:'new-topup'}:staffContext)}
- const scope=mount(StaffTopup,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{},permissions);await tick();scope.workspace.account.value={...funded};await tick();enterNumber(scope.root,20);await tick();await nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await new Promise(r=>setTimeout(r,10));await tick();const body=calls.find(c=>c.url.endsWith('/topups')).body;assert.equal(body.amount,'20');assert.equal(typeof body.amount,'string');scope.unmount()
+ const scope=mount(StaffTopup,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{},permissions);await tick();scope.workspace.account.value={...funded};await tick();await enterNumber(scope.root,20);await tick();await nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await new Promise(r=>setTimeout(r,10));await tick();const body=calls.find(c=>c.url.endsWith('/topups')).body;assert.equal(body.amount,'20');assert.equal(typeof body.amount,'string');scope.unmount()
 })
 test('disabled points retain original-entry reversal operation without a history list',async()=>{
  const calls=[];globalThis.fetch=async(url,options)=>{calls.push(url);return response(url.endsWith('/points/context')?{...staffContext,transactionsEnabled:false,program:null}:{accountId:'p',balance:100,version:2})}
@@ -351,7 +375,7 @@ test('authorized customer sees no repeated approval form; editing amount clears 
 
 test('store switch during payment clears new-store busy state and cannot navigate with old response',async()=>{
  let resolveWrite;globalThis.fetch=async(url,options)=>url.endsWith('/personal-scan-charges')?await new Promise(r=>resolveWrite=r):response(staffContext)
- const route=reactive({params:{storeId:'switch-A'},query:{},hash:''}),scope=mount(StaffCollect,'staff',route,{},permissions);await tick();enterNumber(scope.root,5);await tick();nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();route.params.storeId='switch-B';await tick();assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='number')[0].props.disabled,false);resolveWrite(response({status:'paid',bill:{id:'old'}}));await tick();assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='number')[0].props.disabled,false);scope.unmount()
+ const route=reactive({params:{storeId:'switch-A'},query:{},hash:''}),scope=mount(StaffCollect,'staff',route,{},permissions);await tick();await enterNumber(scope.root,5);await tick();nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();route.params.storeId='switch-B';await tick();assert.equal(nodes(scope.root,n=>n.props?.['data-amount-key']==='1')[0].props.disabled,false);resolveWrite(response({status:'paid',bill:{id:'old'}}));await tick();assert.equal(nodes(scope.root,n=>n.props?.['data-amount-key']==='1')[0].props.disabled,false);scope.unmount()
 })
 
 
@@ -382,7 +406,7 @@ test('merchant home has one amount-first payment entry and scan-first top-up hin
 
 test('cashier login change keeps original pending key, blocks recovery and ignores late payment result',async()=>{
  let release,commands=0;globalThis.fetch=async(url)=>{if(url.endsWith('/personal-scan-charges')){commands++;return await new Promise(r=>release=r)};return response(staffContext)}
- const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'actor-change'},query:{},hash:''}),{},permissions);await tick();enterNumber(scope.root,5);await tick();nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();const saved=sessionStorage.getItem('rpb.wallet.personal-attempt.actor-change');assert.ok(saved)
+ const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'actor-change'},query:{},hash:''}),{},permissions);await tick();await enterNumber(scope.root,5);await tick();nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();const saved=sessionStorage.getItem('rpb.wallet.personal-attempt.actor-change');assert.ok(saved)
  scope.auth.user={...scope.auth.user,accountId:'cashier-B'};await tick();assert.match(allText(scope.root),/原收银员账号/);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n).includes('查询 / 重试原交易'))[0].props.disabled,true)
  release(response({status:'paid',bill:{id:'old'}}));await tick();assert.equal(sessionStorage.getItem('rpb.wallet.personal-attempt.actor-change'),saved);assert.match(allText(scope.root),/原收银员账号/);assert.equal(commands,1);scope.unmount()
 })

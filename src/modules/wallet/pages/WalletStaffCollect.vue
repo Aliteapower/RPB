@@ -7,6 +7,7 @@ import { staffWalletPath } from '../navigation'
 import { createPersonalChargeAttempt,type PersonalChargeResult } from '../personalCharge'
 import { chargePreview } from '../scanCharge'
 import WalletQrScanner from '../components/WalletQrScanner.vue'
+import WalletAmountKeypad from '../components/WalletAmountKeypad.vue'
 const {t}=useI18n(),router=useRouter(),workspace=useStaffWallet(),{store,actorId,context,can}=workspace
 const amount=ref(''),description=ref(''),scanning=ref(false),busy=ref(false),error=ref(''),pending=ref(false),ownerMismatch=ref(false)
 let attempt=createPersonalChargeAttempt(store.value,actorId.value,()=>actorId.value),generation=0
@@ -23,7 +24,7 @@ async function recover(){if(busy.value||!pending.value||ownerMismatch.value)retu
 </script>
 <template><section class="wallet-page-heading"><h2>{{t('wallet.ui.collect')}}</h2><p>{{t('wallet.personal.collectHint')}}</p></section>
  <template v-if="allowed"><form class="wallet-amount-card" @submit.prevent="scanning=true">
-  <label>{{t('wallet.amount')}}<span class="wallet-amount-input"><span>S$</span><input v-model="amount" :disabled="busy||pending||scanning" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
+  <WalletAmountKeypad v-model="amount" :store="store" :disabled="busy||pending||scanning" />
   <label>{{t('wallet.personal.description')}}<input v-model.trim="description" :disabled="busy||pending||scanning" maxlength="200"></label>
   <button v-if="!scanning&&!pending" class="wallet-primary wallet-block" :disabled="busy||!valid">{{t('wallet.personal.scanPay')}}</button>
   <WalletQrScanner v-if="scanning" purpose="personal" auto-start :disabled="busy||pending" @code="scanned" />
