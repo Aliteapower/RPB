@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { rechargeRecordsTarget } from '../pointsOperations'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -7,8 +8,9 @@ import WalletStaffTopup from './WalletStaffTopup.vue'
 import WalletPoints from './WalletPoints.vue'
 import WalletCustomerIdentityPicker from '../components/WalletCustomerIdentityPicker.vue'
 import WalletPhoneCustomerPicker from '../components/WalletPhoneCustomerPicker.vue'
+import WalletCustomerManagementEntry from '../components/WalletCustomerManagementEntry.vue'
 const { t } = useI18n(), route = useRoute(), router = useRouter()
-const { can, busy, customer, identifiedCustomerId,phoneConfirmedCustomerId:confirmedPhoneId, choose, pointsContext } = useStaffWallet(), operationBusy = ref(false)
+const { store, can, busy, customer, identifiedCustomerId,phoneConfirmedCustomerId:confirmedPhoneId, choose, pointsContext } = useStaffWallet(), operationBusy = ref(false)
 const phoneMode=computed(()=>route.query.entry==='phone')
 const moneyAllowed = computed(() => can('wallet.view') && can('wallet.topup.create'))
 const pointsAllowed = computed(() => can('wallet.points.view'))
@@ -26,7 +28,7 @@ const identified=computed(()=>!!customer.value&&customer.value.id===(phoneMode.v
 const selected=computed(()=>route.query.kind==='points'||route.query.kind==='money')
 </script>
 <template>
-  <section class="wallet-page-heading"><h2>{{ t('wallet.marketing.rechargeEntry') }}</h2></section>
+  <section class="wallet-page-heading"><h2>{{ t('wallet.marketing.rechargeEntry') }}</h2><WalletCustomerManagementEntry source="wallet-recharge" :disabled="busy||operationBusy" /><RouterLink :to="rechargeRecordsTarget(store,pointsMode?'points':'topup',customer)">{{t('wallet.operation.records')}}</RouterLink></section>
   <WalletPhoneCustomerPicker v-if="phoneMode&&(moneyAllowed||pointsAllowed)" :confirmed-id="confirmedPhoneId" :disabled="operationBusy" @confirmed="confirmPhone" @clear="resetOperation" />
   <WalletCustomerIdentityPicker v-else-if="moneyAllowed||pointsAllowed" :disabled="operationBusy" @identified="prepareMoney" @clear="resetOperation" />
   <div v-if="identified && (moneyAllowed || pointsAllowed)" class="wallet-recharge-options" :aria-label="t('wallet.marketing.operationType')">

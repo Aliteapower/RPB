@@ -19,6 +19,7 @@ import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useGeneratedText } from '../i18n/generatedText'
 import { useAuthSessionStore } from '../stores/authSession'
+import { customerManagementReturnTarget, customerPhonePrefill } from '../modules/customers/navigation'
 
 const { gt } = useGeneratedText()
 const { t } = useI18n()
@@ -31,7 +32,7 @@ const saving = ref(false)
 const archivingId = ref('')
 const errorText = ref('')
 const successText = ref('')
-const keyword = ref('')
+const keyword = ref(typeof route.query.keyword==='string'?route.query.keyword:'')
 const limit = ref(20)
 const offset = ref(0)
 const page = ref<TenantAdminPage>({
@@ -49,6 +50,7 @@ const form = reactive({
 })
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const walletReturnTarget=computed(()=>customerManagementReturnTarget(storeId.value,route.query.from))
 const hasDirtyQuery = computed(() => keyword.value.trim() !== '')
 const hasPhoneCount = computed(() => customers.value.filter(item => Boolean(item.phoneE164)).length)
 const hasEmailCount = computed(() => customers.value.filter(item => Boolean(item.email)).length)
@@ -61,6 +63,10 @@ const actionDisabled = computed(() => loading.value || saving.value || archiving
 
 onMounted(() => {
   void loadCustomers()
+  if(route.query.create==='1'){
+    openCreateEditor()
+    form.phoneE164=customerPhonePrefill(keyword.value)
+  }
   window.addEventListener('focus', refreshVisibleCustomers)
   document.addEventListener('visibilitychange', refreshVisibleCustomers)
 })
@@ -256,6 +262,7 @@ function apiErrorText(error: unknown): string {
           <span>{{ gt('generated.tenant-admin-customers.001') }}</span>
           <h1>{{ gt('generated.tenant-admin-customers.002') }}</h1>
         </div>
+        <RouterLink v-if="walletReturnTarget" :to="walletReturnTarget">{{t(route.query.from==='wallet-recharge'?'wallet.operation.backRecharge':'wallet.operation.backWallet')}}</RouterLink>
       </header>
 
       <p class="shared-customer-note">{{ t('customerAuth.sharedHint') }}</p>

@@ -3,6 +3,7 @@ import {computed,ref,watch,onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {useStaffWallet} from '../useStaffWallet'
 import type {Customer} from '../types'
+import WalletCustomerManagementEntry from './WalletCustomerManagementEntry.vue'
 const props=defineProps<{disabled?:boolean;confirmedId:string|null;hintKey?:string;confirmHintKey?:string}>()
 const emit=defineEmits<{confirmed:[id:string];clear:[]}>()
 const {t}=useI18n(),workspace=useStaffWallet(),{store,customer,customers,busy,error,search,choose,clear}=workspace
@@ -21,6 +22,6 @@ function reset(){if(props.disabled||busy.value)return;generation++;clear();error
  <section v-else class="wallet-card"><p>{{t(hintKey||'wallet.marketing.phoneHint')}}</p><form class="wallet-phone-search wallet-search" @submit.prevent="lookup"><input v-model.trim="phone" type="tel" inputmode="tel" autocomplete="off" maxlength="24" :aria-label="t('wallet.marketing.phoneLabel')" :placeholder="t('wallet.marketing.phoneLabel')" :disabled="busy||disabled"><button :disabled="busy||disabled||!phone">{{t('wallet.transactions.search')}}</button></form>
  <p v-if="invalid" class="wallet-error" role="alert">{{t('wallet.marketing.phoneInvalid')}}</p><p v-if="error" class="wallet-error" role="alert">{{error}}</p>
  <div class="wallet-customer-results"><button v-for="c in results" :key="c.id" type="button" :data-phone-candidate="c.id" :aria-pressed="candidate?.id===c.id" :disabled="busy||disabled" @click="candidate=c"><strong>{{c.displayName||c.customerCode}}</strong><small>{{c.phone}}</small></button></div>
- <section v-if="candidate" class="wallet-phone-confirm"><strong>{{candidate.displayName||candidate.customerCode}}</strong><p>{{candidate.phone}}</p><p>{{t(confirmHintKey||'wallet.marketing.phoneConfirmHint')}}</p><button type="button" class="wallet-primary wallet-block" :disabled="busy||disabled" @click="confirm">{{t('wallet.marketing.confirmCustomer')}}</button></section><p v-if="searched&&!busy&&!results.length" class="wallet-empty">{{t('wallet.empty')}}</p>
+ <section v-if="candidate" class="wallet-phone-confirm"><strong>{{candidate.displayName||candidate.customerCode}}</strong><p>{{candidate.phone}}</p><p>{{t(confirmHintKey||'wallet.marketing.phoneConfirmHint')}}</p><button type="button" class="wallet-primary wallet-block" :disabled="busy||disabled" @click="confirm">{{t('wallet.marketing.confirmCustomer')}}</button></section><template v-if="searched&&!busy&&!error&&!results.length"><p class="wallet-empty">{{t('wallet.empty')}}</p><WalletCustomerManagementEntry source="wallet-recharge" :keyword="phone" create :disabled="disabled" /></template>
  </section>
 </template>

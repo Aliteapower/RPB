@@ -7,7 +7,9 @@ import { walletScanChargeZh, walletScanChargeEn } from './scanChargeLocales'
 import { walletTopupQrZh, walletTopupQrEn } from './topupQrLocales'
 import { personalZh,personalEn } from './personalLocales'
 import {settingsZh,settingsEn} from './settingsLocales'
+import {operationZh,operationEn} from './operationLocales'
 export const walletZh = {
+  operation:operationZh,
   settingsUi: settingsZh,
   merchantQr:merchantQrZh,
   transactions:transactionsZh,
@@ -57,6 +59,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  operation:operationEn,
   settingsUi: settingsEn,
   merchantQr:merchantQrEn,
   transactions:transactionsEn,

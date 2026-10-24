@@ -5,6 +5,7 @@ export const walletRoutes: RouteRecordRaw[] = [
     { path: 'collect', name: 'wallet-collect', component: () => import('./pages/WalletStaffCollect.vue') },
     { path: 'merchant-code', name: 'wallet-merchant-code', component: () => import('./pages/WalletMerchantCode.vue') },
     { path: 'topup', name: 'wallet-topup', component: () => import('./pages/WalletStaffRecharge.vue') },
+    { path: 'points/:entryId/reverse', name: 'wallet-points-reverse', component: () => import('./pages/WalletPointsReversal.vue') },
     { path: 'transactions', name: 'wallet-staff-transactions', component: () => import('./pages/WalletTransactions.vue') },
     { path: 'transactions/:sourceType/:transactionId', name: 'wallet-staff-transaction', component: () => import('./pages/WalletTransactionDetail.vue') },
     { path: 'bills/:billId', name: 'wallet-staff-bill', component: () => import('./pages/WalletStaffBill.vue') },

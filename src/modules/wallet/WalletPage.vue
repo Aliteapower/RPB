@@ -20,8 +20,9 @@ const nativeDetail=computed(()=>['wallet-staff-bill','wallet-staff-topup','walle
 const historical=computed(()=>queryPage.value||nativeDetail.value)
 const atHome=computed(()=>route.name==='wallet-workbench')
 const backPath=computed(()=>{
+ if(route.name==='wallet-points-reverse')return {path:staffWalletPath(store.value,`transactions/points/${route.params.entryId}`),query:{returnTo:safeTransactionReturn(route.query.returnTo??(route.name==='wallet-points-reverse'||route.params.sourceType==='points'?staffWalletPath(store.value,'transactions')+'?category=points':route.params.sourceType==='topup'||route.name==='wallet-staff-topup'?staffWalletPath(store.value,'transactions')+'?category=topup':undefined),store.value)}}
  if(String(route.name).startsWith('wallet-settings-'))return staffWalletPath(store.value,'settings')
- if(['wallet-staff-topup','wallet-staff-bill','wallet-refund-detail','wallet-staff-transaction'].includes(String(route.name)))return safeTransactionReturn(route.query.returnTo,store.value)
+ if(['wallet-staff-topup','wallet-staff-bill','wallet-refund-detail','wallet-staff-transaction'].includes(String(route.name)))return safeTransactionReturn(route.query.returnTo??(route.name==='wallet-points-reverse'||route.params.sourceType==='points'?staffWalletPath(store.value,'transactions')+'?category=points':route.params.sourceType==='topup'||route.name==='wallet-staff-topup'?staffWalletPath(store.value,'transactions')+'?category=topup':undefined),store.value)
  if(['wallet-settings','wallet-report','wallet-exceptions','wallet-refund-create'].includes(String(route.name)))return staffWalletPath(store.value,'more')
  return staffWalletPath(store.value)
 })

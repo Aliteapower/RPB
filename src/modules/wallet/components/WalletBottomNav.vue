@@ -9,7 +9,7 @@ const { t } = useI18n()
 const route=useRoute()
 const href = (page: string) => props.customer ? customerWalletPath(props.store, page) : staffWalletPath(props.store, page)
 const relative=computed(()=>route.path.slice(href('').length))
-const section=computed(()=>/^\/(transactions|bills|topups|refunds)(\/|$)/.test(relative.value)?'transactions':(['','/collect','/topup','/merchant-code'].includes(relative.value)||relative.value.startsWith('/merchant-orders/'))?'home':'other')
+const section=computed(()=>/^\/(transactions|bills|topups|refunds|points)(\/|$)/.test(relative.value)?'transactions':(['','/collect','/topup','/merchant-code'].includes(relative.value)||relative.value.startsWith('/merchant-orders/'))?'home':'other')
 </script>
 <template><nav class="wallet-bottom-nav" :aria-label="t('wallet.ui.navigation')">
   <RouterLink :to="href('')" :class="{'is-current':section==='home'}"><WalletIcon name="wallet" /><span>{{ t(customer ? 'wallet.ui.myWallet' : 'wallet.ui.cashier') }}</span></RouterLink>
