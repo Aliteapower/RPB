@@ -11,7 +11,7 @@ watch(home, () => { if (!busy.value) void points.refresh() })
 </script>
 <template>
   <section class="wallet-card wallet-points-summary">
-    <div class="wallet-page-heading"><h2>{{ t('wallet.marketing.balance') }}<template v-if="account">: {{ account.balance.toLocaleString(locale) }}</template></h2><RouterLink :to="customerWalletPath(store,'transactions')">{{ t('wallet.transactions.title') }} ›</RouterLink></div>
+    <div class="wallet-page-heading"><h2>{{ t('wallet.marketing.balance') }}<template v-if="account">: {{ account.balance.toLocaleString(locale) }}</template></h2><RouterLink :to="customerWalletPath(store,'transactions')+'?category=points'">{{ t('wallet.transactions.title') }} ›</RouterLink></div>
     <p v-if="busy&&!ready" role="status">{{ t('wallet.loading') }}</p>
     <p v-if="error" class="wallet-error" role="alert">{{ error }} <button :disabled="busy" @click="points.refresh()">{{ t('wallet.refresh') }}</button></p>
     <small>{{ t('wallet.marketing.pointsHint') }}</small>

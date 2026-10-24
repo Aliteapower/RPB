@@ -18,6 +18,7 @@ final class TransactionFilters {
         Set<String> allowed;
         String sql;
         switch(category) {
+            case "money" -> {allowed=Set.of("all","payment","topup","refund","reversal");if(sources.stream().noneMatch(s->Set.of("bill","topup","refund","money_reversal").contains(s)))throw WalletException.forbidden();sql="source_type in ('bill','topup','refund','money_reversal')";}
             case "consumption" -> {allowed=Set.of("all","payment","refund");if(!sources.contains("bill")&&!sources.contains("refund"))throw WalletException.forbidden();sql="(source_type='bill' or (source_type='refund' and original_source_type='bill'))";}
             case "topup" -> {allowed=Set.of("all","topup","refund","reversal");if(!sources.contains("topup")&&!sources.contains("refund")&&!sources.contains("money_reversal"))throw WalletException.forbidden();sql="(source_type in ('topup','money_reversal') or (source_type='refund' and original_source_type='topup'))";}
             case "points" -> {allowed=Set.of("all","points_grant","points_deduct","points_redemption","reversal");if(!sources.contains("points"))throw WalletException.forbidden();sql="source_type='points'";}

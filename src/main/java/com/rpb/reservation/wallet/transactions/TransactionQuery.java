@@ -26,7 +26,7 @@ public record TransactionQuery(String type,String status,String reference,String
             String ref=q.getOrDefault("reference","").trim(),search=q.getOrDefault("customerQuery","").trim();
             if(ref.length()>200||search.length()>200||q.getOrDefault("cursor","").length()>2000)throw WalletException.invalid();
             String category=q.getOrDefault("category","all"),direction=q.getOrDefault("direction","all");
-            if(!Set.of("all","auto","consumption","topup","points").contains(category)||!Set.of("all","in","out").contains(direction))throw WalletException.invalid();
+            if(!Set.of("all","auto","consumption","topup","money","points").contains(category)||!Set.of("all","in","out").contains(direction))throw WalletException.invalid();
             return new TransactionQuery(type,status,ref,search,q.getOrDefault("targetStoreId",""),category,direction,limit,q.get("cursor"),new TransactionViews.Period(mode,start,end,zone));
         } catch(DateTimeException|NumberFormatException|NullPointerException e){throw WalletException.invalid();}
     }

@@ -14,7 +14,7 @@ const filters=reactive<Record<string,string>>({targetStoreId:store.value,...tran
 watch(()=>route.query,q=>{for(const key of Object.keys(filters))delete filters[key];Object.assign(filters,{targetStoreId:store.value,...transactionQuery(q,customer)})})
 const caps=computed(()=>data.value?.capabilities??{money:true,points:true,refunds:true,reversals:true})
 const category=computed(()=>data.value?.category??effectiveCategory(String(route.query.category??'auto'),String(route.query.type??'all')))
-const folders=computed(()=>availableCategories(caps.value))
+const folders=computed(()=>availableCategories(caps.value,customer))
 const direction=computed(()=>String(route.query.direction??'all'))
 const types=computed(()=>availableTypes(caps.value,category.value))
 const stats=computed(()=>data.value?summaryKeys(data.value.capabilities,category.value):[])

@@ -148,6 +148,7 @@ class WalletTransactionsPostgresTest {
         assertThat(list(Map.of("period","month")).period().startDate()).isEqualTo(LocalDate.of(2026,10,1));
     }
     @Test void pointsIncludeBothReversalDirectionsAndOnlyWalletBoundPrograms() {
+        var fundingActor=actor;
         actor=new CurrentActor(tenant,actorId,"tenant_admin",Set.of("tenant_admin"),Set.of("wallet.view","wallet.points.view","wallet.refund.manage"),Set.of(store));
         var pointsRepository=new com.rpb.reservation.loyalty.persistence.PointsRepository(jdbc);
         var pointsService=new com.rpb.reservation.loyalty.application.PointsService(pointsRepository,new com.rpb.reservation.loyalty.persistence.PointsCommandRepository(jdbc,json));
@@ -169,6 +170,21 @@ class WalletTransactionsPostgresTest {
         tx.execute(s->pointsService.mutate(otherBinding,actorId,customer,"manual_grant",new com.rpb.reservation.loyalty.application.PointsViews.Mutation(99,"其他产品积分",null,null,null,null,key())));
         assertThat(list(all()).totalCount()).isEqualTo(4);
         var onlyMoney=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.view"),Set.of(store));assertThat(query().list(scope,onlyMoney,null,all()).items()).isEmpty();
+        var permissions=new HashSet<>(fundingActor.permissions());permissions.add("wallet.points.view");
+        actor=new CurrentActor(tenant,actorId,"tenant_admin",Set.of("tenant_admin"),permissions,Set.of(store));
+        var a=credit(open(),"100","cash");pay(bill(a,"25"));
+        var moneyQuery=folder("money","all");moneyQuery.put("limit","1");
+        var money=tx.execute(s->query().list(scope,null,principal,moneyQuery));
+        assertThat(money.category()).isEqualTo("money");assertThat(money.totalCount()).isEqualTo(2);
+        assertThat(money.summary().topupPrincipalCents()).isEqualTo(10000);assertThat(money.summary().consumptionCents()).isEqualTo(2500);assertThat(money.summary().pointsGranted()).isZero();
+        assertThat(money.items()).allSatisfy(i->assertThat(i.sourceType()).isNotEqualTo("points"));assertThat(money.nextCursor()).isNotNull();
+        moneyQuery.put("cursor",money.nextCursor());
+        assertThat(query().list(scope,null,principal,moneyQuery).items()).singleElement().satisfies(i->assertThat(i.sourceType()).isNotEqualTo("points"));
+        moneyQuery.put("category","all");assertThatThrownBy(()->query().list(scope,null,principal,moneyQuery)).isInstanceOf(WalletException.class);
+        assertThat(query().list(scope,null,principal,folder("all","all")).totalCount()).isEqualTo(6);
+        assertThat(query().list(scope,null,principal,folder("points","all")).totalCount()).isEqualTo(4);
+        assertThatThrownBy(()->query().list(scope,onlyPoints,null,folder("money","all"))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_FORBIDDEN");
+        var invalid=folder("money","all");invalid.put("type","points_grant");assertThatThrownBy(()->list(invalid)).isInstanceOf(WalletException.class);
     }
     @Test void historyDoesNotRequireCommercialEligibilityOrActiveStoreButValidatesCustomerIdentity() {
         var a=credit(open(),"10","cash");var b=bill(a,"3");pay(b);jdbc.update("update stores set status='inactive' where id=?",store);

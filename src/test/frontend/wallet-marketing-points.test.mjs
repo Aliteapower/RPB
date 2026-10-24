@@ -364,7 +364,12 @@ test('staff navigation switches points and funding contexts immediately and igno
 test('customer wallet home shows points balance and unified transactions entry',async()=>{
  const entries=[{id:'grant',kind:'manual_grant',quantity:1000,beforeBalance:0,afterBalance:1000,createdAt:new Date().toISOString(),reason:'欢迎积分'},{id:'redeem',kind:'redemption',quantity:50,beforeBalance:1000,afterBalance:950,createdAt:new Date().toISOString(),redemptionDescription:'兑换咖啡'},{id:'reverse',kind:'reversal',quantity:10,beforeBalance:950,afterBalance:960,createdAt:new Date().toISOString(),reason:'纠正扣分'}]
  globalThis.fetch=async url=>response(url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:url.includes('/entries')?entries:{balance:960,version:3})
- const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/积分余额/);assert.match(allText(scope.root),/960/);assert.ok(nodes(scope.root,n=>n.tag==='a'&&n.props.href==='/wallet/A/transactions').length);scope.unmount()
+ const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/积分余额/);assert.match(allText(scope.root),/960/);
+ for(const [section,category] of [['wallet-balance-hero','money'],['wallet-points-summary','points'],['wallet-shortcuts','all']]){
+  const card=nodes(scope.root,n=>String(n.props?.class??'').split(' ').includes(section))[0];assert.ok(card,section)
+  assert.equal(nodes(card,n=>n.tag==='a'&&n.props.href===`/wallet/A/transactions?category=${category}`).length,1)
+ }
+ const nav=mount(BottomNav,'customer',reactive({params:{storeId:'A'},path:'/wallet/A',query:{},hash:''}),{store:'A',customer:true});await tick();assert.ok(nodes(nav.root,n=>n.tag==='a'&&n.props.href==='/wallet/A/transactions?category=all').length);nav.unmount();scope.unmount()
 })
 
 test('unified recharge retains the selected customer when switching to points and back; points mode never opens a wallet',async()=>{
