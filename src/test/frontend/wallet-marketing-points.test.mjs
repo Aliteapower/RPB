@@ -662,7 +662,7 @@ test('wallet customer cards use central APIs, have no tenant sidebar, and defaul
 test('profile editing does not manufacture a new privacy confirmation; records open separately',async()=>{
  const scope=await managedCustomers();await tick();nodes(scope.root,n=>n.tag==='button'&&allText(n).trim()==='编辑')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='checkbox').length,0)
  await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();assert.equal(scope.calls.find(c=>c.method==='PATCH').body.privacyConsent,undefined)
- nodes(scope.root,n=>n.tag==='button'&&allText(n).trim()==='PDPA 登记记录')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='form').length,0);assert.match(allText(scope.root),/尚无登记记录/);assert.ok(scope.calls.some(c=>c.url.endsWith('/shared-customer/privacy-consents')));scope.unmount()
+ nodes(scope.root,n=>n.tag==='button'&&allText(n).trim()==='顾客同意（PDPA）')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='form').length,0);assert.match(allText(scope.root),/商户新增顾客，即确认已取得顾客同意/);assert.doesNotMatch(allText(scope.root),/尚无.*同意|不代表已经同意/);assert.ok(scope.calls.some(c=>c.url.endsWith('/shared-customer/privacy-consents')));scope.unmount()
 })
 
 test('shared customer save blocks duplicates and a late response cannot repaint another store',async()=>{
