@@ -1,6 +1,6 @@
 # 充值及积分办理成功后清除顾客
 
-日期：2026-10-24。状态：本地实现，未提交、推送或部署。
+日期：2026-10-24。状态：功能已提交，生产发布进行中。
 
 ## 行为
 
@@ -14,7 +14,7 @@
 - 先补失败回归，再实现；组件套件 95 项通过，包含手机号／扫码、三种积分操作、失败保留、刷新后不恢复、重新选择同一顾客后字段为空、充值终态以及确认成功后读取失败。
 - `target/wallet-completed-customer-reset-tests.log` 保存组件验证；前端 vue-tsc 与 Vite 构建通过，见 `target/wallet-completed-customer-reset-build.log`。
 - 范围审查：清除动作由页面编排，复用 workspace.clear；积分组件只通知已完成事件；不修改领域记账、授权或幂等机制。
-- 现金充值独立测试 `wallet-cash-topup.test.mjs` 在 Vite 初始化阶段 90 秒超时，未计为通过。该文件和 WalletCollectionForm 本轮均未修改。其余钱包回归 182 项通过，见 `target/wallet-completed-customer-reset-final-regression.log`。
+- 现金充值独立测试在原目录 Vite 初始化超时；干净目录复跑揭示旧断言遗漏了凭证变化后重新核对的现有规则。测试加载改为与现有组件套件相同的 esbuild 直接编译，避免创建 Vite 服务，并补上凭证变化后再次确认的断言。四项现金测试通过；WalletCollectionForm 业务代码未改。发布前将复跑全部钱包测试。
 - 未启动后端、连接数据库或执行生产交易；iPhone 微信真机仍待发布后验收。
 
 ## 兼容与回退
