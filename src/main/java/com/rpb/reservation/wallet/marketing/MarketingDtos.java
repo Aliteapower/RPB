@@ -14,7 +14,9 @@ public final class MarketingDtos {
  public record Publish(int draftVersion,int expectedVersion,String idempotencyKey) {}
  public record Lifecycle(int expectedVersion,String reason,String idempotencyKey) {}
  public record Offer(UUID id,int version,long principalCents,long bonusCents,long creditTotalCents) {}
- public record Offers(UUID campaignId,Integer campaignVersion,String campaignName,String deductionPolicy,int policyVersion,List<String> channels,List<Offer> offers,boolean selfServiceEnabled) {}
+ public record Offers(UUID campaignId,Integer campaignVersion,String campaignName,String deductionPolicy,int policyVersion,List<String> channels,List<Offer> offers,boolean selfServiceEnabled,Map<String,String> channelLabels) {
+  public Offers(UUID campaign,Integer revision,String name,String policy,int version,List<String> channels,List<Offer> offers,boolean self){this(campaign,revision,name,policy,version,channels,offers,self,Map.of());}
+ }
  public record Settings(int version,String deductionPolicy,int policyVersion,boolean selfServiceEnabled,boolean campaignsEnabled,boolean pointsEnabled,List<UUID> affectedStoreIds,List<Offer> baseOffers) {}
  public record Campaign(UUID id,String name,String status,int version,Integer currentPublishedRevision,List<Revision> revisions,Instant createdAt) {
   @JsonProperty(access=JsonProperty.Access.READ_ONLY) public int draftVersion(){return revisions.isEmpty()?0:revisions.getFirst().revision();}

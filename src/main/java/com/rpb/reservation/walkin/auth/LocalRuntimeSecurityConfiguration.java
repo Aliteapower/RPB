@@ -42,6 +42,8 @@ public class LocalRuntimeSecurityConfiguration {
         return http
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/collection-methods").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/wallet/collection-methods").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/transactions","/api/v1/stores/*/wallet/transactions/*/*","/api/v1/public/stores/*/wallet/transactions","/api/v1/public/stores/*/wallet/transactions/*/*").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/personal-scan-charges/result","/api/v1/public/stores/*/wallet/personal-payment-consent").permitAll()
                 .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/personal-scan-charges/reconcile","/api/v1/stores/*/wallet/personal-scan-charges","/api/v1/public/stores/*/wallet/personal-payment-consent","/api/v1/public/stores/*/wallet/personal-codes","/api/v1/public/stores/*/wallet/personal-codes/status").permitAll()

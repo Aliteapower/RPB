@@ -6,7 +6,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestControllerAdvice(assignableTypes={WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,WalletFundingController.class,WalletCustomerIdentityController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
+@RestControllerAdvice(assignableTypes={com.rpb.reservation.wallet.collectionmethods.CollectionMethodController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,WalletFundingController.class,WalletCustomerIdentityController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
 public class WalletErrorAdvice {
     @ExceptionHandler(WalletException.class)
     public ResponseEntity<Map<String,String>> wallet(WalletException e) {return ResponseEntity.status(e.status()).body(Map.of("code",e.code(),"message",e.getMessage()));}

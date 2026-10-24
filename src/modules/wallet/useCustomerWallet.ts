@@ -4,10 +4,13 @@ import { walletApi, WalletApiError } from './api'
 import { merchantCode } from './scanning/walletQr'
 import { customerWalletPath, legacyWalletTarget } from './navigation'
 import type { CustomerHome } from './types'
+import {useI18n} from 'vue-i18n'
+import {logoutCustomer} from '../../api/customerAuthApi'
 
 function createWorkspace() {
   const route=useRoute(),router=useRouter(),store=computed(()=>String(route.params.storeId))
   const home=ref<CustomerHome|null>(null),needsLogin=ref(false),error=ref(''),linkError=ref(''),loading=ref(false)
+  const loggingOut=ref(false),{t}=useI18n()
   const account=computed(()=>home.value?.accounts[0]??null)
   let generation=0,sequence=0,legacyRunning=false,lastLegacyAttempt=''
   async function scan(value:string,replace=false) {
@@ -29,6 +32,7 @@ function createWorkspace() {
     catch(e){linkError.value=e instanceof Error?e.message:String(e)} finally{legacyRunning=false}
   }
   async function refresh() {
+    if(loggingOut.value)return
     const current=generation,request=++sequence,id=store.value
     loading.value=!home.value
     try {
@@ -42,11 +46,21 @@ function createWorkspace() {
     }finally{if(current===generation && request===sequence)loading.value=false}
   }
   async function authenticated(){needsLogin.value=false;error.value='';await refresh()}
+  async function logout(){
+    if(loggingOut.value)return
+    loggingOut.value=true;generation++;sequence++;error.value='';linkError.value=''
+    try{
+      await logoutCustomer()
+      generation++;sequence++;home.value=null;needsLogin.value=true;loading.value=false;lastLegacyAttempt=''
+      await router.replace(customerWalletPath(store.value))
+    }catch{error.value=t('wallet.operation.logoutFailed')}
+    finally{loggingOut.value=false}
+  }
   watch(store,()=>{generation++;home.value=null;needsLogin.value=false;error.value='';linkError.value='';lastLegacyAttempt='';void refresh()},{immediate:true})
   watch(()=>route.hash,()=>{lastLegacyAttempt='';linkError.value='';void legacy()})
   const timer=window.setInterval(()=>{if(!needsLogin.value && document.visibilityState==='visible')void refresh()},5000)
   onUnmounted(()=>{generation++;window.clearInterval(timer)})
-  return{store,home,account,needsLogin,error:computed(()=>linkError.value||error.value),loading,refresh,scan,authenticated}
+  return{store,home,account,needsLogin,error:computed(()=>linkError.value||error.value),loading,refresh,scan,authenticated,logout,loggingOut}
 }
 type Workspace=ReturnType<typeof createWorkspace>
 const key:InjectionKey<Workspace>=Symbol('customer-wallet')

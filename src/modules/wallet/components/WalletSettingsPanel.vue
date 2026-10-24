@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {channelType,channelLabel,topupChannelName} from '../collectionMethods'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { staffWalletPath } from '../navigation'
@@ -7,7 +8,7 @@ import WalletIcon from './WalletIcon.vue'
 const props = defineProps<{ store: string; context: Context; allowed: boolean }>()
 const { t } = useI18n()
 const channels = computed(() => props.context.program
-  ? props.context.program.channels.map(c => t(`wallet.channels.${c}`)).join(' / ')
+  ? props.context.program.channels.map(c => channelLabel(t,c,props.context.program?.channelLabels)).join(' / ')
   : t('wallet.settingsUi.unopened'))
 </script>
 <template>

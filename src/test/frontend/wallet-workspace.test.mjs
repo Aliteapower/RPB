@@ -2,6 +2,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createRenderer, h, reactive, ref, nextTick } from 'vue'
 import { createPinia } from 'pinia'
+import { createI18n } from 'vue-i18n'
 import { routeLocationKey, routerKey } from 'vue-router'
 let historyModule, recordModule, staffModule, customerModule, authModule, receiptModule, codeModule
 const oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldDocument=globalThis.document
@@ -11,7 +12,7 @@ const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick
 const renderer=createRenderer({createElement:tag=>({tag,children:[]}),createText:text=>({text}),createComment:()=>({}),setText:()=>{},setElementText:()=>{},patchProp:()=>{},insert:(child,parent)=>parent.children.push(child),remove:()=>{},parentNode:()=>null,nextSibling:()=>null})
 function mount(setup,route={params:{storeId:'A'},hash:'',query:{}},pinia=createPinia(),router={push:async()=>{},replace:async()=>{}}){
   let state;const app=renderer.createApp({setup(){state=setup();return()=>h('div')}})
-  app.use(pinia);app.provide(routeLocationKey,route);app.provide(routerKey,router);app.mount({children:[]})
+  app.use(pinia);app.use(createI18n({legacy:false,locale:'en',messages:{en:{}}}));app.provide(routeLocationKey,route);app.provide(routerKey,router);app.mount({children:[]})
   return{state,unmount:()=>app.unmount()}
 }
 before(async()=>{
@@ -20,7 +21,7 @@ before(async()=>{
   // Bundle the production modules together so their injection keys retain identity without a dev server.
   const {build}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
   const source=`export * as historyModule from './src/modules/wallet/transactions/useTransactions.ts';export * as recordModule from './src/modules/wallet/useWalletRecord.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as receiptModule from './src/modules/wallet/useWalletCodeReceipt.ts';export * as codeModule from './src/modules/wallet/useCustomerWalletCode.ts'`
-  const result=await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','pinia']})
+  const result=await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','pinia','vue-i18n']})
   const dir=process.cwd()+'/target/wallet-workspace-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
   ;({historyModule,recordModule,staffModule,customerModule,authModule,receiptModule,codeModule}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
 })

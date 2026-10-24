@@ -49,6 +49,19 @@ before(async()=>{
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
+
+test('wallet logout revokes the customer session only and ignores a late wallet response',async()=>{
+ const writes=[];let late,finishLogout,reads=0;const home={context:staffContext,accounts:[{id:'account-A',balanceCents:12000,reservedCents:0}],pendingBills:[]}
+ globalThis.fetch=async(url,options={})=>{if(url.endsWith('/customer-auth/logout')){writes.push({url,options});return new Promise(resolve=>finishLogout=resolve)}if(url.endsWith('/wallet/me')){if(++reads===1)return response(home);return new Promise(resolve=>late=resolve)}return response({balance:25})}
+ const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();const button=nodes(scope.root,n=>n.tag==='button'&&allText(n)==='退出登录')[0];assert.ok(button)
+ const refresh=scope.workspace.refresh();await tick();const logout=scope.workspace.logout();await tick();assert.equal(scope.workspace.loggingOut.value,true);assert.equal(button.props.disabled,true);await scope.workspace.logout();assert.equal(writes.length,1)
+ finishLogout(response({success:true,principal:null}));await logout;late(response(home));await refresh;await tick();assert.equal(scope.workspace.home.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.needsLogin.value,true);assert.equal(writes[0].url,'/api/v1/public/customer-auth/logout');assert.equal(writes[0].options.credentials,'include');assert.equal(scope.auth.user.accountId,'cashier-A');scope.unmount()
+})
+
+test('failed wallet logout shows an error and can be retried without claiming success',async()=>{
+ let attempts=0;const home={context:staffContext,accounts:[],pendingBills:[]};globalThis.fetch=async url=>{if(url.endsWith('/customer-auth/logout')){if(++attempts===1)throw new Error('offline');return response({success:true,principal:null})}return response(url.endsWith('/wallet/me')?home:{balance:0})}
+ const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();await scope.workspace.logout();assert.ok(scope.workspace.home.value);assert.equal(scope.workspace.needsLogin.value,false);assert.equal(scope.workspace.loggingOut.value,false);assert.match(scope.workspace.error.value,/退出失败/);await scope.workspace.logout();assert.equal(attempts,2);assert.equal(scope.workspace.needsLogin.value,true);assert.equal(scope.workspace.home.value,null);scope.unmount()
+})
 test('phone entry requires candidate confirmation before operations and never opens a funding account while searching',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.includes('/customers?')?[{id:'phone-customer',displayName:'手机号顾客',phone:'+6581234567'}]:staffContext)}
  const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}),scope=mount(RechargePage,'staff',route);await tick()
@@ -533,12 +546,31 @@ test('settings deep links deny unauthorized staff without loading the PayNow pro
  for(const section of ['overview','channels','paynow']){const scope=mount(StaffSettings,'staff',reactive({name:'wallet-settings',params:{storeId:'A'},query:{},hash:''}),{section},['wallet.view']);await tick();assert.equal(nodes(scope.root,n=>n.tag==='form').length,0);assert.equal(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('/settings/')).length,0);scope.unmount()}
  assert.equal(calls.filter(u=>u.endsWith('/collection-profile')).length,0)
 })
-test('channel settings save only the current store program with its version and selected channels',async()=>{
- const writes=[];globalThis.fetch=async(url,options={})=>{if(options.method==='PUT')writes.push({url,body:JSON.parse(options.body)});return response(settingsContext)}
+test('collection subjects save the current issuer version with editable names and order',async()=>{
+ const writes=[];globalThis.fetch=async(url,options={})=>{if(options.method==='PUT'){const body=JSON.parse(options.body);writes.push({url,body});return response({version:4,methods:body.methods,affectedStoreIds:['A']})}return response(settingsContext)}
  const scope=mount(ChannelSettings,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',context:settingsContext});await tick()
- assert.equal(nodes(scope.root,n=>n.tag==='form').length,1);assert.equal(nodes(scope.root,n=>n.tag==='select').length,0)
- await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/stores/A/wallet/program');assert.equal(writes[0].body.version,3);assert.deepEqual(writes[0].body.channels,['cash','paynow']);scope.unmount()
+ assert.equal(nodes(scope.root,n=>n.tag==='form').length,1);assert.equal(nodes(scope.root,n=>n.tag==='select').length,2)
+ nodes(scope.root,n=>n.tag==='input')[0].props['onUpdate:modelValue']('柜台现金');await tick()
+ nodes(scope.root,n=>n.tag==='button'&&allText(n)==='下移')[0].props.onClick();await tick()
+ await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/stores/A/wallet/collection-methods');assert.equal(writes[0].body.version,3);assert.deepEqual(writes[0].body.methods.map(m=>m.code),['paynow','cash']);assert.equal(writes[0].body.methods[1].name,'柜台现金');scope.unmount()
 })
+test('collection subjects can be added and removed but duplicate names cannot be saved',async()=>{
+ const scope=mount(ChannelSettings,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',context:settingsContext});await tick()
+ nodes(scope.root,n=>n.tag==='button'&&allText(n)==='新增收款科目')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='select').length,3)
+ let inputs=nodes(scope.root,n=>n.tag==='input');inputs[2].props['onUpdate:modelValue']('现金');await tick();assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='保存')[0].props.disabled,true)
+ inputs[2].props['onUpdate:modelValue']('银行转账');await tick();assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='保存')[0].props.disabled,false)
+ nodes(scope.root,n=>n.tag==='button'&&allText(n)==='移除')[2].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='select').length,2);scope.unmount()
+})
+
+test('an unconfigured store attaches the existing issuer before editing without overwriting shared subjects',async()=>{
+ const calls=[],code='other:00000000-0000-0000-0000-000000000001';globalThis.fetch=async(url,options={})=>{if(options.method==='PUT'){calls.push({url,body:JSON.parse(options.body)});return response({...settingsContext.program,version:9,channels:[code],channelLabels:{[code]:'发行主体既有转账'}})}return response(settingsContext)}
+ const scope=mount(ChannelSettings,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',context:{...settingsContext,program:null}});await tick();assert.equal(nodes(scope.root,n=>n.tag==='input').length,0);await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/v1/stores/A/wallet/program');assert.equal(nodes(scope.root,n=>n.tag==='input')[0].value,'发行主体既有转账');scope.unmount()
+})
+
+test('offer channel labels are server data and custom PayNow subjects still need a configured account',async()=>{
+ const code='paynow:00000000-0000-0000-0000-000000000001';const scope=mount(OfferComponent,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{offers:{...offers,channels:[code],channelLabels:{[code]:'公司转账'}},selected:'offer',channel:code,quote:null,expired:false,busy:false,timezone:'Asia/Singapore',paynowConfigured:false,confirmOnly:true});await tick();assert.match(allText(scope.root),/公司转账/);assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.value===code)[0].props.disabled,true);scope.unmount()
+})
+
 test('PayNow deep link mounts only its existing account form and preserves shared-account verification',async()=>{
  const writes=[];globalThis.fetch=async(url,options={})=>{if(options.method==='PUT'){writes.push({url,body:JSON.parse(options.body)});return response({version:2,status:'active',paynowType:'uen',paynowUen:'UEN1',merchantName:'店名'})}return response(url.endsWith('/collection-profile')?{version:1,inherited:false,status:'active',paynowType:'uen',paynowUen:'UEN1',merchantName:'店名'}:settingsContext)}
  const scope=mount(StaffSettings,'staff',reactive({name:'wallet-settings-paynow',params:{storeId:'A'},query:{},hash:''}),{section:'paynow'},['wallet.view','wallet.settings.manage']);await tick();assert.equal(nodes(scope.root,n=>n.tag==='form').length,1);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='保存')[0].props.disabled,true)
@@ -549,7 +581,7 @@ test('PayNow deep link mounts only its existing account form and preserves share
 
 test('channel form prevents empty or unavailable program writes, and displays save conflicts',async()=>{
  let writes=0;globalThis.fetch=async(url,options={})=>{if(options.method==='PUT'){writes++;return {ok:false,status:409,json:async()=>({code:'WALLET_CONFLICT',message:'配置已更新，请刷新后重试'})}}return response(settingsContext)}
- for(const context of [{...settingsContext,program:{...settingsContext.program,channels:[]}},{...settingsContext,denialReason:'STORE_OFF'},{...settingsContext,store:{...settingsContext.store,operatingEntityId:null}}]){const scope=mount(ChannelSettings,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',context});await tick();assert.equal(nodes(scope.root,n=>n.tag==='button')[0].props.disabled,true);await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();scope.unmount()}
+ for(const context of [{...settingsContext,program:{...settingsContext.program,channels:[]}},{...settingsContext,denialReason:'STORE_OFF'},{...settingsContext,store:{...settingsContext.store,operatingEntityId:null}}]){const scope=mount(ChannelSettings,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',context});await tick();assert.equal(nodes(scope.root,n=>n.tag==='button'&&['保存','开通配置'].includes(allText(n)))[0].props.disabled,true);await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();scope.unmount()}
  assert.equal(writes,0)
  const scope=mount(ChannelSettings,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',context:settingsContext});await tick();await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();assert.equal(writes,1);assert.match(allText(scope.root),/配置已更新/);scope.unmount()
 })

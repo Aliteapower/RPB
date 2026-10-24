@@ -6,6 +6,7 @@ import { useWalletTask } from './useWalletTask'
 import { walletApi, WalletApiError } from './api'
 import { rows } from './marketingTypes'
 import type { Topup } from './types'
+import {channelType} from './collectionMethods'
 
 export function useCustomerTopups() {
   const route=useRoute()
@@ -18,7 +19,7 @@ export function useCustomerTopups() {
   const canApply = computed(() => !!home.value?.context.transactionsEnabled && offers.value?.selfServiceEnabled === true
     && !!offers.value.offers.find(o => o.id === selected.value)
     && offers.value.channels.includes(channel.value as never)
-    && (channel.value !== 'paynow' || home.value.context.paynowConfigured))
+    && (channelType(channel.value) !== 'paynow' || home.value.context.paynowConfigured))
   let generation = 0, selection = 0
   const current = (version: number) => version === generation
   function remember(result: Topup) {

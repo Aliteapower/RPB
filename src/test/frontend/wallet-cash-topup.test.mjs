@@ -63,3 +63,9 @@ test('busy cash confirmation stays disabled with an optional receipt',async()=>{
  const view=mount(CollectionForm,{...props('cash'),busy:true});verify(view.root);await tick()
  assert.equal(nodes(view.root,n=>n.tag==='button')[0].props.disabled,true);view.unmount()
 })
+
+test('custom cash subject keeps optional receipt while other offline methods require account and receipt',async()=>{
+ const cash='cash:00000000-0000-0000-0000-000000000001',other='other:00000000-0000-0000-0000-000000000002'
+ const view=mount(CollectionForm,{...props(cash),channelLabels:{[cash]:'柜台现金'}});verify(view.root);await tick();assert.equal(receipt(view.root).props.required,false);assert.equal(nodes(view.root,n=>n.tag==='button')[0].props.disabled,false);view.unmount()
+ const offline=mount(CollectionForm,props(other));verify(offline.root);await tick();assert.equal(receipt(offline.root).props.required,true);assert.ok(nodes(offline.root,n=>n.tag==='input'&&n.props.maxlength==='100').length);offline.unmount()
+})

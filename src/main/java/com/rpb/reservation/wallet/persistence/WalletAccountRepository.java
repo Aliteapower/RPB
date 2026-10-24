@@ -26,7 +26,7 @@ public class WalletAccountRepository {
         return p;
     }
     public Program configure(StoreScope scope,UUID issuer,List<String> channels,Integer version) {
-        if(issuer==null || channels==null || channels.isEmpty() || channels.size()>3 || new HashSet<>(channels).size()!=channels.size()) throw WalletException.invalid();
+        if(issuer==null || channels==null || channels.isEmpty() || channels.size()>30 || new HashSet<>(channels).size()!=channels.size()) throw WalletException.invalid();
         channels.forEach(WalletMoney::channel);
         try {
             boolean alreadyAttached=program(scope).isPresent();
@@ -80,7 +80,7 @@ public class WalletAccountRepository {
     }
     public boolean retainsCustomer(com.rpb.reservation.common.scope.TenantScope scope,UUID customer) {return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from wallet_accounts where tenant_id=? and customer_id=?)",Boolean.class,scope.tenantId().value(),customer));}
     private Program program(ResultSet rs) throws SQLException {
-        try {return new Program(rs.getObject("id",UUID.class),rs.getObject("tenant_id",UUID.class),rs.getObject("operating_entity_id",UUID.class),json.readValue(rs.getString("channels"),new TypeReference<List<String>>(){}),rs.getString("status"),rs.getInt("version"));}
+        try {return new Program(rs.getObject("id",UUID.class),rs.getObject("tenant_id",UUID.class),rs.getObject("operating_entity_id",UUID.class),json.readValue(rs.getString("channels"),new TypeReference<List<String>>(){}),rs.getString("status"),rs.getInt("version"),json.readValue(rs.getString("channel_labels"),new TypeReference<Map<String,String>>(){}));}
         catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
     }
     private Account account(ResultSet rs) throws SQLException {

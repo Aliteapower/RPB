@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {channelType,channelLabel,topupChannelName} from '../collectionMethods'
 import { computed, ref, watch } from 'vue'
 import { useRouter,useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -19,7 +20,7 @@ const effectiveChannel=computed(()=>offers.value?.campaignId?offer.channel.value
 const canCreate=computed(()=>can('wallet.topup.create') && context.value?.transactionsEnabled && !!account.value && !!offers.value
   && (offers.value.campaignId?offers.value.offers.some(o=>o.id===selected.value):Number(amount.value)>0)
   && (offers.value.campaignId?offers.value.channels:context.value?.program?.channels??[]).includes(effectiveChannel.value as Channel)
-  && (effectiveChannel.value!=='paynow'||context.value?.paynowConfigured))
+  && (channelType(effectiveChannel.value)!=='paynow'||context.value?.paynowConfigured))
 watch([busy,offer.busy],()=>emit('busy-change',busy.value||offer.busy.value),{immediate:true,flush:'sync'})
 watch(() => context.value?.program?.channels, channels => { if (channels?.length && !channels.includes(channel.value)) channel.value = channels[0]! }, { immediate: true })
 async function create() {
@@ -45,7 +46,7 @@ async function create() {
 <template><section v-if="!embedded" class="wallet-page-heading"><h2>{{ t('wallet.ui.customerTopup') }}</h2><p>{{ t('wallet.offline') }}</p></section>
   <template v-if="can('wallet.topup.create') && context?.transactionsEnabled && context.program"><WalletStaffCustomerPicker v-if="!embedded" scan-purpose="topup" :disabled="busy||offer.busy.value" />
     <form v-if="account" class="wallet-amount-card" @submit.prevent="create"><template v-if="offers && !offers.campaignId"><label>{{ t('wallet.amount') }}<span class="wallet-amount-input"><span>S$</span><input v-model="amount" :aria-label="t('wallet.amount')" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required></span></label>
-      <fieldset class="wallet-channel-picker" :disabled="busy"><legend>{{ t('wallet.channel') }}</legend><label v-for="c in context.program.channels" :key="c"><input v-model="channel" type="radio" :value="c" :disabled="c==='paynow' && !context.paynowConfigured">{{ t(`wallet.channels.${c}`) }}</label></fieldset></template><WalletTopupOffers v-else v-model:selected="selected" v-model:channel="offer.channel.value" :offers="offers" :quote="quote" :expired="expired" :busy="busy||offer.busy.value" :timezone="context.store.timezone" :paynow-configured="context.paynowConfigured" confirm-only /><p v-if="offer.error.value" class="wallet-error" role="alert">{{offer.error.value}}</p><button type="button" :disabled="busy||offer.busy.value" @click="offer.refresh">{{t('wallet.refresh')}}</button>
+      <fieldset class="wallet-channel-picker" :disabled="busy"><legend>{{ t('wallet.channel') }}</legend><label v-for="c in context.program.channels" :key="c"><input v-model="channel" type="radio" :value="c" :disabled="channelType(c)==='paynow' && !context.paynowConfigured">{{ channelLabel(t,c,context.program.channelLabels) }}</label></fieldset></template><WalletTopupOffers v-else v-model:selected="selected" v-model:channel="offer.channel.value" :offers="offers" :quote="quote" :expired="expired" :busy="busy||offer.busy.value" :timezone="context.store.timezone" :paynow-configured="context.paynowConfigured" confirm-only /><p v-if="offer.error.value" class="wallet-error" role="alert">{{offer.error.value}}</p><button type="button" :disabled="busy||offer.busy.value" @click="offer.refresh">{{t('wallet.refresh')}}</button>
       <small>{{ t('wallet.ui.topupNotCredited') }}</small><p v-if="error" class="wallet-error" role="alert">{{ error }}</p><button class="wallet-primary wallet-block" :disabled="busy || offer.busy.value || !canCreate">{{ t('wallet.operation.confirmTopup') }}</button>
     </form></template><p v-else class="wallet-empty">{{ t('wallet.noRights') }}</p>
 </template>

@@ -41,9 +41,10 @@ public final class WalletMoney {
         return result;
     }
     public static String channel(String channel) {
-        if(!Set.of("cash","paynow","credit_card").contains(Objects.toString(channel,""))) throw WalletException.invalid();
+        if(channel==null || !channel.matches("(?:cash|paynow|credit_card|other)(?::[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?")) throw WalletException.invalid();
         return channel;
     }
+    public static String channelType(String channel) {return channel(channel).split(":",2)[0];}
     public static String text(String value) {
         if(value==null || value.isBlank() || value.length()>200) throw WalletException.invalid();
         return value.trim();

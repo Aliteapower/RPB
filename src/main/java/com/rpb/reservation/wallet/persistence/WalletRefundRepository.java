@@ -42,12 +42,12 @@ public class WalletRefundRepository {
         jdbc.update("insert into wallet_refund_parts(tenant_id,refund_id,collection_id,amount_cents) values(?,?,?,?)",scope.tenantId().value(),refund,collection,amount);
     }
     public List<RefundPart> parts(StoreScope scope,UUID id) {
-        return jdbc.query("select p.*,c.channel from wallet_refund_parts p join wallet_collections c on c.id=p.collection_id and c.tenant_id=p.tenant_id where p.tenant_id=? and p.refund_id=? order by p.id",
-            (rs,n)->new RefundPart(rs.getObject("id",UUID.class),rs.getObject("collection_id",UUID.class),rs.getString("channel"),rs.getLong("amount_cents"),rs.getBoolean("completed"),rs.getString("receipt_reference")),scope.tenantId().value(),id);
+        return jdbc.query("select p.*,c.channel,c.channel_name from wallet_refund_parts p join wallet_collections c on c.id=p.collection_id and c.tenant_id=p.tenant_id where p.tenant_id=? and p.refund_id=? order by p.id",
+            (rs,n)->new RefundPart(rs.getObject("id",UUID.class),rs.getObject("collection_id",UUID.class),rs.getString("channel"),rs.getLong("amount_cents"),rs.getBoolean("completed"),rs.getString("receipt_reference"),rs.getString("channel_name")),scope.tenantId().value(),id);
     }
     public void completePart(StoreScope scope,RefundPart part,String reference) {
         var original=collection(scope,part.collectionId());
-        String receiptKey=com.rpb.reservation.wallet.domain.WalletTokens.hash(original.channel()+"\u0000"+original.collectionAccount()+"\u0000"+reference.toUpperCase(Locale.ROOT));
+        String receiptKey=com.rpb.reservation.wallet.domain.WalletTokens.hash(com.rpb.reservation.wallet.domain.WalletMoney.channelType(original.channel())+"\u0000"+original.collectionAccount()+"\u0000"+reference.toUpperCase(Locale.ROOT));
         jdbc.update("update wallet_refund_parts set completed=true,receipt_reference=?,receipt_key=?,updated_at=now() where tenant_id=? and id=? and completed=false",reference,receiptKey,scope.tenantId().value(),part.id());
         jdbc.update("update wallet_collections set refunded_cents=refunded_cents+? where tenant_id=? and id=?",part.amountCents(),scope.tenantId().value(),part.collectionId());
     }

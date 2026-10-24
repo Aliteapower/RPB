@@ -23,3 +23,6 @@ export function loginCustomerWithPassword(storeId: string, phoneE164: string, pa
 export function changeCustomerPassword(currentPassword: string, newPassword: string) {
   return command('password-change', { currentPassword, newPassword })
 }
+export function logoutCustomer() {
+  return command('logout', {})
+}

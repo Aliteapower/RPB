@@ -78,6 +78,44 @@ class WalletPostgresTest {
         refunds=new WalletRefundService(accounts,ledger,commands,topupRepo,bills,refundRepo,access,funding);
         tx.execute(s->accountService.configure(scope,actor,new ProgramSettings(null,List.of("cash","paynow","credit_card"),key())));
     }
+    com.rpb.reservation.wallet.collectionmethods.CollectionMethodService methodService(){return new com.rpb.reservation.wallet.collectionmethods.CollectionMethodService(access,accounts,directory,commands,new com.rpb.reservation.wallet.collectionmethods.CollectionMethodRepository(jdbc,json));}
+    @Test void customCollectionSubjectsPreserveHistoryAndRecoverPendingAfterRemoval(){
+        var service=methodService();var before=service.get(scope,actor);var method=new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Method(null,"柜台现金","cash");String requestKey=key();
+        var change=new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(before.version(),List.of(method),requestKey);
+        var saved=tx.execute(s->service.save(scope,actor,change));var replay=tx.execute(s->service.save(scope,actor,change));assertThat(replay).isEqualTo(saved);
+        String code=saved.methods().getFirst().code();var account=open();var first=create(account,"10",code);assertThat(first.offerSnapshot().get("channelName")).isEqualTo("柜台现金");
+        var renamed=tx.execute(s->service.save(scope,actor,new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(saved.version(),List.of(new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Method(code,"新现金名称","cash")),key())));
+        var second=create(account,"5",code);assertThat(second.offerSnapshot().get("channelName")).isEqualTo("新现金名称");
+        tx.execute(s->service.save(scope,actor,new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(renamed.version(),List.of(new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Method(null,"转账","other")),key())));
+        assertThatThrownBy(()->create(account,"1",code)).isInstanceOf(WalletException.class);
+        var paid=tx.execute(s->topups.confirm(scope,actor,first.id(),confirm("10",code,"")));assertThat(paid.account().balanceCents()).isEqualTo(1000);
+        var receipt=new WalletCollectionRepository(jdbc).list(scope,first.id(),null).getFirst();assertThat(receipt.channelName()).isEqualTo("柜台现金");assertThat(receipt.receiptReference()).startsWith("CASH-TOPUP-");
+        assertThat(topupRepo.get(scope,first.id(),false).offerSnapshot().get("channelName")).isEqualTo("柜台现金");
+        var repository=new WalletCollectionRepository(jdbc);var exceptions=new WalletCollectionExceptionService(accounts,topupRepo,bills,new WalletCollectionService(repository,collectionPort),repository,commands,access);String otherCode=service.get(scope,actor).methods().getFirst().code();
+        var fact=tx.execute(s->exceptions.record(scope,actor,new CollectionException("top_up",second.id(),confirm("5",otherCode,"OTHER-ACTUAL-RECEIPT"),"实际收款方式不同",key())));assertThat(fact.channelName()).isEqualTo("转账");assertThat(accounts.account(scope,account.id(),false).balanceCents()).isEqualTo(1000);
+    }
+    @Test void collectionSubjectConfigurationIsVersionedAndTenantAdministratorScoped(){
+        var service=methodService();var original=service.get(scope,actor);
+        var input=new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(original.version(),List.of(new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Method("cash","现金","cash")),key());
+        tx.execute(s->service.save(scope,actor,input));assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(original.version(),input.methods(),key())))).isInstanceOf(WalletException.class);
+        var employee=new CurrentActor(tenant,actorId,"staff",Set.of("store_manager"),actor.permissions(),actor.storeIds());assertThatThrownBy(()->service.get(scope,employee)).isInstanceOf(WalletException.class);
+        var outsider=new CurrentActor(UUID.randomUUID(),actorId,"tenant_admin",actor.roles(),actor.permissions(),actor.storeIds());assertThatThrownBy(()->service.get(scope,outsider)).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->service.get(new StoreScope(scope.tenantId(),UUID.randomUUID()),actor)).isInstanceOf(WalletException.class);
+        UUID nextStore=UUID.randomUUID();jdbc.update("insert into stores(id,tenant_id,operating_entity_id,store_code,display_name,status,timezone,locale,date_format,time_format,currency) values(?,?,?,'second','二店','active','Asia/Singapore','zh-CN','DD-MM-YYYY','HH:mm','SGD')",nextStore,tenant,issuer);
+        var nextScope=new StoreScope(scope.tenantId(),nextStore);var nextActor=new CurrentActor(tenant,actorId,"tenant_admin",actor.roles(),actor.permissions(),Set.of(nextStore));when(directory.store(nextScope)).thenReturn(new StoreIdentity(tenant,nextStore,issuer,"发行主体","二店","test","Asia/Singapore","zh-CN",null));
+        assertThatThrownBy(()->tx.execute(s->service.save(nextScope,nextActor,new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(null,input.methods(),key())))).isInstanceOf(WalletException.class);
+        var attached=tx.execute(s->accountService.configure(nextScope,nextActor,new ProgramSettings(null,List.of("cash","paynow","credit_card"),key())));assertThat(attached.channels()).containsExactly("cash");assertThat(attached.channelLabels().get("cash")).isEqualTo("现金");
+    }
+    @Test void methodChangesInvalidateQuotesAndAliasesCannotReuseReceipts(){
+        var service=methodService();var current=service.get(scope,actor);var input=List.of(new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Method(null,"现金一","cash"),new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Method(null,"现金二","cash"));
+        var saved=tx.execute(s->service.save(scope,actor,new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(current.version(),input,key())));var account=open();var offers=tx.execute(s->marketing.offers(scope,actor));var offer=offers.offers().getFirst();String one=saved.methods().getFirst().code(),two=saved.methods().getLast().code();
+        var quote=tx.execute(s->marketing.quote(scope,actor,new com.rpb.reservation.wallet.marketing.MarketingDtos.QuoteRequest(account.id(),offer.id(),offer.version(),one)));
+        tx.execute(s->service.save(scope,actor,new com.rpb.reservation.wallet.collectionmethods.CollectionMethods.Update(saved.version(),saved.methods().reversed(),key())));
+        assertThatThrownBy(()->tx.execute(s->topups.create(scope,actor,new TopupCreate(account.id(),null,null,key(),quote.quoteId())))).isInstanceOf(WalletException.class);
+        var first=create(account,"10",one);tx.execute(s->topups.confirm(scope,actor,first.id(),confirm("10",one,"DUPLICATE-RECEIPT")));
+        var second=create(account,"10",two);assertThatThrownBy(()->tx.execute(s->topups.confirm(scope,actor,second.id(),confirm("10",two,"DUPLICATE-RECEIPT")))).isInstanceOf(WalletException.class);
+        assertThat(accounts.account(scope,account.id(),false).balanceCents()).isEqualTo(1000);
+    }
     String key(){return UUID.randomUUID().toString();}
     Account open(){return tx.execute(s->accountService.open(scope,actor,customer,key()));}
     Topup create(Account a,String amount,String channel){return tx.execute(s->topups.create(scope,actor,new TopupCreate(a.id(),amount,channel,key())));}

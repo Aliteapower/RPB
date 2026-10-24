@@ -27,7 +27,7 @@ public class WalletTopupService {
         return commands.run(scope,actor.actorId(),"topup.create",c.idempotencyKey(),c,Topup.class,()->{
             var offer=marketing.prepare(scope,actor,c);long amount=offer.principalCents();String channel=offer.channel();
             var p=accounts.requireProgram(scope,true);if(!p.channels().contains(channel))throw WalletException.invalid();
-            if("paynow".equals(channel) && !collections.paynowConfigured(scope))throw WalletException.conflict("门店未配置有效 PayNow 收款资料");
+            if("paynow".equals(WalletMoney.channelType(channel)) && !collections.paynowConfigured(scope))throw WalletException.conflict("门店未配置有效 PayNow 收款资料");
             var a=accounts.account(scope,c.accountId(),true);accounts.requireActive(a);
             var t=topups.create(scope,a,amount,channel,actor.actorId());marketing.attach(scope,t.id(),offer);commands.audit(scope,actor.actorId(),"topup.create",t.id(),t);return topups.get(scope,t.id(),false);
         });
@@ -62,7 +62,7 @@ public class WalletTopupService {
     }
     public String paynowQr(StoreScope scope,CurrentActor actor,UUID id,WalletCollectionPort port) {
         access.staff(scope,actor,"wallet.view",true);var t=topups.get(scope,id,false);
-        if(!"paynow".equals(t.channel()) || !"pending_collection".equals(t.status()))throw WalletException.conflict("充值单当前不能展示收款码");
+        if(!"paynow".equals(WalletMoney.channelType(t.channel())) || !"pending_collection".equals(t.status()))throw WalletException.conflict("充值单当前不能展示收款码");
         var a=accounts.account(scope,t.accountId(),false);accounts.requireActive(a);accounts.verifyIntegrity(a);
         return port.paynowQr(scope,t.amountCents(),t.id());
     }

@@ -30,7 +30,8 @@ public class WalletCollectionExceptionService {
             // Serialize with confirmation and refund, but retain factual receipts even if the account is frozen.
             accounts.lockForExternalRecovery(scope,initial);
             if(topup)topups.get(scope,c.sourceId(),true);else bills.get(scope,c.sourceId(),true);
-            var collected=collections.confirm(scope,topup?c.sourceId():null,topup?null:c.sourceId(),amount,c.confirmation(),actor.actorId(),List.of("cash","paynow","credit_card"),true);
+            var program=accounts.requireProgram(scope,false);var allowed=new HashSet<>(program.channels());allowed.addAll(program.channelLabels().keySet());allowed.addAll(List.of("cash","paynow","credit_card"));
+            var collected=collections.confirm(scope,topup?c.sourceId():null,topup?null:c.sourceId(),amount,c.confirmation(),actor.actorId(),List.copyOf(allowed),true);
             var result=repository.markException(scope,collected.id(),reason);
             if(topup && !"credited".equals(topups.get(scope,c.sourceId(),false).status()))topups.status(scope,c.sourceId(),"exception");
             commands.audit(scope,actor.actorId(),"collection.exception",result.id(),Map.of("reason",reason,"amountCents",amount));return result;

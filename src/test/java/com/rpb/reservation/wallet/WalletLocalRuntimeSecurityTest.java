@@ -15,12 +15,17 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({com.rpb.reservation.wallet.merchantorder.MerchantOrderController.class,com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
+@WebMvcTest({com.rpb.reservation.wallet.collectionmethods.CollectionMethodController.class,com.rpb.reservation.wallet.merchantorder.MerchantOrderController.class,com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
 class WalletLocalRuntimeSecurityTest {
     @Autowired MockMvc mvc;
+    @MockBean com.rpb.reservation.wallet.collectionmethods.CollectionMethodService collectionMethods;
+    @Test void collectionMethodRoutesReachIdentityButRejectOtherMethodsAndCrossSite() throws Exception {
+        when(identity.staff()).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录"));String base="/api/v1/stores/20000000-0000-0000-0000-000000000983/wallet/collection-methods";
+        mvc.perform(get(base)).andExpect(status().isUnauthorized());mvc.perform(put(base).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());mvc.perform(delete(base).header("X-RPB-Wallet","1")).andExpect(status().isForbidden());mvc.perform(put(base).header("X-RPB-Wallet","1").header("Sec-Fetch-Site","cross-site").contentType("application/json").content("{}")).andExpect(status().isForbidden());verifyNoInteractions(collectionMethods);
+    }
     @MockBean com.rpb.reservation.wallet.merchantorder.MerchantOrderService merchantOrders;
     @MockBean com.rpb.reservation.wallet.redemption.RedemptionService redemptions;
     @MockBean WalletApiIdentity identity;

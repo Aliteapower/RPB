@@ -13,7 +13,8 @@ public class WalletOfflineCollectionAdapter implements WalletCollectionPort {
     public WalletOfflineCollectionAdapter(OfflinePayNowCollectionService paynow) {this.paynow=paynow;}
     public boolean paynowConfigured(StoreScope scope) {return paynow.configured(scope);}
     public String canonicalAccount(StoreScope scope,String channel,String account,String terminal) {
-        return switch(WalletMoney.channel(channel)) {
+        return switch(WalletMoney.channelType(channel)) {
+            case "other" -> "offline:"+WalletMoney.text(account).toUpperCase()+":"+WalletMoney.text(terminal).toUpperCase();
             case "cash" -> "cash:"+scope.storeId().value()+":"+WalletMoney.text(terminal).toUpperCase();
             case "paynow" -> {
                 if(!paynow.configured(scope)) throw WalletException.conflict("请先在统一收款设置配置 PayNow");
@@ -31,7 +32,7 @@ public class WalletOfflineCollectionAdapter implements WalletCollectionPort {
         return paynow.preview(scope,cents,"W"+source.toString().replace("-","").substring(0,20));
     }
     public String canonicalRecoveryAccount(StoreScope scope,String channel,String account,String terminal) {
-        if(!"paynow".equals(WalletMoney.channel(channel)))return canonicalAccount(scope,channel,account,terminal);
+        if(!"paynow".equals(WalletMoney.channelType(channel)))return canonicalAccount(scope,channel,account,terminal);
         // Manager-attested external facts must remain recordable after profile changes/disablement.
         // This path never credits a wallet or settles a bill.
         String actual=WalletMoney.text(account).toUpperCase(java.util.Locale.ROOT);

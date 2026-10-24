@@ -29,7 +29,7 @@ public class WalletAccountService {
     @Transactional
     public Program configure(StoreScope scope,CurrentActor actor,ProgramSettings settings) {
         access.staff(scope,actor,"wallet.settings.manage",true);
-        if(settings==null)throw WalletException.invalid();
+        if(settings==null || settings.channels()==null || settings.channels().stream().anyMatch(c->!List.of("cash","paynow","credit_card").contains(c)))throw WalletException.invalid();
         return commands.run(scope,actor.actorId(),"program.configure",settings.idempotencyKey(),settings,Program.class,()->{
             var identity=directory.store(scope);if(identity.operatingEntityId()==null)throw WalletException.conflict("请先在统一资料设置经营主体");
             var p=accounts.configure(scope,identity.operatingEntityId(),settings.channels(),settings.version());

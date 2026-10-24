@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {channelType,channelLabel,topupChannelName} from '../collectionMethods'
 import WalletTransactionEvidence from '../transactions/WalletTransactionEvidence.vue'
 import WalletRefundAmounts from './WalletRefundAmounts.vue'
 import WalletRefundComponents from './WalletRefundComponents.vue'
@@ -57,7 +58,7 @@ onMounted(() => { void run(refresh) })
     </form>
     <section v-if="detail" class="wallet-card"><WalletTransactionEvidence :store="store" source-type="refund" :id="detail.refund.id" /><h3>{{ t('wallet.refundParts') }} · {{ detail.refund.id }}</h3><p>{{ t(`wallet.states.${detail.refund.status}`) }}</p><WalletRefundAmounts :amounts="detail.refund" />
       <template v-if="detail.refund.status === 'pending'"><label>{{ t('wallet.receipt') }}<input v-model.trim="receipt" maxlength="160"></label><label class="wallet-check"><input v-model="verified" type="checkbox">{{ t('wallet.refundAttested') }}</label></template>
-      <div v-for="part in detail.parts" :key="part.id" class="wallet-record"><strong>{{ t(`wallet.channels.${part.channel}`) }} {{ money(part.amountCents) }}</strong><span v-if="part.completed">{{ t('wallet.states.completed') }} · {{ part.receiptReference }}</span><button v-else-if="detail.refund.status === 'pending'" :disabled="busy || !verified || !receipt" @click="confirm(part.id)">{{ t('wallet.confirmRefund') }}</button></div>
+      <div v-for="part in detail.parts" :key="part.id" class="wallet-record"><strong>{{ channelLabel(t,part.channel,undefined,part.channelName) }} {{ money(part.amountCents) }}</strong><span v-if="part.completed">{{ t('wallet.states.completed') }} · {{ part.receiptReference }}</span><button v-else-if="detail.refund.status === 'pending'" :disabled="busy || !verified || !receipt" @click="confirm(part.id)">{{ t('wallet.confirmRefund') }}</button></div>
       <button v-if="detail.refund.status === 'pending'" :disabled="busy" @click="cancel">{{ t('wallet.cancelRefund') }}</button><RouterLink :to="safeTransactionReturn(route.query.returnTo,store)">{{ t('wallet.ui.back') }}</RouterLink>
     </section>
   </section>

@@ -6,7 +6,10 @@ import java.util.*;
 /** Explicit immutable application DTOs, never persistence/JPA entities. Amounts are integer SGD cents. */
 public final class WalletViews {
     private WalletViews() {}
-    public record Program(UUID id, UUID tenantId, UUID operatingEntityId, List<String> channels, String status, int version) {}
+    public record Program(UUID id, UUID tenantId, UUID operatingEntityId, List<String> channels, String status, int version,Map<String,String> channelLabels) {
+        public Program(UUID id,UUID tenant,UUID issuer,List<String> channels,String status,int version){this(id,tenant,issuer,channels,status,version,Map.of());}
+        public Program {if(channelLabels==null)channelLabels=Map.of();}
+    }
     public record Account(UUID id, UUID tenantId, UUID programId, UUID customerId, long balanceCents,
                           long reservedCents, String status, int version,Long principalBalanceCents,Long bonusBalanceCents,Long principalReservedCents,Long bonusReservedCents) {
         public Account {if(principalBalanceCents==null)principalBalanceCents=balanceCents;if(bonusBalanceCents==null)bonusBalanceCents=0L;if(principalReservedCents==null)principalReservedCents=reservedCents;if(bonusReservedCents==null)bonusReservedCents=0L;}
@@ -36,7 +39,9 @@ public final class WalletViews {
     }
     public record Collection(UUID id, UUID topupId, UUID billId, String channel, long amountCents,
                              long refundedCents, String receiptReference, String collectionAccount, String terminalCode,
-                             boolean exception, String exceptionReason, Instant createdAt) {}
+                             boolean exception, String exceptionReason, Instant createdAt,String channelName) {
+        public Collection(UUID id,UUID topup,UUID bill,String channel,long amount,long refunded,String receipt,String account,String terminal,boolean exception,String reason,Instant at){this(id,topup,bill,channel,amount,refunded,receipt,account,terminal,exception,reason,at,null);}
+    }
     public record Quote(UUID id, UUID billId, UUID accountId, long amountCents, long remainingCents,
                         int accountVersion, int billVersion, Instant expiresAt,Long principalDebitCents,Long bonusDebitCents) {
         public Quote {if(principalDebitCents==null)principalDebitCents=amountCents;if(bonusDebitCents==null)bonusDebitCents=0L;}
@@ -54,7 +59,9 @@ public final class WalletViews {
         @com.fasterxml.jackson.annotation.JsonProperty(access=com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY) public long getBonusRevokeCents(){return topupId!=null&&exceptionCollectionId==null?bonusCents:0;}
     }
     public record RefundPart(UUID id, UUID collectionId, String channel, long amountCents,
-                             boolean completed, String receiptReference) {}
+                             boolean completed, String receiptReference,String channelName) {
+        public RefundPart(UUID id,UUID collection,String channel,long amount,boolean completed,String receipt){this(id,collection,channel,amount,completed,receipt,null);}
+    }
     public record RefundDetail(Refund refund, List<RefundPart> parts) {}
     public record Paid(Bill bill, Account account) {}
     public record TopupResult(Topup topup, Account account) {}
@@ -79,10 +86,11 @@ public final class WalletViews {
                                  long creditedPrincipalCents,long creditedBonusCents,long spentPrincipalCents,long spentBonusCents,
                                  long returnedPrincipalCents,long returnedBonusCents,long cashPrincipalRefundCents,long revokedBonusCents,
                                  long programPrincipalBalanceCents,long programBonusBalanceCents,long programPrincipalReservedCents,long programBonusReservedCents,
-                                 long componentMismatchAccounts,long fundingMismatchAccounts) {
+                                 long componentMismatchAccounts,long fundingMismatchAccounts,long topupOtherCents) {
+        public Reconciliation(long cash,long paynow,long card,long spent,long external,long refunds,long pending,long due,long balance,long reserved,long exceptions,long credited,long pendingRefund,long mismatches,List<Collection> collections,long cp,long cb,long sp,long sb,long rp,long rb,long cr,long revoke,long pp,long pb,long pr,long pbr,long cm,long fm){this(cash,paynow,card,spent,external,refunds,pending,due,balance,reserved,exceptions,credited,pendingRefund,mismatches,collections,cp,cb,sp,sb,rp,rb,cr,revoke,pp,pb,pr,pbr,cm,fm,0);}
         public Reconciliation(long cash,long paynow,long card,long spent,long external,long refunds,long pending,long due,long balance,long reserved,long exceptions,long credited,long pendingRefund,long mismatches,List<Collection> collections){
             this(cash,paynow,card,spent,external,refunds,pending,due,balance,reserved,exceptions,credited,pendingRefund,mismatches,collections,
-                 credited,0,spent,0,0,0,0,0,balance,0,reserved,0,0,0);
+                 credited,0,spent,0,0,0,0,0,balance,0,reserved,0,0,0,0);
         }
     }
 }

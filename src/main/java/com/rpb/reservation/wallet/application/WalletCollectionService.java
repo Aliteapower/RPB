@@ -20,7 +20,7 @@ public class WalletCollectionService {
         if(c==null || !c.verified() || WalletMoney.cents(c.amount())!=expected || !channels.contains(WalletMoney.channel(c.channel()))) throw WalletException.invalid();
         String terminal=WalletMoney.text(c.terminalCode()).toUpperCase(Locale.ROOT);
         String account=exception?port.canonicalRecoveryAccount(scope,c.channel(),c.collectionAccount(),terminal):port.canonicalAccount(scope,c.channel(),c.collectionAccount(),terminal);
-        boolean cashTopupWithoutReceipt="cash".equals(c.channel()) && topup!=null && bill==null && !exception
+        boolean cashTopupWithoutReceipt="cash".equals(WalletMoney.channelType(c.channel())) && topup!=null && bill==null && !exception
             && (c.receiptReference()==null || c.receiptReference().isBlank());
         String receipt=cashTopupWithoutReceipt ? "CASH-TOPUP-"+topup : WalletMoney.text(c.receiptReference()).toUpperCase(Locale.ROOT);
         String note=Objects.toString(c.note(),"").trim();if(note.length()>500)throw WalletException.invalid();

@@ -17,7 +17,7 @@ async function save() {
 </script>
 <template>
   <section class="customer-password-change">
-    <button v-if="!open" type="button" @click="open=true;success=false">{{ t('customerAuth.changePassword') }}</button>
+    <div v-if="!open" class="customer-account-actions"><button type="button" @click="open=true;success=false">{{ t('customerAuth.changePassword') }}</button><slot name="actions" /></div>
     <form v-else @submit.prevent="save">
       <strong>{{ t('customerAuth.changePassword') }}</strong><p>{{ t('customerAuth.passwordHint') }}</p>
       <label>{{ t('customerAuth.currentPassword') }}<input v-model="current" type="password" autocomplete="current-password" maxlength="72" :disabled="busy" required></label>
@@ -32,5 +32,6 @@ async function save() {
 </template>
 <style scoped>
 .customer-password-change{padding:16px;background:white;border:1px solid #dbe3ea;border-radius:10px;margin-top:16px;color:#102033}form,label{display:grid;gap:10px}form{gap:14px}
+.customer-account-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 button,input{font:inherit;min-height:40px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}input{width:100%}button{cursor:pointer;background:#f8fafc;color:#0f766e;font-weight:700}button:disabled{opacity:.6}.error{color:#991b1b}p{font-size:14px;line-height:1.5}
 </style>
