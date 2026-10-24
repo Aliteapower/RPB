@@ -203,6 +203,12 @@ export const router = createRouter({
       })
     },
     {
+      path: '/stores/:storeId/admin/product-lines',
+      name: 'tenant-admin-product-lines',
+      component: () => import('../modules/tenant-products/TenantProductsPage.vue'),
+      meta: { requiresTenantAdmin: true }
+    },
+    {
       path: '/stores/:storeId/admin/profile',
       name: 'tenant-admin-profile',
       component: TenantAdminProfilePage,

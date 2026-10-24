@@ -23,6 +23,7 @@ const hasReservationQueueProductLine = computed(() =>
   !visibleAppsLoaded.value || hasVisibleApp('reservation_queue')
 )
 const primaryNavItems = computed(() => [
+  { to: `/stores/${storeId.value}/admin/product-lines`, labelKey: 'tenantProducts.title' },
   { to: `/stores/${storeId.value}/admin/profile`, labelKey: 'nav.tenant.profile' },
   { to: `/stores/${storeId.value}/admin/entry-links`, labelKey: 'tenantEntryLinks.title' },
   { to: `/stores/${storeId.value}/admin/staff`, labelKey: 'nav.tenant.staff' },

@@ -183,6 +183,71 @@ class StoreProductAccessPostgresTest {
         assertThatThrownBy(() -> profiles.getProfile(wrongScope)).isInstanceOf(com.rpb.reservation.tenantadmin.application.TenantAdminServiceException.class);
     }
 
+    @Test void manuallyDisabledStoreRemainsOffAfterSubscriptionSyncAndRenewal() {
+        var purchased = purchase();
+        jdbc.update("update store_app_settings set is_enabled=false,disabled_at=now() where tenant_id=? and store_id=? and app_key='daily_ledger'", tenant, store);
+        var before = jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'", tenant, store);
+        assertThat(gate.evaluateStoreActivation("daily_ledger",tenant,store).allowed()).isTrue();
+        var siblingBefore = jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'", tenant, sibling);
+        new JdbcTenantProductEntitlementSyncGateway(jdbc).enableTenantApp(tenant,"daily_ledger",NOW,NOW.plusMonths(1),null);
+        assertThat(jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'", tenant, store)).isEqualTo(before);
+        var item=purchased.items().stream().filter(row->row.storeId().equals(store)).findFirst().orElseThrow();
+        tx.execute(status->billing.renewItem(tenant,purchased.id(),item.id(),new ProductSubscriptionCommand("renew-closed-store","daily_ledger","monthly",null,null,null,"SGD","test",1,0),new PlatformBillingOperator(null,"platform_admin")));
+        assertThat(gate.evaluateCommercial("daily_ledger",tenant,store).denyReason()).isEqualTo(AppGateDenyReason.STORE_APP_NOT_ENABLED);
+        assertThat(gate.visibleApps(actor,store)).isEmpty();
+        assertThat(gate.visibleApps(actor,sibling)).hasSize(1);
+        assertThat(jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'", tenant, sibling)).isEqualTo(siblingBefore);
+    }
+
+    @Test void actualJpaCommandsPersistScopedSwitchesAndSingleAuditPerTransition() {
+        purchase();
+        jdbc.update("update platform_product_line_prices set status='active',amount=30 where app_key='wallet'");
+        UUID issuer=UUID.randomUUID();
+        jdbc.update("insert into operating_entities(id,tenant_id,entity_code,display_name,status) values(?,?,'switch-test','test','active')",issuer,tenant);
+        jdbc.update("update stores set operating_entity_id=? where tenant_id=? and id=?",issuer,tenant,store);
+        var walletBilling=new SelectedStoreBillingService(new JdbcProductSubscriptionRepository(jdbc),new JdbcProductSubscriptionEventRepository(jdbc),new JdbcProductSubscriptionItemRepository(jdbc),
+            new JdbcTenantProductEntitlementSyncGateway(jdbc),new SubscriptionQuoteService(new JdbcPlatformProductLinePriceRepository(jdbc,new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc))),
+            new SelectedBillingCommandRepository(jdbc,new ObjectMapper().findAndRegisterModules()),new com.rpb.reservation.platform.application.SharedStoreIdentityQuery(new com.rpb.reservation.platform.persistence.PlatformTenantStructureRepository(jdbc)),Clock.fixed(NOW.toInstant(),ZoneOffset.UTC));
+        tx.execute(status->walletBilling.purchase(tenant,new ProductSubscriptionCommand("purchase-wallet","wallet","monthly",null,null,null,"SGD","test",1,null,List.of(store)),new PlatformBillingOperator(null,"platform_admin")));
+        var factory=new org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean();
+        factory.setDataSource(jdbc.getDataSource());
+        factory.setPackagesToScan("com.rpb.reservation.appgate.persistence.entity");
+        factory.setJpaVendorAdapter(new org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter());
+        factory.setJpaPropertyMap(Map.of("hibernate.default_schema",SCHEMA,"hibernate.hbm2ddl.auto","none"));
+        factory.afterPropertiesSet();
+        try {
+            var emf=factory.getObject();
+            var em=org.springframework.orm.jpa.SharedEntityManagerCreator.createSharedEntityManager(emf);
+            var repositories=new org.springframework.data.jpa.repository.support.JpaRepositoryFactory(em);
+            var settings=repositories.getRepository(StoreAppSettingJpaRepository.class);
+            var entitlements=repositories.getRepository(TenantAppEntitlementJpaRepository.class);
+            var apps=repositories.getRepository(PlatformAppJpaRepository.class);
+            var audits=repositories.getRepository(AppGateAuditLogJpaRepository.class);
+            var actualGate=new AppGateService(apps,entitlements,settings,access,Clock.fixed(NOW.toInstant(),ZoneOffset.UTC));
+            var service=new StoreProductSettingsService(new StoreProductManagementRepository(jdbc),settings,new AppGateCommandService(entitlements,settings,audits),actualGate);
+            var actualTx=new TransactionTemplate(new org.springframework.orm.jpa.JpaTransactionManager(emf));
+            var scope=new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(tenant),store);
+            var admin=new CurrentActor(tenant,UUID.randomUUID(),"admin",Set.of("tenant_admin"),Set.of("tenant.admin.manage"),Set.of(store));
+            var siblingBefore=jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'",tenant,sibling);
+            for (String key:List.of("wallet","daily_ledger")) {
+                for (boolean enabled:List.of(false,false,true,true)) {
+                    actualTx.execute(status->service.setEnabled(scope,admin,key,enabled));
+                    assertThat(actualGate.evaluateCommercial(key,tenant,store).allowed()).isEqualTo(enabled);
+                    if (!enabled) {
+                        new JdbcTenantProductEntitlementSyncGateway(jdbc).enableTenantApp(tenant,key,NOW,NOW.plusMonths(1),null);
+                        assertThat(actualGate.evaluateCommercial(key,tenant,store).denyReason()).isEqualTo(AppGateDenyReason.STORE_APP_NOT_ENABLED);
+                    }
+                }
+                assertThat(jdbc.queryForObject("select count(*) from app_gate_audit_logs where tenant_id=? and store_id=? and app_key=? and operator_user_id=? and action in ('STORE_APP_DISABLED','STORE_APP_ENABLED')",Integer.class,tenant,store,key,admin.actorId())).isEqualTo(2);
+            }
+            assertThat(jdbc.queryForMap("select is_enabled,entry_visible,disabled_at from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'",tenant,store)).containsEntry("is_enabled",true).containsEntry("entry_visible",true).containsEntry("disabled_at",null);
+            assertThat(jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'",tenant,sibling)).isEqualTo(siblingBefore);
+            assertThat(actualGate.evaluateCommercial("daily_ledger",tenant,store).allowed()).isTrue();
+            var wrongScope=new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(foreignTenant),store);
+            assertThat(new StoreProductManagementRepository(jdbc).isActive(wrongScope,false)).isFalse();
+        } finally { factory.destroy(); }
+    }
+
     @RestController static class TestProductController {
         @GetMapping("/api/v1/stores/{storeId}/test-product")
         @RequireAppGate(appKey = "daily_ledger", permission = "daily_ledger.view")

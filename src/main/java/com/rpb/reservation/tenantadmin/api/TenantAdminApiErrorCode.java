@@ -7,6 +7,7 @@ public enum TenantAdminApiErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "tenant.admin.forbidden"),
     STORE_SCOPE_MISMATCH(HttpStatus.FORBIDDEN, "tenant.admin.store_scope_mismatch"),
     REQUEST_INVALID(HttpStatus.BAD_REQUEST, "tenant.admin.request_invalid"),
+    PRODUCT_LINE_UNAVAILABLE(HttpStatus.CONFLICT, "tenant.admin.product_line_unavailable"),
     TENANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.tenant_profile_not_found"),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.staff_not_found"),
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.customer_not_found"),

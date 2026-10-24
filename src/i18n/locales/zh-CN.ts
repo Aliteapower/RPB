@@ -2,7 +2,9 @@ import { ledgerMessages } from '../../modules/daily-ledger/locales/zh-CN'
 import { walletZh } from '../../modules/wallet/locales'
 import { customerAuthZh } from '../../components/customer-auth/locales'
 import { tenantEntryLinksZh } from '../../modules/tenant-entry-links/locales'
+import { tenantProductsZh } from '../../modules/tenant-products/locales'
 export const zhCN = {
+  tenantProducts: tenantProductsZh,
   customerAuth: customerAuthZh,
   tenantEntryLinks: tenantEntryLinksZh,
   wallet: walletZh,

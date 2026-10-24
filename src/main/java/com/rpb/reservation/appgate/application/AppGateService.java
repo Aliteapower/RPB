@@ -100,6 +100,15 @@ public class AppGateService {
 
     /** Customer-facing operations share commercial checks without manufacturing an employee actor. */
     public AppGateDecision evaluateCommercial(String appKey, UUID tenantId, UUID storeId) {
+        return evaluateCommercial(appKey, tenantId, storeId, true);
+    }
+
+    /** Activation still requires commercial authorization, but intentionally ignores the operational switch. */
+    public AppGateDecision evaluateStoreActivation(String appKey, UUID tenantId, UUID storeId) {
+        return evaluateCommercial(appKey, tenantId, storeId, false);
+    }
+
+    private AppGateDecision evaluateCommercial(String appKey, UUID tenantId, UUID storeId, boolean requireEnabledStore) {
         var request = new AppGateAccessRequest(appKey,tenantId,storeId,null,null);
         OffsetDateTime now = OffsetDateTime.now(clock);
         var app = platformApps.findByAppKey(appKey);
@@ -108,8 +117,10 @@ public class AppGateService {
         if(entitlement.isEmpty()) return denied(request,AppGateDenyReason.TENANT_APP_NOT_ENABLED);
         if(isExpired(entitlement.get(),now)) return denied(request,AppGateDenyReason.TENANT_APP_EXPIRED);
         if(!isEnabledOrValidTrial(entitlement.get())) return denied(request,AppGateDenyReason.TENANT_APP_NOT_ENABLED);
-        var setting=storeSettings.findByTenantIdAndStoreIdAndAppKey(tenantId,storeId,appKey);
-        if(setting.isEmpty() || !setting.get().isEnabled()) return denied(request,AppGateDenyReason.STORE_APP_NOT_ENABLED);
+        if (requireEnabledStore) {
+            var setting=storeSettings.findByTenantIdAndStoreIdAndAppKey(tenantId,storeId,appKey);
+            if(setting.isEmpty() || !setting.get().isEnabled()) return denied(request,AppGateDenyReason.STORE_APP_NOT_ENABLED);
+        }
         var billing=storeSubscriptions.findByTenantAndStore(tenantId,storeId).get(appKey);
         var reason=storeDenial(appKey,billing,now);
         return reason==null ? AppGateDecision.allow(appKey,tenantId,storeId,null) : denied(request,reason);

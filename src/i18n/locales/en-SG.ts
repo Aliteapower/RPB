@@ -2,7 +2,9 @@ import { ledgerMessages } from '../../modules/daily-ledger/locales/en-SG'
 import { walletEn } from '../../modules/wallet/locales'
 import { customerAuthEn } from '../../components/customer-auth/locales'
 import { tenantEntryLinksEn } from '../../modules/tenant-entry-links/locales'
+import { tenantProductsEn } from '../../modules/tenant-products/locales'
 export const enSG = {
+  tenantProducts: tenantProductsEn,
   customerAuth: customerAuthEn,
   tenantEntryLinks: tenantEntryLinksEn,
   wallet: walletEn,
