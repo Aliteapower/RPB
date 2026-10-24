@@ -1,0 +1,43 @@
+[
+  {
+    "appKey": "",
+    "value": "",
+    "labelKey": "platform.productLines.entryRoutes.none.label",
+    "descriptionKey": "platform.productLines.entryRoutes.none.description",
+    "permissions": []
+  },
+  {
+    "appKey": "reservation_queue",
+    "value": "/stores/:storeId/staff",
+    "labelKey": "platform.productLines.entryRoutes.staffHome.label",
+    "descriptionKey": "platform.productLines.entryRoutes.staffHome.description",
+    "permissions": [
+      "reservation.create", "reservation.check_in", "reservation.seat", "reservation.today_view",
+      "reservation.queue", "reservation.cancel", "reservation.no_show", "reservation.complete",
+      "queue.view", "queue.call", "queue.seat", "queue.skip", "queue.rejoin", "queue.cancel",
+      "queue.display.view", "table.view", "table.switch", "customer.lookup",
+      "walkin.direct_seating.create", "walkin.queue.create", "cleaning.start", "cleaning.complete"
+    ]
+  },
+  {
+    "appKey": "payment",
+    "value": "/stores/:storeId/payments",
+    "labelKey": "platform.productLines.entryRoutes.payment.label",
+    "descriptionKey": "platform.productLines.entryRoutes.payment.description",
+    "permissions": ["payment.intent.view", "payment.intent.create", "payment.verification.review", "payment.proof.review", "payment.proof_template.manage"]
+  },
+  {
+    "appKey": "wallet",
+    "value": "/stores/:storeId/wallet",
+    "labelKey": "wallet.entry",
+    "descriptionKey": "wallet.description",
+    "permissions": ["wallet.view", "wallet.topup.create", "wallet.charge.create"]
+  },
+  {
+    "appKey": "daily_ledger",
+    "value": "/stores/:storeId/daily-ledger",
+    "labelKey": "platform.productLines.entryRoutes.dailyLedger.label",
+    "descriptionKey": "platform.productLines.entryRoutes.dailyLedger.description",
+    "permissions": ["daily_ledger.view", "daily_ledger.write"]
+  }
+]

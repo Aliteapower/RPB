@@ -15,6 +15,7 @@ public enum TenantAdminApiErrorCode {
     TEMPLATE_UNKNOWN_VARIABLE(HttpStatus.BAD_REQUEST, "tenant.admin.template_unknown_variable"),
     STAFF_CODE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.staff_code_conflict"),
     CUSTOMER_PHONE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.customer_phone_conflict"),
+    CUSTOMER_HAS_RETAINED_ASSETS(HttpStatus.CONFLICT, "tenant.admin.customer_has_retained_assets"),
     TABLE_CODE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.table_code_conflict"),
     TABLE_IN_USE(HttpStatus.CONFLICT, "tenant.admin.table_in_use"),
     PERSISTENCE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "tenant.admin.persistence_error");

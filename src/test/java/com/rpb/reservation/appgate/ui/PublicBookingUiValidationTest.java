@@ -27,15 +27,8 @@ class PublicBookingUiValidationTest {
             .contains("下一步：登录")
             .contains("<section v-else-if=\"currentStep === 2\" class=\"booking-panel\" aria-label=\"登录\">")
             .contains("<strong>顾客登录</strong>")
-            .contains("emailAuthEnabled")
-            .contains("hasConfiguredLoginMethod")
-            .contains("v-if=\"emailAuthEnabled\"")
-            .contains("v-if=\"!hasConfiguredLoginMethod\"")
-            .contains("门店尚未配置顾客登录方式，请联系门店")
-            .contains("邮箱注册 / 登录")
-            .contains("已注册邮箱通过验证码登录，未注册邮箱自动注册")
-            .contains("Google 登录")
-            .contains("Facebook 登录")
+            .contains("CustomerPasswordLogin")
+            .contains("@authenticated=\"passwordAuthenticated\"")
             .contains("下一步：填写手机号")
             .contains("<form v-else-if=\"currentStep === 3\" class=\"booking-panel\" aria-label=\"提交预约\" @submit.prevent=\"submitBooking\">")
             .contains("<strong>填写手机号并提交</strong>")
@@ -77,20 +70,16 @@ class PublicBookingUiValidationTest {
     }
 
     @Test
-    void publicBookingPageRendersGoogleIdentityButtonInsteadOfRepeatedPrompt() throws Exception {
+    void publicBookingPageReusesSharedPhonePasswordLoginAndPasswordChange() throws Exception {
         String publicBookingPageSource = FrontendSourceSupport.readString(Path.of("src", "pages", "PublicBookingPage.vue"));
 
         assertThat(publicBookingPageSource)
-            .contains("renderButton: (parent: HTMLElement")
-            .contains("const googleSignInButton = ref<HTMLElement | null>(null)")
-            .contains("const googleIdentityClientId = ref('')")
-            .contains("function handleGoogleCredential")
-            .contains("async function renderGoogleSignInButton")
-            .contains("googleIdentityClientId.value !== clientId")
-            .contains("window.google?.accounts.id.renderButton")
-            .contains("ref=\"googleSignInButton\"")
-            .doesNotContain("@click=\"startOAuthLogin('google')\"")
-            .doesNotContain("window.google?.accounts.id.prompt()");
+            .contains("CustomerPasswordLogin")
+            .contains("CustomerPasswordChange")
+            .contains("passwordAuthenticated")
+            .contains(":store=\"storeId\"")
+            .doesNotContain("authForm.email")
+            .doesNotContain("window.google?.accounts.id");
     }
 
     @Test
@@ -192,8 +181,7 @@ class PublicBookingUiValidationTest {
             .contains("WhatsApp")
             .contains("context.store.googleMapUrl")
             .contains("context.store.shareContactPhone")
-            .contains("emailAuthEnabled")
-            .contains("门店尚未配置顾客登录方式，请联系门店");
+            .contains("CustomerPasswordLogin");
 
         assertThat(publicBookingTypeSource)
             .contains("shareEmail: string | null")

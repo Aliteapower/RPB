@@ -1,0 +1,29 @@
+/* RPB shell integration; accounting behavior stays in the existing composable. */
+.daily-ledger { min-height:100vh; }
+#app:has(>.daily-ledger)>.frontend-locale-switcher { display:none; }
+.daily-ledger .platform-tools .frontend-locale-switcher { position:static; box-shadow:none; padding:2px; border-color:var(--line); background:transparent; }
+.daily-ledger .platform-tools .frontend-locale-switcher__button { font-size:10px; height:25px; min-width:30px; padding:0 6px; }
+.daily-ledger .topbar .store-switcher { max-width:210px; }
+.daily-ledger .record-inputs { padding:0; margin:0; border:0; min-width:0; }
+.daily-ledger .money-input { display:block; margin-top:9px; }
+.daily-ledger .payment-item label { margin-bottom:0; }
+.daily-ledger .field-time { overflow:hidden; text-overflow:ellipsis; }
+.daily-ledger .expense-row { grid-template-columns:minmax(100px,1fr) minmax(110px,1.5fr) 25px; }
+.daily-ledger .expense-row .payment-item label { margin-bottom:0; }
+.daily-ledger .expense-row .payment-item .note-input { height:28px; font-size:10px; margin-top:4px; }
+.daily-ledger .withdrawal-row { grid-template-columns:minmax(0,1fr) 25px; padding:0 24px 17px; }
+.daily-ledger .ledger-error { background:#fff0eb; border:1px solid #e8c3b7; padding:16px; margin:16px 0; color:#963e2b; border-radius:8px; font-size:12px; line-height:1.8; }
+.daily-ledger .ledger-error button { margin-top:10px; }
+.daily-ledger pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:400px; overflow:auto; font-size:11px; padding:14px; }
+.daily-ledger .history-empty { line-height:1.8; }
+.daily-ledger .nav-item { text-decoration:none; }
+@media(max-width:760px) {
+  .daily-ledger .sidebar .brand { max-width:calc(100% - 105px); }
+  .daily-ledger .topbar { height:auto; min-height:43px; gap:8px; padding:8px 17px; }
+  .daily-ledger .topbar .platform-tools { gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+  .daily-ledger .topbar .store-switcher { max-width:140px; }
+  .daily-ledger .topbar .live-dot { display:none; }
+  .daily-ledger .expense-row { grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 25px; }
+  .daily-ledger .withdrawal-row { grid-template-columns:minmax(0,1fr) 25px; padding:0 16px 17px; }
+  .daily-ledger .mobile-save { left:0; }
+}

@@ -13,8 +13,13 @@ record ProductSubscriptionMutationRequest(
     String currency,
     String paymentNote,
     Integer durationCount,
-    Integer version
+    Integer version,
+    java.util.List<java.util.UUID> storeIds
 ) {
+    ProductSubscriptionMutationRequest(String idempotencyKey,String appKey,String billingCycle,
+        OffsetDateTime currentPeriodStart,OffsetDateTime currentPeriodEnd,BigDecimal amount,String currency,String paymentNote,Integer durationCount,Integer version) {
+        this(idempotencyKey,appKey,billingCycle,currentPeriodStart,currentPeriodEnd,amount,currency,paymentNote,durationCount,version,null);
+    }
 }
 
 record ProductSubscriptionStatusRequest(

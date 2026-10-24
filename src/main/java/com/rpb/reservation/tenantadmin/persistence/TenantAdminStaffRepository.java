@@ -21,6 +21,11 @@ public class TenantAdminStaffRepository {
     private static final String STAFF_ACCOUNT_TYPE = "staff";
     private static final String TENANT_ADMIN = "tenant_admin";
     private static final List<String> STAFF_PERMISSIONS = List.of(
+        "wallet.view",
+        "wallet.topup.create",
+        "wallet.charge.create",
+        "daily_ledger.view",
+        "daily_ledger.write",
         "reservation.create",
         "reservation.check_in",
         "reservation.seat",
@@ -38,6 +43,9 @@ public class TenantAdminStaffRepository {
         "table.view",
         "table.switch",
         "customer.lookup",
+        "payment.intent.view",
+        "payment.intent.create",
+        "payment.proof.review",
         "walkin.direct_seating.create",
         "walkin.queue.create",
         "cleaning.start",

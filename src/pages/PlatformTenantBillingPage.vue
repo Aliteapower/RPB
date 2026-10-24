@@ -9,10 +9,12 @@ import {
   listProductLines,
   listTenantProductSubscriptions,
   purchaseProductSubscription,
-  renewProductSubscriptionItem
+  renewProductSubscriptionItem,
+  addSubscriptionStores
 } from '../api/platformProductLineBillingApi'
 import { listTenantStores, type PlatformStore } from '../api/platformApi'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
+import { walletBillingWarning } from '../components/platform/storeBillingEligibility'
 import type {
   PlatformProductLine,
   ProductBillingCycle,
@@ -33,6 +35,8 @@ const saving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const selectedStoreItemId = ref<string | null>(null)
+const walletStoreIds = ref<string[]>([])
+const walletAddStores = ref(false)
 const form = reactive({
   appKey: 'reservation_queue',
   billingCycle: 'monthly' as ProductBillingCycle,
@@ -66,10 +70,13 @@ const selectedStoreItem = computed(() => {
 })
 const singleStoreRenewalMode = computed(() => (
   selectedSubscription.value !== null &&
+  !(form.appKey === 'wallet' && walletAddStores.value) &&
   selectedSubscription.value.billingCycle !== 'legacy_grant'
 ))
-const quoteStoreCount = computed(() => (singleStoreRenewalMode.value ? (selectedStoreItem.value ? 1 : 0) : activeBillableStoreCount.value))
-const billingDisabled = computed(() => (singleStoreRenewalMode.value ? selectedStoreItem.value === null : activeBillableStoreCount.value <= 0))
+const walletSelectableStores = computed(() => tenantStores.value.filter(store => store.status === 'active' && store.operatingEntityId && (!walletAddStores.value || !storeItemRows.value.some(item => item.storeId === store.id))))
+const quoteStoreCount = computed(() => (singleStoreRenewalMode.value ? (selectedStoreItem.value ? 1 : 0) : form.appKey === 'wallet' ? walletStoreIds.value.filter(id => walletSelectableStores.value.some(s => s.id === id)).length : activeBillableStoreCount.value))
+const billingDisabled = computed(() => quoteStoreCount.value <= 0 || (form.appKey === 'wallet' && selectedPrice.value?.status !== 'active'))
+const walletWarning = computed(() => walletBillingWarning(tenantStores.value, quoteStoreCount.value, walletSelectableStores.value.length, selectedPrice.value?.status === 'active'))
 const storeUnitAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
 const calculatedAmount = computed(() => storeUnitAmount.value * quoteStoreCount.value)
 const durationUnitLabel = computed(() => (
@@ -78,6 +85,7 @@ const durationUnitLabel = computed(() => (
     : t('platform.billing.units.month')
 ))
 const primaryActionLabel = computed(() => {
+  if (form.appKey === 'wallet' && walletAddStores.value) return t('wallet.addStores')
   const subscription = selectedSubscription.value
   if (!subscription) {
     return t('platform.billing.actions.purchase')
@@ -102,6 +110,7 @@ onMounted(() => {
 })
 
 watch(() => form.appKey, () => {
+  walletStoreIds.value = []; walletAddStores.value = false
   ensureSelectedStoreItem()
 })
 
@@ -143,6 +152,11 @@ async function submitSelectedProductMutation(): Promise<void> {
     await convertLegacyProduct(subscription)
     return
   }
+  if (form.appKey === 'wallet' && walletAddStores.value) {
+    const saved = await saveMutation(() => addSubscriptionStores(tenantId.value, subscription.id, mutationPayload(subscription.version)))
+    if(saved) { walletAddStores.value = false; walletStoreIds.value = [] }
+    return
+  }
   await renewSelectedProduct(subscription)
 }
 
@@ -170,9 +184,9 @@ async function convertLegacyProduct(subscription: TenantProductSubscription): Pr
   await saveMutation(() => convertLegacyProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
 }
 
-async function saveMutation(action: () => Promise<unknown>): Promise<void> {
+async function saveMutation(action: () => Promise<unknown>): Promise<boolean> {
   if (saving.value) {
-    return
+    return false
   }
   saving.value = true
   errorText.value = ''
@@ -181,8 +195,10 @@ async function saveMutation(action: () => Promise<unknown>): Promise<void> {
     await action()
     savedText.value = t('platform.billing.messages.saved')
     await loadBilling()
+    return true
   } catch (error) {
     errorText.value = apiErrorText(error)
+    return false
   } finally {
     saving.value = false
   }
@@ -190,6 +206,7 @@ async function saveMutation(action: () => Promise<unknown>): Promise<void> {
 
 function mutationPayload(version?: number, appKey = form.appKey) {
   return {
+    ...(appKey === 'wallet' ? { storeIds: singleStoreRenewalMode.value ? (selectedStoreItem.value?.storeId ? [selectedStoreItem.value.storeId] : []) : walletStoreIds.value.filter(id => walletSelectableStores.value.some(s => s.id === id)) } : {}),
     idempotencyKey: newIdempotencyKey(),
     appKey,
     billingCycle: form.billingCycle,
@@ -259,6 +276,10 @@ function formatAmount(value: number): string {
 function storeItemName(item: TenantProductSubscriptionItem): string {
   const name = item.storeName || item.storeCode || item.storeId?.slice(0, 8) || '-'
   return item.operatingEntityName ? `${name} / ${item.operatingEntityName}` : name
+}
+function storeItemStatus(item: TenantProductSubscriptionItem): string {
+  return form.appKey==='wallet' && item.status==='active' && item.currentPeriodEnd && Date.parse(item.currentPeriodEnd)<=Date.now()
+    ? t('platform.billing.status.expired') : item.status
 }
 
 function billingItemsForSubscription(subscription: TenantProductSubscription | null): TenantProductSubscription['items'] {
@@ -354,6 +375,9 @@ function apiErrorText(error: unknown): string {
               </option>
             </select>
           </label>
+          <label v-if="form.appKey === 'wallet' && selectedSubscription"><span><input v-model="walletAddStores" type="checkbox"> {{ $t('wallet.addStores') }}</span></label>
+          <section v-if="form.appKey === 'wallet' && !singleStoreRenewalMode"><h3>{{ $t('wallet.selectStores') }}</h3><label v-for="store in walletSelectableStores" :key="store.id"><span><input v-model="walletStoreIds" type="checkbox" :value="store.id"> {{ store.storeName }} · {{ store.storeCode }}</span></label></section>
+          <p v-if="form.appKey === 'wallet' && selectedPrice?.status !== 'active'" class="warning-text">{{ $t('wallet.priceRequired') }}</p>
           <section v-if="singleStoreRenewalMode" class="store-items" :aria-label="$t('platform.billing.storeItems.title')">
             <h3>{{ $t('platform.billing.storeItems.title') }}</h3>
             <p v-if="storeItemRows.length === 0" class="muted-text">{{ $t('platform.billing.storeItems.empty') }}</p>
@@ -368,7 +392,7 @@ function apiErrorText(error: unknown): string {
               >
                 <div>
                   <strong>{{ storeItemName(item) }}</strong>
-                  <small>{{ item.storeCode || '-' }} / {{ item.status }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
+                  <small>{{ item.storeCode || '-' }} / {{ storeItemStatus(item) }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
                 </div>
                 <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
               </button>
@@ -396,7 +420,8 @@ function apiErrorText(error: unknown): string {
             <span>{{ $t('platform.billing.form.storeCount') }}</span>
             <strong>{{ quoteStoreCount }}</strong>
           </div>
-          <p v-if="billingDisabled" class="warning-text">{{ $t('platform.billing.form.noBillableStores') }}</p>
+          <p v-if="billingDisabled" class="warning-text">{{ form.appKey === 'wallet' ? $t(`platform.billing.storeEligibility.${walletWarning}`) : $t('platform.billing.form.noBillableStores') }}</p>
+          <router-link v-if="form.appKey === 'wallet' && tenantStores.some(store => !store.operatingEntityId)" :to="{ name: 'platform-tenant-edit', params: { tenantId }, hash: '#tenant-structure' }">{{ $t('platform.billing.storeEligibility.manageStructure') }}</router-link>
           <div class="quote-summary">
             <span>{{ $t('platform.billing.form.storeUnitAmount') }}</span>
             <strong>{{ formatAmount(storeUnitAmount) }} {{ selectedCurrency }}</strong>

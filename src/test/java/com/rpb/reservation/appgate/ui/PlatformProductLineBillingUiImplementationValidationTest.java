@@ -158,8 +158,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
 
         assertThat(productLineCatalog)
             .contains("defaultEntryRouteOptions")
-            .contains("platform.productLines.entryRoutes.none.label")
-            .contains("/stores/:storeId/staff")
+            .contains("main/resources/product-line-entries.json")
             .contains("normalizeProductLineAppKey")
             .contains("isProductLineAppKeyValid");
 

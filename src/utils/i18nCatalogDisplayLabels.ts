@@ -9,7 +9,8 @@ const namespaceLabelKeys: Record<string, string> = {
   reservation_share: 'i18nCatalog.namespaces.reservation_share',
   queue: 'i18nCatalog.namespaces.queue',
   call_screen: 'i18nCatalog.namespaces.call_screen',
-  reservation_meal_period: 'i18nCatalog.namespaces.reservation_meal_period'
+  reservation_meal_period: 'i18nCatalog.namespaces.reservation_meal_period',
+  payment: 'i18nCatalog.namespaces.payment'
 }
 
 const categoryLabelKeys: Record<string, string> = {
@@ -23,7 +24,8 @@ const categoryLabelKeys: Record<string, string> = {
   template: 'i18nCatalog.categories.template',
   display: 'i18nCatalog.categories.display',
   display_name: 'i18nCatalog.categories.display_name',
-  restaurant_default: 'i18nCatalog.categories.restaurant_default'
+  restaurant_default: 'i18nCatalog.categories.restaurant_default',
+  quick_pay: 'i18nCatalog.categories.quick_pay'
 }
 
 const textKindLabelKeys: Record<string, string> = {

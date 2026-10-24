@@ -13,8 +13,14 @@ public record ProductSubscriptionCommand(
     String currency,
     String paymentNote,
     Integer durationCount,
-    Integer version
+    Integer version,
+    java.util.List<java.util.UUID> storeIds
 ) {
+    public ProductSubscriptionCommand(String idempotencyKey,String appKey,String billingCycle,
+        OffsetDateTime currentPeriodStart,OffsetDateTime currentPeriodEnd,BigDecimal amount,String currency,
+        String paymentNote,Integer durationCount,Integer version) {
+        this(idempotencyKey,appKey,billingCycle,currentPeriodStart,currentPeriodEnd,amount,currency,paymentNote,durationCount,version,null);
+    }
     public ProductSubscriptionCommand(
         String idempotencyKey,
         String appKey,

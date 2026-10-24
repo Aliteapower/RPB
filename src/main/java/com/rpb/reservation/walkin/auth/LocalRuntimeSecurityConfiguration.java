@@ -42,6 +42,64 @@ public class LocalRuntimeSecurityConfiguration {
         return http
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/collection-methods").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/wallet/collection-methods").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/transactions","/api/v1/stores/*/wallet/transactions/*/*","/api/v1/public/stores/*/wallet/transactions","/api/v1/public/stores/*/wallet/transactions/*/*").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/personal-scan-charges/result","/api/v1/public/stores/*/wallet/personal-payment-consent").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/personal-scan-charges/reconcile","/api/v1/stores/*/wallet/personal-scan-charges","/api/v1/public/stores/*/wallet/personal-payment-consent","/api/v1/public/stores/*/wallet/personal-codes","/api/v1/public/stores/*/wallet/personal-codes/status").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/collection-proofs/*/*/submitted","/api/v1/stores/*/wallet/collection-proofs/*/*/context","/api/v1/stores/*/wallet/collection-proofs/*/*","/api/v1/stores/*/wallet/collection-proofs/images/*").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/collection-proofs/*/*/scan").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/public/stores/*/wallet/collection-proofs/*/*/context","/api/v1/public/stores/*/wallet/collection-proofs/*/*/paynow","/api/v1/public/stores/*/wallet/collection-proofs/*/*","/api/v1/public/stores/*/wallet/collection-proofs/images/*").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/public/stores/*/wallet/collection-proofs/*/*/submit").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/collection-profile","/api/v1/stores/*/wallet/context","/api/v1/stores/*/wallet/customers/*","/api/v1/stores/*/wallet/customers/*/accounts","/api/v1/stores/*/wallet/logo/*","/api/v1/stores/*/wallet/collection-exceptions","/api/v1/stores/*/wallet/customers","/api/v1/stores/*/wallet/accounts/*","/api/v1/stores/*/wallet/topups/*","/api/v1/stores/*/wallet/topups/*/paynow","/api/v1/stores/*/wallet/bills/*","/api/v1/stores/*/wallet/bills/*/paynow","/api/v1/stores/*/wallet/refunds/*","/api/v1/stores/*/wallet/reconciliation").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/wallet/collection-profile","/api/v1/stores/*/wallet/program").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/scan-charges","/api/v1/stores/*/wallet/payment-codes/resolve","/api/v1/stores/*/wallet/collection-exceptions","/api/v1/stores/*/wallet/accounts","/api/v1/stores/*/wallet/topups","/api/v1/stores/*/wallet/topups/*/confirm","/api/v1/stores/*/wallet/topups/*/cancel","/api/v1/stores/*/wallet/bills","/api/v1/stores/*/wallet/bills/*/code","/api/v1/stores/*/wallet/bills/*/bind-code","/api/v1/stores/*/wallet/bills/*/collections","/api/v1/stores/*/wallet/bills/*/cancel","/api/v1/stores/*/wallet/refunds","/api/v1/stores/*/wallet/refunds/*/confirm","/api/v1/stores/*/wallet/refunds/*/cancel").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/public/stores/*/wallet/me","/api/v1/public/stores/*/wallet/bills/*","/api/v1/public/stores/*/wallet/logo/*","/api/v1/public/stores/*/wallet/pending-bills").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/public/stores/*/wallet/payment-codes/status","/api/v1/public/stores/*/wallet/payment-codes","/api/v1/public/stores/*/wallet/bill-code","/api/v1/public/stores/*/wallet/bills/*/quote","/api/v1/public/stores/*/wallet/bills/*/pay").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/points-redemptions/*","/api/v1/public/stores/*/wallet/points-redemptions/*").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/points-redemptions","/api/v1/stores/*/wallet/points-redemptions/*/code","/api/v1/stores/*/wallet/points-redemptions/*/cancel","/api/v1/public/stores/*/wallet/points-redemption-code","/api/v1/public/stores/*/wallet/points-redemptions/*/confirm").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/merchant-orders/*","/api/v1/public/stores/*/wallet/merchant-orders/*").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/merchant-orders","/api/v1/stores/*/wallet/merchant-orders/*/code","/api/v1/stores/*/wallet/merchant-orders/*/cancel","/api/v1/public/stores/*/wallet/merchant-order-code","/api/v1/public/stores/*/wallet/merchant-orders/*/confirm").permitAll()
+                // Exact method/path additions; wallet use cases still enforce session, scope and App Gate.
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/stores/*/wallet/marketing/settings",
+                    "/api/v1/stores/*/wallet/marketing/campaigns",
+                    "/api/v1/stores/*/wallet/marketing/campaigns/*",
+                    "/api/v1/stores/*/wallet/topup-offers",
+                    "/api/v1/stores/*/wallet/accounts/*/funding-lots",
+                    "/api/v1/stores/*/wallet/points/context",
+                    "/api/v1/stores/*/wallet/customers/*/points").permitAll()
+                .requestMatchers(HttpMethod.PUT,
+                    "/api/v1/stores/*/wallet/marketing/settings",
+                    "/api/v1/stores/*/wallet/marketing/campaigns/*/draft").permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/stores/*/wallet/marketing/campaigns",
+                    "/api/v1/stores/*/wallet/marketing/campaigns/*/publish",
+                    "/api/v1/stores/*/wallet/marketing/campaigns/*/disable",
+                    "/api/v1/stores/*/wallet/marketing/campaigns/*/archive",
+                    "/api/v1/stores/*/wallet/topup-quotes",
+                    "/api/v1/stores/*/wallet/customer-codes/resolve",
+                    "/api/v1/stores/*/wallet/charge-previews",
+                    "/api/v1/stores/*/wallet/refund-previews",
+                    "/api/v1/stores/*/wallet/funding-lots/*/exit-bonus",
+                    "/api/v1/stores/*/wallet/customers/*/points/grants",
+                    "/api/v1/stores/*/wallet/customers/*/points/deductions",
+                    "/api/v1/stores/*/wallet/customers/*/points/redemptions",
+                    "/api/v1/stores/*/wallet/points/entries/*/reverse").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/public/stores/*/wallet/topup-offers",
+                    "/api/v1/public/stores/*/wallet/topups/*",
+                    "/api/v1/public/stores/*/wallet/topups/*/paynow",
+                    "/api/v1/public/stores/*/wallet/points").permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/public/stores/*/wallet/topup-quotes",
+                    "/api/v1/public/stores/*/wallet/customer-codes",
+                    "/api/v1/public/stores/*/wallet/topups",
+                    "/api/v1/public/stores/*/wallet/topups/*/declare-paid",
+                    "/api/v1/public/stores/*/wallet/topups/*/cancel").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/platform/tenants/*/product-subscriptions/quote","/api/v1/platform/tenants/*/product-subscriptions/*/add-stores").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/daily-ledger/settings", "/api/v1/stores/*/daily-ledger/days/*", "/api/v1/stores/*/daily-ledger/history", "/api/v1/stores/*/daily-ledger/years", "/api/v1/stores/*/daily-ledger/audit").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/v1/stores/*/daily-ledger/settings", "/api/v1/stores/*/daily-ledger/days/*/records/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/me/apps").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/walk-ins/direct-seating").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/stores/*/walk-ins/queue").permitAll()

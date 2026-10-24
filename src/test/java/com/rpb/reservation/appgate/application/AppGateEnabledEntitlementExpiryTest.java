@@ -30,7 +30,8 @@ class AppGateEnabledEntitlementExpiryTest {
         PlatformAppJpaRepository platformApps = mock(PlatformAppJpaRepository.class);
         TenantAppEntitlementJpaRepository entitlements = mock(TenantAppEntitlementJpaRepository.class);
         StoreAppSettingJpaRepository storeSettings = mock(StoreAppSettingJpaRepository.class);
-        AppGateService service = new AppGateService(platformApps, entitlements, storeSettings);
+        AppGateService service = new AppGateService(platformApps, entitlements, storeSettings,
+            mock(com.rpb.reservation.appgate.persistence.repository.StoreAppSubscriptionRepository.class), java.time.Clock.systemUTC());
 
         when(platformApps.findByAppKey(APP_KEY)).thenReturn(Optional.of(PlatformAppEntity.of(
             UUID.randomUUID(),

@@ -5,6 +5,7 @@ import com.rpb.reservation.platformbilling.application.PlatformBillingServiceExc
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionCommand;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionService;
 import com.rpb.reservation.platformbilling.application.ProductSubscriptionStatusCommand;
+import com.rpb.reservation.platformbilling.application.SelectedStoreBillingService;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.util.UUID;
@@ -25,13 +26,18 @@ public class PlatformTenantProductSubscriptionController {
 
     private final ProductSubscriptionService subscriptionService;
     private final CurrentActorProvider currentActorProvider;
+    private final SelectedStoreBillingService selectedStores;
 
     public PlatformTenantProductSubscriptionController(
         ProductSubscriptionService subscriptionService,
         CurrentActorProvider currentActorProvider
     ) {
-        this.subscriptionService = subscriptionService;
-        this.currentActorProvider = currentActorProvider;
+        this(subscriptionService,currentActorProvider,null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public PlatformTenantProductSubscriptionController(ProductSubscriptionService subscriptionService,CurrentActorProvider currentActorProvider,SelectedStoreBillingService selectedStores) {
+        this.subscriptionService=subscriptionService;this.currentActorProvider=currentActorProvider;this.selectedStores=selectedStores;
     }
 
     @GetMapping
@@ -47,7 +53,7 @@ public class PlatformTenantProductSubscriptionController {
     ) {
         PlatformBillingOperator operator = requireOperator();
         return ResponseEntity.status(201).body(ProductSubscriptionResponse.from(
-            subscriptionService.purchase(tenantId, toCommand(request), operator)
+            request!=null && "wallet".equals(request.appKey()) ? selectedStores.purchase(tenantId,toCommand(request),operator) : subscriptionService.purchase(tenantId, toCommand(request), operator)
         ));
     }
 
@@ -59,7 +65,7 @@ public class PlatformTenantProductSubscriptionController {
     ) {
         PlatformBillingOperator operator = requireOperator();
         return ResponseEntity.ok(ProductSubscriptionResponse.from(
-            subscriptionService.renew(tenantId, subscriptionId, toCommand(request), operator)
+            request!=null && "wallet".equals(request.appKey()) ? selectedStores.renew(tenantId,subscriptionId,toCommand(request),operator) : subscriptionService.renew(tenantId, subscriptionId, toCommand(request), operator)
         ));
     }
 
@@ -72,8 +78,18 @@ public class PlatformTenantProductSubscriptionController {
     ) {
         PlatformBillingOperator operator = requireOperator();
         return ResponseEntity.ok(ProductSubscriptionResponse.from(
-            subscriptionService.renewItem(tenantId, subscriptionId, itemId, toCommand(request), operator)
+            request!=null && "wallet".equals(request.appKey()) ? selectedStores.renewItem(tenantId,subscriptionId,itemId,toCommand(request),operator) : subscriptionService.renewItem(tenantId, subscriptionId, itemId, toCommand(request), operator)
         ));
+    }
+
+    @PostMapping("/{subscriptionId}/add-stores")
+    public ResponseEntity<ProductSubscriptionResponse> addStores(@PathVariable UUID tenantId,@PathVariable UUID subscriptionId,@RequestBody ProductSubscriptionMutationRequest request) {
+        var operator=requireOperator();return ResponseEntity.ok(ProductSubscriptionResponse.from(selectedStores.addStores(tenantId,subscriptionId,toCommand(request),operator)));
+    }
+
+    @PostMapping("/quote")
+    public Object quote(@PathVariable UUID tenantId,@RequestBody ProductSubscriptionMutationRequest request) {
+        requireOperator();return selectedStores.quote(tenantId,toCommand(request));
     }
 
     @PostMapping("/{subscriptionId}/suspend")
@@ -146,7 +162,8 @@ public class PlatformTenantProductSubscriptionController {
             request.currency(),
             request.paymentNote(),
             request.durationCount(),
-            request.version()
+            request.version(),
+            request.storeIds()
         );
     }
 

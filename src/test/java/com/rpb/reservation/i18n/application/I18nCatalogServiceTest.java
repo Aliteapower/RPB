@@ -39,6 +39,64 @@ class I18nCatalogServiceTest {
     }
 
     @Test
+    void tenantCatalogCanBeScopedToPaymentProductLine() {
+        FakeI18nCatalogRepository repository = new FakeI18nCatalogRepository();
+        repository.keys.add(key("payment.quick_pay.customer_scan_notice", true, List.of()));
+        repository.keys.add(key("queue.ticket.customer_notice", true, List.of("queueNo")));
+        repository.keys.add(key("reservation_share.message.template", true, List.of("guestName")));
+
+        I18nCatalogView view = new I18nCatalogService(repository).tenantCatalog(STORE_SCOPE, "payment");
+
+        assertThat(view.entries())
+            .extracting(entry -> entry.key().i18nKey())
+            .containsExactly("payment.quick_pay.customer_scan_notice");
+    }
+
+    @Test
+    void tenantCatalogCanBeScopedToReservationQueueProductLine() {
+        FakeI18nCatalogRepository repository = new FakeI18nCatalogRepository();
+        repository.keys.add(key("payment.quick_pay.customer_scan_notice", true, List.of()));
+        repository.keys.add(key("queue.ticket.customer_notice", true, List.of("queueNo")));
+        repository.keys.add(key("reservation_share.message.template", true, List.of("guestName")));
+
+        I18nCatalogView view = new I18nCatalogService(repository).tenantCatalog(STORE_SCOPE, "reservation_queue");
+
+        assertThat(view.entries())
+            .extracting(entry -> entry.key().i18nKey())
+            .containsExactly("queue.ticket.customer_notice", "reservation_share.message.template");
+    }
+
+    @Test
+    void tenantUpdateRejectsKeysOutsideRequestedProductLine() {
+        FakeI18nCatalogRepository repository = new FakeI18nCatalogRepository();
+        repository.keys.add(key("payment.quick_pay.customer_scan_notice", true, List.of()));
+        repository.keys.add(key("queue.ticket.customer_notice", true, List.of("queueNo")));
+
+        I18nCatalogService service = new I18nCatalogService(repository);
+
+        assertThatThrownBy(() -> service.updateTenantCatalog(
+            STORE_SCOPE,
+            "store",
+            "payment",
+            List.of(new I18nCatalogMessageCommand("queue.ticket.customer_notice", "zh-CN", "请 {{queueNo}} 入座", "active", null, false))
+        ))
+            .isInstanceOf(I18nCatalogServiceException.class)
+            .extracting("code")
+            .isEqualTo(I18nCatalogServiceErrorCode.KEY_NOT_ALLOWED);
+    }
+
+    @Test
+    void tenantCatalogRejectsUnknownProductLineScope() {
+        FakeI18nCatalogRepository repository = new FakeI18nCatalogRepository();
+        repository.keys.add(key("payment.quick_pay.customer_scan_notice", true, List.of()));
+
+        assertThatThrownBy(() -> new I18nCatalogService(repository).tenantCatalog(STORE_SCOPE, "unknown_line"))
+            .isInstanceOf(I18nCatalogServiceException.class)
+            .extracting("code")
+            .isEqualTo(I18nCatalogServiceErrorCode.REQUEST_INVALID);
+    }
+
+    @Test
     void tenantUpdateRejectsKeysThatAreNotTenantEditable() {
         FakeI18nCatalogRepository repository = new FakeI18nCatalogRepository();
         repository.keys.add(key("status.reservation.confirmed", false, List.of()));

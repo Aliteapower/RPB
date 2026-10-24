@@ -37,6 +37,14 @@ public class CustomerProfileResolver {
                 phone,
                 email
             ));
+        if (phone.isPresent()) {
+            if (command.customerId() != null && customer.phone().isPresent() && !customer.phone().equals(phone)) {
+                throw new CustomerManagementException(CustomerManagementError.CUSTOMER_PHONE_CONFLICT);
+            }
+            customerRepository.findByPhone(scope, phone)
+                .filter(other -> !other.id().equals(customer.id()))
+                .ifPresent(other -> { throw new CustomerManagementException(CustomerManagementError.CUSTOMER_PHONE_CONFLICT); });
+        }
         Customer refreshed = customer.refreshProfile(
             phone,
             command.displayName(),

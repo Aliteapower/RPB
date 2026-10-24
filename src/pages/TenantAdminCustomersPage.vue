@@ -1,246 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-
-import {
-  archiveCustomer,
-  createCustomer,
-  listCustomers,
-  TenantAdminApiError,
-  type TenantAdminCustomer,
-  type TenantAdminCustomerMutation,
-  type TenantAdminPage,
-  updateCustomer
-} from '../api/tenantAdminApi'
-import CountryPhoneField from '../components/common/CountryPhoneField.vue'
+import { useI18n } from 'vue-i18n'
+import CustomerProfileFields from '../modules/customers/CustomerProfileFields.vue'
+import CustomerRegistrationEntry from '../modules/customers/CustomerRegistrationEntry.vue'
+import CustomerPrivacyRecords from '../modules/customers/CustomerPrivacyRecords.vue'
 import ErpPagination from '../components/erp/ErpPagination.vue'
 import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useGeneratedText } from '../i18n/generatedText'
-import { useAuthSessionStore } from '../stores/authSession'
-
-const { gt } = useGeneratedText()
-
-const route = useRoute()
-const auth = useAuthSessionStore()
-const customers = ref<TenantAdminCustomer[]>([])
-const loading = ref(false)
-const saving = ref(false)
-const archivingId = ref('')
-const errorText = ref('')
-const successText = ref('')
-const keyword = ref('')
-const limit = ref(20)
-const offset = ref(0)
-const page = ref<TenantAdminPage>({
-  limit: 20,
-  offset: 0,
-  total: 0
-})
-const editorOpen = ref(false)
-const editingCustomer = ref<TenantAdminCustomer | null>(null)
-const form = reactive({
-  displayName: '',
-  nickname: '',
-  phoneE164: '',
-  email: ''
-})
-
-const storeId = computed(() => String(route.params.storeId || ''))
-const hasDirtyQuery = computed(() => keyword.value.trim() !== '')
-const hasPhoneCount = computed(() => customers.value.filter(item => Boolean(item.phoneE164)).length)
-const hasEmailCount = computed(() => customers.value.filter(item => Boolean(item.email)).length)
-const safePage = computed<TenantAdminPage>(() => page.value ?? {
-  limit: limit.value,
-  offset: offset.value,
-  total: customers.value.length
-})
-const actionDisabled = computed(() => loading.value || saving.value || archivingId.value !== '')
-
-onMounted(() => {
-  void loadCustomers()
-  window.addEventListener('focus', refreshVisibleCustomers)
-  document.addEventListener('visibilitychange', refreshVisibleCustomers)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('focus', refreshVisibleCustomers)
-  document.removeEventListener('visibilitychange', refreshVisibleCustomers)
-})
-
-async function loadCustomers(nextOffset = offset.value): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
-    const response = await listCustomers(storeId.value, {
-      keyword: keyword.value,
-      limit: limit.value,
-      offset: nextOffset
-    })
-    customers.value = response.customers
-    page.value = response.page
-    offset.value = response.page.offset
-  } catch (error) {
-    errorText.value = apiErrorText(error)
-  } finally {
-    loading.value = false
-  }
-}
-
-function searchCustomers(): void {
-  offset.value = 0
-  void loadCustomers(0)
-}
-
-function resetFilters(): void {
-  keyword.value = ''
-  offset.value = 0
-  void loadCustomers(0)
-}
-
-function refreshVisibleCustomers(): void {
-  if (document.visibilityState !== 'visible' || editorOpen.value || actionDisabled.value) {
-    return
-  }
-  void loadCustomers()
-}
-
-function openCreateEditor(): void {
-  editingCustomer.value = null
-  resetForm()
-  errorText.value = ''
-  successText.value = ''
-  editorOpen.value = true
-}
-
-function openEditEditor(item: TenantAdminCustomer): void {
-  editingCustomer.value = item
-  form.displayName = item.displayName || ''
-  form.nickname = item.nickname || ''
-  form.phoneE164 = item.phoneE164 || ''
-  form.email = item.email || ''
-  errorText.value = ''
-  successText.value = ''
-  editorOpen.value = true
-}
-
-function closeEditor(): void {
-  editorOpen.value = false
-  editingCustomer.value = null
-  resetForm()
-}
-
-async function submitCustomer(): Promise<void> {
-  if (saving.value) {
-    return
-  }
-
-  const payload = customerPayload()
-  if (!payload.displayName && !payload.phoneE164 && !payload.email) {
-    errorText.value = gt('generated.tenant-admin-customers.035')
-    return
-  }
-
-  saving.value = true
-  errorText.value = ''
-  successText.value = ''
-  const reloadOffset = editingCustomer.value ? offset.value : 0
-  try {
-    if (editingCustomer.value) {
-      await updateCustomer(storeId.value, editingCustomer.value.id, payload)
-    } else {
-      await createCustomer(storeId.value, payload)
-      offset.value = 0
-    }
-    closeEditor()
-    await loadCustomers(reloadOffset)
-    successText.value = gt('generated.tenant-admin-customers.038')
-  } catch (error) {
-    errorText.value = apiErrorText(error)
-  } finally {
-    saving.value = false
-  }
-}
-
-async function archiveCustomerRecord(item: TenantAdminCustomer): Promise<void> {
-  if (archivingId.value) {
-    return
-  }
-  if (!window.confirm(gt('generated.tenant-admin-customers.036'))) {
-    return
-  }
-
-  archivingId.value = item.id
-  errorText.value = ''
-  successText.value = ''
-  try {
-    await archiveCustomer(storeId.value, item.id)
-    const nextOffset = customers.value.length === 1 && offset.value > 0
-      ? Math.max(0, offset.value - limit.value)
-      : offset.value
-    await loadCustomers(nextOffset)
-    successText.value = gt('generated.tenant-admin-customers.037')
-  } catch (error) {
-    errorText.value = apiErrorText(error)
-  } finally {
-    archivingId.value = ''
-  }
-}
-
-function resetForm(): void {
-  form.displayName = ''
-  form.nickname = ''
-  form.phoneE164 = ''
-  form.email = ''
-}
-
-function customerPayload(): TenantAdminCustomerMutation {
-  return {
-    displayName: blankToNull(form.displayName),
-    nickname: blankToNull(form.nickname),
-    phoneE164: blankToNull(form.phoneE164),
-    email: blankToNull(form.email)
-  }
-}
-
-function blankToNull(value: string): string | null {
-  const text = value.trim()
-  return text === '' ? null : text
-}
-
-function displayValue(value: string | null): string {
-  return value?.trim() ? value : '-'
-}
-
-function statusLabel(status: string): string {
-  return status === 'active' ? gt('generated.tenant-admin-customers.019') : status
-}
-
-function apiErrorText(error: unknown): string {
-  if (!(error instanceof TenantAdminApiError)) {
-    return gt('generated.tenant-admin-customers.029')
-  }
-  if (error.status === 401) {
-    auth.clear()
-    return gt('generated.tenant-admin-customers.030')
-  }
-  if (error.response.error.code === 'STORE_SCOPE_MISMATCH') {
-    return gt('generated.tenant-admin-customers.031')
-  }
-  if (error.response.error.code === 'FORBIDDEN') {
-    return gt('generated.tenant-admin-customers.032')
-  }
-  if (error.response.error.code === 'CUSTOMER_PHONE_CONFLICT') {
-    return gt('generated.tenant-admin-customers.033')
-  }
-  if (error.response.error.code === 'CUSTOMER_NOT_FOUND') {
-    return gt('generated.tenant-admin-customers.034')
-  }
-  if (error.response.error.code === 'REQUEST_INVALID') {
-    return gt('generated.tenant-admin-customers.035')
-  }
-  return gt('generated.tenant-admin-customers.029')
-}
+import { customerManagementReturnTarget } from '../modules/wallet/customerManagementNavigation'
+import { useCustomerManagement } from '../modules/customers/useCustomerManagement'
+const {gt}=useGeneratedText(),{t}=useI18n(),route=useRoute()
+const storeId=computed(()=>String(route.params.storeId||''))
+const walletReturnTarget=computed(()=>customerManagementReturnTarget(storeId.value,route.query.from))
+const {privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords,canSubmit,customers,loading,saving,archivingId,errorText,successText,keyword,safePage,editorOpen,editingCustomer,form,actionDisabled,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord}=useCustomerManagement(storeId,{keyword:typeof route.query.keyword==='string'?route.query.keyword:'',create:route.query.create==='1'})
+function displayValue(value:string|null){return value?.trim()?value:'-'}
+function statusLabel(status:string){return status==='active'?gt('generated.tenant-admin-customers.019'):status}
 </script>
 
 <template>
@@ -253,7 +29,10 @@ function apiErrorText(error: unknown): string {
           <span>{{ gt('generated.tenant-admin-customers.001') }}</span>
           <h1>{{ gt('generated.tenant-admin-customers.002') }}</h1>
         </div>
+        <RouterLink v-if="walletReturnTarget" :to="walletReturnTarget">{{t(route.query.from==='wallet-recharge'?'wallet.operation.backRecharge':'wallet.operation.backWallet')}}</RouterLink>
       </header>
+
+      <CustomerRegistrationEntry :store="storeId" /><p class="shared-customer-note">{{ t('customerAuth.sharedHint') }}</p>
 
       <ErpQueryToolbar
         v-model:keyword="keyword"
@@ -315,7 +94,7 @@ function apiErrorText(error: unknown): string {
                     </span>
                   </td>
                   <td>
-                    <div class="row-actions">
+                    <div class="row-actions"><button type="button" class="link-button" :disabled="actionDisabled" @click="openPrivacyRecords(item)">{{gt('generated.tenant-admin-customers.040')}}</button>
                       <button type="button" class="link-button" :disabled="actionDisabled" @click="openEditEditor(item)">
                         {{ gt('generated.tenant-admin-customers.017') }}
                       </button>
@@ -343,7 +122,7 @@ function apiErrorText(error: unknown): string {
           />
         </div>
 
-        <aside v-if="editorOpen" class="editor-panel" :aria-label="gt('generated.tenant-admin-customers.020')">
+        <CustomerPrivacyRecords v-if="privacyCustomer" :customer="privacyCustomer" :records="privacyRecords" :loading="privacyLoading" @close="privacyCustomer=null" /><aside v-if="editorOpen" class="editor-panel" :aria-label="gt('generated.tenant-admin-customers.020')">
           <form class="customer-form" @submit.prevent="submitCustomer">
             <header class="editor-heading">
               <span>{{ editingCustomer ? gt('generated.tenant-admin-customers.022') : gt('generated.tenant-admin-customers.021') }}</span>
@@ -352,37 +131,13 @@ function apiErrorText(error: unknown): string {
               </button>
             </header>
 
-            <label>
-              <span>{{ gt('generated.tenant-admin-customers.009') }} <small>{{ gt('generated.tenant-admin-customers.023') }}</small></span>
-              <input v-model.trim="form.displayName" name="displayName" autocomplete="name" />
-            </label>
-
-            <label>
-              <span>{{ gt('generated.tenant-admin-customers.010') }} <small>{{ gt('generated.tenant-admin-customers.023') }}</small></span>
-              <select v-model="form.nickname" name="nickname">
-                <option value="">{{ gt('generated.tenant-admin-customers.023') }}</option>
-                <option value="先生">{{ gt('generated.tenant-admin-customers.024') }}</option>
-                <option value="女士">{{ gt('generated.tenant-admin-customers.025') }}</option>
-              </select>
-            </label>
-
-            <CountryPhoneField
-              v-model="form.phoneE164"
-              :label="gt('generated.tenant-admin-customers.011')"
-              name="phoneE164"
-              model-format="e164"
-            />
-
-            <label>
-              <span>{{ gt('generated.tenant-admin-customers.012') }} <small>{{ gt('generated.tenant-admin-customers.023') }}</small></span>
-              <input v-model.trim="form.email" name="email" type="email" autocomplete="email" />
-            </label>
+            <CustomerProfileFields :form="form" :disabled="saving" :show-privacy="!editingCustomer" v-model:privacy-accepted="privacyAccepted" :privacy-notice="privacyNotice" :notice-loading="noticeLoading" @reload-notice="loadPrivacyNotice" />
 
             <div class="form-actions">
               <button class="secondary-button" type="button" :disabled="saving" @click="closeEditor">
                 {{ gt('generated.tenant-admin-customers.028') }}
               </button>
-              <button class="primary-button" type="submit" :disabled="saving">
+              <button class="primary-button" type="submit" :disabled="!canSubmit">
                 {{ saving ? gt('generated.tenant-admin-customers.026') : gt('generated.tenant-admin-customers.027') }}
               </button>
             </div>

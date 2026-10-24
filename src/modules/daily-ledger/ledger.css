@@ -1,0 +1,6 @@
+@import './theme/base.css';
+@import './theme/shell.css';
+@import './theme/record.css';
+@import './theme/history.css';
+@import './theme/settings.css';
+@import './theme/platform.css';
