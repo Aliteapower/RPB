@@ -29,7 +29,7 @@ public class WalletOfflineCollectionAdapter implements WalletCollectionPort {
     }
     public String paynowQr(StoreScope scope,long cents,UUID source) {
         if(!paynow.configured(scope)) throw WalletException.conflict("门店未配置 PayNow");
-        return paynow.preview(scope,cents,"W"+source.toString().replace("-","").substring(0,20));
+        return paynow.preview(scope,cents,WalletPayNowReference.forSource(source));
     }
     public String canonicalRecoveryAccount(StoreScope scope,String channel,String account,String terminal) {
         if(!"paynow".equals(WalletMoney.channelType(channel)))return canonicalAccount(scope,channel,account,terminal);

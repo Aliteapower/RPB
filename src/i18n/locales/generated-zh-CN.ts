@@ -1543,6 +1543,7 @@ export const generatedZhCN: Record<string, string> = {
   "generated.payment-quick-pay.080": "收银员",
   "generated.payment-quick-pay.081": "创建时间",
   "generated.payment-quick-pay.082": "Session",
+  "generated.payment-proof-review.invalidImage": "请选择支持的图片格式，且图片不超过80MB",
   "generated.payment-proof-review.001": "门店 {shortId}",
   "generated.payment-proof-review.002": "默认门店",
   "generated.payment-proof-review.003": "回单校验",

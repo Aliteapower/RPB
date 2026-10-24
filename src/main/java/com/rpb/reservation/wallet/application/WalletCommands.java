@@ -10,7 +10,10 @@ public final class WalletCommands {
         public TopupCreate(UUID account,String amount,String channel,String key){this(account,amount,channel,key,null);}
     }
     public record CollectionConfirm(String channel,String amount,String collectionAccount,String receiptReference,
-                                    String terminalCode,String note,boolean verified,String idempotencyKey) {}
+                                    String terminalCode,String note,boolean verified,String idempotencyKey,
+                                    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) UUID proofId) {
+        public CollectionConfirm(String channel,String amount,String collectionAccount,String receiptReference,String terminalCode,String note,boolean verified,String idempotencyKey){this(channel,amount,collectionAccount,receiptReference,terminalCode,note,verified,idempotencyKey,null);}
+    }
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     public record BillCreate(UUID accountId,String amount,String idempotencyKey,String customerCode) {
         public BillCreate(UUID accountId,String amount,String idempotencyKey) {this(accountId,amount,idempotencyKey,null);}

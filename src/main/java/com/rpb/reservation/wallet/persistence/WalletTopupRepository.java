@@ -35,6 +35,7 @@ public class WalletTopupRepository {
         parameters.add(query.offset());
         return jdbc.query("select * from wallet_topups where tenant_id=? and store_id=?"+filter+" order by created_at desc,id limit 100 offset ?",(rs,n)->row(rs),parameters.toArray());
     }
+    public void declarePaid(StoreScope s,UUID id){jdbc.update("update wallet_topups set customer_declared_paid_at=coalesce(customer_declared_paid_at,now()),version=version+case when customer_declared_paid_at is null then 1 else 0 end,updated_at=now() where tenant_id=? and store_id=? and id=? and status='pending_collection'",s.tenantId().value(),s.storeId().value(),id);}
     public void status(StoreScope scope,UUID id,String status) {
         jdbc.update("update wallet_topups set status=?,credited_at=case when ?='credited' then coalesce(credited_at,now()) else credited_at end,version=version+1,updated_at=now() where tenant_id=? and store_id=? and id=?",status,status,scope.tenantId().value(),scope.storeId().value(),id);
     }

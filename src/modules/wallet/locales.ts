@@ -1,3 +1,4 @@
+import {proofZh,proofEn} from './proof/locales'
 import {merchantQrZh,merchantQrEn} from './merchantQrLocales'
 import {transactionsZh,transactionsEn} from './transactions/locales'
 import { marketingZh, marketingEn } from './marketingLocales'
@@ -9,6 +10,7 @@ import { personalZh,personalEn } from './personalLocales'
 import {settingsZh,settingsEn} from './settingsLocales'
 import {operationZh,operationEn} from './operationLocales'
 export const walletZh = {
+  proof:proofZh,
   operation:operationZh,
   settingsUi: settingsZh,
   merchantQr:merchantQrZh,
@@ -59,6 +61,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  proof:proofEn,
   operation:operationEn,
   settingsUi: settingsEn,
   merchantQr:merchantQrEn,

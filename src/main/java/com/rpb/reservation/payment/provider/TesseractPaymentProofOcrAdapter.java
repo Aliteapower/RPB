@@ -23,8 +23,8 @@ import org.springframework.stereotype.Component;
 public class TesseractPaymentProofOcrAdapter implements PaymentProofOcrAdapter {
     private static final List<String> PAGE_SEGMENTATION_MODES = List.of("6", "11", "4");
     private static final Pattern AMOUNT_PATTERN = Pattern.compile(
-        "(?:SGD|S\\$|\\$)\\s*([0-9OoIl]{1,3}(?:,[0-9OoIl]{3})*(?:[.,][0-9OoIl]{1,2})?)|"
-            + "([0-9OoIl]{1,3}(?:,[0-9OoIl]{3})*(?:[.,][0-9OoIl]{1,2})?)\\s*(?:SGD|S6D|SG)",
+        "(?:SGD|S\\$|\\$)\\s*([0-9OoIl]{1,12}(?:,[0-9OoIl]{3})*(?:[.,][0-9OoIl]{1,2})?)|"
+            + "([0-9OoIl]{1,12}(?:,[0-9OoIl]{3})*(?:[.,][0-9OoIl]{1,2})?)\\s*(?:SGD|S6D|SG)",
         Pattern.CASE_INSENSITIVE
     );
     private static final List<String> SUCCESS_KEYWORDS = List.of(

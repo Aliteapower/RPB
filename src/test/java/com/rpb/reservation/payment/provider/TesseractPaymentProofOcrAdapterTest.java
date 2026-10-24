@@ -9,6 +9,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class TesseractPaymentProofOcrAdapterTest {
+    @Test void amountWithoutThousandsSeparatorIsNotTruncated(){
+        assertThat(TesseractPaymentProofOcrAdapter.extractAmount("SGD 1000.00",null)).contains(new BigDecimal("1000.00"));
+        assertThat(TesseractPaymentProofOcrAdapter.extractAmount("1000.00 SGD",null)).contains(new BigDecimal("1000.00"));
+    }
 
     @Test
     void parserExtractsOcbcChineseReceiptReferenceAndAmount() {

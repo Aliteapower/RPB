@@ -1543,6 +1543,7 @@ export const generatedEnSG: Record<string, string> = {
   "generated.payment-quick-pay.080": "Cashier",
   "generated.payment-quick-pay.081": "Created",
   "generated.payment-quick-pay.082": "Session",
+  "generated.payment-proof-review.invalidImage": "Choose a supported image no larger than 80MB",
   "generated.payment-proof-review.001": "Store {shortId}",
   "generated.payment-proof-review.002": "Default store",
   "generated.payment-proof-review.003": "Proof Review",

@@ -11,7 +11,10 @@ import static com.rpb.reservation.wallet.application.WalletCommands.*;
 public class WalletCollectionService {
     private final WalletCollectionRepository repository;
     private final WalletCollectionPort port;
-    public WalletCollectionService(WalletCollectionRepository repository,WalletCollectionPort port) {this.repository=repository;this.port=port;}
+    private final com.rpb.reservation.wallet.proof.WalletCollectionProofService proofs;
+    public WalletCollectionService(WalletCollectionRepository repository,WalletCollectionPort port) {this(repository,port,null);}
+    @org.springframework.beans.factory.annotation.Autowired
+    public WalletCollectionService(WalletCollectionRepository repository,WalletCollectionPort port,com.rpb.reservation.wallet.proof.WalletCollectionProofService proofs) {this.repository=repository;this.port=port;this.proofs=proofs;}
     public boolean paynowConfigured(StoreScope scope) {return port.paynowConfigured(scope);}
     public WalletViews.Collection confirm(StoreScope scope,UUID topup,UUID bill,long expected,CollectionConfirm c,UUID actor,List<String> channels) {
         return confirm(scope,topup,bill,expected,c,actor,channels,false);
@@ -24,6 +27,10 @@ public class WalletCollectionService {
             && (c.receiptReference()==null || c.receiptReference().isBlank());
         String receipt=cashTopupWithoutReceipt ? "CASH-TOPUP-"+topup : WalletMoney.text(c.receiptReference()).toUpperCase(Locale.ROOT);
         String note=Objects.toString(c.note(),"").trim();if(note.length()>500)throw WalletException.invalid();
-        return repository.confirm(scope,topup,bill,c.channel(),expected,account,receipt,terminal,note,actor,exception);
+        if("paynow".equals(WalletMoney.channelType(c.channel()))&&receipt.equalsIgnoreCase(WalletPayNowReference.forSource(topup!=null?topup:bill)))throw WalletException.conflict("系统付款参考号不能代替银行交易 Ref");
+        if(c.proofId()!=null){if(proofs==null||exception)throw WalletException.invalid();proofs.validate(scope,topup,bill,expected,c,account);}
+        var collection=repository.confirm(scope,topup,bill,c.channel(),expected,account,receipt,terminal,note,actor,exception);
+        if(c.proofId()!=null)proofs.bind(scope,collection,c,actor);
+        return collection;
     }
 }

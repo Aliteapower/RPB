@@ -9,7 +9,7 @@ export function walletApi(store: string, customer = false) {
   const base = `/api/v1/${customer ? 'public/' : ''}stores/${encodeURIComponent(store)}/wallet`
   async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
     const response = await fetch(base + path, { method, credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-RPB-Wallet': '1', 'X-RPB-Wallet-Model': 'components-v2' }, body: body === undefined ? undefined : JSON.stringify(body) })
+      headers: { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-RPB-Wallet': '1', 'X-RPB-Wallet-Model': 'components-v2' }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) })
     const result = await response.json().catch(() => ({})) as { code?: string; message?: string } & Record<string, unknown>
     if (!response.ok) throw new WalletApiError(response.status, result.code ?? 'WALLET_ERROR', result.message ?? `HTTP ${response.status}`,result)
     return result as T
@@ -27,5 +27,5 @@ export function walletApi(store: string, customer = false) {
     try { sessionStorage.removeItem(slot) } catch { /* no sensitive payload stored */ }
     return result
   }
-  return { get: <T>(path: string) => request<T>(path), post: <T>(path: string, body?: unknown) => request<T>(path, 'POST', body), command }
+  return { upload:<T>(path:string,body:FormData)=>request<T>(path,'POST',body), get: <T>(path: string) => request<T>(path), post: <T>(path: string, body?: unknown) => request<T>(path, 'POST', body), command }
 }

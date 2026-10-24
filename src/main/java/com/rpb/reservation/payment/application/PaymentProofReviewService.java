@@ -4,10 +4,7 @@ import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.payment.domain.PaymentReferencePattern;
 import com.rpb.reservation.payment.persistence.PaymentProofReviewRepository;
 import com.rpb.reservation.walkin.api.CurrentActor;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -180,22 +177,7 @@ public class PaymentProofReviewService {
     }
 
     private PaymentProofOcrFields extract(StoreScope scope, PaymentProofScanCommand command) {
-        Path tempFile = null;
-        try {
-            tempFile = Files.createTempFile("rpb-payment-proof-", suffix(command.originalFileName()));
-            Files.write(tempFile, command.fileBytes());
-            PaymentProofOcrFields fields = ocrAdapter.extract(tempFile, new PaymentProofOcrExpected(null, null));
-            return templateService == null ? fields : templateService.enhance(scope, fields);
-        } catch (IOException exception) {
-            throw new PaymentServiceException(PaymentServiceErrorCode.REQUEST_INVALID);
-        } finally {
-            if (tempFile != null) {
-                try {
-                    Files.deleteIfExists(tempFile);
-                } catch (IOException ignored) {
-                }
-            }
-        }
+        return new PaymentProofImageInspector(ocrAdapter,templateService).inspect(scope,command.fileBytes(),command.originalFileName());
     }
 
     private static PaymentProofScanCommand normalized(PaymentProofScanCommand command) {
@@ -243,15 +225,6 @@ public class PaymentProofReviewService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("sha_256_required", exception);
         }
-    }
-
-    private static String suffix(String fileName) {
-        String safe = trimLower(fileName);
-        if (safe == null || !safe.contains(".")) {
-            return ".img";
-        }
-        String suffix = safe.substring(safe.lastIndexOf('.'));
-        return suffix.matches("\\.[a-z0-9]{2,5}") ? suffix : ".img";
     }
 
     private static String trim(String value) {

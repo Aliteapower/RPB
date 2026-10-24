@@ -90,6 +90,145 @@ class WalletTransactionsPostgresTest {
     TransactionService query(){return new TransactionService(new TransactionRepository(jdbc),access,Clock.fixed(Instant.parse("2026-10-23T00:00:00Z"),ZoneOffset.UTC));}
     Map<String,String> all(){return Map.of("period","range","startDate","2020-01-01","endDate","2030-12-31");}
     Map<String,String> folder(String category,String direction){var q=new HashMap<>(all());q.put("category",category);q.put("direction",direction);return q;}
+    static byte[] proofImage(int size){try{var bytes=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(size,size,java.awt.image.BufferedImage.TYPE_INT_RGB),"png",bytes);return bytes.toByteArray();}catch(java.io.IOException e){throw new IllegalStateException(e);}}
+    @Test void customerBillProofPreservesPartialPaymentAndRespectsExpiredProductQrRules() {
+        var a=open();var b=bill(a,"20");
+        var ocr=mock(com.rpb.reservation.payment.application.PaymentProofOcrAdapter.class);
+        when(ocr.extract(any(),any())).thenReturn(new com.rpb.reservation.payment.application.PaymentProofOcrFields(null,new java.math.BigDecimal("10.00"),null,"ocbc",true,java.math.BigDecimal.ONE,"Payment successful\nMessage: "+WalletPayNowReference.forSource(b.id())+"\nTransaction ID: BILL-CUSTOMER-123\nUEN: 202012345A", "{}"));
+        when(collectionPort.settings(scope)).thenReturn(new CollectionSettings(1,false,"enabled","uen",null,"202012345A","Shop"));
+        when(collectionPort.canonicalAccount(any(),any(),any(),any())).thenReturn("paynow:uen:202012345A");
+        when(collectionPort.paynowQr(any(),anyLong(),any())).thenReturn("QR");
+        var repo=new com.rpb.reservation.wallet.proof.WalletCollectionProofRepository(jdbc,json);var inspector=new com.rpb.reservation.payment.application.PaymentProofImageInspector(ocr,null);
+        var service=new com.rpb.reservation.wallet.proof.WalletCustomerProofService(repo,access,accounts,topupRepo,bills,collectionPort,commands,inspector);
+        var staff=new com.rpb.reservation.wallet.proof.WalletCollectionProofService(repo,access,topupRepo,bills,collectionPort,inspector,json);
+        var collection=new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort,staff);
+        var staffBills=new WalletCheckoutService(accounts,commands,bills,collection,access,auths,clock);
+        var pendingTopup=create(a,"10","paynow");
+        when(gate.evaluateCommercial(any(),any(),any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,AppGateDenyReason.TENANT_APP_EXPIRED));
+        assertThatThrownBy(()->service.paynow(scope,principal,"bill",b.id(),"paynow")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->service.paynow(scope,principal,"topup",pendingTopup.id(),"paynow")).isInstanceOf(WalletException.class);
+        // An existing receipt can still be declared; this does not solicit or credit new funds.
+        var e=tx.execute(st->service.submit(scope,principal,"bill",b.id(),"paynow","10",key(),"receipt.png","image/png",proofImage(5)));
+        assertThat(e.status()).isEqualTo("waiting_confirmation");assertThat(bills.get(scope,b.id(),false).externalPaidCents()).isZero();
+        assertThatThrownBy(()->tx.execute(st->staffBills.collect(scope,actor,b.id(),new CollectionConfirm("paynow","10","202012345A","BILL-CUSTOMER-123","T1","checked",true,key(),e.id())))).isInstanceOf(WalletException.class);
+        assertThat(repo.get(scope,e.id(),false).collectionId()).isNull();
+        when(gate.evaluateCommercial(any(),any(),any())).thenReturn(AppGateDecision.allow("wallet",tenant,store,null));
+        tx.execute(st->staffBills.collect(scope,actor,b.id(),confirm("10","cash",key())));
+        when(gate.evaluateCommercial(any(),any(),any())).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,AppGateDenyReason.TENANT_APP_EXPIRED));
+        assertThat(service.paynow(scope,principal,"bill",b.id(),"paynow").get("payload")).isEqualTo("QR");
+        tx.execute(st->staffBills.collect(scope,actor,b.id(),new CollectionConfirm("paynow","10","202012345A","BILL-CUSTOMER-123","T1","checked",true,key(),e.id())));
+        assertThat(bills.get(scope,b.id(),false).remainingCents()).isZero();assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();
+        assertThat(service.list(scope,principal,"bill",b.id()).getFirst().status()).isEqualTo("confirmed");
+        assertThatThrownBy(()->service.context(scope,principal,"bill",b.id(),"paynow")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(st->service.submit(scope,principal,"bill",b.id(),"paynow","10",key(),"receipt.png","image/png",proofImage(5)))).isInstanceOf(WalletException.class);
+        var closed=bill(a,"10");tx.execute(st->{bills.close(scope,closed.id());return null;});
+        assertThatThrownBy(()->tx.execute(st->service.submit(scope,principal,"bill",closed.id(),"paynow","10",key(),"receipt.png","image/png",proofImage(5)))).isInstanceOf(WalletException.class);
+    }
+
+    @Test void customerProofStaysPendingPrivateAndCanOnlyBeConfirmedByStaff() {
+        var a=open();var topup=create(a,"10","paynow");
+        var ocr=mock(com.rpb.reservation.payment.application.PaymentProofOcrAdapter.class);
+        when(ocr.extract(any(),any())).thenReturn(new com.rpb.reservation.payment.application.PaymentProofOcrFields(null,new java.math.BigDecimal("10.00"),null,"ocbc",true,java.math.BigDecimal.ONE,"Payment successful\nMessage: "+WalletPayNowReference.forSource(topup.id())+"\nTransaction ID: CUSTOMER-123\nUEN: 202012345A", "{}"));
+        when(collectionPort.settings(scope)).thenReturn(new CollectionSettings(1,false,"enabled","uen",null,"202012345A","Shop"));
+        when(collectionPort.canonicalAccount(any(),any(),any(),any())).thenReturn("paynow:uen:202012345A");
+        when(collectionPort.paynowQr(any(),anyLong(),any())).thenReturn("QR");
+        var repo=new com.rpb.reservation.wallet.proof.WalletCollectionProofRepository(jdbc,json);
+        var inspector=new com.rpb.reservation.payment.application.PaymentProofImageInspector(ocr,null);
+        var service=new com.rpb.reservation.wallet.proof.WalletCustomerProofService(repo,access,accounts,topupRepo,bills,collectionPort,commands,inspector);
+        var staff=new com.rpb.reservation.wallet.proof.WalletCollectionProofService(repo,access,topupRepo,bills,collectionPort,inspector,json);
+        byte[] bytes=proofImage(4);String uploadKey=key();
+        var evidence=tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","10",uploadKey,"receipt.png","image/png",bytes));
+        assertThat(evidence.status()).isEqualTo("waiting_confirmation");
+        assertThat(json.valueToTree(evidence).has("confirmation")).isFalse();assertThat(json.valueToTree(evidence).has("extracted")).isFalse();
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();
+        assertThat(topupRepo.get(scope,topup.id(),false).customerDeclaredPaidAt()).isNotNull();
+        assertThat(topupRepo.get(scope,topup.id(),false).status()).isEqualTo("pending_collection");
+        assertThat(jdbc.queryForObject("select count(*) from wallet_collections where tenant_id=?",Long.class,tenant)).isZero();
+        assertThat(staff.submitted(scope,actor,"topup",topup.id())).extracting("id").containsExactly(evidence.id());
+        assertThat(service.image(scope,principal,evidence.id()).bytes()).containsExactly(bytes);
+        var stranger=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),UUID.randomUUID(),"other@example.com","Other");
+        assertThatThrownBy(()->service.image(scope,stranger,evidence.id())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->service.list(scope,stranger,"topup",topup.id())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(st->service.submit(scope,stranger,"topup",topup.id(),"paynow","10",uploadKey,"receipt.png","image/png",bytes))).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->service.context(new StoreScope(new TenantId(UUID.randomUUID()),store),principal,"topup",topup.id(),"paynow")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->service.context(new StoreScope(new TenantId(tenant),UUID.randomUUID()),principal,"topup",topup.id(),"paynow")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","9",uploadKey,"receipt.png","image/png",bytes))).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","10",key(),"receipt.png","image/png",new byte[]{1,2}))).isInstanceOf(WalletException.class);
+        var employeeProof=tx.execute(st->staff.scan(scope,actor,"topup",topup.id(),"paynow","10",key(),"receipt.png","image/png",proofImage(3)));
+        assertThatThrownBy(()->service.image(scope,principal,employeeProof.id())).isInstanceOf(WalletException.class);
+        assertThat(service.list(scope,principal,"topup",topup.id())).hasSize(1);
+        var collections=new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort,staff);
+        var staffTopups=new WalletTopupService(accounts,ledger,commands,topupRepo,collections,access,funding,marketing);
+        tx.execute(st->staffTopups.confirm(scope,actor,topup.id(),new CollectionConfirm("paynow","10","202012345A","CUSTOMER-123","T1","private employee note",true,key(),evidence.id())));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(1000);
+        assertThat(service.list(scope,principal,"topup",topup.id()).getFirst().status()).isEqualTo("confirmed");
+        assertThat(staff.submitted(scope,actor,"topup",topup.id())).isEmpty();
+        assertThat(tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","10",uploadKey,"receipt.png","image/png",bytes)).id()).isEqualTo(evidence.id());
+        assertThatThrownBy(()->tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","10",key(),"receipt.png","image/png",bytes))).isInstanceOf(WalletException.class);
+        assertThat(jdbc.queryForObject("select count(*) from wallet_audit where tenant_id=? and action='customer.paynow.proof.submit'",Long.class,tenant)).isEqualTo(1);
+    }
+
+    @Test void paynowProofScanDoesNotCreditAndConfirmationBindsOnlyMatchingEvidence() {
+        var a=open();var topup=create(a,"10","paynow");
+        var ocr=mock(com.rpb.reservation.payment.application.PaymentProofOcrAdapter.class);
+        String reference=com.rpb.reservation.wallet.domain.WalletPayNowReference.forSource(topup.id());
+        when(ocr.extract(any(),any())).thenReturn(new com.rpb.reservation.payment.application.PaymentProofOcrFields(null,new java.math.BigDecimal("10.00"),null,"ocbc",true,java.math.BigDecimal.ONE,"Payment successful\nMessage: "+reference+"\nTransaction ID: BANK-123\nUEN: 202012345A", "{}"));
+        when(collectionPort.settings(scope)).thenReturn(new CollectionSettings(1,false,"enabled","uen",null,"202012345A","Shop"));
+        when(collectionPort.canonicalAccount(any(),any(),any(),any())).thenReturn("paynow:uen:202012345A");
+        var repo=new com.rpb.reservation.wallet.proof.WalletCollectionProofRepository(jdbc,json);
+        var proofs=new com.rpb.reservation.wallet.proof.WalletCollectionProofService(repo,access,topupRepo,bills,collectionPort,new com.rpb.reservation.payment.application.PaymentProofImageInspector(ocr,null),json);
+        byte[] image=proofImage(2);
+        String scanKey=key();var p=tx.execute(s->proofs.scan(scope,actor,"topup",topup.id(),"paynow","10",scanKey,"receipt.png","image/png",image));
+        assertThat(p.checks().get("reference")).isEqualTo("match");assertThat(p.bankReference()).isEqualTo("BANK-123");
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();assertThat(jdbc.queryForObject("select count(*) from wallet_collections where tenant_id=?",Long.class,tenant)).isZero();
+        assertThat(tx.execute(s->proofs.scan(scope,actor,"topup",topup.id(),"paynow","10",scanKey,"receipt.png","image/png",image)).id()).isEqualTo(p.id());
+        assertThatThrownBy(()->tx.execute(s->proofs.scan(scope,actor,"topup",topup.id(),"paynow","9",scanKey,"receipt.png","image/png",image))).isInstanceOf(WalletException.class);
+        var collections=new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort,proofs);
+        var service=new WalletTopupService(accounts,ledger,commands,topupRepo,collections,access,funding,marketing);
+        var differentSource=create(a,"10","paynow");
+        var crossed=new CollectionConfirm("paynow","10","202012345A","BANK-123","T1","wrong source",true,key(),p.id());
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,actor,differentSource.id(),crossed))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_PROOF_CONFLICT");
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();
+        var otherStoreScope=new StoreScope(new TenantId(tenant),UUID.randomUUID());
+        assertThatThrownBy(()->repo.get(otherStoreScope,p.id(),false)).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_NOT_FOUND");
+        var wrong=new CollectionConfirm("paynow","10","202012345A","OTHER-REF","T1","checked",true,key(),p.id());
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,actor,topup.id(),wrong))).isInstanceOf(WalletException.class);assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();
+        var confirmation=new CollectionConfirm("paynow","10","202012345A","BANK-123","T1","merchant bank checked",true,key(),p.id());
+        tx.execute(s->service.confirm(scope,actor,topup.id(),confirmation));tx.execute(s->service.confirm(scope,actor,topup.id(),confirmation));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(1000);
+        assertThat(proofs.list(scope,actor,"topup",topup.id())).singleElement().satisfies(e->assertThat(e.confirmation().get("bankReference")).isEqualTo("BANK-123"));
+        var alien=new CurrentActor(UUID.randomUUID(),actorId,"staff",Set.of(),actor.permissions(),Set.of(store));assertThatThrownBy(()->proofs.image(scope,alien,p.id())).isInstanceOf(WalletException.class);
+        assertThat(proofs.image(scope,actor,p.id()).bytes()).isEqualTo(image);
+        var another=create(accounts.account(scope,a.id(),false),"10","paynow");
+        assertThatThrownBy(()->tx.execute(s->proofs.scan(scope,actor,"topup",another.id(),"paynow","10",scanKey,"receipt.png","image/png",image))).isInstanceOf(WalletException.class);
+        var missingActor=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.points.view"),Set.of(store));
+        assertThatThrownBy(()->proofs.context(scope,missingActor,"topup",another.id(),"paynow")).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->tx.execute(s->proofs.scan(scope,actor,"topup",another.id(),"paynow","10",key(),"fake.png","image/png",new byte[]{1,2,3}))).isInstanceOf(WalletException.class);
+        when(ocr.extract(any(),any())).thenReturn(new com.rpb.reservation.payment.application.PaymentProofOcrFields(null,new java.math.BigDecimal("9.00"),null,"ocbc",true,java.math.BigDecimal.ONE,"Payment successful\nMessage: "+com.rpb.reservation.wallet.domain.WalletPayNowReference.forSource(another.id())+"\nUEN: 202012345A", "{}"));
+        var mismatch=tx.execute(s->proofs.scan(scope,actor,"topup",another.id(),"paynow","10",key(),"receipt.png","image/png",image));
+        assertThat(mismatch.checks().get("amount")).isEqualTo("mismatch");
+        var mismatched=new CollectionConfirm("paynow","10","202012345A","BANK-456","T1","checked",true,key(),mismatch.id());
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,actor,another.id(),mismatched))).isInstanceOf(WalletException.class);
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(1000);
+        // Missing OCR fields allow manual checking; reusing the same image for a second credit still rolls back.
+        when(ocr.extract(any(),any())).thenReturn(new com.rpb.reservation.payment.application.PaymentProofOcrFields(null,null,null,null,false,java.math.BigDecimal.ZERO,"Unreadable receipt", "{}"));
+        var missing=tx.execute(s->proofs.scan(scope,actor,"topup",another.id(),"paynow","10",key(),"receipt.png","image/png",image));
+        var reused=new CollectionConfirm("paynow","10","202012345A","BANK-789","T1","checked",true,key(),missing.id());
+        assertThatThrownBy(()->tx.execute(s->service.confirm(scope,actor,another.id(),reused))).isInstanceOf(WalletException.class).extracting("code").isEqualTo("WALLET_PROOF_CONFLICT");
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(1000);
+        var manual=tx.execute(s->proofs.scan(scope,actor,"topup",another.id(),"paynow","10",key(),"different.png","image/png",proofImage(3)));
+        tx.execute(s->service.confirm(scope,actor,another.id(),new CollectionConfirm("paynow","10","202012345A","MANUAL-REF","T1","checked missing fields against bank",true,key(),manual.id())));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(2000);
+        var unavailable=create(accounts.account(scope,a.id(),false),"10","paynow");
+        when(ocr.extract(any(),any())).thenThrow(new com.rpb.reservation.payment.application.PaymentServiceException(com.rpb.reservation.payment.application.PaymentServiceErrorCode.PAYMENT_OCR_UNAVAILABLE));
+        var manualAfterOcrFailure=tx.execute(s->proofs.scan(scope,actor,"topup",unavailable.id(),"paynow","10",key(),"new.png","image/png",proofImage(4)));
+        assertThat(manualAfterOcrFailure.extracted().get("ocrStatus")).isEqualTo("unavailable");assertThat(manualAfterOcrFailure.checks().values()).containsOnly("missing");
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(2000);
+        tx.execute(s->service.confirm(scope,actor,unavailable.id(),new CollectionConfirm("paynow","10","202012345A","MANUAL-OCR-DOWN","T1","checked original image and bank",true,key(),manualAfterOcrFailure.id())));
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(3000);
+
+
+    }
     @Test void consumptionAndTopupFoldersNeverMixAndDirectionsFollowViewer() {
         var a=credit(open(),"100","cash");var b=bill(a,"25");pay(b);
         tx.execute(s->refunds.create(scope,actor,new RefundCreate("bill",b.id(),"5","部分退款",key())));

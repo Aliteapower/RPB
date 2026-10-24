@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import WalletCustomerProofHistory from '../proof/WalletCustomerProofHistory.vue'
+import WalletCustomerPayNowProof from '../proof/WalletCustomerPayNowProof.vue'
+import {channelType,channelLabel} from '../collectionMethods'
 import WalletAmountSplit from '../components/WalletAmountSplit.vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,6 +14,9 @@ import type { Bill, Context, Quote } from '../types'
 const props = defineProps<{ store: string; bill: Bill; context: Context }>()
 const emit = defineEmits<{ changed: [bill: Bill] }>()
 const { t } = useI18n(), { busy, error, run } = useWalletTask()
+const paynowChannels=computed(()=>props.context.paynowConfigured?(props.context.program?.channels??[]).filter(c=>channelType(c)==='paynow'):[])
+const paynowChannel=ref('')
+watch(paynowChannels,channels=>{if(!channels.includes(paynowChannel.value))paynowChannel.value=channels[0]??''},{immediate:true})
 const quote = ref<Quote | null>(null), now = ref(Date.now())
 const expired = computed(() => !!quote.value && Date.parse(quote.value.expiresAt) <= now.value)
 const timer = window.setInterval(() => { now.value = Date.now() }, 1000)
@@ -37,5 +43,7 @@ async function pay() {
     <template v-if="!bill.walletApplied && !bill.closed && remaining(bill)>0 && context.transactionsEnabled"><button v-if="!quote || expired" class="wallet-primary wallet-block" :disabled="busy" @click="review">{{ t('wallet.quote') }}</button>
       <section v-if="quote" class="wallet-confirm-card"><WalletAmountSplit :principal="quote.principalDebitCents??quote.amountCents" :bonus="quote.bonusDebitCents??0" /><h3>{{ t('wallet.ui.confirmAmount') }}</h3><dl class="wallet-detail-fields"><dt>{{ t('wallet.debit') }}</dt><dd>{{ money(quote.amountCents) }}</dd><dt>{{ t('wallet.stillDue') }}</dt><dd :class="{'wallet-due':quote.remainingCents>0}">{{ money(quote.remainingCents) }}</dd></dl><p v-if="quote.remainingCents>0" class="wallet-warning">{{ t('wallet.ui.supplementHint',{amount:money(quote.remainingCents)}) }}</p><p v-if="expired" class="wallet-error" role="status">{{ t('wallet.quoteExpired') }}</p><button class="wallet-primary wallet-block" :disabled="busy || expired" @click="pay">{{ t('wallet.confirmPay') }} {{ money(quote.amountCents) }}</button></section>
     </template>
+    <section v-if="!bill.closed&&remaining(bill)>0&&paynowChannel"><label v-if="paynowChannels.length>1">{{t('wallet.channel')}}<select v-model="paynowChannel"><option v-for="channel in paynowChannels" :key="channel" :value="channel">{{channelLabel(t,channel,context.program?.channelLabels)}}</option></select></label><WalletCustomerPayNowProof :store="store" source-type="bill" :source-id="bill.id" :channel="paynowChannel" :amount="(remaining(bill)/100).toFixed(2)" show-paynow /></section>
+    <WalletCustomerProofHistory v-if="bill.closed||remaining(bill)===0" :store="store" source-type="bill" :source-id="bill.id" />
   </article>
 </template>

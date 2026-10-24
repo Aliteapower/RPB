@@ -7,6 +7,7 @@ import {
   PaymentApiError,
   scanPaymentProof
 } from '../api/paymentApi'
+import PaymentProofUpload from '../components/payment/PaymentProofUpload.vue'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
@@ -41,12 +42,9 @@ const cameraStarting = ref(false)
 const cameraError = ref('')
 const errorText = ref('')
 const selectedFile = ref<File | null>(null)
-const previewUrl = ref('')
 const scanResult = ref<PaymentProofScanResponse | null>(null)
 const successfulDisplayNumber = ref<number | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
-const photoInputRef = ref<HTMLInputElement | null>(null)
-const albumInputRef = ref<HTMLInputElement | null>(null)
 let candidateSequence = 0
 let scannerStream: MediaStream | null = null
 let scannerTimer: number | undefined
@@ -81,7 +79,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshCandidatesOnFocus)
   clearSuccessAutoAdvance()
   stopScanner()
-  revokePreview()
 })
 
 watch(storeId, () => {
@@ -134,25 +131,10 @@ async function loadCandidates(): Promise<void> {
   }
 }
 
-function onFileSelected(event: Event): void {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0] || null
-  input.value = ''
+function onFileSelected(file: File | null): void {
   selectedFile.value = file
   scanResult.value = null
   successfulDisplayNumber.value = null
-  revokePreview()
-  if (file) {
-    previewUrl.value = URL.createObjectURL(file)
-  }
-}
-
-function openPhotoCapture(): void {
-  photoInputRef.value?.click()
-}
-
-function openAlbumPicker(): void {
-  albumInputRef.value?.click()
 }
 
 async function submitScan(): Promise<void> {
@@ -315,7 +297,6 @@ function prepareNextScan(): void {
   successfulDisplayNumber.value = null
   errorText.value = ''
   cameraError.value = ''
-  revokePreview()
   void loadCandidates()
   if (!scannerActive.value && !cameraStarting.value) {
     void startScanner()
@@ -435,12 +416,7 @@ function createIdempotencyKey(): string {
   return `proof-review-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function revokePreview(): void {
-  if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
-    previewUrl.value = ''
-  }
-}
+
 
 function apiErrorText(error: unknown): string {
   if (!(error instanceof PaymentApiError)) {
@@ -528,34 +504,7 @@ function apiErrorText(error: unknown): string {
 
         <p v-if="cameraError" class="empty-line">{{ cameraError }}</p>
 
-        <div class="upload-actions">
-          <button class="secondary-button" type="button" :disabled="scanning" @click="openPhotoCapture">
-            {{ gt('generated.payment-proof-review.037') }}
-          </button>
-          <button class="secondary-button" type="button" :disabled="scanning" @click="openAlbumPicker">
-            {{ gt('generated.payment-proof-review.038') }}
-          </button>
-        </div>
-
-        <input
-          ref="photoInputRef"
-          accept="image/png,image/jpeg,image/webp"
-          capture="environment"
-          class="file-input"
-          type="file"
-          @change="onFileSelected"
-        />
-        <input
-          ref="albumInputRef"
-          accept="image/png,image/jpeg,image/webp"
-          class="file-input"
-          type="file"
-          @change="onFileSelected"
-        />
-
-        <p class="selected-file">{{ selectedFile ? selectedFile.name : gt('generated.payment-proof-review.010') }}</p>
-
-        <img v-if="previewUrl" class="preview-image" :src="previewUrl" alt="" />
+        <PaymentProofUpload :model-value="selectedFile" :disabled="scanning" :capture-label="gt('generated.payment-proof-review.037')" :album-label="gt('generated.payment-proof-review.038')" :empty-label="gt('generated.payment-proof-review.010')" :invalid-label="gt('generated.payment-proof-review.invalidImage')" @update:model-value="onFileSelected" />
 
         <button class="primary-button" type="button" :disabled="!canScan" @click="submitScan">
           {{ scanning ? gt('generated.payment-proof-review.011') : gt('generated.payment-proof-review.012') }}

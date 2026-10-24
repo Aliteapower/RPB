@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {channelType,channelLabel,topupChannelName} from '../collectionMethods'
+import WalletProofHistory from '../proof/WalletProofHistory.vue'
 import WalletNextCustomer from '../components/WalletNextCustomer.vue'
 import {staffWalletPath} from '../navigation'
 import {safeTransactionReturn} from '../transactions/query'
@@ -31,8 +32,8 @@ async function cancel(){await run(async()=>{await walletApi(store.value).command
     <p v-if="topup.status==='pending_collection'" class="wallet-warning">{{ t('wallet.ui.topupNotCredited') }}</p>
     <button v-if="topup.status==='pending_collection' && channelType(topup.channel)==='paynow' && context.transactionsEnabled" class="wallet-block" :disabled="busy" @click="showQr">{{ t('wallet.showPaynow') }}</button>
     <section v-if="qr && topup.status==='pending_collection'" class="wallet-card"><WalletQrDisplay :value="qr" /><p>{{ t('wallet.paynowHint') }}</p></section>
-    <WalletCollectionForm v-if="can('wallet.collection.confirm') && topup.status==='pending_collection'" :key="topup.id" :amount-cents="topup.amountCents" :channel-labels="{[topup.channel]:topupChannelName(topup)||''}" :fixed-channel="topup.channel" :channels="[topup.channel]" :paynow-configured="context.paynowConfigured" :busy="busy" topup @confirm="confirm" />
+    <WalletCollectionForm :store="store" source-type="topup" :source-id="topup.id" v-if="can('wallet.collection.confirm') && topup.status==='pending_collection'" :key="topup.id" :amount-cents="topup.amountCents" :channel-labels="{[topup.channel]:topupChannelName(topup)||''}" :fixed-channel="topup.channel" :channels="[topup.channel]" :paynow-configured="context.paynowConfigured" :busy="busy" topup @confirm="confirm" />
     <button v-if="can('wallet.topup.create') && topup.status==='pending_collection'" class="wallet-link-button" :disabled="busy" @click="cancel">{{ t('wallet.cancel') }}</button>
-    <WalletNextCustomer v-if="topup.status==='credited'||topup.status==='cancelled'" :disabled="busy" /><RouterLink class="wallet-secondary-link" :to="{path:staffWalletPath(store,`transactions/topup/${topup.id}`),query:{returnTo:historyReturn}}">{{t('wallet.operation.detail')}}</RouterLink><details class="wallet-reference"><summary>{{ t('wallet.ui.transactionInfo') }}</summary><p>{{ t('wallet.reference') }} {{ topup.id }}</p><p>{{ dateTime(topup.createdAt,context.store.timezone) }}</p></details>
+    <WalletProofHistory :store="store" source-type="topup" :source-id="topup.id" :key="topup.status" /><WalletNextCustomer v-if="topup.status==='credited'||topup.status==='cancelled'" :disabled="busy" /><RouterLink class="wallet-secondary-link" :to="{path:staffWalletPath(store,`transactions/topup/${topup.id}`),query:{returnTo:historyReturn}}">{{t('wallet.operation.detail')}}</RouterLink><details class="wallet-reference"><summary>{{ t('wallet.ui.transactionInfo') }}</summary><p>{{ t('wallet.reference') }} {{ topup.id }}</p><p>{{ dateTime(topup.createdAt,context.store.timezone) }}</p></details>
   </template>
 </template>
