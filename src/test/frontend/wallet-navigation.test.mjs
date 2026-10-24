@@ -45,3 +45,11 @@ test('new cashier flow sends exactly one atomic bill command and keeps its retry
   assert.equal(calls.length,2);assert.ok(calls.every(c=>c.url.endsWith('/wallet/bills')))
   assert.equal(calls[0].body.customerCode,'WP.test');assert.equal(calls[0].body.idempotencyKey,calls[1].body.idempotencyKey)
 })
+
+
+test('wallet settings directory and individual functions have distinct staff-only routes',()=>{
+ const routes=walletRoutes[0].children
+ for(const [path,name] of [['settings','wallet-settings'],['settings/channels','wallet-settings-channels'],['settings/paynow','wallet-settings-paynow']]){const r=routes.find(r=>r.path===path);assert.ok(r,path);assert.equal(r.name,name)}
+ assert.equal(new Set(routes.map(r=>r.name)).size,routes.length)
+ assert.ok(!walletRoutes[1].children.some(r=>r.path.startsWith('settings')))
+})

@@ -11,8 +11,12 @@ export const walletRoutes: RouteRecordRaw[] = [
     { path: 'topups/:topupId', name: 'wallet-staff-topup', component: () => import('./pages/WalletStaffTopupDetail.vue') },
     { path: 'marketing', name: 'wallet-marketing', component: () => import('./pages/WalletMarketing.vue') },
     { path: 'more', name: 'wallet-more', component: () => import('./pages/WalletStaffMore.vue') },
-    ...['refund-create','refunds/:refundId','settings','report','exceptions'].map((path, index) => ({
-      path, name: ['wallet-refund-create','wallet-refund-detail','wallet-settings','wallet-report','wallet-exceptions'][index],
+    ...(['overview','channels','paynow'] as const).map(section => ({
+      path: section==='overview'?'settings':`settings/${section}`, name: section==='overview'?'wallet-settings':`wallet-settings-${section}`,
+      component: () => import('./pages/WalletStaffSettings.vue'), props: {section}
+    })),
+    ...['refund-create','refunds/:refundId','report','exceptions'].map((path, index) => ({
+      path, name: ['wallet-refund-create','wallet-refund-detail','wallet-report','wallet-exceptions'][index],
       component: () => import('./pages/WalletStaffManagement.vue')
     }))
   ] },
