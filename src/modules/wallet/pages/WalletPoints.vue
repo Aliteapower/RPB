@@ -8,7 +8,7 @@ import { rechargeRecordsTarget } from '../pointsOperations'
 import type { PointsEntry } from '../marketingTypes'
 import WalletStaffCustomerPicker from '../components/WalletStaffCustomerPicker.vue'
 defineProps<{embedded?:boolean}>()
-const emit=defineEmits<{'busy-change':[busy:boolean]}>()
+const emit=defineEmits<{'busy-change':[busy:boolean];completed:[entry:PointsEntry]}>()
 const {t}=useI18n(),{store,customer,can,context}=useStaffWallet()
 const points=usePoints(store,false,computed(()=>customer.value?.id),()=>can('wallet.points.view')),{account,busy,error,ready}=points
 const kind=ref<'grants'|'deductions'|'redemptions'>(can('wallet.points.grant')?'grants':can('wallet.points.adjust')?'deductions':'redemptions')
@@ -28,7 +28,7 @@ async function submit(){
   if(busy.value||!reviewing.value||!valid.value||points.stale.value)return
   const id=customer.value?.id,storeId=store.value
   await points.command(kind.value,{quantity:Number(quantity.value),note:note.value,...(kind.value==='redemptions'?{redemptionDescription:redemptionDescription.value,externalReference:externalReference.value}:kind.value==='grants'?{reason:reason.value,externalReference:externalReference.value}:{reason:reason.value})})
-  if(storeId===store.value&&id===customer.value?.id&&!error.value&&points.entries.value[0]){result.value=points.entries.value[0];reviewing.value=false}
+  if(storeId===store.value&&id===customer.value?.id&&!error.value&&points.entries.value[0]){result.value=points.entries.value[0];reviewing.value=false;emit('completed',result.value)}
 }
 </script>
 <template>

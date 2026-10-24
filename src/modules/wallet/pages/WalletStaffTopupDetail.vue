@@ -20,8 +20,9 @@ const {t}=useI18n(),route=useRoute(),workspace=useStaffWallet(),{store,context,c
 const path=computed(()=>`/topups/${encodeURIComponent(String(route.params.topupId))}`)
 const historyReturn=computed(()=>safeTransactionReturn(route.query.returnTo??staffWalletPath(store.value,'transactions')+'?category=topup',store.value))
 const {record:topup,ready,busy,error,run,refresh}=useWalletRecord<Topup>(store,path)
+watch(()=>topup.value?.status,status=>{if(status==='credited'||status==='cancelled')workspace.clear()},{flush:'sync'})
 const qr=ref('');watch(path,()=>{qr.value=''})
-async function confirm(value:CollectionConfirm){await run(async()=>{await walletApi(store.value).command(`${path.value}/confirm`,value as unknown as Record<string,unknown>);qr.value='';await refresh();await workspace.refresh()})}
+async function confirm(value:CollectionConfirm){await run(async()=>{const id=store.value,recordPath=path.value;await walletApi(id).command(`${recordPath}/confirm`,value as unknown as Record<string,unknown>);if(id!==store.value||recordPath!==path.value)return;workspace.clear();qr.value='';await refresh();await workspace.refresh()})}
 async function showQr(){await run(async()=>{qr.value=(await walletApi(store.value).get<{payload:string}>(`${path.value}/paynow`)).payload})}
 async function cancel(){await run(async()=>{await walletApi(store.value).command(`${path.value}/cancel`);qr.value='';await refresh()})}
 </script>

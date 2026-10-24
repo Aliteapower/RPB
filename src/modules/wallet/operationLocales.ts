@@ -1,4 +1,5 @@
 export const operationZh={
+ selectNext:'当前顾客已清除，请重新选择顾客后办理下一笔；同一顾客也需重新选择。',
  logout:'退出登录',loggingOut:'正在退出…',logoutFailed:'退出失败，请检查网络后重试。',
  otherCollectionAccount:'实际收款账户或渠道',
  otherCollectionHint:'请按商户指引完成线下付款，提交付款声明后仍需商户核实到账。',
@@ -14,6 +15,7 @@ export const operationZh={
  selected:'本次办理顾客',change:'积分变化',result:'本次操作结果',reviewHint:'请核对顾客、操作类型及积分数量，确认后才会记账。'
 }
 export const operationEn={
+ selectNext:'Customer selection cleared. Select a customer again for the next operation, including the same customer.',
  logout:'Sign out',loggingOut:'Signing out…',logoutFailed:'Sign out failed. Check your connection and try again.',
  otherCollectionAccount:'Actual receiving account or channel',
  otherCollectionHint:'Follow the merchant’s offline payment instructions. Funds remain unavailable until the merchant verifies receipt.',
