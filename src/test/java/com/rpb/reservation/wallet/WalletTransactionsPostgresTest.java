@@ -352,6 +352,15 @@ class WalletTransactionsPostgresTest {
         assertThat(list(all()).items().stream().filter(i->i.id().equals(b.id())).findFirst().orElseThrow().postedAt()).isEqualTo(original.postedAt());
         var detail=query().detail(scope,null,principal,"refund",result.id());assertThat(detail.events()).anySatisfy(e->{assertThat(e.type()).isEqualTo("refund_part_completed");assertThat(e.occurredAt()).isEqualTo(result.postedAt());});
     }
+    @Test void defaultSummariesAreLanguageNeutralButExplicitConsumptionDescriptionIsPreserved() {
+        var a=open();var b=bill(a,"3");var topup=create(a,"10","cash");
+        assertThat(query().detail(scope,actor,null,"bill",b.id()).transaction().summary()).isNull();
+        assertThat(query().detail(scope,null,principal,"topup",topup.id()).transaction().summary()).isNull();
+        assertThat(list(all()).items()).allSatisfy(i->assertThat(i.summary()).isNull());
+        jdbc.update("insert into wallet_customer_identity_codes(tenant_id,customer_id,program_id,code_hash,expires_at,payment_bill_id,payment_store_id,payment_description) values(?,?,?,?,now()+interval '1 hour',?,?,?)",tenant,customer,a.programId(),"b".repeat(64),b.id(),store,"消费");
+        assertThat(query().detail(scope,null,principal,"bill",b.id()).transaction().summary()).isEqualTo("消费");
+        assertThat(list(all()).items().stream().filter(i->i.id().equals(b.id())).findFirst().orElseThrow().summary()).isEqualTo("消费");
+    }
     @Test void personalPaymentDescriptionIsReadWithoutExposingCodeSecrets() {
         var a=credit(open(),"10","cash");var b=bill(a,"3");pay(b);
         String secret="a".repeat(64);

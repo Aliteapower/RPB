@@ -6,6 +6,7 @@ import {routeLocationKey,routerKey} from 'vue-router'
 import {createI18n} from 'vue-i18n'
 import {transactionEventLabel} from '../../modules/wallet/transactions/eventLabel.ts'
 import {transactionsZh,transactionsEn} from '../../modules/wallet/transactions/locales.ts'
+import {transactionSummary} from '../../modules/wallet/transactions/summary.ts'
 import {walletRoutes} from '../../modules/wallet/routes.ts'
 import {readFile,readdir,mkdir,writeFile} from 'node:fs/promises'
 let StaffShell,CustomerShell,Page,Detail,Evidence,Row,query,api,composable,messages
@@ -165,4 +166,35 @@ test('all system event labels translate with safe fallbacks and posted status di
  assert.equal(transactionEventLabel({type:'future'},'completed',translate),'future')
  assert.equal(transactionEventLabel({type:'action',label:'constructor'},'completed',translate),'constructor')
  assert.equal(transactionEventLabel({},'completed',translate),'')
+})
+
+
+test('default summaries localize across list, detail and embedded evidence while literal business notes stay intact',async()=>{
+ for(const sourceType of ['bill','topup']){
+  const transaction=row({sourceType,type:sourceType==='bill'?'payment':'topup',summary:null})
+  globalThis.fetch=async()=>response({transaction,related:[],events:[]})
+  for(const component of [Row,Detail,Evidence]){
+   const scope=mount(component,route(true,{params:{storeId:'A',sourceType,transactionId:'record'}}),{row:transaction,customer:true,returnTo:'/wallet/A/transactions',store:'A',sourceType,id:'record'},'en');await tick()
+   const paragraphs=()=>nodes(scope.root,n=>n.tag==='p').map(text)
+   const en=sourceType==='bill'?'Payment':'Top-up',zh=sourceType==='bill'?'消费':'充值'
+   assert.ok(paragraphs().includes(en),`${component.__name} ${en}`);assert.ok(!paragraphs().includes(zh))
+   scope.i18n.global.locale.value='zh-CN';await tick();assert.ok(paragraphs().includes(zh));scope.unmount()
+  }
+ }
+ for(const component of [Row,Detail,Evidence]){
+  const transaction=row({summary:'消费'});globalThis.fetch=async()=>response({transaction,related:[],events:[]})
+  const scope=mount(component,route(true,{params:{storeId:'A',sourceType:'bill',transactionId:'record'}}),{row:transaction,customer:true,returnTo:'/wallet/A/transactions',store:'A',sourceType:'bill',id:'record'},'en');await tick()
+  assert.ok(nodes(scope.root,n=>n.tag==='p').map(text).includes('消费'));scope.unmount()
+ }
+})
+
+
+test('summary defaults depend on source and never translate user descriptions',()=>{
+ const t=key=>({ 'wallet.transactions.payment':'Payment','wallet.transactions.topup':'Top-up' })[key]
+ for(const sourceType of ['bill','topup','points','refund','money_reversal']){
+  for(const summary of ['消费','充值','自定义说明','', 'Payment'])assert.equal(transactionSummary({sourceType,summary},t),summary)
+ }
+ for(const sourceType of ['points','refund','money_reversal'])assert.equal(transactionSummary({sourceType,summary:null},t),'')
+ assert.equal(transactionSummary({sourceType:'bill',summary:null},t),'Payment')
+ assert.equal(transactionSummary({sourceType:'topup',summary:null},t),'Top-up')
 })

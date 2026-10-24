@@ -17,7 +17,7 @@ final class TransactionProjection {
             b.tenant_id,b.store_id,a.customer_id,b.amount_cents,0::bigint quantity,
             -b.wallet_paid_cents wallet_delta,b.principal_paid_cents principal,b.bonus_paid_cents bonus,
             0::bigint credit,b.wallet_paid_cents wallet_paid,b.external_paid_cents external_paid,b.refund_status,
-            coalesce((select nullif(m.description,'') from wallet_merchant_orders m where m.tenant_id=b.tenant_id and m.bill_id=b.id),(select nullif(c.payment_description,'') from wallet_customer_identity_codes c where c.tenant_id=b.tenant_id and c.payment_bill_id=b.id),'消费')::text summary,b.created_by actor_id,null::text original_source_type,null::uuid original_id,
+            coalesce((select nullif(m.description,'') from wallet_merchant_orders m where m.tenant_id=b.tenant_id and m.bill_id=b.id),(select nullif(c.payment_description,'') from wallet_customer_identity_codes c where c.tenant_id=b.tenant_id and c.payment_bill_id=b.id))::text summary,b.created_by actor_id,null::text original_source_type,null::uuid original_id,
             b.id::text reference,'out'::text direction
           from wallet_bills b join wallet_accounts a on a.id=b.account_id and a.tenant_id=b.tenant_id where b.tenant_id=:tenant
           union all
@@ -25,7 +25,7 @@ final class TransactionProjection {
             t.created_at,case when t.status='credited' then coalesce((select e.created_at from wallet_entries e where e.tenant_id=t.tenant_id and e.source_id=t.id and e.kind='topup_credit'),t.credited_at) end,
             t.tenant_id,t.store_id,a.customer_id,t.amount_cents,0,case when t.status='credited' then t.credit_total_cents else 0 end,t.principal_cents,t.bonus_cents,t.credit_total_cents,0,case when t.status='credited' then t.amount_cents else 0 end,
             case when t.refunded_cents=0 then 'none' when t.refunded_cents=t.amount_cents then 'refunded' else 'partially_refunded' end,
-            '充值',t.created_by,null,null,t.id::text,'in'
+            null::text,t.created_by,null,null,t.id::text,'in'
           from wallet_topups t join wallet_accounts a on a.id=t.account_id and a.tenant_id=t.tenant_id where t.tenant_id=:tenant
           union all
           select r.id,'refund','refund',r.status,r.created_at,
