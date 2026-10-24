@@ -15,8 +15,8 @@ function createWorkspace() {
     if(decoded.store && decoded.store!==store.value){const path=`${customerWalletPath(decoded.store)}#${decoded.kind}=${encodeURIComponent(decoded.code)}`;if(replace)await router.replace(path);else await router.push(path);return}
     const current=generation,id=store.value
     const redemption=decoded.kind==='redeem'
-    const bill=await walletApi(id,true).post<{id:string}>(redemption?'/points-redemption-code':'/bill-code',{code:decoded.code})
-    if(current===generation){const path=customerWalletPath(id,`${redemption?'points-redemptions':'bills'}/${bill.id}`);if(replace)await router.replace(path);else await router.push(path)}
+    const bill=await walletApi(id,true).post<{id:string}>(decoded.kind==='order'?'/merchant-order-code':redemption?'/points-redemption-code':'/bill-code',{code:decoded.code})
+    if(current===generation){const path=customerWalletPath(id,`${decoded.kind==='order'?'merchant-orders':redemption?'points-redemptions':'bills'}/${bill.id}`);if(replace)await router.replace(path);else await router.push(path)}
   }
   async function legacy() {
     if(!home.value || legacyRunning)return

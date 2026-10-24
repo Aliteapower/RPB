@@ -19,6 +19,7 @@ export const walletRoutes: RouteRecordRaw[] = [
   { path: '/wallet/:storeId', component: () => import('./WalletCustomerPage.vue'), meta: { public: true, walletWorkspace: 'customer' }, children: [
     { path: '', name: 'wallet-customer', component: () => import('./pages/WalletCustomerHome.vue') },
     { path: 'code', name: 'wallet-customer-code', component: () => import('./pages/WalletCustomerCode.vue') },
+    { path: 'merchant-orders/:orderId', name:'wallet-customer-order', component:()=>import('./pages/WalletCustomerOrder.vue') },
     { path: 'scan', name: 'wallet-customer-scan', component: () => import('./pages/WalletCustomerScan.vue') },
     { path: 'points-redemptions/:redemptionId', name: 'wallet-customer-redemption', component: () => import('./pages/WalletCustomerRedemption.vue') },
     { path: 'transactions', name: 'wallet-customer-transactions', component: () => import('./pages/WalletTransactions.vue') },

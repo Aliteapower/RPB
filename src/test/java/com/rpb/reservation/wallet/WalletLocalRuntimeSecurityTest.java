@@ -15,12 +15,13 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
+@WebMvcTest({com.rpb.reservation.wallet.merchantorder.MerchantOrderController.class,com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
 class WalletLocalRuntimeSecurityTest {
     @Autowired MockMvc mvc;
+    @MockBean com.rpb.reservation.wallet.merchantorder.MerchantOrderService merchantOrders;
     @MockBean com.rpb.reservation.wallet.redemption.RedemptionService redemptions;
     @MockBean WalletApiIdentity identity;
     @MockBean com.rpb.reservation.wallet.transactions.TransactionService transactions;
@@ -111,6 +112,24 @@ class WalletLocalRuntimeSecurityTest {
         mvc.perform(post(staff).header("X-RPB-Wallet","1").contentType("application/json").content("{\"quantity\":1.5}")).andExpect(status().isBadRequest());
         mvc.perform(post(customer).header("X-RPB-Wallet","1").contentType("application/json").content("{\"expectedVersion\":1,\"customerId\":\""+id+"\"}")).andExpect(status().isBadRequest());
         verifyNoInteractions(redemptions);
+    }
+    @Test void unboundMerchantOrderRoutesRequireIdentityAndOnlyDeclaredMethods() throws Exception {
+        when(identity.staff()).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"login"));
+        when(identity.customer(any())).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"login"));
+        String id="20000000-0000-0000-0000-000000000983",staff="/api/v1/stores/"+id+"/wallet/",customer="/api/v1/public/stores/"+id+"/wallet/";
+        for(String path:new String[]{staff+"merchant-orders/"+id,customer+"merchant-orders/"+id})mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        for(String path:new String[]{staff+"merchant-orders",staff+"merchant-orders/"+id+"/code",staff+"merchant-orders/"+id+"/cancel",customer+"merchant-order-code",customer+"merchant-orders/"+id+"/confirm"})mvc.perform(post(path).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
+        mvc.perform(get(staff+"merchant-orders")).andExpect(status().isForbidden());
+        mvc.perform(post(customer+"merchant-orders/"+id+"/confirm").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        mvc.perform(post(customer+"merchant-orders/"+id+"/confirm").header("X-RPB-Wallet","1").header("Sec-Fetch-Site","cross-site").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        verifyNoInteractions(merchantOrders);
+    }
+
+
+    @Test void unboundOrdersNeverAcceptCustomerOrAccountOverrides() throws Exception {
+        String base="/api/v1/stores/20000000-0000-0000-0000-000000000983/wallet/merchant-orders";
+        for(String body:new String[]{"{\"kind\":\"money\",\"amount\":\"10\",\"customerId\":\"00000000-0000-0000-0000-000000000000\"}","{\"kind\":\"points\",\"quantity\":1.5}","{\"kind\":\"money\",\"accountId\":\"00000000-0000-0000-0000-000000000000\"}"})mvc.perform(post(base).header("X-RPB-Wallet","1").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        verifyNoInteractions(merchantOrders);
     }
 
 }

@@ -17,7 +17,7 @@ final class TransactionProjection {
             b.tenant_id,b.store_id,a.customer_id,b.amount_cents,0::bigint quantity,
             -b.wallet_paid_cents wallet_delta,b.principal_paid_cents principal,b.bonus_paid_cents bonus,
             0::bigint credit,b.wallet_paid_cents wallet_paid,b.external_paid_cents external_paid,b.refund_status,
-            coalesce((select nullif(c.payment_description,'') from wallet_customer_identity_codes c where c.tenant_id=b.tenant_id and c.payment_bill_id=b.id),'消费')::text summary,b.created_by actor_id,null::text original_source_type,null::uuid original_id,
+            coalesce((select nullif(m.description,'') from wallet_merchant_orders m where m.tenant_id=b.tenant_id and m.bill_id=b.id),(select nullif(c.payment_description,'') from wallet_customer_identity_codes c where c.tenant_id=b.tenant_id and c.payment_bill_id=b.id),'消费')::text summary,b.created_by actor_id,null::text original_source_type,null::uuid original_id,
             b.id::text reference,'out'::text direction
           from wallet_bills b join wallet_accounts a on a.id=b.account_id and a.tenant_id=b.tenant_id where b.tenant_id=:tenant
           union all

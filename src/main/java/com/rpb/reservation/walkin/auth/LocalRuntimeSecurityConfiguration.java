@@ -52,6 +52,8 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.POST,"/api/v1/public/stores/*/wallet/payment-codes/status","/api/v1/public/stores/*/wallet/payment-codes","/api/v1/public/stores/*/wallet/bill-code","/api/v1/public/stores/*/wallet/bills/*/quote","/api/v1/public/stores/*/wallet/bills/*/pay").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/points-redemptions/*","/api/v1/public/stores/*/wallet/points-redemptions/*").permitAll()
                 .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/points-redemptions","/api/v1/stores/*/wallet/points-redemptions/*/code","/api/v1/stores/*/wallet/points-redemptions/*/cancel","/api/v1/public/stores/*/wallet/points-redemption-code","/api/v1/public/stores/*/wallet/points-redemptions/*/confirm").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/wallet/merchant-orders/*","/api/v1/public/stores/*/wallet/merchant-orders/*").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/stores/*/wallet/merchant-orders","/api/v1/stores/*/wallet/merchant-orders/*/code","/api/v1/stores/*/wallet/merchant-orders/*/cancel","/api/v1/public/stores/*/wallet/merchant-order-code","/api/v1/public/stores/*/wallet/merchant-orders/*/confirm").permitAll()
                 // Exact method/path additions; wallet use cases still enforce session, scope and App Gate.
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/stores/*/wallet/marketing/settings",
