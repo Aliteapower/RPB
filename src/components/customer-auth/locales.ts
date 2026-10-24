@@ -1,4 +1,5 @@
 export const customerAuthZh = {
+  register:'注册顾客',
   login: '顾客登录', phone: '手机号', password: '密码', loginHint: '使用门店登记的手机号登录，初始密码为手机号后 6 位。',
   changePassword: '修改登录密码', currentPassword: '当前密码', newPassword: '新密码', confirmPassword: '确认新密码',
   passwordHint: '新密码至少 8 个字符。修改后请使用新密码登录。', save: '保存新密码', changed: '密码已修改，其他登录会话已退出。',
@@ -10,6 +11,7 @@ export const customerAuthZh = {
     network_failure: '网络连接失败，请重试。', request_failed: '操作失败，请稍后重试。' }
 }
 export const customerAuthEn = {
+  register:'Register customer',
   login: 'Customer sign in', phone: 'Phone number', password: 'Password', loginHint: 'Use the phone registered with the store. Your initial password is the last 6 digits of your phone.',
   changePassword: 'Change password', currentPassword: 'Current password', newPassword: 'New password', confirmPassword: 'Confirm new password',
   passwordHint: 'Use at least 8 characters. Sign in with your new password after changing it.', save: 'Save password', changed: 'Password changed. Other sessions have been signed out.',

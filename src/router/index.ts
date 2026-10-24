@@ -56,6 +56,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     ...walletRoutes,
+    {path:'/customers/register',name:'public-customer-register',component:()=>import('../modules/customers/PublicCustomerRegistrationPage.vue'),meta:{public:true}},
     {
       path: '/stores/:storeId/daily-ledger',
       name: 'daily-ledger',

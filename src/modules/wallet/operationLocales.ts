@@ -1,4 +1,5 @@
 export const operationZh={
+ customerPages:'顾客列表分页',
  customers:'顾客管理',createCustomer:'新增顾客',customersHint:'新增、维护租户统一顾客档案，按手机号识别。',backWallet:'返回钱包收银台',backRecharge:'返回充值与积分',
  confirmTopup:'确定充值',
  records:'查看交易记录',review:'核对本次操作',edit:'返回修改',done:'办理成功',again:'继续办理',detail:'查看本笔记录',
@@ -8,6 +9,7 @@ export const operationZh={
  selected:'本次办理顾客',change:'积分变化',result:'本次操作结果',reviewHint:'请核对顾客、操作类型及积分数量，确认后才会记账。'
 }
 export const operationEn={
+ customerPages:'Customer list pagination',
  customers:'Customers',createCustomer:'Add customer',customersHint:'Create and maintain shared tenant customer profiles, identified by phone.',backWallet:'Back to wallet cashier',backRecharge:'Back to top-ups and points',
  confirmTopup:'Confirm top-up',
  records:'View transaction records',review:'Review this operation',edit:'Back to edit',done:'Operation completed',again:'Continue',detail:'View this transaction',

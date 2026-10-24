@@ -1,13 +1,13 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {build} from 'esbuild'
-const result=await build({stdin:{contents:"export * from './src/modules/customers/navigation.ts'",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'})
+const result=await build({stdin:{contents:"export * from './src/modules/customers/navigation.ts'; export * from './src/modules/wallet/customerManagementNavigation.ts'",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'})
 const {customerManagementTarget,customerManagementReturnTarget,customerPhonePrefill}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].contents).toString('base64'))
 
-test('wallet management and missing-phone creation target the existing tenant directory',()=>{
- assert.equal(customerManagementTarget('A','wallet'),'/stores/A/admin/customers?from=wallet')
+test('wallet management and missing-phone creation stay in the wallet while sharing the central directory',()=>{
+ assert.equal(customerManagementTarget('A','wallet'),'/stores/A/wallet/customers?from=wallet')
  const url=new URL(customerManagementTarget('A','wallet-recharge','+65 81112469',true),'https://test.local')
- assert.equal(url.pathname,'/stores/A/admin/customers');assert.equal(url.searchParams.get('keyword'),'+65 81112469');assert.equal(url.searchParams.get('create'),'1')
+ assert.equal(url.pathname,'/stores/A/wallet/customers');assert.equal(url.searchParams.get('keyword'),'+65 81112469');assert.equal(url.searchParams.get('create'),'1')
 })
 test('return navigation only accepts named wallet sources and stays in the current store',()=>{
  assert.equal(customerManagementReturnTarget('A','wallet'),'/stores/A/wallet')

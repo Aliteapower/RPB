@@ -5,6 +5,7 @@ export const walletRoutes: RouteRecordRaw[] = [
     { path: 'collect', name: 'wallet-collect', component: () => import('./pages/WalletStaffCollect.vue') },
     { path: 'merchant-code', name: 'wallet-merchant-code', component: () => import('./pages/WalletMerchantCode.vue') },
     { path: 'topup', name: 'wallet-topup', component: () => import('./pages/WalletStaffRecharge.vue') },
+    { path: 'customers', name: 'wallet-customers', component: () => import('./pages/WalletStaffCustomers.vue'), meta:{requiresTenantAdmin:true} },
     { path: 'points/:entryId/reverse', name: 'wallet-points-reverse', component: () => import('./pages/WalletPointsReversal.vue') },
     { path: 'transactions', name: 'wallet-staff-transactions', component: () => import('./pages/WalletTransactions.vue') },
     { path: 'transactions/:sourceType/:transactionId', name: 'wallet-staff-transaction', component: () => import('./pages/WalletTransactionDetail.vue') },
@@ -23,6 +24,7 @@ export const walletRoutes: RouteRecordRaw[] = [
   ] },
   { path: '/wallet/:storeId', component: () => import('./WalletCustomerPage.vue'), meta: { public: true, walletWorkspace: 'customer' }, children: [
     { path: '', name: 'wallet-customer', component: () => import('./pages/WalletCustomerHome.vue') },
+    { path: 'register', name: 'wallet-customer-register', component: () => import('./pages/WalletCustomerRegister.vue') },
     { path: 'code', name: 'wallet-customer-code', component: () => import('./pages/WalletCustomerCode.vue') },
     { path: 'merchant-orders/:orderId', name:'wallet-customer-order', component:()=>import('./pages/WalletCustomerOrder.vue') },
     { path: 'scan', name: 'wallet-customer-scan', component: () => import('./pages/WalletCustomerScan.vue') },

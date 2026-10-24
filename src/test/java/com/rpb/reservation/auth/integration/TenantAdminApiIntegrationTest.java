@@ -69,6 +69,7 @@ class TenantAdminApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.update("delete from customer_privacy_consents where tenant_id = ?", VALIDATION_TENANT_ID);
         jdbc.update("delete from auth_user_sessions");
         jdbc.update("delete from auth_slider_captcha_challenges");
         jdbc.update("delete from audit_logs where operation_code = 'tenant_admin.account.self_update'");
@@ -1010,7 +1011,7 @@ class TenantAdminApiIntegrationTest {
                       "displayName":"Codex 王小明",
                       "nickname":"先生",
                       "phoneE164":"+6598880001",
-                      "email":"codex-customer-001@example.test"
+                      "email":"codex-customer-001@example.test", "privacyConsent":{"accepted":true,"noticeVersion":"customer-profile-v1","entrySource":"tenant_admin"}
                     }
                     """)
                 .cookie(session))
@@ -1088,7 +1089,7 @@ class TenantAdminApiIntegrationTest {
                       "displayName":"Codex 另一位顾客",
                       "nickname":"先生",
                       "phoneE164":"+6598880002",
-                      "email":"codex-customer-003@example.test"
+                      "email":"codex-customer-003@example.test", "privacyConsent":{"accepted":true,"noticeVersion":"customer-profile-v1","entrySource":"tenant_admin"}
                     }
                     """)
                 .cookie(session))
@@ -1131,7 +1132,7 @@ class TenantAdminApiIntegrationTest {
                       "displayName":"%s",
                       "nickname":"%s",
                       "phoneE164":"%s",
-                      "email":"%s"
+                      "email":"%s", "privacyConsent":{"accepted":true,"noticeVersion":"customer-profile-v1","entrySource":"tenant_admin"}
                     }
                     """.formatted(displayName, nickname, phoneE164, email))
                 .cookie(session))

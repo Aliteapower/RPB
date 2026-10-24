@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthSessionStore } from '../../../stores/authSession'
-import { customerManagementTarget, type CustomerEntrySource } from '../../customers/navigation'
+import { customerManagementTarget, type CustomerEntrySource } from '../customerManagementNavigation'
 import { useStaffWallet } from '../useStaffWallet'
 import WalletIcon from './WalletIcon.vue'
 const props=withDefaults(defineProps<{source?:CustomerEntrySource;keyword?:string;create?:boolean;shortcut?:boolean;disabled?:boolean}>(),{source:'wallet',keyword:'',create:false,shortcut:false,disabled:false})

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import CountryPhoneField from '../common/CountryPhoneField.vue'
 import { CustomerPasswordApiError, loginCustomerWithPassword } from '../../api/customerAuthApi'
 import type { CustomerAuthPrincipal } from '../../types/publicBooking'
-const props = defineProps<{ store: string }>()
+const props = defineProps<{ store: string; registrationTo?:string }>()
 const emit = defineEmits<{ authenticated: [principal: CustomerAuthPrincipal] }>()
 const { t, te } = useI18n()
 const phone = ref(''), password = ref(''), busy = ref(false), error = ref('')
@@ -29,6 +29,7 @@ async function login() {
       <button :disabled="busy">{{ t(busy ? 'customerAuth.busy' : 'customerAuth.login') }}</button>
     </form>
     <p v-if="error" class="customer-auth-error" role="alert">{{ error }}</p>
+    <RouterLink :to="registrationTo??('/customers/register?storeId='+encodeURIComponent(store))">{{t('customerAuth.register')}}</RouterLink>
   </section>
 </template>
 <style scoped>

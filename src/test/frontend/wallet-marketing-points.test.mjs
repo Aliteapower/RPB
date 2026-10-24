@@ -5,7 +5,7 @@ import { createRenderer, h, nextTick, reactive } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { createI18n } from 'vue-i18n'
-let ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
+let SelfRegistrationView,StaffCustomers, sharedCustomerModule, ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
 const originalStorage=globalThis.sessionStorage
 const originalWindow=globalThis.window, originalFetch=globalThis.fetch, originalDocument=globalThis.document, originalDocumentClass=globalThis.Document, originalShadowRoot=globalThis.ShadowRoot
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
@@ -28,24 +28,24 @@ function mount(component,kind,route,props={},permissions) {
  app.component('RouterLink',{props:['to'],setup:(props,{slots})=>()=>h('a',{href:props.to},slots.default?.())});app.mount(root)
  return{root,navigation,get auth(){return authModule.useAuthSessionStore(pinia)},get workspace(){return workspace},unmount:()=>app.unmount()}
 }
-const response=body=>({ok:true,status:200,json:async()=>body})
+const response=body=>({ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)})
 const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' ')
 
 before(async()=>{
- globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible'})
- globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
+ globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',documentElement:{},addEventListener(){},removeEventListener(){}})
+ globalThis.window={setInterval:()=>1,clearInterval:()=>{},addEventListener(){},removeEventListener(){}}
  const storage=new Map();globalThis.sessionStorage={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}
  const {build,transform}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
  const entry=`export {default as ReversalPage} from './src/modules/wallet/pages/WalletPointsReversal.vue';export {default as ReversalAction} from './src/modules/wallet/components/WalletPointsReversalAction.vue';export {default as SettingsPanel} from './src/modules/wallet/components/WalletSettingsPanel.vue';export {default as ChannelSettings} from './src/modules/wallet/components/WalletChannelSettings.vue';export {default as StaffSettings} from './src/modules/wallet/pages/WalletStaffSettings.vue';export {default as BottomNav} from './src/modules/wallet/components/WalletBottomNav.vue';export {default as CustomerOrder} from './src/modules/wallet/pages/WalletCustomerOrder.vue';export {default as MerchantCode} from './src/modules/wallet/pages/WalletMerchantCode.vue';export {default as CustomerRedemption} from './src/modules/wallet/pages/WalletCustomerRedemption.vue';export {default as NextCustomer} from './src/modules/wallet/components/WalletNextCustomer.vue';export {default as StaffHome} from './src/modules/wallet/pages/WalletStaffHome.vue';export * as personalCodeModule from './src/modules/wallet/usePersonalCode.ts';export {default as PersonalCode} from './src/modules/wallet/components/WalletPersonalCode.vue';export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopup.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
- const result=await build({stdin:{contents:entry,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'vue-runtime-test',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{
+ const result=await build({stdin:{contents:"export {default as SelfRegistrationView} from './src/modules/customers/CustomerSelfRegistrationForm.vue';export {default as StaffCustomers} from './src/modules/wallet/pages/WalletStaffCustomers.vue';export * as sharedCustomerModule from './src/modules/customers/useCustomerManagement.ts';"+entry,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'vue-runtime-test',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{
   if(path.endsWith('WalletQrScanner.vue'))return {contents:`import {h} from 'vue';export default {props:['purpose'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code',((p.purpose==='identity'||p.purpose==='personal')?'WI.':'WC.')+'A'.repeat(43))},'scan')}`,loader:'js'}
-  if(path.endsWith('WalletQrDisplay.vue'))return {contents:`import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`,loader:'js'}
+  if(path.endsWith('WalletQrDisplay.vue')||path.endsWith('DownloadableQrCode.vue'))return {contents:`import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`,loader:'js'}
   const {readFile}=await import('node:fs/promises');const source=await readFile(path,'utf8'),{descriptor}=parse(source,{filename:path}),script=compileScript(descriptor,{id:'test-'+path,inlineTemplate:true})
   return {contents:script.content,loader:'ts'}
  })}}]})
  const dir='target/wallet-marketing-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
  const loaded=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now())
- ;({ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
+ ;({SelfRegistrationView,StaffCustomers,sharedCustomerModule,ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
@@ -590,17 +590,58 @@ test('wallet customer maintenance reuses the tenant directory only for authorize
  globalThis.fetch=async()=>response(staffContext)
  for(const component of [StaffHome,RechargePage,StaffMore]){
   const scope=mount(component,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}));await tick()
-  const links=()=>nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('/admin/customers'))
+  const links=()=>nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('/wallet/customers'))
   assert.equal(links().length,0);scope.auth.user.roles=['tenant_admin'];scope.auth.user.permissions.push('tenant.admin.manage');await tick()
-  assert.equal(links().length,1);assert.match(String(links()[0].props.href),/^\/stores\/A\/admin\/customers\?from=wallet/)
+  assert.equal(links().length,1);assert.match(String(links()[0].props.href),/^\/stores\/A\/wallet\/customers\?from=wallet/)
   scope.auth.user.storeIds=['B'];await tick();assert.equal(links().length,0);scope.unmount()
  }
 })
 
-test('no phone match offers shared-directory creation without creating accounts or customers automatically',async()=>{
+test('no phone match offers shared customer creation without creating accounts or customers automatically',async()=>{
  const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method});return response(url.includes('/customers?')?[]:staffContext)}
  const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}));scope.auth.user.roles=['tenant_admin'];scope.auth.user.permissions.push('tenant.admin.manage');await tick()
  const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0];input.props['onUpdate:modelValue']('81112469');await tick();await nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick()
- const link=nodes(scope.root,n=>n.tag==='a'&&allText(n).includes('新增顾客'))[0];assert.ok(link);assert.match(String(link.props.href),/\/admin\/customers\?/);assert.match(String(link.props.href),/create=1/);assert.match(String(link.props.href),/keyword=81112469/)
+ const link=nodes(scope.root,n=>n.tag==='a'&&allText(n).includes('新增顾客'))[0];assert.ok(link);assert.match(String(link.props.href),/\/wallet\/customers\?/);assert.match(String(link.props.href),/create=1/);assert.match(String(link.props.href),/keyword=81112469/)
  assert.equal(scope.workspace.customer.value,null);assert.ok(!calls.some(c=>c.method==='POST'||c.url.endsWith('/accounts')));scope.unmount()
+})
+
+const privacyNoticeFixture={version:'customer-profile-v1',textZh:'顾客请求的服务及交易记录用途',textEn:'Requested services',labelZh:'已向顾客说明并取得同意（商户登记）',labelEn:'Merchant attestation'}
+async function managedCustomers(query={},post){
+ const calls=[],profile={id:'shared-customer',customerCode:'C-SHARED',displayName:'统一顾客',nickname:'先生',phoneE164:'+6581112470',email:null,status:'active'}
+ globalThis.fetch=async(url,options={})=>{const body=options.body&&JSON.parse(options.body);calls.push({url,body,method:options.method});if(options.method==='POST'||options.method==='PATCH')return post?post(url,body):response({success:true,customer:profile});return response(url.endsWith('/customer-privacy-notice')?privacyNoticeFixture:url.endsWith('/privacy-consents')?{records:[]}:url.includes('/tenant-admin/customers?')?{success:true,customers:[profile],page:{limit:20,offset:0,total:1}}:staffContext)}
+ const route=reactive({name:'wallet-customers',params:{storeId:'A'},query,hash:''}),scope=mount(StaffCustomers,'staff',route);scope.auth.user.roles=['tenant_admin'];scope.auth.user.permissions.push('tenant.admin.manage');await tick()
+ return {...scope,route,calls,profile}
+}
+
+test('wallet customer cards use central APIs, have no tenant sidebar, and default PDPA checkbox is required',async()=>{
+ const scope=await managedCustomers({create:'1',keyword:'81112470',from:'wallet-recharge'});await tick()
+ assert.equal(nodes(scope.root,n=>n.tag==='table').length,0);assert.doesNotMatch(allText(scope.root),/租户后台/)
+ const check=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];assert.ok(check);assert.equal(check.checked,true)
+ const form=nodes(scope.root,n=>n.tag==='form')[0];check.checked=false;check.listeners.change({target:check});await tick();assert.equal(nodes(form,n=>n.tag==='button'&&allText(n).trim()==='保存')[0].props.disabled,true);await form.props.onSubmit(submitEvent());await tick();assert.ok(!scope.calls.some(c=>c.method==='POST'))
+ check.checked=true;check.listeners.change({target:check});await tick();await form.props.onSubmit(submitEvent());await tick()
+ const created=scope.calls.find(c=>c.method==='POST');assert.match(created.url,/\/tenant-admin\/customers$/);assert.deepEqual(created.body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v1',entrySource:'wallet'});assert.equal(created.body.phoneE164,'+6581112470');assert.ok(!scope.calls.some(c=>c.url.endsWith('/accounts')));scope.unmount()
+})
+
+test('profile editing does not manufacture a new privacy confirmation; records open separately',async()=>{
+ const scope=await managedCustomers();await tick();nodes(scope.root,n=>n.tag==='button'&&allText(n).trim()==='编辑')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='checkbox').length,0)
+ await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await tick();assert.equal(scope.calls.find(c=>c.method==='PATCH').body.privacyConsent,undefined)
+ nodes(scope.root,n=>n.tag==='button'&&allText(n).trim()==='PDPA 登记记录')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='form').length,0);assert.match(allText(scope.root),/尚无登记记录/);assert.ok(scope.calls.some(c=>c.url.endsWith('/shared-customer/privacy-consents')));scope.unmount()
+})
+
+test('shared customer save blocks duplicates and a late response cannot repaint another store',async()=>{
+ let finish;const scope=await managedCustomers({create:'1',keyword:'81112470'},()=>new Promise(resolve=>{finish=resolve}));const form=nodes(scope.root,n=>n.tag==='form')[0];const first=form.props.onSubmit(submitEvent());await form.props.onSubmit(submitEvent());await tick();assert.equal(scope.calls.filter(c=>c.method==='POST').length,1)
+ scope.auth.user.storeIds.push('B');scope.route.params.storeId='B';await tick();finish(response({success:true,customer:scope.profile}));await first;await tick();assert.doesNotMatch(allText(scope.root),/保存成功/);assert.equal(scope.calls.filter(c=>c.method==='POST').length,1);scope.unmount()
+})
+
+test('unprivileged wallet customer management does not query the central directory',async()=>{
+ const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(staffContext)};const scope=mount(StaffCustomers,'staff',reactive({name:'wallet-customers',params:{storeId:'A'},query:{},hash:''}));await tick();assert.ok(!calls.some(url=>url.includes('/tenant-admin/')));assert.equal(nodes(scope.root,n=>n.tag==='form').length,0);scope.unmount()
+})
+
+test('customer self-registration confirms PDPA, blocks duplicate clicks, and never submits passwords or wallet commands',async()=>{
+ let finish;const calls=[];globalThis.fetch=async(url,options={})=>{const body=options.body&&JSON.parse(options.body);calls.push({url,body});if(url.endsWith('/register'))return new Promise(resolve=>{finish=resolve});return response(url.includes('/registration-notice')?{...privacyNoticeFixture,labelZh:'本人已阅读并确认 PDPA'}:{accounts:[],pendingBills:[],context:staffContext})}
+ const scope=mount(SelfRegistrationView,'customer',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A'});await tick()
+ assert.doesNotMatch(allText(scope.root),/商户代为登记/);const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0];input.value='81112473';input.props.onInput({target:input});await tick()
+ const checkbox=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];checkbox.checked=false;checkbox.listeners.change({target:checkbox});await tick();const form=nodes(scope.root,n=>n.tag==='form')[0];assert.equal(nodes(form,n=>n.tag==='button'&&allText(n).trim()==='注册顾客')[0].props.disabled,true);await form.props.onSubmit(submitEvent());assert.ok(!calls.some(c=>c.body))
+ checkbox.checked=true;checkbox.listeners.change({target:checkbox});await tick();const pending=form.props.onSubmit(submitEvent());await form.props.onSubmit(submitEvent());await tick();assert.equal(calls.filter(c=>c.url.endsWith('/register')).length,1);const body=calls.find(c=>c.url.endsWith('/register')).body;assert.deepEqual(body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v1'});assert.equal(body.password,undefined);assert.equal(body.storeId,'A');assert.equal(body.phoneE164,'+6581112473')
+ finish(response({success:true,customerId:'self-created'}));await pending;await tick();assert.match(allText(scope.root),/注册成功/);assert.match(allText(scope.root),/手机号后 6 位/);assert.ok(!calls.some(c=>c.url.includes('/accounts')||c.url.endsWith('/topups')));scope.unmount()
 })

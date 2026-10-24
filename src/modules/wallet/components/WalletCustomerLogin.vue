@@ -3,4 +3,4 @@ import CustomerPasswordLogin from '../../../components/customer-auth/CustomerPas
 defineProps<{ store: string }>()
 const emit = defineEmits<{ authenticated: [] }>()
 </script>
-<template><CustomerPasswordLogin :store="store" @authenticated="emit('authenticated')" /></template>
+<template><CustomerPasswordLogin :store="store" :registration-to="`/wallet/${encodeURIComponent(store)}/register`" @authenticated="emit('authenticated')" /></template>

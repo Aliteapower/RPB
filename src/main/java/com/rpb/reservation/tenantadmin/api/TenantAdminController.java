@@ -57,6 +57,7 @@ public class TenantAdminController {
     private final TenantAdminProfileService profileService;
     private final ReservationMealPeriodManagementService mealPeriodService;
     private final CustomerManagementApplicationService customerManagementService;
+    private final com.rpb.reservation.customer.application.CustomerRegistrationService registrationService;
     private final TenantAdminScopeResolver scopeResolver;
 
     public TenantAdminController(
@@ -66,6 +67,7 @@ public class TenantAdminController {
         TenantAdminProfileService profileService,
         ReservationMealPeriodManagementService mealPeriodService,
         CustomerManagementApplicationService customerManagementService,
+        com.rpb.reservation.customer.application.CustomerRegistrationService registrationService,
         TenantAdminScopeResolver scopeResolver
     ) {
         this.staffService = staffService;
@@ -74,6 +76,7 @@ public class TenantAdminController {
         this.profileService = profileService;
         this.mealPeriodService = mealPeriodService;
         this.customerManagementService = customerManagementService;
+        this.registrationService = registrationService;
         this.scopeResolver = scopeResolver;
     }
 
@@ -203,10 +206,21 @@ public class TenantAdminController {
         @PathVariable UUID storeId,
         @RequestBody(required = false) TenantAdminCustomerMutationRequest request
     ) {
-        StoreScope scope = requireTenantAdminScope(storeId);
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
         return ResponseEntity.status(201).body(TenantAdminCustomerResponse.from(
-            customerManagementService.create(scope.tenantScope(), toCommand(request))
+            registrationService.create(actorScope.scope(),actorScope.actor().actorId(),toCommand(request),request==null||request.privacyConsent()==null?null:request.privacyConsent().toCommand())
         ));
+    }
+
+    @GetMapping("/customer-privacy-notice")
+    public ResponseEntity<TenantAdminCustomerPrivacyResponses.Notice> privacyNotice(@PathVariable UUID storeId) {
+        requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminCustomerPrivacyResponses.Notice.from(registrationService.notice()));
+    }
+
+    @GetMapping("/customers/{customerId}/privacy-consents")
+    public ResponseEntity<TenantAdminCustomerPrivacyResponses.History> customerPrivacyRecords(@PathVariable UUID storeId,@PathVariable UUID customerId) {
+        return ResponseEntity.ok(TenantAdminCustomerPrivacyResponses.History.from(registrationService.records(requireTenantAdminScope(storeId),customerId)));
     }
 
     @GetMapping("/customers/{customerId}")

@@ -16,6 +16,7 @@ function createWorkspace() {
   let generation = 0, selection = 0
   function clear() { selection++; identifiedCustomerId.value=null;phoneConfirmedCustomerId.value=null; customer.value = null; account.value = null; customerCode.value = ''; customers.value = [] }
   async function refresh() {
+    if(route.name==='wallet-customers')return
     const current = generation, id = store.value, selected = account.value?.id
     const pointsOnly=pointsContext.value
     const result = await walletApi(id).get<Context>(pointsOnly?'/points/context':'/context').catch(e=>{
@@ -63,13 +64,13 @@ function createWorkspace() {
       return true
     })
   }
-  watch([store,pointsContext,()=>route.query.entry==='phone'], ([id,only,byPhone],old) => {
+  watch([store,pointsContext,()=>route.query.entry==='phone',()=>route.name==='wallet-customers'], ([id,only,byPhone],old) => {
     const preserved=old?.[0]===id&&old?.[2]===byPhone?customer.value:null
     const identity=preserved?.id===identifiedCustomerId.value?identifiedCustomerId.value:null
     const phoneIdentity=preserved?.id===phoneConfirmedCustomerId.value?phoneConfirmedCustomerId.value:null
-    generation++; clear();customer.value=preserved;identifiedCustomerId.value=identity;phoneConfirmedCustomerId.value=phoneIdentity; context.value = null;task.error.value=''
+    generation++; clear();customer.value=preserved;identifiedCustomerId.value=identity;phoneConfirmedCustomerId.value=phoneIdentity;if(route.name!=='wallet-customers'||old?.[0]!==id)context.value = null;task.error.value=''
     const current=generation
-    void refresh().then(async()=>{if(current===generation && preserved && !only && !String(route.name).includes('transaction') && route.name!=='wallet-points-reverse' && (route.name!=='wallet-topup'||((identity||phoneIdentity)&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
+    void refresh().then(async()=>{if(current===generation && preserved && !only && !String(route.name).includes('transaction') && route.name!=='wallet-customers' && route.name!=='wallet-points-reverse' && (route.name!=='wallet-topup'||((identity||phoneIdentity)&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
   }, { immediate: true,flush:'sync' })
   const timer = window.setInterval(() => { if (!task.busy.value && document.visibilityState === 'visible') void refresh().catch(e => { task.error.value = String(e.message ?? e) }) }, 5000)
   onUnmounted(() => { generation++; window.clearInterval(timer) })
