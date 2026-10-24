@@ -4,9 +4,11 @@ import {parse,compileScript} from '@vue/compiler-sfc'
 import {createRenderer,h,nextTick,reactive,ref} from 'vue'
 import {routeLocationKey,routerKey} from 'vue-router'
 import {createI18n} from 'vue-i18n'
+import {transactionEventLabel} from '../../modules/wallet/transactions/eventLabel.ts'
+import {transactionsZh,transactionsEn} from '../../modules/wallet/transactions/locales.ts'
 import {walletRoutes} from '../../modules/wallet/routes.ts'
 import {readFile,readdir,mkdir,writeFile} from 'node:fs/promises'
-let StaffShell,CustomerShell,Page,Detail,Row,query,api,composable,messages
+let StaffShell,CustomerShell,Page,Detail,Evidence,Row,query,api,composable,messages
 const oldFetch=globalThis.fetch,oldDocument=globalThis.document,oldWindow=globalThis.window
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
 const renderer=createRenderer({
@@ -22,23 +24,23 @@ function nodes(root,predicate){let out=[];if(predicate(root))out.push(root);for(
 
 const text=root=>[root.text||'',...(root.children||[]).map(text)].join(' ')
 const response=body=>({ok:true,status:200,json:async()=>body})
-function mount(component,route,props={}){
+function mount(component,route,props={},locale='zh-CN'){
  const root={children:[]},calls=[]
  const router={push:async target=>{calls.push(target);route.query=target.query;route.fullPath=target.path+'?'+new URLSearchParams(target.query)},back:()=>calls.push('back')}
  const app=renderer.createApp({setup:()=>()=>h(component,props)})
- app.use(createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':{wallet:messages.walletZh}}}));app.provide(routeLocationKey,route);app.provide(routerKey,router)
+ const i18n=createI18n({legacy:false,locale,messages:{'zh-CN':{wallet:messages.walletZh},en:{wallet:messages.walletEn}}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,router)
  app.component('RouterView',{setup:()=>()=>h('section',{'data-router-view':true},'query view')});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root)
- return {root,calls,unmount:()=>app.unmount()}
+ return {root,calls,i18n,unmount:()=>app.unmount()}
 }
 before(async()=>{
  globalThis.document={};globalThis.window={setInterval:()=>1,clearInterval:()=>{}};const {build}=await import('esbuild'),{pathToFileURL}=await import('node:url')
- const entry=`export {default as StaffShell} from './src/modules/wallet/WalletPage.vue';export {default as CustomerShell} from './src/modules/wallet/WalletCustomerPage.vue';export {default as Page} from './src/modules/wallet/pages/WalletTransactions.vue';export {default as Detail} from './src/modules/wallet/pages/WalletTransactionDetail.vue';export {default as Row} from './src/modules/wallet/transactions/WalletTransactionRow.vue';export * as query from './src/modules/wallet/transactions/query.ts';export * as composable from './src/modules/wallet/transactions/useTransactions.ts';export * as messages from './src/modules/wallet/locales.ts'`
+ const entry=`export {default as StaffShell} from './src/modules/wallet/WalletPage.vue';export {default as CustomerShell} from './src/modules/wallet/WalletCustomerPage.vue';export {default as Page} from './src/modules/wallet/pages/WalletTransactions.vue';export {default as Detail} from './src/modules/wallet/pages/WalletTransactionDetail.vue';export {default as Evidence} from './src/modules/wallet/transactions/WalletTransactionEvidence.vue';export {default as Row} from './src/modules/wallet/transactions/WalletTransactionRow.vue';export * as query from './src/modules/wallet/transactions/query.ts';export * as composable from './src/modules/wallet/transactions/useTransactions.ts';export * as messages from './src/modules/wallet/locales.ts'`
  const result=await build({stdin:{contents:entry,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,loader:{'.css':'empty'},platform:'node',format:'esm',external:['vue','vue-router','vue-i18n'],plugins:[{name:'vue-test',setup(b){
  b.onLoad({filter:/useStaffWallet\.ts$/},()=>({contents:`import {ref} from 'vue';export function provideStaffWallet(){return {store:ref('A'),context:ref(null),pointsContext:ref(false),busy:ref(false),error:ref('old context denied'),run:async fn=>fn(),refresh:async()=>{},can:()=>false}}`,loader:'ts'}));
  b.onLoad({filter:/authSession\.ts$/},()=>({contents:`export function useAuthSessionStore(){return {authorizedStores:[{storeId:'A',storeName:'共享授权门店',operatingEntityName:'共享租户'}],ensureAuthorizedStores:async()=>{}}}`,loader:'ts'}));
  b.onLoad({filter:/useCustomerWallet\.ts$/},()=>({contents:`import {ref} from 'vue';export function provideCustomerWallet(){return {store:ref('A'),home:ref(null),needsLogin:ref(false),error:ref('inactive store context'),loading:ref(false),refresh:async()=>{},authenticated:async()=>{}}}`,loader:'ts'}));
  b.onLoad({filter:/\.vue$/},async({path})=>{if(/(StoreSwitcher|WalletCustomerLogin|WalletLocaleControl|WalletBottomNav|WalletIcon)\.vue$/.test(path))return {contents:"import {h} from 'vue';export default {setup:()=>()=>h('i')}",loader:'js'};const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return {contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}})}}]})
- const dir='target/wallet-transactions-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({StaffShell,CustomerShell,Page,Detail,Row,query,composable,messages}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
+ const dir='target/wallet-transactions-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({StaffShell,CustomerShell,Page,Detail,Evidence,Row,query,composable,messages}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
 })
 after(()=>{globalThis.fetch=oldFetch;globalThis.document=oldDocument;globalThis.window=oldWindow})
 const capabilities={money:true,points:true,refunds:true,reversals:true}
@@ -132,4 +134,35 @@ test('native bill detail falls back to authorized historical read-only query whe
 
 test('pending mixed refund shows actual wallet posting without claiming external cash already returned',()=>{
  const scope=mount(Row,route(true),{row:row({sourceType:'refund',type:'refund',status:'pending',externalPaidCents:4000,walletDeltaCents:6000}),customer:true,returnTo:'/wallet/A/transactions'});assert.match(text(scope.root),/外部退款待处理/);assert.match(text(scope.root),/钱包权益变化 \+\$60\.00/);assert.ok(!text(scope.root).includes('外部现金退回'));scope.unmount()
+})
+
+
+test('transaction event labels follow the selected language in customer, staff and embedded views',async()=>{
+ const at='2026-10-24T07:43:00Z'
+ const events=[{type:'created',label:'创建',occurredAt:at},{type:'posted',label:'完成记账',occurredAt:at},{type:'action',label:'确认充值入账',occurredAt:at},{type:'collection',label:'线下实收确认',occurredAt:at},{type:'refund_part_completed',label:'外部退款完成',occurredAt:at},{type:'wallet_posted',label:'钱包扣款',occurredAt:at}]
+ globalThis.fetch=async()=>response({transaction:row({sourceType:'points',type:'points_grant',summary:'充测',customerName:'演示账户 · 张'}),related:[],events})
+ for(const [component,customer] of [[Detail,true],[Detail,false],[Evidence,false]]){
+  const scope=mount(component,route(customer,{params:{storeId:'A',sourceType:'points',transactionId:'record'}}),{store:'A',sourceType:'points',id:'record'},'en');await tick()
+  for(const label of ['Created','Posting completed','Top-up confirmed','Offline collection confirmed','External refund completed','Wallet debited'])assert.ok(text(scope.root).includes(label),label)
+  for(const event of events)assert.ok(!text(scope.root).includes(event.label),event.label)
+  assert.ok(text(scope.root).includes('充测'))
+  scope.i18n.global.locale.value='zh-CN';await tick()
+  for(const event of events)assert.ok(text(scope.root).includes(event.label),event.label)
+  scope.unmount()
+ }
+})
+
+
+test('all system event labels translate with safe fallbacks and posted status distinctions',()=>{
+ const translate=key=>transactionsEn.eventLabels[key.split('.').at(-1)]
+ for(const [key,label] of Object.entries(transactionsZh.eventLabels)){
+  assert.equal(transactionEventLabel({type:'action',label},'completed',translate),transactionsEn.eventLabels[key])
+ }
+ assert.equal(transactionEventLabel({type:'posted',label:'完成记账'},'pending',translate),'Posted')
+ assert.equal(transactionEventLabel({kind:'created'},'completed',translate),'Created')
+ assert.equal(transactionEventLabel({type:'action'},'completed',translate),'Transaction activity')
+ assert.equal(transactionEventLabel({type:'future',label:'自定义内容'},'completed',translate),'自定义内容')
+ assert.equal(transactionEventLabel({type:'future'},'completed',translate),'future')
+ assert.equal(transactionEventLabel({type:'action',label:'constructor'},'completed',translate),'constructor')
+ assert.equal(transactionEventLabel({},'completed',translate),'')
 })
