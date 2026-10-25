@@ -207,4 +207,34 @@ class StoragePostgresTest extends CatalogPostgresTest {
   var c=new Receive(List.of(new ReceiptLine(a.lines().getFirst().id(),product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(photo(true)),"核对","A1","L1")),"确认",key(),person.id());
   Application accepted=tx.execute(s->app.receive(scope,actor,a.id(),c));assertThat(accepted.confirmation().custodianId()).isEqualTo(person.id());assertThat(r.items(scope,customer,clock.instant()).getFirst().snapshot().custodian().kind()).isEqualTo("custodian");
  }
+
+ StorageScanDeliveryService scanDeliveries(){return new StorageScanDeliveryService(access,r,new StorageCommands(r),withdrawals);}
+ Intent scanDeliver(Intent intent,String key){return tx.execute(s->scanDeliveries().deliver(scope,actor,new ScanDelivery(intent.code(),key)));}
+ @Test void customerCodeScanImmediatelyDeliversOnceAndLostResponseCanBeReplayed()throws Exception{
+  var item=stored(5,false);var code=intent(item,2);String retry=key();var done=scanDeliver(code,retry);assertThat(done.status()).isEqualTo("completed");assertThat(done.code()).isNull();assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(3);
+  assertThatThrownBy(()->scanDeliver(code,key())).isInstanceOf(StorageException.class);assertThatThrownBy(()->withdrawals.scan(scope,actor,code.code())).isInstanceOf(StorageException.class);
+  clock.now=clock.now.plusSeconds(301);assertThat(scanDeliver(code,retry)).isEqualTo(done);assertThat(r.events(scope,customer).stream().filter(e->e.action().equals("delivered"))).hasSize(1);
+ }
+ @Test void concurrentScansOfOneCustomerCodeCannotDoubleDebit()throws Exception{
+  var item=stored(4,false);var code=intent(item,1);
+  try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<Boolean> attempt=()->{start.await();try{scanDeliver(code,key());return true;}catch(StorageException e){return false;}};var a=pool.submit(attempt);var b=pool.submit(attempt);start.countDown();assertThat(List.of(a.get(15,TimeUnit.SECONDS),b.get(15,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);}
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(3);assertThat(r.events(scope,customer).stream().filter(e->e.action().equals("delivered"))).hasSize(1);
+ }
+ @Test void scanRejectsMerchantOriginCancellationExpiryAndWrongStoreWithoutDeducting()throws Exception{
+  var item=stored(5,false);var merchant=tx.execute(s->withdrawals.create(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())));assertThatThrownBy(()->scanDeliver(merchant,key())).isInstanceOf(StorageException.class);
+  var cancelled=intent(item,1);tx.execute(s->withdrawals.cancel(scope,principal,cancelled.id(),new Key(key(),"cancel")));assertThatThrownBy(()->scanDeliver(cancelled,key())).isInstanceOf(StorageException.class);
+  var expired=intent(item,1);clock.now=expired.expiresAt();assertThatThrownBy(()->scanDeliver(expired,key())).isInstanceOf(StorageException.class);
+  var other=intent(item,1);assertThatThrownBy(()->tx.execute(s->scanDeliveries().deliver(new StoreScope(new TenantId(UUID.randomUUID()),store),actor,new ScanDelivery(other.code(),key())))).isInstanceOf(StorageException.class);assertThatThrownBy(()->tx.execute(s->scanDeliveries().deliver(new StoreScope(scope.tenantId(),UUID.randomUUID()),actor,new ScanDelivery(other.code(),key())))).isInstanceOf(StorageException.class);
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(5);
+ }
+ @Test void scannedBatchUsesOriginalStockValidationAndRollsBackAllLines()throws Exception{
+  var first=stored(2,false);var second=stored(2,false);var batch=tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(first.id(),1),new Selection(second.id(),2)),key())));deliver(intent(second,1),key());
+  assertThatThrownBy(()->scanDeliver(batch,key())).isInstanceOf(StorageException.class);assertThat(r.item(scope,first.id(),false,clock.instant()).remaining()).isEqualTo(2);assertThat(r.intent(scope,batch.id(),false).status()).isEqualTo("authorized");
+ }
+
+ @Test void concurrentRetryOfOneScanCommandReturnsSameCommittedResult()throws Exception{
+  var item=stored(3,false);var code=intent(item,1);String same=key();
+  try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<Intent> attempt=()->{start.await();return scanDeliver(code,same);};var a=pool.submit(attempt);var b=pool.submit(attempt);start.countDown();assertThat(a.get(15,TimeUnit.SECONDS)).isEqualTo(b.get(15,TimeUnit.SECONDS));}
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);assertThat(r.events(scope,customer).stream().filter(e->e.action().equals("scan.delivered"))).hasSize(1);
+ }
 }

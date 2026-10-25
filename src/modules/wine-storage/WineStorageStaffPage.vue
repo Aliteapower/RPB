@@ -2,6 +2,7 @@
 import {ref,watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {useMerchantStorage} from './merchant/useMerchantStorage'
+import StorageScanResult from './merchant/StorageScanResult.vue'
 import StorageCustomerPicker from './merchant/StorageCustomerPicker.vue'
 import MerchantStorageInbox from './merchant/MerchantStorageInbox.vue'
 import MerchantStorageCustodians from './merchant/MerchantStorageCustodians.vue'
@@ -13,7 +14,7 @@ import WalletQrScanner from '../wallet/components/WalletQrScanner.vue'
 import '../wallet/wallet.css'
 import './storage.css'
 defineOptions({inheritAttrs:false})
-const {store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scoped,can,choose,search,open,load,run,scan,recover,fail,t}=useMerchantStorage()
+const {store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scanResult,scoped,can,choose,search,open,load,run,scan,recover,fail,t}=useMerchantStorage()
 const router=useRouter(),operationBusy=ref(false),reviewing=ref(false),showScan=ref(false),storeInput=ref(store.value)
 watch(store,()=>{operationBusy.value=false;reviewing.value=false;showScan.value=false;storeInput.value=store.value})
 function identify(code:string){showScan.value=false;void run(()=>scan(code))}
@@ -27,11 +28,12 @@ function identify(code:string){showScan.value=false;void run(()=>scan(code))}
   <button v-if="task==='withdraw'&&can('deliver')" :disabled="busy||operationBusy||pending" @click="showScan=!showScan">{{t('scanCode')}}</button><WalletQrScanner v-if="task==='withdraw'&&showScan" purpose="storage" :title="t('scanCode')" :privacy-message="t('scanPrivacy')" :manual-label="t('pasteCode')" :invalid-message="t('invalidCode')" :disabled="busy||pending" @code="identify"/>
 <MerchantStorageInbox v-if="task==='deposit'&&can('receive')" :key="store" :api="api" :home="home" :disabled="busy||pending||operationBusy" @changed="load();notice=$event" @error="fail" @busy-change="operationBusy=$event" @reviewing-change="reviewing=$event"/>
   <details v-if="task==='deposit'&&!reviewing" class="storage-panel"><summary>{{t('directRegister')}}</summary><StorageCustomerPicker v-model:query="query" :customer="customer" :results="results" :busy="busy||operationBusy" :searching="searching" :searched="searched" @search="search" @choose="choose"/><MerchantStorageDeposit v-if="scoped&&customer" :key="`${store}:${customer.id}`" :home="scoped" :api="api" :store="store" :customer-id="customer.id" :disabled="busy||pending||operationBusy" :can-receive="can('receive')" @saved="load();notice=t('received')" @error="fail" @busy-change="operationBusy=$event"/></details>
-  <StorageCustomerPicker v-if="task!=='deposit'&&!reviewing" v-model:query="query" :customer="customer" :results="results" :busy="busy||operationBusy" :searching="searching" :searched="searched" @search="search" @choose="choose"/>
-  <template v-if="task!=='deposit'&&scoped&&customer&&!reviewing">
+  <StorageScanResult v-if="task==='withdraw'&&scanResult" :intent="scanResult" :home="home" :disabled="busy||pending" @next="scanResult=null;showScan=true"/>
+  <StorageCustomerPicker v-if="task!=='deposit'&&!reviewing&&!scanResult" v-model:query="query" :customer="customer" :results="results" :busy="busy||operationBusy" :searching="searching" :searched="searched" @search="search" @choose="choose"/>
+  <template v-if="task!=='deposit'&&scoped&&customer&&!reviewing&&!scanResult">
    <MerchantStorageWithdrawal v-if="task==='withdraw'" :key="`${store}:${customer.id}`" :home="scoped" :customer-id="customer.id" :api="api" :disabled="busy||pending" :can-deliver="can('deliver')" :active-intent="activeIntent" @created="activeIntent=$event;load()" @command="run" @refresh="load" @error="fail" @cleared="activeIntent=null" @busy-change="operationBusy=$event"/>
    <MerchantStorageRecords v-if="task==='records'" :key="`${store}:${customer.id}`" :home="scoped" :api="api" :disabled="busy||pending" :can-correct="can('correct')" :can-photo="can('receive')" @command="run" @error="fail" @changed="load"/>
-  </template><p v-else-if="task!=='deposit'&&!reviewing" class="storage-panel storage-empty">{{t('noCustomer')}}</p>
+  </template><p v-else-if="task!=='deposit'&&!reviewing&&!scanResult" class="storage-panel storage-empty">{{t('noCustomer')}}</p>
   <MerchantStorageCustodians v-if="can('custodians.manage')" :key="store" :api="api" :disabled="busy||pending||operationBusy" @error="fail" @busy-change="operationBusy=$event"/>
   <MerchantStorageSettings :home="home" :api="api" :disabled="busy||pending||operationBusy" :can-manage="can('rules.manage')" @command="run"/>
  </template>

@@ -32,3 +32,9 @@ test('a definitive batch rejection clears the pending command and exposes exact 
  await assert.rejects(api.command('/intents/x/deliver',{}),e=>e.status===409&&e.problems[0].itemId==='expired')
  assert.equal(api.pending(),null)
 })
+
+test('lost scan redemption response recovers the same one-time code command and exact idempotency key',async()=>{
+ const api=storageApi('scan-store',false),calls=[],done={id:'pickup',status:'completed',code:null}
+ globalThis.fetch=async(url,options)=>{calls.push({url,body:options.body});if(calls.length===1)throw new Error('lost scan response');return{ok:true,json:async()=>done}}
+ await assert.rejects(api.command('/scan-deliver',{code:'WS.'+'S'.repeat(43)}),/lost scan response/);assert.equal(api.pending().path,'/scan-deliver');assert.deepEqual(await api.recover(),done);assert.equal(calls[0].body,calls[1].body);assert.equal(calls[1].url,'/api/v1/stores/scan-store/wine-storage/scan-deliver');assert.equal(api.pending(),null)
+})

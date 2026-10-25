@@ -23,6 +23,7 @@ public final class StorageDtos {
  public record IntentWrite(UUID customerId,List<Selection> selections,String idempotencyKey){}
  public record Intent(UUID id,UUID customerId,String origin,String status,Instant expiresAt,Instant completedAt,List<Selection> selections,String code){}
  public record Scan(String code){}
+ public record ScanDelivery(String code,String idempotencyKey){}
  public record Authorize(String code,String idempotencyKey){}
  public record Correction(String reason,String note,String idempotencyKey){}
  public record PhotoAdd(List<UUID> photos,String note,String idempotencyKey){}

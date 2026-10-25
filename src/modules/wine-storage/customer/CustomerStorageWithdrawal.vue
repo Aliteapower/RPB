@@ -33,5 +33,5 @@ async function create(){if(props.disabled||saving.value)return;const lines=withd
    <p class="storage-notice">{{t('handoverHint')}}</p><div class="storage-inline"><button :disabled="saving||disabled" @click="review=false">{{t('editSelection')}}</button><button class="primary" :disabled="saving||disabled||!selection" @click="create">{{t('generateCode')}}</button></div>
   </template>
  </section>
- <details class="storage-panel storage-customer-scan"><summary>{{t('scanMerchant')}}</summary><p>{{t('handoverHint')}}</p><button :disabled="disabled||saving" @click="emit('scan')">{{t('scan')}}</button></details>
+ <details class="storage-panel storage-customer-scan"><summary>{{t('scanMerchant')}}</summary><p>{{t('merchantHandoverHint')}}</p><button :disabled="disabled||saving" @click="emit('scan')">{{t('scan')}}</button></details>
 </template>
