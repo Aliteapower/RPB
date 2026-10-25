@@ -1,3 +1,68 @@
-.storage-page{--wallet-line:#d0dfd5;--wallet-muted:#5b6d65;--wallet-blue:#295b46;--wallet-ink:#183d35;max-width:1120px;margin:auto;padding:20px;color:#183d35;background:#f6f8f6;min-height:100vh;font:16px/1.6 system-ui}.storage-page header,.storage-page nav,.storage-inline{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.storage-page h1{flex:1;font-size:26px}.storage-page button,.storage-page select,.storage-page input:not([type=checkbox]),.storage-page textarea{font:inherit;border:1px solid #bdcec5;border-radius:8px;padding:10px;max-width:100%;box-sizing:border-box}.storage-page button{background:#e4eee7;color:#153a2d;cursor:pointer;min-height:44px}.storage-page button:disabled{opacity:.45;cursor:default}.storage-page label{display:block;margin:12px 0}.storage-page input:not([type=checkbox]),.storage-page textarea{display:block;width:100%;background:white}.storage-panel{padding:20px;border:1px solid #d0dfd5;border-radius:14px;background:white;margin:16px 0;overflow-wrap:anywhere}.storage-panel small{display:block;color:#5b6d65}.storage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:18px}.storage-grid .storage-panel{margin:0}.storage-photos{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.storage-photos img{width:100px;height:120px;object-fit:contain;background:#edf1ee;border-radius:6px}.storage-options{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow:auto}.storage-notice{padding:14px;background:#fff3d6;border-radius:8px}.storage-error{color:#a22020;background:#ffeded;padding:14px}.storage-page pre{white-space:pre-wrap;overflow-wrap:anywhere}.storage-page nav{margin:20px 0}.storage-inline input:not([type=checkbox]){width:120px}@media(max-width:600px){.storage-page{padding:14px}.storage-page h1{font-size:22px}.storage-panel{padding:14px}}
+@import '../shared-commerce/commerce.css';
 
-.storage-page fieldset{border:0;margin:0;padding:0;min-width:0}.storage-photos>div{display:grid;gap:4px}
+.storage-page {
+  --wallet-line: #d9e4e6;
+  --wallet-muted: #567277;
+  --wallet-blue: #155f52;
+  --wallet-ink: #172b36;
+  min-height: 100dvh;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  padding-bottom: 48px;
+}
+.storage-page *, .storage-page *::before, .storage-page *::after { box-sizing: border-box; }
+.storage-page h1, .storage-page h2, .storage-page p { margin-top: 0; }
+.storage-page h1 { margin-bottom: 0; line-height: 1.4; }
+.storage-page h2 { margin-bottom: 16px; }
+.storage-page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0 20px; }
+.storage-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.storage-heading > div { display: grid; gap: 6px; }
+.storage-heading .cards-badge { width: fit-content; }
+.storage-page-header > button { flex-shrink: 0; }
+.storage-page a { text-decoration: none; }
+.storage-page a:hover { text-decoration: underline; }
+.storage-panel { background: #fff; border: 1px solid #d9e4e6; border-radius: 16px; padding: 18px; margin: 16px 0; box-shadow: 0 3px 12px #17394105; overflow-wrap: anywhere; }
+.storage-panel small { display: block; color: #567277; }
+.storage-store { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+.storage-store p { margin: 0; }
+.storage-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.storage-inline input:not([type=checkbox]) { width: 140px; }
+.storage-store select { width: auto; max-width: 100%; min-width: 160px; }
+.storage-page button { min-height: 44px; }
+.storage-page button:focus-visible, .storage-page a:focus-visible { outline: 3px solid #82b8ac; outline-offset: 3px; }
+.storage-page .storage-tabs { gap: 10px; margin: 20px 0 14px; }
+.storage-actions { margin-bottom: 16px; }
+.storage-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, 170px) auto; gap: 14px; align-items: end; margin-bottom: 20px; }
+.storage-page label { margin: 0; }
+.storage-page label:has(> input[type=checkbox]) { flex-direction: row; align-items: flex-start; }
+.storage-page input[type=checkbox] { accent-color: #155f52; margin-top: 5px; }
+.storage-page form:not(.storage-inline) > label, .storage-page fieldset > label, .storage-page form > button { margin-top: 14px; }
+.storage-page form:not(.storage-inline) > select, .storage-page fieldset > select { margin-top: 12px; }
+.storage-page textarea { min-height: 88px; resize: vertical; }
+.storage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.storage-grid .storage-panel { margin: 0; box-shadow: none; }
+.storage-empty { padding: 28px 12px; text-align: center; color: #567277; }
+.storage-photos { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.storage-photos img { width: 100px; height: 120px; object-fit: contain; background: #f1f7f6; border: 1px solid #d9e4e6; border-radius: 8px; }
+.storage-photos > div { display: grid; gap: 4px; }
+.storage-options { display: flex; flex-wrap: wrap; gap: 8px; max-height: 220px; overflow: auto; margin: 12px 0; }
+.storage-notice { padding: 12px 14px; border-radius: 9px; background: #f1f7f6; line-height: 1.6; color: #315c56; }
+.storage-error { color: #9b3322; background: #fff0ed; border-radius: 9px; padding: 12px 14px; overflow-wrap: anywhere; }
+.storage-page details { margin: 12px 0; }
+.storage-page summary { color: #155f52; cursor: pointer; }
+.storage-page fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.storage-page pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .storage-page { padding: 14px 14px 32px; }
+  .storage-page h1 { font-size: 22px; }
+  .storage-heading { gap: 10px; }
+  .storage-panel { padding: 16px; }
+  .storage-store { align-items: stretch; }
+  .storage-store form { width: 100%; }
+  .storage-store select { flex: 1; min-width: 0; }
+  .storage-toolbar { grid-template-columns: 1fr; }
+  .storage-toolbar > button { width: 100%; }
+  .storage-page .storage-tabs { gap: 8px; }
+  .storage-tabs button { flex: 1 1 auto; }
+}

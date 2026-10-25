@@ -771,7 +771,7 @@ test('cashier shortcuts directly expose permitted card and storage operations wi
   assert.equal(links.includes('/stores/A/wallet/transactions'),false)
   assert.ok(links.includes('/stores/A/wallet/transactions?type=topup&status=pending'))
   if(permissions.includes('wallet.cards.view'))assert.match(allText(scope.root),/持卡与核销/)
-  if(permissions.includes('wine_storage.view'))assert.match(allText(scope.root),/酒水寄存卡/)
+  if(permissions.includes('wine_storage.view'))assert.match(allText(scope.root),/酒水寄存管理/)
   scope.unmount()
   const more=mount(StaffMore,'staff',route,{},permissions);await tick()
   assert.equal(nodes(more.root,n=>n.tag==='a'&&['/stores/A/wallet/cards','/stores/A/wine-storage'].includes(n.props.href)).length,0)
