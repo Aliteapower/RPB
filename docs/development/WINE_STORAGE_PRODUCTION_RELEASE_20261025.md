@@ -60,6 +60,8 @@
 
 真实门店按现有商业授权与门店开关启用后才能开展新业务；本次发布没有自动开通。
 
+npm audit 报告既有锁文件的 7 个 high 级依赖条目（Vue/server-renderer、Vite、PostCSS、source-map-js、nanoid、brace-expansion），package.json/package-lock.json 与发布前一致。所列直接公告涉及 SSR、开发服务器或构建工具；本次线上交付为 nginx 静态 SPA 与 Java 后端，不运行 Node SSR/Vite 开发服务。本轮未升级依赖或做完整依赖可达性安全审计，保留 npm-audit.json 供后续维护，不能将构建成功解释为依赖无漏洞。
+
 ### Rollback Plan
 
 保留旧制品、完整备份和 V077 全部资料。保护期间的脚本可恢复旧 JAR、index 和版本标记，但先检查没有新增寄存物品及 NULL 价格，回退不删表或还原数据库覆盖交易。当前发布点满足该数据条件。
