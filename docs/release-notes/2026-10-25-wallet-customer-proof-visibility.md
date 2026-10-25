@@ -1,6 +1,6 @@
 # 商户查看顾客 PayNow 凭证
 
-2026-10-25；D:\RPB；本地修复，未发布生产。
+2026-10-25；D:\RPB；已按用户“提交部署”授权发布生产。
 
 ## 原因与修改
 
@@ -28,3 +28,18 @@
 需同时部署前后端，旧后端仍会过滤未确认凭证。本轮未执行生产顾客图片读取、收款确认或密码操作，未取得浏览器/真机视觉验收证据。
 
 回退本次查询条件和凭证组件、语言包修改即可恢复原行为，不恢复数据库，也不删除已上传凭证。
+
+## 生产发布记录
+
+- 功能提交 `05bf684e72089a145924edf7b7207fbd607bdca5` 已推送 `origin/codex/paynow-payment-product-line-staging`，仅8个相关文件；原有8个钱包组件换行状态及未跟踪材料保留，未纳入制品。
+- 干净Git归档2484文件核对通过，1989个源码文件与已测试工作区一致；独立安装锁定依赖后47项前端测试、类型检查、Vite构建及Maven package通过。此前30项后端结果按源码一致性核验后复用。
+- 与线上旧JAR逐项比较，仅WalletCollectionProofRepository.class发生实质变化；73个资源仅CRLF/LF差异，配置、迁移语义与全部依赖条目不变。Flyway保持070/70/0。
+- 发布目录 `/opt/rpb/releases/20261025-proof-visibility-05bf684e`，前后端版本标记均为功能提交。备份 `/opt/rpb/backups/20261025-proof-visibility-05bf684e-before`，包含旧JAR、完整前端、版本标记及1083528字节数据库dump，pg_restore目录验证通过。
+- JAR SHA256 `26cfda83d3209d05e7efe762ba8b5ae4bba2dc72f370b6ccf517d81e66ac53ec`；前端归档SHA256 `024598b4b5f72215bb5a44f1e12bf08728f4fb357e4acb4f3b760ce03000d906`；index SHA256 `9f29d1487021d1d6dee2027f62c1062111c74842ee7dc79191a460b7bb73a7f8`。
+- 持既有发布锁，短时隔离nginx到RPB请求，停止RPB后备份并比对116张原业务/配置表指纹；新程序就绪后数据指纹一致。资源先复制、index原子切换，进程稳定后恢复流量；自动回退未触发，临时规则已撤销。
+- 4个域名、12个页面入口匹配新index，20000000域名224个公网资源逐字节匹配制品；匿名auth/me、商户凭证历史及原图接口均401。未使用生产会话查看私人原图或确认交易，真机视觉验证限制仍保留。
+- 后端active，PID1436636，InvocationID `5b25b68536674301a5bd4e7708d2f25d`，NRestarts0；独立最终检查进程身份稳定，无新ERROR或Exception。nginx、PostgreSQL、Redis及Docker状态和进程身份保持。
+
+生产回退：持同一发布锁、隔离RPB入口、停止RPB，恢复备份JAR、index和两份版本标记；启动并确认就绪后恢复流量。旧assets已保留，不恢复数据库覆盖发布后的真实数据。
+
+证据：target/proof-visibility-source-proof.json、proof-visibility-clean-tests.log、proof-visibility-clean-build.log、proof-visibility-clean-package.log、proof-visibility-artifacts.json、proof-visibility-deploy.log、proof-visibility-public-proof.json、proof-visibility-final.log。
