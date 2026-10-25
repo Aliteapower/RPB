@@ -1,7 +1,7 @@
 # Release Notes
 
 ## Version / Date
-2026-10-25 storage-inbox-custodians；本地实现与验证完成，用户已授权提交部署，发布执行中。
+2026-10-25 storage-inbox-custodians；已按用户授权提交、推送并完成前后端生产部署，V078 已应用。
 
 ## New
 - 商户存酒首屏直接展示本店顾客待审核申请，包括顾客身份、原酒品/瓶数、提交时间和原申请图文。点击即进入该申请审核，不要求手动查找或选择顾客。
@@ -39,4 +39,25 @@ API、数据库、权限、事务/共享锁、JSON兼容、模块边界和UI自�
 前后端及 V078 需配套发布；未验证真实摄像头和生产业务写操作。待办最多100条，按最早优先，办理后刷新补齐；照片仍由原鉴权接口控制。
 
 ## Rollback Notes
-本轮未发布。后续发布保留 V078 表、权限、管理审计和已冻结的人员信息，不删业务数据；先回退前端入口和显示改动。回退后端前须验证旧版本对新增JSON字段的兼容，避免未验证的旧制品读取历史失败。不得整体回滚工作区已有改动。
+本轮已发布。回退保留 V078 表、权限、管理审计和已冻结的人员信息，不删业务数据；先回退前端入口和显示改动。回退后端前须验证旧版本对新增JSON字段的兼容，避免未验证的旧制品读取历史失败。不得整体回滚工作区已有改动。
+
+## 生产发布结果
+
+- 功能提交 `f4f500c917b6f06147a088d06087f14e6dfb65a2`，已推送 origin/codex/paynow-payment-product-line-staging；线上前后端均为该版本。
+- 从干净 git archive 构建，npm ci、237项钱包/存酒前端组合测试、TypeScript/Vite构建及Maven打包通过。后台36项测试与发布提交代码一致，复用当前证据；没有混入工作区另有12个文件的改动。
+- V078在生产数据库隔离副本 `rpb_storage_inbox_rehearsal_f4f500c9` 演练通过：145项既有业务快照一致，新名单/审计为空，仅管理员新增权限。副本和dump保留为本轮演练证据，无改动实际业务数据库。新增权限从其他权限快照中单独排除，原有 wine_storage 权限仍受快照保护。
+- 实际旧590b54c1 JAR的DTO与依赖已单独抽出，在项目未自定义的Spring Jackson builder默认配置下读取新增人员快照和确认JSON成功，证据 rollback-compat.log；这是序列化兼容验证，不宣称完整旧服务回退启动演练。回退流程保留V078新增表和数据，不恢复业务数据库。
+- 服务器 43.134.69.75，发布目录 `/opt/rpb/releases/20261025-storage-inbox-f4f500c9`，备份 `/opt/rpb/backups/20261025-storage-inbox-f4f500c9-before`，包含旧JAR、前端、标记及数据库dump（5,017,382 bytes，经pg_restore列表验证）。
+- Flyway为 `078|78|0`。仅重启rpb-backend；nginx/PostgreSQL/Redis/Docker身份不变。新PID 1639145，InvocationID `0dc3d6baed49464f9925167083f00609`，发布及浏览器验收后仍稳定，当前进程无ERROR。
+- 13项已登录QA接口检查通过：产品、卡、钱包、商户/顾客存酒历史、顾客查询、商业关闭时新代登记拒绝、新待办及人员名单/管理员列表、顾客身份不能访问商户人员。只新增/撤销本轮独立测试会话，未处理真实资产交易。
+- 4域名32条公开页面路径与发布首页字节一致，11项相关静态资源与制品一致；20项匿名顾客/商户寄存、顾客查询、待办、人员接口均401。
+- 生产浏览器实际验证：首屏直接显示原有12瓶待办，不查顾客即可打开审核；原图可适屏放大/继续放大并关闭；实际瓶数临时改10可编辑，返回后原待办仍12；人员默认为“不指定”，管理入口及空名单可加载。顾客端自己的空记录及390px布局正常。未提交收存、拒绝、人员创建/停用，未上传照片或执行交付。
+- 浏览器验收后重新生成业务快照，145项仍与发布前一致；人员表0条，非管理员获新权限0条。原有12个本地文件SHA256未变。
+
+制品SHA256：
+
+- JAR `7e728ba47c91f9a2d9006e61856b5e146369bca22316035d260b497d1d85c40e`
+- 前端归档 `d5fc3303ffed7481b1638655b3afde2161d25b942f410ceda9bc152f81fa48c5`
+- 首页 `2a5dbb69980cecf2920d7be64d95d386f6f8acb5a3015daf30564a33c55134b0`
+
+证据：本地 `target/storage-inbox-release-20261025/`，服务器 `/home/ubuntu/storage-inbox-release-20261025/`，包括 scope.json、artifacts.json、frontend-tests.log、frontend-build.log、maven-package.log、rollback-compat.log、rehearsal.log、deploy.log、live-readback.json、final-check.json、after-browser.log。临时发布脚本、制品及真实照片不提交。
