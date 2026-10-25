@@ -53,3 +53,7 @@ Pre-flight：T1 产品快照供 T2 定价/T3 卡规则；T3 权益供 T4 核销�
 最终判定：APPROVE_WITH_COMMENTS，仅针对本地实现与已执行验证范围。剩余项为首版明确限制和手机摄像头/微信/iPhone 实机验收，不包含生产就绪或发布结论。
 
 详见 `CATALOG_CARDS_ACCEPTANCE_20261025.md` 和 `../release-notes/2026-10-25-shared-catalog-wallet-cards.md`。
+
+## 生产发布补记（2026-10-25）
+
+用户随后明确授权提交部署。功能提交 `9835201d` 已推送并部署；原有改动保留。产品目录、卡业务和原钱包真实 API、原数据保护及线上入口复核结果见 [生产发布记录](CATALOG_CARDS_PRODUCTION_RELEASE_20261025.md)。上文关于未提交/未发布的描述是本地验收当时的历史状态。
