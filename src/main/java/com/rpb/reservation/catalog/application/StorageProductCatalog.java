@@ -22,6 +22,19 @@ public class StorageProductCatalog {
   var ids=jdbc.queryForList("select p.id from catalog_products p join catalog_categories c on c.id=p.category_id and c.tenant_id=p.tenant_id left join catalog_product_stores l on l.product_id=p.id and l.tenant_id=p.tenant_id and l.store_id=? where p.tenant_id=? and (strpos(lower(p.name_zh),?)>0 or strpos(lower(p.name_en),?)>0 or strpos(lower(p.code),?)>0)"+(review?"":" and p.kind='physical' and p.status='active' and c.enabled and l.enabled and 'storage'=any(l.channels)")+" order by p.code limit 100",UUID.class,s.storeId().value(),s.tenantId().value(),q,q,q);
   return ids.stream().map(id->r.get(s,id)).toList();
  }
+ public record Options(List<Product> items,boolean hasMore,int page,List<CatalogDtos.Category> categories){}
+ public Options options(StoreScope s,String value,UUID category,int page,int size,String barcode){
+  String q=value==null?"":value.trim().toLowerCase(Locale.ROOT);if(q.length()>120||page<0||page>100000||size<1||size>12)throw CatalogException.invalid();
+  var args=new ArrayList<Object>();args.add(s.storeId().value());args.add(s.tenantId().value());
+  String sql="select p.id from catalog_products p join catalog_categories c on c.id=p.category_id and c.tenant_id=p.tenant_id join catalog_product_stores l on l.product_id=p.id and l.tenant_id=p.tenant_id and l.store_id=? where p.tenant_id=? and p.kind='physical' and p.status='active' and c.enabled and l.enabled and 'storage'=any(l.channels)";
+  if(barcode!=null&&!barcode.isBlank()){sql+=" and exists(select 1 from catalog_product_barcodes b where b.tenant_id=p.tenant_id and b.product_id=p.id and b.barcode=?)";args.add(ProductBarcode.normalize(barcode));}
+  else {sql+=" and (strpos(lower(p.name_zh),?)>0 or strpos(lower(p.name_en),?)>0 or strpos(lower(p.code),?)>0)";args.add(q);args.add(q);args.add(q);}
+  if(category!=null){sql+=" and p.category_id=?";args.add(category);}
+  args.add(size+1);args.add(page*size);
+  var ids=jdbc.queryForList(sql+" order by c.sort_order,p.code,p.id limit ? offset ?",UUID.class,args.toArray());
+  var cats=categories(s).stream().filter(CatalogDtos.Category::enabled).toList();
+  return new Options(ids.stream().limit(size).map(id->r.get(s,id)).toList(),ids.size()>size,page,cats);
+ }
  public Product selectable(StoreScope s,UUID id){return query.requireUsable(s,id,"storage");}
  @Transactional
  public Product associate(StoreScope s,UUID id,UUID category,String zh,String en,UUID actor){

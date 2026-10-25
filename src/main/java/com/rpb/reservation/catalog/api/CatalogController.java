@@ -9,9 +9,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/catalog")
 public class CatalogController {
- private final CatalogAccess identity;private final CatalogService service;
- public CatalogController(CatalogAccess identity,CatalogService service){this.identity=identity;this.service=service;}
+ private final CatalogBarcodeService barcodes;private final CatalogAccess identity;private final CatalogService service;
+ public CatalogController(CatalogAccess identity,CatalogService service,CatalogBarcodeService barcodes){this.barcodes=barcodes;this.identity=identity;this.service=service;}
  private StoreScope scope(UUID store){return new StoreScope(new TenantId(identity.actor().tenantId()),store);}
+ @GetMapping("/products/{id}/barcodes")public CatalogBarcodeService.Barcodes barcodes(@PathVariable UUID storeId,@PathVariable UUID id){return barcodes.list(scope(storeId),identity.actor(),id);}
+ @PostMapping("/products/{id}/barcodes")public CatalogBarcodeService.Barcodes barcode(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody CatalogBarcodeService.Write c){return barcodes.save(scope(storeId),identity.actor(),id,c);}
  @GetMapping("/categories")public List<Category> categories(@PathVariable UUID storeId){return service.categories(scope(storeId),identity.actor());}
  @PostMapping("/categories")public Category createCategory(@PathVariable UUID storeId,@RequestBody CategoryWrite c){return service.category(scope(storeId),identity.actor(),null,c);}
  @PutMapping("/categories/{id}")public Category updateCategory(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody CategoryWrite c){return service.category(scope(storeId),identity.actor(),id,c);}

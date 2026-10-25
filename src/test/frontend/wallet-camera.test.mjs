@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createWalletCamera } from '../../modules/wallet/scanning/cameraSession.ts'
+import { createCameraSession as createWalletCamera } from '../../modules/shared-commerce/scanning/cameraSession.ts'
 import { normalizeWalletQr } from '../../modules/wallet/scanning/walletQr.ts'
 
 const code='WP.'+'A'.repeat(43),bill='WB.'+'B'.repeat(43),origin='https://test.example'
