@@ -290,6 +290,9 @@ class WalletTransactionsPostgresTest {
         var page=list(all());var paid=page.items().stream().filter(i->i.id().equals(b.id())).findFirst().orElseThrow();
         assertThat(paid.status()).isEqualTo("completed");assertThat(paid.amountCents()).isEqualTo(2500);assertThat(paid.refundStatus()).isEqualTo("refunded");
         assertThat(paid.occurredAt()).isEqualTo(original.occurredAt());assertThat(page.summary().consumptionCents()).isEqualTo(2500);assertThat(page.summary().refundCents()).isEqualTo(2500);
+        var report=new WalletBusinessReportRepository(jdbc).query(scope,Instant.EPOCH,Instant.parse("2031-01-01T00:00:00Z"),"Asia/Singapore","month",false);
+        assertThat(report).anySatisfy(r->{assertThat(r.metric()).isEqualTo("consumption");assertThat(r.amount()).isEqualTo(2500);assertThat(r.count()).isEqualTo(1);});
+        assertThat(report).anySatisfy(r->{assertThat(r.metric()).isEqualTo("consumptionRefund");assertThat(r.amount()).isEqualTo(2500);});
         var detail=tx.execute(s->query().detail(scope,actor,null,"bill",b.id()));assertThat(detail.related()).extracting("sourceType").contains("refund");
         assertThat(detail.events()).extracting("type").contains("created","posted","wallet_posted");
     }
@@ -336,6 +339,13 @@ class WalletTransactionsPostgresTest {
         UUID independent=tx.execute(s->pointsService.createProgram(tenant,issuer));var otherBinding=new com.rpb.reservation.loyalty.application.PointsViews.Binding(tenant,issuer,null,store,independent);
         tx.execute(s->pointsService.mutate(otherBinding,actorId,customer,"manual_grant",new com.rpb.reservation.loyalty.application.PointsViews.Mutation(99,"其他产品积分",null,null,null,null,key())));
         assertThat(list(all()).totalCount()).isEqualTo(4);
+        var reportRepo=new WalletBusinessReportRepository(jdbc);
+        var report=reportRepo.query(scope,Instant.EPOCH,Instant.parse("2031-01-01T00:00:00Z"),"Asia/Singapore","month",true);
+        assertThat(report).hasSize(4);
+        assertThat(report).anySatisfy(r->{assertThat(r.metric()).isEqualTo("pointsGrant");assertThat(r.amount()).isEqualTo(20);});
+        assertThat(report).anySatisfy(r->{assertThat(r.metric()).isEqualTo("pointsReversalIn");assertThat(r.amount()).isEqualTo(5);});
+        assertThat(report).anySatisfy(r->{assertThat(r.metric()).isEqualTo("pointsReversalOut");assertThat(r.amount()).isEqualTo(20);});
+        assertThat(reportRepo.query(scope,Instant.EPOCH,Instant.parse("2031-01-01T00:00:00Z"),"Asia/Singapore","month",false)).isEmpty();
         var onlyMoney=new CurrentActor(tenant,actorId,"staff",Set.of(),Set.of("wallet.view"),Set.of(store));assertThat(query().list(scope,onlyMoney,null,all()).items()).isEmpty();
         var permissions=new HashSet<>(fundingActor.permissions());permissions.add("wallet.points.view");
         actor=new CurrentActor(tenant,actorId,"tenant_admin",Set.of("tenant_admin"),permissions,Set.of(store));

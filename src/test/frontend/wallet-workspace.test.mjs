@@ -139,3 +139,13 @@ test('staff selects a shared phone customer without requiring a prior customer l
   assert.equal(scope.state.customer.value.id,'legacy-without-phone');assert.equal(scope.state.account.value,null)
   assert.ok(calls.slice(before).every(c=>!c.body));scope.unmount()
 })
+
+test('switching from identified points customer to business report never opens a wallet account',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url,method:options.method});return response({transactionsEnabled:true})}
+ const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{kind:'points'},hash:''}),pinia=createPinia(),auth=authModule.useAuthSessionStore(pinia)
+ auth.user={permissions:['wallet.view','wallet.points.view','wallet.topup.create','wallet.reconcile.view']}
+ const scope=mount(()=>staffModule.provideStaffWallet(),route,pinia);await tick()
+ scope.state.customer.value={id:'customer-with-no-wallet',phone:'+6591234567'};scope.state.identifiedCustomerId.value='customer-with-no-wallet'
+ route.name='wallet-business-report';route.query={};await tick()
+ assert.ok(calls.every(c=>c.method==='GET'));assert.ok(calls.every(c=>!c.url.endsWith('/accounts')));scope.unmount()
+})

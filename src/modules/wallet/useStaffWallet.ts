@@ -70,7 +70,7 @@ function createWorkspace() {
     const phoneIdentity=preserved?.id===phoneConfirmedCustomerId.value?phoneConfirmedCustomerId.value:null
     generation++; clear();customer.value=preserved;identifiedCustomerId.value=identity;phoneConfirmedCustomerId.value=phoneIdentity;if(route.name!=='wallet-customers'||old?.[0]!==id)context.value = null;task.error.value=''
     const current=generation
-    void refresh().then(async()=>{if(current===generation && preserved && !only && !String(route.name).includes('transaction') && route.name!=='wallet-customers' && route.name!=='wallet-points-reverse' && (route.name!=='wallet-topup'||((identity||phoneIdentity)&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
+    void refresh().then(async()=>{if(current===generation && preserved && !only && !String(route.name).includes('transaction') && route.name!=='wallet-business-report' && route.name!=='wallet-customers' && route.name!=='wallet-points-reverse' && (route.name!=='wallet-topup'||((identity||phoneIdentity)&&route.query.kind==='money')))await choose(preserved)}).catch(e=>{if(current===generation)task.error.value=e instanceof Error?e.message:String(e)})
   }, { immediate: true,flush:'sync' })
   const timer = window.setInterval(() => { if (!task.busy.value && document.visibilityState === 'visible') void refresh().catch(e => { task.error.value = String(e.message ?? e) }) }, 5000)
   onUnmounted(() => { generation++; window.clearInterval(timer) })

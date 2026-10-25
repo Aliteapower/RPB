@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({com.rpb.reservation.wallet.proof.WalletCustomerProofController.class,com.rpb.reservation.wallet.proof.WalletCollectionProofController.class,com.rpb.reservation.wallet.collectionmethods.CollectionMethodController.class,com.rpb.reservation.wallet.merchantorder.MerchantOrderController.class,com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class})
+@WebMvcTest({com.rpb.reservation.wallet.proof.WalletCustomerProofController.class,com.rpb.reservation.wallet.proof.WalletCollectionProofController.class,com.rpb.reservation.wallet.collectionmethods.CollectionMethodController.class,com.rpb.reservation.wallet.merchantorder.MerchantOrderController.class,com.rpb.reservation.wallet.redemption.RedemptionController.class,WalletStaffController.class,WalletCustomerController.class,WalletSupportController.class,WalletCollectionSettingsController.class,WalletScanChargeController.class,com.rpb.reservation.wallet.personalpayment.WalletPersonalPaymentController.class,WalletPointsStaffController.class,com.rpb.reservation.wallet.transactions.TransactionController.class,com.rpb.reservation.wallet.transactions.WalletBusinessReportController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
@@ -58,6 +58,14 @@ class WalletLocalRuntimeSecurityTest {
     @MockBean com.rpb.reservation.wallet.redemption.RedemptionService redemptions;
     @MockBean WalletApiIdentity identity;
     @MockBean com.rpb.reservation.wallet.transactions.TransactionService transactions;
+    @MockBean com.rpb.reservation.wallet.transactions.WalletBusinessReportService businessReports;
+    @Test void businessReportRemainsStaffOnlyPrivateAndGetOnly()throws Exception{
+        when(identity.staff()).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录"));
+        String base="/api/v1/stores/20000000-0000-0000-0000-000000000983/wallet/business-report";
+        mvc.perform(get(base).param("period","day").param("date","2026-10-25")).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
+        mvc.perform(post(base).header("X-RPB-Wallet","1")).andExpect(status().isForbidden());
+        verifyNoInteractions(businessReports);
+    }
     @MockBean com.rpb.reservation.wallet.integration.WalletPointsAdapter points;
     @MockBean WalletAccountService accounts;
     @MockBean WalletTopupService topups;

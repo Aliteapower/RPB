@@ -24,7 +24,7 @@ watch(()=>route.name==='wallet-customers',active=>{if(active)void auth.ensureAut
 const viewRevision=ref(0),operationBusy=ref(false)
 watch(()=>route.fullPath,()=>{operationBusy.value=false},{flush:'sync'})
 function refreshView(){if(busy.value||operationBusy.value)return;viewRevision.value++;void run(refresh)}
-const queryPage=computed(()=>String(route.name).includes('transaction')||route.name==='wallet-customers')
+const queryPage=computed(()=>String(route.name).includes('transaction')||route.name==='wallet-customers'||route.name==='wallet-business-report')
 const nativeDetail=computed(()=>['wallet-staff-bill','wallet-staff-topup','wallet-refund-detail','wallet-customer-bill'].includes(String(route.name)))
 const historical=computed(()=>queryPage.value||nativeDetail.value)
 const atHome=computed(()=>route.name==='wallet-workbench'||route.name==='wallet-collect'||(route.name==='wallet-topup'&&route.query.entry!=='phone'))

@@ -37,6 +37,28 @@ class WalletComponentReportingTest {
   scope=new StoreScope(new TenantId(tenant),store);accounts=new WalletAccountRepository(jdbc,new ObjectMapper().findAndRegisterModules());ledger=new WalletLedgerRepository(jdbc);funding=new WalletFundingService(new WalletFundingRepository(jdbc),accounts,ledger);topups=new WalletTopupRepository(jdbc);collections=new WalletCollectionRepository(jdbc);reports=new WalletReconciliationRepository(jdbc,collections);program=accounts.requireProgram(scope,false);
  }
  Reconciliation report(){return reports.query(scope,program,Instant.EPOCH,Instant.now().plusSeconds(60));}
+ @Test void businessReportUsesPostingPeriodAndHidesAbsentItemsWithNoTruncationOrCrossStoreLeak(){
+  UUID id=tx.execute(t->{var a=accounts.open(scope,program,customer);var x=topups.create(scope,a,10000,"cash",actor);topups.status(scope,x.id(),"credited");
+   jdbc.update("update wallet_accounts set balance_cents=10000,principal_balance_cents=10000,version=1,funding_cutover_version=1 where tenant_id=? and id=?",tenant,a.id());
+   jdbc.update("insert into wallet_funding_lots(tenant_id,program_id,account_id,legacy,policy,initial_principal,initial_bonus,principal,bonus,credit_sequence) values(?,?,?,true,'principal_first',10000,0,10000,0,0)",tenant,program.id(),a.id());
+   jdbc.update("insert into wallet_entries(tenant_id,program_id,account_id,store_id,actor_id,kind,source_id,amount_cents,before_cents,after_cents,account_version,created_at) values(?,?,?,?,?,'topup_credit',?,10000,0,10000,1,'2024-02-29T16:00:00Z')",tenant,program.id(),a.id(),store,actor,x.id());
+   jdbc.update("insert into wallet_collections(tenant_id,store_id,topup_id,channel,amount_cents,collection_account,receipt_reference,terminal_code,confirmed_by,created_at) values(?,?,?,'cash',10000,'cash','report-test','T1',?,'2024-02-29T16:00:00Z')",tenant,store,x.id(),actor);
+   return x.id();});
+  jdbc.update("update wallet_topups set created_at='2024-01-01T00:00:00Z' where tenant_id=? and id=?",tenant,id);
+  var r=new com.rpb.reservation.wallet.transactions.WalletBusinessReportRepository(jdbc);
+  var rows=r.query(scope,Instant.parse("2024-02-29T16:00:00Z"),Instant.parse("2024-03-31T16:00:00Z"),"Asia/Singapore","day",true);
+  assertThat(rows).anySatisfy(v->{assertThat(v.metric()).isEqualTo("topupPrincipal");assertThat(v.amount()).isEqualTo(10000);assertThat(v.count()).isEqualTo(1);assertThat(v.bucket()).isEqualTo("2024-03-01");});
+  assertThat(rows).anySatisfy(v->{assertThat(v.metric()).isEqualTo("topupReceipt");assertThat(v.amount()).isEqualTo(10000);assertThat(v.channel()).isEqualTo("cash");});
+  assertThat(rows).noneSatisfy(v->assertThat(v.metric()).isIn("consumption","pointsGrant","topupBonus"));
+  assertThat(r.query(scope,Instant.parse("2024-01-01T00:00:00Z"),Instant.parse("2024-02-29T16:00:00Z"),"Asia/Singapore","day",true)).isEmpty();
+  assertThat(r.query(new StoreScope(scope.tenantId(),UUID.randomUUID()),Instant.EPOCH,Instant.now(),"Asia/Singapore","month",true)).isEmpty();
+  assertThat(r.query(new StoreScope(new TenantId(UUID.randomUUID()),store),Instant.EPOCH,Instant.now(),"Asia/Singapore","month",true)).isEmpty();
+  jdbc.update("insert into wallet_topups(tenant_id,program_id,account_id,store_id,amount_cents,bonus_cents,channel,status,created_by,created_at,credited_at) select tenant_id,program_id,account_id,store_id,100,10,channel,'credited',created_by,'2024-03-02T00:00:00Z','2024-03-02T00:00:00Z' from wallet_topups cross join generate_series(1,1201) where id=?",id);
+  jdbc.update("insert into wallet_topups(tenant_id,program_id,account_id,store_id,amount_cents,channel,status,created_by,created_at) select tenant_id,program_id,account_id,store_id,999999,channel,'pending_collection',created_by,'2024-03-02T00:00:00Z' from wallet_topups where id=?",id);
+  var annual=r.query(scope,Instant.parse("2023-12-31T16:00:00Z"),Instant.parse("2024-12-31T16:00:00Z"),"Asia/Singapore","month",false);
+  assertThat(annual).anySatisfy(v->{assertThat(v.metric()).isEqualTo("topupPrincipal");assertThat(v.count()).isEqualTo(1202);assertThat(v.amount()).isEqualTo(130100);assertThat(v.bucket()).isEqualTo("2024-03-01");});
+  assertThat(annual).anySatisfy(v->{assertThat(v.metric()).isEqualTo("topupBonus");assertThat(v.amount()).isEqualTo(12010);});
+ }
  @Test void giftComponentsNeverIncreaseCashAndExitReportsPrincipalCashAndRevokedBonusSeparately(){
   Topup topup=tx.execute(t->{var a=accounts.open(scope,program,customer);var x=topups.create(scope,a,10000,"cash",actor);jdbc.update("update wallet_topups set bonus_cents=1000 where tenant_id=? and id=?",tenant,x.id());var updated=topups.get(scope,x.id(),false);funding.credit(scope,a,updated,actor);topups.status(scope,x.id(),"credited");collections.confirm(scope,x.id(),null,"cash",10000,"cash","cash-test-"+UUID.randomUUID(),"T1","收款",actor);return updated;});
   var initial=report();assertThat(initial.topupCashCents()).isEqualTo(10000);assertThat(initial.creditedTopupCents()).isEqualTo(11000);assertThat(initial.creditedPrincipalCents()).isEqualTo(10000);assertThat(initial.creditedBonusCents()).isEqualTo(1000);
