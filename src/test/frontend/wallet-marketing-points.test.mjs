@@ -745,3 +745,18 @@ test('successful collection clears selection even when the subsequent detail ref
  await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await settle();assert.equal(scope.workspace.customer.value.id,'completed-c')
  fail=false;await nodes(scope.root,n=>n.tag==='form')[0].props.onSubmit(submitEvent());await settle();assert.equal(confirmed,true);assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.phoneConfirmedCustomerId.value,null);scope.unmount()
 })
+
+
+test('customer home keeps the same two action columns with and without a wallet account',async()=>{
+ const requests=[]
+ for(const accounts of [[],[{...funded}]]){
+  globalThis.fetch=async(url,options={})=>{requests.push({url,options});return response(url.endsWith('/me')?{accounts,pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:{balance:0})}
+  const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick()
+  const actions=nodes(scope.root,n=>String(n.props?.class??'').split(' ').includes('wallet-code-actions'))[0];assert.ok(actions)
+  assert.equal(actions.props.class,'wallet-hero-actions wallet-code-actions')
+  assert.deepEqual(nodes(actions,n=>n.tag==='a').map(n=>n.props.href),['/wallet/A/code','/wallet/A/scan'])
+  scope.unmount()
+ }
+ assert.ok(requests.every(r=>!r.options.method||r.options.method==='GET'))
+ assert.ok(!requests.some(r=>r.url.endsWith('/accounts')))
+})
