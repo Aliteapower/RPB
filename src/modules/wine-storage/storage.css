@@ -95,3 +95,12 @@
 .storage-merchant-customer-search input { width: 100% !important; }
 .storage-merchant-page .storage-inline h2 { margin-bottom: 6px; }
 .storage-merchant-page .storage-customer-tasks { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.storage-page .storage-photo-button { padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.storage-lightbox { position: fixed; inset: 0; z-index: 5000; background: rgba(8,20,25,.95); display: flex; flex-direction: column; padding: 16px; }
+.storage-lightbox-toolbar { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; }
+.storage-lightbox-toolbar a { color: white; }
+.storage-lightbox-image { overflow: auto; flex: 1; min-height: 0; display: grid; place-items: center; overscroll-behavior: contain; touch-action: pan-x pan-y pinch-zoom; }
+.storage-lightbox-image img { display: block; max-width: 100%; max-height: calc(100dvh - 120px); object-fit: contain; }
+.storage-lightbox-image.is-zoomed { display: block; }
+.storage-lightbox-image.is-zoomed img { width: 180%; max-width: none; max-height: none; }
+.storage-receipt-summary { padding: 14px; margin: 14px 0; border-radius: 12px; background: #eef6f4; }

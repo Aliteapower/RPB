@@ -32,7 +32,7 @@ public class StorageRegistrationService {
    r.update(scope,"insert into wine_storage_applications(tenant_id,store_id,id,customer_id,status,original,created_at,updated_at) values(?,?,?,?,'pending',?::jsonb,?,?)",id,command.customerId(),r.json(original),at(now),at(now));
    for(var line:originals)r.update(scope,"insert into wine_storage_application_lines(tenant_id,store_id,id,customer_id,application_id,original) values(?,?,?,?,?,?::jsonb)",line.id(),command.customerId(),id,r.json(line));
    r.event(scope,command.customerId(),id,"staff.registered",actor.actorId(),Map.of("rulesConfirmed",true,"origin","staff","reason",command.reason()),now);
-   return applications.receive(scope,actor,id,new Receive(receipts,command.reason(),UUID.randomUUID().toString()));
+   return applications.receive(scope,actor,id,new Receive(receipts,command.reason(),UUID.randomUUID().toString(),command.custodianId()));
   });
  }
 }

@@ -28,7 +28,7 @@ class StoragePostgresTest extends CatalogPostgresTest {
  @BeforeEach void storageFixture(){
   clock=new MutableClock();r=new StorageRepository(jdbc,json);var commands=new StorageCommands(r);access=mock(StorageAccess.class);when(access.timezone(scope)).thenReturn("Asia/Singapore");when(access.enabled(scope)).thenReturn(true);doCallRealMethod().when(access).own(any(),any());
   principal=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),customer,"test@example.com","顾客");storageCatalog=new StorageProductCatalog(new CatalogRepository(jdbc),products,jdbc);
-  photos=new StoragePhotoService(access,r);app=new StorageApplicationService(access,r,commands,storageCatalog,photos,clock);withdrawals=new StorageWithdrawalService(access,r,commands,clock);
+  photos=new StoragePhotoService(access,r);app=new StorageApplicationService(access,r,commands,storageCatalog,photos,clock,custodians());withdrawals=new StorageWithdrawalService(access,r,commands,clock);
   product=tx.execute(s->catalog.listing(scope,actor,product.id(),new Listing(500,List.of("cards","storage"),true,product.listingVersion(),key())));
   rule=tx.execute(s->app.rule(scope,actor,new RuleWrite(product.categoryId(),"自然月",3,key())));
  }
@@ -174,5 +174,37 @@ class StoragePostgresTest extends CatalogPostgresTest {
   doThrow(StorageException.forbidden()).when(access).staff(scope,actor,"wine_storage.receive",true);
   assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,c))).isInstanceOf(StorageException.class);
   assertThat(r.applications(scope,customer)).isEmpty();assertThat(r.items(scope,customer,clock.instant())).isEmpty();
+ }
+
+ StorageCustodianService custodians(){return new StorageCustodianService(access,r,new StorageCommands(r));}
+ @Test void custodianSelectionIsOptionalAndHistoricalSnapshotSurvivesRenameDisable()throws Exception{
+  var team=custodians();var write=new CustodianWrite("小兰","hostess",true,null,key());var person=tx.execute(s->team.save(scope,actor,null,write));
+  assertThat(tx.<Custodian>execute(s->team.save(scope,actor,null,write)).id()).isEqualTo(person.id());
+  var c=registration(photo(true),key());var assigned=new Registration(customer,c.lines(),c.reason(),true,c.idempotencyKey(),person.id());
+  var result=tx.execute(s->registrations().register(scope,actor,assigned));var item=r.items(scope,customer,clock.instant()).getFirst();assertThat(item.snapshot().custodian().name()).isEqualTo("小兰");
+  tx.execute(s->team.save(scope,actor,person.id(),new CustodianWrite("兰姐","hostess",false,person.version(),key())));
+  assertThat(team.list(scope,actor,false)).isEmpty();assertThat(team.list(scope,actor,true)).hasSize(1);assertThat(r.item(scope,item.id(),false,clock.instant()).snapshot().custodian().name()).isEqualTo("小兰");
+  Application replay=tx.execute(s->registrations().register(scope,actor,assigned));assertThat(replay).isEqualTo(result);
+  var fresh=registration(photo(true),key());assertThatThrownBy(()->tx.execute(s->registrations().register(scope,actor,new Registration(customer,fresh.lines(),fresh.reason(),true,fresh.idempotencyKey(),person.id())))).isInstanceOf(StorageException.class);
+  assertThat(r.items(scope,customer,clock.instant())).hasSize(1);
+ }
+ @Test void custodianVersionScopeAndAdministratorBoundariesAreEnforced(){
+  var team=custodians();var p=tx.execute(s->team.save(scope,actor,null,new CustodianWrite("保管一号","custodian",true,null,key())));
+  assertThatThrownBy(()->tx.execute(s->team.save(scope,actor,p.id(),new CustodianWrite("改名","custodian",true,99,key())))).isInstanceOf(StorageException.class);
+  var other=new StoreScope(scope.tenantId(),UUID.randomUUID());assertThatThrownBy(()->tx.execute(s->team.resolve(other,p.id()))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->team.resolve(new StoreScope(new TenantId(UUID.randomUUID()),store),p.id()))).isInstanceOf(StorageException.class);
+  var employee=new com.rpb.reservation.walkin.api.CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of("staff"),Set.of("wine_storage.custodians.manage"),Set.of(store));assertThatThrownBy(()->tx.execute(s->team.save(scope,employee,null,new CustodianWrite("擅自新增","hostess",true,null,key())))).isInstanceOf(StorageException.class);
+ }
+ @Test void inboxReturnsOwnStorePendingApplicationsWithCorrectCustomerIdentity()throws Exception{
+  var pending=apply(3,false);var done=apply(1,false);receive(done,1,false);clearInvocations(access);var inbox=new StoragePendingQuery(access,r);
+  var queue=inbox.list(scope,actor);assertThat(queue).hasSize(1);assertThat(queue.getFirst().application().id()).isEqualTo(pending.id());assertThat(queue.getFirst().customer().id()).isEqualTo(customer);assertThat(queue.getFirst().customer().displayName()).isEqualTo("顾客");
+  assertThat(inbox.list(new StoreScope(scope.tenantId(),UUID.randomUUID()),actor)).isEmpty();
+  verify(access).staff(scope,actor,"wine_storage.receive",false);
+ }
+
+ @Test void existingApplicationReceiptAlsoSupportsOptionalCustodian()throws Exception{
+  var person=tx.execute(s->custodians().save(scope,actor,null,new CustodianWrite("保管员A","custodian",true,null,key())));var a=apply(2,false);
+  var c=new Receive(List.of(new ReceiptLine(a.lines().getFirst().id(),product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(photo(true)),"核对","A1","L1")),"确认",key(),person.id());
+  Application accepted=tx.execute(s->app.receive(scope,actor,a.id(),c));assertThat(accepted.confirmation().custodianId()).isEqualTo(person.id());assertThat(r.items(scope,customer,clock.instant()).getFirst().snapshot().custodian().kind()).isEqualTo("custodian");
  }
 }

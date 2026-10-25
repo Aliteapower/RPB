@@ -24,4 +24,10 @@ class StorageJsonTest {
   assertThat(json.readValue("{\"quantity\":2}",ReceiptLine.class).quantity()).isEqualTo(2);
   assertThatThrownBy(()->json.readValue("{\"quantity\":1.5}",ReceiptLine.class)).isInstanceOf(JsonProcessingException.class);
  }
+
+ @Test void historicalReceiptAndSnapshotWithoutCustodianRemainReadable()throws Exception{
+  assertThat(json.writeValueAsString(new Receive(java.util.List.of(),"legacy","key"))).isEqualTo("{\"lines\":[],\"reason\":\"legacy\",\"idempotencyKey\":\"key\"}");
+  assertThat(json.readValue("{\"lines\":[],\"reason\":\"legacy\",\"idempotencyKey\":\"key\"}",Receive.class).custodianId()).isNull();
+  assertThat(json.readValue("{\"nameZh\":\"old wine\",\"receiptPhotos\":[],\"applicationPhotos\":[]}",Snapshot.class).custodian()).isNull();
+ }
 }

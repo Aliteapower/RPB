@@ -17,8 +17,8 @@ import static com.rpb.reservation.winestorage.persistence.StorageRepository.at;
 @Transactional(readOnly=true)
 public class StorageApplicationService {
  private final StorageAccess access;private final StorageRepository r;private final StorageCommands commands;
- private final StorageProductCatalog products;private final StoragePhotoService photos;private final Clock clock;
- public StorageApplicationService(StorageAccess access,StorageRepository r,StorageCommands commands,StorageProductCatalog products,StoragePhotoService photos,Clock clock){this.access=access;this.r=r;this.commands=commands;this.products=products;this.photos=photos;this.clock=clock;}
+ private final StorageProductCatalog products;private final StoragePhotoService photos;private final Clock clock;private final StorageCustodianService custodians;
+ public StorageApplicationService(StorageAccess access,StorageRepository r,StorageCommands commands,StorageProductCatalog products,StoragePhotoService photos,Clock clock,StorageCustodianService custodians){this.custodians=custodians;this.access=access;this.r=r;this.commands=commands;this.products=products;this.photos=photos;this.clock=clock;}
 
  @Transactional public Rule rule(StoreScope s,CurrentActor a,RuleWrite c){
   access.staff(s,a,"wine_storage.rules.manage",true);
@@ -88,7 +88,7 @@ public class StorageApplicationService {
     int actual=c.lines().stream().mapToInt(ReceiptLine::quantity).sum();if(actual<1||used+actual>available)throw StorageException.conflict("再次收存数量不能超过原实际领取数量");
     r.change(s,"redeposits",id,"quantity=?",actual);
    }
-   String zone=access.timezone(s);var now=clock.instant();var confirmed=new ArrayList<ReceiptLine>();var associated=new HashMap<UUID,com.rpb.reservation.catalog.application.CatalogDtos.Product>();Set<UUID> receiptPhotos=new HashSet<>();
+   CustodianRef custodian=custodians.resolve(s,c.custodianId());String zone=access.timezone(s);var now=clock.instant();var confirmed=new ArrayList<ReceiptLine>();var associated=new HashMap<UUID,com.rpb.reservation.catalog.application.CatalogDtos.Product>();Set<UUID> receiptPhotos=new HashSet<>();
    for(ReceiptLine l:c.lines()){
     var before=original.get(l.lineId());if(before==null||text(l.location()).length()>200||text(l.label()).length()>200)throw StorageException.invalid();validate(l.quantity(),l.opened(),l.source(),l.note());names(l.nameZh(),l.nameEn());
     photos.require(s,app.customerId(),l.photos(),"receipt");
@@ -97,14 +97,14 @@ public class StorageApplicationService {
     if(app.original().withdrawalId()!=null&&(!product.id().equals(before.productId())||!l.source().equals(before.source())))throw StorageException.conflict("再次寄存不能更换原领取酒品及来源");
     var rule=r.rule(s,l.ruleId());if(!rule.categoryId().equals(product.categoryId()))throw StorageException.conflict("保存规则与酒品分类不符");
     if(r.rules(s).stream().anyMatch(latest->latest.categoryId().equals(rule.categoryId())&&latest.version()>rule.version()))throw StorageException.conflict("保存规则已有新版本，请刷新后重新确认");
-    var snapshot=new Snapshot(product.id(),product.code(),product.nameZh(),product.nameEn(),product.categoryId(),rule,zone,text(l.note()),before.photos(),List.copyOf(l.photos()));
+    var snapshot=new Snapshot(product.id(),product.code(),product.nameZh(),product.nameEn(),product.categoryId(),rule,zone,text(l.note()),before.photos(),List.copyOf(l.photos()),custodian);
     var item=new Item(UUID.randomUUID(),id,app.customerId(),snapshot,l.quantity(),l.quantity(),l.opened(),l.source(),text(l.location()),text(l.label()),now,StorageRules.expires(now,zone,rule.months()),"stored");
     r.addItem(s,id,l.lineId(),rule.id(),item);
     photos.attach(s,app.customerId(),l.photos(),item.id(),"item");
     confirmed.add(new ReceiptLine(l.lineId(),product.id(),product.categoryId(),product.nameZh(),product.nameEn(),l.quantity(),l.opened(),l.source(),rule.id(),l.photos(),text(l.note()),text(l.location()),text(l.label())));
     r.change(s,"suggestions",l.lineId(),"status=?,product_id=?,reviewed_by=?,reviewed_at=?",l.productId()==null?"created":"linked",product.id(),a.actorId(),at(now));
    }
-   var confirmation=new Receive(confirmed,c.reason(),c.idempotencyKey());r.change(s,"applications",id,"status='stored',confirmation=?::jsonb,reason=?,updated_at=?",r.json(confirmation),c.reason(),at(now));
+   var confirmation=new Receive(confirmed,c.reason(),c.idempotencyKey(),c.custodianId());r.change(s,"applications",id,"status='stored',confirmation=?::jsonb,reason=?,updated_at=?",r.json(confirmation),c.reason(),at(now));
    r.event(s,app.customerId(),id,"received",a.actorId(),confirmation,now);return r.application(s,id,false);
   });
  }
