@@ -1,7 +1,7 @@
 # Release Notes
 
 ## Version / Date
-2026-10-26 storage-scan-delivery；已完成本地实现与验证，用户已授权提交部署，发布执行中。
+2026-10-26 storage-scan-delivery；已按用户授权提交、推送并完成前后端生产部署。
 
 ## New
 - 商户扫描顾客自己生成并授权的取酒码，直接核销码内酒品及数量，不再二次点击“确认实物已交付”。扫码前明确提示即刻核销，成功显示酒品/数量、完成时间及码已失效，可继续办理下一位。
@@ -37,4 +37,25 @@ API、状态转换、事务传播、幂等、权限和UI自审完成。扫码编
 前后端需配套发布。顾客页面离线时可能暂时显示旧二维码，服务端已完成的码仍不可再用。没有改变商户出码的交付流程。
 
 ## Rollback Notes
-本轮未发布。回退前端可以恢复原两步操作；后端新接口可暂保留，旧接口行为不变。已完成的核销和审计必须保留，不能恢复数据库来撤销真实交付，不整体回滚其他已有改动。
+本轮已发布。回退前端可以恢复原两步操作；后端新接口可暂保留，旧接口行为不变。已完成的核销和审计必须保留，不能恢复数据库来撤销真实交付，不整体回滚其他已有改动。
+
+## 生产发布结果
+
+- 功能提交 `b4a3bf0d4f525130bab71e419eb77fd2fdee0785` 已推送 origin/codex/paynow-payment-product-line-staging，线上前后端均为该版本。
+- 从干净 git archive 源码构建，npm ci、全部240项钱包/存酒前端测试、TypeScript/Vite构建及Maven打包通过。42项后台测试与本次提交的后台代码一致，复用本轮已经核实的PostgreSQL隔离测试证据。
+- 没有数据库迁移、环境变量或依赖变更；Flyway发布前后均为 `078|78|0`。
+- 服务器 43.134.69.75；发布目录 `/opt/rpb/releases/20261026-storage-scan-b4a3bf0d`；备份 `/opt/rpb/backups/20261026-storage-scan-b4a3bf0d-before`，含旧JAR、前端、标记和经pg_restore列表验证的数据库dump（12,451,875 bytes）。回退只恢复制品，保留所有已完成业务数据。
+- 新rpb-backend PID 1711100，InvocationID `d156249e7f8e4fdfa5af6cbc9f8671ba`，发布和最终观察后稳定，日志无ERROR。nginx、PostgreSQL、Redis、Docker身份均未改变。
+- 16项已登录QA接口回读通过，含目录、卡、钱包、寄存/人员/待办、新扫码接口。新接口使用先经SQL证明不存在的随机合成码验证404、错误格式400、顾客身份写商户接口401，不消费任何真实码。成功扣减、并发和重复码场景由本轮真实PostgreSQL隔离schema测试覆盖，不将生产拒绝性探测描述为真实核销验收。
+- 4域名32个公开路径响应与新首页相同，11个相关静态资源字节与制品一致；24项匿名接口检查均401，包含新扫码写接口。
+- 业务快照本轮扩大到147项，涵盖人员/审计、完整平台应用及全部权限；部署前、回读后和浏览器检查后均相同。临时QA会话按本轮hash撤销，没有修改其他会话。
+- 生产浏览器跳转登录页，当前商户会话已过期，因此本轮未完成已登录页面点击验收；未代填生产密码、处理滑块或扫描真实取酒码。前文成功/失效页面和自动隐藏验证属于本地模拟UI及组件测试，不能作为生产实机扫描证明。
+- 原有12个无关本地文件的SHA256保持一致，未混入功能或证据提交。
+
+制品SHA256：
+
+- JAR `57a74edb2af22398405e7492e3d62a6ef40f9ce477fb05066ebe08f5b51092ba`
+- 前端归档 `d8096e5aae317e9ba977f3d4d2e8a27721e253bc8a4423757df3f8ad26affafc`
+- 首页 `7b2adcb4e80ec49ebb3943eeeb19f4804f087911541930a1d98b74af049a7be1`
+
+证据：本地 `target/storage-scan-release-20261026/`，服务器 `/home/ubuntu/storage-scan-release-20261026/`，含scope.json、artifacts.json、frontend-tests.log、frontend-build.log、maven-package.log、deploy.log、live-readback.json、final-check.json及after-browser.log。发布制品、临时脚本和合成码不提交。
