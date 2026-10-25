@@ -143,4 +143,36 @@ class StoragePostgresTest extends CatalogPostgresTest {
    assertThat(jdbc.queryForObject("select count(*) from "+table+" where tenant_id=?",Integer.class,tenant)).isZero();
   }
  }
+
+ Registration registration(UUID photo,String key){return new Registration(customer,List.of(new ReceiptLine(null,product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(photo),"代登记","A1","STAFF")),"已核对实物并向顾客说明规则",true,key);}
+ StorageRegistrationService registrations(){return new StorageRegistrationService(access,r,new StorageCommands(r),app,clock);}
+ @Test void staffRegistrationStoresAtomicallyAndReplaysWithoutImpersonatingCustomer()throws Exception{
+  var c=registration(photo(true),key());var service=registrations();var result=tx.execute(s->service.register(scope,actor,c));
+  assertThat(result.status()).isEqualTo("stored");assertThat(result.original().rulesAccepted()).isFalse();assertThat(result.lines().getFirst().photos()).isEmpty();
+  var items=r.items(scope,customer,clock.instant());assertThat(items).hasSize(1);assertThat(items.getFirst().remaining()).isEqualTo(2);assertThat(items.getFirst().snapshot().receiptPhotos()).isEqualTo(c.lines().getFirst().photos());
+  Application replay=tx.execute(s->service.register(scope,actor,c));assertThat(replay).isEqualTo(result);assertThat(r.items(scope,customer,clock.instant())).hasSize(1);
+  assertThat(r.events(scope,customer)).anySatisfy(e->{assertThat(e.action()).isEqualTo("staff.registered");assertThat(e.actorId()).isEqualTo(actor.actorId());assertThat(e.details()).containsEntry("rulesConfirmed",true);});
+  verify(access,atLeastOnce()).staff(scope,actor,"wine_storage.receive",true);verify(access,atLeastOnce()).customerId(scope,customer);
+  assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,new Registration(customer,c.lines(),"不同内容",true,c.idempotencyKey())))).isInstanceOf(StorageException.class);
+ }
+ @Test void staffRegistrationRequiresAttestationAndRollsBackInvalidEvidence()throws Exception{
+  var service=registrations();var c=registration(photo(false),key());
+  assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,new Registration(customer,c.lines(),c.reason(),false,key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,c))).isInstanceOf(StorageException.class);
+  assertThat(r.items(scope,customer,clock.instant())).isEmpty();assertThat(r.applications(scope,customer)).isEmpty();assertThat(r.events(scope,customer)).isEmpty();
+  var good=registration(photo(true),key());var line=good.lines().getFirst();var bad=new ReceiptLine(null,line.productId(),line.categoryId(),line.nameZh(),line.nameEn(),line.quantity(),line.opened(),line.source(),UUID.randomUUID(),line.photos(),line.note(),line.location(),line.label());
+  assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,new Registration(customer,List.of(bad),good.reason(),true,key())))).isInstanceOf(StorageException.class);
+  assertThat(r.applications(scope,customer)).isEmpty();assertThat(r.events(scope,customer)).isEmpty();
+  // A failed transaction must leave the receipt photo available for the corrected command.
+  Application corrected=tx.execute(s->service.register(scope,actor,good));assertThat(corrected.status()).isEqualTo("stored");
+
+ }
+ @Test void staffRegistrationRejectsWrongCustomerAndDeniedAccessBeforeWriting()throws Exception{
+  var service=registrations();var c=registration(photo(true),key());
+  doThrow(StorageException.missing()).when(access).customerId(scope,customer);
+  assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,c))).isInstanceOf(StorageException.class);
+  doThrow(StorageException.forbidden()).when(access).staff(scope,actor,"wine_storage.receive",true);
+  assertThatThrownBy(()->tx.execute(s->service.register(scope,actor,c))).isInstanceOf(StorageException.class);
+  assertThat(r.applications(scope,customer)).isEmpty();assertThat(r.items(scope,customer,clock.instant())).isEmpty();
+ }
 }

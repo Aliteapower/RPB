@@ -14,6 +14,7 @@ public final class StorageDtos {
  public record Application(UUID id,UUID customerId,String status,Apply original,List<Line> lines,Receive confirmation,String reason,Instant createdAt){}
  public record ReceiptLine(UUID lineId,UUID productId,UUID categoryId,String nameZh,String nameEn,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity,boolean opened,String source,UUID ruleId,List<UUID> photos,String note,String location,String label){}
  public record Receive(List<ReceiptLine> lines,String reason,String idempotencyKey){}
+ public record Registration(UUID customerId,List<ReceiptLine> lines,String reason,boolean rulesConfirmed,String idempotencyKey){}
  public record Key(String idempotencyKey,String reason){}
  public record Snapshot(UUID productId,String code,String nameZh,String nameEn,UUID categoryId,Rule rule,String timezone,String note,List<UUID> applicationPhotos,List<UUID> receiptPhotos){}
  public record Item(UUID id,UUID applicationId,UUID customerId,Snapshot snapshot,int quantity,int remaining,boolean opened,String source,String location,String label,Instant receivedAt,Instant expiresAt,String status){}

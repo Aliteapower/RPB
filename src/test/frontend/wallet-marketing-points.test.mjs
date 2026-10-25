@@ -29,6 +29,7 @@ function mount(component,kind,route,props={},permissions) {
  return{root,navigation,replacements,get auth(){return authModule.useAuthSessionStore(pinia)},get workspace(){return workspace},unmount:()=>app.unmount()}
 }
 const response=body=>({ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)})
+const storageHome={timezone:'Asia/Singapore',storeName:'QA Store',stores:[],newBusinessEnabled:true,permissions:[],rules:[],categories:[],items:[],applications:[],intents:[],events:[]}
 const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' ')
 
 before(async()=>{
@@ -53,14 +54,14 @@ const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000
 
 test('wallet logout revokes the customer session only and ignores a late wallet response',async()=>{
  const writes=[];let late,finishLogout,reads=0;const home={context:staffContext,accounts:[{id:'account-A',balanceCents:12000,reservedCents:0}],pendingBills:[]}
- globalThis.fetch=async(url,options={})=>{if(url.endsWith('/customer-auth/logout')){writes.push({url,options});return new Promise(resolve=>finishLogout=resolve)}if(url.endsWith('/wallet/me')){if(++reads===1)return response(home);return new Promise(resolve=>late=resolve)}return response({balance:25})}
+ globalThis.fetch=async(url,options={})=>{if(url.endsWith('/wine-storage/home'))return response(storageHome);if(url.endsWith('/customer-auth/logout')){writes.push({url,options});return new Promise(resolve=>finishLogout=resolve)}if(url.endsWith('/wallet/me')){if(++reads===1)return response(home);return new Promise(resolve=>late=resolve)}return response({balance:25})}
  const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='退出登录').length,0)
  const refresh=scope.workspace.refresh();await tick();const logout=scope.workspace.logout();await tick();assert.equal(scope.workspace.loggingOut.value,true);await scope.workspace.logout();assert.equal(writes.length,1)
  finishLogout(response({success:true,principal:null}));await logout;late(response(home));await refresh;await tick();assert.equal(scope.workspace.home.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.needsLogin.value,true);assert.equal(writes[0].url,'/api/v1/public/customer-auth/logout');assert.equal(writes[0].options.credentials,'include');assert.equal(scope.auth.user.accountId,'cashier-A');scope.unmount()
 })
 
 test('failed wallet logout shows an error and can be retried without claiming success',async()=>{
- let attempts=0;const home={context:staffContext,accounts:[],pendingBills:[]};globalThis.fetch=async url=>{if(url.endsWith('/customer-auth/logout')){if(++attempts===1)throw new Error('offline');return response({success:true,principal:null})}return response(url.endsWith('/wallet/me')?home:{balance:0})}
+ let attempts=0;const home={context:staffContext,accounts:[],pendingBills:[]};globalThis.fetch=async url=>{if(url.endsWith('/wine-storage/home'))return response(storageHome);if(url.endsWith('/customer-auth/logout')){if(++attempts===1)throw new Error('offline');return response({success:true,principal:null})}return response(url.endsWith('/wallet/me')?home:{balance:0})}
  const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();await scope.workspace.logout();assert.ok(scope.workspace.home.value);assert.equal(scope.workspace.needsLogin.value,false);assert.equal(scope.workspace.loggingOut.value,false);assert.match(scope.workspace.error.value,/退出失败/);await scope.workspace.logout();assert.equal(attempts,2);assert.equal(scope.workspace.needsLogin.value,true);assert.equal(scope.workspace.home.value,null);scope.unmount()
 })
 test('phone entry requires candidate confirmation before operations and never opens a funding account while searching',async()=>{
@@ -364,8 +365,8 @@ test('staff navigation switches points and funding contexts immediately and igno
 
 test('customer wallet home shows points balance and unified transactions entry',async()=>{
  const entries=[{id:'grant',kind:'manual_grant',quantity:1000,beforeBalance:0,afterBalance:1000,createdAt:new Date().toISOString(),reason:'欢迎积分'},{id:'redeem',kind:'redemption',quantity:50,beforeBalance:1000,afterBalance:950,createdAt:new Date().toISOString(),redemptionDescription:'兑换咖啡'},{id:'reverse',kind:'reversal',quantity:10,beforeBalance:950,afterBalance:960,createdAt:new Date().toISOString(),reason:'纠正扣分'}]
- globalThis.fetch=async url=>response(url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:url.includes('/entries')?entries:{balance:960,version:3})
- const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/积分余额/);assert.match(allText(scope.root),/960/);
+ globalThis.fetch=async url=>response(url.endsWith('/wine-storage/home')?storageHome:url.endsWith('/me')?{accounts:[],pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:url.includes('/entries')?entries:{balance:960,version:3})
+ const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.match(allText(scope.root),/积分余额/);assert.match(allText(scope.root),/960/);assert.equal(nodes(scope.root,n=>n.tag==='a'&&n.props.href==='/wallet/A/wine-storage').length,1);
  for(const [section,category] of [['wallet-balance-hero','money'],['wallet-points-summary','points'],['wallet-shortcuts','all']]){
   const card=nodes(scope.root,n=>String(n.props?.class??'').split(' ').includes(section))[0];assert.ok(card,section)
   assert.equal(nodes(card,n=>n.tag==='a'&&n.props.href===`/wallet/A/transactions?category=${category}`).length,1)
@@ -748,10 +749,10 @@ test('successful collection clears selection even when the subsequent detail ref
 test('customer home keeps the same two action columns with and without a wallet account',async()=>{
  const requests=[]
  for(const accounts of [[],[{...funded}]]){
-  globalThis.fetch=async(url,options={})=>{requests.push({url,options});return response(url.endsWith('/me')?{accounts,pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:{balance:0})}
+  globalThis.fetch=async(url,options={})=>{requests.push({url,options});return response(url.endsWith('/wine-storage/home')?storageHome:url.endsWith('/me')?{accounts,pendingBills:[],context:{transactionsEnabled:true,store:{timezone:'Asia/Singapore'}}}:{balance:0})}
   const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick()
   const actions=nodes(scope.root,n=>String(n.props?.class??'').split(' ').includes('wallet-code-actions'))[0];assert.ok(actions)
-  assert.equal(actions.props.class,'wallet-hero-actions wallet-code-actions')
+  assert.equal(actions.props.class,'wallet-hero-actions wallet-code-actions');assert.equal(nodes(scope.root,n=>n.tag==='a'&&n.props.href==='/wallet/A/wine-storage').length,1)
   assert.deepEqual(nodes(actions,n=>n.tag==='a').map(n=>n.props.href),['/wallet/A/code','/wallet/A/scan'])
   scope.unmount()
  }

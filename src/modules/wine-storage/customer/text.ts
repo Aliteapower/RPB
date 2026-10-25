@@ -1,0 +1,24 @@
+import {useStorageText} from '../text'
+const zh={
+ bottleUnit:'瓶',bottleState:'酒瓶状态',customer:'自己带来的酒',source:'酒品来源',deposit:'我要存酒',withdrawTask:'我要取酒',records:'我的记录',
+ depositHint:'选择酒品、填写瓶数并拍照，提交后由门店核实收存。',
+ withdrawHint:'选择要取的酒，核对清单后生成取酒码，到店出示给店员。',
+ recordsHint:'查看自己的寄存申请、取酒记录和已结束的寄存。',
+ selectWine:'1. 选择酒品',wineSearch:'输入酒名或编号',chooseWine:'选择',noProducts:'没有找到酒品，可以填写酒名。',manualWine:'找不到酒品？填写酒名',wineName:'酒名',addManual:'添加这款酒',
+ bottleDetails:'2. 填写瓶数并拍照',photoHint:'请拍摄实际要寄存的酒，方便门店核对。',addWine:'继续选择其他酒品',submitApplication:'提交寄存申请',applicationSent:'寄存申请已提交，请把酒交给门店核实收存。',rulesTitle:'寄存须知',
+ emptyCollectible:'暂无可领取的酒品',emptyCollectibleHint:'新提交的寄存申请需等门店确认收存后，才会出现在这里。',chooseBottles:'1. 选择要取的酒',collectQuantity:'这次取几瓶',reviewSelection:'下一步：核对领取清单',reviewTitle:'2. 核对领取清单',generateCode:'生成取酒码',editSelection:'返回修改',selectOwn:'请先选择要取的酒品和有效瓶数',handoverHint:'生成取酒码不会扣减寄存数量；到店交给店员核对，实际交付后完成领取。',codeCreated:'取酒码已生成，请到店向店员出示。',scanMerchant:'店员已出码？扫描确认',
+ requests:'寄存申请',collections:'取酒记录',pastBottles:'已结束的寄存',noRequests:'还没有寄存申请',noCollections:'还没有取酒记录',noPastBottles:'暂无已结束的寄存',requestDetails:'查看申请明细',recover:'查询上次提交结果',pendingHint:'上一笔提交的结果还未确定，请先查询结果，避免重复提交。',
+ selectionChanged:'酒品状态或数量已变化，请重新核对领取清单。',signIn:'请先登录自己的顾客账号。',
+}
+const en:Record<keyof typeof zh,string>={
+ bottleUnit:'bottles',bottleState:'Bottle condition',customer:'Brought by me',source:'Bottle source',deposit:'Store bottles',withdrawTask:'Collect bottles',records:'My records',
+ depositHint:'Choose the wine, enter bottle quantities and add photos. The store checks and accepts your bottles.',
+ withdrawHint:'Select your bottles, review the quantities, then show the collection code to staff.',
+ recordsHint:'View your storage applications, collections and past holdings.',
+ selectWine:'1. Choose wine',wineSearch:'Search wine name or code',chooseWine:'Select',noProducts:'No matching wine. You can enter its name.',manualWine:'Cannot find it? Enter the wine name',wineName:'Wine name',addManual:'Add this wine',
+ bottleDetails:'2. Add quantities and photos',photoHint:'Photograph the actual bottles so staff can check them.',addWine:'Choose more wine',submitApplication:'Submit storage application',applicationSent:'Application submitted. Hand your bottles to staff for verification.',rulesTitle:'Storage terms',
+ emptyCollectible:'No bottles available to collect',emptyCollectibleHint:'New applications appear here after the store confirms physical receipt.',chooseBottles:'1. Choose bottles to collect',collectQuantity:'Bottles to collect',reviewSelection:'Next: review collection',reviewTitle:'2. Review your collection',generateCode:'Generate collection code',editSelection:'Back to selection',selectOwn:'Select your bottles and valid quantities first',handoverHint:'Creating a code does not deduct bottles. Staff checks it and confirms actual handover at the store.',codeCreated:'Your collection code is ready. Show it to staff at the store.',scanMerchant:'Staff has a code? Scan to confirm',
+ requests:'Storage applications',collections:'Collections',pastBottles:'Past holdings',noRequests:'No storage applications yet',noCollections:'No collections yet',noPastBottles:'No past holdings',requestDetails:'View application details',recover:'Check previous submission',pendingHint:'The previous result is uncertain. Check it before submitting again.',
+ selectionChanged:'Bottle availability changed. Review your selection again.',signIn:'Sign in to your customer account first.',
+}
+export function useCustomerStorageText(){const base=useStorageText();return{locale:base.locale,t:(key:string)=>(base.locale.value.startsWith('en')?en:zh)[key as keyof typeof zh]??base.t(key)}}
