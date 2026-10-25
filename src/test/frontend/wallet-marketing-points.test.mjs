@@ -5,7 +5,7 @@ import { createRenderer, h, nextTick, reactive } from 'vue'
 import { createPinia } from 'pinia'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { createI18n } from 'vue-i18n'
-let TopupDetail,SelfRegistrationView,StaffCustomers, sharedCustomerModule, ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
+let CashierTabs,CashierTools,TopupDetail,SelfRegistrationView,StaffCustomers, sharedCustomerModule, ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel, ReportPanel, EntryAllocations, MarketingPage, RefundComponent, StaffPoints, OfferComponent, CustomerTopups, messages, customerModule, staffModule, authModule, offersModule, pointsModule, apiModule
 const originalStorage=globalThis.sessionStorage
 const originalWindow=globalThis.window, originalFetch=globalThis.fetch, originalDocument=globalThis.document, originalDocumentClass=globalThis.Document, originalShadowRoot=globalThis.ShadowRoot
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
@@ -20,13 +20,13 @@ const renderer=createRenderer({
 function nodes(root,predicate){let out=[];if(predicate(root))out.push(root);for(const c of root.children||[])out.push(...nodes(c,predicate));return out}
 
 function mount(component,kind,route,props={},permissions) {
- let workspace;const navigation=[];
+ let workspace;const navigation=[],replacements=[];
  const root={children:[]},i18n=createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':{wallet:messages.walletZh}}}),pinia=createPinia()
  authModule.useAuthSessionStore(pinia).user={accountId:'cashier-A',roles:[],storeIds:['A'],permissions:permissions??['wallet.view','wallet.topup.create','wallet.points.view','wallet.points.grant','wallet.points.adjust','wallet.points.redeem','wallet.points.reverse']}
  const app=renderer.createApp({setup(){workspace=kind==='customer'?customerModule.provideCustomerWallet():staffModule.provideStaffWallet();return()=>h(component,props)}})
- app.use(pinia);app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target)},replace:async target=>{if(target&&typeof target==='object'&&target.query)route.query=target.query}})
+ app.use(pinia);app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target)},replace:async target=>{replacements.push(target);if(target&&typeof target==='object'&&target.query)route.query=target.query}})
  app.component('RouterLink',{props:['to'],setup:(props,{slots})=>()=>h('a',{href:props.to},slots.default?.())});app.mount(root)
- return{root,navigation,get auth(){return authModule.useAuthSessionStore(pinia)},get workspace(){return workspace},unmount:()=>app.unmount()}
+ return{root,navigation,replacements,get auth(){return authModule.useAuthSessionStore(pinia)},get workspace(){return workspace},unmount:()=>app.unmount()}
 }
 const response=body=>({ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)})
 const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' ')
@@ -36,7 +36,7 @@ before(async()=>{
  globalThis.window={setInterval:()=>1,clearInterval:()=>{},addEventListener(){},removeEventListener(){}}
  const storage=new Map();globalThis.sessionStorage={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}
  const {build,transform}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
- const entry=`export {default as TopupDetail} from './src/modules/wallet/pages/WalletStaffTopupDetail.vue';export {default as ReversalPage} from './src/modules/wallet/pages/WalletPointsReversal.vue';export {default as ReversalAction} from './src/modules/wallet/components/WalletPointsReversalAction.vue';export {default as SettingsPanel} from './src/modules/wallet/components/WalletSettingsPanel.vue';export {default as ChannelSettings} from './src/modules/wallet/components/WalletChannelSettings.vue';export {default as StaffSettings} from './src/modules/wallet/pages/WalletStaffSettings.vue';export {default as BottomNav} from './src/modules/wallet/components/WalletBottomNav.vue';export {default as CustomerOrder} from './src/modules/wallet/pages/WalletCustomerOrder.vue';export {default as MerchantCode} from './src/modules/wallet/pages/WalletMerchantCode.vue';export {default as CustomerRedemption} from './src/modules/wallet/pages/WalletCustomerRedemption.vue';export {default as NextCustomer} from './src/modules/wallet/components/WalletNextCustomer.vue';export {default as StaffHome} from './src/modules/wallet/pages/WalletStaffHome.vue';export * as personalCodeModule from './src/modules/wallet/usePersonalCode.ts';export {default as PersonalCode} from './src/modules/wallet/components/WalletPersonalCode.vue';export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopup.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
+ const entry=`export {default as CashierTabs} from './src/modules/wallet/components/WalletCashierTabs.vue';export {default as CashierTools} from './src/modules/wallet/components/WalletCashierTools.vue';export {default as TopupDetail} from './src/modules/wallet/pages/WalletStaffTopupDetail.vue';export {default as ReversalPage} from './src/modules/wallet/pages/WalletPointsReversal.vue';export {default as ReversalAction} from './src/modules/wallet/components/WalletPointsReversalAction.vue';export {default as SettingsPanel} from './src/modules/wallet/components/WalletSettingsPanel.vue';export {default as ChannelSettings} from './src/modules/wallet/components/WalletChannelSettings.vue';export {default as StaffSettings} from './src/modules/wallet/pages/WalletStaffSettings.vue';export {default as BottomNav} from './src/modules/wallet/components/WalletBottomNav.vue';export {default as CustomerOrder} from './src/modules/wallet/pages/WalletCustomerOrder.vue';export {default as MerchantCode} from './src/modules/wallet/pages/WalletMerchantCode.vue';export {default as CustomerRedemption} from './src/modules/wallet/pages/WalletCustomerRedemption.vue';export {default as NextCustomer} from './src/modules/wallet/components/WalletNextCustomer.vue';export {default as StaffHome} from './src/modules/wallet/pages/WalletStaffHome.vue';export * as personalCodeModule from './src/modules/wallet/usePersonalCode.ts';export {default as PersonalCode} from './src/modules/wallet/components/WalletPersonalCode.vue';export {default as RechargePage} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CustomerHome} from './src/modules/wallet/pages/WalletCustomerHome.vue';export {default as StaffMore} from './src/modules/wallet/pages/WalletStaffMore.vue';export {default as StaffCollect} from './src/modules/wallet/pages/WalletStaffCollect.vue';export {default as StaffTopup} from './src/modules/wallet/pages/WalletStaffTopup.vue';export {default as ExistingCharge} from './src/modules/wallet/components/WalletExistingBillCharge.vue';export * as chargeComponentsModule from './src/modules/wallet/useChargeComponents.ts';export {default as LedgerPanel} from './src/modules/wallet/components/WalletLedgerPanel.vue';export {default as ReportPanel} from './src/modules/wallet/components/WalletReportPanel.vue';export {default as EntryAllocations} from './src/modules/wallet/components/WalletEntryAllocations.vue';export {default as MarketingPage} from './src/modules/wallet/pages/WalletMarketing.vue';export {default as RefundComponent} from './src/modules/wallet/components/WalletRefundComponents.vue';export {default as StaffPoints} from './src/modules/wallet/pages/WalletPoints.vue';export {default as OfferComponent} from './src/modules/wallet/components/WalletTopupOffers.vue';export {default as CustomerTopups} from './src/modules/wallet/pages/WalletCustomerTopup.vue';export * as messages from './src/modules/wallet/locales.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as offersModule from './src/modules/wallet/useTopupOffers.ts';export * as pointsModule from './src/modules/wallet/usePoints.ts';`
  const result=await build({stdin:{contents:"export {default as SelfRegistrationView} from './src/modules/customers/CustomerSelfRegistrationForm.vue';export {default as StaffCustomers} from './src/modules/wallet/pages/WalletStaffCustomers.vue';export * as sharedCustomerModule from './src/modules/customers/useCustomerManagement.ts';"+entry,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'vue-runtime-test',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{
   if(path.endsWith('WalletQrScanner.vue'))return {contents:`import {h} from 'vue';export default {props:['purpose'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scan':true,onClick:()=>emit('code',((p.purpose==='identity'||p.purpose==='personal')?'WI.':'WC.')+'A'.repeat(43))},'scan')}`,loader:'js'}
   if(path.endsWith('WalletQrDisplay.vue')||path.endsWith('DownloadableQrCode.vue'))return {contents:`import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}`,loader:'js'}
@@ -46,7 +46,7 @@ before(async()=>{
  const dir='target/wallet-marketing-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
  const loaded=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now())
  TopupDetail=loaded.TopupDetail;
- ;({SelfRegistrationView,StaffCustomers,sharedCustomerModule,ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
+ ;({CashierTabs,CashierTools,SelfRegistrationView,StaffCustomers,sharedCustomerModule,ReversalPage,ReversalAction,SettingsPanel,ChannelSettings,StaffSettings,BottomNav,CustomerOrder,MerchantCode,CustomerRedemption,NextCustomer,StaffHome,personalCodeModule,PersonalCode,RechargePage,CustomerHome,StaffMore,StaffCollect,StaffTopup,ExistingCharge,chargeComponentsModule,LedgerPanel,ReportPanel,EntryAllocations,MarketingPage,RefundComponent,StaffPoints,OfferComponent,CustomerTopups,messages,customerModule,staffModule,authModule,offersModule,pointsModule}=loaded)
 })
 after(async()=>{globalThis.sessionStorage=originalStorage;globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000,creditTotalCents:11000}],campaignId:'campaign',channels:['cash','paynow'],deductionPolicy:'proportional',selfServiceEnabled:true}
@@ -72,13 +72,13 @@ test('phone entry requires candidate confirmation before operations and never op
  await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'phone-customer');assert.equal(scope.workspace.identifiedCustomerId.value,null)
  assert.ok(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length);assert.ok(!calls.some(u=>u.endsWith('/accounts')||u.endsWith('/topup-offers')));scope.unmount()
 })
-test('cashier hero has three permission-filtered folders and a distinct phone entry',async()=>{
+test('cashier landing directly enters consumption without a second entry click',async()=>{
  globalThis.fetch=async()=>response(staffContext)
- const scope=mount(StaffHome,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{},['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create','wallet.points.view']);await tick()
- assert.equal(nodes(scope.root,n=>n.props?.['data-cashier-tab']).length,3)
- nodes(scope.root,n=>n.props?.['data-cashier-tab']==='money')[0].props.onClick();await tick();assert.ok(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('scan=1')&&String(n.props.href).includes('kind=money')).length)
- assert.ok(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('entry=phone')).length);scope.unmount()
+ const scope=mount(StaffHome,'staff',reactive({name:'wallet-workbench',params:{storeId:'A'},query:{},hash:''}),{},['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create','wallet.points.view']);await tick()
+ assert.deepEqual(scope.replacements[0],{path:'/stores/A/wallet/collect'})
+ assert.equal(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).endsWith('/collect')).length,0);scope.unmount()
 })
+
 test('phone points-only entry confirms explicitly, cannot use short searches, and clears on a new store',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.includes('/customers?')?[{id:'phone-points',displayName:'积分顾客',phone:'+6581234567'}]:url.endsWith('/points/context')?{...staffContext,program:null}:{balance:10,version:1})}
  const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}),scope=mount(RechargePage,'staff',route,{},['wallet.points.view','wallet.points.grant']);await tick()
@@ -195,7 +195,7 @@ test('merchant selects one tier and confirms directly with server quote and PayN
  await scope.select('offer');await scope.select('paynow');assert.equal(scope.confirm().props.disabled,false);await scope.submit();await tick()
  assert.deepEqual(scope.calls.find(c=>c.url.endsWith('/topup-quotes')).body,{accountId:'merchant-account',offerId:'offer',offerVersion:2,channel:'paynow'})
  const body=scope.calls.find(c=>c.body&&c.url.endsWith('/topups')).body;assert.equal(body.quoteId,'automatic-quote');assert.equal(body.accountId,'merchant-account');assert.equal(body.amount,undefined)
- assert.equal(scope.navigation[0].path,'/stores/A/wallet/topups/pending-merchant');assert.deepEqual(scope.navigation[0].query,{entry:'phone'});assert.ok(!scope.calls.some(c=>c.url.includes('confirm-collection')));assert.doesNotMatch(allText(scope.root),/报价有效至/);scope.unmount()
+ assert.equal(scope.navigation[0].path,'/stores/A/wallet/topups/pending-merchant');assert.deepEqual(scope.navigation[0].query,{entry:'phone',kind:'money'});assert.ok(!scope.calls.some(c=>c.url.includes('confirm-collection')));assert.doesNotMatch(allText(scope.root),/报价有效至/);scope.unmount()
 })
 test('merchant automatic quote failure does not create a topup',async()=>{
  const scope=await merchantRecharge(()=>({ok:false,status:409,json:async()=>({code:'WALLET_OFFER_CHANGED',message:'充值活动已调整'})}));await scope.select('offer');await scope.submit();await tick();assert.equal(scope.calls.filter(c=>c.body&&c.url.endsWith('/topups')).length,0);assert.match(allText(scope.root),/充值活动已调整/);scope.unmount()
@@ -416,7 +416,7 @@ test('recharge scans consecutive customers and clears the previous wallet and op
  nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'customer-1')
  route.query={kind:'money'};scope.workspace.account.value={id:'old-account'};await tick()
  nodes(scope.root,n=>n.tag==='button'&&allText(n)==='扫下一位顾客')[0].props.onClick();await tick()
- assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(route.query.kind,undefined)
+ assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(route.query.kind,'money')
  nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'customer-2');assert.equal(scope.workspace.account.value,null);scope.unmount()
 })
 
@@ -477,15 +477,13 @@ test('renewal refreshes personal authorization from another device and late read
 })
 
 
-test('merchant home has one amount-first payment entry and scan-first top-up hint',async()=>{
+test('cashier landing falls back to topup or points according to real permissions',async()=>{
  globalThis.fetch=async()=>response(staffContext)
- const scope=mount(StaffHome,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{},permissions);await tick()
- const links=nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('/collect'))
- assert.equal(links.length,1);assert.equal(links[0].props.href.endsWith('/collect'),true)
- assert.match(allText(scope.root),/消费收款/);assert.match(allText(scope.root),/先输入消费金额和说明/);assert.match(allText(scope.root),/输入顾客手机号，核对并确认选中/)
- assert.doesNotMatch(allText(scope.root),/选择顾客收款|识别顾客付款码|员工确认扣款/);scope.unmount()
+ for(const [rights,kind] of [[['wallet.view','wallet.topup.create'],'money'],[['wallet.points.view'],'points']]){
+  const scope=mount(StaffHome,'staff',reactive({name:'wallet-workbench',params:{storeId:'A'},query:{},hash:''}),{},rights);await tick()
+  assert.deepEqual(scope.replacements[0],{path:'/stores/A/wallet/topup',query:{kind,scan:'1'}});scope.unmount()
+ }
 })
-
 
 test('cashier login change keeps original pending key, blocks recovery and ignores late payment result',async()=>{
  let release,commands=0;globalThis.fetch=async(url)=>{if(url.endsWith('/personal-scan-charges')){commands++;return await new Promise(r=>release=r)};return response(staffContext)}
@@ -502,7 +500,7 @@ test('settled result next customer clears identity and navigates to a fresh scan
   scope.workspace.customer.value={id:'previous'};scope.workspace.identifiedCustomerId.value='previous';scope.workspace.account.value={id:'previous-wallet'}
   const button=nodes(scope.root,n=>n.tag==='button')[0];button.props.onClick();assert.equal(scope.workspace.customer.value.id,'previous');assert.equal(scope.navigation.length,0)
   props.disabled=false;await tick();button.props.onClick();await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.identifiedCustomerId.value,null)
-  assert.equal(scope.navigation[0].path,collect?'/stores/A/wallet/collect':'/stores/A/wallet/topup');assert.deepEqual(scope.navigation[0].query,collect?{}:{scan:'1'});scope.unmount()
+  assert.equal(scope.navigation[0].path,collect?'/stores/A/wallet/collect':'/stores/A/wallet/topup');assert.deepEqual(scope.navigation[0].query,collect?{}:{scan:'1',kind:'money'});scope.unmount()
  }
 })
 
@@ -626,7 +624,7 @@ test('a dedicated points reversal stays in the transaction-record navigation sec
 
 test('wallet customer maintenance reuses the tenant directory only for authorized tenant administrators',async()=>{
  globalThis.fetch=async()=>response(staffContext)
- for(const component of [StaffHome,RechargePage,StaffMore]){
+ for(const component of [CashierTools,RechargePage,StaffMore]){
   const scope=mount(component,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}));await tick()
   const links=()=>nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).includes('/wallet/customers'))
   assert.equal(links().length,0);scope.auth.user.roles=['tenant_admin'];scope.auth.user.permissions.push('tenant.admin.manage');await tick()
@@ -759,4 +757,38 @@ test('customer home keeps the same two action columns with and without a wallet 
  }
  assert.ok(requests.every(r=>!r.options.method||r.options.method==='GET'))
  assert.ok(!requests.some(r=>r.url.endsWith('/accounts')))
+})
+
+
+test('cashier tabs directly navigate to operations, clear prior identity, and cannot switch while busy',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ const route=reactive({name:'wallet-collect',params:{storeId:'A'},query:{},hash:''}),props=reactive({disabled:false})
+ const scope=mount(CashierTabs,'staff',route,props,['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create','wallet.points.view']);await tick()
+ assert.equal(nodes(scope.root,n=>n.props?.['data-cashier-tab']).length,3)
+ scope.workspace.customer.value={id:'previous'};scope.workspace.identifiedCustomerId.value='previous';scope.workspace.account.value={id:'previous-account'}
+ await nodes(scope.root,n=>n.props?.['data-cashier-tab']==='money')[0].props.onClick();await tick()
+ assert.deepEqual(scope.navigation[0],{path:'/stores/A/wallet/topup',query:{kind:'money',scan:'1'}});assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.identifiedCustomerId.value,null)
+ props.disabled=true;await tick();await nodes(scope.root,n=>n.props?.['data-cashier-tab']==='points')[0].props.onClick();assert.equal(scope.navigation.length,1)
+ props.disabled=false;await tick();await nodes(scope.root,n=>n.props?.['data-cashier-tab']==='points')[0].props.onClick();assert.deepEqual(scope.navigation[1],{path:'/stores/A/wallet/topup',query:{kind:'points',scan:'1'}});scope.unmount()
+ const points=mount(CashierTabs,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{kind:'points'},hash:''}),{},['wallet.points.view']);await tick();assert.equal(nodes(points.root,n=>n.props?.['data-cashier-tab']).length,1);points.unmount()
+})
+test('next recharge customer preserves the chosen kind without carrying customer or receipt query fields',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ for(const kind of ['money','points']){
+  const scope=mount(NextCustomer,'staff',reactive({params:{storeId:'A'},query:{kind,receipt:'old',customerId:'previous'},hash:''}));await tick();scope.workspace.customer.value={id:'previous'}
+  nodes(scope.root,n=>n.tag==='button')[0].props.onClick();await tick();assert.deepEqual(scope.navigation[0].query,{scan:'1',kind});assert.equal(scope.workspace.customer.value,null);scope.unmount()
+ }
+})
+test('late payment completion after leaving the cashier cannot navigate over the new operation',async()=>{
+ let resolve;const writes=[];globalThis.fetch=async(url,options)=>{if(url.endsWith('/personal-scan-charges')){writes.push(options);return new Promise(r=>resolve=r)}return response(staffContext)}
+ const scope=mount(StaffCollect,'staff',reactive({params:{storeId:'leave-cashier'},query:{},hash:''}),{},permissions);await tick();await enterNumber(scope.root,5);await tick();nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0].props.onSubmit(submitEvent());await tick();nodes(scope.root,n=>n.props?.['data-scan'])[0].props.onClick();await tick();assert.equal(writes.length,1);scope.unmount()
+ resolve(response({status:'paid',bill:{id:'original-bill'}}));await tick();assert.equal(scope.navigation.length,0)
+})
+
+
+test('direct cashier cannot start the camera before a valid amount is entered',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ const scope=mount(StaffCollect,'staff',reactive({name:'wallet-collect',params:{storeId:'valid-cashier-amount'},query:{},hash:''}),{},permissions);await tick()
+ const form=nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0];form.props.onSubmit(submitEvent());await tick();assert.equal(nodes(scope.root,n=>n.props?.['data-scan']).length,0)
+ await enterNumber(scope.root,5);await tick();form.props.onSubmit(submitEvent());await tick();assert.equal(nodes(scope.root,n=>n.props?.['data-scan']).length,1);scope.unmount()
 })

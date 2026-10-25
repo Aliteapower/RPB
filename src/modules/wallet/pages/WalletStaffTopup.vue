@@ -35,7 +35,7 @@ async function create() {
       const result = await walletApi(id).command<Topup>('/topups',campaignId?{accountId,quoteId:quote.value!.quoteId}:{accountId,amount:String(amount.value),channel:method})
       if(id!==store.value || accountId!==account.value?.id)return
       quote.value=null
-      amount.value='';await router.push({path:staffWalletPath(id,`topups/${result.id}`),query:route.query.entry==='phone'?{entry:'phone'}:{}})
+      amount.value='';await router.push({path:staffWalletPath(id,`topups/${result.id}`),query:route.query.entry==='phone'?{entry:'phone',kind:'money'}:{kind:'money'}})
     } catch(e) {
       if(e instanceof WalletApiError&&['WALLET_OFFER_CHANGED','WALLET_TOPUP_QUOTE_EXPIRED','WALLET_TOPUP_OFFER_REQUIRED'].includes(e.code))quote.value=null
       throw e
