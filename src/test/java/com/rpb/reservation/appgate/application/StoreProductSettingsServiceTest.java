@@ -23,18 +23,18 @@ class StoreProductSettingsServiceTest {
     @BeforeEach void prepare(){
         when(stores.isActive(scope,false)).thenReturn(true);
         when(stores.isActive(scope,true)).thenReturn(true);
-        for(String key:List.of("wallet","daily_ledger"))when(gate.evaluateStoreActivation(key,tenant,store)).thenReturn(AppGateDecision.allow(key,tenant,store,null));
+        for(String key:List.of("wallet","daily_ledger","wine_storage"))when(gate.evaluateStoreActivation(key,tenant,store)).thenReturn(AppGateDecision.allow(key,tenant,store,null));
     }
     StoreAppSettingEntity setting(String key,boolean enabled){return StoreAppSettingEntity.of(UUID.randomUUID(),tenant,store,key,enabled,enabled,"{}",null,null,null);}
     @Test void listIncludesClosedAndUnpurchasedProductsWithoutWriting(){
         when(settings.findByTenantIdAndStoreIdAndAppKey(tenant,store,"wallet")).thenReturn(Optional.of(setting("wallet",false)));
         when(gate.evaluateStoreActivation("wallet",tenant,store)).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,AppGateDenyReason.STORE_APP_EXPIRED));
         var rows=service.list(scope);
-        assertThat(rows).hasSize(2);assertThat(rows.getFirst().enabled()).isFalse();assertThat(rows.getFirst().canEnable()).isFalse();assertThat(rows.getFirst().unavailableReason()).isEqualTo("STORE_APP_EXPIRED");
+        assertThat(rows).hasSize(3);assertThat(rows.getFirst().enabled()).isFalse();assertThat(rows.getFirst().canEnable()).isFalse();assertThat(rows.getFirst().unavailableReason()).isEqualTo("STORE_APP_EXPIRED");
         verifyNoInteractions(commands);
     }
     @Test void bothProductsCanBeDisabledAndReenabledThroughAuditedCommands(){
-        for(String key:List.of("wallet","daily_ledger")){
+        for(String key:List.of("wallet","daily_ledger","wine_storage")){
             when(settings.findByTenantIdAndStoreIdAndAppKey(tenant,store,key)).thenReturn(Optional.of(setting(key,true)));
             service.setEnabled(scope,actor,key,false);verify(commands).disableStoreApp(tenant,store,key,actor.actorId(),"tenant_admin");
             when(settings.findByTenantIdAndStoreIdAndAppKey(tenant,store,key)).thenReturn(Optional.of(setting(key,false)));

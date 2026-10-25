@@ -42,6 +42,7 @@ public class PlatformTenantAdminAccountRepository {
         ensurePermission(accountId, TENANT_ADMIN_MANAGE);
         AppGateRequiredPermission.DAILY_LEDGER_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
         AppGateRequiredPermission.WALLET_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
+        AppGateRequiredPermission.WINE_STORAGE_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
         AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS.forEach(
             permission -> ensurePermission(accountId, permission)
         );

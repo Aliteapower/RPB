@@ -155,7 +155,7 @@ public class AppGateService {
 
     private static AppGateDenyReason storeDenial(String appKey,StoreAppSubscription subscription,OffsetDateTime now) {
         // Wallet has no legacy tenant-wide grant: every trading store must be explicitly purchased.
-        if(subscription==null) return "wallet".equals(appKey)?AppGateDenyReason.STORE_APP_NOT_ENABLED:null;
+        if(subscription==null) return Set.of("wallet","wine_storage").contains(appKey)?AppGateDenyReason.STORE_APP_NOT_ENABLED:null;
         return subscription.denialAt(now);
     }
 

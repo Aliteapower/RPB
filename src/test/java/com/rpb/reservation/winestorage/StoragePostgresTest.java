@@ -1,0 +1,146 @@
+package com.rpb.reservation.winestorage;
+
+import com.rpb.reservation.catalog.CatalogPostgresTest;
+import com.rpb.reservation.catalog.application.*;
+import com.rpb.reservation.catalog.application.CatalogDtos.Listing;
+import com.rpb.reservation.catalog.persistence.CatalogRepository;
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
+import com.rpb.reservation.tenant.value.TenantId;
+import com.rpb.reservation.winestorage.application.*;
+import com.rpb.reservation.winestorage.domain.StorageException;
+import com.rpb.reservation.winestorage.persistence.*;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import javax.imageio.ImageIO;
+import org.junit.jupiter.api.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static com.rpb.reservation.winestorage.application.StorageDtos.*;
+
+class StoragePostgresTest extends CatalogPostgresTest {
+ StorageRepository r;StorageApplicationService app;StorageWithdrawalService withdrawals;StoragePhotoService photos;StorageProductCatalog storageCatalog;StorageAccess access;
+ CustomerAuthPrincipal principal;Rule rule;MutableClock clock;
+ static class MutableClock extends Clock {volatile Instant now=Instant.parse("2026-01-31T13:30:00Z");public Instant instant(){return now;}public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId z){return this;}}
+ @BeforeEach void storageFixture(){
+  clock=new MutableClock();r=new StorageRepository(jdbc,json);var commands=new StorageCommands(r);access=mock(StorageAccess.class);when(access.timezone(scope)).thenReturn("Asia/Singapore");when(access.enabled(scope)).thenReturn(true);doCallRealMethod().when(access).own(any(),any());
+  principal=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),customer,"test@example.com","顾客");storageCatalog=new StorageProductCatalog(new CatalogRepository(jdbc),products,jdbc);
+  photos=new StoragePhotoService(access,r);app=new StorageApplicationService(access,r,commands,storageCatalog,photos,clock);withdrawals=new StorageWithdrawalService(access,r,commands,clock);
+  product=tx.execute(s->catalog.listing(scope,actor,product.id(),new Listing(500,List.of("cards","storage"),true,product.listingVersion(),key())));
+  rule=tx.execute(s->app.rule(scope,actor,new RuleWrite(product.categoryId(),"自然月",3,key())));
+ }
+ UUID photo(boolean receipt)throws Exception {var out=new ByteArrayOutputStream();ImageIO.write(new BufferedImage(2,2,BufferedImage.TYPE_INT_RGB),"png",out);return tx.execute(s->receipt?photos.upload(scope,actor,customer,"receipt","image/png",out.toByteArray()):photos.upload(scope,principal,"image/png",out.toByteArray())).id();}
+ Apply command(int qty,boolean opened)throws Exception{return new Apply(List.of(new Line(null,product.id(),"","",qty,opened,"customer",List.of(photo(false)),"原申请")),true,null,null,key());}
+ Application apply(int qty,boolean opened)throws Exception {var c=command(qty,opened);return tx.execute(s->app.apply(scope,principal,c));}
+ Application receive(Application original,int qty,boolean opened)throws Exception{
+  var c=new Receive(List.of(new ReceiptLine(original.lines().getFirst().id(),product.id(),null,"","",qty,opened,"customer",rule.id(),List.of(photo(true)),"现场核对","A1","L1")),"现场核对后确认",key());return tx.execute(s->app.receive(scope,actor,original.id(),c));
+ }
+ Item stored(int qty,boolean opened)throws Exception {var a=apply(qty,opened);receive(a,qty,opened);return r.items(scope,customer,clock.instant()).stream().filter(i->i.applicationId().equals(a.id())).findFirst().orElseThrow();}
+ Intent intent(Item item,int qty){return tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(item.id(),qty)),key())));}
+ Intent deliver(Intent intent,String key){return tx.execute(s->withdrawals.deliver(scope,actor,intent.id(),new Key(key,"现场交付")));}
+ @Test void pendingConfirmRejectCancelAndImmutableSnapshots()throws Exception{
+  var c=command(6,false);var pending=tx.execute(s->app.apply(scope,principal,c));assertThat(r.items(scope,customer,clock.instant())).isEmpty();
+  assertThat(tx.execute(s->app.apply(scope,principal,c)).id()).isEqualTo(pending.id());receive(pending,5,false);
+  var item=r.items(scope,customer,clock.instant()).getFirst();assertThat(item.remaining()).isEqualTo(5);assertThat(item.expiresAt()).isEqualTo(Instant.parse("2026-04-30T13:30:00Z"));
+  assertThat(r.application(scope,pending.id(),false).lines().getFirst().quantity()).isEqualTo(6);
+  tx.execute(s->app.rule(scope,actor,new RuleWrite(product.categoryId(),"新规则",6,key())));assertThat(r.item(scope,item.id(),false,clock.instant()).snapshot().rule().months()).isEqualTo(3);
+  var rename=new com.rpb.reservation.catalog.application.CatalogDtos.ProductWrite("P",product.categoryId(),"新名称","Renamed","","","physical","瓶","",500,"inclusive","taxable",new java.math.BigDecimal("0.10"),List.of("storage","cards"),product.version(),key());
+  tx.execute(s->catalog.save(scope,actor,product.id(),rename));assertThat(r.item(scope,item.id(),false,clock.instant()).snapshot().nameEn()).isEqualTo("Coffee");
+  var cancelled=apply(1,false);assertThat(tx.execute(s->app.cancel(scope,principal,cancelled.id(),new Key(key(),"撤销"))).status()).isEqualTo("cancelled");
+  var rejected=apply(1,false);assertThat(tx.execute(s->app.reject(scope,actor,rejected.id(),new Key(key(),"未见实物"))).status()).isEqualTo("rejected");
+  assertThatThrownBy(()->tx.execute(s->app.receive(scope,actor,rejected.id(),new Receive(List.of(),"核对",key())))).isInstanceOf(StorageException.class);
+ }
+ @Test void partialOpenedBatchAndReplay()throws Exception{
+  var whole=stored(6,false);var opened=stored(1,true);var c=new IntentWrite(null,List.of(new Selection(whole.id(),2),new Selection(opened.id(),1)),key());
+  var intent=tx.execute(s->withdrawals.create(scope,principal,c));assertThat(withdrawals.scan(scope,actor,intent.code()).selections()).hasSize(2);String retry=key();deliver(intent,retry);deliver(intent,retry);
+  assertThat(r.item(scope,whole.id(),false,clock.instant()).remaining()).isEqualTo(4);assertThat(r.item(scope,opened.id(),false,clock.instant()).remaining()).isZero();
+  assertThat(r.item(scope,whole.id(),false,clock.instant()).expiresAt()).isEqualTo(whole.expiresAt());
+  assertThatThrownBy(()->deliver(intent,key())).isInstanceOf(StorageException.class);
+  assertThat(r.events(scope,customer).stream().filter(e->e.action().equals("delivered"))).hasSize(2);
+ }
+ @Test void preExpiryIntentCannotDeliverAtExpiryAndBatchRollsBack()throws Exception{
+  var first=stored(3,false);clock.now=clock.now.plusSeconds(60);var second=stored(3,false);
+  clock.now=first.expiresAt().minusSeconds(1);var i=tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(first.id(),1),new Selection(second.id(),1)),key())));
+  clock.now=first.expiresAt();assertThatThrownBy(()->deliver(i,key())).isInstanceOfSatisfying(StorageException.class,e->assertThat(e.problems().contains(new Problem(first.id(),"EXPIRED"))).isTrue());
+  assertThat(r.items(scope,customer,clock.instant())).allMatch(item->item.remaining()==3);
+ }
+ @Test void merchantIntentRequiresCustomerAuthorizationAndExpires()throws Exception{
+  var item=stored(2,false);var i=tx.execute(s->withdrawals.create(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())));
+  assertThatThrownBy(()->deliver(i,key())).hasMessageContaining("授权");assertThat(withdrawals.scan(scope,principal,i.code()).id()).isEqualTo(i.id());
+  tx.execute(s->withdrawals.authorize(scope,principal,i.id(),new Authorize(i.code(),key())));deliver(i,key());
+  var expired=intent(item,1);clock.now=clock.now.plusSeconds(300);assertThatThrownBy(()->deliver(expired,key())).hasMessageContaining("超时");
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(1);
+ }
+ @Test void simultaneousIntentsNeverOverdraw()throws Exception{
+  var item=stored(3,false);var one=intent(item,2);var two=intent(item,2);
+  try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<Boolean> a=()->{start.await();try{deliver(one,key());return true;}catch(StorageException e){return false;}};Callable<Boolean> b=()->{start.await();try{deliver(two,key());return true;}catch(StorageException e){return false;}};var x=pool.submit(a);var y=pool.submit(b);start.countDown();assertThat(List.of(x.get(15,TimeUnit.SECONDS),y.get(15,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);}
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(1);
+ }
+ @Test void suggestionsArePrivateUnpricedAndTenantStoreCustomerPhotosAreIsolated()throws Exception{
+  UUID img=photo(false);var c=new Apply(List.of(new Line(null,null,"茅台","Moutai",1,false,"customer",List.of(img),"")),true,null,null,key());var pending=tx.execute(s->app.apply(scope,principal,c));
+  assertThat(storageCatalog.search(scope,"Moutai",false)).isEmpty();
+  var rc=new Receive(List.of(new ReceiptLine(pending.lines().getFirst().id(),null,product.categoryId(),"茅台","Moutai",1,false,"customer",rule.id(),List.of(photo(true)),"","","")),"新酒审核",key());
+  var accepted=tx.execute(s->app.receive(scope,actor,pending.id(),rc));Application replay=tx.execute(s->app.receive(scope,actor,pending.id(),rc));assertThat(replay).isEqualTo(accepted);
+  assertThatThrownBy(()->tx.execute(s->app.receive(scope,actor,pending.id(),new Receive(rc.lines(),rc.reason(),key())))).isInstanceOf(StorageException.class);
+  var created=storageCatalog.search(scope,"Moutai",false).getFirst();assertThat(created.priceCents()).isNull();assertThat(created.channels()).containsExactly("storage");
+  assertThat(storageCatalog.search(scope,"茅台",false)).hasSize(1);assertThat(storageCatalog.search(scope,created.code(),false)).hasSize(1);assertThatThrownBy(()->products.requireUsable(scope,created.id(),"cards")).isInstanceOf(RuntimeException.class);
+  var other=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),UUID.randomUUID(),"other","Other");assertThatThrownBy(()->photos.image(scope,other,img)).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->r.application(new StoreScope(new TenantId(UUID.randomUUID()),store),pending.id(),false)).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->r.application(new StoreScope(new TenantId(tenant),UUID.randomUUID()),pending.id(),false)).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->app.cancel(scope,other,pending.id(),new Key(key(),"")))) .isInstanceOf(StorageException.class);
+ }
+ @Test void delistingDoesNotBlockDeliveryAndRedepositCreatesNewPending()throws Exception{
+  var item=stored(3,false);var i=intent(item,2);deliver(i,key());
+  var c=new Apply(List.of(new Line(null,product.id(),"","",2,false,"customer",List.of(photo(false)),"重新收存")),true,i.id(),item.id(),key());
+  var again=tx.execute(s->app.apply(scope,principal,c));assertThat(again.id()).isNotEqualTo(item.applicationId());assertThat(again.status()).isEqualTo("pending");
+  assertThatThrownBy(()->tx.execute(s->app.apply(scope,principal,new Apply(c.lines(),true,i.id(),item.id(),key())))).hasMessageContaining("超过");
+  tx.execute(s->catalog.status(scope,actor,product.id(),new com.rpb.reservation.catalog.application.CatalogDtos.Status("inactive",product.version(),key())));
+  deliver(intent(item,1),key());assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isZero();
+ }
+ @Test void changedQuantityCancelsAndForeignAuthorizationDoNotDebit()throws Exception{
+  var first=stored(2,false);var second=stored(2,false);
+  var batch=tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(first.id(),2),new Selection(second.id(),2)),key())));
+  deliver(intent(second,1),key());assertThatThrownBy(()->deliver(batch,key())).isInstanceOf(StorageException.class);
+  assertThat(r.item(scope,first.id(),false,clock.instant()).remaining()).isEqualTo(2);
+  var cancelled=intent(first,1);tx.execute(s->withdrawals.cancel(scope,principal,cancelled.id(),new Key(key(),"取消")));assertThatThrownBy(()->deliver(cancelled,key())).isInstanceOf(StorageException.class);
+  var merchant=tx.execute(s->withdrawals.create(scope,actor,new IntentWrite(customer,List.of(new Selection(first.id(),1)),key())));
+  var other=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),UUID.randomUUID(),"other","Other");assertThatThrownBy(()->tx.execute(s->withdrawals.authorize(scope,other,merchant.id(),new Authorize(merchant.code(),key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->withdrawals.scan(scope,actor,"WI."+"a".repeat(43))).isInstanceOf(StorageException.class);
+  assertThat(r.item(scope,first.id(),false,clock.instant()).remaining()).isEqualTo(2);
+ }
+ @Test void concurrentRetryOfSameHandoverReturnsOneCommittedResult()throws Exception{
+  var item=stored(3,false);var intent=intent(item,2);String sameKey=key();
+  try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<Intent> attempt=()->{start.await();return deliver(intent,sameKey);};var one=pool.submit(attempt);var two=pool.submit(attempt);start.countDown();assertThat(one.get(15,TimeUnit.SECONDS)).isEqualTo(two.get(15,TimeUnit.SECONDS));}
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(1);assertThat(r.events(scope,customer).stream().filter(e->e.action().equals("delivered"))).hasSize(1);
+ }
+ @Test void verifiedRedepositQuantityDoesNotConsumeBottlesThatWereNotReceivedAgain()throws Exception{
+  var item=stored(3,false);var pickup=intent(item,2);deliver(pickup,key());
+  var c=new Apply(List.of(new Line(null,product.id(),"","",2,false,"customer",List.of(photo(false)),"")),true,pickup.id(),item.id(),key());
+  var pending=tx.execute(s->app.apply(scope,principal,c));receive(pending,1,false);
+  var next=new Apply(List.of(new Line(null,product.id(),"","",1,false,"customer",List.of(photo(false)),"")),true,pickup.id(),item.id(),key());
+  assertThat(tx.execute(s->app.apply(scope,principal,next)).status()).isEqualTo("pending");
+ }
+ @Test void equivalentObjectKeyOrderReplaysTheOriginalCommittedCommand(){
+  var first=new LinkedHashMap<String,Object>();first.put("quantity",1);first.put("item","one");var reordered=new LinkedHashMap<String,Object>();reordered.put("item","one");reordered.put("quantity",1);
+  var commands=new StorageCommands(r);String key=key();String original=tx.execute(s->commands.run(scope,actor.actorId(),"staff","canonical-test",key,first,String.class,()->"committed"));
+  String replay=tx.execute(s->commands.run(scope,actor.actorId(),"staff","canonical-test",key,reordered,String.class,()->"must-not-execute"));assertThat(replay).isEqualTo(original);
+  assertThatThrownBy(()->tx.execute(s->commands.run(scope,actor.actorId(),"staff","canonical-test",key,Map.of("item","one","quantity",2),String.class,()->"must-not-execute"))).isInstanceOf(StorageException.class).hasMessageContaining("幂等键");
+ }
+ @Test void wrongPhotoPhaseReusedEvidenceAndOpenedQuantitiesAreRejected()throws Exception{
+  var invalid=command(2,true);assertThatThrownBy(()->tx.execute(s->app.apply(scope,principal,invalid))).isInstanceOf(StorageException.class);
+  UUID receipt=photo(true);var wrong=new Apply(List.of(new Line(null,product.id(),"","",1,false,"customer",List.of(receipt),"")),true,null,null,key());assertThatThrownBy(()->tx.execute(s->app.apply(scope,principal,wrong))).isInstanceOf(StorageException.class);
+  var original=command(1,false);tx.execute(s->app.apply(scope,principal,original));assertThatThrownBy(()->tx.execute(s->app.apply(scope,principal,new Apply(original.lines(),true,null,null,key())))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+  assertThatThrownBy(()->tx.execute(s->photos.upload(scope,principal,"image/png",new byte[]{1,2,3}))).isInstanceOf(StorageException.class);
+ }
+ @Test void newNameCanBeLinkedAndCorrectionsRemainAppendOnly()throws Exception{
+  var c=new Apply(List.of(new Line(null,null,"咖啡","Coffee",1,false,"customer",List.of(photo(false)),"用户原文")),true,null,null,key());var a=tx.execute(s->app.apply(scope,principal,c));receive(a,1,false);
+  assertThat(r.rows(scope,"select status,product_id from wine_storage_suggestions where tenant_id=? and store_id=? and line_id=?",a.lines().getFirst().id()).getFirst().get("status")).isEqualTo("linked");
+  var item=r.items(scope,customer,clock.instant()).getFirst();var event=tx.execute(s->app.correct(scope,actor,item.id(),new Correction("标签误写","实际标签 A2",key())));assertThat(event.action()).isEqualTo("correction");assertThat(r.item(scope,item.id(),false,clock.instant())).isEqualTo(item);
+  for(String table:List.of("wallet_accounts","wallet_entries","loyalty_accounts","loyalty_entries","customer_cards","card_entries","card_purchase_orders","card_payment_links")){
+   assertThat(jdbc.queryForObject("select count(*) from "+table+" where tenant_id=?",Integer.class,tenant)).isZero();
+  }
+ }
+}

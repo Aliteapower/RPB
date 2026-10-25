@@ -34,6 +34,13 @@
     "permissions": ["wallet.view", "wallet.topup.create", "wallet.charge.create"]
   },
   {
+    "appKey": "wine_storage",
+    "value": "/stores/:storeId/wine-storage",
+    "labelKey": "wineStorage.entry",
+    "descriptionKey": "wineStorage.description",
+    "permissions": ["wine_storage.view", "wine_storage.receive", "wine_storage.deliver"]
+  },
+  {
     "appKey": "daily_ledger",
     "value": "/stores/:storeId/daily-ledger",
     "labelKey": "platform.productLines.entryRoutes.dailyLedger.label",

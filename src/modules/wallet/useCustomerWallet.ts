@@ -15,6 +15,7 @@ function createWorkspace() {
   const account=computed(()=>home.value?.accounts[0]??null)
   let generation=0,sequence=0,legacyRunning=false,lastLegacyAttempt=''
   async function scan(value:string,replace=false) {
+    if(/^WS\.[A-Za-z0-9_-]{43}$/.test(value.trim())){await router.push(`/wallet/${store.value}/wine-storage#storage=${encodeURIComponent(value.trim())}`);return}
     const card=cardCode(value,window.location.origin)
     if(card){const target=value.startsWith('http')?new URL(value).pathname:`/wallet/${store.value}/cards`;await router.push(`${target}#card=${encodeURIComponent(card)}`);return}
     const decoded=merchantCode(value,window.location.origin)

@@ -4,6 +4,7 @@ import { customerAuthZh } from '../../components/customer-auth/locales'
 import { tenantEntryLinksZh } from '../../modules/tenant-entry-links/locales'
 import { tenantProductsZh } from '../../modules/tenant-products/locales'
 export const zhCN = {
+  wineStorage:{entry:'酒水寄存',description:'存酒卡、现场收存与领取'},
   tenantProducts: tenantProductsZh,
   customerAuth: customerAuthZh,
   tenantEntryLinks: tenantEntryLinksZh,

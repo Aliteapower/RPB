@@ -13,4 +13,5 @@ public class SharedStoreIdentityQuery {
     public Optional<PlatformStore> active(UUID tenant,UUID store) {
         return stores.findStore(tenant,store).filter(s -> !s.deleted() && "active".equals(s.status()));
     }
+    public java.util.List<PlatformStore> activeStores(UUID tenant){return stores.listStores(tenant).stream().filter(s->!s.deleted()&&"active".equals(s.status())).toList();}
 }

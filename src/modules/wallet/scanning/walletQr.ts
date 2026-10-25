@@ -9,12 +9,14 @@ export function merchantCode(value:string,origin:string):{store?:string;code:str
  throw new Error('Invalid merchant wallet code')
 }
 
-export type WalletQrPurpose = 'customer' | 'bill' | 'identity' | 'personal' | 'cardMerchant' | 'cardAuthorization'
+export type WalletQrPurpose = 'customer' | 'bill' | 'identity' | 'personal' | 'cardMerchant' | 'cardAuthorization' | 'storage'
 
 /** Shape/type checks only. Expiry, ownership and replay remain server decisions. */
 export function normalizeWalletQr(value: string, purpose: WalletQrPurpose, origin: string): string | null {
   const text = value.trim()
   if (text.length > 4096) return null
+  if(purpose==='storage')return /^WS\.[A-Za-z0-9_-]{43}$/.test(text)?text:null
+  if(purpose==='bill'&&/^WS\.[A-Za-z0-9_-]{43}$/.test(text))return text
   if(purpose==='cardMerchant')return cardCode(text,origin)?text:null
   if(purpose==='cardAuthorization')return cardCode(text,origin,'CA')
   if(purpose==='bill'&&cardCode(text,origin))return text

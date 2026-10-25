@@ -3,6 +3,7 @@ package com.rpb.reservation.appgate.domain;
 import java.util.Set;
 
 public final class AppGateRequiredPermission {
+    public static final Set<String> WINE_STORAGE_ADMIN_PERMISSIONS=Set.of("wine_storage.view","wine_storage.receive","wine_storage.deliver","wine_storage.rules.manage","wine_storage.correct");
     public static final Set<String> WALLET_ENTRY_PERMISSIONS=Set.of("wallet.view","wallet.topup.create","wallet.charge.create");
     public static final Set<String> WALLET_ADMIN_PERMISSIONS=Set.of("wallet.view","wallet.topup.create","wallet.charge.create","wallet.collection.confirm","wallet.refund.manage","wallet.reconcile.view","wallet.settings.manage","wallet.marketing.view","wallet.marketing.manage","wallet.points.view","wallet.points.grant","wallet.points.redeem","wallet.points.adjust","wallet.points.reverse","wallet.cards.view","wallet.cards.manage","wallet.cards.sell","wallet.cards.stamp","wallet.cards.redeem","wallet.cards.reverse","wallet.cards.refund","catalog.view","catalog.manage","catalog.publish");
     public static final Set<String> DAILY_LEDGER_ENTRY_PERMISSIONS = Set.of("daily_ledger.view", "daily_ledger.write");

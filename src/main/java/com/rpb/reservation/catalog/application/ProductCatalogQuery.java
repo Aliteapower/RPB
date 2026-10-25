@@ -13,5 +13,5 @@ public class ProductCatalogQuery {
  private final CatalogRepository r;
  public ProductCatalogQuery(CatalogRepository r){this.r=r;}
  public Product get(StoreScope s,UUID id){return r.get(s,id);}
- public Product requireUsable(StoreScope s,UUID id,String channel){var p=r.get(s,id);if(!p.listingEnabled()||!p.status().equals("active")||!p.channels().contains(channel)||r.categories(s.tenantId().value()).stream().noneMatch(c->c.id().equals(p.categoryId())&&c.enabled()))throw new CatalogException("CATALOG_UNAVAILABLE",409,"产品未上架或不适用于本门店渠道");return p;}
+ public Product requireUsable(StoreScope s,UUID id,String channel){var p=r.get(s,id);if(!p.listingEnabled()||!p.status().equals("active")||!p.channels().contains(channel)||r.categories(s.tenantId().value()).stream().noneMatch(c->c.id().equals(p.categoryId())&&c.enabled()))throw new CatalogException("CATALOG_UNAVAILABLE",409,"产品未上架或不适用于本门店渠道");if(!"storage".equals(channel)&&(p.priceCents()==null||p.taxMode()==null||p.taxCategory()==null||p.taxRate()==null))throw new CatalogException("CATALOG_UNPRICED",409,"产品尚未完成价格及税务配置");return p;}
 }

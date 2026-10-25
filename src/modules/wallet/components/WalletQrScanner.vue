@@ -5,7 +5,7 @@ import { createWalletCamera, type CameraState } from '../scanning/cameraSession'
 import { createQrDecoder } from '../scanning/qrDecoder'
 import { normalizeWalletQr, type WalletQrPurpose } from '../scanning/walletQr'
 import WalletIcon from './WalletIcon.vue'
-const props = withDefaults(defineProps<{ purpose: WalletQrPurpose; autoStart?: boolean; disabled?: boolean }>(), { autoStart: false, disabled: false })
+const props = withDefaults(defineProps<{ purpose: WalletQrPurpose; autoStart?: boolean; disabled?: boolean; title?:string; privacyMessage?:string; manualLabel?:string; invalidMessage?:string }>(), { autoStart: false, disabled: false })
 const emit = defineEmits<{ code: [value: string] }>()
 const { t } = useI18n(), video = ref<HTMLVideoElement | null>(null), manual = ref(''), imageError = ref(''), readingImage = ref(false)
 const state = shallowRef<CameraState>({ phase:'idle', issue:null, facing:'environment', torchAvailable:false, torch:false })
@@ -14,7 +14,7 @@ let sourceGeneration = 0
 function normalize(value: string) { return normalizeWalletQr(value, props.purpose, window.location.origin) }
 function found(value: string) {
   const code = normalize(value)
-  if (!code || props.disabled) { imageError.value = t(`wallet.scanner.${props.purpose === 'bill' ? 'wrongBill' : 'wrongCustomer'}`); return }
+  if (!code || props.disabled) { imageError.value = props.invalidMessage ?? t(`wallet.scanner.${props.purpose === 'bill' ? 'wrongBill' : 'wrongCustomer'}`); return }
   sourceGeneration++; camera.stop(); imageError.value = ''; manual.value = ''; emit('code', code)
 }
 const camera = createWalletCamera({
@@ -54,10 +54,10 @@ onMounted(() => {
 onUnmounted(() => { sourceGeneration++; camera.dispose(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', pause) })
 </script>
 <template>
-  <section class="wallet-scanner" :aria-label="t('wallet.scanner.title')" :aria-busy="disabled || readingImage">
+  <section class="wallet-scanner" :aria-label="title ?? t('wallet.scanner.title')" :aria-busy="disabled || readingImage">
     <div class="wallet-camera-preview" :class="{'is-live':live}">
       <video ref="video" v-show="live" autoplay playsinline webkit-playsinline muted disablepictureinpicture :aria-label="t('wallet.scan')" />
-      <div v-if="state.phase!=='scanning'" class="wallet-camera-placeholder"><WalletIcon name="scan" :size="48" /><strong>{{ t('wallet.scanner.title') }}</strong></div>
+      <div v-if="state.phase!=='scanning'" class="wallet-camera-placeholder"><WalletIcon name="scan" :size="48" /><strong>{{ title ?? t('wallet.scanner.title') }}</strong></div>
       <div v-if="state.phase==='scanning'" class="wallet-camera-guide" aria-hidden="true" />
       <p class="wallet-camera-status" role="status" aria-live="polite">{{ readingImage ? t('wallet.loading') : status }}</p>
     </div>
@@ -71,8 +71,8 @@ onUnmounted(() => { sourceGeneration++; camera.dispose(); document.removeEventLi
     <p v-if="cameraError || imageError" class="wallet-error" role="alert">{{ imageError || cameraError }}</p>
     <details class="wallet-scan-alternatives"><summary>{{ t('wallet.scanner.alternatives') }}</summary>
       <label class="wallet-camera-image">{{ t('wallet.scanImage') }}<input type="file" accept="image/*" :disabled="disabled || readingImage" @change="image"></label>
-      <form class="wallet-scan-manual" @submit.prevent="found(manual)"><input v-model="manual" :placeholder="t(purpose==='identity'||purpose==='personal'?'wallet.marketing.pastePersonal':'wallet.manualCode')" :aria-label="t(purpose==='identity'||purpose==='personal'?'wallet.marketing.pastePersonal':'wallet.manualCode')" maxlength="4096" autocomplete="off" :disabled="disabled || readingImage"><button :disabled="disabled || readingImage || !manual.trim()">{{ t('wallet.useCode') }}</button></form>
+      <form class="wallet-scan-manual" @submit.prevent="found(manual)"><input v-model="manual" :placeholder="manualLabel ?? t(purpose==='identity'||purpose==='personal'?'wallet.marketing.pastePersonal':'wallet.manualCode')" :aria-label="manualLabel ?? t(purpose==='identity'||purpose==='personal'?'wallet.marketing.pastePersonal':'wallet.manualCode')" maxlength="4096" autocomplete="off" :disabled="disabled || readingImage"><button :disabled="disabled || readingImage || !manual.trim()">{{ t('wallet.useCode') }}</button></form>
     </details>
-    <small>{{ t(purpose==='personal'?'wallet.personal.scanPrivacy':'wallet.scanner.privacy') }}</small>
+    <small>{{ privacyMessage ?? t(purpose==='personal'?'wallet.personal.scanPrivacy':'wallet.scanner.privacy') }}</small>
   </section>
 </template>

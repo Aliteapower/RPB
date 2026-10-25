@@ -1,4 +1,4 @@
-export type ManagedProductKey = 'wallet' | 'daily_ledger'
+export type ManagedProductKey = 'wallet' | 'daily_ledger' | 'wine_storage'
 export interface StoreProductSetting {
   appKey: ManagedProductKey
   enabled: boolean

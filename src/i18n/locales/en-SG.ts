@@ -4,6 +4,7 @@ import { customerAuthEn } from '../../components/customer-auth/locales'
 import { tenantEntryLinksEn } from '../../modules/tenant-entry-links/locales'
 import { tenantProductsEn } from '../../modules/tenant-products/locales'
 export const enSG = {
+  wineStorage:{entry:'Bottle storage',description:'Storage cards, receipt and collection'},
   tenantProducts: tenantProductsEn,
   customerAuth: customerAuthEn,
   tenantEntryLinks: tenantEntryLinksEn,
