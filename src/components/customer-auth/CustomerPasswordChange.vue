@@ -2,30 +2,32 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { changeCustomerPassword, CustomerPasswordApiError } from '../../api/customerAuthApi'
+const props = defineProps<{ disabled?: boolean }>()
 const { t, te } = useI18n()
+const emit = defineEmits<{ busyChange: [busy: boolean] }>()
 const open = ref(false), current = ref(''), password = ref(''), confirm = ref(''), busy = ref(false), error = ref(''), success = ref(false)
 function close() { open.value=false;current.value='';password.value='';confirm.value='';error.value='' }
 async function save() {
-  if (busy.value) return
+  if (busy.value || props.disabled) return
   error.value='';success.value=false
   if (password.value !== confirm.value) {error.value=t('customerAuth.mismatch');return}
-  busy.value=true
+  busy.value=true;emit('busyChange',true)
   try { await changeCustomerPassword(current.value,password.value);close();success.value=true }
   catch (e) { const key=`customerAuth.errors.${e instanceof CustomerPasswordApiError ? e.code : 'request_failed'}`;error.value=t(te(key)?key:'customerAuth.errors.request_failed') }
-  finally {busy.value=false}
+  finally {busy.value=false;emit('busyChange',false)}
 }
 </script>
 <template>
   <section class="customer-password-change">
-    <div v-if="!open" class="customer-account-actions"><button type="button" @click="open=true;success=false">{{ t('customerAuth.changePassword') }}</button><slot name="actions" /></div>
+    <div v-if="!open" class="customer-account-actions"><button type="button" :disabled="disabled" @click="open=true;success=false">{{ t('customerAuth.changePassword') }}</button><slot name="actions" /></div>
     <form v-else @submit.prevent="save">
       <strong>{{ t('customerAuth.changePassword') }}</strong><p>{{ t('customerAuth.passwordHint') }}</p>
-      <label>{{ t('customerAuth.currentPassword') }}<input v-model="current" type="password" autocomplete="current-password" maxlength="72" :disabled="busy" required></label>
-      <label>{{ t('customerAuth.newPassword') }}<input v-model="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy" required></label>
-      <label>{{ t('customerAuth.confirmPassword') }}<input v-model="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy" required></label>
+      <label>{{ t('customerAuth.currentPassword') }}<input v-model="current" type="password" autocomplete="current-password" maxlength="72" :disabled="busy || disabled" required></label>
+      <label>{{ t('customerAuth.newPassword') }}<input v-model="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy || disabled" required></label>
+      <label>{{ t('customerAuth.confirmPassword') }}<input v-model="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy || disabled" required></label>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <button :disabled="busy">{{ t(busy?'customerAuth.busy':'customerAuth.save') }}</button>
-      <button type="button" :disabled="busy" @click="close">{{ t('customerAuth.cancel') }}</button>
+      <button :disabled="busy || disabled">{{ t(busy?'customerAuth.busy':'customerAuth.save') }}</button>
+      <button type="button" :disabled="busy || disabled" @click="close">{{ t('customerAuth.cancel') }}</button>
     </form>
     <p v-if="success" role="status">{{ t('customerAuth.changed') }}</p>
   </section>

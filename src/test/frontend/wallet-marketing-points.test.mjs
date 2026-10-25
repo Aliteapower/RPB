@@ -54,8 +54,8 @@ const offers={offers:[{id:'offer',version:2,principalCents:10000,bonusCents:1000
 test('wallet logout revokes the customer session only and ignores a late wallet response',async()=>{
  const writes=[];let late,finishLogout,reads=0;const home={context:staffContext,accounts:[{id:'account-A',balanceCents:12000,reservedCents:0}],pendingBills:[]}
  globalThis.fetch=async(url,options={})=>{if(url.endsWith('/customer-auth/logout')){writes.push({url,options});return new Promise(resolve=>finishLogout=resolve)}if(url.endsWith('/wallet/me')){if(++reads===1)return response(home);return new Promise(resolve=>late=resolve)}return response({balance:25})}
- const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();const button=nodes(scope.root,n=>n.tag==='button'&&allText(n)==='退出登录')[0];assert.ok(button)
- const refresh=scope.workspace.refresh();await tick();const logout=scope.workspace.logout();await tick();assert.equal(scope.workspace.loggingOut.value,true);assert.equal(button.props.disabled,true);await scope.workspace.logout();assert.equal(writes.length,1)
+ const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='退出登录').length,0)
+ const refresh=scope.workspace.refresh();await tick();const logout=scope.workspace.logout();await tick();assert.equal(scope.workspace.loggingOut.value,true);await scope.workspace.logout();assert.equal(writes.length,1)
  finishLogout(response({success:true,principal:null}));await logout;late(response(home));await refresh;await tick();assert.equal(scope.workspace.home.value,null);assert.equal(scope.workspace.account.value,null);assert.equal(scope.workspace.needsLogin.value,true);assert.equal(writes[0].url,'/api/v1/public/customer-auth/logout');assert.equal(writes[0].options.credentials,'include');assert.equal(scope.auth.user.accountId,'cashier-A');scope.unmount()
 })
 
