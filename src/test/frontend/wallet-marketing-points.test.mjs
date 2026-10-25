@@ -760,6 +760,28 @@ test('customer home keeps the same two action columns with and without a wallet 
 })
 
 
+test('cashier shortcuts directly expose permitted card and storage operations without duplicating transaction navigation',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ for(const permissions of [[],['wallet.cards.view'],['wine_storage.view'],['wallet.cards.view','wine_storage.view']]){
+  const route=reactive({name:'wallet-collect',path:'/stores/A/wallet/collect',params:{storeId:'A'},query:{},hash:''})
+  const scope=mount(CashierTools,'staff',route,{},permissions);await tick()
+  const links=nodes(scope.root,n=>n.tag==='a').map(n=>n.props.href)
+  assert.equal(links.includes('/stores/A/wallet/cards'),permissions.includes('wallet.cards.view'))
+  assert.equal(links.includes('/stores/A/wine-storage'),permissions.includes('wine_storage.view'))
+  assert.equal(links.includes('/stores/A/wallet/transactions'),false)
+  assert.ok(links.includes('/stores/A/wallet/transactions?type=topup&status=pending'))
+  if(permissions.includes('wallet.cards.view'))assert.match(allText(scope.root),/持卡与核销/)
+  if(permissions.includes('wine_storage.view'))assert.match(allText(scope.root),/酒水寄存卡/)
+  scope.unmount()
+  const more=mount(StaffMore,'staff',route,{},permissions);await tick()
+  assert.equal(nodes(more.root,n=>n.tag==='a'&&['/stores/A/wallet/cards','/stores/A/wine-storage'].includes(n.props.href)).length,0)
+  more.unmount()
+  const nav=mount(BottomNav,'staff',route,{store:'A'},permissions);await tick()
+  assert.equal(nodes(nav.root,n=>n.tag==='a'&&n.props.href==='/stores/A/wallet/transactions').length,1)
+  nav.unmount()
+ }
+})
+
 test('cashier tabs directly navigate to operations, clear prior identity, and cannot switch while busy',async()=>{
  globalThis.fetch=async()=>response(staffContext)
  const route=reactive({name:'wallet-collect',params:{storeId:'A'},query:{},hash:''}),props=reactive({disabled:false})
