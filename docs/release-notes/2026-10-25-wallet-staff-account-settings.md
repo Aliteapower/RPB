@@ -1,6 +1,6 @@
 # 钱包收银台账户弹窗与当前用户信息
 
-2026-10-25；D:\RPB；本地实现，未提交或发布生产。
+2026-10-25；D:\RPB；已与收银台直接操作一起提交并发布生产，功能版本608dfa54。
 
 ## 功能
 
@@ -24,3 +24,5 @@
 - 手工代码审查通过：所有目标身份来自真实会话，查询/更新同时约束账号及租户；认证模块内职责分离，未修改原登录、原顾客改密和全局退出逻辑。证据：target/wallet-staff-account-ui-red.log、wallet-staff-account-backend-red.log、wallet-staff-account-ui-tests.log、wallet-staff-account-backend-tests.log、wallet-staff-account-build.log及surefire-reports。
 - 未执行真实账号密码修改或已登录生产视觉验收。需配套部署新增后端接口与前端。
 - 回退恢复本轮auth及账户弹窗程序即可；已由用户自行修改的密码和审计记录保留，不能恢复旧数据库覆盖密码或业务数据。
+
+生产证据与备份：docs/development/WALLET_ACCOUNT_DIRECT_CASHIER_PRODUCTION_RELEASE_20261025.md。
