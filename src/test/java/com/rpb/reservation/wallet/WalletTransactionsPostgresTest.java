@@ -145,6 +145,25 @@ class WalletTransactionsPostgresTest {
         assertThat(topupRepo.get(scope,topup.id(),false).status()).isEqualTo("pending_collection");
         assertThat(jdbc.queryForObject("select count(*) from wallet_collections where tenant_id=?",Long.class,tenant)).isZero();
         assertThat(staff.submitted(scope,actor,"topup",topup.id())).extracting("id").containsExactly(evidence.id());
+        var viewer=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of(),Set.of("wallet.view"),Set.of(store));
+        assertThat(staff.list(scope,viewer,"topup",topup.id())).extracting("id").containsExactly(evidence.id());
+        assertThat(staff.list(scope,viewer,"topup",topup.id()).getFirst().confirmation()).isEmpty();
+        assertThat(staff.image(scope,viewer,evidence.id()).bytes()).containsExactly(bytes);
+        assertThatThrownBy(()->staff.list(scope,null,"topup",topup.id())).isInstanceOf(WalletException.class);
+        var noRights=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of(store));
+        assertThatThrownBy(()->staff.list(scope,noRights,"topup",topup.id())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->staff.image(scope,noRights,evidence.id())).isInstanceOf(WalletException.class);
+        assertThatThrownBy(()->staff.list(scope,viewer,"topup",UUID.randomUUID())).isInstanceOf(WalletException.class);
+        var foreignTenant=new StoreScope(new TenantId(UUID.randomUUID()),store);
+        var foreignStore=new StoreScope(new TenantId(tenant),UUID.randomUUID());
+        for(var foreign:List.of(foreignTenant,foreignStore)){
+            assertThat(repo.list(foreign,"topup",topup.id())).isEmpty();
+            assertThatThrownBy(()->repo.get(foreign,evidence.id(),false)).isInstanceOf(WalletException.class);
+            assertThatThrownBy(()->staff.list(foreign,viewer,"topup",topup.id())).isInstanceOf(WalletException.class);
+            assertThatThrownBy(()->staff.image(foreign,viewer,evidence.id())).isInstanceOf(WalletException.class);
+        }
+        assertThat(accounts.account(scope,a.id(),false).balanceCents()).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from wallet_collections where tenant_id=?",Long.class,tenant)).isZero();
         assertThat(service.image(scope,principal,evidence.id()).bytes()).containsExactly(bytes);
         var stranger=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),UUID.randomUUID(),"other@example.com","Other");
         assertThatThrownBy(()->service.image(scope,stranger,evidence.id())).isInstanceOf(WalletException.class);
@@ -157,15 +176,24 @@ class WalletTransactionsPostgresTest {
         var employeeProof=tx.execute(st->staff.scan(scope,actor,"topup",topup.id(),"paynow","10",key(),"receipt.png","image/png",proofImage(3)));
         assertThatThrownBy(()->service.image(scope,principal,employeeProof.id())).isInstanceOf(WalletException.class);
         assertThat(service.list(scope,principal,"topup",topup.id())).hasSize(1);
+        // Staff scan drafts stay private to the confirmation workflow, not transaction history.
+        assertThat(staff.list(scope,viewer,"topup",topup.id())).extracting("id").containsExactly(evidence.id());
+        var pendingBill=bill(a,"10");
+        var billEvidence=tx.execute(st->service.submit(scope,principal,"bill",pendingBill.id(),"paynow","10",key(),"receipt.png","image/png",proofImage(6)));
+        assertThat(staff.list(scope,viewer,"bill",pendingBill.id())).extracting("id").containsExactly(billEvidence.id());
+        assertThat(staff.image(scope,viewer,billEvidence.id()).bytes()).containsExactly(proofImage(6));
+        assertThat(bills.get(scope,pendingBill.id(),false).externalPaidCents()).isZero();
         var collections=new WalletCollectionService(new WalletCollectionRepository(jdbc),collectionPort,staff);
         var staffTopups=new WalletTopupService(accounts,ledger,commands,topupRepo,collections,access,funding,marketing);
         tx.execute(st->staffTopups.confirm(scope,actor,topup.id(),new CollectionConfirm("paynow","10","202012345A","CUSTOMER-123","T1","private employee note",true,key(),evidence.id())));
         assertThat(accounts.account(scope,a.id(),false).balanceCents()).isEqualTo(1000);
         assertThat(service.list(scope,principal,"topup",topup.id()).getFirst().status()).isEqualTo("confirmed");
         assertThat(staff.submitted(scope,actor,"topup",topup.id())).isEmpty();
+        assertThat(staff.list(scope,viewer,"topup",topup.id())).extracting("id").containsExactly(evidence.id());
+        assertThat(staff.list(scope,viewer,"topup",topup.id()).getFirst().confirmation()).containsEntry("verified",true);
         assertThat(tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","10",uploadKey,"receipt.png","image/png",bytes)).id()).isEqualTo(evidence.id());
         assertThatThrownBy(()->tx.execute(st->service.submit(scope,principal,"topup",topup.id(),"paynow","10",key(),"receipt.png","image/png",bytes))).isInstanceOf(WalletException.class);
-        assertThat(jdbc.queryForObject("select count(*) from wallet_audit where tenant_id=? and action='customer.paynow.proof.submit'",Long.class,tenant)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from wallet_audit where tenant_id=? and action='customer.paynow.proof.submit'",Long.class,tenant)).isEqualTo(2);
     }
 
     @Test void paynowProofScanDoesNotCreditAndConfirmationBindsOnlyMatchingEvidence() {

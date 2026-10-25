@@ -130,7 +130,7 @@ test('direct customer-management entry uses shared authorized store header witho
  const scope=mount(StaffShell,route(false,{name:'wallet-customers'}));assert.match(text(scope.root),/共享授权门店 · 共享租户/);assert.ok(nodes(scope.root,n=>n.props?.['data-router-view']).length);assert.ok(!text(scope.root).includes('old context denied'));scope.unmount()
 })
 test('native bill detail falls back to authorized historical read-only query when legacy context is unavailable',async()=>{
- const requests=[];globalThis.fetch=async url=>{requests.push(url);return response({transaction:row(),related:[],events:[]})};const scope=mount(StaffShell,route(false,{name:'wallet-staff-bill',params:{storeId:'A',billId:'original-bill'}}));await tick();assert.ok(requests[0].endsWith('/transactions/bill/original-bill'));assert.match(text(scope.root),/交易记录/);scope.unmount()
+ const requests=[];globalThis.fetch=async url=>{requests.push(url);return response(url.includes('/collection-proofs/')?[]:{transaction:row(),related:[],events:[]})};const scope=mount(StaffShell,route(false,{name:'wallet-staff-bill',params:{storeId:'A',billId:'original-bill'}}));await tick();assert.ok(requests[0].endsWith('/transactions/bill/original-bill'));assert.match(text(scope.root),/交易记录/);scope.unmount()
 })
 
 test('pending mixed refund shows actual wallet posting without claiming external cash already returned',()=>{

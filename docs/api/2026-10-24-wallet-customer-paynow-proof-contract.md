@@ -10,6 +10,8 @@
 
 员工GET `/api/v1/stores/{storeId}/wallet/collection-proofs/{type}/{id}/submitted`：wallet.collection.confirm，返回该单据顾客提交且未绑定的凭证供核对。顾客无法调用员工接口、查看员工图或员工内部确认JSON。
 
+员工GET `/api/v1/stores/{storeId}/wallet/collection-proofs/{type}/{id}`：wallet.view，交易详情历史返回该租户、门店、源单据的已绑定收款凭证，以及顾客已提交但尚未绑定的凭证。待核实项的confirmation为空，前端标记“顾客已提交，尚未核实收款”，显示快照应收账户和原图入口，不显示为已收款；只有confirmation.verified=true才显示人工确认的实际收款账户及备注。未绑定的员工扫描草稿不进入此列表。原响应结构、原图员工权限及private/no-store、nosniff保护保持不变。查询、刷新和查看原图均不改变单据、余额、实收或审计记录；无须wallet.collection.confirm权限即可按wallet.view查看，选用和确认仍要求原确认权限。列表支持充值topup和账单bill；源单据不存在404，未登录401，无权限或跨租户/门店403；原图查询仍按租户、门店及凭证ID约束。
+
 提交只保存证据及审计；充值同步标记顾客声明付款，状态仍pending_collection，账单仍未付或部分支付，绝不增加余额、核销积分或生成实收。商户必须明确选择凭证并核实到账，原确认携带proofId，使用原事务及防重复约束。客户或员工均不能借附件切换单据、金额、账号或已使用凭证。
 
 幂等键按顾客身份分区，完整内容改变409，相同请求返回原凭证；顾客不能借猜测员工键重放员工图片。上传后单据状态已变，相同请求仍可在本人归属内安全重放原结果，不重新写审计或声明付款。source/account锁顺序为账户后单据，避免与商户确认死锁。

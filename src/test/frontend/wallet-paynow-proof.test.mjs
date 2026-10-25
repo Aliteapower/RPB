@@ -22,17 +22,17 @@ function nodes(root,predicate){let out=[];if(predicate(root))out.push(root);for(
 
 const text=root=>[root.text||'',...(root.children||[]).map(text)].join(' ')
 const response=body=>({ok:true,status:200,json:async()=>body})
-let CustomerBill,CustomerProof,customerHook,Form,Upload,proofHook
+let StaffHistory,CustomerBill,CustomerProof,customerHook,Form,Upload,proofHook
 const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL
-function mountProof(component,props={}){
+function mountProof(component,props={},locale='zh-CN'){
  const root={children:[]},app=renderer.createApp({setup:()=>()=>h(component,props)})
- app.use(createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':{wallet:messages.walletZh}}}));app.mount(root);return{root,unmount:()=>app.unmount()}
+ app.use(createI18n({legacy:false,locale,messages:{'zh-CN':{wallet:messages.walletZh},'en-SG':{wallet:messages.walletEn}}}));app.mount(root);return{root,unmount:()=>app.unmount()}
 }
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=new Document();URL.createObjectURL=()=> 'blob:test';URL.revokeObjectURL=()=>{}
  const {build}=await import('esbuild'),{pathToFileURL}=await import('node:url')
- const result=await build({stdin:{contents:`export {default as CustomerBill} from './src/modules/wallet/components/WalletCustomerBill.vue';export {default as CustomerProof} from './src/modules/wallet/proof/WalletCustomerPayNowProof.vue';export * as customerHook from './src/modules/wallet/proof/useCustomerPayNowProof.ts';export {default as Form} from './src/modules/wallet/components/WalletCollectionForm.vue';export {default as Upload} from './src/components/payment/PaymentProofUpload.vue';export * as proofHook from './src/modules/wallet/proof/useWalletPayNowProof.ts';export * as messages from './src/modules/wallet/locales.ts'`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-i18n','qrcode'],plugins:[{name:'vue',setup(b){b.onLoad({filter:/\.vue$/},async({path})=>{const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}})}}]})
- const dir='target/wallet-proof-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({CustomerBill,CustomerProof,customerHook,Form,Upload,proofHook,messages}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
+ const result=await build({stdin:{contents:`export {default as StaffHistory} from './src/modules/wallet/proof/WalletProofHistory.vue';export {default as CustomerBill} from './src/modules/wallet/components/WalletCustomerBill.vue';export {default as CustomerProof} from './src/modules/wallet/proof/WalletCustomerPayNowProof.vue';export * as customerHook from './src/modules/wallet/proof/useCustomerPayNowProof.ts';export {default as Form} from './src/modules/wallet/components/WalletCollectionForm.vue';export {default as Upload} from './src/components/payment/PaymentProofUpload.vue';export * as proofHook from './src/modules/wallet/proof/useWalletPayNowProof.ts';export * as messages from './src/modules/wallet/locales.ts'`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',external:['vue','vue-i18n','qrcode'],plugins:[{name:'vue',setup(b){b.onLoad({filter:/\.vue$/},async({path})=>{const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}})}}]})
+ const dir='target/wallet-proof-component-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({StaffHistory,CustomerBill,CustomerProof,customerHook,Form,Upload,proofHook,messages}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
 })
 after(()=>{globalThis.window=oldWindow;globalThis.fetch=oldFetch;globalThis.document=oldDocument;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke})
 const context={sourceType:'topup',sourceId:'one',channel:'paynow',systemReference:'W0123456789abcdefabcd',amountCents:1000,expectedAccount:'202012345A',merchantName:'Shop'}
@@ -118,4 +118,34 @@ test('settled or closed bill still exposes own receipt history without context, 
  globalThis.fetch=async url=>{requests.push(url);return response([{...evidence(),status:'confirmed'}])}
  const scope=mountProof(CustomerBill,p);await tick();assert.match(text(scope.root),/商户已确认收款/);assert.equal(nodes(scope.root,n=>n.tag==='a'&&n.props.href==='/private/image').length,1);assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='file').length,0);assert.ok(requests.length);assert.ok(requests.every(url=>!url.includes('/context')&&!url.includes('/paynow')))
  p.bill={...p.bill,closed:true,version:3};await tick();assert.match(text(scope.root),/商户已确认收款/);scope.unmount()
+})
+
+
+test('merchant history shows pending customer receipt without implying collection; refresh exposes new uploads',async()=>{
+ globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
+ const requests=[];let uploaded=false
+ globalThis.fetch=async(url,options={})=>{requests.push({url,options});return response(uploaded?[{...evidence({reference:'match',amount:'mismatch',account:'missing',status:'missing'}),confirmation:{},imageUrl:'/api/v1/stores/A/wallet/collection-proofs/images/proof-one'}]:[])}
+ const p=reactive({store:'A',sourceType:'topup',sourceId:'one'}),scope=mountProof(StaffHistory,p);await tick()
+ assert.match(text(scope.root),/暂无记录/);uploaded=true;await button(scope,'刷新').props.onClick();await tick()
+ assert.match(text(scope.root),/顾客已提交，尚未核实收款/);assert.match(text(scope.root),/202012345A/);assert.match(text(scope.root),/BANK-123/);assert.match(text(scope.root),/信息不匹配/)
+ assert.doesNotMatch(text(scope.root),/商户已确认收款/);assert.doesNotMatch(text(scope.root),/实际收款账户/)
+ assert.equal(nodes(scope.root,n=>n.tag==='a'&&n.props.href==='/api/v1/stores/A/wallet/collection-proofs/images/proof-one').length,1)
+ assert.ok(requests.every(r=>!r.options.method||r.options.method==='GET'));assert.ok(requests.every(r=>r.url==='/api/v1/stores/A/wallet/collection-proofs/topup/one'));scope.unmount()
+})
+test('merchant history distinguishes confirmed receipt and clears stale images on source changes or denied reads',async()=>{
+ globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
+ let resolveLate,fail=false
+ globalThis.fetch=async url=>{if(url.includes('/two'))return new Promise(r=>resolveLate=r);if(fail)throw Error('没有查看凭证权限');return response([{...evidence(),confirmation:{verified:true,bankReference:'BANK-CONFIRMED',actualAccount:'MERCHANT',note:'checked'}}])}
+ const p=reactive({store:'A',sourceType:'bill',sourceId:'one'}),scope=mountProof(StaffHistory,p);await tick();assert.match(text(scope.root),/商户已确认收款/);assert.match(text(scope.root),/BANK-CONFIRMED/)
+ p.sourceId='two';await tick();assert.equal(nodes(scope.root,n=>n.tag==='a').length,0)
+ p.store='B';p.sourceId='three';fail=true;await tick();resolveLate(response([evidence()]));await tick();assert.equal(nodes(scope.root,n=>n.tag==='a').length,0);assert.match(text(scope.root),/没有查看凭证权限/);scope.unmount()
+})
+
+
+test('merchant pending receipt labels and original-image action are available in English',async()=>{
+ globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
+ globalThis.fetch=async()=>response([evidence()])
+ const scope=mountProof(StaffHistory,{store:'A',sourceType:'topup',sourceId:'one'},'en-SG');await tick()
+ assert.match(text(scope.root),/Customer submitted; receipt not yet verified/);assert.doesNotMatch(text(scope.root),/wallet.proof.unconfirmed/)
+ assert.equal(nodes(scope.root,n=>n.tag==='a'&&n.props.href==='/private/image').length,1);scope.unmount()
 })
