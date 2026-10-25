@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class WalletOfflineCollectionAdapter implements WalletCollectionPort {
     private final OfflinePayNowCollectionService paynow;
-    public WalletOfflineCollectionAdapter(OfflinePayNowCollectionService paynow) {this.paynow=paynow;}
+    private final com.rpb.reservation.payment.application.OfflineReceiptRegistry receipts;
+    public WalletOfflineCollectionAdapter(OfflinePayNowCollectionService paynow,com.rpb.reservation.payment.application.OfflineReceiptRegistry receipts) {this.paynow=paynow;this.receipts=receipts;}
+    public void claimReceipt(StoreScope scope,UUID source,String type,String channel,String account,String receipt){try{receipts.claim(scope,source,type,channel,account,receipt);}catch(org.springframework.dao.DataIntegrityViolationException e){throw new WalletException("WALLET_RECEIPT_USED",409,"此收款凭证已登记，请核对原交易，勿重复收款");}}
     public boolean paynowConfigured(StoreScope scope) {return paynow.configured(scope);}
     public String canonicalAccount(StoreScope scope,String channel,String account,String terminal) {
         return switch(WalletMoney.channelType(channel)) {

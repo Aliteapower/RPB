@@ -1,3 +1,4 @@
+import {cardCode} from '../cards/qr.mjs'
 import { computed, inject, onUnmounted, provide, ref, watch, type InjectionKey } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { walletApi, WalletApiError } from './api'
@@ -14,6 +15,8 @@ function createWorkspace() {
   const account=computed(()=>home.value?.accounts[0]??null)
   let generation=0,sequence=0,legacyRunning=false,lastLegacyAttempt=''
   async function scan(value:string,replace=false) {
+    const card=cardCode(value,window.location.origin)
+    if(card){const target=value.startsWith('http')?new URL(value).pathname:`/wallet/${store.value}/cards`;await router.push(`${target}#card=${encodeURIComponent(card)}`);return}
     const decoded=merchantCode(value,window.location.origin)
     if(decoded.store && decoded.store!==store.value){const path=`${customerWalletPath(decoded.store)}#${decoded.kind}=${encodeURIComponent(decoded.code)}`;if(replace)await router.replace(path);else await router.push(path);return}
     const current=generation,id=store.value

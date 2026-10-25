@@ -703,7 +703,7 @@ class WalletPostgresTest {
         var profileRepo=new com.rpb.reservation.payment.persistence.JdbcPaymentMethodProfileRepository(jdbc);
         var profileService=new com.rpb.reservation.payment.application.PaymentMethodProfileService(profileRepo,new com.rpb.reservation.payment.provider.PayNowQrPayloadBuilder());
         var offline=new com.rpb.reservation.payment.application.OfflinePayNowCollectionService(profileService,new com.rpb.reservation.payment.provider.PayNowQrPayloadBuilder());
-        var adapter=new com.rpb.reservation.wallet.integration.WalletOfflineCollectionAdapter(offline);
+        var adapter=new com.rpb.reservation.wallet.integration.WalletOfflineCollectionAdapter(offline,new com.rpb.reservation.payment.application.OfflineReceiptRegistry(new com.rpb.reservation.payment.persistence.OfflineReceiptClaimRepository(jdbc)));
         var service=new WalletCollectionSettingsService(access,adapter,commands,gate);
         when(gate.evaluateCommercial(eq("payment"),any(),any())).thenReturn(AppGateDecision.deny("payment",tenant,store,null,AppGateDenyReason.TENANT_APP_NOT_ENABLED));
         jdbc.update("insert into payment_method_profiles(tenant_id,method,status,paynow_type,paynow_uen,merchant_name,config_json) values(?,'paynow','active','uen','TESTONLY01','Test Merchant','{\"keepQuickPay\":42}'::jsonb)",tenant);

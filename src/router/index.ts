@@ -1,3 +1,4 @@
+import {catalogRoutes} from '../modules/catalog/routes'
 import { walletRoutes } from '../modules/wallet/routes'
 import { createRouter, createWebHistory } from 'vue-router'
 
@@ -56,6 +57,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     ...walletRoutes,
+    ...catalogRoutes,
     {path:'/customers/register',name:'public-customer-register',component:()=>import('../modules/customers/PublicCustomerRegistrationPage.vue'),meta:{public:true}},
     {
       path: '/stores/:storeId/daily-ledger',

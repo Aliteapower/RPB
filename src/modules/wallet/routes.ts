@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 export const walletRoutes: RouteRecordRaw[] = [
   { path: '/stores/:storeId/wallet', component: () => import('./WalletPage.vue'), meta: { walletWorkspace: 'staff' }, children: [
     { path: '', name: 'wallet-workbench', component: () => import('./pages/WalletStaffHome.vue') },
+    {path:'cards',name:'wallet-cards',component:()=>import('../cards/CardsStaffPage.vue')},
     { path: 'collect', name: 'wallet-collect', component: () => import('./pages/WalletStaffCollect.vue') },
     { path: 'merchant-code', name: 'wallet-merchant-code', component: () => import('./pages/WalletMerchantCode.vue') },
     { path: 'topup', name: 'wallet-topup', component: () => import('./pages/WalletStaffRecharge.vue') },
@@ -25,6 +26,7 @@ export const walletRoutes: RouteRecordRaw[] = [
   ] },
   { path: '/wallet/:storeId', component: () => import('./WalletCustomerPage.vue'), meta: { public: true, walletWorkspace: 'customer' }, children: [
     { path: '', name: 'wallet-customer', component: () => import('./pages/WalletCustomerHome.vue') },
+    {path:'cards',name:'wallet-customer-cards',component:()=>import('../cards/CardsCustomerPage.vue')},
     { path: 'register', name: 'wallet-customer-register', component: () => import('./pages/WalletCustomerRegister.vue') },
     { path: 'code', name: 'wallet-customer-code', component: () => import('./pages/WalletCustomerCode.vue') },
     { path: 'merchant-orders/:orderId', name:'wallet-customer-order', component:()=>import('./pages/WalletCustomerOrder.vue') },

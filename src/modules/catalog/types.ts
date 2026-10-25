@@ -1,0 +1,2 @@
+export interface Product {id:string;categoryId:string;code:string;nameZh:string;nameEn:string;descriptionZh:string;descriptionEn:string;kind:string;unit:string;imageUrl:string;status:string;version:number;priceCents:number;currency:string;taxMode:string;taxCategory:string;taxRate:string;channels:string[];listingEnabled:boolean;listingVersion:number}
+export interface Category {id:string;code:string;nameZh:string;nameEn:string;enabled:boolean;sortOrder:number;version:number}

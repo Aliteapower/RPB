@@ -26,6 +26,13 @@ public class WalletCustomerIdentityService {
  }
  public Customer resolve(StoreScope scope,CurrentActor actor,String token){
   access.staff(scope,actor,actor!=null&&actor.hasPermission("wallet.topup.create")?"wallet.topup.create":"wallet.points.view",true);
+  return resolveCode(scope,token);
+ }
+ public Customer resolveForCards(StoreScope scope,CurrentActor actor,String token){
+  access.staff(scope,actor,"wallet.cards.view",true);
+  return resolveCode(scope,token);
+ }
+ private Customer resolveCode(StoreScope scope,String token){
   var program=accounts.requireProgram(scope,true);UUID customer;
   if(token!=null&&token.startsWith("WP.")){
    var account=accounts.account(scope,legacy.resolve(scope,WalletTokens.required(token,"WP"),clock.instant()),false);accounts.requireActive(account);customer=account.customerId();

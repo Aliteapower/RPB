@@ -1,0 +1,8 @@
+package com.rpb.reservation.cards;
+import java.nio.file.*;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+class CardArchitectureTest {
+ @Test void sharedModulesDoNotCollideWithExistingSpringBeanNames(){var scanner=new org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider(true);var generator=new org.springframework.context.annotation.AnnotationBeanNameGenerator();var registry=new org.springframework.beans.factory.support.SimpleBeanDefinitionRegistry();var names=new java.util.HashMap<String,String>();for(var bean:scanner.findCandidateComponents("com.rpb.reservation")){String name=generator.generateBeanName(bean,registry),type=bean.getBeanClassName();String previous=names.putIfAbsent(name,type);if(previous!=null&&(type.startsWith("com.rpb.reservation.cards.")||previous.startsWith("com.rpb.reservation.cards.")||type.startsWith("com.rpb.reservation.catalog.")||previous.startsWith("com.rpb.reservation.catalog.")))assertThat(type).as("Spring bean %s also belongs to %s",name,previous).isEqualTo(previous);}}
+ @Test void catalogHasNoWalletOrCardDependencyAndCardServicesUsePorts()throws Exception{try(var files=Files.walk(Path.of("src/main/java/com/rpb/reservation/catalog"))){for(var f:files.filter(p->p.toString().endsWith(".java")).toList())assertThat(Files.readString(f)).as(f.toString()).doesNotContain("import com.rpb.reservation.wallet.","import com.rpb.reservation.cards.");}try(var files=Files.walk(Path.of("src/main/java/com/rpb/reservation/cards"))){for(var f:files.filter(p->p.toString().endsWith(".java")).toList())assertThat(Files.readString(f)).as(f.toString()).doesNotContain("import com.rpb.reservation.wallet.persistence.");}}
+}

@@ -29,6 +29,7 @@ public class WalletCollectionService {
         String note=Objects.toString(c.note(),"").trim();if(note.length()>500)throw WalletException.invalid();
         if("paynow".equals(WalletMoney.channelType(c.channel()))&&receipt.equalsIgnoreCase(WalletPayNowReference.forSource(topup!=null?topup:bill)))throw WalletException.conflict("系统付款参考号不能代替银行交易 Ref");
         if(c.proofId()!=null){if(proofs==null||exception)throw WalletException.invalid();proofs.validate(scope,topup,bill,expected,c,account);}
+        port.claimReceipt(scope,topup!=null?topup:bill,"wallet",c.channel(),account,receipt);
         var collection=repository.confirm(scope,topup,bill,c.channel(),expected,account,receipt,terminal,note,actor,exception);
         if(c.proofId()!=null)proofs.bind(scope,collection,c,actor);
         return collection;

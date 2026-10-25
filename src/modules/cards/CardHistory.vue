@@ -1,0 +1,9 @@
+<script setup lang="ts">
+import {ref} from 'vue'
+import {cardApi} from './api'
+import {useCardText} from './text'
+import type {CardEntry,Holding} from './types'
+const props=defineProps<{store:string;entries:CardEntry[];holdings:Holding[];customer?:boolean;canReverse?:boolean;disabled?:boolean}>(),emit=defineEmits<{changed:[];error:[message:string]}>(),{t}=useCardText(),selected=ref(''),reason=ref(''),busy=ref(false)
+async function reverse(e:CardEntry){busy.value=true;try{await cardApi(props.store).command(`/entries/${e.id}/${e.kind==='stamp'?'reverse-stamp':'reverse'}`,{reason:reason.value},e.kind==='stamp'?'stamp.reverse':'redeem.reverse');selected.value='';reason.value='';emit('changed')}catch(error){emit('error',String(error))}finally{busy.value=false}}
+</script>
+<template><section class="cards-panel"><h2>{{t('records')}}</h2><p class="cards-muted">{{t('historyHint')}}</p><p v-if="!entries.length">{{t('empty')}}</p><article v-for="e in entries" :key="e.id" class="cards-panel"><div class="cards-actions"><strong>{{t(e.kind)}}</strong><span>× {{e.quantity}}</span><small>{{e.businessDay}} · {{new Date(e.createdAt).toLocaleTimeString()}}</small></div><p>{{e.beforeTotal??'—'}} → {{e.afterTotal??'—'}} · {{t('daily')}} {{e.beforeDaily}} → {{e.afterDaily}}</p><small>{{e.source}}<template v-if="e.originalId"> · {{t('linked')}} {{e.originalId}}</template></small><p v-if="e.reason">{{e.reason}}</p><button v-if="canReverse&&['redeem','stamp'].includes(e.kind)&&!entries.some(x=>x.originalId===e.id)" :disabled="busy||disabled" @click="selected=e.id">{{t('reverse')}}</button><form v-if="selected===e.id" @submit.prevent="reverse(e)"><label>{{t('reason')}}<input v-model="reason" required></label><button :disabled="busy||disabled||!reason">{{t('confirm')}}</button></form></article></section></template>

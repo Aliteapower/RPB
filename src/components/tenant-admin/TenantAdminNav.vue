@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {useCatalogText} from '../../modules/catalog/text'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -11,6 +12,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthSessionStore()
 const { t } = useI18n()
+const {t:ct}=useCatalogText()
 const loggingOut = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || auth.user?.defaultStoreId || auth.user?.storeIds[0] || ''))
@@ -68,7 +70,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
         <small>{{ t('nav.tenant.storePrefix') }} {{ auth.user?.username || '20000000' }}</small>
         <StoreSwitcher class="tenant-store-switcher" surface="tenant-admin" />
       </div>
-      <nav class="nav-list">
+      <nav class="nav-list"><RouterLink v-if="auth.user?.permissions.includes('catalog.view')" class="nav-item" :to="`/stores/${storeId}/catalog`">{{ct('catalog')}}</RouterLink>
         <RouterLink v-if="hasVisibleApp('daily_ledger')" class="nav-item" :to="`/stores/${storeId}/daily-ledger`">{{ t('dailyLedger.entry') }}</RouterLink>
         <RouterLink v-if="hasVisibleApp('wallet')" class="nav-item" :to="`/stores/${storeId}/wallet`">{{ t('wallet.entry') }}</RouterLink>
         <RouterLink
