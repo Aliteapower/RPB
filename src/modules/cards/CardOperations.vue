@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import {computed,onUnmounted,ref,watch} from 'vue'
+import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
+import {useAuthSessionStore} from '../../stores/authSession'
+import {takeScanHandoff} from '../staff-scan/handoff'
 import {cardApi} from './api'
 import {useCardText} from './text'
 import {displayName,businessDay,cardCode,dateTime} from './format'
@@ -8,8 +10,10 @@ import WalletQrScanner from '../wallet/components/WalletQrScanner.vue'
 import WalletQrDisplay from '../wallet/components/WalletQrDisplay.vue'
 const props=defineProps<{store:string;plans:Plan[];holdings:Holding[];disabled:boolean;can:(permission:string)=>boolean}>(),emit=defineEmits<{changed:[];error:[message:string]}>(),{t,locale}=useCardText()
 const origin=window.location.origin
+const auth=useAuthSessionStore()
 const search=ref(''),customers=ref<Customer[]>([]),customer=ref(''),card=ref(''),plan=ref(''),source=ref(''),quantity=ref(1),kind=ref('redeem'),request=ref<CardRequest|null>(null),qr=ref<QrCode|null>(null),busy=ref(false),scanMode=ref<'identity'|'authorization'|null>(null)
 const customerCards=ref<Holding[]>([]),moreCustomerCards=ref(false)
+onMounted(()=>{const owner=auth.user?.accountId??'',value=takeScanHandoff(props.store,owner,'cards'),g=generation;if(value)void run(async()=>{const c=await cardApi(props.store).post<Customer>('/identity',{code:value.code});if(g!==generation||auth.user?.accountId!==owner)return;customer.value=c.id;customers.value=[c]})})
 const choices=computed(()=>customer.value?customerCards.value:props.holdings),selected=computed(()=>choices.value.find(h=>h.id===card.value))
 let generation=0;watch(()=>props.store,()=>{generation++;customer.value='';card.value='';plan.value='';customers.value=[];request.value=null;qr.value=null;busy.value=false;scanMode.value=null})
 async function run(work:()=>Promise<void>){if(busy.value)return;const g=generation;busy.value=true;try{await work();if(g===generation)emit('changed')}catch(e){if(g===generation)emit('error',e instanceof Error?e.message:String(e))}finally{if(g===generation)busy.value=false}}

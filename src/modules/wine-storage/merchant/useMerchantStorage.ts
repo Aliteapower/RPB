@@ -4,6 +4,8 @@ import {storageApi,StorageApiError} from '../api'
 import type {Home,Intent} from '../types'
 import {customerStorage,type StorageCustomer} from './scope'
 import {useMerchantStorageText} from './text'
+import {useAuthSessionStore} from '../../../stores/authSession'
+import {takeScanHandoff} from '../../staff-scan/handoff'
 export function useMerchantStorage(){
  const route=useRoute(),router=useRouter(),{t}=useMerchantStorageText(),store=computed(()=>String(route.params.storeId)),api=computed(()=>storageApi(store.value,false))
  const home=ref<Home|null>(null),customer=ref<StorageCustomer|null>(null),results=ref<StorageCustomer[]>([]),query=ref(''),task=ref('deposit'),busy=ref(false),loading=ref(false),searching=ref(false),searched=ref(false),pending=ref(false),error=ref(''),notice=ref(''),activeIntent=ref<Intent|null>(null),scanResult=ref<Intent|null>(null)
@@ -20,6 +22,18 @@ export function useMerchantStorage(){
  async function scan(code:string){const g=generation,client=api.value;choose(null);const result=await client.command<Intent>('/scan-deliver',{code});if(g===generation)scanned(result)}
  async function recover(){await run(async()=>{const g=generation,client=api.value,result=await client.recover();if(g!==generation)return;if(result&&typeof result==='object'&&'selections'in result&&'status'in result&&result.status==='completed'){scanned(result as Intent);return}if(result&&typeof result==='object'&&'customerId'in result){const identified=await client.get<StorageCustomer>(`/customers/${encodeURIComponent(String(result.customerId))}`);if(g!==generation)return;choose(identified);if('selections'in result){activeIntent.value=result as Intent;task.value='withdraw'}else task.value='records'}})}
  watch(()=>route.query.task,value=>{task.value=value==='withdraw'||value==='records'?value:'deposit'},{immediate:true})
- watch(store,()=>{generation++;searchGeneration++;home.value=null;choose(null);query.value='';results.value=[];busy.value=false;searching.value=false;pending.value=false;task.value='deposit';void load()},{immediate:true})
+ const auth=useAuthSessionStore()
+ async function loadScanCustomer(handoff:ReturnType<typeof takeScanHandoff>,g:number){
+  const client=api.value
+  await load()
+  if(!handoff?.customerId||g!==generation||!home.value)return
+  searching.value=true
+  try{
+   const identified=await client.get<StorageCustomer>(`/customers/${encodeURIComponent(handoff.customerId)}`)
+   if(g!==generation||handoff.actor!==(auth.user?.accountId??''))return
+   choose(identified);task.value=handoff.task==='withdraw'?'withdraw':'deposit'
+  }catch(e){if(g===generation)fail(e)}finally{if(g===generation)searching.value=false}
+ }
+ watch(store,()=>{generation++;searchGeneration++;home.value=null;choose(null);query.value='';results.value=[];busy.value=false;searching.value=false;pending.value=false;task.value='deposit';void loadScanCustomer(takeScanHandoff(store.value,auth.user?.accountId??'','storage'),generation)},{immediate:true})
  return{store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scanResult,scoped,can,choose,search,open,load,run,scan,recover,fail,t}
 }

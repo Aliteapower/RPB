@@ -9,6 +9,7 @@ import {
 } from '../api/staffHomeOverviewApi'
 import StaffBottomNav from '../components/staff/StaffBottomNav.vue'
 import StaffHomeTopBar from '../components/staff-home/StaffHomeTopBar.vue'
+import StaffScanEntry from '../modules/staff-scan/StaffScanEntry.vue'
 import { useCurrentClock } from '../components/staff-home/useCurrentClock'
 import { useStoreVisibleApps } from '../composables/useStoreVisibleApps'
 import { useAuthSessionStore } from '../stores/authSession'
@@ -444,6 +445,7 @@ function hasPaymentPermission(permission: string): boolean {
     >
       <template #utility>
         <div class="topbar-actions">
+          <StaffScanEntry v-if="storeId&&(walletEntry||findVisibleApp('wine_storage'))" :store="storeId" :disabled="isLoading||loggingOut"/>
           <button class="topbar-logout" type="button" :disabled="loggingOut" @click="logoutFromStaffHome">
             {{ loggingOut ? t('common.actions.loggingOut') : t('common.actions.logout') }}
           </button>

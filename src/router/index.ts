@@ -56,6 +56,7 @@ const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationS
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {path:'/stores/:storeId/scan',name:'staff-scan',component:()=>import('../modules/staff-scan/StaffScanPage.vue')},
     { path: '/stores/:storeId/wine-storage',name:'wine-storage',component:()=>import('../modules/wine-storage/WineStorageStaffPage.vue')},
     {path:'/wallet/:storeId/wine-storage',name:'wine-storage-customer',component:()=>import('../modules/wine-storage/WineStorageCustomerPage.vue'),meta:{public:true}},
     ...walletRoutes,

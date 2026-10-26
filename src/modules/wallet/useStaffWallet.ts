@@ -48,9 +48,9 @@ function createWorkspace() {
   }
   async function identifyCustomer(code:string){
     return await task.run(async()=>{
-      const current=generation,request=++selection
+      const current=generation,request=++selection,owner=actorId.value
       const result=await walletApi(store.value).post<Customer>('/customer-codes/resolve',{code})
-      if(current!==generation||request!==selection)return
+      if(current!==generation||request!==selection||owner!==actorId.value)return
       identifiedCustomerId.value=result.id;customer.value=result;account.value=null;customerCode.value='';customers.value=[]
       return true
     })

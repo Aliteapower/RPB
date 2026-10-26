@@ -11,6 +11,7 @@ import WalletLocaleControl from './components/WalletLocaleControl.vue'
 import WalletCashierTabs from './components/WalletCashierTabs.vue'
 import WalletCashierTools from './components/WalletCashierTools.vue'
 import WalletStaffAccountMenu from './components/WalletStaffAccountMenu.vue'
+import StaffScanEntry from '../staff-scan/StaffScanEntry.vue'
 import {safeTransactionReturn} from './transactions/query'
 import WalletTransactionDetail from './pages/WalletTransactionDetail.vue'
 import './wallet.css'
@@ -39,7 +40,7 @@ const backPath=computed(()=>{
 </script>
 <template><main class="wallet-shell wallet-staff">
   <header class="wallet-header"><RouterLink v-if="!atHome&&!pointsOnly" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="context?.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/stores/${store}/wallet/logo/${context.store.logoMediaAssetId}`" alt=""><WalletStaffAccountMenu v-if="atHome && auth.user" :key="store" :store="store" :store-name="storeCaption" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.ui.staffWallet') }}</h1><small>{{storeCaption}}</small></div><button class="wallet-icon-button" :disabled="busy||operationBusy" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button></header>
-  <div class="wallet-utility-bar"><template v-if="atHome&&!pointsOnly"><RouterLink :to="`/stores/${store}/staff`">{{ t('nav.staff.home') }}</RouterLink><StoreSwitcher surface="staff" /></template><WalletLocaleControl /></div>
+  <div class="wallet-utility-bar"><template v-if="atHome&&!pointsOnly"><RouterLink :to="`/stores/${store}/staff`">{{ t('nav.staff.home') }}</RouterLink><StoreSwitcher surface="staff" /></template><StaffScanEntry :store="store" :disabled="busy||operationBusy"/><WalletLocaleControl /></div>
   <WalletCashierTabs v-if="atHome" :disabled="operationBusy" />
   <p v-if="error&&!historical" class="wallet-error" role="alert">{{ error }}</p><p v-if="busy && !context&&!historical" class="wallet-empty" role="status">{{ t('wallet.loading') }}</p>
   <RouterView v-if="queryPage" :key="`${store}:${viewRevision}`" /><WalletTransactionDetail v-else-if="nativeDetail&&!context" :key="`${String(route.name)}:${store}:${String(route.params.billId??route.params.topupId??route.params.refundId)}`" /><template v-else-if="context"><p v-if="!context.transactionsEnabled" class="wallet-warning" role="status">{{ pointsContext?t('wallet.marketing.unavailable'):context.program?t('wallet.expired'):t('wallet.noProgram') }}</p><RouterView :key="`${store}:${viewRevision}`" @busy-change="operationBusy=$event" /></template>

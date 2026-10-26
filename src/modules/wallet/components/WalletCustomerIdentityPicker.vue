@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref,onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useStaffWallet } from '../useStaffWallet'
 import WalletQrScanner from './WalletQrScanner.vue'
 import WalletIcon from './WalletIcon.vue'
+import {takeScanHandoff} from '../../staff-scan/handoff'
+import {useAuthSessionStore} from '../../../stores/authSession'
 defineProps<{ disabled?: boolean }>()
 const emit=defineEmits<{clear:[];identified:[]}>()
-const {t}=useI18n(),{customer,identifiedCustomerId,busy,error,clear,identifyCustomer}=useStaffWallet(),scanning=ref(useRoute().query.scan==='1')
+const {t}=useI18n(),{store,customer,identifiedCustomerId,busy,error,clear,identifyCustomer}=useStaffWallet(),scanning=ref(useRoute().query.scan==='1')
 function reset(){clear();error.value='';scanning.value=true;emit('clear')}
 async function scanned(code:string){if(await identifyCustomer(code)){scanning.value=false;emit('identified')}}
+const auth=useAuthSessionStore()
+onMounted(()=>{const value=takeScanHandoff(store.value,auth.user?.accountId??'','recharge');if(value)void scanned(value.code)})
 </script>
 <template>
   <section v-if="customer&&customer.id===identifiedCustomerId" class="wallet-customer-chip">

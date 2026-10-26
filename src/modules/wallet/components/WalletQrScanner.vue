@@ -23,7 +23,7 @@ const camera = createWalletCamera({
   decode: decoder.video, accept: value => !!normalize(value), onCode: found, onChange: value => { state.value = value }
 })
 const live = computed(() => state.value.phase === 'opening' || state.value.phase === 'scanning')
-const cameraError = computed(() => !state.value.issue ? '' : state.value.issue === 'wrongCode' ? t(`wallet.scanner.${props.purpose === 'bill' ? 'wrongBill' : 'wrongCustomer'}`) : t(`wallet.scanner.issues.${state.value.issue}`))
+const cameraError = computed(() => !state.value.issue ? '' : state.value.issue === 'wrongCode' ? props.invalidMessage ?? t(`wallet.scanner.${props.purpose === 'bill' ? 'wrongBill' : 'wrongCustomer'}`) : t(`wallet.scanner.issues.${state.value.issue}`))
 const status = computed(() => props.disabled ? t('wallet.scanner.processing') : t(`wallet.scanner.${state.value.phase === 'error' ? 'idle' : state.value.phase}`))
 async function start() { if (props.disabled || readingImage.value) return; sourceGeneration++; imageError.value = ''; await camera.start() }
 function stop() { sourceGeneration++; camera.stop() }
