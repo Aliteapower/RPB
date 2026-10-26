@@ -204,6 +204,24 @@ class AppGateGuardIntegrationTest {
         return new AppGateInterceptor(service, auditService, actorProvider, new AppGateApiErrorMapper(), new ObjectMapper());
     }
 
+    @Test void explicitHistoryReadDoesNotAuthorizeAWriteEvenWithTheSameAnnotation() throws Exception {
+        var service=mock(AppGateService.class);
+        when(service.evaluateHistory(any())).thenReturn(AppGateDecision.allow(APP_KEY,TENANT_ID,STORE_ID,"reservation.today_view"));
+        when(service.evaluate(any())).thenReturn(AppGateDecision.deny(APP_KEY,TENANT_ID,STORE_ID,"reservation.today_view",AppGateDenyReason.STORE_APP_NOT_ENABLED));
+        var mvc=MockMvcBuilders.standaloneSetup(new DemoHistoryController()).addInterceptors(interceptor(service,mock(AppGateDenialAuditService.class))).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/stores/{storeId}/demo-history",STORE_ID)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/stores/{storeId}/demo-history",STORE_ID)).andExpect(status().isForbidden());
+        verify(service).evaluateHistory(any());verify(service).evaluate(any());
+    }
+    @RestController static class DemoHistoryController {
+        @org.springframework.web.bind.annotation.GetMapping("/api/v1/stores/{storeId}/demo-history")
+        @RequireAppGate(appKey=APP_KEY,permission="reservation.today_view",allowClosedHistory=true)
+        public String read(){return "history";}
+        @PostMapping("/api/v1/stores/{storeId}/demo-history")
+        @RequireAppGate(appKey=APP_KEY,permission="reservation.today_view",allowClosedHistory=true)
+        public String write(){return "must not run";}
+    }
+
     @RestController
     @RequestMapping("/api/v1/stores/{storeId}")
     private static final class DemoProtectedController {

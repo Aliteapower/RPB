@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductHistoryLinks from '../../modules/tenant-products/ProductHistoryLinks.vue'
 import {useCatalogText} from '../../modules/catalog/text'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -17,7 +18,7 @@ const loggingOut = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || auth.user?.defaultStoreId || auth.user?.storeIds[0] || ''))
 const currentStoreId = computed(() => storeId.value || undefined)
-const { hasVisibleApp } = useStoreVisibleApps(currentStoreId)
+const { hasVisibleApp, historyApps } = useStoreVisibleApps(currentStoreId)
 const hasPaymentProductLine = computed(() =>
   hasVisibleApp('payment')
 )
@@ -114,6 +115,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
             {{ t(item.labelKey) }}
           </RouterLink>
         </section>
+        <ProductHistoryLinks :entries="historyApps" />
       </nav>
     </div>
 

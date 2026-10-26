@@ -49,7 +49,8 @@ class LedgerPostgresTest {
     }
     @AfterAll static void close(){if(adminJdbc!=null)adminJdbc.execute("drop schema if exists "+SCHEMA+" cascade");}
     @BeforeEach void setup(){
-        gate=mock(AppGateService.class);when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("daily_ledger",TENANT,STORE,"daily_ledger.view"));
+        gate=mock(AppGateService.class);when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.allow("daily_ledger",TENANT,STORE,"daily_ledger.view"));
+        when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("daily_ledger",TENANT,STORE,"daily_ledger.write"));
         access=new LedgerAccess(gate);repository=new LedgerRepository(jdbc,JSON);rules=new LedgerRules(JSON);
         queries=new LedgerQueryService(repository,rules,access,JSON);commands=new LedgerCommandService(repository,rules,access,queries,JSON,Clock.fixed(Instant.parse("2026-10-22T01:00:00Z"),ZoneOffset.UTC));
         tx.execute(status->{repository.lockSettings(SCOPE,rules.defaults());var current=repository.settings(SCOPE).orElseThrow();repository.updateSettings(SCOPE,rules.defaults(),JSON.createObjectNode(),current.version());return null;});
@@ -141,7 +142,7 @@ class LedgerPostgresTest {
     @Test void tenantStoreAndAppGateFailuresDenyBeforeDatabaseAccess(){
         assertThatThrownBy(()->queries.day(new StoreScope(new TenantId(OTHER_TENANT),OTHER_STORE),LocalDate.now(),admin)).isInstanceOf(LedgerException.class).hasMessageContaining("无权");
         for(var reason:List.of(AppGateDenyReason.APP_DISABLED,AppGateDenyReason.TENANT_APP_NOT_ENABLED,AppGateDenyReason.STORE_APP_NOT_ENABLED,AppGateDenyReason.PERMISSION_DENIED)){
-            when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("daily_ledger",TENANT,STORE,"daily_ledger.view",reason));
+            when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.deny("daily_ledger",TENANT,STORE,"daily_ledger.view",reason));
             assertThatThrownBy(()->queries.settings(SCOPE,admin)).isInstanceOf(LedgerException.class);
         }
     }

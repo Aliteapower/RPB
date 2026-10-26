@@ -45,7 +45,7 @@ public class ReservationTodayViewController {
     }
 
     @GetMapping("/today")
-    @RequireAppGate(appKey = "reservation_queue", permission = REQUIRED_PERMISSION)
+    @RequireAppGate(appKey = "reservation_queue", permission = REQUIRED_PERMISSION, allowClosedHistory = true)
     public ResponseEntity<?> todayReservations(
         @PathVariable UUID storeId,
         @RequestParam(value = "businessDate", required = false) String businessDate,
@@ -78,7 +78,7 @@ public class ReservationTodayViewController {
     }
 
     @GetMapping("/calendar-summary")
-    @RequireAppGate(appKey = "reservation_queue", permission = REQUIRED_PERMISSION)
+    @RequireAppGate(appKey = "reservation_queue", permission = REQUIRED_PERMISSION, allowClosedHistory = true)
     public ResponseEntity<?> calendarSummary(
         @PathVariable UUID storeId,
         @RequestParam(value = "month", required = false) String month

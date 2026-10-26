@@ -286,6 +286,11 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
+      path: '/stores/:storeId/payments/records',
+      name: 'payment-records',
+      component: TenantAdminPaymentRecordsPage
+    },
+    {
       path: '/stores/:storeId/admin/payment/records',
       name: 'tenant-admin-payment-records',
       component: TenantAdminPaymentRecordsPage,

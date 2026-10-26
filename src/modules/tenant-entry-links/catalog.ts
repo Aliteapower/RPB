@@ -22,7 +22,7 @@ export function buildTenantEntries(context: EntryLinksContext, location: Pick<Lo
         { key: 'ledger', audience: 'staff', path: `/stores/${store}/daily-ledger`, app: 'daily_ledger', login: 'staff' },
         { key: 'admin', audience: 'admin', path: `/stores/${store}/admin/profile`, login: 'tenant_admin' }
     ];
-    return entries.map(e => {
+    return entries.filter(e => !e.app || context.products.some(p => p.appKey===e.app && p.available)).filter(e => e.key!=='booking' || context.publicBookingEnabled).map(e => {
         const product = e.app ? context.products.find(p => p.appKey === e.app) : null;
         const denialReason = !active ? (id.tenantStatus !== 'active' ? 'TENANT_INACTIVE' : 'STORE_INACTIVE')
             : e.app && !product?.available ? (product?.denialReason ?? 'TENANT_APP_NOT_ENABLED')

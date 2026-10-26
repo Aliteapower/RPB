@@ -17,10 +17,10 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const currentStoreId = computed(() => props.storeId || undefined)
-const { hasVisibleApp, loaded } = useStoreVisibleApps(currentStoreId)
+const { hasVisibleApp } = useStoreVisibleApps(currentStoreId)
 const items = computed(() =>
   staffBottomNavItems
-    .filter(item => !item.appKey || !loaded.value || hasVisibleApp(item.appKey))
+    .filter(item => !item.appKey || hasVisibleApp(item.appKey))
     .map(item => ({
       ...item,
       to: {

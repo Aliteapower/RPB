@@ -22,7 +22,7 @@ test('local development keeps its actual origin and port and supplies only a ten
 })
 test('unavailable products, closed booking and inactive stores never become distributable entry codes',()=>{
  const c={...context,publicBookingEnabled:false,products:[{appKey:'wallet',available:false,denialReason:'STORE_APP_EXPIRED'}]}
- const rows=buildTenantEntries(c,loc());assert.equal(rows[0].denialReason,'STORE_APP_EXPIRED');assert.equal(rows[1].available,false);assert.equal(rows.find(e=>e.key==='payment').available,false);assert.equal(rows.find(e=>e.key==='staff').available,true)
+ const rows=buildTenantEntries(c,loc());assert.equal(rows.some(e=>e.key==='walletCustomer'||e.key==='booking'||e.key==='payment'),false);assert.equal(rows.find(e=>e.key==='staff').available,true)
  assert.ok(buildTenantEntries({...context,identity:{...context.identity,storeStatus:'inactive'}},loc()).every(e=>!e.available))
 })
 test('switching a store changes public paths and protected redirects and unsafe tenant domains are rejected',()=>{

@@ -103,7 +103,8 @@ function isMeAppsResponse(payload: unknown): payload is MeAppsResponse {
   return (
     candidate.success === true &&
     Array.isArray(candidate.apps) &&
-    candidate.apps.every(isMeAppEntry)
+    candidate.apps.every(isMeAppEntry) &&
+    (candidate.historyApps === undefined || Array.isArray(candidate.historyApps) && candidate.historyApps.every(isMeAppEntry))
   )
 }
 

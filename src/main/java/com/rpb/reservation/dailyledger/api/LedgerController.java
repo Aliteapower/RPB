@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/daily-ledger")
-@RequireAppGate(appKey="daily_ledger",permission="daily_ledger.view")
+@RequireAppGate(appKey="daily_ledger",permission="daily_ledger.view",allowClosedHistory=true)
 public class LedgerController {
     private final LedgerQueryService queries;private final LedgerCommandService commands;
     private final CurrentActorProvider actors;private final ObjectMapper json;private final LedgerBrandingService branding;

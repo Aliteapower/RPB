@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import ProductHistoryNotice from '../modules/tenant-products/ProductHistoryNotice.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import {useI18n} from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import { getQuickPayRecords, PaymentApiError } from '../api/paymentApi'
@@ -9,7 +11,8 @@ import { useAuthSessionStore } from '../stores/authSession'
 import type { QuickPayRecord, QuickPayRecordSummary } from '../types/payment'
 import { formatAppGateErrorMessage } from '../utils/appGateErrorMessages'
 
-const route = useRoute()
+const route = useRoute(),{t}=useI18n()
+const staffHistory=computed(()=>route.name==='payment-records')
 const auth = useAuthSessionStore()
 const { gt } = useGeneratedText()
 
@@ -159,16 +162,18 @@ function isAppGateError(code: string, messageKey: string): boolean {
 </script>
 
 <template>
-  <main class="tenant-shell">
-    <TenantAdminNav />
+  <main class="tenant-shell" :class="{'staff-history':staffHistory}">
+    <TenantAdminNav v-if="!staffHistory" />
 
     <section class="tenant-workspace">
+      <RouterLink v-if="staffHistory" :to="`/stores/${storeId}/staff`">{{t('nav.staff.home')}}</RouterLink>
+      <ProductHistoryNotice v-if="route.query.history==='1'" />
       <header class="page-heading">
         <div>
           <span>{{ gt('generated.tenant-admin-payment-records.001') }}</span>
           <h1>{{ gt('generated.tenant-admin-payment-records.002') }}</h1>
         </div>
-        <RouterLink class="secondary-link" :to="{ name: 'tenant-admin-payment-settings', params: { storeId } }">
+        <RouterLink v-if="!staffHistory&&route.query.history!=='1'" class="secondary-link" :to="{ name: 'tenant-admin-payment-settings', params: { storeId } }">
           {{ gt('generated.tenant-admin-payment-records.003') }}
         </RouterLink>
       </header>
@@ -285,6 +290,8 @@ function isAppGateError(code: string, messageKey: string): boolean {
   grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100dvh;
 }
+
+.tenant-shell.staff-history { grid-template-columns: minmax(0,1fr); }
 
 .tenant-workspace {
   min-width: 0;
@@ -540,7 +547,9 @@ td small {
 }
 
 @media (max-width: 700px) {
-  .tenant-workspace {
+  .tenant-shell.staff-history { grid-template-columns: minmax(0,1fr); }
+
+.tenant-workspace {
     padding: 14px;
   }
 

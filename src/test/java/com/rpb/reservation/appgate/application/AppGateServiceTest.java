@@ -392,4 +392,13 @@ class AppGateServiceTest {
             assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isTrue();
         }
     }
+    @Test void closedProductKeepsOnlyRegisteredHistoryPermission(){
+        var setting=storeSetting(false,false);setting.enable(ACTOR_ID,OffsetDateTime.now());setting.disable(OffsetDateTime.now());
+        when(storeSettings.findByTenantIdAndStoreIdAndAppKey(TENANT_ID,STORE_ID,APP_KEY)).thenReturn(Optional.of(setting));
+        var query=new AppGateAccessRequest(APP_KEY,TENANT_ID,STORE_ID,"reservation.today_view",actor(Set.of(STORE_ID),Set.of("reservation.today_view")));
+        assertThat(service.evaluate(query).allowed()).isFalse();assertThat(service.evaluateHistory(query).allowed()).isTrue();
+        assertThat(service.evaluateHistory(request(actor(Set.of(STORE_ID),Set.of(PERMISSION)))).allowed()).isFalse();
+        assertThat(service.evaluateHistory(new AppGateAccessRequest(APP_KEY,TENANT_ID,OTHER_STORE_ID,"reservation.today_view",query.actor())).allowed()).isFalse();
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.empty());assertThat(service.evaluateHistory(query).allowed()).isFalse();
+    }
 }

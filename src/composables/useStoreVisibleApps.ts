@@ -5,6 +5,7 @@ import type { MeAppEntry } from '../types/meApps'
 
 export function useStoreVisibleApps(storeId: Ref<string | undefined>) {
   const apps = ref<MeAppEntry[]>([])
+  const historyApps = ref<MeAppEntry[]>([])
   const loaded = ref(false)
   const loading = ref(false)
   let loadSequence = 0
@@ -13,7 +14,7 @@ export function useStoreVisibleApps(storeId: Ref<string | undefined>) {
     storeId,
     async nextStoreId => {
       const sequence = ++loadSequence
-      apps.value = []
+      apps.value = []; historyApps.value = []
       loaded.value = false
 
       if (!nextStoreId) {
@@ -28,11 +29,11 @@ export function useStoreVisibleApps(storeId: Ref<string | undefined>) {
         const result = await fetchMeApps(nextStoreId)
 
         if (sequence === loadSequence) {
-          apps.value = result.apps
+          apps.value = result.apps; historyApps.value = result.historyApps ?? []
         }
       } catch {
         if (sequence === loadSequence) {
-          apps.value = []
+          apps.value = []; historyApps.value = []
         }
       } finally {
         if (sequence === loadSequence) {
@@ -57,6 +58,7 @@ export function useStoreVisibleApps(storeId: Ref<string | undefined>) {
 
   return {
     apps,
+    historyApps,
     visibleApps,
     visibleAppKeys,
     loaded,

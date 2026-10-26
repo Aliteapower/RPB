@@ -199,6 +199,20 @@ class StoreProductAccessPostgresTest {
         assertThat(jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key='daily_ledger'", tenant, sibling)).isEqualTo(siblingBefore);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"payment","reservation_queue"})
+    void syncingOtherProductLinesNeverReopensAnExplicitlyClosedStore(String key) {
+        var sync=new JdbcTenantProductEntitlementSyncGateway(jdbc);
+        jdbc.update("update platform_product_line_prices set status='active',amount=30 where app_key=?",key);
+        var purchased=tx.execute(status->billing.purchase(tenant,new ProductSubscriptionCommand(UUID.randomUUID().toString(),key,"monthly",null,null,null,"SGD","test",1,null),new PlatformBillingOperator(null,"platform_admin")).subscription());
+        jdbc.update("update store_app_settings set is_enabled=false,entry_visible=false,disabled_at=now() where tenant_id=? and store_id=? and app_key=?",tenant,store,key);
+        var before=jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key=?",tenant,store,key);
+        var neighbor=jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key=?",tenant,sibling,key);
+        sync.enableTenantApp(tenant,key,NOW,NOW.plusMonths(2),null);
+        assertThat(jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key=?",tenant,store,key)).isEqualTo(before);
+        assertThat(jdbc.queryForMap("select * from store_app_settings where tenant_id=? and store_id=? and app_key=?",tenant,sibling,key)).isEqualTo(neighbor);
+    }
+
     @Test void actualJpaCommandsPersistScopedSwitchesAndSingleAuditPerTransition() {
         purchase();
         jdbc.update("update platform_product_line_prices set status='active',amount=30 where app_key='wallet'");

@@ -108,7 +108,7 @@ public class JdbcTenantProductEntitlementSyncGateway implements TenantProductEnt
             where (store_app_settings.is_enabled is distinct from true
                or store_app_settings.entry_visible is distinct from true
                or store_app_settings.disabled_at is not null)
-              and not (store_app_settings.app_key in ('wallet', 'daily_ledger', 'wine_storage')
+              and not (store_app_settings.app_key in ('wallet', 'daily_ledger', 'wine_storage', 'payment', 'reservation_queue')
                        and store_app_settings.is_enabled = false
                        and store_app_settings.disabled_at is not null)
             """,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {useI18n} from 'vue-i18n'
 import { useLedgerI18n } from './i18n'
 import { computed, provide, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
@@ -15,13 +16,14 @@ import LedgerSettings from './components/LedgerSettings.vue'
 import './ledger.css'
 import { defaultDisplay, displayKey } from './format'
 const { text, locale, errorText, itemName } = useLedgerI18n()
-const route = useRoute(), auth = useAuthSessionStore()
+const route = useRoute(), auth = useAuthSessionStore(), {t}=useI18n()
+const historyOnly=computed(()=>route.query.history==='1')
 const storeId = computed(() => String(route.params.storeId))
 const settings = ref<Settings>(), day = ref<LedgerDay>(), date = ref(businessDate()), period = ref<Period>('dinner')
 const tab = ref<'record' | 'history' | 'settings'>('record'), loading = ref(false), error = ref('')
 const editor = ref<InstanceType<typeof LedgerRecordEditor>>()
-const admin = computed(() => auth.user?.permissions.includes('daily_ledger.settings.manage') === true)
-const writable = computed(() => auth.user?.permissions.includes('daily_ledger.write') === true)
+const admin = computed(() => !historyOnly.value && auth.user?.permissions.includes('daily_ledger.settings.manage') === true)
+const writable = computed(() => !historyOnly.value && auth.user?.permissions.includes('daily_ledger.write') === true)
 const timezone = ref('Asia/Singapore')
 provide(displayKey, computed(() => settings.value?.display ?? defaultDisplay))
 let selectedDate = false
@@ -46,11 +48,12 @@ async function changePeriod(value: Period) { if (await flush()) { period.value =
 function offsetDate(offset: number) { const value = new Date(date.value + 'T12:00:00Z'); value.setUTCDate(value.getUTCDate() + offset); void changeDate(value.toISOString().slice(0, 10)) }
 async function changeTab(value: typeof tab.value) { if (await flush()) { tab.value = value; if (value === 'record') await load() } }
 onBeforeRouteLeave(flush); onBeforeRouteUpdate(flush)
-watch(storeId, () => { selectedDate = false; settings.value = undefined; tab.value = 'record'; void load() }, { immediate: true })
+watch(storeId, () => { selectedDate = false; settings.value = undefined; tab.value = historyOnly.value?'history':'record'; void load() }, { immediate: true })
 </script>
 <template>
   <div class="daily-ledger">
-    <LedgerShell :branding="settings?.branding" :store-id="storeId" :tab="tab" :admin="admin" :currency="settings?.config.currency" @navigate="changeTab">
+    <LedgerShell :branding="settings?.branding" :store-id="storeId" :tab="tab" :admin="admin" :history-only="historyOnly" :currency="settings?.config.currency" @navigate="changeTab">
+      <p v-if="historyOnly" role="status">{{t('tenantProducts.closedHistory')}}</p>
       <div v-if="error" role="alert" class="ledger-error">{{ errorText(error) }} <button class="button secondary" @click="load">{{ text('重新载入') }}</button></div>
       <p v-if="loading" class="loading">{{ text('正在读取门店账本…') }}</p>
       <template v-if="!loading && day && settings">
@@ -59,10 +62,10 @@ watch(storeId, () => { selectedDate = false; settings.value = undefined; tab.val
           <LedgerOverview :submitted="day.submitted_records[day.config.final_period]" :base="day.config.base_amount" />
           <LedgerSubmittedPayments :record="day.submitted_records[period]" :config="day.config" :period="period" />
           <div class="record-toolbar"><div class="period-tabs" role="tablist" :aria-label="text('盘点时段')"><button v-for="p in day.config.periods.filter(p => p.enabled)" :key="p.id" class="period-tab" :class="{ selected: period === p.id }" role="tab" :aria-selected="period === p.id" @click="changePeriod(p.id as Period)"><span>{{ p.id === 'breakfast' ? '◔' : p.id === 'lunch' ? '☀' : '☾' }}</span>{{ itemName(p) }}<i v-if="day.records[p.id as Period]" :class="day.records[p.id as Period]?.status === 'submitted' ? 'tab-saved' : 'tab-draft'">{{ day.records[p.id as Period]?.status === 'submitted' ? '✓' : text("草稿") }}</i></button></div><span class="toolbar-date">{{ new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric', weekday: 'long', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z')) }}<span class="tag subtle">{{ text('累计盘点') }}</span></span></div>
-          <LedgerRecordEditor :key="`${storeId}-${date}-${period}`" ref="editor" :store-id="storeId" :initial-day="day" :period="period" :admin="admin" :writable="writable" :owner-key="`${auth.user?.tenantId}/${auth.user?.accountId}`" @saved="value => day = value" />
+          <LedgerRecordEditor v-if="!historyOnly" :key="`${storeId}-${date}-${period}`" ref="editor" :store-id="storeId" :initial-day="day" :period="period" :admin="admin" :writable="writable" :owner-key="`${auth.user?.tenantId}/${auth.user?.accountId}`" @saved="value => day = value" />
         </section>
         <LedgerHistory v-else :key="storeId" :store-id="storeId" :timezone="timezone" @open="async value => { tab = 'record'; await changeDate(value) }" />
-        <LedgerSettings v-if="tab === 'settings'" :key="storeId" :store-id="storeId" :initial="settings" @saved="value => settings = value" @close="tab = 'record'" />
+        <LedgerSettings v-if="!historyOnly && tab === 'settings'" :key="storeId" :store-id="storeId" :initial="settings" @saved="value => settings = value" @close="tab = 'record'" />
       </template>
     </LedgerShell>
   </div>

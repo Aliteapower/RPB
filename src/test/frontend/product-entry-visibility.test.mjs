@@ -12,7 +12,7 @@ let Nav,Tools,useAuthSessionStore;const mounted=new Set(),originalFetch=globalTh
 const renderer=createRenderer({createElement:tag=>({tag,children:[],props:{}}),createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>n.text=t,patchProp:(n,k,o,v)=>n.props[k]=v,insert:(n,p,a)=>{n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:()=>null})
 const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))],tick=async()=>{for(let i=0;i<16;i++){await Promise.resolve();await nextTick()}}
 const appEntry={appKey:'wine_storage',appName:'Bottle storage',status:'active',entryRoute:'/stores/A/wine-storage',entryVisible:true,permissions:['wine_storage.view']}
-const response=apps=>({ok:true,status:200,text:async()=>JSON.stringify({success:true,apps})})
+const response=(apps,historyApps=[])=>({ok:true,status:200,text:async()=>JSON.stringify({success:true,apps,historyApps})})
 before(async()=>{
  const result=await build({stdin:{contents:"export {default as Nav} from './src/components/tenant-admin/TenantAdminNav.vue';export {default as Tools} from './src/modules/wallet/components/WalletCashierTools.vue';export {useAuthSessionStore} from './src/stores/authSession'",resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'entry-visibility',setup(b){
  b.onLoad({filter:/useStaffWallet\.ts$/},()=>({contents:"import {computed} from 'vue';import {useRoute} from 'vue-router';import {useAuthSessionStore} from '../../stores/authSession';export function useStaffWallet(){const route=useRoute(),auth=useAuthSessionStore();return {store:computed(()=>String(route.params.storeId)),context:computed(()=>null),can:p=>auth.user?.permissions.includes(p)===true}}",loader:'ts'}))
@@ -26,3 +26,20 @@ test('permissions alone never show an unprovisioned storage link in either staff
 test('both staff surfaces require a visible AppGate entry and the employee view permission',async()=>{for(const component of [Nav,Tools]){globalThis.fetch=async()=>response([appEntry]);const shown=mount(component);await tick();assert.equal(wineLinks(shown.root).length,1);const denied=mount(component,[]);await tick();assert.equal(wineLinks(denied.root).length,0);globalThis.fetch=async()=>response([{...appEntry,entryVisible:false}]);const hidden=mount(component);await tick();assert.equal(wineLinks(hidden.root).length,0)}})
 test('loading and failed visibility reads never reveal a storage link',async()=>{for(const component of [Nav,Tools]){let reject;globalThis.fetch=()=>new Promise((_,no)=>reject=no);const s=mount(component);await tick();assert.equal(wineLinks(s.root).length,0);assert.equal(nodes(s.root,n=>n.tag==='a'&&/admin\/(payment|tables|settings)/.test(String(n.props.href))).length,0);reject(Error('offline'));await tick();assert.equal(wineLinks(s.root).length,0)}})
 test('late previous-store entries cannot leak into the new store menu',async()=>{for(const component of [Nav,Tools]){const requests=[];globalThis.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));const s=mount(component);await tick();s.route.params.storeId='B';await tick();assert.equal(wineLinks(s.root).length,0);requests[0].resolve(response([appEntry]));await tick();assert.equal(wineLinks(s.root).length,0);assert.equal(requests.length,2);requests[1].resolve(response([]));await tick();assert.equal(wineLinks(s.root).length,0)}})
+
+
+test('closed products appear only in separate history links and stale history clears when switching stores',async()=>{
+ const history={...appEntry,status:'history',entryRoute:'/stores/A/wine-storage?task=records&history=1'}
+ globalThis.fetch=async()=>response([],[history]);const s=mount(Nav);await tick();
+ assert.equal(wineLinks(s.root).length,0)
+ assert.equal(nodes(s.root,n=>n.tag==='a'&&String(n.props.href).includes('history=1')).length,1)
+ let resolve;globalThis.fetch=()=>new Promise(done=>resolve=done);s.route.params.storeId='B';await tick();
+ assert.equal(nodes(s.root,n=>n.tag==='a'&&String(n.props.href).includes('history=1')).length,0)
+ resolve(response([]));await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='a'&&String(n.props.href).includes('history=1')).length,0)
+})
+
+test('malformed history results fail closed rather than leaving prior operational entries',async()=>{
+ globalThis.fetch=async()=>({ok:true,status:200,text:async()=>JSON.stringify({success:true,apps:[appEntry],historyApps:{wrong:true}})})
+ const s=mount(Nav);await tick();assert.equal(wineLinks(s.root).length,0)
+})

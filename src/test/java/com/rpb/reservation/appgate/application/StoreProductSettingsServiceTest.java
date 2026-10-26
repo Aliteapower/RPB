@@ -53,7 +53,7 @@ class StoreProductSettingsServiceTest {
         verifyNoInteractions(commands);
     }
     @Test void unknownProductAndInactiveStoreCannotWrite(){
-        assertThatThrownBy(()->service.setEnabled(scope,actor,"payment",true)).isInstanceOf(StoreProductSettingsException.class);
+        assertThatThrownBy(()->service.setEnabled(scope,actor,"unknown_product",true)).isInstanceOf(StoreProductSettingsException.class);
         when(stores.isActive(scope,true)).thenReturn(false);
         assertThatThrownBy(()->service.setEnabled(scope,actor,"wallet",true)).isInstanceOf(StoreProductSettingsException.class);verifyNoInteractions(commands);
     }
@@ -72,6 +72,15 @@ class StoreProductSettingsServiceTest {
     @Test void everyManagedProductUsesTheSameProvisioningRule(){
         for(String key:List.of("wallet","daily_ledger","wine_storage"))when(gate.isStoreProductProvisioned(key,tenant,store)).thenReturn(false);
         assertThat(service.list(scope)).isEmpty();verifyNoInteractions(commands);
+    }
+    @Test void everyRegisteredProductSupportsScopedManagement(){
+        for(String key:com.rpb.reservation.common.product.ProductLineEntryRegistry.managedProducts()){
+            when(gate.isStoreProductProvisioned(key,tenant,store)).thenReturn(true);
+            when(gate.evaluateStoreActivation(key,tenant,store)).thenReturn(AppGateDecision.allow(key,tenant,store,null));
+            when(settings.findByTenantIdAndStoreIdAndAppKey(tenant,store,key)).thenReturn(Optional.of(setting(key,false)));
+            service.setEnabled(scope,actor,key,true);verify(commands).enableStoreApp(tenant,store,key,actor.actorId(),"tenant_admin");
+        }
+        assertThat(service.list(scope)).hasSize(5);
     }
 }
 

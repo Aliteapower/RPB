@@ -42,7 +42,7 @@ public class QueueTicketListController {
     }
 
     @GetMapping
-    @RequireAppGate(appKey = "reservation_queue", permission = VIEW_PERMISSION)
+    @RequireAppGate(appKey = "reservation_queue", permission = VIEW_PERMISSION, allowClosedHistory = true)
     public ResponseEntity<?> listQueueTickets(
         @PathVariable UUID storeId,
         @RequestParam(value = "status", required = false) String status,
@@ -50,7 +50,8 @@ public class QueueTicketListController {
         @RequestParam(value = "offset", required = false) String offset,
         @RequestParam(value = "tableArea", required = false) String tableArea,
         @RequestParam(value = "partySize", required = false) String partySize,
-        @RequestParam(value = "phone", required = false) String phone
+        @RequestParam(value = "phone", required = false) String phone,
+        @RequestParam(required=false) String businessDate
     ) {
         Optional<CurrentActor> currentActor = currentActorProvider.currentActor();
         if (currentActor.isEmpty()) {
@@ -72,6 +73,7 @@ public class QueueTicketListController {
             tableArea,
             partySize,
             phone,
+            businessDate,
             actor
         );
         QueueTicketListResult result = applicationService.listQueueTickets(query);
@@ -81,6 +83,9 @@ public class QueueTicketListController {
 
         return ResponseEntity.ok(apiMapper.toResponse(result));
     }
+
+    @RequireAppGate(appKey = "reservation_queue", permission = VIEW_PERMISSION, allowClosedHistory = true)
+    public ResponseEntity<?> listQueueTickets(UUID storeId,String status,String limit,String offset,String tableArea,String partySize,String phone) { return listQueueTickets(storeId,status,limit,offset,tableArea,partySize,phone,null); }
 
     private static boolean hasAllowedRole(CurrentActor actor) {
         return actor.roles().stream().anyMatch(ALLOWED_ROLES::contains);

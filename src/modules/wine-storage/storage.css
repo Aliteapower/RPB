@@ -117,3 +117,9 @@
 
 .storage-bottle-code input { width: 100%; min-width: 0; margin: 4px 0 8px; }
 .storage-bottle-code label { font-size: 12px; }
+
+.storage-quantity-field { margin-bottom: 8px; font-size: 12px; }
+.storage-page .storage-quantity { display: grid; grid-template-columns: 40px minmax(0,1fr) 40px; align-items: center; gap: 2px; margin-top: 6px; }
+.storage-page .storage-quantity button { min-height: 40px; padding: 6px; font-size: 20px; }
+.storage-page .storage-quantity input { width: 100%; min-width: 0; margin: 0; padding: 8px 0; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.storage-quantity input::-webkit-inner-spin-button,.storage-quantity input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

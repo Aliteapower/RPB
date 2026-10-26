@@ -25,6 +25,15 @@ class ProductLineEntryRegistryTest {
         for (var entry : ProductLineEntryRegistry.entries()) {
             if (!entry.value().isBlank()) assertThat(mountedRoutes).contains("path: '" + entry.value() + "'");
         }
+        for (var entry : ProductLineEntryRegistry.entries()) {
+            if (entry.historyRoute().isBlank()) continue;
+            String path=entry.historyRoute().split("\\?")[0];
+            if (path.startsWith("/stores/:storeId/wallet/")) {
+                assertThat(mountedRoutes).contains("path: '/stores/:storeId/wallet'", "path: '"+path.substring("/stores/:storeId/wallet/".length())+"'");
+            } else assertThat(mountedRoutes).contains("path: '"+path+"'");
+            assertThat(entry.historyPermissions()).isNotEmpty();
+        }
+        assertThat(router.replace("\r\n", "\n")).contains("name: 'payment-records',\n      component: TenantAdminPaymentRecordsPage\n    }");
         assertThat(Files.readString(Path.of("src/components/platform/product-line/productLineCatalog.ts")))
             .contains("main/resources/product-line-entries.json");
     }

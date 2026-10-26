@@ -67,6 +67,7 @@ class QueueTicketListControllerTest {
         when(applicationService.listQueueTickets(any())).thenReturn(success());
 
         mockMvc.perform(get(ENDPOINT, STORE_ID)
+                .param("businessDate", "2026-10-20")
                 .param("status", "called")
                 .param("limit", "25")
                 .param("offset", "5")
@@ -108,6 +109,7 @@ class QueueTicketListControllerTest {
         assertThat(query.actorId()).isEqualTo(ACTOR_ID);
         assertThat(query.actorType()).isEqualTo("staff");
         assertThat(query.status()).isEqualTo("called");
+        assertThat(query.businessDate()).isEqualTo("2026-10-20");
         assertThat(query.limit()).isEqualTo("25");
         assertThat(query.offset()).isEqualTo("5");
         assertThat(query.tableArea()).isEqualTo("A区");

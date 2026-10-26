@@ -21,6 +21,7 @@ class TenantEntryLinksTest {
     final TenantEntryLinksService service=new TenantEntryLinksService(repository,gate,booking);
     TenantEntryLinksContext.Identity identity(String tenantStatus,String storeStatus){return new TenantEntryLinksContext.Identity(tenant,"tenant-a","统一租户名称",tenantStatus,store,"shop-a","另一个门店名称",storeStatus);}
 
+    @org.junit.jupiter.api.BeforeEach void provisioned(){when(gate.isStoreProductProvisioned(anyString(),eq(tenant),eq(store))).thenReturn(true);}
     @Test void readsSharedTenantNameAndCommercialAccessWithoutCreatingSubscriptions() {
         when(repository.find(scope)).thenReturn(Optional.of(identity("active","active")));
         when(gate.evaluateCommercial(anyString(),eq(tenant),eq(store))).thenAnswer(i->AppGateDecision.allow(i.getArgument(0),tenant,store,null));

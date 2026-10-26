@@ -10,6 +10,7 @@ export interface MeAppEntry {
 export interface MeAppsResponse {
   success: true
   apps: MeAppEntry[]
+  historyApps?: MeAppEntry[]
 }
 
 export interface MeAppsApiErrorBody {

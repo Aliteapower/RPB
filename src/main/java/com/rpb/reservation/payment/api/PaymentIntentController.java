@@ -59,7 +59,7 @@ public class PaymentIntentController {
     }
 
     @GetMapping("/sessions/{sessionNo}")
-    @RequireAppGate(appKey = "payment", permission = INTENT_VIEW_PERMISSION)
+    @RequireAppGate(appKey = "payment", permission = INTENT_VIEW_PERMISSION, allowClosedHistory = true)
     public ResponseEntity<PaymentIntentResponses.SessionResponse> getSession(
         @PathVariable UUID storeId,
         @PathVariable String sessionNo
@@ -111,7 +111,7 @@ public class PaymentIntentController {
     }
 
     @GetMapping("/quick-pay-records")
-    @RequireAppGate(appKey = "payment", permission = INTENT_VIEW_PERMISSION)
+    @RequireAppGate(appKey = "payment", permission = INTENT_VIEW_PERMISSION, allowClosedHistory = true)
     public ResponseEntity<PaymentIntentResponses.QuickPayRecordsResponse> getQuickPayRecords(
         @PathVariable UUID storeId,
         @RequestParam(required = false) java.time.LocalDate businessDate,

@@ -11,7 +11,7 @@ import static com.rpb.reservation.appgate.application.StoreProductSettingsExcept
 @Service
 @Transactional(readOnly = true)
 public class StoreProductSettingsService {
-    private static final List<String> PRODUCTS = List.of("wallet", "daily_ledger", "wine_storage");
+    private static final List<String> PRODUCTS = com.rpb.reservation.common.product.ProductLineEntryRegistry.managedProducts();
     private final StoreProductManagementRepository stores;
     private final StoreAppSettingJpaRepository settings;
     private final AppGateCommandService commands;

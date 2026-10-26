@@ -25,7 +25,7 @@ class LedgerApiTest {
     @Test void appGateDenialsDoNotInvokeLedgerQueries() throws Exception {
         for(var reason:List.of(AppGateDenyReason.APP_DISABLED,AppGateDenyReason.TENANT_APP_NOT_ENABLED,AppGateDenyReason.STORE_APP_NOT_ENABLED,AppGateDenyReason.PERMISSION_DENIED)){
             var queries=mock(LedgerQueryService.class);var gate=mock(AppGateService.class);
-            when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("daily_ledger",tenant,store,"daily_ledger.view",reason));
+            when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.deny("daily_ledger",tenant,store,"daily_ledger.view",reason));
             var provider=(CurrentActorProvider)()->Optional.of(actor);
             var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,mock(LedgerCommandService.class),provider,json,mock(LedgerBrandingService.class)))
                 .addInterceptors(new AppGateInterceptor(gate,mock(AppGateDenialAuditService.class),provider,new AppGateApiErrorMapper(),json)).build();
@@ -36,7 +36,7 @@ class LedgerApiTest {
     }
     @Test void staffLogoReadUsesLedgerViewAndPrivateMediaResponse() throws Exception {
         var queries=mock(LedgerQueryService.class);var gate=mock(AppGateService.class);var branding=mock(LedgerBrandingService.class);
-        when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("daily_ledger",tenant,store,"daily_ledger.view"));
+        when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.allow("daily_ledger",tenant,store,"daily_ledger.view"));
         UUID asset=UUID.randomUUID();
         when(branding.logo(any(),eq(asset))).thenReturn(new com.rpb.reservation.queuedisplay.application.CallScreenMediaContent(
             new org.springframework.core.io.ByteArrayResource(new byte[]{1,2,3}),"image/png",3));
@@ -51,7 +51,7 @@ class LedgerApiTest {
     }
     @Test void settingsResponseHasExplicitEnvelopeAndMutationUsesManagePermission() throws Exception {
         var queries=mock(LedgerQueryService.class);var gate=mock(AppGateService.class);var commands=mock(LedgerCommandService.class);
-        when(gate.evaluate(any())).thenReturn(AppGateDecision.allow("daily_ledger",tenant,store,"daily_ledger.view"));
+        when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.allow("daily_ledger",tenant,store,"daily_ledger.view"));
         when(queries.settings(any(),any())).thenReturn(new LedgerRepository.Settings(new LedgerRules(json).defaults(),json.createObjectNode(),2));
         var provider=(CurrentActorProvider)()->Optional.of(actor);
         var mvc=MockMvcBuilders.standaloneSetup(new LedgerController(queries,commands,provider,json,mock(LedgerBrandingService.class)))

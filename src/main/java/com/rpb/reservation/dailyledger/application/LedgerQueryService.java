@@ -19,10 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class LedgerQueryService {
     private final LedgerRepository repository;private final LedgerRules rules;private final LedgerAccess access;private final ObjectMapper json;
     public LedgerQueryService(LedgerRepository repository,LedgerRules rules,LedgerAccess access,ObjectMapper json){this.repository=repository;this.rules=rules;this.access=access;this.json=json;}
-    public LedgerRepository.Settings settings(StoreScope s,CurrentActor actor){access.require(s,actor,"daily_ledger.view");return currentSettings(s);}
-    public LedgerStoreDisplay display(StoreScope s,CurrentActor actor){access.require(s,actor,"daily_ledger.view");return repository.display(s);}
+    public LedgerRepository.Settings settings(StoreScope s,CurrentActor actor){access.requireHistory(s,actor,"daily_ledger.view");return currentSettings(s);}
+    public LedgerStoreDisplay display(StoreScope s,CurrentActor actor){access.requireHistory(s,actor,"daily_ledger.view");return repository.display(s);}
     LedgerRepository.Settings currentSettings(StoreScope s){return repository.settings(s).orElseGet(()->new LedgerRepository.Settings(rules.defaults(),json.createObjectNode(),0));}
-    public ObjectNode day(StoreScope s,LocalDate date,CurrentActor actor){access.require(s,actor,"daily_ledger.view");return assemble(s,date);}
+    public ObjectNode day(StoreScope s,LocalDate date,CurrentActor actor){access.requireHistory(s,actor,"daily_ledger.view");return assemble(s,date);}
     ObjectNode assemble(StoreScope s,LocalDate date) {
         var frozen=repository.dayConfig(s,date);JsonNode config=frozen.orElseGet(()->currentSettings(s).config());
         ObjectNode out=json.createObjectNode().put("date",date.toString()).put("locked_config",frozen.isPresent());out.set("config",config);
@@ -36,10 +36,10 @@ public class LedgerQueryService {
         String closing=config.path("final_period").asText("dinner");if(submitted.has(closing))out.put("last_period",closing);else out.putNull("last_period");return out;
     }
     public List<ObjectNode> history(StoreScope s,LocalDate start,LocalDate end,CurrentActor actor){
-        access.require(s,actor,"daily_ledger.view");
+        access.requireHistory(s,actor,"daily_ledger.view");
         if(start.isAfter(end)||ChronoUnit.DAYS.between(start,end)>=366)throw LedgerException.invalid("单次查询1至366天");
         return repository.dates(s,start,end).stream().map(d->assemble(s,d)).toList();
     }
-    public List<Integer> years(StoreScope s,CurrentActor actor){access.require(s,actor,"daily_ledger.view");return repository.years(s);}
-    public List<JsonNode> audit(StoreScope s,LocalDate date,String period,CurrentActor actor){access.require(s,actor,"daily_ledger.view");if(!LedgerRules.PERIODS.contains(period))throw LedgerException.invalid("餐段无效");return repository.audit(s,date,period);}
+    public List<Integer> years(StoreScope s,CurrentActor actor){access.requireHistory(s,actor,"daily_ledger.view");return repository.years(s);}
+    public List<JsonNode> audit(StoreScope s,LocalDate date,String period,CurrentActor actor){access.requireHistory(s,actor,"daily_ledger.view");if(!LedgerRules.PERIODS.contains(period))throw LedgerException.invalid("餐段无效");return repository.audit(s,date,period);}
 }

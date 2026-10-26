@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductHistoryLinks from '../modules/tenant-products/ProductHistoryLinks.vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
@@ -66,6 +67,7 @@ let overviewLoadSequence = 0
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const {
   findVisibleApp,
+  historyApps,
   loaded: visibleAppsLoaded,
   loading: visibleAppsLoading
 } = useStoreVisibleApps(storeId)
@@ -78,7 +80,8 @@ const hasReservationQueue = computed(() =>
 )
 const ledgerEntry = computed(() => findVisibleApp('daily_ledger'))
 const walletEntry = computed(() => findVisibleApp('wallet'))
-const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined || walletEntry.value !== undefined)
+const wineEntry = computed(() => findVisibleApp('wine_storage'))
+const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined || walletEntry.value !== undefined || wineEntry.value !== undefined)
 const reservationQueuePermissions = computed(() => reservationQueueEntry.value?.permissions ?? [])
 const paymentPermissions = computed(() => paymentEntry.value?.permissions ?? [])
 const canCheckInReservation = computed(() =>
@@ -94,7 +97,7 @@ const canCreatePaymentIntent = computed(() =>
   hasPaymentPermission('payment.intent.create')
 )
 const hasVisibleOperation = computed(
-  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value || ledgerEntry.value !== undefined
+  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value || ledgerEntry.value !== undefined || walletEntry.value !== undefined || wineEntry.value !== undefined
 )
 const appStatusLabel = computed(() => {
   if (visibleAppsLoading.value || isLoading.value) {
@@ -133,6 +136,9 @@ const paymentQuickPayRoute = computed(() => ({
   }
 }))
 const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactToolbarItems([
+  wineEntry.value
+    ? {id:'wine_storage',labelKey:'wineStorage.entry',descriptionKey:'wineStorage.description',symbolKey:'wallet.symbol',to:wineEntry.value.entryRoute,tone:'success'}
+    : null,
   walletEntry.value
     ? { id: 'wallet', labelKey: 'wallet.entry', descriptionKey: 'wallet.description', symbolKey: 'wallet.symbol', to: walletEntry.value.entryRoute, tone: 'payment' }
     : null,
@@ -563,6 +569,7 @@ function hasPaymentPermission(permission: string): boolean {
     </div>
 
     <StaffBottomNav :store-id="storeId" active-tab="home" />
+    <ProductHistoryLinks :entries="historyApps" />
   </main>
 </template>
 

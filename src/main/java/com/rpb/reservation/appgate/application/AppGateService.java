@@ -139,6 +139,57 @@ public class AppGateService {
         return !Set.of("wallet", "wine_storage").contains(appKey);
     }
 
+    /** Read-only ownership path. It never grants an operational permission. */
+    public AppGateDecision evaluateHistory(AppGateAccessRequest request) {
+        if (request.requiredPermission() == null || !ProductLineEntryRegistry.historyPermissions(request.appKey()).contains(request.requiredPermission())) {
+            return evaluate(request);
+        }
+        CurrentActor actor = request.actor();
+        if (actor == null || request.tenantId() == null || request.storeId() == null
+            || !request.tenantId().equals(actor.tenantId()) || !actor.canAccessStore(request.storeId())) {
+            return denied(request, AppGateDenyReason.STORE_ACCESS_DENIED);
+        }
+        if (!actor.hasPermission(request.requiredPermission())) return denied(request, AppGateDenyReason.PERMISSION_DENIED);
+        var platform = platformApps.findByAppKey(request.appKey());
+        if (platform.isEmpty() || !ACTIVE.equals(platform.get().getStatus())) return denied(request, AppGateDenyReason.APP_DISABLED);
+        if (!isStoreProductProvisioned(request.appKey(), request.tenantId(), request.storeId())) {
+            return denied(request, AppGateDenyReason.TENANT_APP_NOT_ENABLED);
+        }
+        var setting = storeSettings.findByTenantIdAndStoreIdAndAppKey(request.tenantId(), request.storeId(), request.appKey());
+        if (setting.isEmpty() || (!setting.get().isEnabled() && setting.get().getEnabledAt() == null && setting.get().getDisabledAt() == null)) {
+            return denied(request, AppGateDenyReason.STORE_APP_NOT_ENABLED);
+        }
+        return AppGateDecision.allow(request.appKey(), request.tenantId(), request.storeId(), request.requiredPermission());
+    }
+
+    public List<AppGateAppEntry> historyApps(CurrentActor actor, UUID storeId) {
+        if (actor == null || actor.tenantId() == null || !actor.canAccessStore(storeId)) return List.of();
+        var active = platformApps.findAllByStatusOrderBySortOrderAscAppKeyAsc(ACTIVE).stream()
+            .collect(Collectors.toMap(PlatformAppEntity::getAppKey, Function.identity()));
+        return ProductLineEntryRegistry.entries().stream()
+            .filter(entry -> !entry.historyRoute().isBlank() && active.containsKey(entry.appKey()))
+            .flatMap(entry -> {
+                var permitted = entry.historyPermissions().stream().filter(actor::hasPermission)
+                    .filter(permission -> evaluateHistory(new AppGateAccessRequest(entry.appKey(), actor.tenantId(), storeId, permission, actor)).allowed())
+                    .collect(Collectors.toSet());
+                if (permitted.isEmpty()) return java.util.stream.Stream.empty();
+                var operational = evaluate(new AppGateAccessRequest(entry.appKey(), actor.tenantId(), storeId, permitted.iterator().next(), actor));
+                if (operational.allowed()) return java.util.stream.Stream.empty();
+                return java.util.stream.Stream.of(new AppGateAppEntry(entry.appKey(), active.get(entry.appKey()).getAppName(),
+                    "history", historyRoute(entry, permitted).replace(":storeId", storeId.toString()), true, permitted));
+            }).toList();
+    }
+
+    private static String historyRoute(ProductLineEntryRegistry.Entry entry, Set<String> permissions) {
+        if ("reservation_queue".equals(entry.appKey()) && !permissions.contains("reservation.today_view")) {
+            return "/stores/:storeId/queue-tickets?history=1";
+        }
+        if ("wallet".equals(entry.appKey()) && !permissions.contains("wallet.view")) {
+            return entry.historyRoute() + "&category=points";
+        }
+        return entry.historyRoute();
+    }
+
     public List<AppGateAppEntry> visibleApps(CurrentActor actor, UUID storeId) {
         if (actor == null || actor.tenantId() == null || !actor.canAccessStore(storeId)) {
             return List.of();

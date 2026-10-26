@@ -106,8 +106,11 @@ public class QueueTicketListApplicationService {
             return QueueTicketListResult.failure(QueueTicketListError.STORE_ACCESS_DENIED);
         }
 
+        LocalDate selectedDate;
+        try { selectedDate=query.businessDate()==null || query.businessDate().isBlank()?LocalDate.now(clock.withZone(zoneId(store.timezone()))):LocalDate.parse(query.businessDate()); }
+        catch (java.time.format.DateTimeParseException error) { return QueueTicketListResult.failure(QueueTicketListError.INVALID_QUERY); }
         try {
-            BusinessDate businessDate = new BusinessDate(LocalDate.now(clock.withZone(zoneId(store.timezone()))));
+            BusinessDate businessDate = new BusinessDate(selectedDate);
             QueueTicketListRows rows = queueTicketRepository.findQueueTicketList(
                 scope,
                 statusFilter.status(),
