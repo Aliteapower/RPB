@@ -3,11 +3,12 @@ import assert from 'node:assert/strict'
 import {parse,compileScript} from '@vue/compiler-sfc'
 import {createRenderer,h,nextTick,reactive} from 'vue'
 import {createI18n} from 'vue-i18n'
+import {createPinia} from 'pinia'
 import {routeLocationKey,routerKey} from 'vue-router'
 import {build} from 'esbuild'
 import {readFile,mkdir,writeFile} from 'node:fs/promises'
 import {pathToFileURL} from 'node:url'
-let Page,Summary,CustomerPage,StaffPage,CatalogBarcodes
+let Page,Summary,CustomerPage,StaffPage,CatalogBarcodes,CatalogPage,useAuthSessionStore
 const mounted=new Set()
 afterEach(()=>{for(const app of mounted)app.unmount();mounted.clear();for(const role of ['true','false'])globalThis.sessionStorage?.removeItem(`rpb.storage.pending:${role}:A`)})
 const originalFetch=globalThis.fetch,originalStorage=globalThis.sessionStorage,originalDocument=globalThis.document,originalDocumentClass=globalThis.Document,originalShadowRoot=globalThis.ShadowRoot
@@ -19,13 +20,13 @@ const home={timezone:'Asia/Singapore',storeName:'QA Store',stores:[{id:'A',name:
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',listeners:new Map(),addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn)},removeEventListener(name,fn){this.listeners.get(name)?.delete(fn)}})
  const memory=new Map();globalThis.sessionStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)}
- const result=await build({stdin:{contents:"export {default as CatalogBarcodes} from './src/modules/catalog/CatalogBarcodes.vue';export {default as CustomerPage} from './src/modules/wine-storage/WineStorageCustomerPage.vue';export {default as StaffPage} from './src/modules/wine-storage/WineStorageStaffPage.vue';export {default as Page} from './src/modules/wine-storage/WineStoragePage.vue';export {default as Summary} from './src/modules/wine-storage/WalletStorageSummary.vue'",resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'storage-page-test',setup(b){b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));b.onLoad({filter:/\.vue$/},async({path})=>{if(path.endsWith('ProductBarcodeScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['disabled'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-barcode':true,onClick:()=>emit('code','00036000291452')},'test-barcode')}",loader:'js'};if(path.endsWith('StoragePhotos.vue'))return{contents:"import {h} from 'vue';export default {props:['modelValue'],emits:['update:modelValue'],setup:(p,{emit})=>()=>h('button',{type:'button','data-test-photo':true,onClick:()=>emit('update:modelValue',['photo-id'])},'test-photo')}",loader:'js'};if(path.endsWith('WalletQrDisplay.vue'))return{contents:"import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}",loader:'js'};if(path.endsWith('WalletQrScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['disabled'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-storage-scan':true,disabled:p.disabled,onClick:()=>emit('code','WS.'+'S'.repeat(43))},'test-storage-scan')}",loader:'js'};if(/WalletCustomerLogin\.vue$/.test(path))return{contents:"export default {render(){return null}}",loader:'js'};const{descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:'storage-test-'+path,inlineTemplate:true}).content,loader:'ts'}})}}]})
- const dir='target/wine-storage-page-test';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({Page,Summary,CustomerPage,StaffPage,CatalogBarcodes}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
+ const result=await build({stdin:{contents:"export {useAuthSessionStore} from './src/stores/authSession';export {default as CatalogPage} from './src/modules/catalog/CatalogPage.vue';export {default as CatalogBarcodes} from './src/modules/catalog/CatalogBarcodes.vue';export {default as CustomerPage} from './src/modules/wine-storage/WineStorageCustomerPage.vue';export {default as StaffPage} from './src/modules/wine-storage/WineStorageStaffPage.vue';export {default as Page} from './src/modules/wine-storage/WineStoragePage.vue';export {default as Summary} from './src/modules/wine-storage/WalletStorageSummary.vue'",resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'storage-page-test',setup(b){b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));b.onLoad({filter:/\.vue$/},async({path})=>{if(path.endsWith('ProductBarcodeScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['disabled','autoStart','showManual'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-barcode':true,'data-auto-start':p.autoStart,onClick:()=>emit('code','00036000291452')},'test-barcode')}",loader:'js'};if(path.endsWith('StoragePhotos.vue'))return{contents:"import {h} from 'vue';export default {props:['modelValue'],emits:['update:modelValue'],setup:(p,{emit})=>()=>h('button',{type:'button','data-test-photo':true,onClick:()=>emit('update:modelValue',['photo-id'])},'test-photo')}",loader:'js'};if(path.endsWith('WalletQrDisplay.vue'))return{contents:"import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}",loader:'js'};if(path.endsWith('WalletQrScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['disabled'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-storage-scan':true,disabled:p.disabled,onClick:()=>emit('code','WS.'+'S'.repeat(43))},'test-storage-scan')}",loader:'js'};if(/WalletCustomerLogin\.vue$/.test(path))return{contents:"export default {render(){return null}}",loader:'js'};const{descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:'storage-test-'+path,inlineTemplate:true}).content,loader:'ts'}})}}]})
+ const dir='target/wine-storage-page-test';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({Page,Summary,CustomerPage,StaffPage,CatalogBarcodes,CatalogPage,useAuthSessionStore}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
 })
 after(()=>{globalThis.fetch=originalFetch;globalThis.sessionStorage=originalStorage;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 function mount(component,customer,locale='zh-CN',data=home,respond,lists={}){
  const calls=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});return{ok:true,json:async()=>url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data}}
- const route=reactive({params:{storeId:'A'},hash:'',query:{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A'})});app.use(createI18n({legacy:false,locale,messages:{}}));app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,unmount:()=>{app.unmount();mounted.delete(app)}}
+ const route=reactive({params:{storeId:'A'},hash:'',query:{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A'})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,i18n,unmount:()=>{app.unmount();mounted.delete(app)}}
 }
 test('storage customer and merchant entry titles and API scopes are distinct',async()=>{
  for(const customer of [true,false]){
@@ -216,7 +217,7 @@ test('customer picker pages and filters on server and barcode chooses a product'
  assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).includes('选择 ＋')).length,1)
  nodes(s.root,n=>n.tag==='button'&&text(n)==='下一页')[0].props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('page=1')))
  const select=nodes(s.root,n=>n.tag==='select')[0];select.children.forEach(o=>o.selected=o.props?.value==='cat');select.listeners.change({target:select});await tick();assert.ok(s.calls.some(c=>c.url.includes('categoryId=cat')&&c.url.includes('page=0')))
- nodes(s.root,n=>n.tag==='button'&&text(n)==='扫瓶身条码选酒')[0].props.onClick();await tick();nodes(s.root,n=>n.props?.['data-barcode'])[0].props.onClick();await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n)==='扫瓶身条码选酒')[0].props.onClick();await tick();assert.equal(nodes(s.root,n=>n.props?.['data-barcode'])[0].props['data-auto-start'],true);nodes(s.root,n=>n.props?.['data-barcode'])[0].props.onClick();await tick()
  assert.ok(s.calls.some(c=>c.url.includes('barcode=00036000291452')));assert.match(text(s.root),/2. 填写瓶数并拍照/);assert.match(text(s.root),/已添加/)
 })
 
@@ -228,9 +229,45 @@ test('unlisted barcode retains identifier in application note and requests wine 
 })
 
 
-test('catalog barcode scan writes only product barcode mapping with an idempotency key',async()=>{
- const wrapper={render:()=>h(CatalogBarcodes,{base:'/api/v1/stores/A/catalog',productId:'wine',disabled:false})}
- const s=mount(wrapper,false,'zh-CN',home,(url,options)=>({barcodes:options?.method==='POST'?['00036000291452']:[]}));await tick()
- nodes(s.root,n=>n.props?.['data-barcode'])[0].props.onClick();await tick()
- const post=s.calls.find(c=>c.method==='POST');assert.equal(post.url,'/api/v1/stores/A/catalog/products/wine/barcodes');assert.equal(post.body.barcode,'00036000291452');assert.equal(post.body.remove,false);assert.ok(post.body.idempotencyKey);assert.match(text(s.root),/00036000291452/)
+test('catalog scan is editable draft and saves explicitly without photos',async()=>{
+ const wrapper={render:()=>h(CatalogBarcodes,{base:'/api/v1/stores/A/catalog',productId:'wine',productName:'白酒',productCode:'W-1',disabled:false})}
+ const s=mount(wrapper,false,'zh-CN',home,(url,options)=>({barcodes:options?.method==='POST'?['06901035601030']:[]}));await tick()
+ nodes(s.root,n=>n.props?.['data-barcode'])[0].props.onClick();await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
+ const field=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0];assert.equal(field.value,'00036000291452');field.value='6901035601030';field.listeners.input({target:field});await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n)==='保存条码')[0].props.onClick();await tick()
+ const post=s.calls.find(c=>c.method==='POST');assert.equal(post.url,'/api/v1/stores/A/catalog/products/wine/barcodes');assert.equal(post.body.barcode,'6901035601030');assert.equal(post.body.remove,false);assert.ok(post.body.idempotencyKey);assert.equal(post.body.photos,undefined);assert.match(text(s.root),/白酒/)
+})
+
+test('saved barcode can be edited as one atomic replacement',async()=>{
+ let codes=['00036000291452'];const wrapper={render:()=>h(CatalogBarcodes,{base:'/api/v1/stores/A/catalog',productId:'wine',productName:'白酒',productCode:'W-1',disabled:false})}
+ const s=mount(wrapper,false,'zh-CN',home,(url,options)=>{if(options?.method==='POST')codes=['06901035601030'];return{barcodes:[...codes]}});await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n)==='修改')[0].props.onClick();await tick();const field=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0];assert.equal(field.value,'00036000291452');field.value='6901035601030';field.listeners.input({target:field});await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n)==='保存修改')[0].props.onClick();await tick()
+ const post=s.calls.find(c=>c.method==='POST');assert.equal(post.body.replaceBarcode,'00036000291452');assert.equal(post.body.barcode,'6901035601030');assert.equal(s.calls.filter(c=>c.method==='POST').length,1)
+})
+
+
+test('barcode editor belongs to the selected product detail card and changes owner cleanly',async()=>{
+ const products=['wine-a','wine-b'].map((id,i)=>({id,categoryId:'cat',code:id,nameZh:'酒品'+(i+1),nameEn:'Wine '+(i+1),priceCents:100,currency:'SGD',taxMode:'inclusive',taxCategory:'not_applicable',taxRate:0,channels:['storage'],kind:'physical',unit:'瓶',status:'active',listingEnabled:true,listingVersion:0,version:0}))
+ const actor={roles:['tenant_admin'],permissions:['catalog.view','catalog.manage'],storeIds:['A']}
+ const s=mount(CatalogPage,false,'zh-CN',home,url=>url.endsWith('/categories')?[{id:'cat',code:'C',nameZh:'酒品',enabled:true}]:url.endsWith('/products')?products:{barcodes:[]},{actor});await tick()
+ let articles=nodes(s.root,n=>n.tag==='article');nodes(articles[0],n=>n.tag==='button'&&text(n)==='编辑')[0].props.onClick();await tick()
+ assert.equal(nodes(articles[0],n=>n.props?.['aria-label']==='商品条码号').length,1);assert.equal(nodes(articles[1],n=>n.props?.['aria-label']==='商品条码号').length,0);assert.match(text(nodes(articles[0],n=>n.props?.['aria-label']==='商品条码号')[0]),/酒品1/)
+ nodes(articles[1],n=>n.tag==='button'&&text(n)==='编辑')[0].props.onClick();await tick();articles=nodes(s.root,n=>n.tag==='article');assert.equal(nodes(articles[0],n=>n.props?.['aria-label']==='商品条码号').length,0);assert.equal(nodes(articles[1],n=>n.props?.['aria-label']==='商品条码号').length,1)
+})
+
+
+test('uncertain replacement keeps the same command for retry and preserves editable draft',async()=>{
+ const wrapper={render:()=>h(CatalogBarcodes,{base:'/api/v1/stores/A/catalog',productId:'wine',productName:'白酒',disabled:false})}
+ const s=mount(wrapper,false,'zh-CN',home,()=>({barcodes:['00036000291452']}));await tick();nodes(s.root,n=>n.tag==='button'&&text(n)==='修改')[0].props.onClick();await tick()
+ const field=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0];field.value='6901035601030';field.listeners.input({target:field});await tick()
+ const commands=[];globalThis.fetch=async(url,options)=>{commands.push(JSON.parse(options.body));return{ok:commands.length>1,status:commands.length===1?503:200,json:async()=>commands.length===1?{code:'TEMP',message:'Retry later'}:{barcodes:['06901035601030']}}}
+ nodes(s.root,n=>n.tag==='button'&&text(n)==='保存修改')[0].props.onClick();await tick();assert.equal(field.value,'6901035601030');assert.equal(field.props.disabled,true);assert.match(text(s.root),/00036000291452/)
+ nodes(s.root,n=>n.tag==='button'&&text(n)==='重试上次条码操作')[0].props.onClick();await tick();assert.deepEqual(commands[0],commands[1]);assert.equal(commands[1].replaceBarcode,'00036000291452');assert.match(text(s.root),/06901035601030/)
+})
+
+
+test('barcode scan guidance follows the current UI language without changing the draft',async()=>{
+ const wrapper={render:()=>h(CatalogBarcodes,{base:'/api/v1/stores/A/catalog',productId:'wine',productName:'白酒',disabled:false})},s=mount(wrapper,false,'zh-CN',home,()=>({barcodes:[]}));await tick();nodes(s.root,n=>n.props?.['data-barcode'])[0].props.onClick();await tick();assert.match(text(s.root),/已识别条码/)
+ s.i18n.global.locale.value='en-SG';await tick();assert.match(text(s.root),/Barcode read. Check or edit it, then save./);assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0].value,'00036000291452');assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
 })
