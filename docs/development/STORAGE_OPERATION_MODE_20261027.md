@@ -4,7 +4,7 @@
 - 不采用前端跳过扫码（会被伪造请求绕过），不将旧待授权单批量改为已授权。直接登记创建的取酒单与扣减同事务完成，审计明确属于商户登记。模式修改和直接取酒使用同一门店事务锁。
 - V084 新增门店设置表及设置审计表，复合门店租户外键、模式约束、版本号；无历史回填，读取无配置时返回默认模式。不改已有迁移。
 - 测试清单：默认模式拒绝直接取酒；管理员及权限校验；配置版本、重放、非法值、门店租户隔离；直接取酒的库存、批量回滚、过期、并发、重复重放、模式切回重放；旧扫码授权回归；前端设置及直接确认入口、顾客入口；构建。
-- 仅本地实现，不提交、推送、部署。保留现有 Wallet 改动。
+- 初始范围为本地实现；后续用户明确授权“提交部署”，已按下方发布记录执行。保留现有 Wallet 改动。
 
 ## API Review
 
@@ -38,3 +38,7 @@
 - `node --experimental-transform-types --test src/test/frontend/wine-storage-page.test.mjs src/test/frontend/wine-storage.test.mjs src/test/frontend/storage-merchant-scope.test.mjs src/test/frontend/storage-customer-selection.test.mjs src/test/frontend/storage-locations.test.mjs`：52 项通过。
 - `npm run build`：vue-tsc 和 Vite 通过。`git diff --check` 通过。
 - 日志：`target/storage-mode-backend.log`、`target/storage-mode-frontend.log`、`target/storage-mode-build.log`。Mockito 动态 agent 警告未影响测试结果。
+
+## 后续生产发布
+
+用户授权后，功能提交 8337a240 已提交、推送并部署；线上前后端版本一致，Flyway 为 084|84|0。完整生产证据、保护性回退与最终验收见 [生产发布记录](STORAGE_OPERATION_MODE_PRODUCTION_RELEASE_20261027.md)。
