@@ -104,3 +104,16 @@
 .storage-lightbox-image.is-zoomed { display: block; }
 .storage-lightbox-image.is-zoomed img { width: 180%; max-width: none; max-height: none; }
 .storage-receipt-summary { padding: 14px; margin: 14px 0; border-radius: 12px; background: #eef6f4; }
+
+/* Keep the single-bottle pickup code beside the product name. */
+.storage-bottle-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.storage-bottle-heading h3 { min-width: 0; flex: 1; }
+.storage-bottle-code { flex: 0 0 140px; max-width: 50%; text-align: center; }
+.storage-bottle-code > button { width: 100%; padding: 8px; }
+.storage-bottle-code .wallet-qr { margin: 0; padding: 0; }
+.storage-bottle-code .wallet-qr img { display: block; width: 100%; height: auto; max-width: 140px; }
+.storage-bottle-code .wallet-qr figcaption { font-size: 11px; overflow-wrap: anywhere; }
+.storage-bottle-code strong { display: block; font-size: 12px; }
+
+.storage-bottle-code input { width: 100%; min-width: 0; margin: 4px 0 8px; }
+.storage-bottle-code label { font-size: 12px; }

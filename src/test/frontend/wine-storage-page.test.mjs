@@ -91,6 +91,39 @@ test('customer reviews their selected bottles before one scoped command generate
  assert.equal(nodes(s.root,n=>n.tag==='figure'&&n.props['data-code']===code).length,0)
  s.unmount()
 })
+test('customer bottle corner generates a quantity-scoped pickup code and hides it after redemption',async()=>{
+ const item={id:'quick-bottle',customerId:'customer',snapshot:{nameZh:'青岛啤酒',nameEn:'Beer',timezone:'Asia/Singapore'},remaining:3,opened:false,status:'stored',expiresAt:new Date(Date.now()+86400000).toISOString()},code='WS.'+'Q'.repeat(43),intent={id:'quick',origin:'customer',status:'authorized',code,expiresAt:new Date(Date.now()+300000).toISOString(),selections:[{itemId:item.id,quantity:2}]},data={...home,items:[item],intents:[]}
+ let resolve
+ const s=mount(CustomerPage,true,'zh-CN',data,(url,options)=>options?.method==='POST'?new Promise(r=>resolve=r):url.includes('/product-options')?{items:[],categories:[],hasMore:false}:{...data});await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='我要取酒')[0].props.onClick();await tick()
+ const quick=()=>nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='出码取酒')[0]
+ assert.ok(quick());assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
+ const quantity=nodes(s.root,n=>n.tag==='input'&&n.props.type==='number')[0];quantity.props.onInput({target:{value:'0'}});await tick();assert.equal(quick().props.disabled,true);quantity.props.onInput({target:{value:'4'}});await tick();assert.equal(quick().props.disabled,true);quantity.props.onInput({target:{value:'1.5'}});await tick();assert.equal(quick().props.disabled,true);quantity.props.onInput({target:{value:'2'}});await tick();assert.equal(quick().props.disabled,false)
+ const first=quick().props.onClick();quick().props.onClick();await tick();assert.equal(quick().props.disabled,true)
+ const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/public/stores/A/wine-storage/intents');assert.deepEqual(writes[0].body.selections,[{itemId:item.id,quantity:2}]);assert.equal('customerId'in writes[0].body,false)
+ data.intents=[{...intent,code:null}];resolve(intent);await first;await tick()
+ const card=nodes(s.root,n=>n.tag==='article'&&String(n.props.class).includes('storage-customer-bottle'))[0]
+ assert.equal(nodes(card,n=>n.tag==='figure'&&n.props['data-code']===code).length,1);assert.match(text(card),/扫码即核销/);assert.match(text(s.root),/1. 选择要取的酒/)
+ data.intents=[{...intent,status:'completed',code:null}];data.items=[{...item,remaining:2}]
+ await Promise.all([...globalThis.document.listeners.get('visibilitychange')].map(fn=>fn()));await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);assert.match(text(s.root),/该码已失效/);assert.equal(s.calls.filter(c=>c.method==='POST').length,1);s.unmount()
+})
+
+test('quick pickup excludes expired holdings, reports rejected commands and supports cancellation in English',async()=>{
+ const item={id:'quick-cancel',snapshot:{nameZh:'啤酒',nameEn:'Beer',timezone:'Asia/Singapore'},remaining:2,opened:false,status:'stored',expiresAt:new Date(Date.now()+86400000).toISOString()},intent={id:'quick-cancel-code',origin:'customer',status:'authorized',code:'WS.'+'C'.repeat(43),expiresAt:new Date(Date.now()+300000).toISOString(),selections:[{itemId:item.id,quantity:1}]},data={...home,items:[item,{...item,id:'expired',expiresAt:new Date(Date.now()-1000).toISOString()}],intents:[]}
+ const s=mount(CustomerPage,true,'en',data,(url,options)=>options?.method==='POST'?(url.endsWith('/cancel')?(data.intents=[{...intent,code:null,status:'cancelled'}],data.intents[0]):(data.intents=[{...intent,code:null}],intent)):url.includes('/product-options')?{items:[],categories:[],hasMore:false}:{...data});await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Collect bottles')[0].props.onClick();await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Show pickup QR').length,1)
+ const fetchOk=globalThis.fetch;globalThis.fetch=async(url,options)=>options?.method==='POST'?{ok:false,status:409,json:async()=>({code:'STORAGE_CONFLICT',message:'Bottle availability changed'})}:fetchOk(url,options)
+ await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Show pickup QR')[0].props.onClick();await tick()
+ assert.match(text(s.root),/Bottle availability changed/);assert.equal(nodes(s.root,n=>n.tag==='figure').length,0)
+ globalThis.fetch=fetchOk
+ await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Show pickup QR')[0].props.onClick();await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='figure').length,1)
+ await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Cancel')[0].props.onClick();await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);assert.equal(s.calls.filter(c=>c.url.endsWith('/intents/quick-cancel-code/cancel')).length,1);s.unmount()
+})
+
 test('customer selects a catalog wine, adds photos and submits the application as the signed-in customer',async()=>{
  const product={id:'wine',nameZh:'可寄存白酒',nameEn:'Spirit',code:'WINE'},s=mount(CustomerPage,true,'zh-CN',home,(url,options)=>url.includes('/product-options')?{items:[product],categories:[],hasMore:false}:url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{id:'applied',lines:[],status:'pending'}:home);await tick()
  nodes(s.root,n=>n.tag==='button'&&text(n).includes('可寄存白酒'))[0].props.onClick();await tick()

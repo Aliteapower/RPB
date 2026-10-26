@@ -1,5 +1,6 @@
 import {useStorageText} from '../text'
 const zh={
+ quickCode:'出码取酒',quickScanHint:'商户扫码即核销',quickQuantity:'本码领取',
  scanBottle:'扫瓶身条码选酒',barcodeLabel:'商品条码',barcodeFound:'已添加',barcodeUnknown:'条码尚未收录，请填写酒名，条码将随申请提交。',wineCategory:'酒品分类',allCategories:'全部分类',previousPage:'上一页',nextPage:'下一页',pageLabel:'页码',
  bottleUnit:'瓶',bottleState:'酒瓶状态',customer:'自己带来的酒',source:'酒品来源',deposit:'我要存酒',withdrawTask:'我要取酒',records:'我的记录',
  depositHint:'选择酒品、填写瓶数并拍照，提交后由门店核实收存。',
@@ -12,6 +13,7 @@ const zh={
  selectionChanged:'酒品状态或数量已变化，请重新核对领取清单。',signIn:'请先登录自己的顾客账号。',
 }
 const en:Record<keyof typeof zh,string>={
+ quickCode:'Show pickup QR',quickScanHint:'Staff scan redeems immediately',quickQuantity:'This code collects',
  scanBottle:'Select by bottle barcode',barcodeLabel:'Product barcode',barcodeFound:'Added',barcodeUnknown:'Barcode not listed. Enter the wine name; the barcode will be included in your application.',wineCategory:'Wine category',allCategories:'All categories',previousPage:'Previous',nextPage:'Next',pageLabel:'Page',
  bottleUnit:'bottles',bottleState:'Bottle condition',customer:'Brought by me',source:'Bottle source',deposit:'Store bottles',withdrawTask:'Collect bottles',records:'My records',
  depositHint:'Choose the wine, enter bottle quantities and add photos. The store checks and accepts your bottles.',
