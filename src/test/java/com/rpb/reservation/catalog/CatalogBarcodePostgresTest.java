@@ -13,7 +13,7 @@ public class CatalogBarcodePostgresTest extends CatalogPostgresTest {
  private StorageProductCatalog options(){return new StorageProductCatalog(new CatalogRepository(jdbc),products,jdbc);}
  @Test void aliasesReplayConflictAndRemoval(){
   var service=service(mock(CatalogAccess.class));var command=new CatalogBarcodeService.Write("036000291452",false,key());
-  var saved=tx.execute(s->service.save(scope,actor,product.id(),command));assertThat(saved.barcodes()).containsExactly("00036000291452");
+  var saved=tx.execute(s->service.save(scope,actor,product.id(),command));assertThat(saved.barcodes()).containsExactly("036000291452");
   CatalogBarcodeService.Barcodes replay=tx.execute(s->service.save(scope,actor,product.id(),command));assertThat(replay).isEqualTo(saved);
   var second=tx.execute(s->new StorageProductCatalog(new CatalogRepository(jdbc),products,jdbc).associate(scope,null,product.categoryId(),"啤酒","Beer",actor.actorId()));
   assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,second.id(),new CatalogBarcodeService.Write("0036000291452",false,key())))).hasMessageContaining("其他商品");
@@ -43,14 +43,14 @@ public class CatalogBarcodePostgresTest extends CatalogPostgresTest {
   var service=service(mock(CatalogAccess.class));String old="036000291452",next="6901035601030";
   tx.execute(s->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write(old,false,key())));
   var change=new CatalogBarcodeService.Write(next,false,key(),old);
-  var result=tx.execute(s->service.save(scope,actor,product.id(),change));assertThat(result.barcodes()).containsExactly(ProductBarcode.normalize(next));
+  var result=tx.execute(s->service.save(scope,actor,product.id(),change));assertThat(result.barcodes()).containsExactly(next);
   CatalogBarcodeService.Barcodes replay=tx.execute(s->service.save(scope,actor,product.id(),change));assertThat(replay).isEqualTo(result);
   var second=tx.execute(s->options().associate(scope,null,product.categoryId(),"啤酒","Beer",actor.actorId()));
   tx.execute(s->service.save(scope,actor,second.id(),new CatalogBarcodeService.Write(old,false,key())));
   assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write(old,false,key(),next)))).hasMessageContaining("其他商品");
-  assertThat(service.list(scope,actor,product.id()).barcodes()).containsExactly(ProductBarcode.normalize(next));
+  assertThat(service.list(scope,actor,product.id()).barcodes()).containsExactly(next);
   assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write("4006381333931",false,key(),old)))).hasMessageContaining("变化");
-  assertThat(service.list(scope,actor,product.id()).barcodes()).containsExactly(ProductBarcode.normalize(next));
+  assertThat(service.list(scope,actor,product.id()).barcodes()).containsExactly(next);
   assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write(next,true,key(),next)))).hasMessageContaining("格式");
  }
  @Test void omittedReplacementPreservesLegacyRequestHash()throws Exception{
