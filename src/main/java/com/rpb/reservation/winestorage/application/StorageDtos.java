@@ -8,6 +8,8 @@ import com.rpb.reservation.common.serialization.StrictIntegerDeserializer;
 
 public final class StorageDtos {
  private StorageDtos(){}
+ public record Settings(String operationMode,int version){}
+ public record SettingsWrite(String operationMode,@JsonDeserialize(using=StrictIntegerDeserializer.class) int version,String idempotencyKey){}
  public record Rule(UUID id,UUID categoryId,String name,int months,int version){}
  public record RuleWrite(UUID categoryId,String name,@JsonDeserialize(using=StrictIntegerDeserializer.class) int months,String idempotencyKey){}
  public record Line(UUID id,UUID productId,String nameZh,String nameEn,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity,boolean opened,String source,List<UUID> photos,String note){}
@@ -36,7 +38,7 @@ public final class StorageDtos {
  public record Product(UUID id,UUID categoryId,String code,String nameZh,String nameEn){}
  public record Category(UUID id,String nameZh,String nameEn){}
  public record StoreOption(UUID id,String name){}
- public record Home(String timezone,String storeName,List<StoreOption> stores,boolean newBusinessEnabled,Set<String> permissions,List<Rule> rules,List<Category> categories,List<Application> applications,List<Item> items,List<Intent> intents,List<Event> events){}
+ public record Home(String operationMode,int settingsVersion,String timezone,String storeName,List<StoreOption> stores,boolean newBusinessEnabled,Set<String> permissions,List<Rule> rules,List<Category> categories,List<Application> applications,List<Item> items,List<Intent> intents,List<Event> events){}
  public record StorageLocation(UUID id,String name,boolean defaultLocation,int version){}
  public record LocationWrite(String name,Integer version,String idempotencyKey){}
  public record LocationRef(UUID id,String name){}

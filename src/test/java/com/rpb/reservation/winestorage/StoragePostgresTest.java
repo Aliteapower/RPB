@@ -41,6 +41,57 @@ class StoragePostgresTest extends CatalogPostgresTest {
  Item stored(int qty,boolean opened)throws Exception {var a=apply(qty,opened);receive(a,qty,opened);return r.items(scope,customer,clock.instant()).stream().filter(i->i.applicationId().equals(a.id())).findFirst().orElseThrow();}
  Intent intent(Item item,int qty){return tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(item.id(),qty)),key())));}
  Intent deliver(Intent intent,String key){return tx.execute(s->withdrawals.deliver(scope,actor,intent.id(),new Key(key,"现场交付")));}
+ StorageSettingsService settings(){return new StorageSettingsService(access,r,new StorageCommands(r));}
+ void directMode(){tx.execute(s->settings().save(scope,actor,new SettingsWrite("staff_registration",r.settings(scope).version(),key())));}
+ @Test void directModeDefaultsSettingsIsolationVersionsAndReplay(){
+  assertThat(r.settings(scope).operationMode()).isEqualTo("customer_verification");
+  var c=new SettingsWrite("staff_registration",0,key());var saved=tx.execute(s->settings().save(scope,actor,c));
+  Settings replay=tx.execute(s->settings().save(scope,actor,c));assertThat(replay).isEqualTo(saved);
+  assertThat(r.settings(new StoreScope(new TenantId(tenant),UUID.randomUUID())).operationMode()).isEqualTo("customer_verification");
+  assertThat(r.settings(new StoreScope(new TenantId(UUID.randomUUID()),store)).operationMode()).isEqualTo("customer_verification");
+  assertThatThrownBy(()->tx.execute(s->settings().save(scope,actor,new SettingsWrite("customer_verification",0,key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->settings().save(scope,actor,new SettingsWrite("invalid",1,key())))).isInstanceOf(StorageException.class);
+  var staff=new com.rpb.reservation.walkin.api.CurrentActor(tenant,UUID.randomUUID(),"store_staff",Set.of("store_staff"),Set.of("wine_storage.rules.manage"),Set.of(store));
+  assertThatThrownBy(()->tx.execute(s->settings().save(scope,staff,new SettingsWrite("customer_verification",1,key())))).isInstanceOf(StorageException.class);
+  doThrow(StorageException.forbidden()).when(access).staff(scope,actor,"wine_storage.rules.manage",true);
+  assertThatThrownBy(()->tx.execute(s->settings().save(scope,actor,new SettingsWrite("customer_verification",1,key())))).isInstanceOf(StorageException.class);
+ }
+ @Test void directDeliveryRequiresModeAndReplaysEvenAfterModeSwitch()throws Exception{
+  var item=stored(4,false);var c=new IntentWrite(customer,List.of(new Selection(item.id(),2)),key());
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,c))).isInstanceOf(StorageException.class);
+  directMode();var result=tx.execute(s->withdrawals.directDeliver(scope,actor,c));
+  assertThat(result.status()).isEqualTo("completed");assertThat(result.code()).isNull();
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);
+  assertThat(r.events(scope,customer)).anyMatch(e->e.action().equals("staff.delivery_registered")&&e.actorId().equals(actor.actorId())).noneMatch(e->e.action().equals("authorized"));
+  tx.execute(s->settings().save(scope,actor,new SettingsWrite("customer_verification",1,key())));
+  Intent replay=tx.execute(s->withdrawals.directDeliver(scope,actor,c));assertThat(replay).isEqualTo(result);
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,c.selections(),key())))).isInstanceOf(StorageException.class);
+ }
+ @Test void directDeliveryRejectsExpiredOverdrawForeignCustomerAndDeniedStaff()throws Exception{
+  var item=stored(2,false);directMode();
+  assertThatThrownBy(()->tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(item.id(),1)),key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(UUID.randomUUID(),List.of(new Selection(item.id(),1)),key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),3)),key())))).isInstanceOf(StorageException.class);
+  clock.now=item.expiresAt();
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())))).isInstanceOf(StorageException.class);
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);
+  doThrow(StorageException.forbidden()).when(access).staff(scope,actor,"wine_storage.deliver",false);
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())))).isInstanceOf(StorageException.class);
+ }
+ @Test void directDeliveryBatchRollbackAndConcurrentCommandsNeverOverdraw()throws Exception{
+  var item=stored(3,false);var other=stored(2,false);var pending=tx.execute(s->withdrawals.create(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())));directMode();
+  assertThatThrownBy(()->deliver(pending,key())).hasMessageContaining("授权");
+  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1),new Selection(other.id(),3)),key())))).isInstanceOf(StorageException.class);
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(3);
+  int before=r.intents(scope,customer).size();
+  assertThatThrownBy(()->tx.execute(s->app.apply(scope,principal,new Apply(List.of(new Line(null,product.id(),"","",1,false,"customer",List.of(),"")),true,null,null,key())))).isInstanceOf(StorageException.class);
+  try(var pool=Executors.newFixedThreadPool(2)){
+   var start=new CountDownLatch(1);Callable<Boolean> task=()->{start.await();try{tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),2)),key())));return true;}catch(StorageException e){return false;}};
+   var one=pool.submit(task);var two=pool.submit(task);start.countDown();assertThat(List.of(one.get(15,TimeUnit.SECONDS),two.get(15,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+  }
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(1);assertThat(r.intents(scope,customer)).hasSize(before+1);
+ }
  @Test void pendingConfirmRejectCancelAndImmutableSnapshots()throws Exception{
   var c=command(6,false);var pending=tx.execute(s->app.apply(scope,principal,c));assertThat(r.items(scope,customer,clock.instant())).isEmpty();
   assertThat(tx.execute(s->app.apply(scope,principal,c)).id()).isEqualTo(pending.id());receive(pending,5,false);

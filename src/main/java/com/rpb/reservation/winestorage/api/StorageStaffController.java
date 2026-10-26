@@ -26,6 +26,7 @@ public class StorageStaffController {
  @PostMapping("/rules") public Rule rule(@PathVariable UUID storeId,@RequestBody RuleWrite c){var a=identity.staff();return applications.rule(identity.scope(a.tenantId(),storeId),a,c);}
  @PostMapping("/applications/{id}/receive") public Application receive(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Receive c){var a=identity.staff();return applications.receive(identity.scope(a.tenantId(),storeId),a,id,c);}
  @PostMapping("/applications/{id}/reject") public Application reject(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key c){var a=identity.staff();return applications.reject(identity.scope(a.tenantId(),storeId),a,id,c);}
+ @PostMapping("/direct-deliver") public Intent directDeliver(@PathVariable UUID storeId,@RequestBody IntentWrite c){var a=identity.staff();return withdrawals.directDeliver(identity.scope(a.tenantId(),storeId),a,c);}
  @PostMapping("/intents") public Intent intent(@PathVariable UUID storeId,@RequestBody IntentWrite c){var a=identity.staff();return withdrawals.create(identity.scope(a.tenantId(),storeId),a,c);}
  @PostMapping("/scan-deliver") public Intent scanDeliver(@PathVariable UUID storeId,@RequestBody ScanDelivery c){var a=identity.staff();return scanDelivery.deliver(identity.scope(a.tenantId(),storeId),a,c);}
  @PostMapping("/scan") public Intent scan(@PathVariable UUID storeId,@RequestBody Scan c){var a=identity.staff();return withdrawals.scan(identity.scope(a.tenantId(),storeId),a,c.code());}

@@ -20,13 +20,25 @@ public class StorageWithdrawalService {
  public StorageWithdrawalService(StorageAccess access,StorageRepository r,StorageCommands commands,Clock clock){this.access=access;this.r=r;this.commands=commands;this.clock=clock;}
  @Transactional public Intent create(StoreScope s,CustomerAuthPrincipal p,IntentWrite c){access.customer(s,p,false);return create(s,p.customerId(),p.customerId(),"customer",c);}
  @Transactional public Intent create(StoreScope s,CurrentActor a,IntentWrite c){access.staff(s,a,"wine_storage.deliver",false);if(c==null)throw StorageException.invalid();access.customerId(s,c.customerId());return create(s,c.customerId(),a.actorId(),"staff",c);}
- private Intent create(StoreScope s,UUID customer,UUID actor,String origin,IntentWrite c){
+ @Transactional public Intent directDeliver(StoreScope s,CurrentActor a,IntentWrite c){
+  access.staff(s,a,"wine_storage.deliver",false);if(c==null)throw StorageException.invalid();access.customerId(s,c.customerId());
+  return commands.run(s,a.actorId(),"staff","direct.deliver",c.idempotencyKey(),c,Intent.class,()->{
+   r.lock(s,"settings");if(!r.settings(s).operationMode().equals("staff_registration"))throw StorageException.conflict("本店使用顾客核销模式，请先取得顾客授权");
+   var i=create(s,c.customerId(),a.actorId(),"staff",c,true);
+   var result=deliver(s,a,i.id(),new Key(c.idempotencyKey(),"商户直接登记实物交付"));
+   r.event(s,c.customerId(),i.id(),"staff.delivery_registered",a.actorId(),Map.of("operationMode","staff_registration","selections",c.selections()),clock.instant());
+   return result;
+  });
+ }
+ private Intent create(StoreScope s,UUID customer,UUID actor,String origin,IntentWrite c){return create(s,customer,actor,origin,c,false);}
+ private Intent create(StoreScope s,UUID customer,UUID actor,String origin,IntentWrite c,boolean direct){
   if(c==null||c.selections()==null||c.selections().isEmpty()||c.selections().size()>50||c.selections().stream().anyMatch(x->x==null||x.itemId()==null||x.quantity()<1)||c.selections().stream().map(Selection::itemId).distinct().count()!=c.selections().size()||c.customerId()!=null&&!c.customerId().equals(customer))throw StorageException.invalid();
   return commands.run(s,actor,origin,"intent",c.idempotencyKey(),c,Intent.class,()->{
+   if(!direct)r.requireCustomerMode(s);
    validate(s,customer,c.selections(),false);UUID id=UUID.randomUUID();byte[] random=new byte[32];new SecureRandom().nextBytes(random);String code="WS."+Base64.getUrlEncoder().withoutPadding().encodeToString(random);
-   var now=clock.instant();r.update(s,"insert into wine_storage_intents(tenant_id,store_id,id,customer_id,origin,status,code_hash,expires_at,created_at) values(?,?,?,?,?,?,?,?,?)",id,customer,origin,origin.equals("customer")?"authorized":"awaiting_authorization",StorageCommands.digest(code),at(now.plusSeconds(300)),at(now));
+   var now=clock.instant();r.update(s,"insert into wine_storage_intents(tenant_id,store_id,id,customer_id,origin,status,code_hash,expires_at,created_at) values(?,?,?,?,?,?,?,?,?)",id,customer,origin,origin.equals("customer")||direct?"authorized":"awaiting_authorization",StorageCommands.digest(code),at(now.plusSeconds(300)),at(now));
    for(var line:c.selections())r.update(s,"insert into wine_storage_intent_lines(tenant_id,store_id,customer_id,intent_id,item_id,quantity) values(?,?,?,?,?,?)",customer,id,line.itemId(),line.quantity());
-   r.event(s,customer,id,"intent.created",actor,Map.of("origin",origin,"selections",c.selections()),now);
+   r.event(s,customer,id,"intent.created",actor,Map.of("origin",origin,"selections",c.selections(),"operationMode",direct?"staff_registration":"customer_verification"),now);
    var intent=r.intent(s,id,false);return new Intent(intent.id(),intent.customerId(),intent.origin(),intent.status(),intent.expiresAt(),null,intent.selections(),code);
   });
  }

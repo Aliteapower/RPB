@@ -33,6 +33,7 @@ public class StorageApplicationService {
  @Transactional public Application apply(StoreScope s,CustomerAuthPrincipal p,Apply c){
   access.customer(s,p,true);if(c==null||!c.rulesAccepted()||c.lines()==null||c.lines().isEmpty()||c.lines().size()>50)throw StorageException.invalid();
   return commands.run(s,p.customerId(),"customer","apply",c.idempotencyKey(),c,Application.class,()->{
+   r.requireCustomerMode(s);
    var lines=new ArrayList<Line>();Set<UUID> allPhotos=new HashSet<>();
    for(Line l:c.lines()){
     if(l==null)throw StorageException.invalid();validate(l.quantity(),l.opened(),l.source(),l.note());names(l.nameZh(),l.nameEn());

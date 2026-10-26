@@ -8,7 +8,7 @@ export interface Item {id:string;applicationId:string;customerId:string;snapshot
 export interface Selection {itemId:string;quantity:number}
 export interface Intent {id:string;customerId:string;origin:string;status:string;expiresAt:string;completedAt:string|null;selections:Selection[];code:string|null}
 export interface Event {id:string;sourceId:string;action:string;actorId:string;details:Record<string,unknown>;createdAt:string}
-export interface Home {timezone:string;storeName:string;stores:{id:string;name:string}[];newBusinessEnabled:boolean;permissions:string[];rules:Rule[];categories:Category[];applications:Application[];items:Item[];intents:Intent[];events:Event[]}
+export interface Home {operationMode?:'customer_verification'|'staff_registration';settingsVersion?:number;timezone:string;storeName:string;stores:{id:string;name:string}[];newBusinessEnabled:boolean;permissions:string[];rules:Rule[];categories:Category[];applications:Application[];items:Item[];intents:Intent[];events:Event[]}
 
 export interface CustodianRef {id:string;name:string;kind:string}
 export interface Custodian extends CustodianRef {enabled:boolean;version:number}

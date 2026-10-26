@@ -416,3 +416,34 @@ test('location maintenance appears only for a tenant administrator while normal 
   const s=mount(StaffPage,false,'zh-CN',home,undefined,{actor:{accountId:'actor',roles:[role],permissions:home.permissions}});await tick();assert.equal(nodes(s.root,n=>n.tag==='summary'&&text(n)==='常用存放位置管理').length,role==='tenant_admin'?1:0);s.unmount()
  }
 })
+
+
+test('mode settings are tenant-admin only and submit scoped versioned selection',async()=>{
+ for(const role of ['tenant_admin','store_manager']){
+  const data={...home,operationMode:'customer_verification',settingsVersion:0},s=mount(StaffPage,false,'zh-CN',data,undefined,{actor:{accountId:'actor',roles:[role],permissions:home.permissions}});await tick()
+  const save=button(s.root,'保存存取酒模式');assert.equal(!!save,role==='tenant_admin')
+  if(save){
+   const select=nodes(s.root,n=>n.tag==='select'&&n.children?.some(c=>c.props?.value==='staff_registration'))[0]
+   select.children.forEach(o=>o.selected=o.props?.value==='staff_registration');select.listeners.change({target:select});await tick()
+   const form=nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k===save).length)[0];await form.props.onSubmit({preventDefault(){}});await tick()
+   const post=s.calls.find(c=>c.method==='POST');assert.ok(post.url.endsWith('/wine-storage/settings'));assert.equal(post.body.operationMode,'staff_registration');assert.equal(post.body.version,0)
+  }
+  s.unmount()
+ }
+})
+test('direct mode requires explicit handover confirmation without customer codes and prevents duplicate submissions',async()=>{
+ const item={id:'direct-bottle',applicationId:'a',customerId:'customer',snapshot:{nameZh:'啤酒',nameEn:'Beer',timezone:'Asia/Singapore'},quantity:3,remaining:3,opened:false,status:'stored',expiresAt:new Date(Date.now()+86400000).toISOString()},person={id:'customer',displayName:'直接取酒顾客',phone:'8000'},data={...home,operationMode:'staff_registration',settingsVersion:1,items:[item],intents:[]}
+ let resolve
+ const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.includes('/customers?')?[person]:options?.method==='POST'?new Promise(r=>resolve=r):{...data});await tick()
+ const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0];nodes(form,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await form.props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('直接取酒顾客'))[0].props.onClick();await tick();button(s.root,'帮顾客取酒').props.onClick();await tick()
+ assert.equal(button(s.root,'扫描顾客取酒码并核销'),undefined);assert.equal(button(s.root,'生成顾客确认码'),undefined)
+ nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='增加瓶数')[0].props.onClick();await tick();button(s.root,'登记取酒').props.onClick();await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
+ const confirm=button(s.root,'确认实物已交付并扣减');confirm.props.onClick();confirm.props.onClick();await tick()
+ const post=s.calls.filter(c=>c.method==='POST');assert.equal(post.length,1);assert.ok(post[0].url.endsWith('/direct-deliver'));assert.equal(post[0].body.customerId,'customer');assert.deepEqual(post[0].body.selections,[{itemId:item.id,quantity:2}]);assert.ok(post[0].body.idempotencyKey)
+ data.items=[{...item,remaining:1}];resolve({id:'done',customerId:'customer',origin:'staff',status:'completed',code:null,selections:post[0].body.selections});await tick();assert.match(text(s.root),/已完成实物交付/);assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);s.unmount()
+})
+test('customer direct mode shows staff service notice and records without new self service forms',async()=>{
+ const s=mount(CustomerPage,true,'zh-CN',{...home,operationMode:'staff_registration'});await tick();assert.match(text(s.root),/无需您扫码核销/)
+ button(s.root,'我要取酒').props.onClick();await tick();assert.equal(button(s.root,'出码取酒'),undefined);assert.match(text(s.root),/联系门店办理/)
+ button(s.root,'我的记录').props.onClick();await tick();assert.doesNotMatch(text(s.root),/无需您扫码核销/);s.unmount()
+})

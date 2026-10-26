@@ -28,3 +28,10 @@
 收存 `lines` 必须覆盖原申请所有明细。一个原明细可分成多个已开瓶实际记录，每瓶数量 1，分别上传照片。商户选正式产品后，响应会填充实际产品 ID 和名称；创建建议产品的原输入仍保留在原申请及审核台账。仅最新规则版本可用于新确认，旧物品读取冻结版本。
 
 共享目录的 `ProductWrite.priceCents` / `Listing.priceCents` 可为 null，仅限 storage 渠道或不开放渠道；空价产品税务保持 null。目录更新空价建档资料不会转成 0。销售调用现有 `ProductCatalogQuery.requireUsable` 和报价校验，必须完成价格、税务及渠道配置。
+
+## 门店存取酒模式（2026-10-27）
+
+Home 增加 `operationMode`（`customer_verification` 默认 / `staff_registration`）和 `settingsVersion`。
+POST `/api/v1/stores/{storeId}/wine-storage/settings`：`{operationMode,version,idempotencyKey}`，仅 tenant_admin 且具备 wine_storage.rules.manage，产品开启时可改。版本冲突 409；非法模式 400；无权限 403。配置按租户、门店隔离，变更审计。
+POST `/api/v1/stores/{storeId}/wine-storage/direct-deliver`：`{customerId,selections:[{itemId,quantity}],idempotencyKey}`，要求 wine_storage.deliver，仅直接登记模式可新执行，否则 409。整批原子扣减，返回 completed Intent（无 code），记录租户办理，绝不记录顾客授权。重试原键返回原结果，不重复扣库存；模式切回后仍可重放已成功命令。
+两模式保留商户直接存酒及旧申请审核。直接登记模式顾客端以查询记录为主，隐藏新申请/出码，并由后端拒绝新顾客申请/新出码；旧授权及旧单仍按原规则收尾。产品关闭后仍允许受控取回历史存酒，禁止新增收存及设置修改。切换不改历史快照、不豁免旧待授权单。

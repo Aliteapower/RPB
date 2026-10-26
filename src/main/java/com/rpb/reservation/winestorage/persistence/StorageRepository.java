@@ -31,6 +31,11 @@ public class StorageRepository {
  public static Instant time(ResultSet r,String key)throws SQLException{Timestamp t=r.getTimestamp(key);return t==null?null:t.toInstant();}
  public static Timestamp at(Instant time){return time==null?null:Timestamp.from(time);}
  public void lock(StoreScope s,String key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","wine:"+s.tenantId().value()+":"+s.storeId().value()+":"+key);}
+ public Settings settings(StoreScope s){
+  var rows=rows(s,"select operation_mode,version from wine_storage_settings where tenant_id=? and store_id=?");
+  return rows.isEmpty()?new Settings("customer_verification",0):new Settings((String)rows.getFirst().get("operation_mode"),((Number)rows.getFirst().get("version")).intValue());
+ }
+ public void requireCustomerMode(StoreScope s){lock(s,"settings");if(!settings(s).operationMode().equals("customer_verification"))throw StorageException.conflict("本店由商户直接登记存取酒，请联系门店办理");}
  public List<Rule> rules(StoreScope s){return jdbc.query("select * from wine_storage_rules where tenant_id=? and store_id=? order by version desc",(r,n)->rule(r),scopeArgs(s,new Object[]{}));}
  private Rule rule(ResultSet r)throws SQLException{return new Rule(id(r,"id"),id(r,"category_id"),r.getString("name"),r.getInt("months"),r.getInt("version"));}
  public Rule rule(StoreScope s,UUID id){return rules(s).stream().filter(r->r.id().equals(id)).findFirst().orElseThrow(StorageException::missing);}
