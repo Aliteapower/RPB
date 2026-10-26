@@ -92,6 +92,26 @@ class StoragePostgresTest extends CatalogPostgresTest {
   }
   assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(1);assertThat(r.intents(scope,customer)).hasSize(before+1);
  }
+ @Test void applicationReceiptAndRedepositCanOmitPhotos()throws Exception{
+  var c=new Apply(List.of(new Line(null,product.id(),"","",2,false,"customer",List.of(),"无照片申请")),true,null,null,key());
+  var pending=tx.execute(s->app.apply(scope,principal,c));
+  var receipt=new Receive(List.of(new ReceiptLine(pending.lines().getFirst().id(),product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(),"","","")),"已核对实物，无照片",key());
+  var received=tx.execute(s->app.receive(scope,actor,pending.id(),receipt));assertThat(received.status()).isEqualTo("stored");
+  Application replay=tx.execute(s->app.receive(scope,actor,pending.id(),receipt));assertThat(replay).isEqualTo(received);
+  var item=r.items(scope,customer,clock.instant()).getFirst();assertThat(item.snapshot().applicationPhotos()).isEmpty();assertThat(item.snapshot().receiptPhotos()).isEmpty();
+  assertThat(r.rows(scope,"select photo_id from wine_storage_photo_links where tenant_id=? and store_id=? and customer_id=?",customer)).isEmpty();
+  var delivered=intent(item,1);deliver(delivered,key());
+  var again=new Apply(List.of(new Line(null,product.id(),"","",1,false,"customer",List.of(),"无照片再次寄存")),true,delivered.id(),item.id(),key());
+  var redeposit=tx.execute(s->app.apply(scope,principal,again));assertThat(redeposit.status()).isEqualTo("pending");
+ }
+ @Test void staffRegistrationWithoutPhotosRetainsAttestationRulesAndIdempotency(){
+  var line=new ReceiptLine(null,product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(),"","","");
+  var c=new Registration(customer,List.of(line),"确认实物",true,key());
+  var result=tx.execute(s->registrations().register(scope,actor,c));Application replay=tx.execute(s->registrations().register(scope,actor,c));assertThat(replay).isEqualTo(result);
+  assertThat(r.items(scope,customer,clock.instant())).hasSize(1);assertThat(r.items(scope,customer,clock.instant()).getFirst().snapshot().receiptPhotos()).isEmpty();
+  assertThatThrownBy(()->tx.execute(s->registrations().register(scope,actor,new Registration(customer,List.of(line),"确认实物",false,key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->app.addPhotos(scope,actor,r.items(scope,customer,clock.instant()).getFirst().id(),new PhotoAdd(List.of(),"",key())))).isInstanceOf(StorageException.class);
+ }
  @Test void pendingConfirmRejectCancelAndImmutableSnapshots()throws Exception{
   var c=command(6,false);var pending=tx.execute(s->app.apply(scope,principal,c));assertThat(r.items(scope,customer,clock.instant())).isEmpty();
   assertThat(tx.execute(s->app.apply(scope,principal,c)).id()).isEqualTo(pending.id());receive(pending,5,false);

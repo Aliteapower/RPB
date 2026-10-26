@@ -35,3 +35,7 @@ Home 增加 `operationMode`（`customer_verification` 默认 / `staff_registrati
 POST `/api/v1/stores/{storeId}/wine-storage/settings`：`{operationMode,version,idempotencyKey}`，仅 tenant_admin 且具备 wine_storage.rules.manage，产品开启时可改。版本冲突 409；非法模式 400；无权限 403。配置按租户、门店隔离，变更审计。
 POST `/api/v1/stores/{storeId}/wine-storage/direct-deliver`：`{customerId,selections:[{itemId,quantity}],idempotencyKey}`，要求 wine_storage.deliver，仅直接登记模式可新执行，否则 409。整批原子扣减，返回 completed Intent（无 code），记录租户办理，绝不记录顾客授权。重试原键返回原结果，不重复扣库存；模式切回后仍可重放已成功命令。
 两模式保留商户直接存酒及旧申请审核。直接登记模式顾客端以查询记录为主，隐藏新申请/出码，并由后端拒绝新顾客申请/新出码；旧授权及旧单仍按原规则收尾。产品关闭后仍允许受控取回历史存酒，禁止新增收存及设置修改。切换不改历史快照、不豁免旧待授权单。
+
+## 存酒照片选填（2026-10-27）
+
+顾客申请、重新寄存、商户收存及直接代登记，明细 photos 可传空数组，不要求照片即可保存。字段仍为数组，null/非法照片不接受；有照片时继续校验租户、门店、顾客、阶段、数量、重复及使用状态。补拍照片接口的操作目的为追加照片，仍要求至少一张。历史照片不修改；无需迁移。重新寄存可不拍照，但选择上传时不可复用原照片。

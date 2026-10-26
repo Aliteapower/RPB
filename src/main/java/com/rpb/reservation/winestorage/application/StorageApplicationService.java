@@ -37,7 +37,7 @@ public class StorageApplicationService {
    var lines=new ArrayList<Line>();Set<UUID> allPhotos=new HashSet<>();
    for(Line l:c.lines()){
     if(l==null)throw StorageException.invalid();validate(l.quantity(),l.opened(),l.source(),l.note());names(l.nameZh(),l.nameEn());
-    photos.require(s,p.customerId(),l.photos(),"application");for(var photo:l.photos())if(!allPhotos.add(photo))throw StorageException.conflict("不同瓶请分别上传照片");
+    photos.requireOptional(s,p.customerId(),l.photos(),"application");for(var photo:l.photos())if(!allPhotos.add(photo))throw StorageException.conflict("不同瓶请分别上传照片");
     String zh=text(l.nameZh()),en=text(l.nameEn());
     if(l.productId()!=null){var product=products.selectable(s,l.productId());zh=product.nameZh();en=product.nameEn();}
     else if(zh.isBlank()&&en.isBlank())throw StorageException.invalid();
@@ -63,7 +63,7 @@ public class StorageApplicationService {
   int used=r.rows(s,"select coalesce(sum(d.quantity),0) used from wine_storage_redeposits d join wine_storage_applications a on a.id=d.application_id where d.tenant_id=? and d.store_id=? and d.intent_id=? and d.item_id=? and a.status in('pending','stored')",c.withdrawalId(),c.withdrawalItemId()).stream().mapToInt(row->((Number)row.get("used")).intValue()).sum();
   if(used+lines.stream().mapToInt(Line::quantity).sum()>selected.quantity())throw StorageException.conflict("再次寄存数量超过原实际领取数量");
   // Photos from the old record cannot be recycled as new evidence.
-  for(Line line:lines)if(line.photos().stream().anyMatch(photo->old.snapshot().applicationPhotos().contains(photo)||old.snapshot().receiptPhotos().contains(photo)))throw StorageException.conflict("再次寄存须重新上传实物照片");
+  for(Line line:lines)if(line.photos().stream().anyMatch(photo->old.snapshot().applicationPhotos().contains(photo)||old.snapshot().receiptPhotos().contains(photo)))throw StorageException.conflict("再次寄存如需上传照片，请使用本次实物照片");
  }
  @Transactional public Application cancel(StoreScope s,CustomerAuthPrincipal p,UUID id,Key c){
   access.customer(s,p,false);if(c==null)throw StorageException.invalid();return commands.run(s,p.customerId(),"customer","cancel.apply",c.idempotencyKey(),Map.of("id",id,"command",c),Application.class,()->{var app=r.application(s,id,true);access.own(app.customerId(),p.customerId());return close(s,app,"cancelled",text(c.reason()),p.customerId());});
@@ -92,7 +92,7 @@ public class StorageApplicationService {
    CustodianRef custodian=custodians.resolve(s,c.custodianId());String zone=access.timezone(s);var now=clock.instant();var confirmed=new ArrayList<ReceiptLine>();var associated=new HashMap<UUID,com.rpb.reservation.catalog.application.CatalogDtos.Product>();Set<UUID> receiptPhotos=new HashSet<>();
    for(ReceiptLine l:c.lines()){
     var before=original.get(l.lineId());if(before==null||text(l.location()).length()>200||text(l.label()).length()>200)throw StorageException.invalid();validate(l.quantity(),l.opened(),l.source(),l.note());names(l.nameZh(),l.nameEn());
-    photos.require(s,app.customerId(),l.photos(),"receipt");
+    photos.requireOptional(s,app.customerId(),l.photos(),"receipt");
     for(UUID photo:l.photos())if(!receiptPhotos.add(photo))throw StorageException.conflict("每瓶收存照片须独立");
     var product=l.productId()==null&&associated.containsKey(l.lineId())?associated.get(l.lineId()):products.associate(s,l.productId(),l.categoryId(),l.nameZh(),l.nameEn(),a.actorId());associated.put(l.lineId(),product);
     if(app.original().withdrawalId()!=null&&(!product.id().equals(before.productId())||!l.source().equals(before.source())))throw StorageException.conflict("再次寄存不能更换原领取酒品及来源");

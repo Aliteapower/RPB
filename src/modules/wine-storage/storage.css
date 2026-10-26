@@ -123,3 +123,37 @@
 .storage-page .storage-quantity button { min-height: 40px; padding: 6px; font-size: 20px; }
 .storage-page .storage-quantity input { width: 100%; min-width: 0; margin: 0; padding: 8px 0; text-align: center; appearance: textfield; -moz-appearance: textfield; }
 .storage-quantity input::-webkit-inner-spin-button,.storage-quantity input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Receipt form: keep required bottle details visible and secondary fields compact. */
+.storage-receive-header h2 { margin-bottom: 6px; }
+.storage-receive-header p { color: var(--wallet-muted); }
+.storage-receive-form h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: 16px; }
+.storage-step { display: inline-grid; place-items: center; flex: 0 0 26px; height: 26px; border-radius: 50%; background: #e3f1ec; color: #155f52; font-size: 13px; }
+.storage-receive-search { padding: 0 0 18px; border-bottom: 1px solid #d9e4e6; }
+.storage-receive-search-row { display: flex; gap: 10px; align-items: end; }
+.storage-receive-search-row > label { flex: 1; min-width: 0; }
+.storage-receive-search-row > button { flex-shrink: 0; margin-bottom: 0; }
+.storage-receive-line { margin: 20px 0; padding: 18px; background: #f8faf9; border: 1px solid #d9e4e6; border-radius: 12px; }
+.storage-receive-line > h3 { margin-top: 22px; }
+.storage-receive-line > label,.storage-receive-extras > label { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.storage-receive-line input,.storage-receive-line select,.storage-receive-line textarea { max-width: 100%; min-width: 0; }
+.storage-receive-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,140px),1fr)); gap: 14px; margin-bottom: 14px; align-items: end; }
+.storage-receive-grid > label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.storage-manual-wine,.storage-receive-extras { padding: 12px 0; border-bottom: 1px solid #d9e4e6; }
+.storage-photo-upload { margin: 18px 0; padding: 14px; border: 1px dashed #b8cfca; border-radius: 10px; background: white; }
+.storage-photo-upload > label { display: flex; flex-direction: column; gap: 8px; }
+.storage-photo-upload input[type=file] { display: block; width: 100%; max-width: 100%; min-width: 0; padding: 8px; font-size: 13px; }
+.storage-photo-upload small { margin-top: 6px; }
+.storage-receive-confirm { padding-top: 20px; border-top: 1px solid #d9e4e6; margin-top: 22px; }
+.storage-receive-confirm > label { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.storage-receive-confirm .storage-receive-consent { display: flex; flex-direction: row; align-items: flex-start; padding: 14px; border-radius: 10px; background: #eef6f2; margin-bottom: 14px; }
+.storage-receive-total { font-weight: 600; }
+.storage-form-guidance { margin: 14px 0; color: #70551e; font-size: 13px; }
+.storage-receive-submit { width: 100%; margin-top: 12px; }
+.storage-add-wine { width: 100%; background: #fff; border-style: dashed; color: #155f52; }
+@media(max-width:560px) {
+ .storage-receive-form { padding: 14px; }
+ .storage-receive-line { padding: 12px; }
+ .storage-receive-grid { grid-template-columns: 1fr; }
+ .storage-receive-form h3 { font-size: 15px; }
+}

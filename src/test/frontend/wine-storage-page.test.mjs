@@ -251,7 +251,7 @@ test('customer picker pages and filters on server and barcode chooses a product'
  nodes(s.root,n=>n.tag==='button'&&text(n)==='下一页')[0].props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('page=1')))
  const select=nodes(s.root,n=>n.tag==='select')[0];select.children.forEach(o=>o.selected=o.props?.value==='cat');select.listeners.change({target:select});await tick();assert.ok(s.calls.some(c=>c.url.includes('categoryId=cat')&&c.url.includes('page=0')))
  nodes(s.root,n=>n.tag==='button'&&text(n)==='扫瓶身条码选酒')[0].props.onClick();await tick();assert.equal(nodes(s.root,n=>n.props?.['data-barcode'])[0].props['data-auto-start'],true);nodes(s.root,n=>n.props?.['data-barcode'])[0].props.onClick();await tick()
- assert.ok(s.calls.some(c=>c.url.includes('barcode=00036000291452')));assert.match(text(s.root),/2. 填写瓶数并拍照/);assert.match(text(s.root),/已添加/)
+ assert.ok(s.calls.some(c=>c.url.includes('barcode=00036000291452')));assert.match(text(s.root),/2. 填写寄存信息/);assert.match(text(s.root),/已添加/)
 })
 
 test('unlisted barcode retains identifier in application note and requests wine name',async()=>{
@@ -446,4 +446,21 @@ test('customer direct mode shows staff service notice and records without new se
  const s=mount(CustomerPage,true,'zh-CN',{...home,operationMode:'staff_registration'});await tick();assert.match(text(s.root),/无需您扫码核销/)
  button(s.root,'我要取酒').props.onClick();await tick();assert.equal(button(s.root,'出码取酒'),undefined);assert.match(text(s.root),/联系门店办理/)
  button(s.root,'我的记录').props.onClick();await tick();assert.doesNotMatch(text(s.root),/无需您扫码核销/);s.unmount()
+})
+
+test('receipt without photos saves after required wine and consent, and explains missing fields',async()=>{
+ const product={id:'wine',categoryId:'category',nameZh:'白酒',nameEn:'Spirit',code:'WINE'},data={...home,rules:[{id:'rule',categoryId:'category',name:'三个月',months:3,version:1}],categories:[{id:'category',nameZh:'白酒'}]},application={id:'',customerId:'customer',status:'pending',lines:[{id:'line',productId:null,nameZh:'',nameEn:'',quantity:1,opened:false,source:'customer',photos:[],note:''}]}
+ const s=mount(ReceiveForm,false,'zh-CN',data,(url,options)=>url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{status:'stored'}:data,{props:{home:data,api:storageApi('A',false),application,direct:true,disabled:false}});await tick()
+ assert.match(text(s.root),/选择酒品|选择已有酒品/);assert.match(text(s.root),/还需完成/)
+ nodes(s.root,n=>n.tag==='select'&&n.props.onChange)[0].props.onChange({target:{value:'wine'}});await tick()
+ const consent=nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.props.required!==undefined)[0];consent.checked=true;consent.listeners.change({target:consent});await tick()
+ const submit=button(s.root,'确认实物已收存');assert.equal(submit.props.disabled,false)
+ await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()
+ const post=s.calls.find(c=>c.method==='POST');assert.ok(post.url.endsWith('/registrations'));assert.deepEqual(post.body.lines[0].photos,[]);s.unmount()
+})
+test('customer may apply without a photograph after confirming storage terms',async()=>{
+ const product={id:'wine',nameZh:'可寄存白酒',nameEn:'Spirit',code:'WINE'},s=mount(CustomerPage,true,'zh-CN',home,(url,options)=>url.includes('/product-options')?{items:[product],categories:[],hasMore:false}:url.includes('/products')?[product]:options?.method==='POST'?{id:'applied',lines:[],status:'pending'}:home);await tick()
+ nodes(s.root,n=>n.tag==='button'&&text(n).includes('可寄存白酒'))[0].props.onClick();await tick()
+ const accepted=nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];accepted.checked=true;accepted.listeners.change({target:accepted});await tick();assert.equal(button(s.root,'提交寄存申请').props.disabled,false)
+ await nodes(s.root,n=>n.tag==='form'&&n.props.class==='storage-customer-deposit')[0].props.onSubmit({preventDefault(){}});await tick();assert.deepEqual(s.calls.find(c=>c.method==='POST').body.lines[0].photos,[]);s.unmount()
 })

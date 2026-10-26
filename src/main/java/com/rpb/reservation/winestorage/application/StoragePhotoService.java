@@ -21,6 +21,10 @@ public class StoragePhotoService {
  private Photo upload(StoreScope s,UUID customer,UUID actor,String phase,String type,byte[] bytes){
   try{SafeImageValidation.validate(type,bytes);}catch(IllegalArgumentException e){throw StorageException.invalid();}UUID id=UUID.randomUUID();r.update(s,"insert into wine_storage_photos(tenant_id,store_id,id,customer_id,phase,uploaded_by,content_type,image) values(?,?,?,?,?,?,?,?)",id,customer,phase,actor,type,bytes);return new Photo(id,phase);
  }
+ public void requireOptional(StoreScope s,UUID customer,List<UUID> photos,String phase){
+  if(photos!=null&&photos.isEmpty())return;
+  require(s,customer,photos,phase);
+ }
  public void require(StoreScope s,UUID customer,List<UUID> photos,String phase){
   if(photos==null||photos.isEmpty()||photos.size()>10||new HashSet<>(photos).size()!=photos.size())throw StorageException.invalid();
   for(UUID id:photos){var rows=r.rows(s,"select id from wine_storage_photos where tenant_id=? and store_id=? and customer_id=? and id=? and phase=?",customer,id,phase);if(rows.isEmpty())throw StorageException.missing();}
