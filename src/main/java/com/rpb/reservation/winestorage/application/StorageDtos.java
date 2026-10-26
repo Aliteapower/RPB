@@ -13,11 +13,16 @@ public final class StorageDtos {
  public record Line(UUID id,UUID productId,String nameZh,String nameEn,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity,boolean opened,String source,List<UUID> photos,String note){}
  public record Apply(List<Line> lines,boolean rulesAccepted,UUID withdrawalId,UUID withdrawalItemId,String idempotencyKey){}
  public record Application(UUID id,UUID customerId,String status,Apply original,List<Line> lines,Receive confirmation,String reason,Instant createdAt){}
- public record ReceiptLine(UUID lineId,UUID productId,UUID categoryId,String nameZh,String nameEn,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity,boolean opened,String source,UUID ruleId,List<UUID> photos,String note,String location,String label){}
+ public record ReceiptLine(UUID lineId,UUID productId,UUID categoryId,String nameZh,String nameEn,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity,boolean opened,String source,UUID ruleId,List<UUID> photos,String note,String location,String label,@JsonInclude(JsonInclude.Include.NON_NULL) UUID storageLocationId,@JsonInclude(JsonInclude.Include.NON_NULL) LocationRef storageLocation){
+  public ReceiptLine(UUID lineId,UUID productId,UUID categoryId,String nameZh,String nameEn,int quantity,boolean opened,String source,UUID ruleId,List<UUID> photos,String note,String location,String label){this(lineId,productId,categoryId,nameZh,nameEn,quantity,opened,source,ruleId,photos,note,location,label,null,null);}
+  public ReceiptLine(UUID lineId,UUID productId,UUID categoryId,String nameZh,String nameEn,int quantity,boolean opened,String source,UUID ruleId,List<UUID> photos,String note,String location,String label,UUID storageLocationId){this(lineId,productId,categoryId,nameZh,nameEn,quantity,opened,source,ruleId,photos,note,location,label,storageLocationId,null);}
+ }
  public record Receive(List<ReceiptLine> lines,String reason,String idempotencyKey,@JsonInclude(JsonInclude.Include.NON_NULL) UUID custodianId){public Receive(List<ReceiptLine> lines,String reason,String idempotencyKey){this(lines,reason,idempotencyKey,null);}}
  public record Registration(UUID customerId,List<ReceiptLine> lines,String reason,boolean rulesConfirmed,String idempotencyKey,@JsonInclude(JsonInclude.Include.NON_NULL) UUID custodianId){public Registration(UUID customerId,List<ReceiptLine> lines,String reason,boolean rulesConfirmed,String idempotencyKey){this(customerId,lines,reason,rulesConfirmed,idempotencyKey,null);}}
  public record Key(String idempotencyKey,String reason){}
- public record Snapshot(UUID productId,String code,String nameZh,String nameEn,UUID categoryId,Rule rule,String timezone,String note,List<UUID> applicationPhotos,List<UUID> receiptPhotos,CustodianRef custodian){}
+ public record Snapshot(UUID productId,String code,String nameZh,String nameEn,UUID categoryId,Rule rule,String timezone,String note,List<UUID> applicationPhotos,List<UUID> receiptPhotos,CustodianRef custodian,@JsonInclude(JsonInclude.Include.NON_NULL) LocationRef storageLocation){
+  public Snapshot(UUID productId,String code,String nameZh,String nameEn,UUID categoryId,Rule rule,String timezone,String note,List<UUID> applicationPhotos,List<UUID> receiptPhotos,CustodianRef custodian){this(productId,code,nameZh,nameEn,categoryId,rule,timezone,note,applicationPhotos,receiptPhotos,custodian,null);}
+ }
  public record Item(UUID id,UUID applicationId,UUID customerId,Snapshot snapshot,int quantity,int remaining,boolean opened,String source,String location,String label,Instant receivedAt,Instant expiresAt,String status){}
  public record Selection(UUID itemId,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity){}
  public record IntentWrite(UUID customerId,List<Selection> selections,String idempotencyKey){}
@@ -32,6 +37,9 @@ public final class StorageDtos {
  public record Category(UUID id,String nameZh,String nameEn){}
  public record StoreOption(UUID id,String name){}
  public record Home(String timezone,String storeName,List<StoreOption> stores,boolean newBusinessEnabled,Set<String> permissions,List<Rule> rules,List<Category> categories,List<Application> applications,List<Item> items,List<Intent> intents,List<Event> events){}
+ public record StorageLocation(UUID id,String name,boolean defaultLocation,int version){}
+ public record LocationWrite(String name,Integer version,String idempotencyKey){}
+ public record LocationRef(UUID id,String name){}
  public record Custodian(UUID id,String name,String kind,boolean enabled,int version){}
  public record CustodianRef(UUID id,String name,String kind){}
  public record CustodianWrite(String name,String kind,Boolean enabled,Integer version,String idempotencyKey){}

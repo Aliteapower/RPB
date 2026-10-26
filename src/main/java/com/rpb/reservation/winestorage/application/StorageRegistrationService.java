@@ -25,7 +25,7 @@ public class StorageRegistrationService {
    for(var line:command.lines()){
     UUID lineId=UUID.randomUUID();
     originals.add(new Line(lineId,line.productId(),line.nameZh(),line.nameEn(),line.quantity(),line.opened(),line.source(),List.of(),StorageApplicationService.text(line.note())));
-    receipts.add(new ReceiptLine(lineId,line.productId(),line.categoryId(),line.nameZh(),line.nameEn(),line.quantity(),line.opened(),line.source(),line.ruleId(),line.photos(),line.note(),line.location(),line.label()));
+    receipts.add(new ReceiptLine(lineId,line.productId(),line.categoryId(),line.nameZh(),line.nameEn(),line.quantity(),line.opened(),line.source(),line.ruleId(),line.photos(),line.note(),line.location(),line.label(),line.storageLocationId()));
    }
    // The pending row exists only inside this transaction; any receive failure rolls everything back.
    var original=new Apply(originals,false,null,null,command.idempotencyKey());

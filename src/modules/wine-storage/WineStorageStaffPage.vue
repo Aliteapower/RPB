@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {ref,watch} from 'vue'
 import {useRouter} from 'vue-router'
+import {useAuthSessionStore} from '../../stores/authSession'
+import MerchantStorageLocations from './merchant/MerchantStorageLocations.vue'
 import {useMerchantStorage} from './merchant/useMerchantStorage'
 import StorageScanResult from './merchant/StorageScanResult.vue'
 import StorageCustomerPicker from './merchant/StorageCustomerPicker.vue'
@@ -15,7 +17,7 @@ import '../wallet/wallet.css'
 import './storage.css'
 defineOptions({inheritAttrs:false})
 const {store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scanResult,scoped,can,choose,search,open,load,run,scan,recover,fail,t}=useMerchantStorage()
-const router=useRouter(),operationBusy=ref(false),reviewing=ref(false),showScan=ref(false),storeInput=ref(store.value)
+const auth=useAuthSessionStore(),router=useRouter(),operationBusy=ref(false),reviewing=ref(false),showScan=ref(false),storeInput=ref(store.value)
 watch(store,()=>{operationBusy.value=false;reviewing.value=false;showScan.value=false;storeInput.value=store.value})
 function identify(code:string){showScan.value=false;void run(()=>scan(code))}
 </script>
@@ -34,6 +36,7 @@ function identify(code:string){showScan.value=false;void run(()=>scan(code))}
    <MerchantStorageWithdrawal v-if="task==='withdraw'" :key="`${store}:${customer.id}`" :home="scoped" :customer-id="customer.id" :api="api" :disabled="busy||pending" :can-deliver="can('deliver')" :active-intent="activeIntent" @created="activeIntent=$event;load()" @command="run" @refresh="load" @error="fail" @cleared="activeIntent=null" @busy-change="operationBusy=$event"/>
    <MerchantStorageRecords v-if="task==='records'" :key="`${store}:${customer.id}`" :home="scoped" :api="api" :disabled="busy||pending" :can-correct="can('correct')" :can-photo="can('receive')" @command="run" @error="fail" @changed="load"/>
   </template><p v-else-if="task!=='deposit'&&!reviewing&&!scanResult" class="storage-panel storage-empty">{{t('noCustomer')}}</p>
+  <MerchantStorageLocations v-if="home.newBusinessEnabled&&can('rules.manage')&&auth.user?.roles.includes('tenant_admin')" :key="store" :api="api" :disabled="busy||pending||operationBusy" @error="fail" @busy-change="operationBusy=$event"/>
   <MerchantStorageCustodians v-if="home.newBusinessEnabled&&can('custodians.manage')" :key="store" :api="api" :disabled="busy||pending||operationBusy" @error="fail" @busy-change="operationBusy=$event"/>
   <MerchantStorageSettings :home="home" :api="api" :disabled="busy||pending||operationBusy" :can-manage="home.newBusinessEnabled&&can('rules.manage')" @command="run"/>
  </template>

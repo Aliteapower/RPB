@@ -7,7 +7,7 @@ import StorageQuantityStepper from '../StorageQuantityStepper.vue'
 import WalletQrDisplay from '../../wallet/components/WalletQrDisplay.vue'
 import {merchantSelection} from './scope'
 import {displayName} from '../../shared-commerce/format'
-import {dateTime} from '../format'
+import {dateTime,storageLocationText} from '../format'
 import {useMerchantStorageText} from './text'
 import {useStorageCodeRefresh} from '../customer/useStorageCodeRefresh'
 const props=defineProps<{home:Home;customerId:string;api:StorageApi;disabled:boolean;canDeliver:boolean;activeIntent:Intent|null}>(),emit=defineEmits<{created:[Intent];command:[()=>Promise<unknown>,string?];error:[unknown];refresh:[];'busy-change':[boolean];cleared:[]}>(),{t,locale}=useMerchantStorageText()
@@ -49,7 +49,7 @@ useStorageCodeRefresh(()=>!!pendingIntent.value&&!props.disabled&&!saving.value,
   <div class="storage-bottle-heading"><h3>{{displayName(item.snapshot,locale)}}</h3><aside class="storage-bottle-code">
    <template v-if="codeFor(item.id)"><WalletQrDisplay v-if="codeFor(item.id)!.status==='awaiting_authorization'&&codeFor(item.id)!.code" :value="codeFor(item.id)!.code!" :expires-at="codeFor(item.id)!.expiresAt"/><strong>{{t(codeFor(item.id)!.status==='authorized'?'customerConfirmed':'quickConfirmHint')}}</strong><small>{{t('quickQuantity')}} {{codeFor(item.id)!.selections[0]!.quantity}} {{t('unit')}}</small></template>
    <template v-else><StorageQuantityStepper :model-value="quantity(item.id)" :max="item.opened?1:item.remaining" :disabled="disabled||saving||!!pendingIntent||!canDeliver" :label="t('collectQuantity')" @update:model-value="quantities[item.id]=$event"/><button :disabled="disabled||saving||!!pendingIntent||!canDeliver||!selection(item.id)" @click="create(item.id)">{{t('authorize')}}</button><small>{{t('quickConfirmHint')}}</small></template>
-  </aside></div><p>{{t('remaining')}} {{item.remaining}} {{t('unit')}}</p><small>{{t('expiresAt')}} {{dateTime(item.expiresAt,item.snapshot.timezone)}}</small><p>{{t('location')}} {{item.location}} · {{t('label')}} {{item.label}}</p>
+  </aside></div><p>{{t('remaining')}} {{item.remaining}} {{t('unit')}}</p><small>{{t('expiresAt')}} {{dateTime(item.expiresAt,item.snapshot.timezone)}}</small><p>{{t('location')}} {{storageLocationText(item)}} · {{t('label')}} {{item.label}}</p>
  </article></div>
  <template v-if="intent"><p class="storage-notice">{{t(intent.status==='authorized'?'deliveryHint':'authorizationHint')}}</p><StorageIntentPanel :intent="{...intent,code:intent.selections.length===1&&items.some(item=>item.id===intent!.selections[0]!.itemId)?null:intent.code}" :items="home.items" :customer="false" :timezone="home.timezone" :disabled="disabled||saving||Date.parse(intent.expiresAt)<=now" :can-deliver="canDeliver" @deliver="emit('command',async()=>{await api.command(`/intents/${intent!.id}/deliver`,{});emit('cleared')},t('delivered'))" @cancel="emit('command',async()=>{await api.command(`/intents/${intent!.id}/cancel`,{});emit('cleared')})"/><button :disabled="disabled||saving" @click="observed=null;emit('refresh')">{{t('refreshAuthorization')}}</button></template>
 </section></template>

@@ -28,7 +28,7 @@ class StoragePostgresTest extends CatalogPostgresTest {
  @BeforeEach void storageFixture(){
   clock=new MutableClock();r=new StorageRepository(jdbc,json);var commands=new StorageCommands(r);access=mock(StorageAccess.class);when(access.timezone(scope)).thenReturn("Asia/Singapore");when(access.enabled(scope)).thenReturn(true);doCallRealMethod().when(access).own(any(),any());
   principal=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),customer,"test@example.com","顾客");storageCatalog=new StorageProductCatalog(new CatalogRepository(jdbc),products,jdbc);
-  photos=new StoragePhotoService(access,r);app=new StorageApplicationService(access,r,commands,storageCatalog,photos,clock,custodians());withdrawals=new StorageWithdrawalService(access,r,commands,clock);
+  photos=new StoragePhotoService(access,r);app=new StorageApplicationService(access,r,commands,storageCatalog,photos,clock,custodians(),locations());withdrawals=new StorageWithdrawalService(access,r,commands,clock);
   product=tx.execute(s->catalog.listing(scope,actor,product.id(),new Listing(500,List.of("cards","storage"),true,product.listingVersion(),key())));
   rule=tx.execute(s->app.rule(scope,actor,new RuleWrite(product.categoryId(),"自然月",3,key())));
  }
@@ -177,6 +177,35 @@ class StoragePostgresTest extends CatalogPostgresTest {
  }
 
  StorageCustodianService custodians(){return new StorageCustodianService(access,r,new StorageCommands(r));}
+ StorageLocationService locations(){return new StorageLocationService(access,r,new StorageCommands(r));}
+ @Test void locationsAreReadOnlyByDefaultAndNamesAreScopedVersionedAndIdempotent(){
+  var service=locations();var initial=service.list(scope,actor);assertThat(initial).hasSize(1);var front=initial.getFirst();assertThat(front.name()).isEqualTo("前台寄存处");assertThat(front.defaultLocation()).isTrue();
+  assertThat(jdbc.queryForObject("select count(*) from wine_storage_locations where tenant_id=?",Integer.class,tenant)).isZero();
+  var body=new LocationWrite("酒柜 A",null,key());var created=tx.execute(s->service.save(scope,actor,null,body));StorageLocation replay=tx.execute(s->service.save(scope,actor,null,body));assertThat(replay).isEqualTo(created);
+  var renamed=tx.execute(s->service.save(scope,actor,front.id(),new LocationWrite("前台储藏室",0,key())));assertThat(renamed.version()).isEqualTo(1);
+  assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,front.id(),new LocationWrite("旧版本",0,key())))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,null,new LocationWrite(" 酒柜 A ",null,key())))).isInstanceOf(StorageException.class);
+  var foreign=new StoreScope(new TenantId(UUID.randomUUID()),store);assertThatThrownBy(()->tx.execute(s->service.resolve(foreign,created.id()))).isInstanceOf(StorageException.class);
+  var other=new StoreScope(new TenantId(tenant),UUID.randomUUID());assertThatThrownBy(()->tx.execute(s->service.resolve(other,front.id()))).isInstanceOf(StorageException.class);
+  assertThatThrownBy(()->tx.execute(s->service.save(other,actor,front.id(),new LocationWrite("前台寄存处",0,key())))).isInstanceOfSatisfying(StorageException.class,e->assertThat(e.status()).isEqualTo(404));
+  for(String bad:List.of(" ","A".repeat(101)))assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,null,new LocationWrite(bad,null,key())))).isInstanceOf(StorageException.class);
+  var staff=new com.rpb.reservation.walkin.api.CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),Set.of("wine_storage.rules.manage"),Set.of(store));
+  assertThatThrownBy(()->tx.execute(s->service.save(scope,staff,null,new LocationWrite("越权",null,key())))).isInstanceOf(StorageException.class);
+  doThrow(StorageException.forbidden()).when(access).staff(scope,actor,"wine_storage.rules.manage",true);
+  assertThatThrownBy(()->tx.execute(s->service.save(scope,actor,null,new LocationWrite("停用",null,key())))).isInstanceOf(StorageException.class);
+ }
+ @Test void optionalStorageLocationAndSlotAreFrozenOnReceiptAndRegistration()throws Exception{
+  var service=locations();var front=service.list(scope,actor).getFirst();var pending=apply(1,false);
+  var line=new ReceiptLine(pending.lines().getFirst().id(),product.id(),product.categoryId(),"","",1,false,"customer",rule.id(),List.of(photo(true)),"","","",front.id(),new LocationRef(front.id(),"客户端伪造名称"));
+  var accepted=tx.execute(s->app.receive(scope,actor,pending.id(),new Receive(List.of(line),"已核实",key())));
+  var item=r.items(scope,customer,clock.instant()).getFirst();assertThat(item.location()).isEmpty();assertThat(item.snapshot().storageLocation().name()).isEqualTo("前台寄存处");assertThat(accepted.confirmation().lines().getFirst().storageLocation().name()).isEqualTo("前台寄存处");
+  tx.execute(s->service.save(scope,actor,front.id(),new LocationWrite("新位置名",0,key())));
+  assertThat(r.item(scope,item.id(),false,clock.instant()).snapshot().storageLocation().name()).isEqualTo("前台寄存处");
+  var registrationLine=new ReceiptLine(UUID.randomUUID(),product.id(),product.categoryId(),"","",1,false,"customer",rule.id(),List.of(photo(true)),"","A-08","",front.id());
+  tx.execute(s->registrations().register(scope,actor,new Registration(customer,List.of(registrationLine),"已核实",true,key())));
+  assertThat(r.items(scope,customer,clock.instant())).anySatisfy(h->{assertThat(h.location()).isEqualTo("A-08");assertThat(h.snapshot().storageLocation().name()).isEqualTo("新位置名");});
+  LocationRef none=tx.execute(s->service.resolve(scope,null));assertThat(none).isNull();
+ }
  @Test void custodianSelectionIsOptionalAndHistoricalSnapshotSurvivesRenameDisable()throws Exception{
   var team=custodians();var write=new CustodianWrite("小兰","hostess",true,null,key());var person=tx.execute(s->team.save(scope,actor,null,write));
   assertThat(tx.<Custodian>execute(s->team.save(scope,actor,null,write)).id()).isEqualTo(person.id());

@@ -30,4 +30,10 @@ class StorageJsonTest {
   assertThat(json.readValue("{\"lines\":[],\"reason\":\"legacy\",\"idempotencyKey\":\"key\"}",Receive.class).custodianId()).isNull();
   assertThat(json.readValue("{\"nameZh\":\"old wine\",\"receiptPhotos\":[],\"applicationPhotos\":[]}",Snapshot.class).custodian()).isNull();
  }
+ @Test void legacyLocationFieldsKeepTheirCanonicalShapeAndOptionalSnapshotsStayReadable()throws Exception{
+  var old=json.readValue("{\"quantity\":2,\"location\":\"旧仓位\"}",ReceiptLine.class);
+  assertThat(old.storageLocationId()).isNull();assertThat(old.storageLocation()).isNull();assertThat(old.location()).isEqualTo("旧仓位");
+  assertThat(json.writeValueAsString(old)).doesNotContain("storageLocation");
+  assertThat(json.readValue("{\"nameZh\":\"旧酒\"}",Snapshot.class).storageLocation()).isNull();
+ }
 }
