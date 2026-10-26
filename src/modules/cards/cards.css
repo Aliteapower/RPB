@@ -1,1 +1,7 @@
 @import '../shared-commerce/commerce.css';
+
+.cards-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.cards-card-heading h2{margin-top:8px;min-width:0}.cards-page .cards-show-code{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;font-size:12px;padding:8px;min-width:64px;min-height:60px}.cards-presentation{position:fixed;inset:0;z-index:1000;width:min(380px,calc(100vw - 64px));max-height:calc(100dvh - 80px);overflow:auto;border:1px solid #b8ccce;border-radius:16px;padding:20px;background:white;color:#172b36;box-shadow:0 8px 40px #172b3640}.cards-presentation .wallet-qr{margin:16px 0}.cards-presentation .cards-qr{text-align:center}
+
+.cards-presentation::backdrop{background:#172b3680}
+
+.cards-presentation .cards-qr img{height:auto}

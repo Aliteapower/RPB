@@ -17,6 +17,8 @@ public final class CardDtos {
  public record Request(UUID id,String kind,UUID planId,UUID cardId,UUID customerId,int quantity,UUID createdBy,String status,Instant expiresAt,UUID entryId,LocalDate authorizationDay){}
  public record Confirm(UUID cardId,String businessDay,String idempotencyKey){}
  public record Code(String code,Instant expiresAt){}
+ public record PresentationCreate(int quantity,String businessDay,String idempotencyKey){}
+ public record Presentation(UUID requestId,String code,Instant expiresAt){}
  public record Scan(String code){}
  public record Authorized(String authorization,String businessDay,String idempotencyKey){}
  public record Key(String idempotencyKey){}

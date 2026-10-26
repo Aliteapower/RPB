@@ -32,6 +32,42 @@ class CardPostgresTest extends CatalogPostgresTest {
  }
  Plan plan(String kind,Integer total,Integer daily,int target){return tx.execute(s->plans.create(scope,actor,new PlanCreate("卡","Card",kind,product.id(),total,daily,30,target,true,7,kind.equals("stamp")?0:20000,"inclusive",java.math.BigDecimal.ZERO,key())));}
  Holding enroll(Plan p){return tx.execute(s->holdings.enroll(scope,principal,new Enroll(p.id(),key())));}
+ @Test void customerPresentationBindsCardQuantityAndReplaysWithoutSpendingTwice(){
+  for(String kind:List.of("count","period")){
+   var h=paid(plan(kind,kind.equals("count")?5:null,3,0));var body=new PresentationCreate(2,"2026-10-25",key());
+   var code=tx.execute(s->redeem.present(scope,principal,h.id(),body));
+   Presentation replay=tx.execute(s->redeem.present(scope,principal,h.id(),body));assertThat(replay).isEqualTo(code);
+   assertThat(redeem.own(scope,principal,code.requestId()).quantity()).isEqualTo(2);
+   assertThat(holdings.own(scope,principal).stream().filter(c->c.id().equals(h.id())).findFirst().orElseThrow().usedToday()).isZero();
+   var command=new Authorized(code.code(),null,key());tx.execute(s->redeem.authorized(scope,actor,command));tx.execute(s->redeem.authorized(scope,actor,command));
+   assertThat(holdings.own(scope,principal).stream().filter(c->c.id().equals(h.id())).findFirst().orElseThrow().usedToday()).isEqualTo(2);
+   assertThatThrownBy(()->tx.execute(s->redeem.present(scope,principal,h.id(),new PresentationCreate(2,"2026-10-25",key())))).isInstanceOf(CardException.class);
+  }
+ }
+ @Test void stampPresentationRequiresStampPermissionAndSupportsRewardCard(){
+  var h=enroll(plan("stamp",null,10,1));var code=tx.execute(s->redeem.present(scope,principal,h.id(),new PresentationCreate(1,"2026-10-25",key())));
+  assertThatThrownBy(()->tx.execute(s->redeem.confirm(scope,principal,code.requestId(),new Confirm(h.id(),"2026-10-25",key())))).isInstanceOf(CardException.class);
+  assertThatThrownBy(()->tx.execute(s->redeem.authorize(scope,principal,code.requestId(),new Confirm(h.id(),"2026-10-25",key())))).isInstanceOf(CardException.class);
+  doThrow(CardException.forbidden()).when(context).staff(scope,actor,"wallet.cards.stamp",true);
+  assertThatThrownBy(()->tx.execute(s->redeem.authorized(scope,actor,new Authorized(code.code(),null,key())))).isInstanceOf(CardException.class);
+  reset(context);when(context.store(scope)).thenReturn(new StoreInfo(issuer,"Asia/Singapore"));
+  tx.execute(s->redeem.authorized(scope,actor,new Authorized(code.code(),null,key())));
+  var reward=holdings.own(scope,principal).stream().filter(c->c.kind().equals("reward")).findFirst().orElseThrow();
+  var rewardCode=tx.execute(s->redeem.present(scope,principal,reward.id(),new PresentationCreate(1,"2026-10-25",key())));
+  tx.execute(s->redeem.authorized(scope,actor,new Authorized(rewardCode.code(),null,key())));
+  assertThat(holdings.own(scope,principal).stream().filter(c->c.id().equals(reward.id())).findFirst().orElseThrow().remaining()).isZero();
+ }
+ @Test void presentationRejectsForeignOwnerScopeExpiredAndDisabled(){
+  var h=paid(plan("count",5,3,0));var c=new PresentationCreate(1,"2026-10-25",key());
+  var other=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),UUID.randomUUID(),"other@test.invalid","Other");
+  assertThatThrownBy(()->tx.execute(s->redeem.present(scope,other,h.id(),c))).isInstanceOf(CardException.class);
+  for(var foreign:List.of(new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(UUID.randomUUID()),store),new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(tenant),UUID.randomUUID())))
+   assertThatThrownBy(()->tx.execute(s->redeem.present(foreign,principal,h.id(),c))).isInstanceOf(CardException.class);
+  var code=tx.execute(s->redeem.present(scope,principal,h.id(),c));clock.now=clock.now.plusSeconds(121);
+  assertThatThrownBy(()->tx.execute(s->redeem.authorized(scope,actor,new Authorized(code.code(),null,key())))).isInstanceOf(CardException.class);
+  tx.execute(s->jdbc.update("update card_settings set enabled=false where tenant_id=?",tenant));
+  assertThatThrownBy(()->tx.execute(s->redeem.present(scope,principal,h.id(),new PresentationCreate(1,"2026-10-25",key())))).isInstanceOf(CardException.class);
+ }
  @Test void tenStampsIssueOneRewardAndSourceCannotBeReused(){var p=plan("stamp",null,20,10);var h=enroll(p);for(int n=0;n<10;n++){int number=n;tx.execute(s->stamps.grant(scope,actor,h.id(),"receipt-"+number,key()));}
   assertThat(holdings.own(scope,principal).stream().filter(c->c.kind().equals("reward"))).hasSize(1);
   assertThatThrownBy(()->tx.execute(s->stamps.grant(scope,actor,h.id(),"receipt-9",key()))).isInstanceOf(RuntimeException.class);

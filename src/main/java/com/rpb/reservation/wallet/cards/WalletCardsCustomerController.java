@@ -25,6 +25,7 @@ public class WalletCardsCustomerController {
  @GetMapping("/purchases")public List<Purchase> purchases(@PathVariable UUID storeId,HttpServletRequest r,@RequestParam(required=false)UUID before){return purchases.own(scope(storeId,r),identity.customer(r),before);}
  @PostMapping("/purchases")public Purchase buy(@PathVariable UUID storeId,HttpServletRequest r,@RequestBody PurchaseCreate c){return purchases.create(scope(storeId,r),identity.customer(r),c);}
  @PostMapping("/scan")public Request scan(@PathVariable UUID storeId,HttpServletRequest r,@RequestBody Scan c){return redeem.scan(scope(storeId,r),identity.customer(r),c.code());}
+ @PostMapping("/holdings/{id}/presentation")public Presentation present(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest r,@RequestBody PresentationCreate c){return redeem.present(scope(storeId,r),identity.customer(r),id,c);}
  @GetMapping("/requests/{id}")public Request request(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest r){return redeem.own(scope(storeId,r),identity.customer(r),id);}
  @PostMapping("/requests/{id}/confirm")public Request confirm(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest r,@RequestBody Confirm c){return redeem.confirm(scope(storeId,r),identity.customer(r),id,c);}
  @PostMapping("/requests/{id}/authorize")public Code authorize(@PathVariable UUID storeId,@PathVariable UUID id,HttpServletRequest r,@RequestBody Confirm c){return redeem.authorize(scope(storeId,r),identity.customer(r),id,c);}
