@@ -22,6 +22,7 @@ public class StorageQueryService {
  public record ProductOptions(List<Product> items,boolean hasMore,int page,List<Category> categories){}
  public ProductOptions options(StoreScope s,CustomerAuthPrincipal p,String query,UUID category,int page,int size,String barcode){access.customer(s,p,false);var result=products.options(s,query,category,page,size,barcode);return new ProductOptions(result.items().stream().map(x->new Product(x.id(),x.categoryId(),x.code(),x.nameZh(),x.nameEn())).toList(),result.hasMore(),result.page(),result.categories().stream().map(c->new Category(c.id(),c.nameZh(),c.nameEn())).toList());}
  public List<Product> products(StoreScope s,CustomerAuthPrincipal p,String query){access.customer(s,p,false);return products(s,query,false);}
+ public Product product(StoreScope s,CurrentActor a,UUID id){access.staff(s,a,"wine_storage.view",false);var p=products.selectable(s,id);return new Product(p.id(),p.categoryId(),p.code(),p.nameZh(),p.nameEn());}
  public List<Product> products(StoreScope s,CurrentActor a,String query){access.staff(s,a,"wine_storage.view",false);return products(s,query,true);}
  private List<Product> products(StoreScope s,String query,boolean review){return products.search(s,query,review).stream().map(p->new Product(p.id(),p.categoryId(),p.code(),p.nameZh(),p.nameEn())).toList();}
 }

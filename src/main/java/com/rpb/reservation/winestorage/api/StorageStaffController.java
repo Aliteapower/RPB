@@ -20,6 +20,7 @@ public class StorageStaffController {
  @PostMapping("/custodians/{id}") public Custodian updateCustodian(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody CustodianWrite c){var a=identity.staff();return custodians.save(identity.scope(a.tenantId(),storeId),a,id,c);}
  @GetMapping("/customers") public List<StorageCustomerQuery.Customer> customers(@PathVariable UUID storeId,@RequestParam(defaultValue="")String query){var a=identity.staff();return customers.search(identity.scope(a.tenantId(),storeId),a,query);}
  @GetMapping("/customers/{id}") public StorageCustomerQuery.Customer customer(@PathVariable UUID storeId,@PathVariable UUID id){var a=identity.staff();return customers.get(identity.scope(a.tenantId(),storeId),a,id);}
+ @GetMapping("/products/{id}") public Product product(@PathVariable UUID storeId,@PathVariable UUID id){var a=identity.staff();return this.query.product(identity.scope(a.tenantId(),storeId),a,id);}
  @GetMapping("/products") public List<Product> products(@PathVariable UUID storeId,@RequestParam(defaultValue="")String query){var a=identity.staff();return this.query.products(identity.scope(a.tenantId(),storeId),a,query);}
  @PostMapping("/registrations") public Application register(@PathVariable UUID storeId,@RequestBody Registration c){var a=identity.staff();return registrations.register(identity.scope(a.tenantId(),storeId),a,c);}
  @PostMapping("/rules") public Rule rule(@PathVariable UUID storeId,@RequestBody RuleWrite c){var a=identity.staff();return applications.rule(identity.scope(a.tenantId(),storeId),a,c);}

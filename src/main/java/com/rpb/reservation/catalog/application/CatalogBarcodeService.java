@@ -19,6 +19,7 @@ public class CatalogBarcodeService {
  public CatalogBarcodeService(CatalogAccess a,CatalogRepository p,CatalogCommands c,JdbcTemplate j){access=a;products=p;commands=c;jdbc=j;}
  public Barcodes list(StoreScope s,CurrentActor a,UUID id){access.require(s,a,"catalog.view");products.get(s,id);return read(s,id);}
  public List<String> values(StoreScope s,UUID id){return jdbc.queryForList("select coalesce(raw_barcode,barcode) from catalog_product_barcodes where tenant_id=? and product_id=? order by barcode",String.class,s.tenantId().value(),id);}
+ private static CatalogException singleBarcode(){return new CatalogException("CATALOG_SINGLE_BARCODE",409,"每个商品只能保留一个条码 / Only one barcode per product");}
  private Barcodes read(StoreScope s,UUID id){return new Barcodes(id,values(s,id));}
  @Transactional public Barcodes save(StoreScope s,CurrentActor a,UUID id,Write c){
   access.requireGlobal(s,a,"catalog.manage");if(c==null)throw CatalogException.invalid();String code=ProductBarcode.normalize(c.barcode());String old=c.replaceBarcode()==null?null:ProductBarcode.normalize(c.replaceBarcode());if(c.remove()&&old!=null)throw CatalogException.invalid();
@@ -30,6 +31,8 @@ public class CatalogBarcodeService {
    if(c.remove())jdbc.update("delete from catalog_product_barcodes where tenant_id=? and product_id=? and barcode=?",s.tenantId().value(),id,code);
    else {var owners=jdbc.queryForList("select product_id from catalog_product_barcodes where tenant_id=? and barcode=?",UUID.class,s.tenantId().value(),code);
     if(!owners.isEmpty()&&!owners.getFirst().equals(id))throw new CatalogException("CATALOG_BARCODE_CONFLICT",409,"该条码已关联其他商品 / Barcode belongs to another product");
+    var existing=jdbc.queryForList("select barcode from catalog_product_barcodes where tenant_id=? and product_id=?",String.class,s.tenantId().value(),id);
+    if(existing.stream().anyMatch(value->!value.equals(code)&&!value.equals(old)))throw singleBarcode();
     jdbc.update("insert into catalog_product_barcodes(tenant_id,barcode,product_id,created_by,raw_barcode) values(?,?,?,?,?) on conflict(tenant_id,barcode) do update set raw_barcode=excluded.raw_barcode where catalog_product_barcodes.product_id=excluded.product_id",s.tenantId().value(),code,id,a.actorId(),c.barcode().trim());
     if(old!=null&&!old.equals(code))jdbc.update("delete from catalog_product_barcodes where tenant_id=? and product_id=? and barcode=?",s.tenantId().value(),id,old);
    }
@@ -38,7 +41,8 @@ public class CatalogBarcodeService {
   });
  }
  @Transactional public void replace(StoreScope s,CurrentActor a,UUID id,List<String> expected,List<String> desired){
-  access.requireGlobal(s,a,"catalog.manage");if(expected==null||desired==null||desired.size()>50||expected.size()>50)throw CatalogException.invalid();
+  access.requireGlobal(s,a,"catalog.manage");if(expected==null||desired==null||expected.size()>50)throw CatalogException.invalid();
+  if(desired.size()>1)throw singleBarcode();
   var p=products.lock(s,id);if(!desired.isEmpty()&&!p.kind().equals("physical"))throw CatalogException.invalid();
   expected.forEach(ProductBarcode::normalize);
   var actual=values(s,id);if(!actual.stream().sorted().toList().equals(expected.stream().sorted().toList()))throw CatalogException.stale();

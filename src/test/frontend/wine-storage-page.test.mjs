@@ -92,7 +92,7 @@ test('customer reviews their selected bottles before one scoped command generate
  s.unmount()
 })
 test('customer selects a catalog wine, adds photos and submits the application as the signed-in customer',async()=>{
- const product={id:'wine',nameZh:'可寄存白酒',nameEn:'Spirit',code:'WINE'},s=mount(CustomerPage,true,'zh-CN',home,(url,options)=>url.includes('/product-options')?{items:[product],categories:[],hasMore:false}:url.includes('/products')?[product]:options?.method==='POST'?{id:'applied',lines:[],status:'pending'}:home);await tick()
+ const product={id:'wine',nameZh:'可寄存白酒',nameEn:'Spirit',code:'WINE'},s=mount(CustomerPage,true,'zh-CN',home,(url,options)=>url.includes('/product-options')?{items:[product],categories:[],hasMore:false}:url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{id:'applied',lines:[],status:'pending'}:home);await tick()
  nodes(s.root,n=>n.tag==='button'&&text(n).includes('可寄存白酒'))[0].props.onClick();await tick()
  const submit=()=>nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='提交寄存申请')[0]
  assert.equal(submit().props.disabled,true)
@@ -126,7 +126,7 @@ test('merchant finds one customer, scopes their bottles and waits for authorizat
 
 test('merchant directly registers bottles for the chosen customer with photos and explicit attestation',async()=>{
  const product={id:'wine',categoryId:'category',nameZh:'白酒',nameEn:'Spirit',code:'WINE'},data={...home,applications:[],rules:[{id:'rule',categoryId:'category',name:'保存三个月',months:3,version:1}],categories:[{id:'category',nameZh:'白酒'}]}
- const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.includes('/customers?')?[{id:'customer',displayName:'甲顾客',phone:'+6580000000'}]:url.includes('/products')?[product]:options?.method==='POST'?{id:'registered',customerId:'customer',status:'stored',lines:[]}:{...data});await tick()
+ const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.includes('/customers?')?[{id:'customer',displayName:'甲顾客',phone:'+6580000000'}]:url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{id:'registered',customerId:'customer',status:'stored',lines:[]}:{...data});await tick()
  const search=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0]
  nodes(search,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await search.props.onSubmit({preventDefault(){}});await tick()
  nodes(s.root,n=>n.tag==='button'&&text(n).includes('甲顾客'))[0].props.onClick();await tick()
@@ -146,7 +146,7 @@ test('merchant directly registers bottles for the chosen customer with photos an
 test('merchant reviews a pending customer request immediately without searching or selecting a customer',async()=>{
  const product={id:'wine',categoryId:'category',nameZh:'顾客提交啤酒',nameEn:'Beer',code:'WINE'},application={id:'pending-inbox',customerId:'inbox-customer',status:'pending',lines:[{id:'line',productId:'wine',nameZh:product.nameZh,nameEn:product.nameEn,quantity:12,opened:false,source:'customer',photos:[],note:''}],createdAt:new Date().toISOString(),reason:'',confirmation:null},person={id:'custodian',name:'保管员A',kind:'custodian',enabled:true,version:0}
  const data={...home,applications:[application],rules:[{id:'rule',categoryId:'category',name:'啤酒规则',months:3,version:1}],categories:[{id:'category',nameZh:'酒水'}]},lists={pending:[{application,customer:{id:'inbox-customer',displayName:'申请顾客',phone:'+6580000000'}}],people:[person]}
- const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.includes('/products')?[product]:options?.method==='POST'?{...application,status:'stored'}:{...data},lists);await tick()
+ const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{...application,status:'stored'}:{...data},lists);await tick()
  assert.match(text(s.root),/顾客提交 · 待审核/);assert.match(text(s.root),/申请顾客/);assert.match(text(s.root),/12/)
  nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='审核并核对收存')[0].props.onClick();await tick()
  assert.equal(nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search')).length,0)
@@ -254,7 +254,7 @@ test('failed atomic save retains product and barcode draft and retries exactly t
 })
 
 test('store managers edit only listing and cannot change product barcodes',async()=>{
- const actor={...catalogActor,roles:['store_manager']},s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>options?.method==='POST'?{...catalogProducts[0],listingVersion:1}:catalogResponse(url,options),{actor});await tick();button(s.root,'编辑').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0].props.disabled,true);assert.equal(button(s.root,'＋ 添加条码'),undefined);nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const post=s.calls.find(c=>c.method==='POST');assert.ok(post.url.endsWith('/listing'));assert.equal(post.body.barcodes,undefined)
+ const actor={...catalogActor,roles:['store_manager']},s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>options?.method==='POST'?{...catalogProducts[0],listingVersion:1}:catalogResponse(url,options),{actor});await tick();button(s.root,'编辑').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0].props.disabled,true);assert.ok(!button(s.root,'＋ 添加条码'));nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const post=s.calls.find(c=>c.method==='POST');assert.ok(post.url.endsWith('/listing'));assert.equal(post.body.barcodes,undefined)
 })
 
 
@@ -263,6 +263,27 @@ test('cancel with unsaved product and barcode changes requires a deliberate choi
 })
 
 
-test('scan-add in unified editor opens camera immediately and keeps the decoded draft until product save',async()=>{
- const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'编辑').props.onClick();await tick();button(s.root,'扫描添加条码').props.onClick();await tick();const scan=nodes(s.root,n=>n.props?.['data-barcode'])[0];assert.equal(scan.props['data-auto-start'],true);scan.props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric').at(-1).value,'00036000291452');assert.equal(s.calls.filter(c=>c.method!=='GET').length,0)
+test('single barcode scan opens camera immediately and replaces the draft until product save',async()=>{
+ const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'编辑').props.onClick();await tick();assert.ok(!button(s.root,'＋ 添加条码'));assert.ok(!button(s.root,'扫描添加条码'));button(s.root,'扫码填写').props.onClick();await tick();const scan=nodes(s.root,n=>n.props?.['data-barcode'])[0];assert.equal(scan.props['data-auto-start'],true);scan.props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric').length,1);assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric')[0].value,'00036000291452');assert.equal(s.calls.filter(c=>c.method!=='GET').length,0)
+})
+
+
+test('unavailable original product is not backfilled as a selectable wine and cannot be received',async()=>{
+ const application={id:'off-request',customerId:'customer',status:'pending',lines:[{id:'line',productId:'wine',nameZh:'未开启寄存商品',nameEn:'Off wine',quantity:1,opened:false,source:'customer',photos:[],note:''}],createdAt:new Date().toISOString(),reason:'',confirmation:null},data={...home,applications:[application],rules:[{id:'rule',categoryId:'category',name:'规则',months:3,version:1}],categories:[{id:'category',nameZh:'酒品'}]},lists={pending:[{application,customer:{id:'customer',displayName:'顾客',phone:'+6580000000'}}]}
+ const s=mount(StaffPage,false,'zh-CN',data,url=>url.includes('/products')?[]:data,lists);await tick();const original=globalThis.fetch;globalThis.fetch=async(url,options)=>url.endsWith('/products/wine')?{ok:false,status:409,json:async()=>({code:'CATALOG_UNAVAILABLE',message:'unavailable'})}:original(url,options)
+ button(s.root,'审核并核对收存').props.onClick();await tick();assert.match(text(s.root),/原选商品未开启寄存酒或已停用/);assert.equal(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine').length,0);assert.equal(button(s.root,'确认实际收存').props.disabled,true);assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
+})
+
+
+test('eligible original wine outside the keyword result is verified by id before preserving selection',async()=>{
+ const product={id:'wine',categoryId:'category',nameZh:'仍可寄存的酒',nameEn:'Eligible wine',code:'WINE'},application={id:'valid-request',customerId:'customer',status:'pending',lines:[{id:'line',productId:'wine',nameZh:'旧申请名称',nameEn:'Old name',quantity:1,opened:false,source:'customer',photos:[],note:''}],createdAt:new Date().toISOString(),reason:'',confirmation:null},data={...home,applications:[application],rules:[{id:'rule',categoryId:'category',name:'规则',months:3,version:1}],categories:[{id:'category',nameZh:'酒品'}]},lists={pending:[{application,customer:{id:'customer',displayName:'顾客',phone:'+6580000000'}}]}
+ const s=mount(StaffPage,false,'zh-CN',data,url=>url.endsWith('/products/wine')?product:url.includes('/products')?[]:data,lists);await tick();button(s.root,'审核并核对收存').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.endsWith('/products/wine')));assert.equal(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine').length,1);assert.match(text(s.root),/仍可寄存的酒/);assert.doesNotMatch(text(s.root),/原选商品未开启寄存酒或已停用/)
+})
+
+test('legacy multiple barcodes require explicit selection and preserve the full save snapshot',async()=>{
+ const old=['06956367311355','036000291452'],s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>url.endsWith('/editor')&&(!options?.method||options.method==='GET')?{product:catalogProducts[0],barcodes:old}:catalogResponse(url,options),{actor:catalogActor});await tick();button(s.root,'编辑').props.onClick();await tick();assert.match(text(s.root),/只能保留一个条码/);nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method!=='GET').length,0);nodes(s.root,n=>n.tag==='button'&&text(n).includes('保留此条码'))[1].props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric').length,1);nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const save=s.calls.find(c=>c.method==='PUT');assert.deepEqual(save.body.barcodes,['036000291452']);assert.deepEqual(save.body.expectedBarcodes,old)
+})
+
+test('new product always has one editable optional barcode field without add buttons',async()=>{
+ const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'＋ 新增商品').props.onClick();await tick();const fields=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric');assert.equal(fields.length,1);assert.equal(fields[0].value,'');assert.ok(button(s.root,'扫码填写'));assert.ok(!button(s.root,'＋ 添加条码'))
 })

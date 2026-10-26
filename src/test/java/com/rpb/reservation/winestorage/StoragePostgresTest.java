@@ -237,4 +237,13 @@ class StoragePostgresTest extends CatalogPostgresTest {
   try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<Intent> attempt=()->{start.await();return scanDeliver(code,same);};var a=pool.submit(attempt);var b=pool.submit(attempt);start.countDown();assertThat(a.get(15,TimeUnit.SECONDS)).isEqualTo(b.get(15,TimeUnit.SECONDS));}
   assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);assertThat(r.events(scope,customer).stream().filter(e->e.action().equals("scan.delivered"))).hasSize(1);
  }
+ @Test void closedStorageChannelBlocksNewReceiptsButKeepsExistingBottlesCollectible()throws Exception{
+  var existing=stored(2,false);var pending=apply(1,false);
+  tx.execute(t->catalog.listing(scope,actor,product.id(),new Listing(500,List.of("cards"),true,product.listingVersion(),key())));
+  assertThat(storageCatalog.search(scope,"",true)).isEmpty();
+  assertThatThrownBy(()->receive(pending,1,false)).hasMessageContaining("不适用");
+  assertThat(r.application(scope,pending.id(),false).status()).isEqualTo("pending");assertThat(r.items(scope,customer,clock.instant())).hasSize(1);
+  var registration=registration(photo(true),key());assertThatThrownBy(()->tx.execute(t->registrations().register(scope,actor,registration))).hasMessageContaining("不适用");
+  assertThat(r.items(scope,customer,clock.instant())).hasSize(1);deliver(intent(existing,1),key());assertThat(r.item(scope,existing.id(),false,clock.instant()).remaining()).isEqualTo(1);
+ }
 }

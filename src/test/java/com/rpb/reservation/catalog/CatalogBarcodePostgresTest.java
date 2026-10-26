@@ -57,4 +57,11 @@ public class CatalogBarcodePostgresTest extends CatalogPostgresTest {
   var c=new CatalogBarcodeService.Write("036000291452",false,"legacy-key");
   assertThat(json.readTree(json.writeValueAsString(c))).isEqualTo(json.readTree("{\"barcode\":\"036000291452\",\"remove\":false,\"idempotencyKey\":\"legacy-key\"}"));
  }
+ @Test void secondBarcodeIsRejectedWithoutChangingExistingValue(){
+  var service=service(mock(CatalogAccess.class));
+  tx.execute(t->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write("036000291452",false,key())));
+  assertThatThrownBy(()->tx.execute(t->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write("6956367311355",false,key())))).hasMessageContaining("一个条码");
+  assertThat(service.list(scope,actor,product.id()).barcodes()).containsExactly("036000291452");
+  assertThat(tx.execute(t->service.save(scope,actor,product.id(),new CatalogBarcodeService.Write("0036000291452",false,key()))).barcodes()).containsExactly("0036000291452");
+ }
 }
