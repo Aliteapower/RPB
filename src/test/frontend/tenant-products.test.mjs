@@ -41,3 +41,7 @@ test('failed reads clear old data and remain refreshable',async()=>{
  globalThis.fetch=async()=>{throw Error('offline')};const s=mount(ref('A'));await tick();assert.equal(s.state.error.value,'tenantProducts.loadFailed');assert.deepEqual(s.state.products.value,[])
  globalThis.fetch=async()=>response([row(false)]);await s.state.refresh();assert.equal(s.state.error.value,'');assert.equal(s.state.products.value[0].enabled,false);s.unmount()
 })
+
+test('refreshing provisioned products also invalidates the side menu visibility query',async()=>{
+ globalThis.fetch=async()=>response([row()]);const s=mount(ref('A'));await tick();const before=s.state.changeCount.value;globalThis.fetch=async()=>response([]);await s.state.refresh();assert.deepEqual(s.state.products.value,[]);assert.equal(s.state.changeCount.value,before+1);s.unmount()
+})

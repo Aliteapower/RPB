@@ -761,8 +761,8 @@ test('customer home keeps the same two action columns with and without a wallet 
 })
 
 
-test('cashier shortcuts directly expose permitted card and storage operations without duplicating transaction navigation',async()=>{
- globalThis.fetch=async()=>response(staffContext)
+test('cashier shortcuts require provisioned storage and permission without duplicating transaction navigation',async()=>{
+ globalThis.fetch=async url=>response(url.startsWith('/api/me/apps?')?{success:true,apps:[{appKey:'wine_storage',appName:'Bottle storage',status:'active',entryRoute:'/stores/A/wine-storage',entryVisible:true,permissions:['wine_storage.view']}]}:staffContext)
  for(const permissions of [[],['wallet.cards.view'],['wine_storage.view'],['wallet.cards.view','wine_storage.view']]){
   const route=reactive({name:'wallet-collect',path:'/stores/A/wallet/collect',params:{storeId:'A'},query:{},hash:''})
   const scope=mount(CashierTools,'staff',route,{},permissions);await tick()

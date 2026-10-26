@@ -36,3 +36,7 @@ test('compiled page renders both language states, saves switches and explains ex
  await switches[0].props.onClick();await tick();switches=nodes(root,n=>n.props?.role==='switch');assert.equal(switches[0].props['aria-checked'],false);assert.ok(text(root).includes('已保存'))
  i18n.global.locale.value='en';await tick();assert.ok(text(root).includes('Wallet and points'));assert.ok(text(root).includes('Turn on'));assert.ok(text(root).includes('subscription has expired'));app.unmount()
 })
+
+test('unopened directory is an empty state without advertising storage-specific management',async()=>{
+ globalThis.fetch=async()=>({ok:true,json:async()=>({success:true,products:[]})});const root={children:[]},app=renderer.createApp({setup:()=>()=>h(Page)});app.use(createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':{tenantProducts:messages.tenantProductsZh,common:{actions:{refresh:'刷新',loading:'加载中'}}}}}));app.provide(routeLocationKey,reactive({params:{storeId:'A'}}));app.mount(root);await tick();assert.match(text(root),/暂无已开通产品/);assert.doesNotMatch(text(root),/酒水寄存/);assert.equal(nodes(root,n=>n.props?.role==='switch').length,0);app.unmount()
+})

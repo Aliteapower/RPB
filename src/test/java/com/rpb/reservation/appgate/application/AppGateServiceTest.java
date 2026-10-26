@@ -15,6 +15,7 @@ import com.rpb.reservation.appgate.persistence.repository.TenantAppEntitlementJp
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -365,5 +366,30 @@ class AppGateServiceTest {
         assertThat(decision.denyReason()).isEqualTo(reason);
         assertThat(decision.messageKey()).isEqualTo(messageKey);
         assertThat(decision.details()).isEmpty();
+    }
+    @Test void managementProvisioningKeepsPastAccessButNeverGrantsOperationalAccess(){
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.empty());
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isFalse();
+        var unopened=entitlement("disabled",null);
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.of(unopened));
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isFalse();
+        unopened.updateStatus("enabled",null,OffsetDateTime.now().minusDays(2));unopened.updateStatus("disabled",null,OffsetDateTime.now());
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isTrue();
+        assertThat(service.evaluate(request(actor(Set.of(STORE_ID),Set.of(PERMISSION)))).allowed()).isFalse();
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.of(entitlement("expired",OffsetDateTime.now().minusDays(1))));
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isTrue();
+        assertThat(service.isStoreProductProvisioned(APP_KEY,UUID.randomUUID(),STORE_ID)).isFalse();
+    }
+    @Test void purchasedProductsRequireThisStoresItemAndIgnoreOnlyTheOperationalSwitch(){
+        var subscriptions=mock(com.rpb.reservation.appgate.persistence.repository.StoreAppSubscriptionRepository.class);
+        var gated=new AppGateService(platformApps,entitlements,storeSettings,subscriptions,java.time.Clock.systemUTC());
+        for(String key:List.of("wallet","wine_storage")){
+            when(entitlements.findByTenantIdAndAppKey(TENANT_ID,key)).thenReturn(Optional.of(entitlementFor(key,"enabled",null)));
+            assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isFalse();
+            when(subscriptions.findByTenantAndStore(TENANT_ID,STORE_ID)).thenReturn(Map.of(key,new com.rpb.reservation.appgate.domain.StoreAppSubscription("active",null,null)));
+            assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isFalse();
+            when(subscriptions.findByTenantAndStore(TENANT_ID,STORE_ID)).thenReturn(Map.of(key,new com.rpb.reservation.appgate.domain.StoreAppSubscription("expired","expired",OffsetDateTime.now().minusDays(1))));
+            assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isTrue();
+        }
     }
 }

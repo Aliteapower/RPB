@@ -1,6 +1,7 @@
 export const tenantProductsZh = {
   title: '产品线管理', hint: '设置当前门店已开通产品的使用状态，不影响其他门店。',
-  retention: '关闭后隐藏入口并停止访问，钱包余额、积分及营业记录保留，重新开启后可继续使用。酒水寄存关闭后停止新申请和收存，历史及有效物品受控领取保留。关闭不会取消订阅或停止计费。',
+  retention: '关闭后隐藏入口并停止新业务，余额、积分与历史记录保留，重新开启后可继续使用。关闭不会取消订阅或停止计费。',
+  empty:'当前门店暂无已开通产品。', storageRetention:'酒水寄存关闭后停止新申请和收存，历史及有效物品受控领取保留。',
   enabled: '已开启', disabled: '已关闭', enable: '开启', disable: '关闭', saving: '保存中…', saved: '已保存',
   loadFailed: '加载失败，请刷新重试。', saveFailed: '保存失败，当前状态未更改，请刷新后重试。', accessDenied: '当前账号无权管理此门店产品线。',
   unavailable: '当前不可开启，请联系平台管理员检查开通状态。',
@@ -13,7 +14,8 @@ export const tenantProductsZh = {
 }
 export const tenantProductsEn = {
   title: 'Product lines', hint: 'Manage purchased products for the current store. Other stores are unaffected.',
-  retention: 'Turning a product off hides its entry and blocks access. Wallet balances, points and ledger records are retained for use when turned on again. Bottle storage blocks new intake while keeping history and controlled collection. This does not cancel the subscription or stop billing.',
+  retention: 'Turning a product off hides its entry and stops new business. Balances, points and history are retained for use when turned on again. This does not cancel the subscription or stop billing.',
+  empty:'No products have been opened for this store.', storageRetention:'Bottle storage blocks new intake while keeping history and controlled collection.',
   enabled: 'On', disabled: 'Off', enable: 'Turn on', disable: 'Turn off', saving: 'Saving…', saved: 'Saved',
   loadFailed: 'Could not load products. Refresh to try again.', saveFailed: 'Could not save. The current state has not changed. Refresh and try again.', accessDenied: 'Your account cannot manage products for this store.',
   unavailable: 'This product cannot be turned on. Contact the platform administrator to check access.',

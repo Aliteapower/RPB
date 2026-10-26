@@ -287,3 +287,8 @@ test('legacy multiple barcodes require explicit selection and preserve the full 
 test('new product always has one editable optional barcode field without add buttons',async()=>{
  const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'＋ 新增商品').props.onClick();await tick();const fields=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric');assert.equal(fields.length,1);assert.equal(fields[0].value,'');assert.ok(button(s.root,'扫码填写'));assert.ok(!button(s.root,'＋ 添加条码'))
 })
+
+test('customer wallet hides unopened empty storage but retains closed product history',async()=>{
+ const empty={...home,newBusinessEnabled:false,items:[],applications:[],intents:[],events:[]};const hidden=mount(Summary,true,'zh-CN',empty);await tick();assert.equal(nodes(hidden.root,n=>n.tag==='a').length,0);hidden.unmount();
+ for(const kind of ['items','applications','intents','events']){const shown=mount(Summary,true,'zh-CN',{...empty,[kind]:kind==='items'?[{id:'old',status:'ended',remaining:0}]:[{id:'old',status:'completed'}]});await tick();assert.equal(nodes(shown.root,n=>n.tag==='a').length,1);shown.unmount()}
+})

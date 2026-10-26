@@ -253,4 +253,12 @@ class StoreProductAccessPostgresTest {
         @RequireAppGate(appKey = "daily_ledger", permission = "daily_ledger.view")
         public String read(@PathVariable UUID storeId) { return "ok"; }
     }
+    @Test void managementCatalogRequiresTheCurrentStorePurchaseAndKeepsAnExpiredPurchase(){
+        assertThat(gate.isStoreProductProvisioned("daily_ledger",tenant,store)).isFalse();
+        purchase();assertThat(gate.isStoreProductProvisioned("daily_ledger",tenant,store)).isTrue();
+        assertThat(gate.isStoreProductProvisioned("daily_ledger",tenant,addStore(tenant))).isFalse();
+        assertThat(gate.isStoreProductProvisioned("daily_ledger",foreignTenant,store)).isFalse();
+        jdbc.update("update tenant_product_subscription_items set status='expired' where tenant_id=? and store_id=?",tenant,store);
+        assertThat(gate.isStoreProductProvisioned("daily_ledger",tenant,store)).isTrue();
+    }
 }

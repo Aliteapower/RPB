@@ -126,6 +126,19 @@ public class AppGateService {
         return reason==null ? AppGateDecision.allow(appKey,tenantId,storeId,null) : denied(request,reason);
     }
 
+    /** Management inventory keeps previously opened products, independent of operational switches. */
+    public boolean isStoreProductProvisioned(String appKey, UUID tenantId, UUID storeId) {
+        if (tenantId == null || storeId == null) return false;
+        var entitlement = entitlements.findByTenantIdAndAppKey(tenantId, appKey);
+        if (entitlement.isEmpty()) return false;
+        var tenantApp = entitlement.get();
+        if (!Set.of(ENABLED, TRIAL, "expired").contains(tenantApp.getStatus()) && tenantApp.getEnabledAt() == null) return false;
+        var subscription = storeSubscriptions.findByTenantAndStore(tenantId, storeId).get(appKey);
+        // A tenant-wide subscription marker with no item for this store is not a purchase.
+        if (subscription != null) return subscription.storeStatus() != null;
+        return !Set.of("wallet", "wine_storage").contains(appKey);
+    }
+
     public List<AppGateAppEntry> visibleApps(CurrentActor actor, UUID storeId) {
         if (actor == null || actor.tenantId() == null || !actor.canAccessStore(storeId)) {
             return List.of();

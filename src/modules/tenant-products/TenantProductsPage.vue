@@ -20,6 +20,8 @@ function reasonText(reason: string | null) {
       <header><h1>{{ t('tenantProducts.title') }}</h1><button type="button" :disabled="loading || !!saving" @click="refresh">{{ t('common.actions.refresh') }}</button></header>
       <p>{{ t('tenantProducts.hint') }}</p>
       <p class="retention">{{ t('tenantProducts.retention') }}</p>
+      <p v-if="products.some(product=>product.appKey==='wine_storage')" class="retention">{{t('tenantProducts.storageRetention')}}</p>
+      <p v-if="!loading&&!error&&!products.length" role="status">{{t('tenantProducts.empty')}}</p>
       <p v-if="loading" role="status">{{ t('common.actions.loading') }}</p>
       <p v-if="error" class="error" role="alert">{{ t(error) }}</p>
       <p v-if="saved" class="saved" role="status">{{ t('tenantProducts.saved') }}</p>

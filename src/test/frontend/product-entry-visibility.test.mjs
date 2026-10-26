@@ -1,0 +1,28 @@
+import {test,before,after,afterEach} from 'node:test'
+import assert from 'node:assert/strict'
+import {parse,compileScript} from '@vue/compiler-sfc'
+import {build} from 'esbuild'
+import {readFile,writeFile,mkdir} from 'node:fs/promises'
+import {pathToFileURL} from 'node:url'
+import {createRenderer,h,nextTick,reactive} from 'vue'
+import {createPinia} from 'pinia'
+import {routeLocationKey,routerKey} from 'vue-router'
+import {createI18n} from 'vue-i18n'
+let Nav,Tools,useAuthSessionStore;const mounted=new Set(),originalFetch=globalThis.fetch
+const renderer=createRenderer({createElement:tag=>({tag,children:[],props:{}}),createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>n.text=t,patchProp:(n,k,o,v)=>n.props[k]=v,insert:(n,p,a)=>{n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:()=>null})
+const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))],tick=async()=>{for(let i=0;i<16;i++){await Promise.resolve();await nextTick()}}
+const appEntry={appKey:'wine_storage',appName:'Bottle storage',status:'active',entryRoute:'/stores/A/wine-storage',entryVisible:true,permissions:['wine_storage.view']}
+const response=apps=>({ok:true,status:200,text:async()=>JSON.stringify({success:true,apps})})
+before(async()=>{
+ const result=await build({stdin:{contents:"export {default as Nav} from './src/components/tenant-admin/TenantAdminNav.vue';export {default as Tools} from './src/modules/wallet/components/WalletCashierTools.vue';export {useAuthSessionStore} from './src/stores/authSession'",resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'entry-visibility',setup(b){
+ b.onLoad({filter:/useStaffWallet\.ts$/},()=>({contents:"import {computed} from 'vue';import {useRoute} from 'vue-router';import {useAuthSessionStore} from '../../stores/authSession';export function useStaffWallet(){const route=useRoute(),auth=useAuthSessionStore();return {store:computed(()=>String(route.params.storeId)),context:computed(()=>null),can:p=>auth.user?.permissions.includes(p)===true}}",loader:'ts'}))
+ b.onLoad({filter:/\.vue$/},async({path})=>{if(/(StoreSwitcher|WalletIcon|WalletCustomerManagementEntry)\.vue$/.test(path))return{contents:'export default {render(){return null}}',loader:'js'};const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}})
+ } }]});await mkdir('target/product-entry-visibility',{recursive:true});await writeFile('target/product-entry-visibility/entry.mjs',result.outputFiles[0].contents);({Nav,Tools,useAuthSessionStore}=await import(pathToFileURL(process.cwd()+'/target/product-entry-visibility/entry.mjs').href+'?'+Date.now()))
+})
+afterEach(()=>{for(const app of mounted)app.unmount();mounted.clear()});after(()=>{globalThis.fetch=originalFetch})
+function mount(component,permissions=['wine_storage.view']){const route=reactive({params:{storeId:'A'}}),root={children:[]},app=renderer.createApp({render:()=>h(component)}),pinia=createPinia();app.use(pinia);useAuthSessionStore(pinia).user={username:'QA',roles:['tenant_admin'],permissions,storeIds:['A','B'],defaultStoreId:'A'};app.use(createI18n({legacy:false,locale:'zh-CN',missingWarn:false,fallbackWarn:false,messages:{'zh-CN':{}}}));app.provide(routeLocationKey,route);app.provide(routerKey,{push:async()=>{}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,route}}
+const wineLinks=root=>nodes(root,n=>n.tag==='a'&&String(n.props.href).endsWith('/wine-storage'))
+test('permissions alone never show an unprovisioned storage link in either staff surface',async()=>{globalThis.fetch=async()=>response([]);for(const component of [Nav,Tools]){const s=mount(component);assert.equal(wineLinks(s.root).length,0);await tick();assert.equal(wineLinks(s.root).length,0)}})
+test('both staff surfaces require a visible AppGate entry and the employee view permission',async()=>{for(const component of [Nav,Tools]){globalThis.fetch=async()=>response([appEntry]);const shown=mount(component);await tick();assert.equal(wineLinks(shown.root).length,1);const denied=mount(component,[]);await tick();assert.equal(wineLinks(denied.root).length,0);globalThis.fetch=async()=>response([{...appEntry,entryVisible:false}]);const hidden=mount(component);await tick();assert.equal(wineLinks(hidden.root).length,0)}})
+test('loading and failed visibility reads never reveal a storage link',async()=>{for(const component of [Nav,Tools]){let reject;globalThis.fetch=()=>new Promise((_,no)=>reject=no);const s=mount(component);await tick();assert.equal(wineLinks(s.root).length,0);assert.equal(nodes(s.root,n=>n.tag==='a'&&/admin\/(payment|tables|settings)/.test(String(n.props.href))).length,0);reject(Error('offline'));await tick();assert.equal(wineLinks(s.root).length,0)}})
+test('late previous-store entries cannot leak into the new store menu',async()=>{for(const component of [Nav,Tools]){const requests=[];globalThis.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));const s=mount(component);await tick();s.route.params.storeId='B';await tick();assert.equal(wineLinks(s.root).length,0);requests[0].resolve(response([appEntry]));await tick();assert.equal(wineLinks(s.root).length,0);assert.equal(requests.length,2);requests[1].resolve(response([]));await tick();assert.equal(wineLinks(s.root).length,0)}})

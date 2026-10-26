@@ -22,7 +22,8 @@ public class StoreProductSettingsService {
     }
     public List<StoreProductSetting> list(StoreScope scope) {
         requireStore(scope, false);
-        return PRODUCTS.stream().map(key -> state(scope,key)).toList();
+        return PRODUCTS.stream().filter(key -> gate.isStoreProductProvisioned(key,scope.tenantId().value(),scope.storeId().value()))
+            .map(key -> state(scope,key)).toList();
     }
     @Transactional
     public StoreProductSetting setEnabled(StoreScope scope, CurrentActor actor, String key, boolean enabled) {

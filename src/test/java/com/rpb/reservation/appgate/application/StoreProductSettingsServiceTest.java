@@ -23,10 +23,10 @@ class StoreProductSettingsServiceTest {
     @BeforeEach void prepare(){
         when(stores.isActive(scope,false)).thenReturn(true);
         when(stores.isActive(scope,true)).thenReturn(true);
-        for(String key:List.of("wallet","daily_ledger","wine_storage"))when(gate.evaluateStoreActivation(key,tenant,store)).thenReturn(AppGateDecision.allow(key,tenant,store,null));
+        for(String key:List.of("wallet","daily_ledger","wine_storage")){when(gate.evaluateStoreActivation(key,tenant,store)).thenReturn(AppGateDecision.allow(key,tenant,store,null));when(gate.isStoreProductProvisioned(key,tenant,store)).thenReturn(true);}
     }
     StoreAppSettingEntity setting(String key,boolean enabled){return StoreAppSettingEntity.of(UUID.randomUUID(),tenant,store,key,enabled,enabled,"{}",null,null,null);}
-    @Test void listIncludesClosedAndUnpurchasedProductsWithoutWriting(){
+    @Test void listKeepsPreviouslyPurchasedClosedAndExpiredProductsWithoutWriting(){
         when(settings.findByTenantIdAndStoreIdAndAppKey(tenant,store,"wallet")).thenReturn(Optional.of(setting("wallet",false)));
         when(gate.evaluateStoreActivation("wallet",tenant,store)).thenReturn(AppGateDecision.deny("wallet",tenant,store,null,AppGateDenyReason.STORE_APP_EXPIRED));
         var rows=service.list(scope);
@@ -62,6 +62,16 @@ class StoreProductSettingsServiceTest {
             assertThatThrownBy(()->service.setEnabled(scope,invalid,"wallet",false)).isInstanceOf(StoreProductSettingsException.class);
         }
         verifyNoInteractions(commands);
+    }
+    @Test void neverOpenedProductMustNotAppearEvenWhenPermissionOrStaleSwitchExists(){
+        when(gate.evaluateStoreActivation("wine_storage",tenant,store)).thenReturn(AppGateDecision.deny("wine_storage",tenant,store,null,AppGateDenyReason.TENANT_APP_NOT_ENABLED));
+        when(gate.isStoreProductProvisioned("wine_storage",tenant,store)).thenReturn(false);
+        assertThat(service.list(scope)).extracting(StoreProductSetting::appKey).doesNotContain("wine_storage");
+        verifyNoInteractions(commands);
+    }
+    @Test void everyManagedProductUsesTheSameProvisioningRule(){
+        for(String key:List.of("wallet","daily_ledger","wine_storage"))when(gate.isStoreProductProvisioned(key,tenant,store)).thenReturn(false);
+        assertThat(service.list(scope)).isEmpty();verifyNoInteractions(commands);
     }
 }
 

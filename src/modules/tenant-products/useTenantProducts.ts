@@ -5,14 +5,14 @@ import type { StoreProductSetting } from './types'
 export function useTenantProducts(store: Ref<string>) {
   const products = ref<StoreProductSetting[]>([])
   const loading = ref(false), saving = ref(''), error = ref(''), saved = ref(false), changeCount = ref(0)
-  let generation = 0
+  let generation = 0, hasRefreshed = false
   async function refresh() {
     if (saving.value) return
     const current = ++generation, id = store.value
     products.value = []; error.value = ''; saved.value = false; loading.value = true
     try {
       const result = await requestProducts(id)
-      if (current === generation) products.value = result
+      if (current === generation) { products.value = result; if (hasRefreshed) changeCount.value++; hasRefreshed = true }
     } catch (e) {
       if (current === generation) error.value = errorKey(e, 'loadFailed')
     } finally {
