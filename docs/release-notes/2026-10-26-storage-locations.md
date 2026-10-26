@@ -1,7 +1,7 @@
 # Release Notes
 
 ## Version / Date
-2026-10-26，本地实现完成，未提交、未部署。
+2026-10-26，已提交、推送并部署 `5b8f7884624a7bfecb5ac84b064108d54d161559`。前后端线上版本一致，Flyway V081。生产证据见 `docs/development/STORAGE_LOCATIONS_PRODUCTION_RELEASE_20261026.md`。
 
 ## New
 租户管理员在酒水寄存管理维护当前门店的常用存放位置，可新增、修改名称。默认提供“前台寄存处”，不需要为读取默认值写入数据库。

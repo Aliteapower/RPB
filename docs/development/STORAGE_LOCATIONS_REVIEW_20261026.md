@@ -18,7 +18,7 @@ Controller 只调用身份与应用服务；所有位置查询、更新及审计
 Vue 组件分为选择和管理职责，复用收存表单；明确区分未初始化、默认选择及主动清空，卸载/切店晚响应不写入新界面。已有记录按原 location 展示。
 
 ## Final Decision
-APPROVE（本地实现，未发布）。
+APPROVE。后续用户明确授权“提交部署”，已按生产检查发布 `5b8f7884`，记录见 STORAGE_LOCATIONS_PRODUCTION_RELEASE_20261026.md。
 
 # TDD Review Report
 
@@ -36,4 +36,4 @@ APPROVE（本地实现，未发布）。
 无阻断项；手机实机未覆盖。
 
 ## Required Next Tests
-后续发布需验证 V081、前后端版本和生产只读页面。当前无发布授权。
+用户后续明确授权发布，V081、前后端版本、认证只读接口及公网资源均已验证；手机实机仍未覆盖。
