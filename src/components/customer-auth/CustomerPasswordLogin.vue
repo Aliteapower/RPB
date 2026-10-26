@@ -1,27 +1,43 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CountryPhoneField from '../common/CountryPhoneField.vue'
 import { CustomerPasswordApiError, loginCustomerWithPassword } from '../../api/customerAuthApi'
 import type { CustomerAuthPrincipal } from '../../types/publicBooking'
+import CustomerActivation from './CustomerActivation.vue'
+import CustomerPasswordReset from './CustomerPasswordReset.vue'
 const props = defineProps<{ store: string; registrationTo?:string }>()
 const emit = defineEmits<{ authenticated: [principal: CustomerAuthPrincipal] }>()
 const { t, te } = useI18n()
 const phone = ref(''), password = ref(''), busy = ref(false), error = ref('')
+const activating=ref(false), recovering=ref(false)
+let generation=0
+function authenticated(principal:CustomerAuthPrincipal){
+  if(principal.passwordChangeRequired){activating.value=true;recovering.value=false;return}
+  emit('authenticated',principal)
+}
+watch(()=>props.store,()=>{generation++;activating.value=false;recovering.value=false;password.value='';phone.value='';error.value='';busy.value=false})
+onUnmounted(()=>generation++)
 async function login() {
   if (busy.value) return
   busy.value = true; error.value = ''
+  const own=++generation
   try {
     const result = await loginCustomerWithPassword(props.store, phone.value, password.value)
-    password.value = ''; emit('authenticated', result.principal)
+    if(own!==generation)return
+    password.value = ''; authenticated(result.principal)
   } catch (e) {
+    if(own!==generation)return
     const key = `customerAuth.errors.${e instanceof CustomerPasswordApiError ? e.code : 'request_failed'}`
     error.value = t(te(key) ? key : 'customerAuth.errors.request_failed')
-  } finally { busy.value = false }
+  } finally { if(own===generation)busy.value = false }
 }
 </script>
 <template>
   <section class="customer-auth-panel">
+    <CustomerActivation v-if="activating" :key="store" :store="store" @done="activating=false" />
+    <CustomerPasswordReset v-else-if="recovering" :key="store" :store="store" @done="recovering=false" />
+    <template v-else>
     <h2>{{ t('customerAuth.login') }}</h2><p>{{ t('customerAuth.loginHint') }}</p>
     <form @submit.prevent="login">
       <CountryPhoneField v-model="phone" model-format="e164" :label="t('customerAuth.phone')" :disabled="busy" required />
@@ -30,6 +46,9 @@ async function login() {
     </form>
     <p v-if="error" class="customer-auth-error" role="alert">{{ error }}</p>
     <RouterLink :to="registrationTo??('/customers/register?storeId='+encodeURIComponent(store))">{{t('customerAuth.register')}}</RouterLink>
+    <button type="button" :disabled="busy" @click="recovering=true">{{t('customerAuth.forgotPassword')}}</button>
+    <button type="button" :disabled="busy" @click="activating=true">{{t('customerAuth.activate')}}</button>
+    </template>
   </section>
 </template>
 <style scoped>

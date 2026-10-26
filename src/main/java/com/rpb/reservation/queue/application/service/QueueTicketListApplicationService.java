@@ -126,7 +126,7 @@ public class QueueTicketListApplicationService {
                 .toList();
             return QueueTicketListResult.success(items, new QueueTicketListPage(limit, offset, rows.total()));
         } catch (RuntimeException exception) {
-            LOGGER.warn("queue_ticket_list_read_failed: {}", exception.toString());
+            LOGGER.warn("queue_ticket_list_read_failed: {}", exception.getClass().getSimpleName());
             return QueueTicketListResult.failure(QueueTicketListError.PERSISTENCE_ERROR);
         }
     }

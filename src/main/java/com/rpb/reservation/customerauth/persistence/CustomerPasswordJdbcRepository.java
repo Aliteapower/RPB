@@ -62,6 +62,13 @@ public class CustomerPasswordJdbcRepository implements CustomerPasswordRepositor
             where tenant_id=? and customer_id=? and status='active' and deleted_at is null
             """,scope.tenantId().value(),id);
     }
+    @Override public boolean passwordChangeRequired(TenantScope scope, UUID id) {
+        return jdbc.query("select password_change_required from customer_password_credentials where tenant_id=? and customer_id=?",
+            (r,n)->r.getBoolean(1),scope.tenantId().value(),id).stream().findFirst().orElse(true);
+    }
+    @Override public void completePasswordChange(TenantScope scope, UUID id) {
+        jdbc.update("update customer_password_credentials set password_change_required=false where tenant_id=? and customer_id=?",scope.tenantId().value(),id);
+    }
     private static String digest(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }

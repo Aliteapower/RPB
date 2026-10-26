@@ -21,14 +21,14 @@ class CustomerSelfRegistrationApiTest {
  private final CustomerRegistrationThrottleService throttle=mock(CustomerRegistrationThrottleService.class);
  private final PublicBookingStoreRepositoryPort stores=mock(PublicBookingStoreRepositoryPort.class);
  private MockMvc mvc;
- private String body(){return "{\"storeId\":\""+store+"\",\"phoneE164\":\"+6581112472\",\"privacyConsent\":{\"accepted\":true,\"noticeVersion\":\"customer-profile-v1\"}}";}
+ private String body(){return "{\"storeId\":\""+store+"\",\"phoneE164\":\"+6581112472\",\"privacyConsent\":{\"accepted\":true,\"noticeVersion\":\"customer-profile-v2\"}}";}
  @BeforeEach void prepare(){
   when(stores.findActiveStoreProfileByStoreId(store)).thenReturn(Optional.of(new PublicBookingStoreProfile(new StoreScope(new TenantId(tenant),store),"店面","Asia/Singapore",null,null,null,null,null)));
   when(customers.create(any(),any())).thenReturn(new CustomerManagementItem(customer,"C",null,null,"+6581112472",null,"active",null,null));
   mvc=MockMvcBuilders.standaloneSetup(new CustomerSelfRegistrationController(new CustomerSelfRegistrationService(customers,consents,throttle),stores)).build();
  }
  @Test void noticeRequiresAnActiveStoreButNotAMerchantSession() throws Exception{
-  mvc.perform(get("/api/v1/public/customer-auth/registration-notice").param("storeId",store.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.version").value("customer-profile-v1"));
+  mvc.perform(get("/api/v1/public/customer-auth/registration-notice").param("storeId",store.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.version").value("customer-profile-v2"));
   mvc.perform(get("/api/v1/public/customer-auth/registration-notice").param("storeId",UUID.randomUUID().toString())).andExpect(status().isBadRequest());
  }
  @Test void publicRegistrationRecordsCustomerSubmission() throws Exception{

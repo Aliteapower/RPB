@@ -279,6 +279,7 @@ public class CustomerAuthJdbcRepository implements
             select
                 session.id as session_id,
                 session.expires_at,
+                session.password_change_required,
                 account.id,
                 account.tenant_id,
                 account.customer_id,
@@ -297,7 +298,8 @@ public class CustomerAuthJdbcRepository implements
             (rs, rowNum) -> new CustomerAuthSessionRecord(
                 rs.getObject("session_id", UUID.class),
                 account(rs),
-                rs.getTimestamp("expires_at").toInstant()
+                rs.getTimestamp("expires_at").toInstant(),
+                rs.getBoolean("password_change_required")
             ),
             sessionHash
         ).stream().findFirst();
@@ -316,6 +318,10 @@ public class CustomerAuthJdbcRepository implements
             """,
             sessionId
         );
+    }
+
+    @Override public void requirePasswordChange(UUID sessionId) {
+        jdbc.update("update customer_auth_sessions set password_change_required=true where id=?", sessionId);
     }
 
     @Override

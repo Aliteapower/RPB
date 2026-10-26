@@ -37,13 +37,13 @@ class CustomerPrivacyApiTest {
   mvc.perform(get("/api/v1/stores/"+UUID.randomUUID()+"/tenant-admin/customer-privacy-notice")).andExpect(status().isForbidden());
  }
  @Test void missingFalseAndStaleConsentDoNotCreateACustomer() throws Exception{
-  for(String consent:List.of("",",\"privacyConsent\":{\"accepted\":false,\"noticeVersion\":\"customer-profile-v1\",\"entrySource\":\"wallet\"}",",\"privacyConsent\":{\"accepted\":true,\"noticeVersion\":\"old\",\"entrySource\":\"wallet\"}")){
+  for(String consent:List.of("",",\"privacyConsent\":{\"accepted\":false,\"noticeVersion\":\"customer-profile-v2\",\"entrySource\":\"wallet\"}",",\"privacyConsent\":{\"accepted\":true,\"noticeVersion\":\"old\",\"entrySource\":\"wallet\"}")){
    mvc.perform(post(base()+"/customers").contentType(MediaType.APPLICATION_JSON).content("{\"phoneE164\":\"+6581112471\""+consent+"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("REQUEST_INVALID"));
   }
   verifyNoInteractions(customers,records);
  }
  @Test void creationRegistersActualAuthenticatedActor() throws Exception{
-  mvc.perform(post(base()+"/customers").contentType(MediaType.APPLICATION_JSON).content("{\"phoneE164\":\"+6581112471\",\"privacyConsent\":{\"accepted\":true,\"noticeVersion\":\"customer-profile-v1\",\"entrySource\":\"wallet\"}}")).andExpect(status().isCreated()).andExpect(jsonPath("$.customer.id").value(customer.toString()));
+  mvc.perform(post(base()+"/customers").contentType(MediaType.APPLICATION_JSON).content("{\"phoneE164\":\"+6581112471\",\"privacyConsent\":{\"accepted\":true,\"noticeVersion\":\"customer-profile-v2\",\"entrySource\":\"wallet\"}}")).andExpect(status().isCreated()).andExpect(jsonPath("$.customer.id").value(customer.toString()));
   verify(records).append(argThat(scope->scope.tenantId().value().equals(tenant)&&scope.storeId().value().equals(store)),eq(customer),eq(actor),eq("wallet"),eq(CustomerPrivacyNotice.CURRENT));
  }
  @Test void unknownOrCrossTenantCustomerHasNoConsentHistory() throws Exception{

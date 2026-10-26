@@ -21,9 +21,10 @@ class CustomerPasswordAuthServiceTest {
     final CustomerRepositoryPort customers = mock(CustomerRepositoryPort.class);
     final CustomerAuthRepositoryPort accounts = mock(CustomerAuthRepositoryPort.class);
     final CustomerPasswordRepositoryPort passwords = mock(CustomerPasswordRepositoryPort.class);
+    final com.rpb.reservation.customerauth.application.port.out.CustomerSecurityEmailPort securityCodes = mock(com.rpb.reservation.customerauth.application.port.out.CustomerSecurityEmailPort.class);
     final CustomerAuthApplicationService sessions = mock(CustomerAuthApplicationService.class);
     final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
-    final CustomerPasswordAuthService service = new CustomerPasswordAuthService(customers,accounts,passwords,sessions,encoder);
+    final CustomerPasswordAuthService service = new CustomerPasswordAuthService(customers,accounts,passwords,sessions,encoder,securityCodes);
     final Customer customer = new Customer(new CustomerId(id),scope,"C-test","regular",new E164Phone("+6591234567"),"active","Guest",null);
 
     @BeforeEach void setup() {
@@ -34,13 +35,17 @@ class CustomerPasswordAuthServiceTest {
         when(accounts.createAccount(any(),eq(tenant),eq(id),isNull(),any())).thenAnswer(i ->
             new CustomerAuthRepositoryPort.CustomerAuthAccountRecord(i.getArgument(0),tenant,id,null,"Guest","active"));
     }
-    @Test void initialPasswordUsesExistingSharedCustomerAndStoresOnlyHash() {
-        service.login(tenant,"+6591234567","234567","127.0.0.1","test");
+    @Test void initialPasswordCanNoLongerBootstrapAnAccount() {
+        assertThatThrownBy(()->service.login(tenant,"+6591234567","234567","127.0.0.1","test"))
+            .isInstanceOf(CustomerAuthServiceException.class).extracting("error").isEqualTo(CustomerAuthError.INVALID_CREDENTIALS);
         verify(customers,never()).save(any(),any());
-        var hash = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(passwords).savePassword(eq(scope),eq(id),hash.capture());
-        assertThat(hash.getValue()).isNotEqualTo("234567");assertThat(encoder.matches("234567",hash.getValue())).isTrue();
-        verify(sessions).loginAccount(argThat(a -> a.customerId().equals(id)),any(),any());
+        verify(passwords,never()).savePassword(any(),any(),any());verifyNoInteractions(sessions);
+    }
+    @Test void previouslyPersistedInitialPasswordMustNotCreateAnOrdinarySession() {
+        when(passwords.passwordHash(scope,id)).thenReturn(Optional.of(encoder.encode("234567")));
+        assertThatThrownBy(()->service.login(tenant,"+6591234567","234567","127.0.0.1","test"))
+            .isInstanceOf(CustomerAuthServiceException.class).extracting("error").isEqualTo(CustomerAuthError.INVALID_CREDENTIALS);
+        verifyNoInteractions(sessions);
     }
     @Test void changedPasswordNeverFallsBackToPhoneSuffix() {
         when(passwords.passwordHash(scope,id)).thenReturn(Optional.of(encoder.encode("new-password")));
@@ -68,6 +73,7 @@ class CustomerPasswordAuthServiceTest {
         verify(passwords,never()).savePassword(any(),any(),any());
         service.change(principal,"old-password","new-password","ip","test");
         verify(passwords).revokeSessions(scope,id);verify(sessions).loginAccount(account,"ip","test");
+        verify(securityCodes).invalidateAll(scope,id);
     }
     @Test void newPasswordRejectsPhoneSuffixAndBcryptTruncation() {
         var principal = new CustomerAuthPrincipal(tenant,UUID.randomUUID(),id,null,"Guest");

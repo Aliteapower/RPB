@@ -69,6 +69,7 @@ export interface CustomerAuthPrincipal {
   email: string | null
   displayName: string | null
   phoneE164?: string | null
+  passwordChangeRequired?: boolean
 }
 
 export interface CustomerAuthLoginResponse {

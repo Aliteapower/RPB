@@ -36,6 +36,15 @@ class CustomerPrivacyConsentPostgresTest {
   Files.writeString(Path.of("target/customer-privacy-postgres-schema.txt"),"port="+port+"\nschema="+schema+"\n");
  }
  private UUID customer(UUID owner){UUID id=UUID.randomUUID();jdbc.update("insert into customers(id,tenant_id) values(?,?)",id,owner);return id;}
+ @Test void upgradingNoticeDoesNotRewriteHistoricalVersionOrBody(){
+  UUID id=customer(tenant);
+  var old=new CustomerPrivacyNotice("customer-profile-v1","历史告知正文","Historical notice","历史确认","Historical confirmation");
+  adapter.append(scope,id,actor,"wallet",old);
+  var saved=adapter.list(scope.tenantScope(),id).getFirst();
+  assertThat(CustomerPrivacyNotice.CURRENT.version()).isEqualTo("customer-profile-v2");
+  assertThat(saved.noticeVersion()).isEqualTo("customer-profile-v1");assertThat(saved.noticeTextZh()).isEqualTo("历史告知正文");
+  assertThat(CustomerPrivacyNotice.CURRENT.textZh()).contains("包含营销推送同意或钱包扣款授权");
+ }
  @Test void persistsAcceptedActorNoticeSnapshotAndServerTime(){
   UUID customer=customer(tenant);OffsetDateTime before=OffsetDateTime.now().minusSeconds(1);adapter.append(scope,customer,actor,"wallet",CustomerPrivacyNotice.CURRENT);
   var saved=adapter.list(scope.tenantScope(),customer).getFirst();assertThat(saved.accepted()).isTrue();assertThat(saved.recordedBy()).isEqualTo(actor);assertThat(saved.recordedByName()).isEqualTo("登记管理员");assertThat(saved.recordedAt()).isAfter(before);assertThat(saved.noticeTextZh()).isEqualTo(CustomerPrivacyNotice.CURRENT.textZh());assertThat(saved.confirmationMethod()).isEqualTo("merchant_attestation");

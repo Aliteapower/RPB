@@ -15,9 +15,9 @@ class CustomerRegistrationServiceTest {
  private final StoreScope scope=new StoreScope(new TenantId(UUID.randomUUID()),UUID.randomUUID());
  private final UUID actor=UUID.randomUUID(),customer=UUID.randomUUID();
  private final CustomerManagementCommand profile=new CustomerManagementCommand("姓名",null,"+6581112467",null);
- private CustomerPrivacyConsentCommand accepted(){return new CustomerPrivacyConsentCommand(true,"customer-profile-v1","wallet");}
+ private CustomerPrivacyConsentCommand accepted(){return new CustomerPrivacyConsentCommand(true,"customer-profile-v2","wallet");}
  @Test void rejectsMissingUncheckedStaleOrForgedConsentBeforeWriting(){
-  for(CustomerPrivacyConsentCommand value:new CustomerPrivacyConsentCommand[]{null,new CustomerPrivacyConsentCommand(false,"customer-profile-v1","wallet"),new CustomerPrivacyConsentCommand(true,"old","wallet"),new CustomerPrivacyConsentCommand(true,"customer-profile-v1","customer_self")}){
+  for(CustomerPrivacyConsentCommand value:new CustomerPrivacyConsentCommand[]{null,new CustomerPrivacyConsentCommand(false,"customer-profile-v2","wallet"),new CustomerPrivacyConsentCommand(true,"customer-profile-v1","wallet"),new CustomerPrivacyConsentCommand(true,"old","wallet"),new CustomerPrivacyConsentCommand(true,"customer-profile-v2","customer_self")}){
    assertThatThrownBy(()->service.create(scope,actor,profile,value)).isInstanceOf(CustomerManagementException.class);
   }
   verifyNoInteractions(customers,records);

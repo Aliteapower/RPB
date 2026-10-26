@@ -63,6 +63,8 @@ public interface CustomerAuthRepositoryPort {
 
     void touchSession(UUID sessionId);
 
+    default void requirePasswordChange(UUID sessionId) { throw new UnsupportedOperationException("restricted_session_not_implemented"); }
+
     void revokeSession(String sessionHash);
 
     record EmailCodeRecord(
@@ -91,7 +93,11 @@ public interface CustomerAuthRepositoryPort {
     record CustomerAuthSessionRecord(
         UUID sessionId,
         CustomerAuthAccountRecord account,
-        Instant expiresAt
+        Instant expiresAt,
+        boolean passwordChangeRequired
     ) {
+        public CustomerAuthSessionRecord(UUID sessionId, CustomerAuthAccountRecord account, Instant expiresAt) {
+            this(sessionId, account, expiresAt, false);
+        }
     }
 }

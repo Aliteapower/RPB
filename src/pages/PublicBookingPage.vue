@@ -181,7 +181,7 @@ async function loadCustomer(): Promise<void> {
   try {
     if (!(await resolvePublicBookingEntry())) return
     const response = await getCustomerMe(undefined, storeId.value)
-    customer.value = response.principal
+    customer.value = response.principal?.passwordChangeRequired ? null : response.principal
   } catch {
     customer.value = null
   }
@@ -573,7 +573,7 @@ function clampBookingDate(isoDate: string): string {
           </button>
         </div>
       </form>
-      <CustomerPasswordChange v-if="customer" :key="storeId + customer.customerId" />
+      <CustomerPasswordChange v-if="customer" :key="storeId + customer.customerId" :store="storeId" />
     </section>
   </main>
 </template>

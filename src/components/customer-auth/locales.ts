@@ -1,6 +1,15 @@
 export const customerAuthZh = {
   register:'注册顾客',
-  login: '顾客登录', phone: '手机号', password: '密码', loginHint: '使用门店登记的手机号登录，初始密码为手机号后 6 位。',
+  firstChangeRequired:'首次登录请先修改并保存密码，完成后才能使用顾客服务。',
+  forgotPassword:'忘记密码',recoveryEmail:'找回电邮',emailCode:'电邮验证码',sendCode:'发送验证码',resendCode:'重新发送验证码',
+  recoveryHint:'填写登记手机号及已验证的找回电邮。未绑定或无法收信时，请联系门店核实处理。',
+  resetCodeSent:'如资料匹配已验证的找回电邮，验证码将发送至该电邮，10 分钟内有效。',
+  resetComplete:'密码已重置，旧登录会话已退出。请使用新密码登录。',
+  bindRecoveryEmail:'绑定／验证找回电邮',bindEmailHint:'请验证可收信的电邮，用于忘记密码时找回。已绑定的不同电邮需联系门店核实更换。',
+  bindingCodeSent:'验证码已发送，10 分钟内有效。',verifyEmail:'验证并保存电邮',emailBound:'找回电邮已验证并保存。',
+  login: '顾客登录', phone: '手机号', password: '密码', loginHint: '使用登记手机号及自己设置的密码登录。首次使用请到店核实并领取激活码。',
+  activate:'首次激活',activationCode:'到店激活码',activateSave:'激活并保存密码',activationHint:'请到店核实身份，由有权限的员工当面交付激活码。验证码 10 分钟有效，请自行设置密码，勿将密码告知员工。',activationComplete:'账号已激活，密码已保存。请使用手机号和新密码登录。',
+  issueActivation:'核实并生成激活码',issueActivationHint:'仅适用于尚未设密且没有已验证电邮的顾客。请当面核实本人，不能仅凭电话报出手机号发码；已有自设密码不能覆盖。',identityConfirmed:'我已当面核实顾客本人，确认将激活码当面交付',activationDeliver:'请当面交给顾客；激活码仅本次显示，关闭后无法查询。不要拍照、转发或存入顾客备注。',activationExpires:'有效至',reissueActivation:'重新生成（旧码失效）',closeActivation:'关闭并清除激活码',
   changePassword: '修改登录密码', currentPassword: '当前密码', newPassword: '新密码', confirmPassword: '确认新密码',
   passwordHint: '新密码至少 8 个字符。修改后请使用新密码登录。', save: '保存新密码', changed: '密码已修改，其他登录会话已退出。',
   mismatch: '两次输入的新密码不一致。', busy: '处理中…', cancel: '取消',
@@ -8,11 +17,21 @@ export const customerAuthZh = {
   errors: { invalid_credentials: '手机号或密码不正确，请核对门店登记资料。', rate_limited: '尝试次数过多，请 15 分钟后重试。',
     account_disabled: '顾客资料或账号已停用，请联系门店。', unauthenticated: '登录已失效，请重新登录。',
     request_invalid: '请检查手机号及密码；新密码至少 8 个字符，不能使用初始密码或原密码。',
+    forbidden:'没有权限或门店范围不符，请联系租户管理员。',code_mismatch:'验证码无效、已过期、已使用或尝试过多，请重新申请。',email_channel_not_configured:'门店尚未配置电邮发送，请联系门店。',email_delivery_failed:'验证码发送失败，请稍后重试或联系门店。',
     network_failure: '网络连接失败，请重试。', request_failed: '操作失败，请稍后重试。' }
 }
 export const customerAuthEn = {
   register:'Register customer',
-  login: 'Customer sign in', phone: 'Phone number', password: 'Password', loginHint: 'Use the phone registered with the store. Your initial password is the last 6 digits of your phone.',
+  firstChangeRequired:'Change and save your password before using customer services for the first time.',
+  forgotPassword:'Forgot password',recoveryEmail:'Recovery email',emailCode:'Email verification code',sendCode:'Send code',resendCode:'Resend code',
+  recoveryHint:'Enter your registered phone and verified recovery email. Contact the store if no email is bound or you cannot receive mail.',
+  resetCodeSent:'If the details match a verified recovery email, a code will be sent there. It expires in 10 minutes.',
+  resetComplete:'Password reset. Previous sessions have been signed out. Sign in with your new password.',
+  bindRecoveryEmail:'Bind / verify recovery email',bindEmailHint:'Verify an email you can receive for password recovery. Contact the store to replace a different email already bound.',
+  bindingCodeSent:'Code sent. It expires in 10 minutes.',verifyEmail:'Verify and save email',emailBound:'Recovery email verified and saved.',
+  login: 'Customer sign in', phone: 'Phone number', password: 'Password', loginHint: 'Use your registered phone and chosen password. Visit the store to verify your identity and collect a code for first activation.',
+  activate:'Activate account',activationCode:'In-person activation code',activateSave:'Activate and save password',activationHint:'Visit the store for identity verification and collect a code from authorized staff in person. Codes expire in 10 minutes. Choose your own password and do not disclose it to staff.',activationComplete:'Account activated and password saved. Sign in with your phone and new password.',
+  issueActivation:'Verify and issue activation code',issueActivationHint:'Only for customers without a chosen password or verified email. Verify the customer in person; a phone number given over a call is insufficient. Existing passwords cannot be overwritten.',identityConfirmed:'I verified the customer in person and will hand over the code in person',activationDeliver:'Hand this to the customer in person. The code is shown only now and cannot be retrieved after closing. Do not photograph, forward, or save it in customer notes.',activationExpires:'Valid until',reissueActivation:'Reissue (invalidate old code)',closeActivation:'Close and clear code',
   changePassword: 'Change password', currentPassword: 'Current password', newPassword: 'New password', confirmPassword: 'Confirm new password',
   passwordHint: 'Use at least 8 characters. Sign in with your new password after changing it.', save: 'Save password', changed: 'Password changed. Other sessions have been signed out.',
   mismatch: 'The new passwords do not match.', busy: 'Processing…', cancel: 'Cancel',
@@ -20,5 +39,6 @@ export const customerAuthEn = {
   errors: { invalid_credentials: 'Incorrect phone or password. Check the details registered with the store.', rate_limited: 'Too many attempts. Try again in 15 minutes.',
     account_disabled: 'This customer profile or account is disabled. Contact the store.', unauthenticated: 'Your session expired. Please sign in again.',
     request_invalid: 'Check the phone and passwords. A new password needs at least 8 characters and must differ from the initial and current passwords.',
+    forbidden:'Permission denied or store scope mismatch. Contact the tenant administrator.',code_mismatch:'The code is invalid, expired, used, or locked. Request a new code.',email_channel_not_configured:'Email delivery is not configured. Contact the store.',email_delivery_failed:'Unable to send the code. Retry later or contact the store.',
     network_failure: 'Unable to connect. Please try again.', request_failed: 'Unable to complete the request. Please try again.' }
 }

@@ -17,7 +17,7 @@ watch(()=>props.store,clear);onUnmounted(()=>generation++)
 <template><WalletAccountMenu :store="store" :caption="storeName" :title="t('wallet.customerWallet')" :busy="changingPassword||loggingOut" @opened="load" @closed="clear">
  <p v-if="loading" role="status">{{t('wallet.loading')}}</p><p v-if="identityError" class="wallet-error" role="alert">{{identityError}} <button type="button" @click="load">{{t('wallet.accountUi.retry')}}</button></p>
  <WalletAccountIdentity v-if="identity" :name="identity.displayName" :phone="identity.phoneE164" :email="identity.email" />
- <CustomerPasswordChange :key="store" :disabled="loggingOut||loading||!identity" @busy-change="changingPassword=$event"><template #actions><button type="button" class="wallet-account-logout" :disabled="loggingOut" @click="emit('logout')">{{t(loggingOut?'wallet.operation.loggingOut':'wallet.operation.logout')}}</button></template></CustomerPasswordChange>
+ <CustomerPasswordChange :key="store" :store="store" :disabled="loggingOut||loading||!identity" @busy-change="changingPassword=$event"><template #actions><button type="button" class="wallet-account-logout" :disabled="loggingOut" @click="emit('logout')">{{t(loggingOut?'wallet.operation.loggingOut':'wallet.operation.logout')}}</button></template></CustomerPasswordChange>
  <p v-if="error" class="wallet-error" role="alert">{{error}}</p>
 </WalletAccountMenu></template>
 <style scoped>.wallet-shell .wallet-account-logout{color:#b42318}</style>

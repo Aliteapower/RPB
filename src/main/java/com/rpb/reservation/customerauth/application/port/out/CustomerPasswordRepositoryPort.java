@@ -10,4 +10,6 @@ public interface CustomerPasswordRepositoryPort {
     Optional<String> passwordHash(TenantScope scope, UUID customerId);
     void savePassword(TenantScope scope, UUID customerId, String hash);
     void revokeSessions(TenantScope scope, UUID customerId);
+    default boolean passwordChangeRequired(TenantScope scope, UUID customerId) { return false; }
+    default void completePasswordChange(TenantScope scope, UUID customerId) { throw new UnsupportedOperationException("password_change_state_not_implemented"); }
 }

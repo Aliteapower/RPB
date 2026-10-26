@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import CustomerProfileFields from '../modules/customers/CustomerProfileFields.vue'
 import CustomerRegistrationEntry from '../modules/customers/CustomerRegistrationEntry.vue'
 import CustomerPrivacyRecords from '../modules/customers/CustomerPrivacyRecords.vue'
+import CustomerActivationIssue from '../modules/customers/CustomerActivationIssue.vue'
+import type {TenantAdminCustomer} from '../api/tenantAdminApi'
 import ErpPagination from '../components/erp/ErpPagination.vue'
 import ErpQueryToolbar from '../components/erp/ErpQueryToolbar.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
@@ -14,7 +16,10 @@ import { useCustomerManagement } from '../modules/customers/useCustomerManagemen
 const {gt}=useGeneratedText(),{t}=useI18n(),route=useRoute()
 const storeId=computed(()=>String(route.params.storeId||''))
 const walletReturnTarget=computed(()=>customerManagementReturnTarget(storeId.value,route.query.from))
-const {privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords,canSubmit,customers,loading,saving,archivingId,errorText,successText,keyword,safePage,editorOpen,editingCustomer,form,actionDisabled,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord}=useCustomerManagement(storeId,{keyword:typeof route.query.keyword==='string'?route.query.keyword:'',create:route.query.create==='1'})
+const {privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords,canSubmit,canManage,customers,loading,saving,archivingId,errorText,successText,keyword,safePage,editorOpen,editingCustomer,form,actionDisabled,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord}=useCustomerManagement(storeId,{keyword:typeof route.query.keyword==='string'?route.query.keyword:'',create:route.query.create==='1'})
+const activationCustomer=ref<TenantAdminCustomer|null>(null)
+watch(storeId,()=>activationCustomer.value=null)
+watch([editorOpen,privacyCustomer,canManage],()=>{if(editorOpen.value||privacyCustomer.value||!canManage.value)activationCustomer.value=null})
 function displayValue(value:string|null){return value?.trim()?value:'-'}
 function statusLabel(status:string){return status==='active'?gt('generated.tenant-admin-customers.019'):status}
 </script>
@@ -94,7 +99,7 @@ function statusLabel(status:string){return status==='active'?gt('generated.tenan
                     </span>
                   </td>
                   <td>
-                    <div class="row-actions"><button type="button" class="link-button" :disabled="actionDisabled" @click="openPrivacyRecords(item)">{{gt('generated.tenant-admin-customers.040')}}</button>
+                    <div class="row-actions"><button type="button" class="link-button" :disabled="actionDisabled || !item.phoneE164" @click="activationCustomer=item">{{t('customerAuth.issueActivation')}}</button><button type="button" class="link-button" :disabled="actionDisabled" @click="openPrivacyRecords(item)">{{gt('generated.tenant-admin-customers.040')}}</button>
                       <button type="button" class="link-button" :disabled="actionDisabled" @click="openEditEditor(item)">
                         {{ gt('generated.tenant-admin-customers.017') }}
                       </button>
@@ -122,7 +127,7 @@ function statusLabel(status:string){return status==='active'?gt('generated.tenan
           />
         </div>
 
-        <CustomerPrivacyRecords v-if="privacyCustomer" :customer="privacyCustomer" :records="privacyRecords" :loading="privacyLoading" @close="privacyCustomer=null" /><aside v-if="editorOpen" class="editor-panel" :aria-label="gt('generated.tenant-admin-customers.020')">
+        <CustomerActivationIssue v-if="activationCustomer && canManage" :key="activationCustomer.id" :store="storeId" :customer="activationCustomer" @close="activationCustomer=null" /><CustomerPrivacyRecords v-if="privacyCustomer" :customer="privacyCustomer" :records="privacyRecords" :loading="privacyLoading" @close="privacyCustomer=null" /><aside v-if="editorOpen" class="editor-panel" :aria-label="gt('generated.tenant-admin-customers.020')">
           <form class="customer-form" @submit.prevent="submitCustomer">
             <header class="editor-heading">
               <span>{{ editingCustomer ? gt('generated.tenant-admin-customers.022') : gt('generated.tenant-admin-customers.021') }}</span>

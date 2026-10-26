@@ -642,7 +642,7 @@ test('no phone match offers shared customer creation without creating accounts o
  assert.equal(scope.workspace.customer.value,null);assert.ok(!calls.some(c=>c.method==='POST'||c.url.endsWith('/accounts')));scope.unmount()
 })
 
-const privacyNoticeFixture={version:'customer-profile-v1',textZh:'顾客请求的服务及交易记录用途',textEn:'Requested services',labelZh:'已向顾客说明并取得同意（商户登记）',labelEn:'Merchant attestation'}
+const privacyNoticeFixture={version:'customer-profile-v2',textZh:'顾客请求的服务及交易记录用途',textEn:'Requested services',labelZh:'已向顾客说明并取得同意（商户登记）',labelEn:'Merchant attestation'}
 async function managedCustomers(query={},post){
  const calls=[],profile={id:'shared-customer',customerCode:'C-SHARED',displayName:'统一顾客',nickname:'先生',phoneE164:'+6581112470',email:null,status:'active'}
  globalThis.fetch=async(url,options={})=>{const body=options.body&&JSON.parse(options.body);calls.push({url,body,method:options.method});if(options.method==='POST'||options.method==='PATCH')return post?post(url,body):response({success:true,customer:profile});return response(url.endsWith('/customer-privacy-notice')?privacyNoticeFixture:url.endsWith('/privacy-consents')?{records:[]}:url.includes('/tenant-admin/customers?')?{success:true,customers:[profile],page:{limit:20,offset:0,total:1}}:staffContext)}
@@ -656,7 +656,7 @@ test('wallet customer cards use central APIs, have no tenant sidebar, and defaul
  const check=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];assert.ok(check);assert.equal(check.checked,true)
  const form=nodes(scope.root,n=>n.tag==='form')[0];check.checked=false;check.listeners.change({target:check});await tick();assert.equal(nodes(form,n=>n.tag==='button'&&allText(n).trim()==='保存')[0].props.disabled,true);await form.props.onSubmit(submitEvent());await tick();assert.ok(!scope.calls.some(c=>c.method==='POST'))
  check.checked=true;check.listeners.change({target:check});await tick();await form.props.onSubmit(submitEvent());await tick()
- const created=scope.calls.find(c=>c.method==='POST');assert.match(created.url,/\/tenant-admin\/customers$/);assert.deepEqual(created.body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v1',entrySource:'wallet'});assert.equal(created.body.phoneE164,'+6581112470');assert.ok(!scope.calls.some(c=>c.url.endsWith('/accounts')));scope.unmount()
+ const created=scope.calls.find(c=>c.method==='POST');assert.match(created.url,/\/tenant-admin\/customers$/);assert.deepEqual(created.body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v2',entrySource:'wallet'});assert.equal(created.body.phoneE164,'+6581112470');assert.ok(!scope.calls.some(c=>c.url.endsWith('/accounts')));scope.unmount()
 })
 
 test('profile editing does not manufacture a new privacy confirmation; records open separately',async()=>{
@@ -679,7 +679,7 @@ test('customer self-registration confirms PDPA, blocks duplicate clicks, and nev
  const scope=mount(SelfRegistrationView,'customer',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A'});await tick()
  assert.doesNotMatch(allText(scope.root),/商户代为登记/);const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0];input.value='81112473';input.props.onInput({target:input});await tick()
  const checkbox=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];checkbox.checked=false;checkbox.listeners.change({target:checkbox});await tick();const form=nodes(scope.root,n=>n.tag==='form')[0];assert.equal(nodes(form,n=>n.tag==='button'&&allText(n).trim()==='注册顾客')[0].props.disabled,true);await form.props.onSubmit(submitEvent());assert.ok(!calls.some(c=>c.body))
- checkbox.checked=true;checkbox.listeners.change({target:checkbox});await tick();const pending=form.props.onSubmit(submitEvent());await form.props.onSubmit(submitEvent());await tick();assert.equal(calls.filter(c=>c.url.endsWith('/register')).length,1);const body=calls.find(c=>c.url.endsWith('/register')).body;assert.deepEqual(body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v1'});assert.equal(body.password,undefined);assert.equal(body.storeId,'A');assert.equal(body.phoneE164,'+6581112473')
+ checkbox.checked=true;checkbox.listeners.change({target:checkbox});await tick();const pending=form.props.onSubmit(submitEvent());await form.props.onSubmit(submitEvent());await tick();assert.equal(calls.filter(c=>c.url.endsWith('/register')).length,1);const body=calls.find(c=>c.url.endsWith('/register')).body;assert.deepEqual(body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v2'});assert.equal(body.password,undefined);assert.equal(body.storeId,'A');assert.equal(body.phoneE164,'+6581112473')
  finish(response({success:true,customerId:'self-created'}));await pending;await tick();assert.match(allText(scope.root),/注册成功/);assert.match(allText(scope.root),/手机号后 6 位/);assert.ok(!calls.some(c=>c.url.includes('/accounts')||c.url.endsWith('/topups')));scope.unmount()
 })
 
