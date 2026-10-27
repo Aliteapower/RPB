@@ -11,3 +11,5 @@
 浏览器：Chrome连接无法附加后使用应用内浏览器，基于真实组件的本地静态接口夹具检查桌面和319px中英文页面。中文列表、英文列表及新增编辑器均无横向溢出；319px时内容clientWidth与scrollWidth均305，操作按钮约44px；新增时寄存酒默认选中，外层返回仍禁用。未连接生产、未写入真实商品/顾客数据；不等同手机真机验收。
 
 证据target/storage-ui-compact-20261027/：frontend.log、build.log、browser-check.json、desktop.png及mobile.png。原12项无关工作区内容SHA256保持不变。代码及UI复查未发现阻断项。
+
+后续授权发布：2026-10-27与新增酒品一起以211630e5上线前端，268个制品文件逐一一致，后端及业务配置指纹未变。完整记录见docs/development/STORAGE_NEW_WINE_UI_RELEASE_20261027.md。

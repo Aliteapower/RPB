@@ -14,4 +14,12 @@ GO。75项前端回归、vue-tsc/Vite及diff检查已通过；桌面及319px中�
 
 ## 发布结果
 
-完成后补充功能SHA及上线证据。证据目录target/storage-new-wine-ui-release-20261027/。
+功能提交211630e54e0d59eb66d0731b52fd0ac1a0e64290已推送并部署前端。后端保持8ca25c8bb67d01009d9b4cae0dc908356b732d26，没有重新打包或重启。不可变前端目录/opt/rpb/releases/20261027-storage-new-wine-ui-211630e5，完整备份/opt/rpb/backups/20261027-storage-new-wine-ui-211630e5-before。备份逐项与原目录一致，本轮没有数据库迁移或数据库备份/恢复操作。
+
+干净Git archive核对2,862个blob；npm ci、75项前端回归及vue-tsc/Vite构建通过。12项无关内容SHA256与发布前一致，未带入提交和制品。前端归档SHA256为aa1fabc170cf982513e53e45e17d1e5f9eed44e3b56d25966b84609b95836603，index为59c129a2bd0364f7943eb210761f1e3b9c74b5d4f794017d55e151e4b671275e。
+
+四个生产域名共64个页面入口返回新index，33项公开资源逐字节一致，72项匿名拒绝及4项匿名空目录验证通过；38项QA认证只读检查通过，含商品分页/搜索/跨店和身份拒绝、寄存清单及3种Excel导出，临时会话已撤销。新增商品保存、默认寄存酒渠道、重复提交抑制、已有商品渠道不覆盖由75项干净源码回归覆盖，未执行生产商品新增。
+
+268个前端文件与发布制品一致，7,351个旧资源保持字节一致。152项业务及配置指纹在切换前、发布后及最终复核一致；排除QA租户、会话、审计、限流等易变数据，不代表整库字节相同。后端、Nginx、PostgreSQL、Redis、Docker服务身份和环境文件均未变；Flyway仍084|84|0。后端active，PID2255987、InvocationID083d8880fda3494386ed5c36c8260dd0、NRestarts0，观察及最终复核无新增ERROR。
+
+GO，发布完成，未触发回退。后续记录提交不改变线上前端功能SHA。本地证据target/storage-new-wine-ui-release-20261027/，服务器证据/home/ubuntu/storage-new-wine-ui-release-20261027/。真实手机及微信实机未验收。
