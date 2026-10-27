@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomerAccessLinks from '../../modules/customers/CustomerAccessLinks.vue'
 import ProductHistoryLinks from '../../modules/tenant-products/ProductHistoryLinks.vue'
 import {useCatalogText} from '../../modules/catalog/text'
 import { computed, ref } from 'vue'
@@ -115,6 +116,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
             {{ t(item.labelKey) }}
           </RouterLink>
         </section>
+        <CustomerAccessLinks :store="storeId" source="admin" :disabled="loggingOut"/>
         <ProductHistoryLinks :entries="historyApps" />
       </nav>
     </div>

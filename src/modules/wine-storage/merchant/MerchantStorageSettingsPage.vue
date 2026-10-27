@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomerAccessLinks from '../../customers/CustomerAccessLinks.vue'
 import {computed,ref,watch} from 'vue'
 import CatalogPage from '../../catalog/CatalogPage.vue'
 import type {Home} from '../types'
@@ -21,5 +22,5 @@ watch(canCatalog,value=>{if(!value)managingProducts.value=false})
 <MerchantStorageModeSettings v-if="home.newBusinessEnabled&&can('rules.manage')&&auth.user?.roles.includes('tenant_admin')" :home="home" :api="api" :disabled="disabled" @command="emit('command',$event)"/>
 <MerchantStorageLocations v-if="home.newBusinessEnabled&&can('rules.manage')&&auth.user?.roles.includes('tenant_admin')" :api="api" :disabled="disabled" @error="emit('error',$event)" @busy-change="emit('busy-change',$event)"/>
 <MerchantStorageCustodians v-if="home.newBusinessEnabled&&can('custodians.manage')" :api="api" :disabled="disabled" @error="emit('error',$event)" @busy-change="emit('busy-change',$event)"/>
-<MerchantStorageSettings :home="home" :api="api" :disabled="disabled" :can-manage="home.newBusinessEnabled&&can('rules.manage')" @command="emit('command',$event)"/>
-</div></template></section></template>
+<MerchantStorageSettings class="storage-rule-settings" :home="home" :api="api" :disabled="disabled" :can-manage="home.newBusinessEnabled&&can('rules.manage')" @command="emit('command',$event)"/>
+<CustomerAccessLinks :store="store" source="storage" :disabled="disabled"/></div></template></section></template>

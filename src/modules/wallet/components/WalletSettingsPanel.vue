@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomerAccessLinks from '../../customers/CustomerAccessLinks.vue'
 import {channelType,channelLabel,topupChannelName} from '../collectionMethods'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -26,6 +27,7 @@ const channels = computed(() => props.context.program
       <WalletIcon name="settings" /><div><h3>{{ t('wallet.settingsUi.profile') }}</h3><p>{{ t('wallet.settingsUi.profileHint') }}</p><span>{{ t('wallet.issuer') }}：{{ context.store.operatingEntityName || '-' }}</span></div><WalletIcon name="arrow" :size="18" />
     </RouterLink>
   </nav>
+  <CustomerAccessLinks :store="store" source="wallet-settings"/>
   <p v-if="!allowed" class="wallet-empty">{{ t('wallet.noRights') }}</p>
 </template>
 <style scoped>

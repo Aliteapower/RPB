@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {customerAccessReturnTarget} from '../modules/customers/accessNavigation'
+import {useCustomerAccessText} from '../modules/customers/accessText'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -13,6 +15,7 @@ import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import { useGeneratedText } from '../i18n/generatedText'
 import { customerManagementReturnTarget } from '../modules/wallet/customerManagementNavigation'
 import { useCustomerManagement } from '../modules/customers/useCustomerManagement'
+const {t:accessText}=useCustomerAccessText()
 const {gt}=useGeneratedText(),{t}=useI18n(),route=useRoute()
 const storeId=computed(()=>String(route.params.storeId||''))
 const walletReturnTarget=computed(()=>customerManagementReturnTarget(storeId.value,route.query.from))
@@ -34,9 +37,11 @@ function statusLabel(status:string){return status==='active'?gt('generated.tenan
           <span>{{ gt('generated.tenant-admin-customers.001') }}</span>
           <h1>{{ gt('generated.tenant-admin-customers.002') }}</h1>
         </div>
-        <RouterLink v-if="walletReturnTarget" :to="walletReturnTarget">{{t(route.query.from==='wallet-recharge'?'wallet.operation.backRecharge':'wallet.operation.backWallet')}}</RouterLink>
+<RouterLink v-if="route.query.accessSource" :to="customerAccessReturnTarget(storeId,route.query.accessSource)">{{accessText('back')}}</RouterLink>
+        <RouterLink v-else-if="walletReturnTarget" :to="walletReturnTarget">{{t(route.query.from==='wallet-recharge'?'wallet.operation.backRecharge':'wallet.operation.backWallet')}}</RouterLink>
       </header>
 
+<p v-if="route.query.action==='activation'" class="shared-customer-note">{{accessText('activationHint')}}</p>
       <CustomerRegistrationEntry :store="storeId" /><p class="shared-customer-note">{{ t('customerAuth.sharedHint') }}</p>
 
       <ErpQueryToolbar
