@@ -12,4 +12,16 @@
 
 ## 结果
 
-完成后补充功能SHA、备份、映射数量、历史证明及服务状态。证据target/storage-legacy-codes-release-20261027/。
+功能提交b7d2d360c142e48c0e32e3b754a9da350d1b6bda已推送并部署后端；前端仍为da729ee927b7a4cdbdf7e2ffda9b59f1af232c60，index及版本标记逐字节未变。不可变制品/opt/rpb/releases/20261027-storage-legacy-codes-b7d2d360，备份/opt/rpb/backups/20261027-storage-legacy-codes-b7d2d360-before；切换边界数据库备份19,974,431字节，目录校验通过。Flyway最终085|85|0。
+
+干净Git archive核对2,873个blob，Maven package成功。JAR与上一版比较唯一变化为新增V085 SQL资源，所有运行类、依赖及历史迁移字节不变；JAR SHA256为d6b0456b1105f182b800d9c9a771f4549bf5f3d7c84a3b00602ff45472569b71。34项本地后端检查通过，无前端源码变化因此复用当前版本已有78项回归，不重新发布前端。原12项无关工作区文件SHA256保持不变。
+
+完整线上备份在本次成功创建的rpb_legacy_code_rehearsal_b7d2d360中恢复，应用V085并核对数据后清理该数据库。首轮演练因postgres用户无权读取ubuntu保护目录中的SQL文件而中断，正式服务及数据未切换；改为调用方重定向SQL输入，校验旧JAR/版本/index/环境相同后复用原备份重新演练，未删除或覆盖备份。第二轮恢复和迁移证明全部通过，随后执行正式切换边界新备份与发布。
+
+正式迁移及最终复核：2个商品转换并记录2条新旧编号映射。全量商品ID集合不变，非目标商品逐字段相同；目标仅code/version/updated_at变化，映射的旧编号、旧版本及原更新时间与切换前一致。关联3条历史寄存记录、23张全租户存酒及目录历史表完整行指纹不变，包括snapshot、数量、日期、取酒及再次寄存关系、渠道、条码、旧命令响应和审计。另151项真实业务及配置指纹切换前后和最终复核一致，口径排除QA租户、会话、限流及审计等易变数据；不能解释为整库不变，catalog_products及新映射表由前述逐字段证明单独覆盖。
+
+38项QA认证只读检查通过，包含商品查询、权限拒绝、当前寄存和3种Excel导出；临时会话finally撤销。四域名64个页面入口、33项公开资源、72项匿名拒绝及4项匿名空目录检查通过。没有新建真实商品或执行顾客存取酒。
+
+后端最终active，PID2282248、InvocationID139b71f87eda4f509d8e8d5483ca1f9a、NRestarts0，就绪401符合认证契约，观察及最终复核无新增ERROR。环境文件及邻接Nginx/PostgreSQL/Redis/Docker服务身份保持不变。GO，发布完成，未发生正式应用回退或数据库恢复；保留备份及映射供后续审计。后续发布记录提交不改变线上功能SHA。
+
+本地证据target/storage-legacy-codes-release-20261027/，服务器证据/home/ubuntu/storage-legacy-codes-release-20261027/。完整商品基线和数据库备份仅在服务器保护目录，未下载业务数据；本地仅保留汇总验证结果。未做手机/微信真机验收。
