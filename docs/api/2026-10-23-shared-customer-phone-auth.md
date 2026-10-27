@@ -10,7 +10,7 @@
 ## API
 POST /api/v1/public/customer-auth/password-login：{storeId, phoneE164, password}，门店决定租户。响应沿用既有登录响应及 HttpOnly cookie。未知号码／错误密码统一 401 invalid_credentials。
 
-POST /api/v1/public/customer-auth/password-change：{currentPassword, newPassword}，要求有效顾客会话及旧密码。新密码至少八字符、UTF-8 最多 72 字节，不等于旧密码或手机号后六位。成功撤销该顾客全部旧会话，签发新会话并替换 cookie。不能修改手机号／顾客 ID，不自动重试。
+POST /api/v1/public/customer-auth/password-change：{currentPassword, newPassword}，要求有效顾客会话及旧密码。新密码至少六字符（支持六位纯数字）、UTF-8 最多 72 字节，不等于旧密码；不从手机号推导或初始化密码。成功撤销该顾客全部旧会话，签发新会话并替换 cookie。不能修改手机号／顾客 ID，不自动重试。
 
 按租户内手机号每十五分钟十次、IP 每十五分钟五十次持久化限流，含失败；同顾客登录／初始化／改密在事务中串行。密码不返回、不记录。登录不创建顾客，只为共享档案创建或复用认证账号。
 

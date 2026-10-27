@@ -14,3 +14,8 @@ test('staff product surfaces expose one shared access component and the email ro
  for(const file of ['src/modules/wine-storage/merchant/MerchantStorageSettingsPage.vue','src/modules/wallet/pages/WalletStaffMore.vue','src/modules/wallet/components/WalletSettingsPanel.vue','src/modules/cards/CardsStaffPage.vue','src/pages/StoreStaffHomePage.vue','src/components/tenant-admin/TenantAdminNav.vue'])assert.match(readFileSync(file,'utf8'),/<CustomerAccessLinks/)
  assert.match(readFileSync('src/router/index.ts','utf8'),/path:'\/stores\/:storeId\/admin\/customer-email'.*requiresTenantAdmin:true/)
 })
+
+test('activation entries use the compact workspace without the full customer editor',()=>{
+ for(const source of ['wallet','wallet-settings','cards','storage','booking','admin','staff'])assert.match(customerAccessTarget('A',source,'activation'),/^\/stores\/A\/admin\/customer-activation\?accessSource=/)
+ assert.match(readFileSync('src/router/index.ts','utf8'),/path:'\/stores\/:storeId\/admin\/customer-activation'.*requiresTenantAdmin:true/)
+})

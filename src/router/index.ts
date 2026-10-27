@@ -56,6 +56,7 @@ const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationS
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {path:'/stores/:storeId/admin/customer-activation',name:'customer-activation',component:()=>import('../pages/TenantAdminCustomerActivationPage.vue'),meta:{requiresTenantAdmin:true}},
     {path:'/stores/:storeId/admin/customer-email',name:'customer-email-settings',component:()=>import('../pages/TenantAdminCustomerEmailPage.vue'),meta:{requiresTenantAdmin:true}},
     {path:'/stores/:storeId/scan',name:'staff-scan',component:()=>import('../modules/staff-scan/StaffScanPage.vue')},
     { path: '/stores/:storeId/wine-storage',name:'wine-storage',component:()=>import('../modules/wine-storage/WineStorageStaffPage.vue')},
@@ -247,6 +248,7 @@ export const router = createRouter({
     {
       path: '/stores/:storeId/admin/customers',
       name: 'tenant-admin-customers',
+      beforeEnter: to => to.query.action==='activation' ? {path:`/stores/${encodeURIComponent(String(to.params.storeId))}/admin/customer-activation`,query:{accessSource:to.query.accessSource}} : true,
       component: TenantAdminCustomersPage,
       meta: { requiresTenantAdmin: true }
     },

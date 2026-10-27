@@ -43,6 +43,7 @@ class CustomerPasswordAuthServiceTest {
     }
     @Test void previouslyPersistedInitialPasswordMustNotCreateAnOrdinarySession() {
         when(passwords.passwordHash(scope,id)).thenReturn(Optional.of(encoder.encode("234567")));
+        when(passwords.passwordChangeRequired(scope,id)).thenReturn(true);
         assertThatThrownBy(()->service.login(tenant,"+6591234567","234567","127.0.0.1","test"))
             .isInstanceOf(CustomerAuthServiceException.class).extracting("error").isEqualTo(CustomerAuthError.INVALID_CREDENTIALS);
         verifyNoInteractions(sessions);

@@ -21,10 +21,11 @@ async function save(){
  <h2>{{t('customerAuth.activate')}}</h2><p>{{t('customerAuth.activationHint')}}</p>
  <template v-if="complete"><p role="status">{{t('customerAuth.activationComplete')}}</p><button type="button" @click="emit('done')">{{t('customerAuth.login')}}</button></template>
  <form v-else @submit.prevent="save">
+  <p class="password-hint">{{t('customerAuth.passwordHint')}}</p>
   <CountryPhoneField v-model="phone" model-format="e164" :label="t('customerAuth.phone')" :disabled="busy" required />
-  <label>{{t('customerAuth.activationCode')}}<input v-model="code" autocomplete="off" autocapitalize="characters" maxlength="24" :disabled="busy" required></label>
-  <label>{{t('customerAuth.newPassword')}}<input v-model="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy" required></label>
-  <label>{{t('customerAuth.confirmPassword')}}<input v-model="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy" required></label>
+  <label>{{t('customerAuth.activationCode')}}<input v-model="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" :disabled="busy" required></label>
+  <label>{{t('customerAuth.newPassword')}}<input v-model="password" type="password" autocomplete="new-password" minlength="6" maxlength="72" :disabled="busy" required></label>
+  <label>{{t('customerAuth.confirmPassword')}}<input v-model="confirm" type="password" autocomplete="new-password" minlength="6" maxlength="72" :disabled="busy" required></label>
   <p v-if="error" role="alert" class="error">{{error}}</p>
   <button :disabled="busy">{{t(busy?'customerAuth.busy':'customerAuth.activateSave')}}</button>
   <button type="button" :disabled="busy" @click="emit('done')">{{t('customerAuth.cancel')}}</button>

@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CustomerActivationService {
-    private static final String ALPHABET="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private final CustomerActivationPort codes;
     private final CustomerRepositoryPort customers;
     private final CustomerPasswordRepositoryPort passwords;
@@ -46,11 +45,11 @@ public class CustomerActivationService {
             .orElseThrow(()->error(CustomerAuthError.REQUEST_INVALID));
         if(!eligible(scope,customer))throw error(CustomerAuthError.REQUEST_INVALID);
         UUID id=UUID.randomUUID();StringBuilder value=new StringBuilder();
-        for(int i=0;i<12;i++)value.append(ALPHABET.charAt(random.nextInt(ALPHABET.length())));
+        for(int i=0;i<6;i++)value.append(random.nextInt(10));
         String raw=value.toString();Instant expires=Instant.now().plusSeconds(600);
         codes.issue(scope,customerId,actor.actorId(),id,hash(id,raw),expires);
         codes.audit(scope,customerId,actor.actorId(),"customer.activation.issued");
-        return new Issued(true,raw.substring(0,4)+"-"+raw.substring(4,8)+"-"+raw.substring(8),expires);
+        return new Issued(true,raw,expires);
     }
 
     @Transactional(noRollbackFor=CustomerAuthServiceException.class)
@@ -59,7 +58,7 @@ public class CustomerActivationService {
         E164Phone number;
         try{if(phone==null||phone.isBlank())throw new IllegalArgumentException();number=new E164Phone(phone.trim());}
         catch(IllegalArgumentException e){throw error(CustomerAuthError.REQUEST_INVALID);}
-        if(newPassword==null||newPassword.isBlank()||newPassword.length()<8||newPassword.getBytes(StandardCharsets.UTF_8).length>72)throw error(CustomerAuthError.REQUEST_INVALID);
+        if(newPassword==null||newPassword.isBlank()||newPassword.length()<6||newPassword.getBytes(StandardCharsets.UTF_8).length>72)throw error(CustomerAuthError.REQUEST_INVALID);
         throttle.check(scope.tenantScope(),"activation-confirm:"+number.value(),ip);
         var found=customers.findByPhone(scope.tenantScope(),number).orElseThrow(()->error(CustomerAuthError.CODE_MISMATCH));
         passwords.lockCustomer(scope.tenantScope(),found.id().value());
@@ -69,7 +68,7 @@ public class CustomerActivationService {
         var challenge=codes.latest(scope,customer.id().value()).orElseThrow(()->error(CustomerAuthError.CODE_MISMATCH));
         if(challenge.attempts()>=5||!challenge.expiresAt().isAfter(Instant.now()))throw error(CustomerAuthError.CODE_MISMATCH);
         String raw=code==null||code.length()>32?"":code.replaceAll("[\\s-]","").toUpperCase(Locale.ROOT);
-        if(!raw.matches("[A-HJ-NP-Z2-9]{12}")||!MessageDigest.isEqual(challenge.codeHash().getBytes(StandardCharsets.US_ASCII),hash(challenge.id(),raw).getBytes(StandardCharsets.US_ASCII))){
+        if(!raw.matches("[0-9]{6}")||!MessageDigest.isEqual(challenge.codeHash().getBytes(StandardCharsets.US_ASCII),hash(challenge.id(),raw).getBytes(StandardCharsets.US_ASCII))){
             codes.fail(scope,challenge.id());throw error(CustomerAuthError.CODE_MISMATCH);
         }
         var account=accounts.findAccountByCustomerId(scope.tenantId().value(),customer.id().value());

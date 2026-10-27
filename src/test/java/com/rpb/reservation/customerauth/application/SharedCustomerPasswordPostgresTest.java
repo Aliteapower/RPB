@@ -181,9 +181,10 @@ class SharedCustomerPasswordPostgresTest {
         var old=login("+6591234567","my-new-password",200);
         securityEmail.requestReset(storeScope(),"+6591234567","verified@example.com","request-ip");String code=capturedCode();
         assertThat(jdbc.queryForObject("select code_hash from customer_security_email_codes where tenant_id=? and purpose='reset_password'",String.class,tenant)).hasSize(64).isNotEqualTo(code);
-        securityEmail.reset(storeScope(),"+6591234567","verified@example.com",code,"recovered-password","confirm-ip");
+        assertThatThrownBy(()->securityEmail.reset(storeScope(),"+6591234567","verified@example.com",code,"12345","confirm-ip")).isInstanceOf(CustomerAuthServiceException.class);
+        securityEmail.reset(storeScope(),"+6591234567","verified@example.com",code,"098765","confirm-ip");
         assertThat(sessions.authenticateSession(cookie(old).getValue())).isEmpty();
-        login("+6591234567","my-new-password",401);login("+6591234567","recovered-password",200);login("+6591234567","234567",401);
+        login("+6591234567","my-new-password",401);login("+6591234567","098765",200);login("+6591234567","234567",401);
         assertThatThrownBy(()->securityEmail.reset(storeScope(),"+6591234567","verified@example.com",code,"another-password","replay-ip"))
             .isInstanceOf(CustomerAuthServiceException.class).extracting("error").isEqualTo(CustomerAuthError.CODE_MISMATCH);
         assertThat(jdbc.queryForObject("select password_change_required from customer_password_credentials where tenant_id=? and customer_id=?",Boolean.class,tenant,customer)).isFalse();
@@ -312,7 +313,7 @@ class SharedCustomerPasswordPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from customer_activation_codes where tenant_id=?",Integer.class,tenant)).isZero();
         var response=mvc.perform(post(issueUrl()).header("X-RPB-Customer-Auth","1").contentType("application/json").content("{\"identityConfirmed\":true}"))
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control","private, no-store")).andExpect(header().string("Referrer-Policy","no-referrer")).andReturn();
-        String code=json.readTree(response.getResponse().getContentAsString()).path("code").asText();assertThat(code).matches("[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){2}");
+        String code=json.readTree(response.getResponse().getContentAsString()).path("code").asText();assertThat(code).matches("[0-9]{6}");
         assertThat(jdbc.queryForObject("select code_hash from customer_activation_codes where tenant_id=?",String.class,tenant)).hasSize(64).doesNotContain(code.replace("-",""));
         assertThat(jdbc.queryForObject("select issued_by from customer_activation_codes where tenant_id=?",UUID.class,tenant)).isEqualTo(staffId);
         mvc.perform(get(issueUrl()).header("X-RPB-Customer-Auth","1")).andExpect(status().isMethodNotAllowed());
@@ -324,6 +325,30 @@ class SharedCustomerPasswordPostgresTest {
         assertThatThrownBy(()->activation.activate(storeScope(),"+6591234567",code,"overwritten-password","ip")).isInstanceOf(CustomerAuthServiceException.class);
         assertThatThrownBy(()->activation.issue(storeScope(),staff,customer,true,"ip")).isInstanceOf(CustomerAuthServiceException.class);
     }
+    @Test void sixDigitPasswordSupportsActivationLoginAndChangeButRejectsFiveDigits() throws Exception {
+        var issued=activation.issue(storeScope(),staff,customer,true,"six-issue");
+        assertThat(issued.code()).matches("[0-9]{6}");
+        assertThatThrownBy(()->activation.activate(storeScope(),"+6591234567",issued.code(),"12345","six-confirm"))
+            .isInstanceOf(CustomerAuthServiceException.class);
+        activation.activate(storeScope(),"+6591234567",issued.code(),"012345","six-confirm");
+        login("+6591234567","012345",200);
+        var principal=passwords.login(tenant,"+6591234567","012345","six-login","test").principal();
+        passwords.change(principal,"012345","654321","six-change","test");
+        login("+6591234567","654321",200);login("+6591234567","012345",401);
+    }
+
+    @Test void legacyActivationCodeIsRejectedEvenWhenUnexpired() {
+        activation.issue(storeScope(),staff,customer,true,"legacy-issue");
+        UUID id=jdbc.queryForObject("select id from customer_activation_codes where tenant_id=?",UUID.class,tenant);
+        String legacy="C7QK8LAN2ZLL";
+        try {
+            String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest((id+"|"+legacy).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            jdbc.update("update customer_activation_codes set code_hash=? where id=?",hash,id);
+        } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        assertThatThrownBy(()->activation.activate(storeScope(),"+6591234567","C7QK-8LAN-2ZLL","012345","legacy-confirm"))
+            .isInstanceOf(CustomerAuthServiceException.class);
+    }
+
     @Test void activationIssueRequiresStaffScopePermissionAndSameOriginHeader() throws Exception {
         mvc.perform(post(issueUrl()).contentType("application/json").content("{\"identityConfirmed\":true}")).andExpect(status().isForbidden());
         mvc.perform(post(issueUrl()).header("X-RPB-Customer-Auth","1").header("Sec-Fetch-Site","same-site").contentType("application/json").content("{\"identityConfirmed\":true}")).andExpect(status().isForbidden());

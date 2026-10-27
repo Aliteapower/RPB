@@ -30,8 +30,8 @@ async function run(reset:boolean){
    <p v-if="sent" role="status">{{t('customerAuth.resetCodeSent')}}</p>
    <template v-if="sent">
     <label>{{t('customerAuth.emailCode')}}<input v-model="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" :disabled="busy" required></label>
-    <label>{{t('customerAuth.newPassword')}}<input v-model="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy" required></label>
-    <label>{{t('customerAuth.confirmPassword')}}<input v-model="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy" required></label>
+    <label>{{t('customerAuth.newPassword')}}<input v-model="password" type="password" autocomplete="new-password" minlength="6" maxlength="72" :disabled="busy" required></label>
+    <label>{{t('customerAuth.confirmPassword')}}<input v-model="confirm" type="password" autocomplete="new-password" minlength="6" maxlength="72" :disabled="busy" required></label>
    </template>
    <p v-if="error" role="alert" class="error">{{error}}</p>
    <button :disabled="busy">{{t(busy?'customerAuth.busy':sent?'customerAuth.save':'customerAuth.sendCode')}}</button>

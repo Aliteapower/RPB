@@ -26,8 +26,8 @@ async function save() {
       <strong>{{ t('customerAuth.changePassword') }}</strong><p>{{ t('customerAuth.passwordHint') }}</p>
       <p v-if="required" role="status">{{ t('customerAuth.firstChangeRequired') }}</p>
       <label>{{ t('customerAuth.currentPassword') }}<input v-model="current" type="password" autocomplete="current-password" maxlength="72" :disabled="busy || disabled" required></label>
-      <label>{{ t('customerAuth.newPassword') }}<input v-model="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy || disabled" required></label>
-      <label>{{ t('customerAuth.confirmPassword') }}<input v-model="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="72" :disabled="busy || disabled" required></label>
+      <label>{{ t('customerAuth.newPassword') }}<input v-model="password" type="password" autocomplete="new-password" minlength="6" maxlength="72" :disabled="busy || disabled" required></label>
+      <label>{{ t('customerAuth.confirmPassword') }}<input v-model="confirm" type="password" autocomplete="new-password" minlength="6" maxlength="72" :disabled="busy || disabled" required></label>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
       <button :disabled="busy || disabled">{{ t(busy?'customerAuth.busy':'customerAuth.save') }}</button>
       <button v-if="!required" type="button" :disabled="busy || disabled" @click="close">{{ t('customerAuth.cancel') }}</button>

@@ -72,7 +72,7 @@ public class CustomerSecurityEmailService {
     @Transactional(noRollbackFor=CustomerAuthServiceException.class)
     public void reset(StoreScope scope,String phone,String email,String code,String newPassword,String ip) {
         String number=phone(phone),address=email(email);
-        if(newPassword==null||newPassword.isBlank()||newPassword.length()<8||newPassword.getBytes(StandardCharsets.UTF_8).length>72)
+        if(newPassword==null||newPassword.isBlank()||newPassword.length()<6||newPassword.getBytes(StandardCharsets.UTF_8).length>72)
             throw error(CustomerAuthError.REQUEST_INVALID);
         throttle.check(scope.tenantScope(),"reset-confirm:"+number,ip);
         UUID customer=records.customerByPhone(scope,number).orElseThrow(()->error(CustomerAuthError.CODE_MISMATCH));

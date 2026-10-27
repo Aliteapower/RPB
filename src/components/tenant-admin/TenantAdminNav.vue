@@ -116,7 +116,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
             {{ t(item.labelKey) }}
           </RouterLink>
         </section>
-        <CustomerAccessLinks :store="storeId" source="admin" :disabled="loggingOut"/>
+        <CustomerAccessLinks compact :store="storeId" source="admin" :disabled="loggingOut"/>
         <ProductHistoryLinks :entries="historyApps" />
       </nav>
     </div>

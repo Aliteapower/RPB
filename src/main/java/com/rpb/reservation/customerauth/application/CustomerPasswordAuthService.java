@@ -46,7 +46,7 @@ public class CustomerPasswordAuthService {
         customer = customers.findById(scope,customer.id()).filter(c -> "active".equals(c.status()) && phone.equals(c.phone()))
             .orElseThrow(CustomerPasswordAuthService::invalidCredentials);
         String hash = passwords.passwordHash(scope,customer.id().value()).orElse(null);
-        if (!matches(password,hash) || !validPasswordLength(password,8) || passwords.passwordChangeRequired(scope,customer.id().value())) throw invalidCredentials();
+        if (!matches(password,hash) || !validPasswordLength(password,6) || passwords.passwordChangeRequired(scope,customer.id().value())) throw invalidCredentials();
         var account = account(customer);
         return sessions.loginAccount(account,remoteAddr,userAgent);
     }
@@ -55,7 +55,7 @@ public class CustomerPasswordAuthService {
     public CustomerAuthLoginResult change(CustomerAuthPrincipal principal, String currentPassword, String newPassword,
         String remoteAddr, String userAgent) {
         if (principal == null || principal.passwordChangeRequired()) throw new CustomerAuthServiceException(CustomerAuthError.UNAUTHENTICATED);
-        if (!validPasswordLength(newPassword,8) || newPassword.equals(currentPassword))
+        if (!validPasswordLength(newPassword,6) || newPassword.equals(currentPassword))
             throw new CustomerAuthServiceException(CustomerAuthError.REQUEST_INVALID);
         var scope = new TenantScope(new TenantId(principal.tenantId()));
         passwords.recordAttempt(scope,"change:"+principal.customerId(),remoteAddr);
@@ -63,7 +63,7 @@ public class CustomerPasswordAuthService {
         var customer = customers.findById(scope,new CustomerId(principal.customerId()))
             .filter(c -> "active".equals(c.status())).orElseThrow(() -> new CustomerAuthServiceException(CustomerAuthError.ACCOUNT_DISABLED));
         String hash = passwords.passwordHash(scope,principal.customerId()).orElse(null);
-        if (!validPasswordLength(currentPassword,8) || !matches(currentPassword,hash) || passwords.passwordChangeRequired(scope,principal.customerId())) throw invalidCredentials();
+        if (!validPasswordLength(currentPassword,6) || !matches(currentPassword,hash) || passwords.passwordChangeRequired(scope,principal.customerId())) throw invalidCredentials();
         var account = account(customer);
         passwords.savePassword(scope,principal.customerId(),encoder.encode(newPassword));
         passwords.completePasswordChange(scope,principal.customerId());

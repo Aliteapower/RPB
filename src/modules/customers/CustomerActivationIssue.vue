@@ -18,13 +18,15 @@ async function issue(){
 }
 </script>
 <template><section class="activation-issue" :aria-label="t('customerAuth.issueActivation')">
- <h3>{{t('customerAuth.issueActivation')}}</h3><p>{{customer.displayName||customer.id}} · {{customer.phoneE164||'—'}}</p><p>{{t('customerAuth.issueActivationHint')}}</p>
+ <h3>{{t('customerAuth.issueActivation')}}</h3><p class="customer-identity">{{customer.displayName||customer.id}} · {{customer.phoneE164||'—'}}</p><details><summary>{{t('customerAuth.activationRules')}}</summary><p>{{t('customerAuth.issueActivationHint')}}</p></details>
  <form @submit.prevent="issue">
-  <label><input v-model="confirmed" type="checkbox" :disabled="busy || !!code"> {{t('customerAuth.identityConfirmed')}}</label>
+  <label class="identity-confirmation"><input v-model="confirmed" type="checkbox" :disabled="busy || !!code"> {{t('customerAuth.identityConfirmed')}}</label>
   <p v-if="error" role="alert" class="error">{{error}}</p>
   <template v-if="code"><p role="status">{{t('customerAuth.activationDeliver')}}</p><output class="activation-secret">{{code}}</output><p>{{t('customerAuth.activationExpires')}} {{new Date(expires).toLocaleTimeString()}}</p></template>
-  <button :disabled="busy || !confirmed || !customer.phoneE164">{{t(busy?'customerAuth.busy':code?'customerAuth.reissueActivation':'customerAuth.issueActivation')}}</button>
-  <button type="button" @click="emit('close')">{{t('customerAuth.closeActivation')}}</button>
+  <div class="activation-actions"><button :disabled="busy || !confirmed || !customer.phoneE164">{{t(busy?'customerAuth.busy':code?'customerAuth.reissueActivation':'customerAuth.issueActivation')}}</button>
+  <button type="button" @click="emit('close')">{{t('customerAuth.closeActivation')}}</button></div>
  </form>
 </section></template>
-<style scoped>.activation-issue{padding:18px;border:1px solid #cbd5e1;background:#fff;color:#102033;border-radius:12px;overflow-wrap:anywhere}form{display:grid;gap:12px}.activation-secret{font-family:monospace;font-size:22px;letter-spacing:2px;padding:12px;background:#f1f5f9}button{font:inherit;min-height:42px;padding:8px 12px}.error{color:#991b1b}p{font-size:14px;line-height:1.6}</style>
+<style scoped>
+.activation-issue{padding:16px;border:1px solid #d5e4e5;background:#fff;color:#163140;border-radius:12px;overflow-wrap:anywhere}h3{font-size:17px;margin:0 0 8px}.customer-identity{font-weight:600;margin:0 0 12px}form{display:grid;gap:12px;margin-top:12px}.identity-confirmation{display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.6}.identity-confirmation input{margin:4px 0 0;flex-shrink:0;width:17px;height:17px;accent-color:#17695f}.activation-secret{display:block;text-align:center;font-family:monospace;font-size:36px;font-weight:700;letter-spacing:8px;padding:14px 8px;background:#edf6f3;border:1px solid #d3e9df;border-radius:8px;color:#125e50}.activation-actions{display:flex;gap:8px;flex-wrap:wrap}.activation-actions button{flex:1;font:inherit;min-height:40px;padding:8px 12px;border:1px solid #cadcde;border-radius:8px;background:#f4f8f8;color:#176459;cursor:pointer}.activation-actions button:first-child{background:#176459;color:white;border-color:#176459}button:disabled{opacity:.45;cursor:default}.error{color:#991b1b}p{font-size:13px;line-height:1.6;margin:0}details{font-size:13px;color:#607580}summary{cursor:pointer}details p{margin-top:8px}@media(max-width:480px){.activation-issue{padding:14px}.activation-actions button{flex-basis:100%}}
+</style>

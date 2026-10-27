@@ -5,7 +5,7 @@ import {useAuthSessionStore} from '../../stores/authSession'
 import {useGeneratedText} from '../../i18n/generatedText'
 import {customerPhonePrefill} from './navigation'
 
-export function useCustomerManagement(storeId:Ref<string>,initial:{keyword?:string;create?:boolean;surface?:'wallet'|'tenant_admin';createOnly?:boolean;onCreated?:(customer:TenantAdminCustomer)=>void}={}){
+export function useCustomerManagement(storeId:Ref<string>,initial:{keyword?:string;create?:boolean;surface?:'wallet'|'tenant_admin';createOnly?:boolean;directoryOnly?:boolean;onCreated?:(customer:TenantAdminCustomer)=>void}={}){
  const auth=useAuthSessionStore(),{gt}=useGeneratedText(),{t}=useI18n()
  const customers=ref<TenantAdminCustomer[]>([]),loading=ref(false),saving=ref(false),archivingId=ref(''),errorText=ref(''),successText=ref('')
  const keyword=ref(initial.keyword??''),limit=ref(20),offset=ref(0),page=ref<TenantAdminPage>({limit:20,offset:0,total:0})
@@ -68,7 +68,7 @@ export function useCustomerManagement(storeId:Ref<string>,initial:{keyword?:stri
   if(error.response.error.code==='CUSTOMER_HAS_RETAINED_ASSETS')return gt('generated.tenant-admin-customers.039')
   return gt('generated.tenant-admin-customers.'+(key[error.response.error.code]??'029'))
  }
- watch([storeId,canManage],()=>{generation++;request++;customers.value=[];page.value={limit:limit.value,offset:0,total:0};offset.value=0;loading.value=false;saving.value=false;archivingId.value='';editorOpen.value=false;editingCustomer.value=null;privacyCustomer.value=null;privacyRecords.value=[];privacyLoading.value=false;privacyNotice.value=null;noticeLoading.value=false;resetForm();errorText.value='';successText.value='';if(canManage.value){void loadCustomers(0);void loadPrivacyNotice();if(initial.create){openCreateEditor();form.phoneE164=customerPhonePrefill(initial.keyword??'')}}},{immediate:true})
+ watch([storeId,canManage],()=>{generation++;request++;customers.value=[];page.value={limit:limit.value,offset:0,total:0};offset.value=0;loading.value=false;saving.value=false;archivingId.value='';editorOpen.value=false;editingCustomer.value=null;privacyCustomer.value=null;privacyRecords.value=[];privacyLoading.value=false;privacyNotice.value=null;noticeLoading.value=false;resetForm();errorText.value='';successText.value='';if(canManage.value){void loadCustomers(0);if(!initial.directoryOnly)void loadPrivacyNotice();if(initial.create){openCreateEditor();form.phoneE164=customerPhonePrefill(initial.keyword??'')}}},{immediate:true})
  onMounted(()=>{if(initial.createOnly)return;window.addEventListener('focus',refreshVisibleCustomers);document.addEventListener('visibilitychange',refreshVisibleCustomers)})
  onUnmounted(()=>{generation++;request++;if(initial.createOnly)return;window.removeEventListener('focus',refreshVisibleCustomers);document.removeEventListener('visibilitychange',refreshVisibleCustomers)})
  return {customers,loading,saving,archivingId,errorText,successText,keyword,limit,offset,page,safePage,editorOpen,editingCustomer,form,canManage,actionDisabled,canSubmit,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord,privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords}
