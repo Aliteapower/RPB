@@ -10,7 +10,7 @@ GET /api/v1/stores/{storeId}/wine-storage/inventory?query=&status=all&page=0&siz
 
 响应包含 items（酒名、顾客、剩余/原瓶数、开瓶、寄存及到期时间、状态、位置/仓位、标签、酒妹），summary（customerCount/bottleCount/openedBottleCount/expiredBottleCount/itemCount），page/size/hasMore。空结果统计为 0。分页及汇总在同一只读快照内完成，按寄存时间和 ID 倒序稳定排序。无迁移、写命令或新增权限。
 
-测试清单：部分领取/取完排除、过期边界、开瓶统计、人数去重、跨租户/门店、姓名关联范围、搜索及分页汇总、无权限/错误参数、空数据、前端入口不依赖选客、字段/双语、重试、翻页、切店及过期响应保护。保留原 12 项无关改动。本轮不包含生产发布。
+测试清单：部分领取/取完排除、过期边界、开瓶统计、人数去重、跨租户/门店、姓名关联范围、搜索及分页汇总、无权限/错误参数、空数据、前端入口不依赖选客、字段/双语、重试、翻页、切店及过期响应保护。保留原 12 项无关改动。本轮实现完成后，用户已明确授权提交部署；发布证据见下。
 
 ## 实现与审查
 
@@ -26,7 +26,7 @@ GET /api/v1/stores/{storeId}/wine-storage/inventory?query=&status=all&page=0&siz
 - 真实 PostgreSQL 覆盖剩余数量、已取完/处置排除、过期边界、开瓶、人数去重、分页稳定顺序与全结果汇总、字面搜索和租户/门店隔离。应用/API 覆盖 view 权限、跨店/跨租户/平台管理员拒绝、历史不依赖新业务授权、非法参数和未登录；安全链验证其他方法/猜测路径/顾客路径拒绝。
 - 62 项前端回归、npm run build 和 git diff --check 通过。前端覆盖无需选客进入、字段/统计/翻页、搜索编码与重置页码、空/错误/重试、切店旧响应和权限丢失清空。
 - Chrome 组件夹具预览核对中英文文本、冻结业务名称和店铺时区日期；实际 390 像素宽度为两列摘要及详情，无横向溢出；桌面为四列摘要及三列详情。预览使用夹具响应，不作为后端连接或手机实机验收。浏览器截图接口出现超时/拼接，截图不作为验收证据；DOM/几何记录在 target/storage-inventory-preview/english-mobile-layout.json。
-- 原 12 项钱包及其他无关文件 SHA256 不变。未提交、推送或部署。
+- 原 12 项钱包及其他无关文件 SHA256 不变。功能 53b7c094 已提交、推送并部署。
 
 日志为 target/storage-inventory-{red,backend,security,frontend,frontend-red,build}.log，验证摘要 target/storage-inventory-20261027/verification.json。
 
@@ -34,4 +34,10 @@ GET /api/v1/stores/{storeId}/wine-storage/inventory?query=&status=all&page=0&siz
 
 测试先因缺失查询类编译失败，页面新增测试 3 项失败，随后实现后通过。构建发现模板汇总键类型错误，已改为显式 typed tuples。安全链测试初次缺少 MVC 公共 App Gate 依赖，按既有 WalletLocalRuntimeSecurityTest 的配置补齐测试依赖后通过，未更改业务授权以绕过失败。
 
-API Review / TDD Review / UI Review / Code Review：通过，无未解决 P0/P1。无业务数据回填，顾客姓名来自当前档案，位置及酒妹来自收存快照；“剩余瓶数”不是原申请瓶数。回退本次应用与前端即可，不需要回退数据库。生产验收留待明确发布授权。
+API Review / TDD Review / UI Review / Code Review：通过，无未解决 P0/P1。无业务数据回填，顾客姓名来自当前档案，位置及酒妹来自收存快照；“剩余瓶数”不是原申请瓶数。回退本次应用与前端即可，不需要回退数据库。生产只读验收已在用户明确授权后完成。
+
+## Production Readiness / GO
+
+已检查测试、隔离、只读 API、本地安全路由、兼容性、配置和回退。无新增权限、迁移、写审计或业务状态变化；页内统计与数据使用同一只读快照。由干净提交构建并比对发布包后，仅切换 rpb-backend 与前端；备份和失败自动回退已准备。
+
+线上 28 项登录态检查与清单字段/统计/搜索/分页/拒绝检查通过；60 页面、33 资源、64 匿名拒绝通过。152 组业务指纹及模式设置不变，数据库 V084、环境及邻接服务不变，后端进程稳定且无 ERROR。完整版本、备份与证据见 docs/release-notes/2026-10-27-storage-inventory.md。手机实机界面未另行验收。
