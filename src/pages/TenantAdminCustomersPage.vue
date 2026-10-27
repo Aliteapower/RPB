@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomerActivationAction from '../modules/customers/CustomerActivationAction.vue'
 import {customerAccessReturnTarget} from '../modules/customers/accessNavigation'
 import {useCustomerAccessText} from '../modules/customers/accessText'
 import { computed, ref, watch } from 'vue'
@@ -19,7 +20,7 @@ const {t:accessText}=useCustomerAccessText()
 const {gt}=useGeneratedText(),{t}=useI18n(),route=useRoute()
 const storeId=computed(()=>String(route.params.storeId||''))
 const walletReturnTarget=computed(()=>customerManagementReturnTarget(storeId.value,route.query.from))
-const {privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords,canSubmit,canManage,customers,loading,saving,archivingId,errorText,successText,keyword,safePage,editorOpen,editingCustomer,form,actionDisabled,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord}=useCustomerManagement(storeId,{keyword:typeof route.query.keyword==='string'?route.query.keyword:'',create:route.query.create==='1'})
+const {activationIssued,privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords,canSubmit,canManage,customers,loading,saving,archivingId,errorText,successText,keyword,safePage,editorOpen,editingCustomer,form,actionDisabled,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord}=useCustomerManagement(storeId,{keyword:typeof route.query.keyword==='string'?route.query.keyword:'',create:route.query.create==='1'})
 const activationCustomer=ref<TenantAdminCustomer|null>(null)
 watch(storeId,()=>activationCustomer.value=null)
 watch([editorOpen,privacyCustomer,canManage],()=>{if(editorOpen.value||privacyCustomer.value||!canManage.value)activationCustomer.value=null})
@@ -104,7 +105,7 @@ function statusLabel(status:string){return status==='active'?gt('generated.tenan
                     </span>
                   </td>
                   <td>
-                    <div class="row-actions"><button type="button" class="link-button" :disabled="actionDisabled || !item.phoneE164" @click="activationCustomer=item">{{t('customerAuth.issueActivation')}}</button><button type="button" class="link-button" :disabled="actionDisabled" @click="openPrivacyRecords(item)">{{gt('generated.tenant-admin-customers.040')}}</button>
+                    <div class="row-actions"><CustomerActivationAction :customer="item" :disabled="actionDisabled" @select="activationCustomer=item" /><button type="button" class="link-button" :disabled="actionDisabled" @click="openPrivacyRecords(item)">{{gt('generated.tenant-admin-customers.040')}}</button>
                       <button type="button" class="link-button" :disabled="actionDisabled" @click="openEditEditor(item)">
                         {{ gt('generated.tenant-admin-customers.017') }}
                       </button>
@@ -132,7 +133,7 @@ function statusLabel(status:string){return status==='active'?gt('generated.tenan
           />
         </div>
 
-        <CustomerActivationIssue v-if="activationCustomer && canManage" :key="activationCustomer.id" :store="storeId" :customer="activationCustomer" @close="activationCustomer=null" /><CustomerPrivacyRecords v-if="privacyCustomer" :customer="privacyCustomer" :records="privacyRecords" :loading="privacyLoading" @close="privacyCustomer=null" /><aside v-if="editorOpen" class="editor-panel" :aria-label="gt('generated.tenant-admin-customers.020')">
+        <CustomerActivationIssue v-if="activationCustomer && canManage" :key="activationCustomer.id" :store="storeId" :customer="activationCustomer" @close="activationCustomer=null" @issued="activationIssued" /><CustomerPrivacyRecords v-if="privacyCustomer" :customer="privacyCustomer" :records="privacyRecords" :loading="privacyLoading" @close="privacyCustomer=null" /><aside v-if="editorOpen" class="editor-panel" :aria-label="gt('generated.tenant-admin-customers.020')">
           <form class="customer-form" @submit.prevent="submitCustomer">
             <header class="editor-heading">
               <span>{{ editingCustomer ? gt('generated.tenant-admin-customers.022') : gt('generated.tenant-admin-customers.021') }}</span>

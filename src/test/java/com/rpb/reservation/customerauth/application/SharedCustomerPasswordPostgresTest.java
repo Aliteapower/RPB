@@ -48,6 +48,7 @@ class SharedCustomerPasswordPostgresTest {
     @Autowired WalletAccountRepository walletAccounts;
     @Autowired CustomerSecurityEmailService securityEmail;
     @Autowired CustomerActivationService activation;
+    @Autowired CustomerActivationStatusQuery activationStatuses;
     @org.springframework.boot.test.mock.mockito.MockBean com.rpb.reservation.walkin.api.CurrentActorProvider staffActors;
     UUID staffId;
     com.rpb.reservation.walkin.api.CurrentActor staff;
@@ -347,6 +348,34 @@ class SharedCustomerPasswordPostgresTest {
         } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
         assertThatThrownBy(()->activation.activate(storeScope(),"+6591234567","C7QK-8LAN-2ZLL","012345","legacy-confirm"))
             .isInstanceOf(CustomerAuthServiceException.class);
+    }
+
+    @Test void directoryActivationStateTracksFirstVerificationAndCompletedPassword() throws Exception {
+        String url="/api/v1/stores/"+store+"/tenant-admin/customers";
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.customers[0].activationState").value("required"));
+        var issued=activation.issue(storeScope(),staff,customer,true,"state-issue");
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.customers[0].activationState").value("verified_pending"));
+        jdbc.update("update customer_activation_codes set created_at=now()-interval '20 minutes',expires_at=now()-interval '10 minutes' where tenant_id=?",tenant);
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.customers[0].activationState").value("verified_pending"));
+        var next=activation.issue(storeScope(),staff,customer,true,"state-reissue");
+        activation.activate(storeScope(),"+6591234567",next.code(),"012345","state-confirm");
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.customers[0].activationState").value("activated"));
+        mvc.perform(get(url+"/"+customer)).andExpect(status().isOk()).andExpect(jsonPath("$.customer.activationState").value("activated"));
+    }
+
+    @Test void activationStatesAreTenantScopedAndVerifiedEmailCannotIssue() throws Exception {
+        assertThat(activationStatuses.states(storeScope(),List.of(customer)).get(customer)).isEqualTo(CustomerActivationState.required);
+        var otherScope=new StoreScope(new TenantId(UUID.randomUUID()),UUID.randomUUID());
+        assertThat(activationStatuses.states(otherScope,List.of(customer))).isEmpty();
+        assertThat(activationStatuses.states(storeScope(),List.of(UUID.randomUUID()))).isEmpty();
+        assertThat(activationStatuses.states(storeScope(),List.of())).isEmpty();
+        mvc.perform(get("/api/v1/stores/"+UUID.randomUUID()+"/tenant-admin/customers")).andExpect(status().isForbidden());
+        var principal=readyCustomer();bind(principal);
+        jdbc.update("update customer_password_credentials set password_change_required=true where tenant_id=? and customer_id=?",tenant,customer);
+        assertThat(activationStatuses.states(storeScope(),List.of(customer)).get(customer)).isEqualTo(CustomerActivationState.email_verified);
+        assertThatThrownBy(()->activation.issue(storeScope(),staff,customer,true,"email-state")).isInstanceOf(CustomerAuthServiceException.class);
+        jdbc.update("update customer_auth_accounts set status='disabled' where tenant_id=? and customer_id=?",tenant,customer);
+        assertThat(activationStatuses.states(storeScope(),List.of(customer)).get(customer)).isEqualTo(CustomerActivationState.unavailable);
     }
 
     @Test void activationIssueRequiresStaffScopePermissionAndSameOriginHeader() throws Exception {

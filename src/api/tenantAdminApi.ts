@@ -32,7 +32,9 @@ export interface TenantAdminStaffMutation {
   defaultStoreId?: string | null
 }
 
+export type CustomerActivationState = 'required'|'verified_pending'|'activated'|'email_verified'|'unavailable'|'unknown'
 export interface TenantAdminCustomer {
+  activationState?: CustomerActivationState
   id: string
   customerCode: string
   displayName: string | null

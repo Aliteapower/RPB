@@ -59,6 +59,7 @@ public class TenantAdminController {
     private final CustomerManagementApplicationService customerManagementService;
     private final com.rpb.reservation.customer.application.CustomerRegistrationService registrationService;
     private final TenantAdminScopeResolver scopeResolver;
+    private final com.rpb.reservation.customerauth.application.CustomerActivationStatusQuery activationStatuses;
 
     public TenantAdminController(
         TenantAdminStaffService staffService,
@@ -68,7 +69,8 @@ public class TenantAdminController {
         ReservationMealPeriodManagementService mealPeriodService,
         CustomerManagementApplicationService customerManagementService,
         com.rpb.reservation.customer.application.CustomerRegistrationService registrationService,
-        TenantAdminScopeResolver scopeResolver
+        TenantAdminScopeResolver scopeResolver,
+        com.rpb.reservation.customerauth.application.CustomerActivationStatusQuery activationStatuses
     ) {
         this.staffService = staffService;
         this.tableService = tableService;
@@ -78,6 +80,7 @@ public class TenantAdminController {
         this.customerManagementService = customerManagementService;
         this.registrationService = registrationService;
         this.scopeResolver = scopeResolver;
+        this.activationStatuses = activationStatuses;
     }
 
     @GetMapping("/profile")
@@ -191,14 +194,9 @@ public class TenantAdminController {
         @RequestParam(value = "offset", required = false) String offset
     ) {
         StoreScope scope = requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminCustomerListResponse.from(
-            customerManagementService.list(
-                scope.tenantScope(),
-                keyword,
-                optionalInteger(limit),
-                optionalInteger(offset)
-            )
-        ));
+        var result=customerManagementService.list(scope.tenantScope(),keyword,optionalInteger(limit),optionalInteger(offset));
+        var states=activationStatuses.states(scope,result.customers().stream().map(c->c.id()).toList());
+        return ResponseEntity.ok(TenantAdminCustomerListResponse.from(result,states));
     }
 
     @PostMapping("/customers")
@@ -229,9 +227,9 @@ public class TenantAdminController {
         @PathVariable UUID customerId
     ) {
         StoreScope scope = requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminCustomerResponse.from(
-            customerManagementService.get(scope.tenantScope(), customerId)
-        ));
+        var customer=customerManagementService.get(scope.tenantScope(),customerId);
+        var state=activationStatuses.states(scope,java.util.List.of(customerId)).getOrDefault(customerId,com.rpb.reservation.customerauth.application.CustomerActivationState.unknown);
+        return ResponseEntity.ok(new TenantAdminCustomerResponse(true,TenantAdminCustomerItemResponse.from(customer,state.name())));
     }
 
     @PatchMapping("/customers/{customerId}")

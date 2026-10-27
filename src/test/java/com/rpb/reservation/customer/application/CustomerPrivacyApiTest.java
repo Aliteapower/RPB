@@ -24,7 +24,7 @@ class CustomerPrivacyApiTest {
  @BeforeEach void prepare(){
   principal.set(new CurrentActor(tenant,actor,"tenant_admin",Set.of("tenant_admin"),Set.of("tenant.admin.manage"),Set.of(store)));
   var registration=new CustomerRegistrationService(customers,records);
-  var controller=new TenantAdminController(mock(TenantAdminStaffService.class),mock(TenantAdminTableService.class),mock(TenantAdminSettingsService.class),mock(TenantAdminProfileService.class),mock(ReservationMealPeriodManagementService.class),customers,registration,new TenantAdminScopeResolver(()->Optional.ofNullable(principal.get())));
+  var controller=new TenantAdminController(mock(TenantAdminStaffService.class),mock(TenantAdminTableService.class),mock(TenantAdminSettingsService.class),mock(TenantAdminProfileService.class),mock(ReservationMealPeriodManagementService.class),customers,registration,new TenantAdminScopeResolver(()->Optional.ofNullable(principal.get())),mock(com.rpb.reservation.customerauth.application.CustomerActivationStatusQuery.class));
   mvc=MockMvcBuilders.standaloneSetup(controller).build();
   when(customers.create(any(),any())).thenReturn(new CustomerManagementItem(customer,"C",null,null,"+6581112471",null,"active",null,null));
  }

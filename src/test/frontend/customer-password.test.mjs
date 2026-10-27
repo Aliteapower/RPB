@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { parse, compileScript } from '@vue/compiler-sfc'
 import { createRenderer, h, nextTick, reactive } from 'vue'
 import { createI18n } from 'vue-i18n'
-let Login, Change, Reset, Binding, Activation, Issue, api, messages
+let ActivationAction,Login, Change, Reset, Binding, Activation, Issue, api, messages
 const originalFetch=globalThis.fetch, originalDocument=globalThis.document, originalDocumentClass=globalThis.Document, originalShadowRoot=globalThis.ShadowRoot
 const tick=async()=>{for(let i=0;i<8;i++){await Promise.resolve();await nextTick()}}
 const renderer=createRenderer({
@@ -26,9 +26,9 @@ const signedOutFetch=handler=>(url,options)=>String(url).includes('/customer-aut
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null})
  const {build}=await import('esbuild'),{mkdir,writeFile,readFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
- const result=await build({stdin:{contents:`export {default as Login} from './src/components/customer-auth/CustomerPasswordLogin.vue';export {default as Change} from './src/components/customer-auth/CustomerPasswordChange.vue';export {default as Reset} from './src/components/customer-auth/CustomerPasswordReset.vue';export {default as Binding} from './src/components/customer-auth/CustomerRecoveryEmail.vue';export {default as Activation} from './src/components/customer-auth/CustomerActivation.vue';export {default as Issue} from './src/modules/customers/CustomerActivationIssue.vue';export * as api from './src/api/customerAuthApi.ts';export * as messages from './src/components/customer-auth/locales.ts'`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',packages:'external',plugins:[{name:'vue-test',setup(b){b.onLoad({filter:/\.vue$/},async({path})=>{const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:'test-'+path,inlineTemplate:true}).content,loader:'ts'}})}}]})
+ const result=await build({stdin:{contents:`export {default as ActivationAction} from './src/modules/customers/CustomerActivationAction.vue';export {default as Login} from './src/components/customer-auth/CustomerPasswordLogin.vue';export {default as Change} from './src/components/customer-auth/CustomerPasswordChange.vue';export {default as Reset} from './src/components/customer-auth/CustomerPasswordReset.vue';export {default as Binding} from './src/components/customer-auth/CustomerRecoveryEmail.vue';export {default as Activation} from './src/components/customer-auth/CustomerActivation.vue';export {default as Issue} from './src/modules/customers/CustomerActivationIssue.vue';export * as api from './src/api/customerAuthApi.ts';export * as messages from './src/components/customer-auth/locales.ts'`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',packages:'external',plugins:[{name:'vue-test',setup(b){b.onLoad({filter:/\.vue$/},async({path})=>{const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:'test-'+path,inlineTemplate:true}).content,loader:'ts'}})}}]})
  const dir=process.cwd()+'/target/customer-password-tests';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents)
- ;({Login,Change,Reset,Binding,Activation,Issue,api,messages}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
+ ;({ActivationAction,Login,Change,Reset,Binding,Activation,Issue,api,messages}=await import(pathToFileURL(dir+'/entry.mjs').href+'?'+Date.now()))
 })
 after(()=>{globalThis.fetch=originalFetch;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 test('shared login sends normalized phone and password, blocks double submit, clears password on success',async()=>{
@@ -159,4 +159,36 @@ test('staff code is displayed only after success and removed when the selected c
  assert.equal(nodes(view.root,n=>n.tag==='output')[0].text,'012345')
  view.props.customer={id:'customer-2',displayName:'Other',phoneE164:'+6591234568'};await tick()
  assert.equal(nodes(view.root,n=>n.tag==='output').length,0);view.unmount()
+})
+
+
+test('verified customers cannot repeat first verification and only pending customers can reissue',async()=>{
+ for(const state of ['required','verified_pending','activated','email_verified','unavailable',undefined]){
+  const selected=[],view=mount(ActivationAction,{customer:{id:'c',phoneE164:'+6591234567',status:'active',activationState:state},onSelect:()=>selected.push(true)})
+  const buttons=nodes(view.root,n=>n.tag==='button');assert.equal(buttons[0].props.disabled,state!=='required')
+  assert.equal(buttons.length,state==='verified_pending'?2:1)
+  if(state==='verified_pending'){buttons[1].props.onClick();await tick();assert.equal(selected.length,1)}
+  view.unmount()
+ }
+})
+
+test('reissuing after first verification does not ask for identity attestation again',async()=>{
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push(JSON.parse(options.body));return response(200,{success:true,code:'001234',expiresAt:new Date(Date.now()+600000).toISOString()})}
+ const view=mount(Issue,{store:'A',customer:{id:'pending',displayName:'Test',phoneE164:'+6591234567',activationState:'verified_pending'}})
+ assert.equal(nodes(view.root,n=>n.tag==='input'&&n.props.type==='checkbox').length,0)
+ nodes(view.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()
+ assert.deepEqual(calls,[{identityConfirmed:true}]);assert.equal(nodes(view.root,n=>n.tag==='output')[0].text,'001234');view.unmount()
+})
+
+
+test('verified pending customer can reissue after the displayed code expires',async()=>{
+ const originalTimer=globalThis.setTimeout;let expire;globalThis.setTimeout=(fn,delay)=>{if(delay>1000){expire=fn;return {}}return originalTimer(fn,delay)}
+ let count=0;globalThis.fetch=async()=>{count++;return response(200,{success:true,code:'001234',expiresAt:new Date(Date.now()+600000).toISOString()})}
+ const view=mount(Issue,{store:'A',customer:{id:'pending-expiry',displayName:'Test',phoneE164:'+6591234567',activationState:'verified_pending'}})
+ try{
+  const submit=()=>nodes(view.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}})
+  submit();await tick();expire();await tick();assert.equal(nodes(view.root,n=>n.tag==='output').length,0)
+  assert.equal(nodes(view.root,n=>n.tag==='input'&&n.props.type==='checkbox').length,0)
+  submit();await tick();assert.equal(count,2);assert.equal(nodes(view.root,n=>n.tag==='output')[0].text,'001234')
+ }finally{view.unmount();globalThis.setTimeout=originalTimer}
 })

@@ -8,10 +8,10 @@ public record TenantAdminCustomerListResponse(
     List<TenantAdminCustomerItemResponse> customers,
     TenantAdminPageResponse page
 ) {
-    public static TenantAdminCustomerListResponse from(CustomerManagementListResult result) {
+    public static TenantAdminCustomerListResponse from(CustomerManagementListResult result, java.util.Map<java.util.UUID, com.rpb.reservation.customerauth.application.CustomerActivationState> states) {
         return new TenantAdminCustomerListResponse(
             true,
-            result.customers().stream().map(TenantAdminCustomerItemResponse::from).toList(),
+            result.customers().stream().map(c -> TenantAdminCustomerItemResponse.from(c,states.getOrDefault(c.id(),com.rpb.reservation.customerauth.application.CustomerActivationState.unknown).name())).toList(),
             new TenantAdminPageResponse(result.limit(), result.offset(), result.total())
         );
     }

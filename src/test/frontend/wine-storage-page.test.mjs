@@ -701,7 +701,7 @@ test('storage activity shows operator names and a translated missing-name fallba
 
 test('compact activation workspace searches the shared directory and isolates selected customer by store',async()=>{
  const actor={accountId:'admin',roles:['tenant_admin'],permissions:['tenant.admin.manage'],storeIds:['A','B']}
- const person={id:'activation-customer',displayName:'测试顾客',customerCode:'C100',phoneE164:'+6591234567',status:'active'}
+ const person={id:'activation-customer',activationState:'required',displayName:'测试顾客',customerCode:'C100',phoneE164:'+6591234567',status:'active'}
  const s=mount(ActivationWorkspace,false,'zh-CN',home,url=>({customers:[person],page:{limit:20,offset:0,total:1}}),{actor,query:{accessSource:'storage'}});await tick()
  assert.match(text(s.root),/到店激活码/);assert.match(text(s.root),/测试顾客/);assert.equal(nodes(s.root,n=>n.tag==='table').length,0)
  assert.equal(nodes(s.root,n=>n.tag==='a')[0].props.href,'/stores/A/wine-storage?task=settings')
@@ -719,4 +719,21 @@ test('compact activation workspace shows loading error retry empty and English s
  const actor={accountId:'admin',roles:['tenant_admin'],permissions:['tenant.admin.manage'],storeIds:['A']};let fail=true
  const s=mount(ActivationWorkspace,false,'en-SG',home,()=>{if(fail)throw new Error('offline');return{customers:[],page:{limit:20,offset:0,total:0}}},{actor});await tick()
  assert.equal(nodes(s.root,n=>n.props?.role==='alert').length,1);fail=false;button(s.root,'Reload').props.onClick();await tick();assert.match(text(s.root),/No customers found/);assert.match(text(s.root),/6 digits/);s.unmount()
+})
+
+
+test('successful first issuance immediately marks verified even when refreshing the directory fails',async()=>{
+ const actor={accountId:'admin',roles:['tenant_admin'],permissions:['tenant.admin.manage'],storeIds:['A']};let issued=false
+ const person={id:'activation-flow',activationState:'required',displayName:'Test',customerCode:'C',phoneE164:'+6591234567',status:'active'}
+ const s=mount(ActivationWorkspace,false,'zh-CN',home,(url,options)=>{
+  if(url.endsWith('/activation-codes')){issued=true;return{success:true,code:'001234',expiresAt:new Date(Date.now()+600000).toISOString()}}
+  if(issued)throw new Error('refresh offline')
+  return{customers:[person],page:{limit:20,offset:0,total:1}}
+ },{actor});await tick()
+ button(s.root,'核实并激活').props.onClick();await tick()
+ const check=nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];check.checked=true;check.listeners.change({target:check});await tick()
+ nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()
+ assert.ok(issued);button(s.root,'customerAuth.closeActivation').props.onClick();await tick()
+ const verified=button(s.root,'customerAuth.alreadyVerified');assert.ok(verified);assert.equal(verified.props.disabled,true)
+ assert.ok(button(s.root,'customerAuth.reissueActivationShort'));assert.equal(button(s.root,'核实并激活'),undefined);s.unmount()
 })

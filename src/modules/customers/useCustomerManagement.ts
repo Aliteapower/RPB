@@ -25,6 +25,7 @@ export function useCustomerManagement(storeId:Ref<string>,initial:{keyword?:stri
   catch(e){if(current(version)&&sequence===request)errorText.value=apiErrorText(e)}
   finally{if(current(version)&&sequence===request)loading.value=false}
  }
+ function activationIssued(customerId:string){const customer=customers.value.find(c=>c.id===customerId);if(customer)customer.activationState='verified_pending';void loadCustomers()}
  function searchCustomers(){if(actionDisabled.value)return;offset.value=0;void loadCustomers(0)}
  function resetFilters(){if(actionDisabled.value)return;keyword.value='';offset.value=0;void loadCustomers(0)}
  function refreshVisibleCustomers(){if(document.visibilityState==='visible'&&!editorOpen.value&&!actionDisabled.value)void loadCustomers()}
@@ -71,5 +72,5 @@ export function useCustomerManagement(storeId:Ref<string>,initial:{keyword?:stri
  watch([storeId,canManage],()=>{generation++;request++;customers.value=[];page.value={limit:limit.value,offset:0,total:0};offset.value=0;loading.value=false;saving.value=false;archivingId.value='';editorOpen.value=false;editingCustomer.value=null;privacyCustomer.value=null;privacyRecords.value=[];privacyLoading.value=false;privacyNotice.value=null;noticeLoading.value=false;resetForm();errorText.value='';successText.value='';if(canManage.value){void loadCustomers(0);if(!initial.directoryOnly)void loadPrivacyNotice();if(initial.create){openCreateEditor();form.phoneE164=customerPhonePrefill(initial.keyword??'')}}},{immediate:true})
  onMounted(()=>{if(initial.createOnly)return;window.addEventListener('focus',refreshVisibleCustomers);document.addEventListener('visibilitychange',refreshVisibleCustomers)})
  onUnmounted(()=>{generation++;request++;if(initial.createOnly)return;window.removeEventListener('focus',refreshVisibleCustomers);document.removeEventListener('visibilitychange',refreshVisibleCustomers)})
- return {customers,loading,saving,archivingId,errorText,successText,keyword,limit,offset,page,safePage,editorOpen,editingCustomer,form,canManage,actionDisabled,canSubmit,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord,privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords}
+ return {activationIssued,customers,loading,saving,archivingId,errorText,successText,keyword,limit,offset,page,safePage,editorOpen,editingCustomer,form,canManage,actionDisabled,canSubmit,hasDirtyQuery,hasPhoneCount,hasEmailCount,loadCustomers,searchCustomers,resetFilters,openCreateEditor,openEditEditor,closeEditor,submitCustomer,archiveCustomerRecord,privacyAccepted,privacyNotice,noticeLoading,privacyCustomer,privacyRecords,privacyLoading,loadPrivacyNotice,openPrivacyRecords}
 }

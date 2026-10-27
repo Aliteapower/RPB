@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomerActivationAction from '../modules/customers/CustomerActivationAction.vue'
 import {computed,ref,watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {useI18n} from 'vue-i18n'
@@ -9,7 +10,7 @@ import {customerAccessReturnTarget} from '../modules/customers/accessNavigation'
 import {useCustomerAccessText} from '../modules/customers/accessText'
 const route=useRoute(),{t}=useCustomerAccessText(),{t:authText}=useI18n()
 const store=computed(()=>String(route.params.storeId||''))
-const {customers,canManage,loading,errorText,keyword,safePage,loadCustomers,searchCustomers}=useCustomerManagement(store,{directoryOnly:true})
+const {activationIssued,customers,canManage,loading,errorText,keyword,safePage,loadCustomers,searchCustomers}=useCustomerManagement(store,{directoryOnly:true})
 const selected=ref<TenantAdminCustomer|null>(null)
 watch([store,canManage],()=>selected.value=null)
 </script>
@@ -20,13 +21,13 @@ watch([store,canManage],()=>selected.value=null)
   <p v-if="!canManage" role="alert">{{t('noAccess')}}</p>
   <template v-else>
    <p class="intro">{{t('activationHint')}} {{t('codeHint')}}</p>
-   <CustomerActivationIssue v-if="selected" :key="store+selected.id" :store="store" :customer="selected" @close="selected=null" />
+   <CustomerActivationIssue v-if="selected" :key="store+selected.id" :store="store" :customer="selected" @close="selected=null" @issued="activationIssued" />
    <section v-else class="customer-directory" :aria-label="t('findCustomer')">
     <form class="search" @submit.prevent="searchCustomers"><label for="activation-customer-query">{{t('findCustomer')}}</label><div><input id="activation-customer-query" v-model="keyword" :placeholder="t('searchHint')" :disabled="loading" type="search"><button :disabled="loading">{{t('search')}}</button></div></form>
     <p v-if="errorText" role="alert" class="error">{{errorText}} <button type="button" :disabled="loading" @click="loadCustomers()">{{t('retry')}}</button></p>
-    <p v-else-if="loading" role="status">{{authText('customerAuth.busy')}}</p>
-    <p v-else-if="!customers.length" role="status">{{t('noCustomers')}}</p>
-    <ul v-else><li v-for="customer in customers" :key="customer.id"><div><strong>{{customer.displayName||customer.nickname||customer.customerCode}}</strong><span>{{customer.phoneE164||'—'}}</span><small v-if="customer.status!=='active'">{{t('inactive')}}</small></div><button type="button" :disabled="!customer.phoneE164||customer.status!=='active'" @click="selected=customer">{{t('verify')}}</button></li></ul>
+    <p v-if="loading" role="status">{{authText('customerAuth.busy')}}</p>
+    <p v-else-if="!customers.length&&!errorText" role="status">{{t('noCustomers')}}</p>
+    <ul v-else><li v-for="customer in customers" :key="customer.id"><div><strong>{{customer.displayName||customer.nickname||customer.customerCode}}</strong><span>{{customer.phoneE164||'—'}}</span><small v-if="customer.status!=='active'">{{t('inactive')}}</small></div><CustomerActivationAction :customer="customer" :label="t('verify')" @select="selected=customer" /></li></ul>
     <footer><span>{{t('total')}} {{safePage.total}}</span><div><button type="button" :disabled="loading||safePage.offset===0" @click="loadCustomers(Math.max(0,safePage.offset-safePage.limit))">{{t('previous')}}</button><button type="button" :disabled="loading||safePage.offset+safePage.limit>=safePage.total" @click="loadCustomers(safePage.offset+safePage.limit)">{{t('next')}}</button></div></footer>
    </section>
   </template>

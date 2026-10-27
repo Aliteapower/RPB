@@ -2,28 +2,29 @@
 import {ref,watch,onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {issueCustomerActivation,CustomerPasswordApiError} from '../../api/customerAuthApi'
-const props=defineProps<{store:string;customer:{id:string;displayName:string|null;phoneE164:string|null}}>(),emit=defineEmits<{close:[]}>(),{t,te}=useI18n()
-const confirmed=ref(false),busy=ref(false),code=ref(''),expires=ref(''),error=ref('')
+const props=defineProps<{store:string;customer:{id:string;displayName:string|null;phoneE164:string|null;activationState?:string}}>(),emit=defineEmits<{close:[];issued:[customerId:string]}>(),{t,te}=useI18n()
+const verified=ref(props.customer.activationState==='verified_pending')
+const confirmed=ref(verified.value),busy=ref(false),code=ref(''),expires=ref(''),error=ref('')
 let generation=0
 let expiryTimer:ReturnType<typeof setTimeout>|undefined
-function clear(){generation++;if(expiryTimer)clearTimeout(expiryTimer);confirmed.value=false;code.value='';expires.value='';error.value='';busy.value=false}
+function clear(){generation++;if(expiryTimer)clearTimeout(expiryTimer);verified.value=props.customer.activationState==='verified_pending';confirmed.value=verified.value;code.value='';expires.value='';error.value='';busy.value=false}
 watch(()=>[props.store,props.customer.id],clear)
 onUnmounted(clear)
 async function issue(){
  if(busy.value||!confirmed.value)return
  const own=++generation;busy.value=true;if(expiryTimer)clearTimeout(expiryTimer);code.value='';expires.value='';error.value=''
- try{const result=await issueCustomerActivation(props.store,props.customer.id,true);if(own===generation){code.value=result.code;expires.value=result.expiresAt;expiryTimer=setTimeout(()=>{if(own===generation){code.value='';expires.value='';confirmed.value=false;error.value=t('customerAuth.errors.code_mismatch')}},Math.max(0,new Date(result.expiresAt).getTime()-Date.now()))}}
+ try{const result=await issueCustomerActivation(props.store,props.customer.id,true);if(own===generation){code.value=result.code;expires.value=result.expiresAt;verified.value=true;emit('issued',props.customer.id);expiryTimer=setTimeout(()=>{if(own===generation){code.value='';expires.value='';confirmed.value=verified.value;error.value=t('customerAuth.errors.code_mismatch')}},Math.max(0,new Date(result.expiresAt).getTime()-Date.now()))}}
  catch(e){if(own===generation){const key=`customerAuth.errors.${e instanceof CustomerPasswordApiError?e.code:'request_failed'}`;error.value=t(te(key)?key:'customerAuth.errors.request_failed')}}
  finally{if(own===generation)busy.value=false}
 }
 </script>
 <template><section class="activation-issue" :aria-label="t('customerAuth.issueActivation')">
- <h3>{{t('customerAuth.issueActivation')}}</h3><p class="customer-identity">{{customer.displayName||customer.id}} · {{customer.phoneE164||'—'}}</p><details><summary>{{t('customerAuth.activationRules')}}</summary><p>{{t('customerAuth.issueActivationHint')}}</p></details>
+ <h3>{{t(verified?'customerAuth.activationCode':'customerAuth.issueActivation')}}</h3><p class="customer-identity">{{customer.displayName||customer.id}} · {{customer.phoneE164||'—'}}</p><details><summary>{{t('customerAuth.activationRules')}}</summary><p>{{t('customerAuth.issueActivationHint')}}</p></details>
  <form @submit.prevent="issue">
-  <label class="identity-confirmation"><input v-model="confirmed" type="checkbox" :disabled="busy || !!code"> {{t('customerAuth.identityConfirmed')}}</label>
+  <p v-if="verified" class="verified-note">{{t('customerAuth.verifiedReissueHint')}}</p><label v-else class="identity-confirmation"><input v-model="confirmed" type="checkbox" :disabled="busy || !!code"> {{t('customerAuth.identityConfirmed')}}</label>
   <p v-if="error" role="alert" class="error">{{error}}</p>
   <template v-if="code"><p role="status">{{t('customerAuth.activationDeliver')}}</p><output class="activation-secret">{{code}}</output><p>{{t('customerAuth.activationExpires')}} {{new Date(expires).toLocaleTimeString()}}</p></template>
-  <div class="activation-actions"><button :disabled="busy || !confirmed || !customer.phoneE164">{{t(busy?'customerAuth.busy':code?'customerAuth.reissueActivation':'customerAuth.issueActivation')}}</button>
+  <div class="activation-actions"><button :disabled="busy || !confirmed || !customer.phoneE164">{{t(busy?'customerAuth.busy':code||verified?'customerAuth.reissueActivation':'customerAuth.issueActivation')}}</button>
   <button type="button" @click="emit('close')">{{t('customerAuth.closeActivation')}}</button></div>
  </form>
 </section></template>
