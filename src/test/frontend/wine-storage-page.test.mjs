@@ -331,11 +331,39 @@ test('unlisted barcode retains identifier in application note and requests wine 
 
 const catalogProducts=['wine-a','wine-b'].map((id,i)=>({id,categoryId:'cat',code:id,nameZh:'酒品'+(i+1),nameEn:'Wine '+(i+1),descriptionZh:'',descriptionEn:'',imageUrl:'',priceCents:100,currency:'SGD',taxMode:'inclusive',taxCategory:'not_applicable',taxRate:0,channels:['storage'],kind:'physical',unit:'瓶',status:'active',listingEnabled:true,listingVersion:0,version:0}))
 const catalogActor={roles:['tenant_admin'],permissions:['catalog.view','catalog.manage','catalog.publish'],storeIds:['A']}
+test('embedded wine workspace keeps one title and groups search and actions without changing the full catalog',async()=>{
+ const actor={...catalogActor,permissions:[...catalogActor.permissions,'tenant.admin.manage']}
+ const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/storage-products?')?{items:catalogProducts,total:2,page:0,size:12,hasMore:false}:catalogResponse(url),{actor});await tick();button(s.root,'设置').props.onClick();await tick();button(s.root,'管理寄存酒商品').props.onClick();await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='h2'&&text(n).trim()==='存酒设置').length,0);assert.equal(nodes(s.root,n=>n.tag==='h2'&&text(n).trim()==='商品列表').length,0);assert.equal(nodes(s.root,n=>n.tag==='h2'&&text(n).trim()==='酒品管理').length,1)
+ const toolbar=nodes(s.root,n=>String(n.props?.class).includes('catalog-storage-toolbar'))[0];assert.ok(toolbar);assert.ok(nodes(toolbar,n=>n.tag==='input').length);assert.match(text(toolbar),/匹配商品/);assert.ok(button(s.root,'＋ 新增酒品'));assert.ok(nodes(s.root,n=>n.tag==='details'&&nodes(n,c=>c.tag==='summary').length).length);s.unmount()
+ const generic=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();assert.ok(button(generic.root,'分类管理'));assert.equal(nodes(generic.root,n=>n.tag==='h2'&&text(n).trim()==='商品列表').length,1);generic.unmount()
+})
+
+test('wine manager creates through the original editor with storage selected and blocks duplicate saves',async()=>{
+ let created=null,finish
+ const actor={...catalogActor,permissions:[...catalogActor.permissions,'tenant.admin.manage']}
+ const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:created?[created]:[],total:created?1:0,page:0,size:12,hasMore:false}:url.endsWith('/products/editor')&&options?.method==='POST'?new Promise(resolve=>finish=()=>{const body=JSON.parse(options.body);created={...catalogProducts[0],...body.product,id:'new-wine'};resolve({product:created,barcodes:body.barcodes})}):catalogResponse(url,options),{actor});await tick()
+ button(s.root,'设置').props.onClick();await tick();button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(button(s.root,'＋ 新增酒品'));button(s.root,'＋ 新增酒品').props.onClick();await tick()
+ assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['storage']);assert.equal(button(s.root,'返回存酒设置').props.disabled,true)
+ const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()===label)[0],n=>n.tag==='input')[0]
+ field('编号').props['onUpdate:modelValue']('NEW-WINE');field('中文名称').props['onUpdate:modelValue']('新增寄存酒');nodes(s.root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('cat');await tick()
+ const form=nodes(s.root,n=>n.tag==='form')[0];form.props.onSubmit({preventDefault(){}});form.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,1);assert.equal(button(s.root,'保存商品与条码').props.disabled,true)
+ const command=s.calls.find(c=>c.method==='POST');assert.equal(command.url,'/api/v1/stores/A/catalog/products/editor');assert.deepEqual(command.body.product.channels,['storage']);assert.equal(command.body.product.nameZh,'新增寄存酒');assert.ok(command.body.idempotencyKey);finish();await tick();assert.match(text(s.root),/商品信息与条码已保存/)
+ button(s.root,'← 返回商品列表').props.onClick();await tick();assert.match(text(s.root),/新增寄存酒/);assert.ok(button(s.root,'＋ 新增酒品'));assert.ok(!s.calls.some(c=>c.url.endsWith('/catalog/products')));s.unmount()
+})
+
+test('wine creation defaults do not override existing channels and cancelling a clean new draft needs no discard',async()=>{
+ const existing={...catalogProducts[0],channels:['storage','shopping']}
+ const s=mount(CatalogPage,false,'en-SG',home,(url,options)=>url.includes('/storage-products?')?{items:[existing],total:1,page:0,size:12,hasMore:false}:url.endsWith('/editor')?{product:existing,barcodes:[]}:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick()
+ button(s.root,'＋ New wine').props.onClick();await tick();assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['storage']);button(s.root,'← Back to products').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0)
+ button(s.root,'Edit').props.onClick();await tick();assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['shopping','storage']);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+})
+
 test('storage settings open an embedded storage-only catalog and reuse editing and store enable commands',async()=>{
  const actor={...catalogActor,permissions:[...catalogActor.permissions,'tenant.admin.manage']};let disabled=false;const working=catalogProducts.map((p,i)=>({...p,listingEnabled:i===0}))
  const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:working.map(p=>({...p})),total:2,page:0,size:12,hasMore:false}:url.endsWith('/listing')?(disabled=true,{...working[0],listingEnabled:false,listingVersion:1}):url.endsWith('/editor')&&options?.method==='PUT'?(working[0]={...working[0],...JSON.parse(options.body).product,version:1,listingVersion:1},{product:working[0],barcodes:JSON.parse(options.body).barcodes}):catalogResponse(url,options),{actor});await tick();button(s.root,'设置').props.onClick();await tick()
  assert.ok(button(s.root,'管理寄存酒商品'));assert.ok(!s.calls.some(c=>c.url.includes('/catalog/')))
- button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('/stores/A/catalog/storage-products?')));assert.ok(!s.calls.some(c=>c.url.endsWith('/catalog/products')));assert.match(text(s.root),/酒品1|酒品2/);assert.equal(button(s.root,'分类管理'),undefined);assert.equal(button(s.root,'＋ 新增商品'),undefined)
+ button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('/stores/A/catalog/storage-products?')));assert.ok(!s.calls.some(c=>c.url.endsWith('/catalog/products')));assert.match(text(s.root),/酒品1|酒品2/);assert.equal(button(s.root,'分类管理'),undefined);assert.equal(button(s.root,'＋ 新增商品'),undefined);assert.ok(button(s.root,'＋ 新增酒品'))
  button(s.root,'编辑').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.endsWith('/products/wine-a/editor')));assert.equal(button(s.root,'返回存酒设置').props.disabled,true)
  const editor=nodes(s.root,n=>n.tag==='form'&&nodes(n,l=>l.tag==='label'&&text(l).includes('中文名称')).length)[0];const nameLabel=nodes(editor,n=>n.tag==='label'&&text(n).includes('中文名称'))[0];nodes(nameLabel,n=>n.tag==='input')[0].props['onUpdate:modelValue']('维护后酒名');editor.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.find(c=>c.method==='PUT').body.product.nameZh,'维护后酒名');assert.equal(working[0].nameZh,'维护后酒名');button(s.root,'← 返回商品列表').props.onClick();await tick();assert.match(text(s.root),/维护后酒名/);button(s.root,'上下架管理').props.onClick();await tick();button(s.root,'本店停用').props.onClick();await tick();button(s.root,'确认').props.onClick();await tick();assert.ok(disabled);const write=s.calls.find(c=>c.url.endsWith('/listing'));assert.deepEqual(write.body.channels,['storage']);assert.equal(write.body.enabled,false);assert.equal(write.body.expectedVersion,1);s.unmount()
 })
@@ -356,7 +384,7 @@ test('embedded wine search paginates on the server and resets store context with
 test('storage product manager remains available with storage closed and clears failed results without claiming zero matches',async()=>{
  const actor={...catalogActor,permissions:['catalog.view']};let fail=true
  const s=mount(StaffPage,false,'zh-CN',{...home,newBusinessEnabled:false},url=>url.includes('/storage-products?')?{items:catalogProducts,total:2,page:0,size:12,hasMore:false}:catalogResponse(url),{actor});await tick();button(s.root,'设置').props.onClick();await tick();const normalFetch=globalThis.fetch;globalThis.fetch=async(url,options)=>fail&&url.includes('/storage-products?')?{ok:false,status:503,json:async()=>({code:'TEMP',message:'查询失败'})}:normalFetch(url,options);button(s.root,'管理寄存酒商品').props.onClick();await tick();await tick();assert.match(text(s.root),/查询失败/);assert.doesNotMatch(text(s.root),/匹配商品: 0/)
- fail=false;const refreshes=nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新');refreshes.at(-1).props.onClick();await tick();assert.match(text(s.root),/酒品1/);assert.equal(button(s.root,'编辑'),undefined);button(s.root,'上下架管理').props.onClick();await tick();assert.equal(button(s.root,'本店停用'),undefined);s.unmount()
+ fail=false;const refreshes=nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新');refreshes.at(-1).props.onClick();await tick();assert.match(text(s.root),/酒品1/);assert.equal(button(s.root,'编辑'),undefined);assert.equal(button(s.root,'＋ 新增酒品'),undefined);button(s.root,'上下架管理').props.onClick();await tick();assert.equal(button(s.root,'本店停用'),undefined);s.unmount()
 })
 function catalogResponse(url,options){if(url.endsWith('/categories'))return[{id:'cat',code:'C',nameZh:'酒类',nameEn:'Wine',enabled:true,version:0,sortOrder:0}];if(url.endsWith('/products'))return catalogProducts;if(url.endsWith('/editor')){const body=options?.body?JSON.parse(options.body):null;return{product:body?{...catalogProducts[0],...body.product,version:1,listingVersion:1}:catalogProducts[0],barcodes:body?body.barcodes:['06956367311355']}}return home}
 function button(root,label){return nodes(root,n=>n.tag==='button'&&text(n).trim()===label)[0]}
@@ -412,7 +440,7 @@ test('legacy multiple barcodes require explicit selection and preserve the full 
 })
 
 test('new product always has one editable optional barcode field without add buttons',async()=>{
- const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'＋ 新增商品').props.onClick();await tick();const fields=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric');assert.equal(fields.length,1);assert.equal(fields[0].value,'');assert.ok(button(s.root,'扫码填写'));assert.ok(!button(s.root,'＋ 添加条码'))
+ const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'＋ 新增商品').props.onClick();await tick();const fields=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric');assert.equal(fields.length,1);assert.equal(fields[0].value,'');assert.ok(button(s.root,'扫码填写'));assert.ok(!button(s.root,'＋ 添加条码'));assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['cards'])
 })
 
 test('customer wallet hides unopened empty storage but retains closed product history',async()=>{

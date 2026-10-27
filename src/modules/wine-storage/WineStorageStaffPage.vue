@@ -15,6 +15,7 @@ import MerchantStorageRecords from './merchant/MerchantStorageRecords.vue'
 import WalletQrScanner from '../wallet/components/WalletQrScanner.vue'
 import '../wallet/wallet.css'
 import './storage.css'
+import './merchant/storage-management.css'
 defineOptions({inheritAttrs:false})
 const {store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scanResult,scoped,can,choose,search,open,load,run,scan,recover,fail,t}=useMerchantStorage()
 const inventoryRefresh=ref(0)

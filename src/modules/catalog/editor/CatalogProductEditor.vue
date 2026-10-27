@@ -5,7 +5,7 @@ import {displayName} from '../../shared-commerce/format'
 import type {Category} from '../types'
 import CatalogBarcodeFields from './CatalogBarcodeFields.vue'
 import {useCatalogProductEditor,type ProductDetail} from './useCatalogProductEditor'
-const props=defineProps<{base:string;productId:string|null;categories:Category[];globalEdit:boolean}>(),emit=defineEmits<{saved:[ProductDetail];cancel:[];busy:[boolean]}>(),{t,locale}=useCatalogText(),discard=ref(false),discardPanel=ref<HTMLElement|null>(null),discardAction=ref<'back'|'reload'>('back')
+const props=defineProps<{base:string;productId:string|null;categories:Category[];globalEdit:boolean;defaultChannels?:readonly string[]}>(),emit=defineEmits<{saved:[ProductDetail];cancel:[];busy:[boolean]}>(),{t,locale}=useCatalogText(),discard=ref(false),discardPanel=ref<HTMLElement|null>(null),discardAction=ref<'back'|'reload'>('back')
 const{form,rows,product,loaded,loading,saving,error,notice,pending,blocked,dirty,save,load,recover}=useCatalogProductEditor(props,t,value=>emit('saved',value))
 watch(blocked,v=>emit('busy',v),{immediate:true})
 watch(discard,async value=>{if(value){await nextTick();discardPanel.value?.querySelector?.('button')?.focus()}})
