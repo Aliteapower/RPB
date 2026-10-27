@@ -94,7 +94,8 @@
 .storage-merchant-customer-search > label { flex: 1; min-width: min(100%,220px); }
 .storage-merchant-customer-search input { width: 100% !important; }
 .storage-merchant-page .storage-inline h2 { margin-bottom: 6px; }
-.storage-merchant-page .storage-customer-tasks { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.storage-merchant-page .storage-customer-tasks { grid-template-columns: repeat(4,minmax(0,1fr)); }
+@media(max-width:640px){.storage-merchant-page .storage-customer-tasks{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .storage-page .storage-photo-button { padding: 0; border: 0; background: transparent; cursor: zoom-in; }
 .storage-lightbox { position: fixed; inset: 0; z-index: 5000; background: rgba(8,20,25,.95); display: flex; flex-direction: column; padding: 16px; }
 .storage-lightbox-toolbar { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; }

@@ -43,3 +43,8 @@ POST `/api/v1/stores/{storeId}/wine-storage/direct-deliver`：`{customerId,selec
 ## 操作者姓名（2026-10-27）
 
 Home.events 增加可空 actorName，原 actorId 保留。姓名在当前租户范围内按事件操作者身份批量关联查询：商户读取账号 display_name，空白时使用 username；顾客操作读取本人顾客档案 display_name。停用/软删除的账号仍可用于历史审计姓名查询，不授予登录或业务权限。姓名无法匹配时返回 null/缺省，前端显示未知操作者，不把 UUID 当作姓名。按当前档案解析，不回写历史事件或伪称操作时姓名快照；无迁移。原查询权限、顾客归属和门店范围不变。
+# 当前寄存清单
+
+`GET /api/v1/stores/{storeId}/wine-storage/inventory?query=&status=all&page=0&size=50`：商户 `wine_storage.view` 只读查询，关闭新业务后仍可查库存。顾客会话不可使用。租户从会话取得，门店权限沿用 StorageAccess。
+
+只统计 `remaining > 0 且实物仍由门店持有`，包含过期未取走实物。`query` 最长 120 字，按字面搜索酒名、顾客姓名/电话、位置/仓位、标签及酒妹；`status=all|stored|expired`，`page=0..100000`，`size=1..100`，非法参数 `STORAGE_INVALID/400`。响应 `{items,summary,page,size,hasMore}`；summary 为整个筛选结果的 `{customerCount,bottleCount,openedBottleCount,expiredBottleCount,itemCount}`，空值为 0。items 保留寄存时酒名/位置/酒妹快照及原/剩余瓶数，顾客姓名按同租户当前档案解析；时间为 UTC Instant，由页面按门店时区展示。不改历史库存或权限。

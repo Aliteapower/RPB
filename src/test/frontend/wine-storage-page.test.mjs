@@ -17,6 +17,37 @@ const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))]
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const tick=async()=>{for(let n=0;n<12;n++){await Promise.resolve();await nextTick()}}
 const home={timezone:'Asia/Singapore',storeName:'QA Store',stores:[{id:'A',name:'QA Store'}],newBusinessEnabled:true,permissions:['wine_storage.view','wine_storage.receive','wine_storage.deliver','wine_storage.rules.manage'],rules:[],categories:[],items:[],events:[],intents:[],applications:[{id:'application',customerId:'customer',status:'pending',lines:[],confirmation:null,reason:'',createdAt:'2026-10-25T10:00:00Z'}]}
+const inventory={items:[{id:'inventory-item',customerId:'person',customerName:'张先生',customerPhone:'+6591234567',nameZh:'茅台',nameEn:'Moutai',quantity:5,remaining:2,opened:false,receivedAt:'2026-01-01T00:00:00Z',expiresAt:'2026-02-01T00:00:00Z',status:'expired',locationName:'前台',slot:'A柜',label:'TAG-1',custodianName:'小兰'}],summary:{customerCount:3,bottleCount:12,openedBottleCount:1,expiredBottleCount:2,itemCount:8},page:0,size:50,hasMore:true}
+
+test('merchant inventory is store-wide, summarizes all matches and displays receipt details without customer lookup',async()=>{
+ const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/inventory?')?inventory:home,{query:{task:'inventory'}});await tick()
+ assert.match(text(s.root),/当前寄存/);assert.match(text(s.root),/3.*寄存人数/);assert.match(text(s.root),/12.*剩余瓶数/)
+ for(const value of ['茅台','张先生','前台','A柜','小兰','TAG-1','已过期','01/01/2026','01/02/2026'])assert.ok(text(s.root).includes(value),value)
+ assert.doesNotMatch(text(s.root),/1\. 找到顾客|请先查找并确认一位顾客/);assert.ok(s.calls.some(c=>c.url.includes('/inventory?')));assert.ok(s.calls.every(c=>c.method==='GET'))
+ button(s.root,'下一页').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('page=1')))
+ s.unmount()
+})
+test('merchant inventory empty and retry states never present failed or stale totals as zero stock',async()=>{
+ let failed=true
+ const s=mount(StaffPage,false,'en',home,url=>{if(url.includes('/inventory?')){if(failed)throw new Error('Inventory unavailable');return{...inventory,items:[],summary:{customerCount:0,bottleCount:0,openedBottleCount:0,expiredBottleCount:0,itemCount:0},hasMore:false}}return home},{query:{task:'inventory'}});await tick()
+ assert.match(text(s.root),/Inventory unavailable/);assert.doesNotMatch(text(s.root),/No bottles currently stored/)
+ failed=false;button(s.root,'Retry').props.onClick();await tick();assert.match(text(s.root),/No bottles currently stored/)
+ s.unmount()
+})
+test('inventory search submits encoded filter and resets pagination; navigation persists inventory task',async()=>{
+ const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/inventory?')?inventory:home);await tick();button(s.root,'当前寄存').props.onClick();await tick();assert.equal(s.route.query.task,'inventory')
+ const input=nodes(s.root,n=>n.tag==='input'&&n.props.maxlength==='120')[0];input.props['onUpdate:modelValue']('小兰%_')
+ const form=nodes(s.root,n=>n.tag==='form'&&nodes(n,c=>c===input).length)[0];form.props.onSubmit({preventDefault(){}});await tick()
+ assert.ok(s.calls.some(c=>c.url.includes('query='+encodeURIComponent('小兰%_'))&&c.url.includes('page=0')))
+ s.route.params.storeId='B';await tick();assert.ok(s.calls.some(c=>c.url.startsWith('/api/v1/stores/B/wine-storage/inventory?')));s.unmount()
+})
+test('inventory ignores previous-store responses and clears totals when authorization is lost',async()=>{
+ let resolveA
+ const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/inventory?')?(url.includes('/stores/A/')?new Promise(resolve=>resolveA=resolve):{...inventory,items:[{...inventory.items[0],nameZh:'B店酒'}]}):home,{query:{task:'inventory'}});await tick()
+ assert.match(text(s.root),/正在加载|加载中/);assert.doesNotMatch(text(s.root),/茅台/)
+ s.route.params.storeId='B';await tick();assert.match(text(s.root),/B店酒/);resolveA(inventory);await tick();assert.doesNotMatch(text(s.root),/茅台/)
+ globalThis.fetch=async()=>({ok:false,status:403,json:async()=>({message:'无查看权限'})});button(s.root,'刷新').props.onClick();await tick();assert.match(text(s.root),/无查看权限/);assert.doesNotMatch(text(s.root),/B店酒/);s.unmount()
+})
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,documentElement:{lang:''},visibilityState:'visible',listeners:new Map(),addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn)},removeEventListener(name,fn){this.listeners.get(name)?.delete(fn)}})
  const memory=new Map();globalThis.sessionStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)}
