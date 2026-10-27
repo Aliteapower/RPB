@@ -10,6 +10,7 @@ import WalletQrScanner from '../wallet/components/WalletQrScanner.vue'
 import WalletCustomerLogin from '../wallet/components/WalletCustomerLogin.vue'
 import '../wallet/wallet.css'
 import './storage.css'
+import './customer/customer.css'
 defineOptions({inheritAttrs:false})
 const {t}=useCustomerStorageText(),{store,api,home,loading,busy,login,pending,error,notice,view,activeIntent,scannedCode,open,load,run,scan,recover,created,quickCreated,applied,fail}=useCustomerStorage()
 const childBusy=ref(false),showScan=ref(false),again=ref<{item:Item;intentId:string;quantity:number}|null>(null)
@@ -17,8 +18,8 @@ watch(store,()=>{childBusy.value=false;showScan.value=false;again.value=null})
 function deposit(value?:{item:Item;intentId:string;quantity:number}){again.value=value??null;open('deposit')}
 </script>
 <template><main class="cards-page storage-page storage-customer-page" data-storage-role="customer">
- <header class="storage-page-header"><div class="storage-heading"><RouterLink :to="`/wallet/${store}`">← {{t('back')}}</RouterLink><div><span class="cards-badge">{{t('customerArea')}}</span><h1>{{t('title')}}</h1></div></div><button :disabled="loading||busy||childBusy" @click="load">{{t('refresh')}}</button></header>
- <p v-if="home" class="storage-customer-store">{{home.storeName}}</p><p v-if="loading&&!home" role="status">{{t('loading')}}</p><p v-if="error" role="alert" class="storage-error">{{error}}</p><p v-if="notice" role="status" class="storage-notice">{{notice}}</p>
+ <header class="storage-page-header"><div class="storage-heading"><RouterLink :to="`/wallet/${store}`">← {{t('back')}}</RouterLink><div><h1>{{t('title')}}</h1><p v-if="home" class="storage-customer-store">{{home.storeName}}</p></div></div><button :disabled="loading||busy||childBusy" @click="load">{{t('refresh')}}</button></header>
+ <p v-if="loading&&!home" role="status">{{t('loading')}}</p><p v-if="error" role="alert" class="storage-error">{{error}}</p><p v-if="notice" role="status" class="storage-notice">{{notice}}</p>
  <WalletCustomerLogin v-if="login" :store="store" @authenticated="load"/>
  <section v-if="pending" class="storage-panel"><p>{{t('pendingHint')}}</p><button :disabled="busy||childBusy" @click="recover">{{t('recover')}}</button></section>
  <template v-if="home">

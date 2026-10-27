@@ -33,10 +33,10 @@ async function quickCreate(id:string){
   <template v-if="!available.length"><h2>{{t('emptyCollectible')}}</h2><p class="cards-muted">{{t('emptyCollectibleHint')}}</p><button @click="emit('deposit')">{{t('deposit')}}</button></template>
   <template v-else><h2>{{t('chooseBottles')}}</h2>
    <div class="storage-grid"><article v-for="item in available" :key="item.id" class="storage-panel storage-customer-bottle">
-    <div class="storage-bottle-heading"><h3>{{displayName(item.snapshot,locale)}}</h3><aside class="storage-bottle-code">
+    <div class="storage-bottle-heading"><div class="storage-bottle-info"><h3>{{displayName(item.snapshot,locale)}}</h3><p class="storage-bottle-remaining">{{t('remaining')}} <strong>{{item.remaining}}</strong> {{t('bottleUnit')}}</p><small>{{t('expiresAt')}} {{dateTime(item.expiresAt,item.snapshot.timezone)}}</small><small v-if="item.snapshot.storageLocation||item.location">{{t('location')}} {{storageLocationText(item)}}</small></div><aside class="storage-bottle-code">
      <template v-if="codeFor(item.id)"><WalletQrDisplay :value="codeFor(item.id)!.code!" :expires-at="codeFor(item.id)!.expiresAt"/><strong>{{t('quickScanHint')}}</strong><small>{{t('quickQuantity')}} {{codeFor(item.id)!.selections[0]!.quantity}} {{t('bottleUnit')}}</small><button :disabled="disabled||saving" @click="emit('cancel')">{{t('cancel')}}</button></template>
      <template v-else><StorageQuantityStepper :model-value="quickQuantity(item.id)" :max="item.opened?1:item.remaining" :disabled="disabled||saving||!!liveCode" :label="t('collectQuantity')" @update:model-value="quickQuantities[item.id]=$event"/><button :disabled="disabled||saving||!!liveCode||!quickSelection(item.id)" @click="quickCreate(item.id)">{{t('quickCode')}}</button><small>{{t('quickScanHint')}}</small></template>
-    </aside></div><p>{{t('remaining')}} {{item.remaining}} {{t('bottleUnit')}}</p><small>{{t('expiresAt')}} {{dateTime(item.expiresAt,item.snapshot.timezone)}}</small><p v-if="item.snapshot.storageLocation||item.location">{{t('location')}} {{storageLocationText(item)}}</p>
+    </aside></div>
    </article></div>
   </template>
  </section>
