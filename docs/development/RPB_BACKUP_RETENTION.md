@@ -49,3 +49,15 @@ sudo systemctl stop rpb-backup-retention.service
 ## 发布审查
 
 Production readiness：GO，限上述运维任务。没有 API、迁移、App Gate 或租户权限变化，不部署或重启应用。代码审查关注路径约束、备份可识别性、版本回退保护、发布互斥和失败关闭；16 项测试通过。Reservation、Queue、Walk-in、Seating、Cleaning 业务逻辑不变。
+
+## 首次生产执行记录
+
+2026-10-27 安装并启用；timer 为 enabled/active，下一次为 2026-10-28 03:30 Asia/Singapore。服务 `Result=success`、`ExecMainStatus=0`。正式服务在 256MB 限制内完成；独立实测峰值 RSS 41,644 KiB。发布锁占用试验返回 75，未删除备份。
+
+首次清理 5 项：`20260706-125244-host-prefix-login`、`20260707-1104-ce1576dc`、`20260707-1249-9ba007ab`、`20260804-112523-4a816daf-queue-groups`、`20260810-2010-056b92f2-paynow-staff-daily-report`。实际空闲增加 456,986,624 bytes，执行后 5,970,223,104 bytes（约 5.56 GiB），磁盘使用率 86%。
+
+保留完整回退 `20261027-customer-cards-daily-expiry-f3f35ca9-before`、`20261027-customer-activation-state-11778be1-before`；保留前端回退 `20261027-storage-customer-compact-a40e5e5f-before`、`20261027-card-workspace-ui-a184c563-before`。三个包含旧 nginx 链接/配置或 branding media 原件的对象跳过，未按日期盲删。
+
+安装前后前后端 SHA（f3f35ca9 / a40e5e5f）及 rpb-backend、nginx、PostgreSQL、Redis、Docker 的 MainPID/InvocationID/NRestarts 快照一致。12 个既有本地改动文件 SHA256 不变。服务器脚本 SHA256：`a6c4545371ff0de2bcf3ad1043a06fd074f6e8be915b92928dad995fe198b197`，与本地一致。
+
+执行证据：服务器 `/home/ubuntu/backup-retention-setup-20261027/` 的 `dry-run.json`、`first-run.json`、`install.log` 及 services/versions 前后快照；最新运行结果亦保存在 `/var/lib/rpb-backup-retention/last-run.json`。
