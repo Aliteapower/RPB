@@ -1,0 +1,6 @@
+{
+  "retention_days": 15,
+  "keep_full": 2,
+  "keep_frontend": 2,
+  "pinned_backups": []
+}

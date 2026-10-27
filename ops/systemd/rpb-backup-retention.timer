@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily RPB backup retention at 03:30 Singapore time
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Asia/Singapore
+Persistent=true
+AccuracySec=1min
+Unit=rpb-backup-retention.service
+
+[Install]
+WantedBy=timers.target

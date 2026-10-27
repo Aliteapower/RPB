@@ -1,0 +1,28 @@
+[Unit]
+Description=RPB expired backup retention with rollback protection
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /usr/local/sbin/rpb-backup-retention.py --apply --config /etc/rpb/backup-retention.json
+StateDirectory=rpb-backup-retention
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=15min
+Restart=on-failure
+RestartSec=15min
+RestartPreventExitStatus=1 2
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=256M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/rpb/backups /home/ubuntu/rpb-ledger-release.lock
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+SyslogIdentifier=rpb-backup-retention
