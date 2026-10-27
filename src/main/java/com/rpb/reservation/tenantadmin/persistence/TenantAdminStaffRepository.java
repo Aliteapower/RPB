@@ -94,6 +94,14 @@ public class TenantAdminStaffRepository {
     }
 
     public Optional<TenantAdminStaff> findById(StoreScope scope, UUID staffId) {
+        return findById(scope, staffId, false);
+    }
+
+    public Optional<TenantAdminStaff> findByIdForUpdate(StoreScope scope, UUID staffId) {
+        return findById(scope, staffId, true);
+    }
+
+    private Optional<TenantAdminStaff> findById(StoreScope scope, UUID staffId, boolean lock) {
         return jdbc.query(
             """
             select account.id, account.username, account.display_name, account.status, account.default_store_id,
@@ -107,7 +115,7 @@ public class TenantAdminStaffRepository {
               and access.tenant_id = ?
               and access.store_id = ?
               and access.deleted_at is null
-            """,
+            """ + (lock ? " for update of account" : ""),
             this::staff,
             staffId,
             scope.tenantId().value(),

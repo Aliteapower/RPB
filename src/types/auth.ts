@@ -26,6 +26,7 @@ export interface AuthUser {
   storeIds: string[]
   roles: string[]
   permissions: string[]
+  storePermissions?: Record<string, string[]>
 }
 
 export interface AuthStoreAccess {

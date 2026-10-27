@@ -22,6 +22,7 @@ public class StorageCustomerQuery {
   if(text.isEmpty())return List.of();return customers.search(scope.tenantScope(),text).stream().map(this::view).toList();
  }
  public Customer get(StoreScope scope,CurrentActor actor,UUID id){require(scope,actor);if(id==null)throw StorageException.invalid();return customers.active(scope.tenantScope(),id).map(this::view).orElseThrow(StorageException::missing);}
- private void require(StoreScope scope,CurrentActor actor){access.staff(scope,actor,"wine_storage.view",false);if(!actor.hasPermission("wine_storage.receive")&&!actor.hasPermission("wine_storage.deliver")&&!actor.hasPermission("customer.lookup"))throw StorageException.forbidden();}
+ // History readers need the same bounded customer lookup as operators; writes still check receive/deliver.
+ private void require(StoreScope scope,CurrentActor actor){access.staff(scope,actor,"wine_storage.view",false);}
  private Customer view(CustomerManagementItem value){return new Customer(value.id(),value.displayName(),value.phoneE164());}
 }

@@ -159,9 +159,9 @@ public class TenantAdminController {
         @PathVariable UUID storeId,
         @RequestBody(required = false) TenantAdminStaffMutationRequest request
     ) {
-        StoreScope scope = requireTenantAdminScope(storeId);
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
         return ResponseEntity.status(201).body(TenantAdminStaffResponse.from(
-            staffService.createStaff(scope, toCommand(request))
+            staffService.createStaff(actorScope.scope(), actorScope.actor(), toCommand(request))
         ));
     }
 
@@ -180,9 +180,9 @@ public class TenantAdminController {
         @PathVariable UUID staffId,
         @RequestBody(required = false) TenantAdminStaffMutationRequest request
     ) {
-        StoreScope scope = requireTenantAdminScope(storeId);
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
         return ResponseEntity.ok(TenantAdminStaffResponse.from(
-            staffService.updateStaff(scope, staffId, toCommand(request))
+            staffService.updateStaff(actorScope.scope(), actorScope.actor(), staffId, toCommand(request))
         ));
     }
 

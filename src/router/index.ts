@@ -429,7 +429,7 @@ router.beforeEach(async to => {
     return true
   }
 
-  await auth.ensureCurrentUser()
+  await auth.refreshStorePermissions(String(to.params.storeId || ''))
   if (!auth.isAuthenticated) {
     return {
       name: 'login',

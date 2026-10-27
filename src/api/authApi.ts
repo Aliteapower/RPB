@@ -121,6 +121,7 @@ async function sendRequest(
       return await fetcher(endpoint, {
         method: options.method,
         credentials: 'include',
+        cache: 'no-store',
         headers,
         body,
         signal: controller.signal

@@ -2,6 +2,7 @@ package com.rpb.reservation.auth.persistence;
 
 import com.rpb.reservation.auth.application.AuthPrincipal;
 import com.rpb.reservation.auth.application.AuthStoreAccess;
+import com.rpb.reservation.auth.authorization.StaffPermissionCatalog;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -11,6 +12,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Arrays;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -359,6 +363,9 @@ public class AuthRepository {
     }
 
     public AuthPrincipal principalFor(AuthAccountRecord account) {
+        Set<UUID> accessibleStores = storeIds(account.id());
+        Set<String> roles = strings("auth_account_roles", "role_code", account.id());
+        Set<String> permissions = strings("auth_account_permissions", "permission_code", account.id());
         return new AuthPrincipal(
             account.id(),
             account.tenantId(),
@@ -366,10 +373,39 @@ public class AuthRepository {
             account.displayName(),
             account.actorType(),
             account.defaultStoreId(),
-            storeIds(account.id()),
-            strings("auth_account_roles", "role_code", account.id()),
-            strings("auth_account_permissions", "permission_code", account.id())
+            accessibleStores,
+            roles,
+            permissions,
+            staffStorePermissions(account, accessibleStores, roles, permissions)
         );
+    }
+
+    private Map<UUID, Set<String>> staffStorePermissions(AuthAccountRecord account, Set<UUID> stores,
+                                                        Set<String> roles, Set<String> legacy) {
+        if (account.tenantId() == null || !"staff".equals(account.actorType())
+            || roles.stream().anyMatch(Set.of("tenant_admin", "store_manager", "platform_admin")::contains)) {
+            return Map.of();
+        }
+        Map<UUID, Set<String>> result = new LinkedHashMap<>();
+        jdbc.query("""
+            select config.store_id, config.permissions
+            from auth_staff_store_permissions config
+            join auth_account_store_access access on access.account_id=config.account_id
+              and access.tenant_id=config.tenant_id and access.store_id=config.store_id and access.deleted_at is null
+            where config.tenant_id=? and config.account_id=?
+            """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+                UUID store = rs.getObject("store_id", UUID.class);
+                if (!stores.contains(store)) return;
+                Set<String> effective = new LinkedHashSet<>(legacy);
+                effective.removeAll(StaffPermissionCatalog.permissions());
+                var array = rs.getArray("permissions");
+                try {
+                    Arrays.stream((String[]) array.getArray()).filter(StaffPermissionCatalog.permissions()::contains)
+                        .forEach(effective::add);
+                } finally { array.free(); }
+                result.put(store, Set.copyOf(effective));
+            }, account.tenantId(), account.id());
+        return Map.copyOf(result);
     }
 
     public List<AuthStoreAccess> authorizedStores(AuthPrincipal principal) {
