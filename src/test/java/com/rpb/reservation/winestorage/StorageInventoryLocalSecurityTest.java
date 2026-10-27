@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(StorageInventoryController.class)
+@WebMvcTest({StorageInventoryController.class,StorageInventoryExportController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,com.rpb.reservation.walkin.auth.LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
@@ -23,6 +23,7 @@ class StorageInventoryLocalSecurityTest {
  @Autowired MockMvc mvc;
  @MockBean StorageIdentity identity;
  @MockBean StorageInventoryQuery query;
+ @MockBean com.rpb.reservation.winestorage.application.StorageInventoryExportService exports;
  @MockBean com.rpb.reservation.appgate.application.AppGateService appGate;
  @MockBean com.rpb.reservation.appgate.application.AppGateDenialAuditService audit;
  @Test void onlyExactStaffGetRouteReachesIdentityOtherMethodsAndGuessedRoutesRemainDenied()throws Exception{
@@ -32,6 +33,10 @@ class StorageInventoryLocalSecurityTest {
   mvc.perform(delete(path).header("X-RPB-Storage","1")).andExpect(status().isForbidden());
   mvc.perform(get(path+"/debug")).andExpect(status().isForbidden());
   mvc.perform(get(path.replace("/api/v1/stores/","/api/v1/public/stores/"))).andExpect(status().isForbidden());
-  verifyNoInteractions(query);
+  mvc.perform(get(path+"/export")).andExpect(status().isUnauthorized());
+  mvc.perform(post(path+"/export").header("X-RPB-Storage","1")).andExpect(status().isForbidden());
+  mvc.perform(get(path+"/export/debug")).andExpect(status().isForbidden());
+  mvc.perform(get(path.replace("/api/v1/stores/","/api/v1/public/stores/")+"/export")).andExpect(status().isForbidden());
+  verifyNoInteractions(query,exports);
  }
 }

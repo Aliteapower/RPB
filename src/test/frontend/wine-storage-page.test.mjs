@@ -18,6 +18,42 @@ const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const tick=async()=>{for(let n=0;n<12;n++){await Promise.resolve();await nextTick()}}
 const home={timezone:'Asia/Singapore',storeName:'QA Store',stores:[{id:'A',name:'QA Store'}],newBusinessEnabled:true,permissions:['wine_storage.view','wine_storage.receive','wine_storage.deliver','wine_storage.rules.manage'],rules:[],categories:[],items:[],events:[],intents:[],applications:[{id:'application',customerId:'customer',status:'pending',lines:[],confirmation:null,reason:'',createdAt:'2026-10-25T10:00:00Z'}]}
 const inventory={items:[{id:'inventory-item',customerId:'person',customerName:'张先生',customerPhone:'+6591234567',nameZh:'茅台',nameEn:'Moutai',quantity:5,remaining:2,opened:false,receivedAt:'2026-01-01T00:00:00Z',expiresAt:'2026-02-01T00:00:00Z',status:'expired',locationName:'前台',slot:'A柜',label:'TAG-1',custodianName:'小兰'}],summary:{customerCount:3,bottleCount:12,openedBottleCount:1,expiredBottleCount:2,itemCount:8},page:0,size:50,hasMore:true}
+test('direct registration is immediately usable and pending requests load only in their separate view',async()=>{
+ const s=mount(StaffPage,false);await tick()
+ assert.match(text(s.root),/1\. 找到顾客/);assert.equal(nodes(s.root,n=>n.tag==='details').length,0);assert.doesNotMatch(text(s.root),/暂无待审核的存酒申请|审核并核对收存/);assert.ok(!s.calls.some(c=>c.url.endsWith('/pending-applications')))
+ const inbox=nodes(s.root,n=>n.tag==='button'&&text(n).includes('顾客提交 · 待审核'))[0];inbox.props.onClick();await tick();assert.equal(s.route.query.task,'inbox');assert.match(text(s.root),/暂无待审核的存酒申请/);assert.doesNotMatch(text(s.root),/1\. 找到顾客/);assert.ok(s.calls.some(c=>c.url.endsWith('/pending-applications')))
+ button(s.root,'直接帮顾客登记存酒').props.onClick();await tick();assert.equal(s.route.query.task,'deposit');assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/暂无待审核的存酒申请/);s.unmount()
+})
+test('pending request route survives settings and store navigation and remains permission gated',async()=>{
+ const s=mount(StaffPage,false,'en',home,undefined,{query:{task:'inbox'}});await tick();assert.match(text(s.root),/No storage requests awaiting review/);assert.doesNotMatch(text(s.root),/1\. Find customer/)
+ button(s.root,'Settings').props.onClick();await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('Back to storage'))[0].props.onClick();await tick();assert.equal(s.route.query.task,'inbox');assert.match(text(s.root),/No storage requests awaiting review/)
+ s.route.params.storeId='B';await tick();assert.ok(s.calls.some(c=>c.url==='/api/v1/stores/B/wine-storage/pending-applications'));s.unmount()
+ for(const data of [{...home,permissions:['wine_storage.view']},{...home,newBusinessEnabled:false}]){
+  const denied=mount(StaffPage,false,'zh-CN',data,undefined,{query:{task:'inbox'}});await tick();assert.ok(!denied.calls.some(c=>c.url.endsWith('/pending-applications')));assert.doesNotMatch(text(denied.root),/审核并核对收存/);denied.unmount()
+ }
+})
+function mockDownload(){const create=URL.createObjectURL,revoke=URL.revokeObjectURL,element=document.createElement,body=document.body,downloads=[];URL.createObjectURL=()=> 'blob:test';URL.revokeObjectURL=()=>{};document.body={appendChild(){}};document.createElement=()=>({remove(){},click(){downloads.push({href:this.href,name:this.download})}});return{downloads,restore(){URL.createObjectURL=create;URL.revokeObjectURL=revoke;document.createElement=element;document.body=body}}}
+test('inventory exports applied filters across all pages and blocks unqueried draft filters',async()=>{
+ const env=mockDownload();try{
+  const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/inventory?')?inventory:home,{query:{task:'inventory'}});await tick()
+  const input=nodes(s.root,n=>n.tag==='input'&&n.props.maxlength==='120')[0];input.props['onUpdate:modelValue']('小兰');await tick();assert.equal(button(s.root,'导出 Excel').props.disabled,true);assert.match(text(s.root),/先点击查询/)
+  nodes(s.root,n=>n.tag==='form'&&nodes(n,c=>c===input).length)[0].props.onSubmit({preventDefault(){}});await tick();button(s.root,'下一页').props.onClick();await tick()
+  const requests=[];globalThis.fetch=async(url,options)=>{requests.push({url,options});return{ok:true,blob:async()=>new Blob(['xlsx'])}}
+  await button(s.root,'导出 Excel').props.onClick();await tick();assert.equal(requests.length,1);assert.ok(requests[0].url.includes('/inventory/export?'));assert.ok(requests[0].url.includes('query='+encodeURIComponent('小兰')));assert.ok(requests[0].url.includes('locale=zh-CN'));assert.ok(!requests[0].url.includes('page='));assert.equal(env.downloads.length,1);assert.match(env.downloads[0].name,/\.xlsx$/);s.unmount()
+ }finally{env.restore()}
+})
+test('inventory export ignores late responses after switching stores and suppresses double clicks',async()=>{
+ const env=mockDownload();try{
+  const s=mount(StaffPage,false,'en',home,url=>url.includes('/inventory?')?inventory:home,{query:{task:'inventory'}});await tick();let finish;let requests=0;globalThis.fetch=async()=>{requests++;return new Promise(resolve=>finish=resolve)}
+  const exportButton=button(s.root,'Export Excel');const work=exportButton.props.onClick();exportButton.props.onClick();await tick();assert.equal(requests,1)
+  s.unmount();finish({ok:true,blob:async()=>new Blob(['xlsx'])});await work;await tick();assert.equal(env.downloads.length,0)
+ }finally{env.restore()}
+})
+test('export failure is visible and never downloads a JSON error as Excel',async()=>{
+ const env=mockDownload();try{
+  const s=mount(StaffPage,false,'en',home,url=>url.includes('/inventory?')?inventory:home,{query:{task:'inventory'}});await tick();globalThis.fetch=async()=>({ok:false,status:422,json:async()=>({code:'STORAGE_EXPORT_TOO_LARGE',message:'Narrow filters'})});await button(s.root,'Export Excel').props.onClick();await tick();assert.match(text(s.root),/Narrow filters/);assert.equal(env.downloads.length,0);assert.match(text(s.root),/张先生/);assert.equal(button(s.root,'Export Excel').props.disabled,false);globalThis.fetch=async()=>({ok:false,status:403,json:async()=>({code:'STORAGE_FORBIDDEN',message:'Access revoked'})});await button(s.root,'Export Excel').props.onClick();await tick();assert.match(text(s.root),/Access revoked/);assert.doesNotMatch(text(s.root),/张先生/);assert.equal(env.downloads.length,0);s.unmount()
+ }finally{env.restore()}
+})
 
 test('merchant inventory is store-wide, summarizes all matches and displays receipt details without customer lookup',async()=>{
  const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/inventory?')?inventory:home,{query:{task:'inventory'}});await tick()
@@ -75,7 +111,7 @@ test('customer pages never expose merchant receipt or rule editing even if respo
   const s=mount(customer?CustomerPage:StaffPage,customer);await tick()
   if(customer){assert.match(text(s.root),/我要存酒/);assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='保存规则').length,0);s.unmount();continue}
   assert.match(text(s.root),/帮顾客存酒.*帮顾客取酒.*存取酒记录/)
-  assert.match(text(s.root),/顾客提交 · 待审核/);assert.doesNotMatch(text(s.root),/请先查找并确认一位顾客/)
+  assert.match(text(s.root),/顾客提交 · 待审核/);assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/请先查找并确认一位顾客/)
   assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='确认实际收存').length,0)
   assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,0);button(s.root,'设置').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,1)
   s.unmount()
@@ -194,7 +230,7 @@ test('merchant directly registers bottles for the chosen customer with photos an
  const search=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0]
  nodes(search,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await search.props.onSubmit({preventDefault(){}});await tick()
  nodes(s.root,n=>n.tag==='button'&&text(n).includes('甲顾客'))[0].props.onClick();await tick()
- nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='直接帮顾客登记存酒')[0].props.onClick();await tick()
+ assert.doesNotMatch(text(s.root),/2\. 审核待收存申请|这位顾客没有待审核申请/)
  const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-panel'))[0]
  const submit=()=>nodes(form,n=>n.tag==='button'&&text(n).trim()==='确认实物已收存')[0]
  assert.equal(submit().props.disabled,true)
@@ -210,7 +246,7 @@ test('merchant directly registers bottles for the chosen customer with photos an
 test('merchant reviews a pending customer request immediately without searching or selecting a customer',async()=>{
  const product={id:'wine',categoryId:'category',nameZh:'顾客提交啤酒',nameEn:'Beer',code:'WINE'},application={id:'pending-inbox',customerId:'inbox-customer',status:'pending',lines:[{id:'line',productId:'wine',nameZh:product.nameZh,nameEn:product.nameEn,quantity:12,opened:false,source:'customer',photos:[],note:''}],createdAt:new Date().toISOString(),reason:'',confirmation:null},person={id:'custodian',name:'保管员A',kind:'custodian',enabled:true,version:0}
  const data={...home,applications:[application],rules:[{id:'rule',categoryId:'category',name:'啤酒规则',months:3,version:1}],categories:[{id:'category',nameZh:'酒水'}]},lists={pending:[{application,customer:{id:'inbox-customer',displayName:'申请顾客',phone:'+6580000000'}}],people:[person]}
- const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{...application,status:'stored'}:{...data},lists);await tick()
+ const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>url.endsWith('/products/wine')?product:url.includes('/products')?[product]:options?.method==='POST'?{...application,status:'stored'}:{...data},{...lists,query:{task:'inbox'}});await tick()
  assert.match(text(s.root),/顾客提交 · 待审核/);assert.match(text(s.root),/申请顾客/);assert.match(text(s.root),/12/)
  nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='审核并核对收存')[0].props.onClick();await tick()
  assert.equal(nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search')).length,0)
@@ -235,7 +271,7 @@ test('custodian management is permission gated and stores an optional local name
 
 test('merchant rejection requires an explicit customer-visible reason and never posts a receipt',async()=>{
  const application={id:'reject-inbox',customerId:'customer',status:'pending',lines:[],createdAt:new Date().toISOString(),reason:'',confirmation:null},lists={pending:[{application,customer:{id:'customer',displayName:'待审核顾客',phone:'+6580000000'}}]}
- const s=mount(StaffPage,false,'zh-CN',{...home,applications:[application]},(url,options)=>url.includes('/products')?[]:options?.method==='POST'?{...application,status:'rejected'}:home,lists);await tick()
+ const s=mount(StaffPage,false,'zh-CN',{...home,applications:[application]},(url,options)=>url.includes('/products')?[]:options?.method==='POST'?{...application,status:'rejected'}:home,{...lists,query:{task:'inbox'}});await tick()
  nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='审核并核对收存')[0].props.onClick();await tick()
  nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='拒绝申请')[0].props.onClick();await tick()
  const form=nodes(s.root,n=>n.tag==='form'&&nodes(n,b=>b.tag==='button'&&text(b).trim()==='确认拒绝申请').length)[0];await form.props.onSubmit({preventDefault(){}});assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
@@ -334,14 +370,14 @@ test('single barcode scan opens camera immediately and replaces the draft until 
 
 test('unavailable original product is not backfilled as a selectable wine and cannot be received',async()=>{
  const application={id:'off-request',customerId:'customer',status:'pending',lines:[{id:'line',productId:'wine',nameZh:'未开启寄存商品',nameEn:'Off wine',quantity:1,opened:false,source:'customer',photos:[],note:''}],createdAt:new Date().toISOString(),reason:'',confirmation:null},data={...home,applications:[application],rules:[{id:'rule',categoryId:'category',name:'规则',months:3,version:1}],categories:[{id:'category',nameZh:'酒品'}]},lists={pending:[{application,customer:{id:'customer',displayName:'顾客',phone:'+6580000000'}}]}
- const s=mount(StaffPage,false,'zh-CN',data,url=>url.includes('/products')?[]:data,lists);await tick();const original=globalThis.fetch;globalThis.fetch=async(url,options)=>url.endsWith('/products/wine')?{ok:false,status:409,json:async()=>({code:'CATALOG_UNAVAILABLE',message:'unavailable'})}:original(url,options)
+ const s=mount(StaffPage,false,'zh-CN',data,url=>url.includes('/products')?[]:data,{...lists,query:{task:'inbox'}});await tick();const original=globalThis.fetch;globalThis.fetch=async(url,options)=>url.endsWith('/products/wine')?{ok:false,status:409,json:async()=>({code:'CATALOG_UNAVAILABLE',message:'unavailable'})}:original(url,options)
  button(s.root,'审核并核对收存').props.onClick();await tick();assert.match(text(s.root),/原选商品未开启寄存酒或已停用/);assert.equal(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine').length,0);assert.equal(button(s.root,'确认实际收存').props.disabled,true);assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
 })
 
 
 test('eligible original wine outside the keyword result is verified by id before preserving selection',async()=>{
  const product={id:'wine',categoryId:'category',nameZh:'仍可寄存的酒',nameEn:'Eligible wine',code:'WINE'},application={id:'valid-request',customerId:'customer',status:'pending',lines:[{id:'line',productId:'wine',nameZh:'旧申请名称',nameEn:'Old name',quantity:1,opened:false,source:'customer',photos:[],note:''}],createdAt:new Date().toISOString(),reason:'',confirmation:null},data={...home,applications:[application],rules:[{id:'rule',categoryId:'category',name:'规则',months:3,version:1}],categories:[{id:'category',nameZh:'酒品'}]},lists={pending:[{application,customer:{id:'customer',displayName:'顾客',phone:'+6580000000'}}]}
- const s=mount(StaffPage,false,'zh-CN',data,url=>url.endsWith('/products/wine')?product:url.includes('/products')?[]:data,lists);await tick();button(s.root,'审核并核对收存').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.endsWith('/products/wine')));assert.equal(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine').length,1);assert.match(text(s.root),/仍可寄存的酒/);assert.doesNotMatch(text(s.root),/原选商品未开启寄存酒或已停用/)
+ const s=mount(StaffPage,false,'zh-CN',data,url=>url.endsWith('/products/wine')?product:url.includes('/products')?[]:data,{...lists,query:{task:'inbox'}});await tick();button(s.root,'审核并核对收存').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.endsWith('/products/wine')));assert.equal(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine').length,1);assert.match(text(s.root),/仍可寄存的酒/);assert.doesNotMatch(text(s.root),/原选商品未开启寄存酒或已停用/)
 })
 
 test('legacy multiple barcodes require explicit selection and preserve the full save snapshot',async()=>{

@@ -168,3 +168,6 @@
 .storage-merchant-customer-search {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
 .storage-merchant-customer-search > label {min-width:0}
 .storage-merchant-customer-search > button {padding:10px 12px}
+
+.storage-page .storage-deposit-views{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 16px}.storage-deposit-views button{min-width:0;min-height:48px}.storage-deposit-views .cards-badge{margin-left:6px}.storage-direct-registration{min-width:0}
+@media(max-width:480px){.storage-page .storage-deposit-views{grid-template-columns:1fr}}

@@ -12,6 +12,12 @@ import static org.assertj.core.api.Assertions.*;
 
 class StorageInventoryPostgresTest extends CatalogPostgresTest {
  final Instant now=Instant.parse("2026-10-27T00:00:00Z");
+ @Test void exportIncludesAllFilteredRowsBeyondThePageLimit(){
+  for(int i=0;i<105;i++)add(customer,5,2,false,now.plusSeconds(100),i%2==0?"茅台":"啤酒");
+  add(customer,5,0,false,now.plusSeconds(100),"取完");var r=new StorageInventoryRepository(jdbc);
+  assertThat(r.list(scope,"","all",0,50,now).items()).hasSize(50);var all=r.export(scope,"","all",now);assertThat(all.items()).hasSize(105);assertThat(all.summary().customerCount()).isEqualTo(1);assertThat(all.summary().bottleCount()).isEqualTo(210);assertThat(all.hasMore()).isFalse();
+  var filtered=r.export(scope,"茅台","all",now);assertThat(filtered.items()).hasSize(53).allMatch(v->v.nameZh().equals("茅台"));assertThat(filtered.summary().bottleCount()).isEqualTo(106);
+ }
  UUID add(UUID owner,int quantity,int remaining,boolean opened,Instant expiry,String wine){
   UUID id=UUID.randomUUID(),app=UUID.randomUUID(),line=UUID.randomUUID(),rule=UUID.randomUUID();
   jdbc.update("insert into wine_storage_rules(id,tenant_id,store_id,category_id,name,months,version,created_by) values(?,?,?,?,'规则',6,?,?)",rule,tenant,store,product.categoryId(),jdbc.queryForObject("select count(*)+1 from wine_storage_rules where tenant_id=?",Integer.class,tenant),actor.actorId());
