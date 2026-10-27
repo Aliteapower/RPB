@@ -1,5 +1,50 @@
 @import '../shared-commerce/commerce.css';
 
+/* Merchant workspace only: shared commerce and customer card pages retain their layout. */
+.cards-page.cards-staff-page{padding:0;font-size:14px;line-height:1.5;color:var(--wallet-ink,#16243b)}
+.cards-page.cards-staff-page .cards-workspace-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px}
+.cards-page.cards-staff-page .cards-workspace-heading h1{font-size:22px;line-height:1.3;margin:0;font-weight:650;letter-spacing:-.3px}
+.cards-page.cards-staff-page .cards-heading-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px}
+.cards-page.cards-staff-page a{color:var(--wallet-blue,#1677ff);text-decoration:none}
+.cards-page.cards-staff-page .cards-feature-toggle{font-size:12px;color:#53647b;gap:7px}
+.cards-page.cards-staff-page .cards-feature-toggle input{width:16px;height:16px;margin:0;accent-color:var(--wallet-blue,#1677ff)}
+.cards-page.cards-staff-page .cards-panel{padding:16px;margin:12px 0;border-color:#e1e7ef;border-radius:12px;box-shadow:none}
+.cards-page.cards-staff-page h2{font-size:16px;line-height:1.4;margin:0 0 12px;font-weight:650}
+.cards-page.cards-staff-page h3{font-size:15px;margin:0 0 8px}
+.cards-page.cards-staff-page button{min-height:38px;padding:7px 12px;font-size:13px;line-height:1.5;border-radius:7px;background:#fff;color:#40516b;border-color:#dce3ed;box-shadow:none}
+.cards-page.cards-staff-page button.primary{background:var(--wallet-blue,#1677ff);border-color:var(--wallet-blue,#1677ff);color:#fff}
+.cards-page.cards-staff-page button:not(:disabled):hover{border-color:#8bb9f7;background:#f3f7fe}
+.cards-page.cards-staff-page button.primary:not(:disabled):hover{background:#0866e4;color:#fff}
+.cards-page.cards-staff-page nav.cards-workspace-tabs{gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:0;padding:4px;background:#eaf0f7;border-radius:9px;scrollbar-width:thin}
+.cards-page.cards-staff-page .cards-workspace-tabs button{flex:1 0 auto;min-height:36px;padding:6px 12px;border-color:transparent;background:transparent;white-space:nowrap;color:#5b6b81}
+.cards-page.cards-staff-page .cards-workspace-tabs button.primary{background:#fff;color:#1266d8;border-color:#dfe6f0;box-shadow:0 1px 3px #18375408;font-weight:650}
+.cards-page.cards-staff-page label{font-size:12px;gap:5px;color:#5b6b81;min-width:0}
+.cards-page.cards-staff-page input:not([type=checkbox]),.cards-page.cards-staff-page select,.cards-page.cards-staff-page textarea{min-width:0;min-height:38px;padding:8px 10px;border-radius:7px;border-color:#dce3ed;color:#243650;background:#fff;font-size:13px;line-height:1.5}
+.cards-page.cards-staff-page input::placeholder{color:#8793a5}
+.cards-page.cards-staff-page .cards-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px}
+.cards-page.cards-staff-page .cards-customer-fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cards-page.cards-staff-page .cards-actions{gap:8px;margin:10px 0}
+.cards-page.cards-staff-page .cards-customer-search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;margin:0 0 14px}
+.cards-page.cards-staff-page .cards-redemption-fields{grid-template-columns:minmax(0,2fr) minmax(90px,1fr);max-width:380px;padding-top:12px;margin-top:12px;border-top:1px solid #edf0f5}
+.cards-page.cards-staff-page .cards-notice{font-size:12px;padding:9px 12px;margin:12px 0 0;background:#f4f7fb;color:#607189;border-radius:7px}
+.cards-page.cards-staff-page .cards-notice p{margin:4px 0}
+.wallet-shell:has(.cards-page.cards-staff-page) .wallet-header{margin-bottom:16px}
+.wallet-shell:has(.cards-page.cards-staff-page) .wallet-utility-bar{margin-bottom:14px}
+@media(max-width:560px){
+ .cards-page.cards-staff-page .cards-workspace-heading{display:block}
+ .cards-page.cards-staff-page .cards-workspace-heading h1{font-size:20px;margin-bottom:10px}
+ .cards-page.cards-staff-page .cards-heading-actions{justify-content:flex-start;gap:8px 12px}
+ .cards-page.cards-staff-page .cards-feature-toggle{flex-basis:100%;margin:0}
+ .cards-page.cards-staff-page .cards-heading-actions>button{margin-left:auto}
+ .cards-page.cards-staff-page .cards-panel{padding:14px}
+ .cards-page.cards-staff-page .cards-customer-fields{grid-template-columns:1fr}
+ .cards-page.cards-staff-page .cards-customer-search{grid-template-columns:minmax(0,1fr) auto}
+ .cards-page.cards-staff-page .cards-customer-search>button:last-child{grid-column:1 / -1}
+ .cards-page.cards-staff-page .cards-redemption-fields{max-width:none}
+ .cards-page.cards-staff-page button{min-height:42px}
+ .cards-page.cards-staff-page .cards-workspace-tabs button{min-height:40px}
+}
+
 .cards-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.cards-card-heading h2{margin-top:8px;min-width:0}.cards-page .cards-show-code{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;font-size:12px;padding:8px;min-width:64px;min-height:60px}.cards-presentation{position:fixed;inset:0;z-index:1000;width:min(380px,calc(100vw - 64px));max-height:calc(100dvh - 80px);overflow:auto;border:1px solid #b8ccce;border-radius:16px;padding:20px;background:white;color:#172b36;box-shadow:0 8px 40px #172b3640}.cards-presentation .wallet-qr{margin:16px 0}.cards-presentation .cards-qr{text-align:center}
 
 .cards-presentation::backdrop{background:#172b3680}

@@ -11,11 +11,17 @@ test('all product account entries and their return paths remain in the selected 
  for(const source of ['https://evil.test','//evil.test',undefined,['wallet']])assert.equal(customerAccessReturnTarget('A',source),'/stores/A/staff')
 })
 test('staff product surfaces expose one shared access component and the email route requires tenant admin',()=>{
- for(const file of ['src/modules/wine-storage/merchant/MerchantStorageSettingsPage.vue','src/modules/wallet/pages/WalletStaffMore.vue','src/modules/wallet/components/WalletSettingsPanel.vue','src/modules/cards/CardsStaffPage.vue','src/pages/StoreStaffHomePage.vue','src/components/tenant-admin/TenantAdminNav.vue'])assert.match(readFileSync(file,'utf8'),/<CustomerAccessLinks/)
+ for(const file of ['src/modules/wine-storage/merchant/MerchantStorageSettingsPage.vue','src/modules/wallet/components/WalletSettingsPanel.vue','src/pages/StoreStaffHomePage.vue','src/components/tenant-admin/TenantAdminNav.vue'])assert.match(readFileSync(file,'utf8'),/<CustomerAccessLinks/)
  assert.match(readFileSync('src/router/index.ts','utf8'),/path:'\/stores\/:storeId\/admin\/customer-email'.*requiresTenantAdmin:true/)
 })
 
 test('activation entries use the compact workspace without the full customer editor',()=>{
  for(const source of ['wallet','wallet-settings','cards','storage','booking','admin','staff'])assert.match(customerAccessTarget('A',source,'activation'),/^\/stores\/A\/admin\/customer-activation\?accessSource=/)
  assert.match(readFileSync('src/router/index.ts','utf8'),/path:'\/stores\/:storeId\/admin\/customer-activation'.*requiresTenantAdmin:true/)
+})
+
+test('wallet account administration is grouped in settings rather than card operations or more',()=>{
+ for(const file of ['src/modules/cards/CardsStaffPage.vue','src/modules/wallet/pages/WalletStaffMore.vue'])assert.doesNotMatch(readFileSync(file,'utf8'),/<CustomerAccessLinks/)
+ assert.match(readFileSync('src/modules/wallet/components/WalletSettingsPanel.vue','utf8'),/<CustomerAccessLinks[^>]+source="wallet-settings"/)
+ assert.match(readFileSync('src/modules/cards/CardsStaffPage.vue','utf8'),/wallet\/settings/)
 })
