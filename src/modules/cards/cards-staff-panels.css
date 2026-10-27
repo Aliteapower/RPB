@@ -1,0 +1,76 @@
+/* Scoped to the staff workspace; shared customer components retain their appearance. */
+.cards-page.cards-staff-page .cards-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cards-page.cards-staff-page .cards-section-heading h2{margin:0}
+.cards-page.cards-staff-page .cards-caption{font-size:12px;line-height:1.6;color:#748196;margin:6px 0 0;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-section-note{margin:0 0 12px}
+.cards-page.cards-staff-page .cards-empty{padding:22px 12px;margin:12px 0 0;border:1px dashed #e0e6ee;border-radius:8px;color:#7b8799;font-size:13px;text-align:center}
+.cards-page.cards-staff-page .cards-list{margin-top:12px}
+.cards-page.cards-staff-page .cards-list-item{padding:14px 0;border-top:1px solid #e9edf3;min-width:0}
+.cards-page.cards-staff-page .cards-list-item:last-child{padding-bottom:0}
+.cards-page.cards-staff-page .cards-item-heading{display:flex;align-items:center;gap:10px;min-width:0}
+.cards-page.cards-staff-page .cards-item-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0;flex:1}
+.cards-page.cards-staff-page .cards-item-title strong,.cards-page.cards-staff-page .cards-item-title h3{font-size:14px;margin:0;line-height:1.5;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-amount{font-size:16px;white-space:nowrap;font-variant-numeric:tabular-nums;color:#243650;font-weight:650}
+.cards-page.cards-staff-page .cards-item-heading>button{flex:none}
+.cards-page.cards-staff-page .cards-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;background:#eef3f9;color:#5f7189;font-size:11px;font-weight:500;line-height:1.6}
+.cards-page.cards-staff-page .cards-badge[data-status=active],.cards-page.cards-staff-page .cards-badge[data-status=issued]{background:#eaf6f0;color:#21724e}
+.cards-page.cards-staff-page .cards-badge[data-status=pending]{background:#fff4df;color:#946414}
+.cards-page.cards-staff-page .cards-badge[data-status=exception]{background:#fff0ed;color:#b34e3b}
+.cards-page.cards-staff-page .cards-badge[data-status=inactive],.cards-page.cards-staff-page .cards-badge[data-status=refunded],.cards-page.cards-staff-page .cards-badge[data-status=exception_refunded]{background:#f0f2f6;color:#7b8798}
+.cards-page.cards-staff-page .cards-item-meta{display:flex;flex-wrap:wrap;gap:3px 16px;color:#7a8799;font-size:11px;margin-top:7px;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-item-meta code{font-family:inherit;font-size:inherit}
+.cards-page.cards-staff-page .cards-item-time{font-size:11px;font-variant-numeric:tabular-nums;color:#7a8799}
+.cards-page.cards-staff-page .cards-quantity{font-size:12px;color:#62728a;font-variant-numeric:tabular-nums}
+.cards-page.cards-staff-page .cards-plan-product{margin:5px 0 10px;font-size:12px;color:#53677f;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-plan-product span{color:#8a95a5}
+.cards-page.cards-staff-page .cards-plan-values,.cards-page.cards-staff-page .cards-entry-values{display:flex;flex-wrap:wrap;gap:8px 24px;margin:10px 0 0}
+.cards-page.cards-staff-page .cards-plan-values>div,.cards-page.cards-staff-page .cards-entry-values>div{display:flex;align-items:baseline;gap:8px}
+.cards-page.cards-staff-page .cards-plan-values dt,.cards-page.cards-staff-page .cards-entry-values dt{font-size:11px;color:#8290a3}
+.cards-page.cards-staff-page .cards-plan-values dd,.cards-page.cards-staff-page .cards-entry-values dd{margin:0;text-align:left;font-size:13px;font-weight:550;font-variant-numeric:tabular-nums}
+.cards-page.cards-staff-page .cards-entry-values dd span{font-weight:400;color:#98a4b4;padding:0 4px}
+.cards-page.cards-staff-page .cards-record-reason{font-size:12px;color:#64748b;margin:6px 0 0;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-plan-editor{background:#f8fafd;padding:14px;margin:12px 0}
+.cards-page.cards-staff-page .cards-plan-editor h2{font-size:14px}
+.cards-page.cards-staff-page .cards-inline-form{margin-top:12px;padding:12px;background:#f8fafd;border:1px solid #e6ebf2;border-radius:8px}
+.cards-page.cards-staff-page .cards-inline-form>.cards-notice{margin:0 0 12px}
+.cards-page.cards-staff-page .cards-form-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.cards-page.cards-staff-page .cards-form-footer .check{font-size:12px}
+.cards-page.cards-staff-page .check input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--wallet-blue,#1677ff)}
+.cards-page.cards-staff-page .cards-form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.cards-page.cards-staff-page .cards-form-footer .cards-form-actions{margin:0}
+.cards-page.cards-staff-page .cards-reverse-form{display:flex;align-items:flex-end;gap:12px}
+.cards-page.cards-staff-page .cards-reverse-form>label{flex:1}
+.cards-page.cards-staff-page .cards-reverse-form .cards-form-actions{margin:0}
+.cards-page.cards-staff-page button.cards-danger{color:#b54f45;border-color:#eed5d0;background:#fff}
+.cards-page.cards-staff-page button.cards-danger:not(:disabled):hover{background:#fff4f1;border-color:#ddafa6}
+.cards-page.cards-staff-page .cards-report-filters{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px;padding:0 0 14px;border-bottom:1px solid #edf0f5}
+.cards-page.cards-staff-page .cards-report-filters label{flex:1;max-width:210px}
+.cards-page.cards-staff-page .cards-report-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.cards-page.cards-staff-page .cards-report-totals>div{border:1px solid #e6ebf2;border-radius:8px;padding:12px;background:#f8fafd;min-width:0}
+.cards-page.cards-staff-page .cards-report-totals dt{font-size:12px;color:#748196}
+.cards-page.cards-staff-page .cards-report-totals dd{margin:5px 0 0;font-size:22px;text-align:left;font-weight:650;letter-spacing:-.3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-subheading{font-size:13px;margin:20px 0 10px}
+.cards-page.cards-staff-page .cards-table-scroll{overflow:auto;max-width:100%;border:1px solid #e6ebf2;border-radius:8px}
+.cards-page.cards-staff-page .cards-data-table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.5}
+.cards-page.cards-staff-page .cards-data-table th,.cards-page.cards-staff-page .cards-data-table td{padding:10px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid #edf0f5;font-variant-numeric:tabular-nums}
+.cards-page.cards-staff-page .cards-data-table thead th{background:#f5f7fb;color:#758298;font-size:11px;font-weight:500}
+.cards-page.cards-staff-page .cards-data-table th:first-child{text-align:left;white-space:normal;overflow-wrap:anywhere;min-width:150px;font-weight:550}
+.cards-page.cards-staff-page .cards-data-table tr:last-child>*{border-bottom:0}
+.cards-page.cards-staff-page .cards-subheading+.cards-caption{margin:-4px 0 10px}
+@media(max-width:560px){
+ .cards-page.cards-staff-page .cards-item-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .cards-page.cards-staff-page .cards-item-title{grid-column:1 / -1}
+ .cards-page.cards-staff-page .cards-item-heading>button{grid-column:2;margin-left:auto}
+ .cards-page.cards-staff-page .cards-item-time{grid-column:1;grid-row:2}
+ .cards-page.cards-staff-page .cards-plan-values{gap:7px 16px}
+ .cards-page.cards-staff-page .cards-plan-editor .cards-grid,.cards-page.cards-staff-page .cards-inline-form .cards-grid{grid-template-columns:1fr}
+ .cards-page.cards-staff-page .cards-reverse-form{display:block}
+ .cards-page.cards-staff-page .cards-reverse-form .cards-form-actions{margin-top:10px}
+ .cards-page.cards-staff-page .cards-report-filters label{max-width:none;flex-basis:calc(50% - 5px)}
+ .cards-page.cards-staff-page .cards-report-filters>button{margin-left:auto}
+ .cards-page.cards-staff-page .cards-report-totals{gap:8px}
+ .cards-page.cards-staff-page .cards-report-totals>div{padding:10px}
+ .cards-page.cards-staff-page .cards-report-totals dd{font-size:18px}
+}
+
+.cards-page.cards-staff-page .cards-workspace-tabs button.primary:not(:disabled):hover{background:#fff;color:#1266d8;border-color:#dfe6f0}

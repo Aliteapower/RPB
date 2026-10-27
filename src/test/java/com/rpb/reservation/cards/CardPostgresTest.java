@@ -23,7 +23,7 @@ class CardPostgresTest extends CatalogPostgresTest {
   clock=new MutableClock();principal=new CustomerAuthPrincipal(tenant,UUID.randomUUID(),customer,"test@example.com","顾客");context=mock(CardContextPort.class);
   when(context.store(scope)).thenReturn(new StoreInfo(issuer,"Asia/Singapore"));
   var access=new CardAccess(context,new CardSettingsRepository(jdbc));tx.execute(s->access.settings(scope,actor,true));
-  commands=new CardCommands(jdbc,json);var planRepo=new CardPlanRepository(jdbc,json);var holdingRepo=new CardHoldingRepository(jdbc,json);
+  commands=new CardCommands(jdbc,json);var planRepo=new CardPlanRepository(jdbc,json);var holdingRepo=new CardHoldingRepository(jdbc,json,new CardDailyExpiryRepository(jdbc));
   plans=new CardPlanService(access,planRepo,products,commands);holdings=new CardHoldingService(access,planRepo,holdingRepo,commands,clock,products);
   stamps=new StampService(access,planRepo,holdingRepo,commands,clock);
   redeem=new RedemptionService(access,new RedemptionRepository(jdbc),planRepo,holdingRepo,commands,stamps,clock);
@@ -127,5 +127,63 @@ class CardPostgresTest extends CatalogPostgresTest {
  @Test void midnightCannotMoveCustomerAuthorizationIntoNextDay(){var h=paid(plan("period",null,1,0));clock.now=Instant.parse("2026-10-25T15:59:30Z");var r=request(h);var code=tx.execute(s->redeem.authorize(scope,principal,r.id(),new Confirm(h.id(),"2026-10-25",key())));clock.now=Instant.parse("2026-10-25T16:00:20Z");assertThatThrownBy(()->tx.execute(s->redeem.authorized(scope,actor,new Authorized(code.code(),"2026-10-26",key())))).hasMessageContaining("日期");assertThat(holdings.own(scope,principal).getFirst().usedToday()).isZero();}
  @Test void oldStampCannotRevokeAnotherRoundsUnusedReward(){var h=enroll(plan("stamp",null,10,1));tx.execute(s->stamps.grant(scope,actor,h.id(),"round-A",key()));var original=jdbc.queryForObject("select id from card_entries where tenant_id=? and kind='stamp' and source='round-A'",UUID.class,tenant);var reward=holdings.own(scope,principal).stream().filter(c->c.kind().equals("reward")).findFirst().orElseThrow();var r=request(reward);tx.execute(s->redeem.confirm(scope,principal,r.id(),new Confirm(reward.id(),"2026-10-25",key())));tx.execute(s->stamps.grant(scope,actor,h.id(),"round-B",key()));assertThatThrownBy(()->tx.execute(s->stamps.reverse(scope,actor,original,new Reverse("撤回旧轮次",key())))).hasMessageContaining("倒序");assertThat(holdings.own(scope,principal).stream().filter(c->c.kind().equals("reward")&&c.status().equals("active")&&c.remaining()==1)).hasSize(1);}
  @Test void singleStampNonRepeatingCardCanRetryAfterUnusedRewardReversal(){var p=tx.execute(s->plans.create(scope,actor,new PlanCreate("单次卡","Single","stamp",product.id(),null,10,30,1,false,7,0,"inclusive",java.math.BigDecimal.ZERO,key())));var h=enroll(p);tx.execute(s->stamps.grant(scope,actor,h.id(),"original",key()));var entry=jdbc.queryForObject("select id from card_entries where tenant_id=? and kind='stamp'",UUID.class,tenant);tx.execute(s->stamps.reverse(scope,actor,entry,new Reverse("登记错误",key())));tx.execute(s->stamps.grant(scope,actor,h.id(),"correct",key()));assertThat(holdings.own(scope,principal).stream().filter(c->c.kind().equals("reward")&&c.status().equals("active"))).hasSize(1);}
- @Test void cursorReachesOlderHoldingsBeyondFiveHundredWithoutDuplicates(){var h=paid(plan("count",1,null,0));jdbc.update("insert into customer_cards(id,tenant_id,store_id,customer_id,plan_id,kind,remaining,initial_total,daily_limit,timezone,starts_at,expires_at,status,snapshot) select gen_random_uuid(),tenant_id,store_id,customer_id,plan_id,kind,remaining,initial_total,daily_limit,timezone,starts_at,expires_at,status,snapshot from customer_cards cross join generate_series(1,505) where customer_cards.id=?",h.id());var first=holdings.own(scope,principal);assertThat(first).hasSize(500);var second=holdings.own(scope,principal,first.getLast().id());assertThat(second).hasSize(6);assertThat(first.stream().map(Holding::id).toList()).doesNotContainAnyElementsOf(second.stream().map(Holding::id).toList());}
+ @Test void cursorReachesOlderHoldingsBeyondFiveHundredWithoutDuplicates(){var h=paid(plan("count",1,null,0));jdbc.update("insert into customer_cards(id,tenant_id,store_id,customer_id,plan_id,kind,remaining,initial_total,daily_limit,timezone,starts_at,expires_at,status,snapshot,daily_expiry_from,daily_expiry_next_day) select gen_random_uuid(),tenant_id,store_id,customer_id,plan_id,kind,remaining,initial_total,daily_limit,timezone,starts_at,expires_at,status,snapshot,daily_expiry_from,daily_expiry_next_day from customer_cards cross join generate_series(1,505) where customer_cards.id=?",h.id());var first=holdings.own(scope,principal);assertThat(first).hasSize(500);var second=holdings.own(scope,principal,first.getLast().id());assertThat(second).hasSize(6);assertThat(first.stream().map(Holding::id).toList()).doesNotContainAnyElementsOf(second.stream().map(Holding::id).toList());}
+ @Test void finiteDailyCardExpiresUnusedDayOnceAndShowsSeparateEntry(){
+  var h=paid(plan("count",30,1,0));clock.now=clock.now.plusSeconds(86400);
+  var next=tx.execute(s->holdings.own(scope,principal)).getFirst();assertThat(next.remaining()).isEqualTo(29);assertThat(next.available()).isEqualTo(1);
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(29);
+  var expired=tx.execute(s->holdings.ownEntries(scope,principal)).stream().filter(e->e.kind().equals("daily_expire")).toList();assertThat(expired).hasSize(1);assertThat(expired.getFirst().quantity()).isEqualTo(1);assertThat(expired.getFirst().beforeTotal()).isEqualTo(30);assertThat(expired.getFirst().afterTotal()).isEqualTo(29);assertThat(expired.getFirst().businessDay()).isEqualTo(LocalDate.parse("2026-10-25"));
+ }
+ @Test void unusedPortionOfDailyLimitExpiresButConsumedPortionDoesNotRepeat(){
+  var h=paid(plan("period",10,3,0));var r=request(h);tx.execute(s->redeem.confirm(scope,principal,r.id(),new Confirm(h.id(),"2026-10-25",key())));clock.now=clock.now.plusSeconds(86400);
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(7);
+  assertThat(tx.execute(s->holdings.ownEntries(scope,principal)).stream().filter(e->e.kind().equals("daily_expire")).mapToInt(Entry::quantity).sum()).isEqualTo(2);
+ }
+ @Test void usedDailyQuotaIsNotExpiredAgainAndCrossDayReversalCannotResurrectIt(){
+  var h=paid(plan("count",30,1,0));var r=request(h);tx.execute(s->redeem.confirm(scope,principal,r.id(),new Confirm(h.id(),"2026-10-25",key())));clock.now=clock.now.plusSeconds(86400);
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(29);
+  var original=tx.execute(s->holdings.ownEntries(scope,principal)).stream().filter(e->e.kind().equals("redeem")).findFirst().orElseThrow();
+  tx.execute(s->redeem.reverse(scope,actor,original.id(),new Reverse("误核销",key())));
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(29);
+ }
+ @Test void severalMissedDaysAreCappedByRemainingAndCardExpiry(){
+  var h=paid(plan("count",30,1,0));jdbc.update("update customer_cards set expires_at=? where id=?",java.sql.Timestamp.from(clock.now.plusSeconds(86400*3)),h.id());clock.now=clock.now.plusSeconds(86400*10);
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(27);
+  assertThat(tx.execute(s->holdings.ownEntries(scope,principal)).stream().filter(e->e.kind().equals("daily_expire"))).hasSize(3);
+ }
+ @Test void ordinaryCountCardWithoutDailyLimitKeepsUnusedBalance(){
+  paid(plan("count",30,null,0));clock.now=clock.now.plusSeconds(86400*3);assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(30);
+ }
+
+ @Test void dailyExpiryNeverGoesNegativeAndDoesNotTouchOtherStore(){
+  var h=paid(plan("count",2,3,0));clock.now=clock.now.plusSeconds(86400*4);
+  var foreign=new com.rpb.reservation.common.scope.StoreScope(scope.tenantId(),UUID.randomUUID());var expiry=new CardDailyExpiryRepository(jdbc);
+  tx.execute(s->{expiry.settleScope(foreign,null,clock.instant());return null;});assertThat(jdbc.queryForObject("select remaining from customer_cards where id=?",Integer.class,h.id())).isEqualTo(2);
+  var result=tx.execute(s->holdings.own(scope,principal)).getFirst();assertThat(result.remaining()).isZero();assertThat(result.available()).isZero();assertThat(tx.execute(s->holdings.ownEntries(scope,principal)).stream().filter(e->e.kind().equals("daily_expire")).mapToInt(Entry::quantity).sum()).isEqualTo(2);
+ }
+ @Test void dailyExpiryUsesFrozenZoneAndSameDayDoesNotExpire(){
+  var h=paid(plan("count",30,1,0));clock.now=Instant.parse("2026-10-25T15:59:59Z");assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(30);
+  when(context.store(scope)).thenReturn(new StoreInfo(issuer,"UTC"));clock.now=Instant.parse("2026-10-25T16:00:00Z");assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(29);
+ }
+ @Test void concurrentSettlementAndRedemptionCannotDoubleExpireOrOverspend()throws Exception{
+  var h=paid(plan("count",2,1,0));clock.now=clock.now.plusSeconds(86400);var r=request(h);var pool=Executors.newFixedThreadPool(2);
+  try{var settle=pool.submit(()->tx.execute(s->holdings.own(scope,principal)));var use=pool.submit(()->tx.execute(s->redeem.confirm(scope,principal,r.id(),new Confirm(h.id(),"2026-10-26",key()))));settle.get(15,TimeUnit.SECONDS);assertThat(use.get(15,TimeUnit.SECONDS).status()).isEqualTo("completed");}finally{pool.shutdownNow();}
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isZero();assertThat(jdbc.queryForObject("select count(*) from card_entries where card_id=? and kind='daily_expire'",Integer.class,h.id())).isEqualTo(1);
+ }
+ @Test void exhaustedCardOldDayReversalAlsoExpiresRestoredUse(){
+  var h=paid(plan("count",1,1,0));var r=request(h);tx.execute(s->redeem.confirm(scope,principal,r.id(),new Confirm(h.id(),"2026-10-25",key())));var original=jdbc.queryForObject("select id from card_entries where card_id=? and kind='redeem'",UUID.class,h.id());clock.now=clock.now.plusSeconds(86400);
+  var result=tx.execute(s->redeem.reverse(scope,actor,original,new Reverse("误核销",key())));assertThat(result.remaining()).isZero();
+ }
+ @Test void migrationStartsExistingCardsTodayWithoutBackChargingOldDays()throws Exception{
+  var h=paid(plan("count",30,1,0));jdbc.execute("drop trigger card_daily_expiry_defaults on customer_cards");jdbc.execute("alter table customer_cards drop column daily_expiry_next_day cascade");jdbc.execute("alter table customer_cards drop column daily_expiry_from cascade");jdbc.execute(java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/db/migration/V086__card_daily_expiry.sql")));
+  var activation=jdbc.queryForObject("select daily_expiry_from from customer_cards where id=?",java.sql.Date.class,h.id()).toLocalDate();clock.now=activation.atTime(12,0).atZone(ZoneId.of(h.timezone())).toInstant();
+  assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(30);assertThat(tx.execute(s->holdings.ownEntries(scope,principal)).stream().filter(e->e.kind().equals("daily_expire"))).isEmpty();clock.now=clock.now.plusSeconds(86400);assertThat(tx.execute(s->holdings.own(scope,principal)).getFirst().remaining()).isEqualTo(29);
+  // Exercise the old issuer SQL, which knows neither of the new cursor columns.
+  UUID legacy=UUID.randomUUID();jdbc.update("insert into customer_cards(id,tenant_id,store_id,customer_id,plan_id,kind,remaining,initial_total,daily_limit,timezone,starts_at,expires_at,status,snapshot) select ?,tenant_id,store_id,customer_id,plan_id,kind,remaining,initial_total,daily_limit,timezone,starts_at,expires_at,status,snapshot from customer_cards where id=?",legacy,h.id());assertThat(jdbc.queryForObject("select daily_expiry_from from customer_cards where id=?",java.sql.Date.class,legacy).toLocalDate()).isEqualTo(activation);
+ }
+ @Test void reportAttributesExpiryToBusinessDayAndKeepsConsumptionSeparate(){
+  var h=paid(plan("count",30,1,0));clock.now=clock.now.plusSeconds(86400*2);tx.execute(s->holdings.own(scope,principal));
+  var r=new com.rpb.reservation.cards.history.CardReportRepository(jdbc);var report=r.query(scope,LocalDate.parse("2026-10-25"),LocalDate.parse("2026-10-25"),h.timezone());assertThat(report.expiredDaily()).hasSize(1);assertThat(report.expiredDaily().getFirst().unused()).isEqualTo(1);assertThat(report.usage().stream().mapToLong(com.rpb.reservation.cards.history.CardReportRepository.Usage::redeemed).sum()).isZero();
+ }
+
 }
