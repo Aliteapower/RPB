@@ -55,3 +55,10 @@
 `GET /api/v1/stores/{storeId}/catalog/storage-products?query=&page=0&size=12`，返回 `{items,total,page,size,hasMore}`。沿用 `catalog.view` 和会话 tenant/store 范围；query≤120，按酒名/编号字面搜索，page=0..100000，size=1..100，非法参数 `CATALOG_INVALID/400`、未登录401、越权403。仅筛选请求门店 channels 含 storage 的商品，包含已停用/下架/归档条目；在分页前过滤，不受原总目录500项上限影响。只读 REPEATABLE_READ 查询保证计数及分页一致，排序 code/id。既有 `/products` 响应不变。
 
 入口内嵌原商品编辑器与状态管理；`catalog.manage` 控制资料/门店维护，租户共享资料需 tenant_admin，`catalog.publish` 控制全局状态。写入仍经原 editor/listing/status 的版本、幂等与审计校验；本店停用影响该商品在本店所有渠道，仅取消 storage 勾选才仅关闭寄存酒。历史寄存快照不改写。无新增权限、迁移或写接口。
+# 寄存酒自动短编号补充（2026-10-27）
+
+POST /api/v1/stores/{storeId}/catalog/products 及 /catalog/products/editor：新建且channels包含storage时，product.code可留空或null，保存事务内分配租户范围未使用的1至5位数字（1..99999），响应返回最终编号。自定义编号沿用原最多80字符约束与CATALOG_CONFLICT/409重复拒绝；编辑已有商品仍须携带编号，不自动替换。幂等重放返回原商品，不重复分配。自动号段用完返回CATALOG_CODE_EXHAUSTED/409，可改用自定义编号。
+
+存酒收存关联创建商品使用同一分配器，替代此前WS-UUID；所有商品新建使用同一租户事务锁协调自动与手动编号，保留unique(tenant_id,code)。分配只查本租户全部商品（含归档），不改历史编号、快照或数据库结构。catalog.manage、tenant_admin和门店访问边界不变。
+
+前端仅存酒新建草稿默认选择已启用且中文名称精确为“酒水”的分类；未找到则手选，不新建分类，不覆盖已有商品/用户选择。编号留空保存后生成，支持自行输入；默认瓶与寄存酒渠道沿用。

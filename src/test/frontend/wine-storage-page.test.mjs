@@ -339,9 +339,16 @@ test('embedded wine workspace keeps one title and groups search and actions with
  const generic=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();assert.ok(button(generic.root,'分类管理'));assert.equal(nodes(generic.root,n=>n.tag==='h2'&&text(n).trim()==='商品列表').length,1);generic.unmount()
 })
 
+test('new storage wine defaults to enabled wine category and lets the server allocate a short code',async()=>{
+ const category={id:'wine-default',code:'WINE',nameZh:'酒水',nameEn:'Wine',enabled:true,version:0,sortOrder:0}
+ const s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:[],total:0,page:0,size:12,hasMore:false}:url.endsWith('/categories')?[{...category,id:'disabled',enabled:false},category]:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
+ const code=nodes(s.root,n=>n.tag==='input'&&n.props.maxlength==='80')[0];assert.equal(code.props.required,false);assert.equal(code.value,'');assert.match(text(s.root),/留空自动生成/);assert.ok(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine-default').length)
+ const name=nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()==='中文名称')[0],n=>n.tag==='input')[0];name.props['onUpdate:modelValue']('自动编号酒');nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.find(c=>c.method==='POST').body.product.code,'');assert.equal(s.calls.find(c=>c.method==='POST').body.product.categoryId,'wine-default');s.unmount()
+})
+
 test('storage editor defaults to bottles and preserves advanced values through collapse and save',async()=>{
  const s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:[],total:0,page:0,size:12,hasMore:false}:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
- const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()===label)[0],n=>n.tag==='input')[0]
+ const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim().startsWith(label))[0],n=>n.tag==='input')[0]
  assert.equal(field('单位').value,'瓶');const extra=nodes(s.root,n=>n.tag==='details'&&String(n.props.class).includes('catalog-editor-extra'))[0];assert.ok(extra);assert.equal(extra.props.open,false);assert.ok(nodes(extra,n=>n.tag==='input'&&n.props.inputmode==='decimal').length)
  nodes(s.root,n=>n.tag==='form')[0].props.onInvalidCapture();await tick();assert.equal(extra.props.open,true);field('价格 (SGD)').props['onUpdate:modelValue']('12.50');field('编号').props['onUpdate:modelValue']('NEW-BOTTLE');field('中文名称').props['onUpdate:modelValue']('快速新增');nodes(s.root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('cat');extra.props.onToggle({target:{open:false}});await tick();nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()
  const body=s.calls.find(c=>c.method==='POST').body;assert.equal(body.product.unit,'瓶');assert.equal(body.product.priceCents,1250);assert.deepEqual(body.product.channels,['storage']);s.unmount()
@@ -359,7 +366,7 @@ test('wine manager creates through the original editor with storage selected and
  const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:created?[created]:[],total:created?1:0,page:0,size:12,hasMore:false}:url.endsWith('/products/editor')&&options?.method==='POST'?new Promise(resolve=>finish=()=>{const body=JSON.parse(options.body);created={...catalogProducts[0],...body.product,id:'new-wine'};resolve({product:created,barcodes:body.barcodes})}):catalogResponse(url,options),{actor});await tick()
  button(s.root,'设置').props.onClick();await tick();button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(button(s.root,'＋ 新增酒品'));button(s.root,'＋ 新增酒品').props.onClick();await tick()
  assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['storage']);assert.equal(button(s.root,'返回存酒设置').props.disabled,true)
- const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()===label)[0],n=>n.tag==='input')[0]
+ const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim().startsWith(label))[0],n=>n.tag==='input')[0]
  field('编号').props['onUpdate:modelValue']('NEW-WINE');field('中文名称').props['onUpdate:modelValue']('新增寄存酒');nodes(s.root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('cat');await tick()
  const form=nodes(s.root,n=>n.tag==='form')[0];form.props.onSubmit({preventDefault(){}});form.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,1);assert.equal(button(s.root,'保存商品与条码').props.disabled,true)
  const command=s.calls.find(c=>c.method==='POST');assert.equal(command.url,'/api/v1/stores/A/catalog/products/editor');assert.deepEqual(command.body.product.channels,['storage']);assert.equal(command.body.product.nameZh,'新增寄存酒');assert.ok(command.body.idempotencyKey);finish();await tick();assert.match(text(s.root),/商品信息与条码已保存/)
@@ -401,7 +408,7 @@ test('storage product manager remains available with storage closed and clears f
  fail=false;const refreshes=nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新');refreshes.at(-1).props.onClick();await tick();assert.match(text(s.root),/酒品1/);assert.equal(button(s.root,'编辑'),undefined);assert.equal(button(s.root,'＋ 新增酒品'),undefined);button(s.root,'上下架管理').props.onClick();await tick();assert.equal(button(s.root,'本店停用'),undefined);s.unmount()
 })
 function catalogResponse(url,options){if(url.endsWith('/categories'))return[{id:'cat',code:'C',nameZh:'酒类',nameEn:'Wine',enabled:true,version:0,sortOrder:0}];if(url.endsWith('/products'))return catalogProducts;if(url.endsWith('/editor')){const body=options?.body?JSON.parse(options.body):null;return{product:body?{...catalogProducts[0],...body.product,version:1,listingVersion:1}:catalogProducts[0],barcodes:body?body.barcodes:['06956367311355']}}return home}
-function button(root,label){return nodes(root,n=>n.tag==='button'&&text(n).trim()===label)[0]}
+function button(root,label){return nodes(root,n=>n.tag==='button'&&text(n).trim().startsWith(label))[0]}
 function typeField(input,value){input.value=value;(input.listeners.input??input.props.onInput)({target:input})}
 
 test('catalog operation areas are separate and list hides publication and editor actions',async()=>{
