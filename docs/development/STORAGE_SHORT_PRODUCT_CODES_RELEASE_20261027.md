@@ -12,4 +12,16 @@ GO。29项后端测试、78项前端回归、vue-tsc/Vite及diff检查通过。�
 
 ## 发布结果
 
-发布后补充功能SHA、备份路径及验证结果。证据target/storage-short-product-codes-release-20261027/。
+功能提交da729ee927b7a4cdbdf7e2ffda9b59f1af232c60已推送并部署前后端。不可变制品/opt/rpb/releases/20261027-storage-short-product-codes-da729ee9，完整备份/opt/rpb/backups/20261027-storage-short-product-codes-da729ee9-before。旧JAR、前端、前后端标记及环境均已备份；切换边界数据库备份19,973,883字节，pg_restore目录校验通过，无迁移或数据库恢复。
+
+干净Git archive核对2,869个blob，npm ci、78项前端回归、vue-tsc/Vite及Maven package成功。JAR与上一版逐项比较仅4个catalog类改变：CatalogService、StorageProductCatalog、CatalogRepository及新增CatalogProductCodes，其他模块、依赖与迁移字节不变。原12项无关文件SHA256与发布前一致，未纳入提交或制品。
+
+四个生产域名64个页面入口返回新index，33项公开资源逐字节一致，72项匿名拒绝及4项匿名空目录通过。38项QA认证只读检查通过，包含商品查询/分页/权限拒绝、寄存清单和3种Excel导出；临时会话finally撤销，无真实商品或存取酒业务写入。自动编号的并发、重放及耗尽由本地PostgreSQL测试验证，不声称执行过生产新建。
+
+268个前端制品文件与正式目录一致，7,593个旧资源字节保持不变。152项业务与配置指纹在切换前、发布后及最终复核一致；排除QA租户、会话、限流和审计等易变数据，不代表整库字节一致。环境文件和邻接Nginx/PostgreSQL/Redis/Docker服务身份不变，Flyway仍084|84|0。
+
+后端最终active，PID2275853、InvocationID718613620fec4489ae683a4e96d7a72a、NRestarts0，就绪认证响应401符合契约，观察及最终复核无新增ERROR。前后端功能SHA一致，GO，未触发回退。后续发布记录提交不改变线上功能SHA。
+
+SHA256：JAR 626ae3e1b140ed249f83ecf93de17336d0c49a74bf6bc7a2116af8a8d7bf8658；前端归档f78d6f03fec6cb19778052ae9da9ed87235e7da64ed83248103fcf36a47cd83d；index 02da7018dfb5c543c0197bd71e4f97448c1fc6a2b280e6eff040982178a18709。
+
+本地证据target/storage-short-product-codes-release-20261027/，服务器证据/home/ubuntu/storage-short-product-codes-release-20261027/。未做真实手机/微信验收。
