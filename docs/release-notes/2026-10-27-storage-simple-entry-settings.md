@@ -19,3 +19,5 @@
 ## 兼容与回退
 
 无后端、API、数据库迁移、权限注册、依赖或环境变化；Reservation、Queue、Walk-in、Seating、Cleaning业务未改。回退本轮前端模板、默认单位参数和样式，保留已创建的商品及其单位和价格。尚未提交、推送或部署。
+
+后续授权发布：2026-10-27以f1cd0b36共同上线前端，后端8ca25c8b未重启。77项干净源码回归、公开入口/资源及QA读取检查通过；完整发布记录见docs/development/STORAGE_SIMPLE_ENTRY_SETTINGS_RELEASE_20261027.md。

@@ -12,4 +12,12 @@ GO。77项前端回归、vue-tsc/Vite和diff检查通过。桌面及319px中英�
 
 ## 发布结果
 
-完成后补充功能SHA、备份路径及验证结果。证据target/storage-simple-entry-settings-release-20261027/。
+功能提交f1cd0b3622499f645a8c1a238a37d0b44bc21be5已推送并部署前端，后端保持8ca25c8bb67d01009d9b4cae0dc908356b732d26且未重启。不可变制品/opt/rpb/releases/20261027-storage-simple-entry-settings-f1cd0b36，完整备份/opt/rpb/backups/20261027-storage-simple-entry-settings-f1cd0b36-before。备份与原前端逐项一致，本轮无数据库备份、迁移或恢复。
+
+干净Git archive核对2,865个blob；npm ci、77项前端回归、vue-tsc/Vite构建成功。12项无关工作区文件SHA256保持不变，未带入提交或制品。前端归档SHA256为6c319dc7f2c6cd331192bff469c9621473bf1e63a73e741071c6b3a7dd96c177，index为abfcb44bf553079ed0493f845af2a69fb01add5dc2b11289d150d66f842b5b24。
+
+四个生产域名共64个页面入口返回新index，33项公开资源逐字节一致；72项匿名拒绝及4项匿名空目录验证通过。38项QA认证只读检查通过，包括商品分页/搜索及访问拒绝、寄存清单和3种Excel导出。临时会话finally撤销，没有通过生产接口新增酒品或办理真实存取酒。
+
+268个前端制品文件与正式目录一致，7,472个旧资源字节保持不变。152项业务及配置指纹在发布前、发布后及最终复核一致，口径排除QA租户、会话、限流及审计等易变数据，不代表整库字节相等。环境文件和后端/Nginx/PostgreSQL/Redis/Docker服务身份不变，Flyway仍084|84|0。后端active，PID2255987、InvocationID083d8880fda3494386ed5c36c8260dd0、NRestarts0；观察及最终复核无新增ERROR。
+
+GO，发布完成且未触发回退。后续发布记录提交不改变线上功能SHA。证据target/storage-simple-entry-settings-release-20261027/；服务器证据/home/ubuntu/storage-simple-entry-settings-release-20261027/。真实手机/微信验收未执行。
