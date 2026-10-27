@@ -34,7 +34,9 @@ public final class StorageDtos {
  public record Authorize(String code,String idempotencyKey){}
  public record Correction(String reason,String note,String idempotencyKey){}
  public record PhotoAdd(List<UUID> photos,String note,String idempotencyKey){}
- public record Event(UUID id,UUID sourceId,String action,UUID actorId,Map<String,Object> details,Instant createdAt){}
+ public record Event(UUID id,UUID sourceId,String action,UUID actorId,Map<String,Object> details,Instant createdAt,@JsonInclude(JsonInclude.Include.NON_NULL) String actorName){
+  public Event(UUID id,UUID sourceId,String action,UUID actorId,Map<String,Object> details,Instant createdAt){this(id,sourceId,action,actorId,details,createdAt,null);}
+ }
  public record Product(UUID id,UUID categoryId,String code,String nameZh,String nameEn){}
  public record Category(UUID id,String nameZh,String nameEn){}
  public record StoreOption(UUID id,String name){}

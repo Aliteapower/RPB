@@ -58,5 +58,24 @@ public class StorageRepository {
  public List<Intent> intents(StoreScope s,UUID customer){return jdbc.query("select * from wine_storage_intents where tenant_id=? and store_id=?"+(customer==null?"":" and customer_id=?")+" order by created_at desc",(r,n)->intent(s,r),scopeArgs(s,customer==null?new Object[]{}:new Object[]{customer}));}
  public Intent byCode(StoreScope s,String hash){var rows=rows(s,"select id from wine_storage_intents where tenant_id=? and store_id=? and code_hash=?",hash);if(rows.isEmpty())throw StorageException.missing();return intent(s,(UUID)rows.getFirst().get("id"),false);}
  public Event event(StoreScope s,UUID customer,UUID source,String action,UUID actor,Object payload,Instant now){UUID event=UUID.randomUUID();String details=json(payload);update(s,"insert into wine_storage_events(tenant_id,store_id,id,customer_id,source_id,action,actor_id,details,created_at) values(?,?,?,?,?,?,?,?::jsonb,?)",event,customer,source,action,actor,details,at(now));return new Event(event,source,action,actor,details(details),now);}
- public List<Event> events(StoreScope s,UUID customer){return jdbc.query("select * from wine_storage_events where tenant_id=? and store_id=?"+(customer==null?"":" and customer_id=?")+" order by created_at desc",(r,n)->new Event(id(r,"id"),id(r,"source_id"),r.getString("action"),id(r,"actor_id"),details(r.getString("details")),time(r,"created_at")),scopeArgs(s,customer==null?new Object[]{}:new Object[]{customer}));}
+ /** One scoped projection resolves historical staff/customer names without changing audit facts. */
+ public List<Event> events(StoreScope s,UUID customer){
+  String sql="""
+   select e.*,
+    case when e.action in ('applied','cancelled','authorized')
+      or (e.action='intent.created' and e.details->>'origin'='customer')
+      or (e.action='intent.cancelled' and e.actor_id=e.customer_id)
+     then nullif(btrim(c.display_name),'')
+     else coalesce(nullif(btrim(a.display_name),''),nullif(btrim(a.username),''))
+    end as actor_name
+   from wine_storage_events e
+   left join auth_accounts a on a.id=e.actor_id and a.tenant_id=e.tenant_id
+   left join customers c on c.id=e.actor_id and c.id=e.customer_id and c.tenant_id=e.tenant_id
+   where e.tenant_id=? and e.store_id=?
+   """;
+  return jdbc.query(sql+(customer==null?"":" and e.customer_id=?")+" order by e.created_at desc",
+   (r,n)->new Event(id(r,"id"),id(r,"source_id"),r.getString("action"),id(r,"actor_id"),details(r.getString("details")),time(r,"created_at"),r.getString("actor_name")),
+   scopeArgs(s,customer==null?new Object[]{}:new Object[]{customer}));
+ }
+
 }

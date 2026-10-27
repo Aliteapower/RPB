@@ -523,3 +523,12 @@ test('settings URL stays on settings after page initialization and supports clos
  assert.match(text(s.root),/存酒设置/);assert.equal(button(s.root,'查找顾客'),undefined);assert.equal(button(s.root,'保存存取酒模式'),undefined);assert.ok(nodes(s.root,n=>n.tag==='summary'&&text(n)==='保存规则设置').length)
  button(s.root,'← 返回存取酒').props.onClick();await tick();assert.ok(button(s.root,'存取酒记录'));assert.equal(button(s.root,'帮顾客存酒'),undefined);s.unmount()
 })
+
+test('storage activity shows operator names and a translated missing-name fallback instead of UUIDs',async()=>{
+ const actorId='30000000-0000-0000-0000-000000000902',person={id:'customer',displayName:'顾客',phone:'8000'},data={...home,events:[{id:'e1',sourceId:'application',action:'received',actorId,actorName:'王经理',details:{},createdAt:new Date().toISOString()},{id:'e2',sourceId:'application',action:'received',actorId:'missing-actor-id',actorName:null,details:{},createdAt:new Date().toISOString()}]}
+ const s=mount(StaffPage,false,'zh-CN',data,url=>url.includes('/customers?')?[person]:data);await tick()
+ const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0];nodes(form,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await form.props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('顾客')&&text(n).includes('8000'))[0].props.onClick();await tick()
+ button(s.root,'存取酒记录').props.onClick();await tick();button(s.root,'操作明细').props.onClick();await tick()
+ assert.match(text(s.root),/操作者.*王经理/);assert.match(text(s.root),/未知操作者/);assert.doesNotMatch(text(s.root),/30000000-0000-0000-0000-000000000902|missing-actor-id/)
+ s.i18n.global.locale.value='en-SG';await tick();assert.match(text(s.root),/Unknown operator/);s.unmount()
+})

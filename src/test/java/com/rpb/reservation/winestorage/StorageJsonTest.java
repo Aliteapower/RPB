@@ -36,4 +36,10 @@ class StorageJsonTest {
   assertThat(json.writeValueAsString(old)).doesNotContain("storageLocation");
   assertThat(json.readValue("{\"nameZh\":\"旧酒\"}",Snapshot.class).storageLocation()).isNull();
  }
+ @Test void historicalEventsWithoutNamesStayReadableAndActorIdIsRetained()throws Exception{
+  var old=json.readValue("{\"actorId\": \"30000000-0000-0000-0000-000000000902\", \"action\": \"received\", \"details\": {}}",Event.class);
+  assertThat(old.actorName()).isNull();assertThat(old.actorId().toString()).isEqualTo("30000000-0000-0000-0000-000000000902");
+  var named=new Event(old.id(),old.sourceId(),old.action(),old.actorId(),old.details(),old.createdAt(),"王经理");
+  assertThat(json.writeValueAsString(named)).contains("王经理",old.actorId().toString());
+ }
 }
