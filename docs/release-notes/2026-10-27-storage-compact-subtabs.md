@@ -5,3 +5,5 @@
 67 项前端回归、构建及差异检查通过；319px 中英文宽度、四位审核数量均无截断或换行，栏高约 56px。原 12 项无关改动保留，无后端、迁移或权限变化。未另做手机实机或生产验收，尚未提交部署。回退前端样式及文案即可。
 
 详情 docs/development/STORAGE_COMPACT_SUBTABS_20261027.md；证据 target/storage-compact-subtabs-20261027/verification.json。
+
+后续授权发布：2026-10-27与设置内酒品管理共同以8ca25c8b上线；发布后267个前端文件逐一一致。发布记录见docs/development/STORAGE_PRODUCT_MANAGEMENT_RELEASE_20261027.md。
