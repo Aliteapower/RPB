@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly=true)
 public class CatalogService {
+ @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+ public ProductPage storageProducts(StoreScope s,CurrentActor a,String query,int page,int size){access.require(s,a,"catalog.view");if(query==null||query.length()>120||page<0||page>100000||size<1||size>100)throw CatalogException.invalid();return r.storageProducts(s,query.trim(),page,size);}
  private final CatalogAccess access;private final CatalogRepository r;private final CatalogCommands commands;private final ProductCatalogQuery query;
  public CatalogService(CatalogAccess access,CatalogRepository r,CatalogCommands commands,ProductCatalogQuery query){this.access=access;this.r=r;this.commands=commands;this.query=query;}
  public List<Category> categories(StoreScope s,CurrentActor a){access.require(s,a,"catalog.view");return r.categories(s.tenantId().value());}

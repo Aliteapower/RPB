@@ -8,6 +8,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 @Repository
 public class CatalogRepository {
+ public ProductPage storageProducts(StoreScope scope,String query,int page,int size){
+  String where=" where p.tenant_id=? and 'storage'=any(s.channels) and strpos(lower(concat_ws(' ',p.code,p.name_zh,p.name_en)),lower(?))>0";
+  Object[] args={scope.storeId().value(),scope.tenantId().value(),query};
+  long total=jdbc.queryForObject("select count(*) from ("+select()+where+") storage_products",Long.class,args);
+  var items=jdbc.query(select()+where+" order by p.code,p.id limit ? offset ?",this::map,scope.storeId().value(),scope.tenantId().value(),query,size,(long)page*size);
+  return new ProductPage(items,total,page,size,((long)page+1)*size<total);
+ }
  private final JdbcTemplate jdbc;
  public CatalogRepository(JdbcTemplate jdbc){this.jdbc=jdbc;}
  public List<Category> categories(UUID tenant){return jdbc.query("select * from catalog_categories where tenant_id=? order by sort_order,code",(r,n)->new Category(r.getObject("id",UUID.class),r.getString("code"),r.getString("name_zh"),r.getString("name_en"),r.getBoolean("enabled"),r.getInt("sort_order"),r.getInt("version")),tenant);}

@@ -21,8 +21,8 @@ const inventory={items:[{id:'inventory-item',customerId:'person',customerName:'�
 test('direct registration is immediately usable and pending requests load only in their separate view',async()=>{
  const s=mount(StaffPage,false);await tick()
  assert.match(text(s.root),/1\. 找到顾客/);assert.equal(nodes(s.root,n=>n.tag==='details').length,0);assert.doesNotMatch(text(s.root),/暂无待审核的存酒申请|审核并核对收存/);assert.ok(!s.calls.some(c=>c.url.endsWith('/pending-applications')))
- const inbox=nodes(s.root,n=>n.tag==='button'&&text(n).includes('顾客提交 · 待审核'))[0];inbox.props.onClick();await tick();assert.equal(s.route.query.task,'inbox');assert.match(text(s.root),/暂无待审核的存酒申请/);assert.doesNotMatch(text(s.root),/1\. 找到顾客/);assert.ok(s.calls.some(c=>c.url.endsWith('/pending-applications')))
- button(s.root,'直接帮顾客登记存酒').props.onClick();await tick();assert.equal(s.route.query.task,'deposit');assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/暂无待审核的存酒申请/);s.unmount()
+ const inbox=nodes(s.root,n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('顾客提交 · 待审核'))[0];inbox.props.onClick();await tick();assert.equal(s.route.query.task,'inbox');assert.match(text(s.root),/暂无待审核的存酒申请/);assert.doesNotMatch(text(s.root),/1\. 找到顾客/);assert.ok(s.calls.some(c=>c.url.endsWith('/pending-applications')))
+ button(s.root,'直接登记').props.onClick();await tick();assert.equal(s.route.query.task,'deposit');assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/暂无待审核的存酒申请/);s.unmount()
 })
 test('pending request route survives settings and store navigation and remains permission gated',async()=>{
  const s=mount(StaffPage,false,'en',home,undefined,{query:{task:'inbox'}});await tick();assert.match(text(s.root),/No storage requests awaiting review/);assert.doesNotMatch(text(s.root),/1\. Find customer/)
@@ -111,7 +111,7 @@ test('customer pages never expose merchant receipt or rule editing even if respo
   const s=mount(customer?CustomerPage:StaffPage,customer);await tick()
   if(customer){assert.match(text(s.root),/我要存酒/);assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='保存规则').length,0);s.unmount();continue}
   assert.match(text(s.root),/存酒.*取酒.*记录/)
-  assert.match(text(s.root),/顾客提交 · 待审核/);assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/请先查找并确认一位顾客/)
+  assert.match(text(s.root),/直接登记.*待审核/);assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/请先查找并确认一位顾客/)
   assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='确认实际收存').length,0)
   assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,0);button(s.root,'设置').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,1)
   s.unmount()
@@ -331,6 +331,33 @@ test('unlisted barcode retains identifier in application note and requests wine 
 
 const catalogProducts=['wine-a','wine-b'].map((id,i)=>({id,categoryId:'cat',code:id,nameZh:'酒品'+(i+1),nameEn:'Wine '+(i+1),descriptionZh:'',descriptionEn:'',imageUrl:'',priceCents:100,currency:'SGD',taxMode:'inclusive',taxCategory:'not_applicable',taxRate:0,channels:['storage'],kind:'physical',unit:'瓶',status:'active',listingEnabled:true,listingVersion:0,version:0}))
 const catalogActor={roles:['tenant_admin'],permissions:['catalog.view','catalog.manage','catalog.publish'],storeIds:['A']}
+test('storage settings open an embedded storage-only catalog and reuse editing and store enable commands',async()=>{
+ const actor={...catalogActor,permissions:[...catalogActor.permissions,'tenant.admin.manage']};let disabled=false;const working=catalogProducts.map((p,i)=>({...p,listingEnabled:i===0}))
+ const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:working.map(p=>({...p})),total:2,page:0,size:12,hasMore:false}:url.endsWith('/listing')?(disabled=true,{...working[0],listingEnabled:false,listingVersion:1}):url.endsWith('/editor')&&options?.method==='PUT'?(working[0]={...working[0],...JSON.parse(options.body).product,version:1,listingVersion:1},{product:working[0],barcodes:JSON.parse(options.body).barcodes}):catalogResponse(url,options),{actor});await tick();button(s.root,'设置').props.onClick();await tick()
+ assert.ok(button(s.root,'管理寄存酒商品'));assert.ok(!s.calls.some(c=>c.url.includes('/catalog/')))
+ button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('/stores/A/catalog/storage-products?')));assert.ok(!s.calls.some(c=>c.url.endsWith('/catalog/products')));assert.match(text(s.root),/酒品1|酒品2/);assert.equal(button(s.root,'分类管理'),undefined);assert.equal(button(s.root,'＋ 新增商品'),undefined)
+ button(s.root,'编辑').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.endsWith('/products/wine-a/editor')));assert.equal(button(s.root,'返回存酒设置').props.disabled,true)
+ const editor=nodes(s.root,n=>n.tag==='form'&&nodes(n,l=>l.tag==='label'&&text(l).includes('中文名称')).length)[0];const nameLabel=nodes(editor,n=>n.tag==='label'&&text(n).includes('中文名称'))[0];nodes(nameLabel,n=>n.tag==='input')[0].props['onUpdate:modelValue']('维护后酒名');editor.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.find(c=>c.method==='PUT').body.product.nameZh,'维护后酒名');assert.equal(working[0].nameZh,'维护后酒名');button(s.root,'← 返回商品列表').props.onClick();await tick();assert.match(text(s.root),/维护后酒名/);button(s.root,'上下架管理').props.onClick();await tick();button(s.root,'本店停用').props.onClick();await tick();button(s.root,'确认').props.onClick();await tick();assert.ok(disabled);const write=s.calls.find(c=>c.url.endsWith('/listing'));assert.deepEqual(write.body.channels,['storage']);assert.equal(write.body.enabled,false);assert.equal(write.body.expectedVersion,1);s.unmount()
+})
+test('wine catalog entry requires tenant administrator catalog access and keeps original catalog scope intact',async()=>{
+ for(const actor of [{...catalogActor,roles:['store_manager']},{...catalogActor,permissions:['tenant.admin.manage']}]){
+  const s=mount(StaffPage,false,'zh-CN',home,catalogResponse,{actor});await tick();button(s.root,'设置').props.onClick();await tick();assert.equal(button(s.root,'管理寄存酒商品'),undefined);assert.ok(!s.calls.some(c=>c.url.includes('/catalog/')));s.unmount()
+ }
+ const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();assert.ok(s.calls.some(c=>c.url.endsWith('/catalog/products')));assert.ok(!s.calls.some(c=>c.url.includes('/storage-products')));s.unmount()
+})
+test('embedded wine search paginates on the server and resets store context without showing unrelated products',async()=>{
+ const actor={...catalogActor,storeIds:['A','B'],permissions:[...catalogActor.permissions,'tenant.admin.manage']}
+ const respond=(url,options)=>url.includes('/storage-products?')?{items:[catalogProducts[0]],total:13,page:Number(new URL(url,'http://localhost').searchParams.get('page')),size:12,hasMore:!url.includes('page=1')}:catalogResponse(url,options)
+ const s=mount(StaffPage,false,'zh-CN',home,respond,{actor});await tick();button(s.root,'设置').props.onClick();await tick();button(s.root,'管理寄存酒商品').props.onClick();await tick()
+ const form=nodes(s.root,n=>n.tag==='form'&&nodes(n,b=>b.tag==='button'&&text(b)==='查询').length)[0];nodes(form,n=>n.tag==='input')[0].props['onUpdate:modelValue']('酒%_');form.props.onSubmit({preventDefault(){}});await tick();assert.ok(s.calls.some(c=>c.url.includes('query='+encodeURIComponent('酒%_'))&&c.url.includes('page=0')))
+ nodes(form,n=>n.tag==='input')[0].props['onUpdate:modelValue']('尚未查询');button(s.root,'下一页').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.includes('query='+encodeURIComponent('酒%_'))&&c.url.includes('page=1')))
+ s.route.params.storeId='B';await tick();assert.doesNotMatch(text(s.root),/酒品1/);button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(s.calls.some(c=>c.url.startsWith('/api/v1/stores/B/catalog/storage-products?')&&c.url.includes('query=&page=0')));s.unmount()
+})
+test('storage product manager remains available with storage closed and clears failed results without claiming zero matches',async()=>{
+ const actor={...catalogActor,permissions:['catalog.view']};let fail=true
+ const s=mount(StaffPage,false,'zh-CN',{...home,newBusinessEnabled:false},url=>url.includes('/storage-products?')?{items:catalogProducts,total:2,page:0,size:12,hasMore:false}:catalogResponse(url),{actor});await tick();button(s.root,'设置').props.onClick();await tick();const normalFetch=globalThis.fetch;globalThis.fetch=async(url,options)=>fail&&url.includes('/storage-products?')?{ok:false,status:503,json:async()=>({code:'TEMP',message:'查询失败'})}:normalFetch(url,options);button(s.root,'管理寄存酒商品').props.onClick();await tick();await tick();assert.match(text(s.root),/查询失败/);assert.doesNotMatch(text(s.root),/匹配商品: 0/)
+ fail=false;const refreshes=nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新');refreshes.at(-1).props.onClick();await tick();assert.match(text(s.root),/酒品1/);assert.equal(button(s.root,'编辑'),undefined);button(s.root,'上下架管理').props.onClick();await tick();assert.equal(button(s.root,'本店停用'),undefined);s.unmount()
+})
 function catalogResponse(url,options){if(url.endsWith('/categories'))return[{id:'cat',code:'C',nameZh:'酒类',nameEn:'Wine',enabled:true,version:0,sortOrder:0}];if(url.endsWith('/products'))return catalogProducts;if(url.endsWith('/editor')){const body=options?.body?JSON.parse(options.body):null;return{product:body?{...catalogProducts[0],...body.product,version:1,listingVersion:1}:catalogProducts[0],barcodes:body?body.barcodes:['06956367311355']}}return home}
 function button(root,label){return nodes(root,n=>n.tag==='button'&&text(n).trim()===label)[0]}
 function typeField(input,value){input.value=value;(input.listeners.input??input.props.onInput)({target:input})}

@@ -1,2 +1,4 @@
 export interface Product {id:string;categoryId:string;code:string;nameZh:string;nameEn:string;descriptionZh:string;descriptionEn:string;kind:string;unit:string;imageUrl:string;status:string;version:number;priceCents:number|null;currency:string;taxMode:string|null;taxCategory:string|null;taxRate:string|null;channels:string[];listingEnabled:boolean;listingVersion:number}
 export interface Category {id:string;code:string;nameZh:string;nameEn:string;enabled:boolean;sortOrder:number;version:number}
+
+export interface ProductPage {items:Product[];total:number;page:number;size:number;hasMore:boolean}

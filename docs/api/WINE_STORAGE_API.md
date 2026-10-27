@@ -45,6 +45,8 @@ POST `/api/v1/stores/{storeId}/wine-storage/direct-deliver`：`{customerId,selec
 Home.events 增加可空 actorName，原 actorId 保留。姓名在当前租户范围内按事件操作者身份批量关联查询：商户读取账号 display_name，空白时使用 username；顾客操作读取本人顾客档案 display_name。停用/软删除的账号仍可用于历史审计姓名查询，不授予登录或业务权限。姓名无法匹配时返回 null/缺省，前端显示未知操作者，不把 UUID 当作姓名。按当前档案解析，不回写历史事件或伪称操作时姓名快照；无迁移。原查询权限、顾客归属和门店范围不变。
 # 当前寄存清单
 
+存酒设置的酒品管理复用商品目录契约：`GET /api/v1/stores/{storeId}/catalog/storage-products?query=&page=0&size=12` 返回 `{items,total,page,size,hasMore}`，仅本店勾选 storage 的商品（包含停用/下架），在分页前过滤，搜索酒名/编号，query≤120、page=0..100000、size=1..100。原 `catalog.view` 及租户/门店权限校验，非法参数 `CATALOG_INVALID/400`，未登录401、越权403。维护仍使用原 catalog editor/listing/status 接口，不增加写权限，不回写历史寄存快照。
+
 `GET /api/v1/stores/{storeId}/wine-storage/inventory/export?query=&status=all&locale=zh-CN`：使用相同 `wine_storage.view`、租户/门店与历史权限，输出真正 `.xlsx`（统计汇总、酒品明细两张表）。query/status 与清单相同，locale 仅 `zh-CN|en`；导出全部筛选结果，与 page/size 无关。表内含门店、时区、导出时间、筛选条件及服务器权威统计。明细最多 50,000 条，超过返回 `STORAGE_EXPORT_TOO_LARGE/422`，不截断；非法参数 `STORAGE_INVALID/400`。响应 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`、attachment、private/no-store，顾客会话 401、越权 403。不会修改库存或审计事实。
 
 `GET /api/v1/stores/{storeId}/wine-storage/inventory?query=&status=all&page=0&size=50`：商户 `wine_storage.view` 只读查询，关闭新业务后仍可查库存。顾客会话不可使用。租户从会话取得，门店权限沿用 StorageAccess。

@@ -17,4 +17,5 @@ public final class CatalogDtos {
  }
  public record QuoteRequest(int quantity,String channel,int expectedVersion){}
  public record Quote(Product product,int quantity,long netCents,long taxCents,long grossCents,String currency,int ruleVersion){}
+ public record ProductPage(List<Product> items,long total,int page,int size,boolean hasMore){}
 }

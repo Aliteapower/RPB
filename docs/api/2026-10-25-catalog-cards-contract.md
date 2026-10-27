@@ -49,3 +49,9 @@
 - `/purchases/{id}/exception`：经理请求 `{payment:PaymentConfirm,reason,idempotencyKey}`，登记已经发生的原单实收但不发卡。状态 exception，可从原单退款到 exception_refunded；关闭新交易后仍受原单恢复权限保护。
 - 购卡新收款渠道必须存在于现有钱包计划科目中，包含自定义科目；原异常收款恢复不冒充新购卡。外部凭证按结算类型/账户/参考号统一登记，禁止跨钱包/卡或自定义别名重复。
 - 员工 `/summary?from=YYYY-MM-DD&to=YYYY-MM-DD`：独立返回实收/退款、各产品单位的集次/奖励/核销/冲正及纯周期卡未用日额度作废量。
+
+## 存酒设置内的商品管理查询
+
+`GET /api/v1/stores/{storeId}/catalog/storage-products?query=&page=0&size=12`，返回 `{items,total,page,size,hasMore}`。沿用 `catalog.view` 和会话 tenant/store 范围；query≤120，按酒名/编号字面搜索，page=0..100000，size=1..100，非法参数 `CATALOG_INVALID/400`、未登录401、越权403。仅筛选请求门店 channels 含 storage 的商品，包含已停用/下架/归档条目；在分页前过滤，不受原总目录500项上限影响。只读 REPEATABLE_READ 查询保证计数及分页一致，排序 code/id。既有 `/products` 响应不变。
+
+入口内嵌原商品编辑器与状态管理；`catalog.manage` 控制资料/门店维护，租户共享资料需 tenant_admin，`catalog.publish` 控制全局状态。写入仍经原 editor/listing/status 的版本、幂等与审计校验；本店停用影响该商品在本店所有渠道，仅取消 storage 勾选才仅关闭寄存酒。历史寄存快照不改写。无新增权限、迁移或写接口。
