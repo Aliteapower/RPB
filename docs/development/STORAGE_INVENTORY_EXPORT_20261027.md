@@ -6,7 +6,7 @@ GET /api/v1/stores/{storeId}/wine-storage/inventory/export?query=&status=all&loc
 
 复用 wine_storage.view、原租户/门店校验和历史查询口径；关闭新业务仍可导出，顾客端不可使用。复用同一仓储过滤/排序和 REPEATABLE_READ 事务，汇总和所有明细取同一快照。生成真正 xlsx，统计汇总、酒品明细两表，包含店名、门店时区、导出时间、筛选条件、人数/剩余瓶数/开瓶/过期数及全部明细。数字为数字单元格，电话/标签/顾客等业务文字为文本，公式形式的名称不作为公式执行。时间按服务端门店时区输出，界面标签支持中英文，业务文字保持原值。
 
-导出最多 50,000 条明细，超出返回 STORAGE_EXPORT_TOO_LARGE/422，提示缩小筛选范围，不截断结果。沿用非法筛选 STORAGE_INVALID/400、未登录 401、越权 403。响应 MIME application/vnd.openxmlformats-officedocument.spreadsheetml.sheet，Content-Disposition attachment，private,no-store。无迁移、新权限或写业务。本轮仅实现和本地验证，不发布。
+导出最多 50,000 条明细，超出返回 STORAGE_EXPORT_TOO_LARGE/422，提示缩小筛选范围，不截断结果。沿用非法筛选 STORAGE_INVALID/400、未登录 401、越权 403。响应 MIME application/vnd.openxmlformats-officedocument.spreadsheetml.sheet，Content-Disposition attachment，private,no-store。无迁移、新权限或写业务。本轮已在用户明确授权后与存酒页面优化一起发布。
 
 测试：跨页/部分领取与取完排除、过期筛选、人数去重、空报表、数字/文本类型及公式注入防护、时区/双语、50,000 上限、真实 xlsx 重开、下载错误/重复点击/筛选草稿/切店响应、原查询回归、API/安全链拒绝。
 
@@ -25,4 +25,8 @@ GET /api/v1/stores/{storeId}/wine-storage/inventory/export?query=&status=all&loc
 
 排错：先确认缺少工作簿实现的编译失败和新增页面 3 个失败；实现后修复测试的 POI Row 名称冲突和 Mockito 可变参数匹配，相关检查通过。代码/API/TDD 审查无未解决 P0/P1；本次只读导出，不改历史事实。证据 target/storage-inventory-export/verification.json、target/storage-export-{backend,workbook-final,frontend,build}.log。
 
-未提交、推送或部署，未做浏览器真实下载及手机实机验收；前端下载通过 DOM/Blob 测试验证。回退本次前后端代码即可，无数据回退。
+功能 b49ddb8f 已提交、推送并部署，生产真实 xlsx 生成和权限校验通过；未另做浏览器实际点击下载及手机实机验收，前端下载通过 DOM/Blob 测试验证。回退本次前后端代码即可，无数据回退。
+
+## 合并发布验证
+
+与 Excel 导出/存酒视图优化一起发布，前后端均为 b49ddb8fb1402c231c00695faa47864cd347347e。完整备份、生产验收与回退记录见 docs/release-notes/2026-10-27-storage-export-views-release.md。

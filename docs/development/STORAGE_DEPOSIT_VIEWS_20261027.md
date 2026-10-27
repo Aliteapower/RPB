@@ -1,4 +1,4 @@
-# 直接登记与顾客待审核分离（2026-10-27，本地实现）
+# 直接登记与顾客待审核分离（2026-10-27，已发布）
 
 默认 task=deposit 直接显示顾客查找/新增，不再折叠“直接帮顾客登记存酒”。选定顾客后立即显示 StorageReceiveForm 的 direct 登记表单，删除子组件中多余的启动登记按钮及混入的该顾客待审核列表；保存仍使用原 registrations 命令和原确认规则，完成后清空表单以便继续登记。
 
@@ -16,4 +16,8 @@ Chrome 静态演示页已核对默认登记、切换待审核及返回，DOM 确
 
 原有 Excel 导出后端和其他无关文件内容以 SHA256 核对不变；共享 merchant/text.ts 与页面测试在现有导出改动上追加，导出三项回归保留且通过。证据 target/storage-deposit-split-20261027/{verification.json,frontend.log,build.log,browser-check.json,preserved-before.json}。
 
-无未解决 P0/P1。本轮未提交、推送或部署；原未提交的 Excel 导出仍保留。回退本次视图、路由和文案即可，无数据库操作。
+无未解决 P0/P1。本轮已与 Excel 导出一起提交、推送并部署，功能版本 b49ddb8f。回退本次视图、路由和文案即可，无数据库操作。
+
+## 合并发布验证
+
+与 Excel 导出/存酒视图优化一起发布，前后端均为 b49ddb8fb1402c231c00695faa47864cd347347e。完整备份、生产验收与回退记录见 docs/release-notes/2026-10-27-storage-export-views-release.md。
