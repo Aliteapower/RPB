@@ -18,15 +18,15 @@ const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const tick=async()=>{for(let n=0;n<12;n++){await Promise.resolve();await nextTick()}}
 const home={timezone:'Asia/Singapore',storeName:'QA Store',stores:[{id:'A',name:'QA Store'}],newBusinessEnabled:true,permissions:['wine_storage.view','wine_storage.receive','wine_storage.deliver','wine_storage.rules.manage'],rules:[],categories:[],items:[],events:[],intents:[],applications:[{id:'application',customerId:'customer',status:'pending',lines:[],confirmation:null,reason:'',createdAt:'2026-10-25T10:00:00Z'}]}
 before(async()=>{
- globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',listeners:new Map(),addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn)},removeEventListener(name,fn){this.listeners.get(name)?.delete(fn)}})
+ globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,documentElement:{lang:''},visibilityState:'visible',listeners:new Map(),addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn)},removeEventListener(name,fn){this.listeners.get(name)?.delete(fn)}})
  const memory=new Map();globalThis.sessionStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)}
  const result=await build({stdin:{contents:"export {default as ReceiveForm} from './src/modules/wine-storage/StorageReceiveForm.vue';export {default as LocationsPanel} from './src/modules/wine-storage/merchant/MerchantStorageLocations.vue';export {storageApi} from './src/modules/wine-storage/api';export {setScanHandoff} from './src/modules/staff-scan/handoff';export {useAuthSessionStore} from './src/stores/authSession';export {default as CatalogPage} from './src/modules/catalog/CatalogPage.vue';export {default as CustomerPage} from './src/modules/wine-storage/WineStorageCustomerPage.vue';export {default as StaffPage} from './src/modules/wine-storage/WineStorageStaffPage.vue';export {default as Page} from './src/modules/wine-storage/WineStoragePage.vue';export {default as Summary} from './src/modules/wine-storage/WalletStorageSummary.vue'",resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-router','vue-i18n','pinia'],plugins:[{name:'storage-page-test',setup(b){b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));b.onLoad({filter:/\.vue$/},async({path})=>{if(path.endsWith('ProductBarcodeScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['disabled','autoStart','showManual'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-barcode':true,'data-auto-start':p.autoStart,onClick:()=>emit('code','00036000291452')},'test-barcode')}",loader:'js'};if(path.endsWith('StoragePhotos.vue'))return{contents:"import {h} from 'vue';export default {props:['modelValue'],emits:['update:modelValue'],setup:(p,{emit})=>()=>h('button',{type:'button','data-test-photo':true,onClick:()=>emit('update:modelValue',['photo-id'])},'test-photo')}",loader:'js'};if(path.endsWith('WalletQrDisplay.vue'))return{contents:"import {h} from 'vue';export default {props:['value'],setup:p=>()=>h('figure',{'data-code':p.value})}",loader:'js'};if(path.endsWith('WalletQrScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['disabled'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-storage-scan':true,disabled:p.disabled,onClick:()=>emit('code','WS.'+'S'.repeat(43))},'test-storage-scan')}",loader:'js'};if(/WalletCustomerLogin\.vue$/.test(path))return{contents:"export default {render(){return null}}",loader:'js'};const{descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:'storage-test-'+path,inlineTemplate:true}).content,loader:'ts'}})}}]})
  const dir='target/wine-storage-page-test';await mkdir(dir,{recursive:true});await writeFile(dir+'/entry.mjs',result.outputFiles[0].contents);({Page,Summary,CustomerPage,StaffPage,CatalogPage,useAuthSessionStore,setScanHandoff,ReceiveForm,LocationsPanel,storageApi}=await import(pathToFileURL(process.cwd()+'/'+dir+'/entry.mjs').href+'?'+Date.now()))
 })
 after(()=>{globalThis.fetch=originalFetch;globalThis.sessionStorage=originalStorage;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 function mount(component,customer,locale='zh-CN',data=home,respond,lists={}){
- const calls=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});return{ok:true,json:async()=>url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data}}
- const route=reactive({params:{storeId:'A'},hash:'',query:{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,i18n,unmount:()=>{app.unmount();mounted.delete(app)}}
+ const calls=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());return response}
+ const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,i18n,route,unmount:()=>{app.unmount();mounted.delete(app)}}
 }
 test('storage customer and merchant entry titles and API scopes are distinct',async()=>{
  for(const customer of [true,false]){
@@ -46,7 +46,7 @@ test('customer pages never expose merchant receipt or rule editing even if respo
   assert.match(text(s.root),/帮顾客存酒.*帮顾客取酒.*存取酒记录/)
   assert.match(text(s.root),/顾客提交 · 待审核/);assert.doesNotMatch(text(s.root),/请先查找并确认一位顾客/)
   assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='确认实际收存').length,0)
-  assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,1)
+  assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,0);button(s.root,'设置').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,1)
   s.unmount()
  }
 })
@@ -195,7 +195,7 @@ test('merchant reviews a pending customer request immediately without searching 
 
 test('custodian management is permission gated and stores an optional local name without creating a login account',async()=>{
  const data={...home,permissions:[...home.permissions,'wine_storage.custodians.manage']},people=[]
- const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>options?.method==='POST'?(people.push({id:'new-person',...JSON.parse(options.body),version:0}),people.at(-1)):{...data},{people});await tick()
+ const s=mount(StaffPage,false,'zh-CN',data,(url,options)=>options?.method==='POST'?(people.push({id:'new-person',...JSON.parse(options.body),version:0}),people.at(-1)):{...data},{people});await tick();button(s.root,'设置').props.onClick();await tick()
  const panel=nodes(s.root,n=>n.tag==='details'&&nodes(n,c=>c.tag==='summary'&&text(c).includes('酒妹／保管员管理')).length)[0];panel.props.onToggle({target:{open:true}});await tick()
  const form=nodes(panel,n=>n.tag==='form')[0];nodes(form,n=>n.tag==='input'&&n.props.maxlength==='100')[0].props['onUpdate:modelValue']('小兰');await tick();await form.props.onSubmit({preventDefault(){}});await tick()
  const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/stores/A/wine-storage/custodians');assert.equal(writes[0].body.name,'小兰');assert.equal(writes[0].body.kind,'hostess');assert.equal(writes[0].body.version,null);assert.match(text(panel),/小兰/);s.unmount()
@@ -413,7 +413,7 @@ test('tenant administrator can rename the default location and add a reusable pl
 
 test('location maintenance appears only for a tenant administrator while normal staff can select on receipt',async()=>{
  for(const role of ['store_staff','store_manager','tenant_admin']){
-  const s=mount(StaffPage,false,'zh-CN',home,undefined,{actor:{accountId:'actor',roles:[role],permissions:home.permissions}});await tick();assert.equal(nodes(s.root,n=>n.tag==='summary'&&text(n)==='常用存放位置管理').length,role==='tenant_admin'?1:0);s.unmount()
+  const s=mount(StaffPage,false,'zh-CN',home,undefined,{actor:{accountId:'actor',roles:[role],permissions:home.permissions}});await tick();button(s.root,'设置').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='summary'&&text(n)==='常用存放位置管理').length,role==='tenant_admin'?1:0);s.unmount()
  }
 })
 
@@ -421,6 +421,7 @@ test('location maintenance appears only for a tenant administrator while normal 
 test('mode settings are tenant-admin only and submit scoped versioned selection',async()=>{
  for(const role of ['tenant_admin','store_manager']){
   const data={...home,operationMode:'customer_verification',settingsVersion:0},s=mount(StaffPage,false,'zh-CN',data,undefined,{actor:{accountId:'actor',roles:[role],permissions:home.permissions}});await tick()
+  assert.equal(button(s.root,'保存存取酒模式'),undefined);button(s.root,'设置').props.onClick();await tick();
   const save=button(s.root,'保存存取酒模式');assert.equal(!!save,role==='tenant_admin')
   if(save){
    const select=nodes(s.root,n=>n.tag==='select'&&n.children?.some(c=>c.props?.value==='staff_registration'))[0]
@@ -463,4 +464,62 @@ test('customer may apply without a photograph after confirming storage terms',as
  nodes(s.root,n=>n.tag==='button'&&text(n).includes('可寄存白酒'))[0].props.onClick();await tick()
  const accepted=nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox')[0];accepted.checked=true;accepted.listeners.change({target:accepted});await tick();assert.equal(button(s.root,'提交寄存申请').props.disabled,false)
  await nodes(s.root,n=>n.tag==='form'&&n.props.class==='storage-customer-deposit')[0].props.onSubmit({preventDefault(){}});await tick();assert.deepEqual(s.calls.find(c=>c.method==='POST').body.lines[0].photos,[]);s.unmount()
+})
+
+test('settings are separated from storage tasks and return preserves customer work',async()=>{
+ const s=mount(StaffPage,false);await tick();assert.doesNotMatch(text(s.root),/存取酒模式|保存规则设置/)
+ button(s.root,'设置').props.onClick();await tick();assert.match(text(s.root),/存酒设置/);assert.equal(button(s.root,'查找顾客'),undefined)
+ button(s.root,'← 返回存取酒').props.onClick();await tick();assert.ok(button(s.root,'查找顾客'));assert.doesNotMatch(text(s.root),/保存规则设置/);s.unmount()
+})
+test('add customer uses shared creation and selects the saved customer for storage',async()=>{
+ const actor={accountId:'admin',roles:['tenant_admin'],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A']},created={id:'new-customer',displayName:'新顾客',phoneE164:'+6581234567',status:'active'}
+ const notice={version:'customer-profile-v2',textZh:'统一隐私告知',textEn:'Shared privacy notice',labelZh:'商户已取得同意',labelEn:'Consent confirmed'}
+ const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.endsWith('/customer-privacy-notice')?notice:url.endsWith('/tenant-admin/customers')&&options?.method==='POST'?{success:true,customer:created}:home,{actor});await tick()
+ const search=nodes(s.root,n=>n.tag==='input'&&n.props.autocomplete==='off')[0];search.props.onInput({target:{value:'81234567'}});await tick();button(s.root,'＋ 新增顾客').props.onClick();await tick()
+ assert.match(text(s.root),/统一隐私告知/);assert.ok(!s.calls.some(c=>c.url.includes('/tenant-admin/customers?')))
+ const form=nodes(s.root,n=>n.tag==='form'&&n.props.class==='customer-quick-create-form')[0];nodes(form,n=>n.tag==='input'&&n.props.name==='displayName')[0].props.onUpdateModelValue?.('新顾客')
+ await form.props.onSubmit({preventDefault(){}});await tick()
+ const post=s.calls.find(c=>c.method==='POST');assert.ok(post.url.endsWith('/tenant-admin/customers'));assert.equal(post.body.phoneE164,'+6581234567');assert.deepEqual(post.body.privacyConsent,{accepted:true,noticeVersion:'customer-profile-v2',entrySource:'tenant_admin'})
+ assert.match(text(s.root),/当前办理顾客.*新顾客/);assert.equal(button(s.root,'保存并选用顾客'),undefined);s.unmount()
+})
+test('staff and closed products do not gain customer creation rights',async()=>{
+ for(const [role,enabled] of [['store_staff',true],['tenant_admin',false]]){
+  const actor={roles:[role],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A']};const s=mount(StaffPage,false,'zh-CN',{...home,newBusinessEnabled:enabled},undefined,{actor});await tick();assert.equal(button(s.root,'＋ 新增顾客'),undefined);s.unmount()
+ }
+})
+
+test('quick customer creation preserves consent and rejects duplicate clicks while saving',async()=>{
+ const actor={accountId:'admin',roles:['tenant_admin'],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A']},notice={version:'v2',textZh:'告知',textEn:'Notice',labelZh:'已同意',labelEn:'Agreed'}
+ let resolve
+ const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.endsWith('/customer-privacy-notice')?notice:options?.method==='POST'?new Promise(r=>resolve=r):home,{actor});await tick()
+ nodes(s.root,n=>n.tag==='input'&&n.props.autocomplete==='off')[0].props.onInput({target:{value:'81234567'}});await tick();button(s.root,'＋ 新增顾客').props.onClick();await tick()
+ const form=nodes(s.root,n=>n.tag==='form'&&n.props.class==='customer-quick-create-form')[0],check=nodes(form,n=>n.tag==='input'&&n.props.type==='checkbox')[0]
+ check.checked=false;check.listeners.change({target:check});await tick();await form.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
+ check.checked=true;check.listeners.change({target:check});await tick();form.props.onSubmit({preventDefault(){}});form.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,1)
+ assert.equal(button(s.root,'设置').props.disabled,true);resolve({success:true,customer:{id:'created',displayName:'新顾客',phoneE164:'+6581234567'}});await tick();assert.match(text(s.root),/当前办理顾客.*新顾客/);assert.ok(!s.calls.some(c=>/accounts|topups|bills/.test(c.url)));s.unmount()
+})
+test('late customer creation response cannot select a customer after changing stores',async()=>{
+ const actor={accountId:'admin',roles:['tenant_admin'],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A','B']}
+ let resolve
+ const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.endsWith('/customer-privacy-notice')?{version:'v2',textZh:'告知',textEn:'Notice',labelZh:'同意',labelEn:'Agree'}:options?.method==='POST'?new Promise(r=>resolve=r):home,{actor});await tick()
+ nodes(s.root,n=>n.tag==='input'&&n.props.autocomplete==='off')[0].props.onInput({target:{value:'81234567'}});await tick();button(s.root,'＋ 新增顾客').props.onClick();await tick()
+ nodes(s.root,n=>n.tag==='form'&&n.props.class==='customer-quick-create-form')[0].props.onSubmit({preventDefault(){}});await tick();s.route.params.storeId='B';await tick()
+ resolve({success:true,customer:{id:'old-store-created',displayName:'原店顾客',phoneE164:'+6581234567'}});await tick();assert.doesNotMatch(text(s.root),/原店顾客/);s.unmount()
+})
+
+test('duplicate phone keeps quick-create details and allows lookup of the existing customer',async()=>{
+ const actor={accountId:'admin',roles:['tenant_admin'],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A']}
+ const s=mount(StaffPage,false,'zh-CN',home,url=>url.endsWith('/customer-privacy-notice')?{version:'v2',textZh:'告知',textEn:'Notice',labelZh:'同意',labelEn:'Agree'}:home,{actor});await tick()
+ nodes(s.root,n=>n.tag==='input'&&n.props.autocomplete==='off')[0].props.onInput({target:{value:'81234567'}});await tick();button(s.root,'＋ 新增顾客').props.onClick();await tick()
+ globalThis.fetch=async()=>({ok:false,status:409,text:async()=>JSON.stringify({success:false,error:{code:'CUSTOMER_PHONE_CONFLICT',messageKey:'conflict'}})})
+ await nodes(s.root,n=>n.tag==='form'&&n.props.class==='customer-quick-create-form')[0].props.onSubmit({preventDefault(){}});await tick()
+ assert.ok(button(s.root,'按此手机号查找已有顾客'));const requests=[]
+ globalThis.fetch=async url=>{requests.push(url);return{ok:true,json:async()=>[{id:'existing',displayName:'已有顾客',phone:'+6581234567'}]}}
+ button(s.root,'按此手机号查找已有顾客').props.onClick();await tick();assert.ok(requests.some(url=>url.includes('/wine-storage/customers?query=%2B6581234567')));assert.match(text(s.root),/已有顾客/);assert.equal(button(s.root,'保存并选用顾客'),undefined);s.unmount()
+})
+
+test('settings URL stays on settings after page initialization and supports closed-product rule history',async()=>{
+ const s=mount(StaffPage,false,'zh-CN',{...home,newBusinessEnabled:false},undefined,{query:{task:'settings'}});await tick()
+ assert.match(text(s.root),/存酒设置/);assert.equal(button(s.root,'查找顾客'),undefined);assert.equal(button(s.root,'保存存取酒模式'),undefined);assert.ok(nodes(s.root,n=>n.tag==='summary'&&text(n)==='保存规则设置').length)
+ button(s.root,'← 返回存取酒').props.onClick();await tick();assert.ok(button(s.root,'存取酒记录'));assert.equal(button(s.root,'帮顾客存酒'),undefined);s.unmount()
 })

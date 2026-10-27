@@ -157,3 +157,13 @@
  .storage-receive-grid { grid-template-columns: 1fr; }
  .storage-receive-form h3 { font-size: 15px; }
 }
+
+.storage-picker-heading,.storage-settings-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.storage-picker-heading h2,.storage-settings-heading h2 {margin:0}
+.storage-picker-heading button,.storage-settings-heading button {flex-shrink:0}
+
+.storage-header-actions {flex-wrap:nowrap;flex-shrink:0;gap:8px}
+.storage-header-actions button {padding:9px 12px}
+.storage-merchant-customer-search {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.storage-merchant-customer-search > label {min-width:0}
+.storage-merchant-customer-search > button {padding:10px 12px}
