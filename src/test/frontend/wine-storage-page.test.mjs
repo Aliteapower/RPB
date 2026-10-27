@@ -339,6 +339,20 @@ test('embedded wine workspace keeps one title and groups search and actions with
  const generic=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();assert.ok(button(generic.root,'分类管理'));assert.equal(nodes(generic.root,n=>n.tag==='h2'&&text(n).trim()==='商品列表').length,1);generic.unmount()
 })
 
+test('storage editor defaults to bottles and preserves advanced values through collapse and save',async()=>{
+ const s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:[],total:0,page:0,size:12,hasMore:false}:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
+ const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()===label)[0],n=>n.tag==='input')[0]
+ assert.equal(field('单位').value,'瓶');const extra=nodes(s.root,n=>n.tag==='details'&&String(n.props.class).includes('catalog-editor-extra'))[0];assert.ok(extra);assert.equal(extra.props.open,false);assert.ok(nodes(extra,n=>n.tag==='input'&&n.props.inputmode==='decimal').length)
+ nodes(s.root,n=>n.tag==='form')[0].props.onInvalidCapture();await tick();assert.equal(extra.props.open,true);field('价格 (SGD)').props['onUpdate:modelValue']('12.50');field('编号').props['onUpdate:modelValue']('NEW-BOTTLE');field('中文名称').props['onUpdate:modelValue']('快速新增');nodes(s.root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('cat');extra.props.onToggle({target:{open:false}});await tick();nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()
+ const body=s.calls.find(c=>c.method==='POST').body;assert.equal(body.product.unit,'瓶');assert.equal(body.product.priceCents,1250);assert.deepEqual(body.product.channels,['storage']);s.unmount()
+})
+
+test('storage settings group compact product, mode and secondary settings without changing save commands',async()=>{
+ const actor={...catalogActor,permissions:[...catalogActor.permissions,'tenant.admin.manage']},data={...home,permissions:[...home.permissions,'wine_storage.rules.manage','wine_storage.custodians.manage']}
+ const s=mount(StaffPage,false,'zh-CN',data,catalogResponse,{actor});await tick();button(s.root,'设置').props.onClick();await tick();assert.ok(nodes(s.root,n=>String(n.props?.class).includes('storage-settings-grid')).length);assert.ok(nodes(s.root,n=>String(n.props?.class).includes('storage-settings-product-entry')).length)
+ const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-mode-form'))[0];assert.ok(form);nodes(form,n=>n.tag==='select')[0].props['onUpdate:modelValue']('staff_registration');await tick();form.props.onSubmit({preventDefault(){}});await tick();assert.deepEqual(s.calls.find(c=>c.url.endsWith('/settings')&&c.method==='POST').body.operationMode,'staff_registration');s.unmount()
+})
+
 test('wine manager creates through the original editor with storage selected and blocks duplicate saves',async()=>{
  let created=null,finish
  const actor={...catalogActor,permissions:[...catalogActor.permissions,'tenant.admin.manage']}
@@ -353,10 +367,10 @@ test('wine manager creates through the original editor with storage selected and
 })
 
 test('wine creation defaults do not override existing channels and cancelling a clean new draft needs no discard',async()=>{
- const existing={...catalogProducts[0],channels:['storage','shopping']}
+ const existing={...catalogProducts[0],unit:'杯',channels:['storage','shopping']}
  const s=mount(CatalogPage,false,'en-SG',home,(url,options)=>url.includes('/storage-products?')?{items:[existing],total:1,page:0,size:12,hasMore:false}:url.endsWith('/editor')?{product:existing,barcodes:[]}:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick()
  button(s.root,'＋ New wine').props.onClick();await tick();assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['storage']);button(s.root,'← Back to products').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0)
- button(s.root,'Edit').props.onClick();await tick();assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['shopping','storage']);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+ button(s.root,'Edit').props.onClick();await tick();assert.ok(nodes(s.root,n=>n.tag==='input'&&n.value==='杯').length);assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['shopping','storage']);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
 })
 
 test('storage settings open an embedded storage-only catalog and reuse editing and store enable commands',async()=>{
@@ -440,7 +454,7 @@ test('legacy multiple barcodes require explicit selection and preserve the full 
 })
 
 test('new product always has one editable optional barcode field without add buttons',async()=>{
- const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'＋ 新增商品').props.onClick();await tick();const fields=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric');assert.equal(fields.length,1);assert.equal(fields[0].value,'');assert.ok(button(s.root,'扫码填写'));assert.ok(!button(s.root,'＋ 添加条码'));assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['cards'])
+ const s=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();button(s.root,'＋ 新增商品').props.onClick();await tick();const fields=nodes(s.root,n=>n.tag==='input'&&n.props.inputmode==='numeric');assert.equal(fields.length,1);assert.equal(fields[0].value,'');assert.ok(button(s.root,'扫码填写'));assert.ok(!button(s.root,'＋ 添加条码'));assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['cards']);assert.ok(nodes(s.root,n=>n.tag==='input'&&n.value==='件').length);assert.equal(nodes(s.root,n=>n.tag==='details'&&String(n.props?.class).includes('catalog-editor-extra')).length,0)
 })
 
 test('customer wallet hides unopened empty storage but retains closed product history',async()=>{

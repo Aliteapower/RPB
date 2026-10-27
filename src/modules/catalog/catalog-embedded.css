@@ -20,6 +20,11 @@
 .catalog-embedded article button { margin-top: 4px; }
 .catalog-embedded > .cards-panel { margin: 12px 0 0; padding: 14px; box-shadow: none; }
 .catalog-embedded .catalog-product-editor .cards-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,210px),1fr)); }
+.catalog-embedded .catalog-editor-extra { margin: 14px 0; padding: 0 12px; border: 1px solid #d9e4e6; border-radius: 10px; background: #f8faf9; }
+.catalog-embedded .catalog-editor-extra > summary { min-height: 44px; padding: 12px 0; font-size: 13px; font-weight: 600; }
+.catalog-embedded .catalog-editor-extra[open] { padding-bottom: 12px; }
+.catalog-embedded .catalog-product-editor > header { justify-content: space-between; gap: 8px; margin-top: 0; }
+.catalog-embedded .catalog-product-editor > header h2 { margin: 0; }
 @media(max-width:560px) {
  .catalog-embedded { padding: 12px; }
  .catalog-embedded .catalog-heading { align-items: flex-start; flex-wrap: wrap; }
