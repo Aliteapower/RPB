@@ -98,6 +98,30 @@ class CardPostgresTest extends CatalogPostgresTest {
   tx.execute(s->purchases.refund(scope,actor,order.id(),new Refund("退卡","refund-1",true,key())));assertThat(holdings.own(scope,principal).getFirst().status()).isEqualTo("refunded");
  }
  @Test void recoveryClosesUnsubmittedKeyAndLateCommandCannotExecute(){String key=key();tx.execute(s->commands.reconcile(scope,customer,"enroll",key));assertThatThrownBy(()->tx.execute(s->holdings.enroll(scope,principal,new Enroll(plan("stamp",null,1,10).id(),key)))).hasMessageContaining("关闭");}
+
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"count","period"})
+ void oneActualUsePreventsRefundEvenAfterReversalAndDoesNotWriteRefundPayment(String kind){
+  var h=paid(plan(kind,30,2,0));var order=purchases.own(scope,principal).getFirst();
+  assertThat(purchases.refundable(scope,actor,Set.of(order.id()))).contains(order.id());
+  var request=request(h);var result=tx.execute(s->redeem.confirm(scope,principal,request.id(),new Confirm(h.id(),"2026-10-25",key())));
+  assertThat(purchases.refundable(scope,actor,Set.of(order.id()))).isEmpty();
+  assertThatThrownBy(()->tx.execute(s->purchases.refund(scope,actor,order.id(),new Refund("误点","refund-used",true,key())))).hasMessageContaining("已使用");
+  tx.execute(s->redeem.reverse(scope,actor,result.entryId(),new Reverse("撤销误用",key())));
+  assertThat(purchases.refundable(scope,actor,Set.of(order.id()))).isEmpty();
+  assertThatThrownBy(()->tx.execute(s->purchases.refund(scope,actor,order.id(),new Refund("重试","refund-reversed",true,key())))).hasMessageContaining("已使用");
+  assertThat(purchases.own(scope,principal).getFirst().status()).isEqualTo("issued");
+  assertThat(jdbc.queryForObject("select count(*) from card_payment_links where tenant_id=? and purchase_id=? and kind='refund'",Integer.class,tenant,order.id())).isZero();
+  var other=new com.rpb.reservation.common.scope.StoreScope(scope.tenantId(),UUID.randomUUID());
+  assertThat(new PurchaseRepository(jdbc,json).refundable(other,Set.of(order.id()))).isEmpty();
+ }
+ @Test void unusedDailyExpiryDoesNotPretendToBeActualUseForRefund(){
+  var h=paid(plan("period",30,1,0));var order=purchases.own(scope,principal).getFirst();
+  clock.now=Instant.parse("2026-10-26T01:00:00Z");assertThat(holdings.own(scope,principal).getFirst().remaining()).isEqualTo(29);
+  assertThat(purchases.refundable(scope,actor,Set.of(order.id()))).contains(order.id());
+  tx.execute(s->purchases.refund(scope,actor,order.id(),new Refund("从未使用","unused-refund",true,key())));
+  assertThat(purchases.refundable(scope,actor,Set.of(order.id()))).isEmpty();assertThat(purchases.own(scope,principal).getFirst().status()).isEqualTo("refunded");
+ }
  @Test void productWithdrawalBlocksNewEnrollmentButExistingRewardsStillRedeem(){
   var p=plan("stamp",null,20,1);var h=enroll(p);tx.execute(s->stamps.grant(scope,actor,h.id(),"sale-1",key()));
   tx.execute(s->catalog.status(scope,actor,product.id(),new com.rpb.reservation.catalog.application.CatalogDtos.Status("inactive",product.version(),key())));

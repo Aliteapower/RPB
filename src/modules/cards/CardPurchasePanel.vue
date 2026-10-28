@@ -8,8 +8,10 @@ import type {Purchase} from './types'
 const props=defineProps<{store:string;orders:Purchase[];disabled:boolean;can:(p:string)=>boolean}>(),emit=defineEmits<{changed:[];error:[message:string]}>(),{t,locale}=useCardText(),selected=ref(''),busy=ref(false)
 const {context}=useStaffWallet();const channels=computed(()=>context.value?.program?.channels??[])
 const form=ref({channel:'cash',account:'',terminal:'T1',receipt:'',verified:false,reason:''})
+function customerLabel(order:Purchase){return [...new Set([order.customerName?.trim(),order.customerPhone?.trim()].filter(Boolean))].join(' · ')||t('customerUnavailable')}
+function toggle(order:Purchase){if(props.disabled||busy.value||(order.status!=='pending'&&order.refundable!==true))return;selected.value=selected.value===order.id?'':order.id}
 watch(channels,list=>{if(!list.includes(form.value.channel))form.value.channel=list[0]??''},{immediate:true})
-async function act(order:Purchase,refund=false){busy.value=true;const store=props.store;try{await cardApi(store).command(`/purchases/${order.id}/${refund?'refund':'confirm'}`,refund?{reason:form.value.reason,receipt:form.value.receipt,verified:form.value.verified}:{...form.value,amountCents:order.amountCents},refund?'purchase.refund':'purchase.confirm');selected.value='';form.value.receipt='';form.value.verified=false;if(store===props.store)emit('changed')}catch(e){if(store===props.store)emit('error',String(e))}finally{busy.value=false}}
+async function act(order:Purchase,refund=false){if(refund&&order.refundable!==true)return;busy.value=true;const store=props.store;try{await cardApi(store).command(`/purchases/${order.id}/${refund?'refund':'confirm'}`,refund?{reason:form.value.reason,receipt:form.value.receipt,verified:form.value.verified}:{...form.value,amountCents:order.amountCents},refund?'purchase.refund':'purchase.confirm');selected.value='';form.value.receipt='';form.value.verified=false;if(store===props.store)emit('changed')}catch(e){if(store===props.store)emit('error',String(e))}finally{busy.value=false}}
 async function exception(order:Purchase){busy.value=true;try{await cardApi(props.store).command(`/purchases/${order.id}/exception`,{payment:{...form.value,amountCents:order.amountCents},reason:form.value.reason},'purchase.exception');selected.value='';emit('changed')}catch(e){emit('error',String(e))}finally{busy.value=false}}
 </script>
 <template>
@@ -22,10 +24,10 @@ async function exception(order:Purchase){busy.value=true;try{await cardApi(props
         <div class="cards-item-heading">
           <div class="cards-item-title"><strong>{{displayName(o.snapshot,locale)}}</strong><span class="cards-badge" :data-status="o.status">{{t(o.status)}}</span></div>
           <strong class="cards-amount">{{money(o.amountCents)}}</strong>
-          <button v-if="(o.status==='pending'&&can('wallet.cards.sell'))||(['issued','exception'].includes(o.status)&&can('wallet.cards.refund'))" :class="o.status==='pending'?'primary':'cards-danger'" :disabled="disabled||busy" :aria-expanded="selected===o.id" @click="selected=selected===o.id?'':o.id">{{t(o.status==='pending'?'payment':'refund')}}</button>
+          <button v-if="(o.status==='pending'&&can('wallet.cards.sell'))||(['issued','exception'].includes(o.status)&&can('wallet.cards.refund'))" :class="o.status==='pending'?'primary':'cards-danger'" :disabled="disabled||busy||(o.status!=='pending'&&o.refundable!==true)" :title="o.status!=='pending'&&o.refundable!==true?t('refundUnavailable'):undefined" :aria-expanded="selected===o.id" @click="toggle(o)">{{t(o.status==='pending'?'payment':o.refundable===true?'refund':'refundBlocked')}}</button>
         </div>
-        <div class="cards-item-meta"><span>{{t('orderNumber')}} <code>{{o.id}}</code></span><span>{{t('customer')}} {{o.customerId.slice(0,8)}}</span></div>
-        <form v-if="selected===o.id" class="cards-inline-form" @submit.prevent="act(o,o.status==='issued'||o.status==='exception')">
+        <div class="cards-item-meta"><span>{{t('orderNumber')}} <code>{{o.id}}</code></span><span>{{t('customer')}} {{customerLabel(o)}}</span></div>
+        <form v-if="selected===o.id&&(o.status==='pending'||o.refundable===true)" class="cards-inline-form" @submit.prevent="act(o,o.status==='issued'||o.status==='exception')">
           <p v-if="o.status!=='pending'" class="cards-notice">{{t('refundHint')}}</p>
           <div class="cards-grid">
             <template v-if="o.status==='pending'">

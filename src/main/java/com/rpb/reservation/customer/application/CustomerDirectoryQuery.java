@@ -24,4 +24,11 @@ public class CustomerDirectoryQuery {
     public Optional<CustomerManagementItem> active(TenantScope scope, UUID id) {
         return customers.findManagementItem(scope, new CustomerId(id)).filter(c -> "active".equals(c.status()));
     }
+
+    /** Bounded lookup for an already authorized product page, never an unscoped directory scan. */
+    public List<CustomerManagementItem> activeByIds(TenantScope scope, java.util.Set<UUID> ids) {
+        if (ids.isEmpty()) return List.of();
+        if (ids.size() > 500) throw new IllegalArgumentException("customer_directory_batch_too_large");
+        return customers.findActiveByIds(scope, java.util.Set.copyOf(ids));
+    }
 }

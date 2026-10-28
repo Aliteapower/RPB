@@ -16,8 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/wallet/cards")
 public class WalletCardsStaffController {
+ private final WalletCardPurchaseQuery purchaseQuery;
  private final WalletApiIdentity identity;private final CardPlanService plans;private final CardHoldingService cards;private final StampService stamps;private final RedemptionService redeem;private final PurchaseService purchases;private final CardAccess access;private final CardCommandService commands;private final WalletDirectory directory;private final WalletCustomerIdentityService codes;
- public WalletCardsStaffController(WalletApiIdentity identity,CardPlanService plans,CardHoldingService cards,StampService stamps,RedemptionService redeem,PurchaseService purchases,CardAccess access,CardCommandService commands,WalletDirectory directory,WalletCustomerIdentityService codes){this.identity=identity;this.plans=plans;this.cards=cards;this.stamps=stamps;this.redeem=redeem;this.purchases=purchases;this.access=access;this.commands=commands;this.directory=directory;this.codes=codes;}
+ public WalletCardsStaffController(WalletApiIdentity identity,CardPlanService plans,CardHoldingService cards,StampService stamps,RedemptionService redeem,PurchaseService purchases,CardAccess access,CardCommandService commands,WalletDirectory directory,WalletCustomerIdentityService codes,WalletCardPurchaseQuery purchaseQuery){this.identity=identity;this.plans=plans;this.cards=cards;this.stamps=stamps;this.redeem=redeem;this.purchases=purchases;this.access=access;this.commands=commands;this.directory=directory;this.codes=codes;this.purchaseQuery=purchaseQuery;}
  private StoreScope scope(UUID store){return identity.scope(identity.staff().tenantId(),store);}
  @GetMapping("/settings")public Settings settings(@PathVariable UUID storeId){return access.settings(scope(storeId),identity.staff());}
  @PutMapping("/settings")public Settings settings(@PathVariable UUID storeId,@RequestBody Settings c){return access.settings(scope(storeId),identity.staff(),c.enabled());}
@@ -38,7 +39,7 @@ public class WalletCardsStaffController {
  @PostMapping("/requests/{id}/code")public Code issue(@PathVariable UUID storeId,@PathVariable UUID id){return redeem.issue(scope(storeId),identity.staff(),id);}
  @PostMapping("/requests/{id}/cancel")public Request cancel(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Key c){return redeem.cancel(scope(storeId),identity.staff(),id,c);}
  @PostMapping("/authorized-redeem")public Request authorized(@PathVariable UUID storeId,@RequestBody Authorized c){return redeem.authorized(scope(storeId),identity.staff(),c);}
- @GetMapping("/purchases")public List<Purchase> purchases(@PathVariable UUID storeId,@RequestParam(required=false)UUID before){return purchases.staff(scope(storeId),identity.staff(),before);}
+ @GetMapping("/purchases")public List<WalletCardPurchaseQuery.StaffPurchase> purchases(@PathVariable UUID storeId,@RequestParam(required=false)UUID before){return purchaseQuery.staff(scope(storeId),identity.staff(),before);}
  @PostMapping("/purchases/{id}/confirm")public Purchase pay(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody PaymentConfirm c){return purchases.confirm(scope(storeId),identity.staff(),id,c);}
  @PostMapping("/purchases/{id}/exception")public Purchase exception(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody ExceptionPayment c){return purchases.exception(scope(storeId),identity.staff(),id,c);}
  @PostMapping("/purchases/{id}/refund")public Purchase refund(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody Refund c){return purchases.refund(scope(storeId),identity.staff(),id,c);}

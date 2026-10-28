@@ -13,7 +13,27 @@ const mounted=[],original={window:globalThis.window,fetch:globalThis.fetch,stora
 const renderer=createRenderer({createElement:tag=>({tag,props:{},children:[],get options(){return this.children.filter(n=>n.tag==='option')},addEventListener(){},getRootNode(){return {}}}),createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>n.text=t,patchProp:(n,k,o,v)=>n.props[k]=v,insert:(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:n=>{const list=n.parent?.children||[];return list[list.indexOf(n)+1]||null}})
 const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))],text=n=>(n.text||'')+(n.children||[]).map(text).join(''),tick=async()=>{for(let i=0;i<20;i++){await Promise.resolve();await nextTick()}},button=(r,label)=>nodes(r,n=>n.tag==='button'&&text(n)===label)[0],submit=async r=>{await nodes(r,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()}
 const plan={id:'plan-A',nameZh:'咖啡月卡',nameEn:'Coffee membership',kind:'count',product:{nameZh:'咖啡',nameEn:'Coffee',unit:'杯'},status:'active',version:7,validDays:30,total:30,dailyLimit:1,priceCents:20005,taxMode:'inclusive'}
-const order=(status='pending',id='order-A')=>({id,customerId:'customer-A',amountCents:20005,status,snapshot:plan})
+const order=(status='pending',id='order-A')=>({id,customerId:'customer-A',amountCents:20005,status,snapshot:plan,refundable:status==='issued'||status==='exception'})
+
+test('purchase customer metadata shows real name and phone with safe empty and legacy fallbacks',()=>{
+ wallet();const rows=[{...order('issued','named'),customerName:'陈小明',customerPhone:'+6591234567'},{...order('issued','phone'),customerName:'  ',customerPhone:'+6581234567'},{...order('issued','name'),customerName:'王女士',customerPhone:null},{...order('issued','missing'),customerName:null,customerPhone:null},order('issued','legacy')]
+ const s=mount(Pages.Purchases,{store:'A',orders:rows,disabled:false,can:()=>false});const values=nodes(s.root,n=>n.props?.class==='cards-item-meta').map(text)
+ assert.match(values[0],/陈小明.*\+6591234567/);assert.match(values[1],/\+6581234567/);assert.doesNotMatch(values[1],/customer/);assert.match(values[2],/王女士/);assert.match(values[3],/顾客资料不可用/);assert.match(values[4],/顾客资料不可用/);assert.doesNotMatch(text(s.root),/customer-A|customer/)
+})
+
+test('used card refund is disabled and cannot open a financial form; missing eligibility fails closed',async()=>{
+ wallet();const used={...order('issued','used'),refundable:false},legacy={...order('issued','legacy')};delete legacy.refundable
+ const s=mount(Pages.Purchases,{store:'A',orders:[used,legacy],disabled:false,can:()=>true});const buttons=nodes(s.root,n=>n.tag==='button')
+ assert.equal(buttons.length,2);for(const b of buttons){assert.equal(b.props.disabled,true);b.props.onClick()};await tick();assert.equal(nodes(s.root,n=>n.tag==='form').length,0)
+})
+
+test('unused refund still requires original receipt confirmation and English disabled state is clear',async()=>{
+ wallet();const calls=[];globalThis.fetch=async(url,o)=>{calls.push({url,body:JSON.parse(o.body)});return{ok:true,json:async()=>({})}}
+ const s=mount(Pages.Purchases,{store:'A',orders:[order('issued')],disabled:false,can:()=>true});button(s.root,'未使用退卡').props.onClick();await tick()
+ assert.equal(button(s.root,'确认').props.disabled,true);const inputs=nodes(s.root,n=>n.tag==='input');inputs[0].props['onUpdate:modelValue']('退款凭证');inputs[1].props['onUpdate:modelValue']('未使用退卡');inputs[2].props['onUpdate:modelValue'](true);await tick();await submit(s.root)
+ assert.equal(calls[0].url,'/api/v1/stores/A/wallet/cards/purchases/order-A/refund');assert.equal(calls[0].body.receipt,'退款凭证');assert.equal(calls[0].body.verified,true)
+ const en=mount(Pages.Purchases,{store:'A',orders:[{...order('issued'),refundable:false}],disabled:false,can:()=>true},'en-SG');assert.match(text(en.root),/Customer details unavailable/);assert.equal(button(en.root,'Not refundable').props.disabled,true)
+})
 const entry=(id='entry-A',kind='redeem',originalId=null)=>({id,kind,originalId,quantity:2,beforeTotal:30,afterTotal:28,beforeDaily:3,afterDaily:1,source:'收据原文 #123',reason:'',createdAt:'2026-10-27T02:00:00Z',businessDay:'2026-10-27'})
 const report={money:{receivedCents:20005,refundedCents:1000},usage:[{planId:'plan-A',nameZh:'咖啡月卡',nameEn:'Coffee membership',unit:'杯',stamps:0,rewards:1,redeemed:2,reversals:0}],expiredDaily:[{planId:'plan-A',nameZh:'咖啡月卡',nameEn:'Coffee membership',unit:'杯',unused:3}]}
 before(async()=>{
