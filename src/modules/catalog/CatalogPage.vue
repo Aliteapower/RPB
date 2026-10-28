@@ -12,6 +12,7 @@ import CatalogCategories from './CatalogCategories.vue'
 import CatalogAvailability from './CatalogAvailability.vue'
 import CatalogProductEditor from './editor/CatalogProductEditor.vue'
 import '../shared-commerce/commerce.css'
+import './catalog-page.css'
 import './catalog-embedded.css'
 const props=defineProps<{storeId?:string;storageOnly?:boolean;embedded?:boolean;disabled?:boolean}>(),emit=defineEmits<{'busy-change':[boolean]}>()
 const {t,locale}=useCatalogText(),route=useRoute(),auth=useAuthSessionStore(),store=computed(()=>props.storeId??String(route.params.storeId)),base=computed(()=>`/api/v1/stores/${store.value}/catalog`)
@@ -35,14 +36,16 @@ watch([store,()=>props.storageOnly,scopeAllowed],()=>{generation++;storagePage.v
 </script>
 <template>
  <component :is="embedded?'section':'main'" class="cards-page catalog-page" :class="{'catalog-embedded':embedded}">
-  <nav class="catalog-heading">
-   <RouterLink v-if="!embedded" :to="`/stores/${store}/wallet/more`">← {{t('back')}}</RouterLink>
-   <component :is="embedded?'h2':'h1'">{{t(storageOnly?'storageCatalog':'catalog')}}</component>
+  <header class="catalog-heading">
+   <div class="catalog-heading-title">
+    <RouterLink v-if="!embedded" class="catalog-back" :to="`/stores/${store}/wallet/more`">← {{t('back')}}</RouterLink>
+    <component :is="embedded?'h2':'h1'">{{t(storageOnly?'storageCatalog':'catalog')}}</component>
+   </div>
    <div class="catalog-heading-actions">
     <button v-if="view!=='editor'" :disabled="blocked" @click="load">{{t('refresh')}}</button>
     <button v-if="storageOnly&&view==='products'&&globalCatalog&&can('catalog.manage')&&scopeAllowed" class="primary" :disabled="blocked" @click="edit()">＋ {{t('newWine')}}</button>
    </div>
-  </nav>
+  </header>
   <p v-if="error" class="cards-error" role="alert">{{error}}</p><p v-if="loading" role="status">{{t('loading')}}</p>
   <template v-if="view!=='editor'">
    <nav class="catalog-view-tabs" :aria-label="t('catalog')"><button v-for="item in (storageOnly?['products','availability']:['products','categories','availability']) as ('products'|'categories'|'availability')[]" :key="item" :class="{primary:view===item}" :aria-pressed="view===item" :disabled="blocked" @click="view=item;choice=null">{{t(item==='products'?'productList':item==='categories'?'categoryManage':'availabilityManage')}}</button></nav>
@@ -51,7 +54,7 @@ watch([store,()=>props.storageOnly,scopeAllowed],()=>{generation++;storagePage.v
     <details class="catalog-guidance"><summary>{{t('storageCatalogGuide')}}</summary><p class="cards-muted">{{t('storageCatalogHint')}}</p></details>
    </template>
    <section v-if="view==='products'">
-    <div v-if="!storageOnly" class="cards-actions"><h2>{{t('productList')}}</h2><button v-if="globalCatalog&&can('catalog.manage')" :disabled="blocked" @click="edit()">＋ {{t('newProduct')}}</button></div>
+    <div v-if="!storageOnly" class="cards-actions catalog-section-heading"><h2>{{t('productList')}}</h2><button v-if="globalCatalog&&can('catalog.manage')" class="primary" :disabled="blocked" @click="edit()">＋ {{t('newProduct')}}</button></div>
     <CatalogProductList v-if="!storageOnly||storageLoaded" :hide-filters="storageOnly" :products="visibleProducts" :categories="categories" :can-edit="can('catalog.manage')" :disabled="blocked" @edit="edit"/>
    </section>
    <CatalogCategories v-if="view==='categories'" :key="base" :base="base" :categories="categories" :can-edit="globalCatalog&&can('catalog.manage')" @saved="load" @busy="childBusy=$event"/>
