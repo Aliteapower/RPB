@@ -1,6 +1,6 @@
 # 卡业务记录顾客信息
 
-2026-10-28，D:\RPB。本地完成，未提交、未生产部署。
+2026-10-28，D:\RPB。已提交、推送并生产部署，功能版本 `0b02c1707913633ade0684f961b82c6514ad98ed`，与钱包首页加载修复一起上线。验证见 `docs/development/WALLET_HISTORY_LOADING_PRODUCTION_RELEASE_20261028.md`。
 
 ## 变更与排查
 
@@ -24,7 +24,7 @@
 - PostgreSQL 测试使用 `target/local-postgres-current.txt` 指定端口的隔离测试 schema，验证跨租户/归档/已删除资料隔离，以及新查询仍将过去未用额度从 30 结算到 29，只有一笔过期分录。
 - `npm run build` 和 `git diff --check` 通过。原有 12 个无关改动文件 SHA256 保持一致。
 
-证据：`target/card-history-customer-ui-red.log`、`card-history-customer-all-ui.log`、`card-history-customer-backend.log`、`card-history-customer-build.log` 及 Surefire XML。未做线上验证。
+本地证据：`target/card-history-customer-ui-red.log`、`card-history-customer-all-ui.log`、`card-history-customer-backend.log`、`card-history-customer-build.log` 及 Surefire XML。生产接口和 Chrome 页面均已验证，证据在 `target/wallet-history-loading-release-20261028/`。
 
 ## 风险与回退
 

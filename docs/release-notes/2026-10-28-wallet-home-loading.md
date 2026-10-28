@@ -1,6 +1,6 @@
 # 钱包首页持续加载与入口失效修复
 
-2026-10-28，D:\RPB。本地完成，未提交、未部署；保留上一轮卡业务记录顾客姓名显示改动及原有无关工作。
+2026-10-28，D:\RPB。已提交、推送并生产部署，功能版本 `0b02c1707913633ade0684f961b82c6514ad98ed`；与卡业务记录顾客姓名显示一起上线，原有无关工作保留。验证见 `docs/development/WALLET_HISTORY_LOADING_PRODUCTION_RELEASE_20261028.md`。
 
 ## 排查与根因
 
@@ -24,7 +24,7 @@ WalletStaffHome 根据钱包 context 和权限计算自动跳转目标。cashier
 - 新增测试先在旧代码失败，再实施修复。
 - 钱包前端全量回归 221 项通过；随后新增/加强的专项测试共 7 项通过，覆盖慢导航下资料和权限刷新、路由拒绝后重试、资源加载失败、无权限/历史模式、十五秒超时恢复、手动页签取代旧导航及真实中英文词条。
 - `npm run build`（Vue 类型检查及 Vite 生产构建）通过，`git diff --check` 通过。
-- 线上 Chrome 仅确认旧版本故障，尚未上线验证修复。没有执行实际收款、充值、退款或修改权限。
+- 线上 Chrome 先确认旧版本故障；发布后经用户重新登录，正常进入消费收款页，返回首页和刷新均不再停在持续加载状态，手机号充值与积分入口正常加载。没有执行实际收款、充值、退款、扫描或修改权限。
 
 证据：`target/wallet-home-loading-red.log`、`target/wallet-home-loading.log`、`target/wallet-home-loading-regression.log`、`target/wallet-home-loading-build.log`。
 
