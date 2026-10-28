@@ -12,6 +12,7 @@ import { personalZh,personalEn } from './personalLocales'
 import {settingsZh,settingsEn} from './settingsLocales'
 import {operationZh,operationEn} from './operationLocales'
 export const walletZh = {
+  navigationFailed: '暂时无法打开收银功能，请重试或选择上方功能。', navigationRetry: '重试',
   businessReport:businessReportZh,
   accountUi: walletAccountZh,
   proof:proofZh,
@@ -65,6 +66,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  navigationFailed: 'Unable to open the cashier. Retry or select a function above.', navigationRetry: 'Retry',
   businessReport:businessReportEn,
   accountUi: walletAccountEn,
   proof:proofEn,

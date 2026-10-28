@@ -4,6 +4,7 @@ import {cardApi} from './api'
 import {useCardText} from './text'
 import type {CardEntry,Holding} from './types'
 const props=defineProps<{store:string;entries:CardEntry[];holdings:Holding[];customer?:boolean;canReverse?:boolean;disabled?:boolean}>(),emit=defineEmits<{changed:[];error:[message:string]}>(),{t}=useCardText(),selected=ref(''),reason=ref(''),busy=ref(false)
+function customerLabel(entry:CardEntry){return [...new Set([entry.customerName?.trim(),entry.customerPhone?.trim()].filter(Boolean))].join(' · ')||t('customerUnavailable')}
 async function reverse(e:CardEntry){busy.value=true;try{await cardApi(props.store).command(`/entries/${e.id}/${e.kind==='stamp'?'reverse-stamp':'reverse'}`,{reason:reason.value},e.kind==='stamp'?'stamp.reverse':'redeem.reverse');selected.value='';reason.value='';emit('changed')}catch(error){emit('error',String(error))}finally{busy.value=false}}
 </script>
 <template>
@@ -24,7 +25,7 @@ async function reverse(e:CardEntry){busy.value=true;try{await cardApi(props.stor
       <article v-for="e in entries" :key="e.id" class="cards-list-item">
         <div class="cards-item-heading"><div class="cards-item-title"><strong>{{t(e.kind==='stamp'?'stampAction':e.kind)}}</strong><span class="cards-quantity">× {{e.quantity}}</span></div><small class="cards-item-time">{{e.businessDay}}<template v-if="e.kind!=='daily_expire'"> · {{new Date(e.createdAt).toLocaleTimeString()}}</template></small><button v-if="canReverse&&['redeem','stamp'].includes(e.kind)&&!entries.some(x=>x.originalId===e.id)" class="cards-danger" :disabled="busy||disabled" :aria-expanded="selected===e.id" @click="selected=e.id">{{t('reverse')}}</button></div>
         <dl class="cards-entry-values"><div><dt>{{t('totalUses')}}</dt><dd>{{e.beforeTotal??'—'}} <span>→</span> {{e.afterTotal??'—'}}</dd></div><div><dt>{{t('dailyAllowance')}}</dt><dd>{{e.beforeDaily}} <span>→</span> {{e.afterDaily}}</dd></div></dl>
-        <div class="cards-item-meta"><span v-if="e.source">{{t('recordSource')}} {{e.source}}</span><span v-if="e.originalId">{{t('linked')}} <code>{{e.originalId}}</code></span></div>
+        <div class="cards-item-meta"><span>{{t('customer')}} {{customerLabel(e)}}</span><span v-if="e.source">{{t('recordSource')}} {{e.source}}</span><span v-if="e.originalId">{{t('linked')}} <code>{{e.originalId}}</code></span></div>
         <p v-if="e.reason" class="cards-record-reason">{{t('reason')}}：{{e.reason}}</p>
         <form v-if="selected===e.id" class="cards-inline-form cards-reverse-form" @submit.prevent="reverse(e)"><label>{{t('reason')}}<input v-model="reason" required></label><div class="cards-form-actions"><button class="cards-danger" :disabled="busy||disabled||!reason">{{t('confirm')}}</button><button type="button" :disabled="busy" @click="selected='';reason=''">{{t('cancel')}}</button></div></form>
       </article>

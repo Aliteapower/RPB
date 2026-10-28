@@ -122,6 +122,17 @@ class CardPostgresTest extends CatalogPostgresTest {
   tx.execute(s->purchases.refund(scope,actor,order.id(),new Refund("从未使用","unused-refund",true,key())));
   assertThat(purchases.refundable(scope,actor,Set.of(order.id()))).isEmpty();assertThat(purchases.own(scope,principal).getFirst().status()).isEqualTo("refunded");
  }
+ @Test void staffHistoryCustomerProjectionPreservesDailyExpirySettlementAndScopedHistory(){
+  var h=paid(plan("count",30,1,0));clock.now=Instant.parse("2026-10-26T01:00:00Z");
+  var directory=mock(com.rpb.reservation.customer.application.CustomerDirectoryQuery.class);
+  when(directory.activeByIds(scope.tenantScope(),Set.of(customer))).thenReturn(List.of(new com.rpb.reservation.customer.application.CustomerManagementItem(customer,"C1","陈小明",null,"+6591234567",null,"active",null,null)));
+  var query=new com.rpb.reservation.wallet.application.WalletCardEntryQuery(holdings,directory);
+  var rows=tx.execute(s->query.staff(scope,actor,customer,null));
+  assertThat(rows).allSatisfy(row->{assertThat(row.customerName()).isEqualTo("陈小明");assertThat(row.customerPhone()).isEqualTo("+6591234567");assertThat(row.entry().customerId()).isEqualTo(customer);});
+  assertThat(rows).anySatisfy(row->{assertThat(row.entry().kind()).isEqualTo("daily_expire");assertThat(row.entry().beforeTotal()).isEqualTo(30);assertThat(row.entry().afterTotal()).isEqualTo(29);});
+  assertThat(holdings.own(scope,principal).getFirst().remaining()).isEqualTo(29);
+  assertThat(jdbc.queryForObject("select count(*) from card_entries where tenant_id=? and card_id=? and kind='daily_expire'",Integer.class,tenant,h.id())).isEqualTo(1);
+ }
  @Test void productWithdrawalBlocksNewEnrollmentButExistingRewardsStillRedeem(){
   var p=plan("stamp",null,20,1);var h=enroll(p);tx.execute(s->stamps.grant(scope,actor,h.id(),"sale-1",key()));
   tx.execute(s->catalog.status(scope,actor,product.id(),new com.rpb.reservation.catalog.application.CatalogDtos.Status("inactive",product.version(),key())));

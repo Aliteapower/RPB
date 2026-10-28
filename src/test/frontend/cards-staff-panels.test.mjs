@@ -35,6 +35,14 @@ test('unused refund still requires original receipt confirmation and English dis
  const en=mount(Pages.Purchases,{store:'A',orders:[{...order('issued'),refundable:false}],disabled:false,can:()=>true},'en-SG');assert.match(text(en.root),/Customer details unavailable/);assert.equal(button(en.root,'Not refundable').props.disabled,true)
 })
 const entry=(id='entry-A',kind='redeem',originalId=null)=>({id,kind,originalId,quantity:2,beforeTotal:30,afterTotal:28,beforeDaily:3,afterDaily:1,source:'收据原文 #123',reason:'',createdAt:'2026-10-27T02:00:00Z',businessDay:'2026-10-27'})
+
+test('staff card history shows real customer contacts and never substitutes customer IDs',()=>{
+ const rows=[{...entry('named'),customerId:'hidden-customer-id',customerName:'陈小明',customerPhone:'+6591234567'},{...entry('phone'),customerId:'phone-customer-id',customerName:' ',customerPhone:'+6581234567'},{...entry('name'),customerId:'name-customer-id',customerName:'王女士',customerPhone:null},{...entry('missing'),customerId:'missing-customer-id'}, {...entry('expired','daily_expire'),customerId:'expired-customer-id',customerName:'李女士'}]
+ const s=mount(Pages.History,{store:'A',entries:rows,holdings:[],canReverse:false});const values=nodes(s.root,n=>n.props?.class==='cards-item-meta').map(text)
+ assert.match(values[0],/陈小明.*\+6591234567/);assert.match(values[1],/\+6581234567/);assert.match(values[2],/王女士/);assert.match(values[3],/顾客资料不可用/);assert.match(values[4],/李女士/);assert.doesNotMatch(text(s.root),/customer-id/)
+ const en=mount(Pages.History,{store:'A',entries:[rows[3]],holdings:[]},'en-SG');assert.match(text(en.root),/Customer details unavailable/)
+ const customer=mount(Pages.History,{store:'A',entries:[rows[0]],holdings:[],customer:true});assert.doesNotMatch(text(customer.root),/陈小明|6591234567|hidden-customer-id/)
+})
 const report={money:{receivedCents:20005,refundedCents:1000},usage:[{planId:'plan-A',nameZh:'咖啡月卡',nameEn:'Coffee membership',unit:'杯',stamps:0,rewards:1,redeemed:2,reversals:0}],expiredDaily:[{planId:'plan-A',nameZh:'咖啡月卡',nameEn:'Coffee membership',unit:'杯',unused:3}]}
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.window={location:{origin:'https://test.local'},setInterval:()=>1,clearInterval(){}}
