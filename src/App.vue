@@ -33,7 +33,8 @@ body,
 }
 
 body {
-  min-width: 320px;
+  /* Classic vertical scrollbars can leave less than 320px of layout width. */
+  min-width: min(320px, 100%);
 }
 
 button,
