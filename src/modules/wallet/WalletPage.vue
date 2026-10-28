@@ -7,6 +7,8 @@ import { provideStaffWallet } from './useStaffWallet'
 import { staffWalletPath } from './navigation'
 import WalletBottomNav from './components/WalletBottomNav.vue'
 import WalletIcon from './components/WalletIcon.vue'
+import WalletPageHeader from './components/WalletPageHeader.vue'
+import { walletStoreCaption } from './storeCaption'
 import WalletLocaleControl from './components/WalletLocaleControl.vue'
 import WalletCashierTabs from './components/WalletCashierTabs.vue'
 import WalletCashierTools from './components/WalletCashierTools.vue'
@@ -22,7 +24,7 @@ const historyOnly=computed(()=>route.query.history==='1'||!!context.value&&!cont
 const pointsOnly=computed(()=>can('wallet.points.view')&&!can('wallet.view'))
 const auth=useAuthSessionStore()
 const headerStore=computed(()=>context.value?.store??auth.authorizedStores.find(item=>item.storeId===store.value))
-const storeCaption=computed(()=>[headerStore.value?.storeName,headerStore.value?.operatingEntityName].filter(Boolean).join(' · ')||t('staffHome.store.label',{shortId:store.value.slice(0,8)}))
+const storeCaption=computed(()=>walletStoreCaption(headerStore.value,t('staffHome.store.label',{shortId:store.value.slice(0,8)})))
 watch(()=>route.name==='wallet-customers',active=>{if(active)void auth.ensureAuthorizedStores()},{immediate:true})
 const viewRevision=ref(0),operationBusy=ref(false)
 watch(()=>route.fullPath,()=>{operationBusy.value=false},{flush:'sync'})
@@ -42,8 +44,11 @@ const backPath=computed(()=>{
 })
 </script>
 <template><main class="wallet-shell wallet-staff">
-  <header class="wallet-header"><RouterLink v-if="!atHome&&!pointsOnly" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="context?.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/stores/${store}/wallet/logo/${context.store.logoMediaAssetId}`" alt=""><WalletStaffAccountMenu v-if="atHome && auth.user" :key="store" :store="store" :store-name="storeCaption" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.ui.staffWallet') }}</h1><small>{{storeCaption}}</small></div><button class="wallet-icon-button" :disabled="busy||operationBusy" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button></header>
-  <div class="wallet-utility-bar"><template v-if="atHome&&!pointsOnly"><RouterLink :to="`/stores/${store}/staff`">{{ t('nav.staff.home') }}</RouterLink><StoreSwitcher surface="staff" /></template><StaffScanEntry :store="store" :disabled="busy||operationBusy"/><WalletLocaleControl /></div>
+  <WalletPageHeader>
+    <RouterLink v-if="!atHome&&!pointsOnly" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="context?.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/stores/${store}/wallet/logo/${context.store.logoMediaAssetId}`" alt=""><WalletStaffAccountMenu v-if="atHome && auth.user" :key="store" :store="store" :store-name="storeCaption" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.ui.staffWallet') }}</h1><small :title="storeCaption">{{storeCaption}}</small></div>
+    <template #navigation><template v-if="atHome&&!pointsOnly"><RouterLink :to="`/stores/${store}/staff`">{{ t('nav.staff.home') }}</RouterLink><StoreSwitcher surface="staff" compact /></template></template>
+    <template #actions><StaffScanEntry :store="store" :disabled="busy||operationBusy"/><button class="wallet-icon-button" :disabled="busy||operationBusy" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button><WalletLocaleControl /></template>
+  </WalletPageHeader>
   <WalletCashierTabs v-if="atHome&&!historyOnly" :disabled="operationBusy" />
   <p v-if="error&&!historical" class="wallet-error" role="alert">{{ error }}</p><p v-if="busy && !context&&!historical" class="wallet-empty" role="status">{{ t('wallet.loading') }}</p>
   <ProductHistoryNotice v-if="historyOnly" />

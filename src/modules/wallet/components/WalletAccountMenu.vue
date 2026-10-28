@@ -11,7 +11,7 @@ function close(){if(!props.busy)reset()}
 watch(()=>props.store,reset)
 </script>
 <template><div class="wallet-header-title">
- <button type="button" class="wallet-account-trigger" aria-haspopup="dialog" :aria-expanded="open" :aria-label="t('wallet.accountUi.open')" @click="show"><span class="wallet-account-caption"><span role="heading" aria-level="1" class="wallet-account-title">{{title}}</span><small>{{caption}}</small></span><WalletIcon name="arrow" :size="16" /></button>
+ <button type="button" class="wallet-account-trigger" aria-haspopup="dialog" :aria-expanded="open" :aria-label="t('wallet.accountUi.open')" @click="show"><span class="wallet-account-caption"><span role="heading" aria-level="1" class="wallet-account-title">{{title}}</span><small :title="caption">{{caption}}</small></span><WalletIcon name="arrow" :size="16" /></button>
  <dialog v-if="open" ref="dialog" class="wallet-account-dialog" aria-modal="true" :aria-label="t('wallet.accountUi.title')" @cancel.prevent="close">
   <header class="wallet-account-dialog-heading"><h2>{{t('wallet.accountUi.title')}}</h2><button type="button" class="wallet-icon-button" :aria-label="t('wallet.close')" :disabled="busy" autofocus @click="close">×</button></header>
   <p class="wallet-account-store">{{caption}}</p><slot />

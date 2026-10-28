@@ -8,6 +8,7 @@ import WalletCustomerLogin from './components/WalletCustomerLogin.vue'
 import WalletCustomerAccountMenu from './components/WalletCustomerAccountMenu.vue'
 import WalletBottomNav from './components/WalletBottomNav.vue'
 import WalletIcon from './components/WalletIcon.vue'
+import WalletPageHeader from './components/WalletPageHeader.vue'
 import WalletLocaleControl from './components/WalletLocaleControl.vue'
 import {safeTransactionReturn} from './transactions/query'
 import WalletTransactionDetail from './pages/WalletTransactionDetail.vue'
@@ -23,8 +24,10 @@ const atHome=computed(()=>route.name==='wallet-customer')
 const backPath=computed(()=>['wallet-customer-bill','wallet-customer-transaction'].includes(String(route.name))?safeTransactionReturn(route.query.returnTo,store.value,true):customerWalletPath(store.value))
 </script>
 <template><main class="wallet-shell wallet-customer">
-  <header class="wallet-header"><RouterLink v-if="!atHome" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="home?.context.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/public/stores/${store}/wallet/logo/${home.context.store.logoMediaAssetId}`" alt=""><WalletCustomerAccountMenu v-if="home && atHome" :key="store" :store="store" :store-name="home.context.store.storeName" :logging-out="loggingOut" :error="error" @logout="logout" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.customerWallet') }}</h1><small>{{ home?.context.store.storeName || t('wallet.ui.secureWallet') }}</small></div><button class="wallet-icon-button" :disabled="loading" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button></header>
-  <div class="wallet-utility-bar"><WalletLocaleControl /></div>
+  <WalletPageHeader>
+    <RouterLink v-if="!atHome" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="home?.context.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/public/stores/${store}/wallet/logo/${home.context.store.logoMediaAssetId}`" alt=""><WalletCustomerAccountMenu v-if="home && atHome" :key="store" :store="store" :store-name="home.context.store.storeName" :logging-out="loggingOut" :error="error" @logout="logout" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.customerWallet') }}</h1><small :title="home?.context.store.storeName">{{ home?.context.store.storeName || t('wallet.ui.secureWallet') }}</small></div>
+    <template #actions><button class="wallet-icon-button" :disabled="loading" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button><WalletLocaleControl /></template>
+  </WalletPageHeader>
   <p v-if="error&&!historical" class="wallet-error" role="alert">{{ error }}</p><p v-if="loading && !home && !needsLogin&&!historical" class="wallet-empty" role="status">{{ t('wallet.loading') }}</p>
   <WalletCustomerLogin v-if="needsLogin&&!registrationPage" :key="store" :store="store" @authenticated="authenticated" />
   <template v-if="registrationPage"><RouterView :key="store" /><WalletBottomNav :store="store" customer /></template><template v-else-if="historical&&!needsLogin"><RouterView v-if="queryPage||home" :key="`${store}:${viewRevision}`" /><WalletTransactionDetail v-else :key="`${store}:${String(route.params.billId)}`" /><WalletBottomNav :store="store" customer /></template><template v-else-if="home"><p v-if="!home.context.transactionsEnabled" class="wallet-warning" role="status">{{ t('wallet.expired') }}</p><RouterView :key="`${store}:${viewRevision}`" /><WalletBottomNav :store="store" customer /></template>
