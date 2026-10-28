@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { walletHeaderTitleKey } from './headerTitle'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -25,7 +26,7 @@ const backPath=computed(()=>['wallet-customer-bill','wallet-customer-transaction
 </script>
 <template><main class="wallet-shell wallet-customer">
   <WalletPageHeader>
-    <RouterLink v-if="!atHome" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="home?.context.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/public/stores/${store}/wallet/logo/${home.context.store.logoMediaAssetId}`" alt=""><WalletCustomerAccountMenu v-if="home && atHome" :key="store" :store="store" :store-name="home.context.store.storeName" :logging-out="loggingOut" :error="error" @logout="logout" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.customerWallet') }}</h1><small :title="home?.context.store.storeName">{{ home?.context.store.storeName || t('wallet.ui.secureWallet') }}</small></div>
+    <RouterLink v-if="!atHome" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="home?.context.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/public/stores/${store}/wallet/logo/${home.context.store.logoMediaAssetId}`" alt=""><WalletCustomerAccountMenu v-if="home && atHome" :key="store" :store="store" :store-name="home.context.store.storeName" :logging-out="loggingOut" :error="error" @logout="logout" /><div v-else class="wallet-header-title"><h1>{{ t(walletHeaderTitleKey(route.name,true)) }}</h1><small :title="home?.context.store.storeName">{{ home?.context.store.storeName || t('wallet.ui.secureWallet') }}</small></div>
     <template #actions><button class="wallet-icon-button" :disabled="loading" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button><WalletLocaleControl /></template>
   </WalletPageHeader>
   <p v-if="error&&!historical" class="wallet-error" role="alert">{{ error }}</p><p v-if="loading && !home && !needsLogin&&!historical" class="wallet-empty" role="status">{{ t('wallet.loading') }}</p>

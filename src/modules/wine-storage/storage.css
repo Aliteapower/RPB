@@ -1,5 +1,7 @@
 @import '../shared-commerce/commerce.css';
 
+.storage-page .storage-header-switch{width:auto;max-width:160px;padding:6px 24px 6px 9px;color:#52647b;background:#fff;border-color:#dbe3ee}
+
 .storage-page {
   --wallet-line: #d9e4e6;
   --wallet-muted: #567277;

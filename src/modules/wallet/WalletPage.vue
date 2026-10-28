@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { walletHeaderTitleKey } from './headerTitle'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -45,7 +46,7 @@ const backPath=computed(()=>{
 </script>
 <template><main class="wallet-shell wallet-staff">
   <WalletPageHeader>
-    <RouterLink v-if="!atHome&&!pointsOnly" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="context?.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/stores/${store}/wallet/logo/${context.store.logoMediaAssetId}`" alt=""><WalletStaffAccountMenu v-if="atHome && auth.user" :key="store" :store="store" :store-name="storeCaption" /><div v-else class="wallet-header-title"><h1>{{ t('wallet.ui.staffWallet') }}</h1><small :title="storeCaption">{{storeCaption}}</small></div>
+    <RouterLink v-if="!atHome&&!pointsOnly" class="wallet-icon-button" :to="backPath" :aria-label="t('wallet.ui.back')"><WalletIcon name="back" /></RouterLink><img v-else-if="context?.store.logoMediaAssetId" class="wallet-logo" :src="`/api/v1/stores/${store}/wallet/logo/${context.store.logoMediaAssetId}`" alt=""><WalletStaffAccountMenu v-if="atHome && auth.user" :key="store" :store="store" :store-name="storeCaption" /><div v-else class="wallet-header-title"><h1>{{ t(walletHeaderTitleKey(route.name)) }}</h1><small :title="storeCaption">{{storeCaption}}</small></div>
     <template #navigation><template v-if="atHome&&!pointsOnly"><RouterLink :to="`/stores/${store}/staff`">{{ t('nav.staff.home') }}</RouterLink><StoreSwitcher surface="staff" compact /></template></template>
     <template #actions><StaffScanEntry :store="store" :disabled="busy||operationBusy"/><button class="wallet-icon-button" :disabled="busy||operationBusy" :aria-label="t('wallet.refresh')" @click="refreshView"><WalletIcon name="refresh" /></button><WalletLocaleControl /></template>
   </WalletPageHeader>

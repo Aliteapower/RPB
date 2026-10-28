@@ -1,5 +1,5 @@
 export const walletUiZh = {
-  navigation:'钱包导航', myWallet:'钱包', cashier:'收银台', staffWallet:'钱包收银台', back:'返回', more:'更多', entries:'资金流水',
+  navigation:'钱包导航', myCards:'我的卡', myWallet:'钱包', cashier:'收银台', staffWallet:'钱包收银台', back:'返回', more:'更多', entries:'资金流水',
   cashierTitle:'发起钱包收款', cashierHint:'先输入消费金额和说明，再扫描顾客个人钱包码；超限由顾客在原账单明确确认。', scanStart:'识别顾客付款码', selectStart:'查找已认证顾客',
   customerCollect:'选择顾客收款', customerTopup:'为顾客充值', offlineChannels:'现金 · PayNow · 信用卡', collectRecords:'收款账单',
   recordsHint:'查看消费、充值、退款和积分记录', pendingTopups:'待核实充值', pendingTopupsHint:'核对商户实际到账后入账', managementHint:'退款、对账与设置',
@@ -17,7 +17,7 @@ export const walletUiZh = {
   status:{waiting:'待顾客确认',due:'待补付',paid:'已完成',closed:'已关闭',pending:'待核实'}
 }
 export const walletUiEn = {
-  navigation:'Wallet navigation', myWallet:'Wallet', cashier:'Cashier', staffWallet:'Wallet cashier', back:'Back', more:'More', entries:'Activity',
+  navigation:'Wallet navigation', myCards:'My cards', myWallet:'Wallet', cashier:'Cashier', staffWallet:'Wallet cashier', back:'Back', more:'More', entries:'Activity',
   cashierTitle:'Start a wallet payment', cashierHint:'Enter the amount and description before scanning the personal wallet code. Payments above the limit require customer approval of the original bill.', scanStart:'Read the customer’s payment code', selectStart:'Find a verified customer',
   customerCollect:'Select customer', customerTopup:'Top up a customer', offlineChannels:'Cash · PayNow · Card', collectRecords:'Payment bills',
   recordsHint:'Payments, top-ups, refunds and points', pendingTopups:'Unverified top-ups', pendingTopupsHint:'Verify merchant receipt before crediting', managementHint:'Refunds, reconciliation and settings',

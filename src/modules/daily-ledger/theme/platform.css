@@ -1,5 +1,16 @@
 /* RPB shell integration; accounting behavior stays in the existing composable. */
 .daily-ledger { min-height:100vh; }
+.daily-ledger .ledger-day-heading{justify-content:flex-end;margin-bottom:16px}
+.daily-ledger .sidebar{padding-top:22px}
+@media(max-width:760px){
+  .daily-ledger .app-shell{display:flex;flex-direction:column}
+  .daily-ledger .workspace{display:contents}
+  .daily-ledger .ledger-page-header{order:0}
+  .daily-ledger .sidebar{order:1;padding:0 17px;border-bottom:1px solid var(--line)}
+  .daily-ledger .sidebar-bottom{display:none}
+  .daily-ledger .workspace>main{order:2;min-width:0;width:100%;margin:0 auto}
+  .daily-ledger .workspace>.page-footer{order:3;width:100%;margin:0 auto}
+}
 #app:has(>.daily-ledger)>.frontend-locale-switcher { display:none; }
 .daily-ledger .platform-tools .frontend-locale-switcher { position:static; box-shadow:none; padding:2px; border-color:var(--line); background:transparent; }
 .daily-ledger .platform-tools .frontend-locale-switcher__button { font-size:10px; height:25px; min-width:30px; padding:0 6px; }

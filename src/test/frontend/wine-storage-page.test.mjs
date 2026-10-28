@@ -93,8 +93,8 @@ before(async()=>{
 })
 after(()=>{globalThis.window=originalWindow;globalThis.fetch=originalFetch;globalThis.sessionStorage=originalStorage;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 function mount(component,customer,locale='zh-CN',data=home,respond,lists={}){
- const calls=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());return response}
- const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,i18n,route,unmount:()=>{app.unmount();mounted.delete(app)}}
+ const calls=[],navigation=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());return response}
+ const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target);if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,navigation,i18n,route,unmount:()=>{app.unmount();mounted.delete(app)}}
 }
 test('storage customer and merchant entry titles and API scopes are distinct',async()=>{
  for(const customer of [true,false]){
@@ -102,7 +102,7 @@ test('storage customer and merchant entry titles and API scopes are distinct',as
   assert.equal(s.calls[0].url,`/api/v1/${customer?'public/':''}stores/A/wine-storage/home`)
   assert.equal(nodes(s.root,n=>n.tag==='a')[0].props.href,customer?'/wallet/A':'/stores/A/wallet')
   assert.ok(nodes(s.root,n=>n.props?.class?.includes('cards-page')).length)
-  assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true).length,1)
+  assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&!n.props.class?.includes('frontend-locale-switcher')).length,1)
   if(customer){assert.match(text(s.root),/我要存酒/);assert.doesNotMatch(text(s.root),/选择同一顾客|搜索酒名、编号、位置或标签/)}
   assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
  }
@@ -150,9 +150,9 @@ test('customer directly generates a scoped code without duplicate selection or r
  const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/public/stores/A/wine-storage/intents');assert.deepEqual(writes[0].body.selections,[{itemId:item.id,quantity:1}]);assert.equal('customerId'in writes[0].body,false)
  assert.equal(nodes(s.root,n=>n.tag==='figure'&&n.props['data-code']===code).length,1);assert.match(text(s.root),/取酒码已生成/)
  globalThis.fetch=async()=>({ok:false,status:401,json:async()=>({message:'Sign in'})})
- await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='刷新')[0].props.onClick();await tick()
+ await nodes(s.root,n=>n.tag==='button'&&(text(n).trim()==='刷新'||n.props['aria-label']==='刷新'))[0].props.onClick();await tick()
  globalThis.fetch=async()=>({ok:true,json:async()=>({...home,items:[],intents:[]})})
- await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='刷新')[0].props.onClick();await tick()
+ await nodes(s.root,n=>n.tag==='button'&&(text(n).trim()==='刷新'||n.props['aria-label']==='刷新'))[0].props.onClick();await tick()
  assert.equal(nodes(s.root,n=>n.tag==='figure'&&n.props['data-code']===code).length,0)
  s.unmount()
 })
@@ -370,7 +370,7 @@ test('new storage wine defaults to enabled wine category and lets the server all
 
 test('storage editor defaults to bottles and preserves advanced values through collapse and save',async()=>{
  const s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:[],total:0,page:0,size:12,hasMore:false}:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
- const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim().startsWith(label))[0],n=>n.tag==='input')[0]
+ const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&(text(n).trim()||n.props['aria-label']||'').startsWith(label))[0],n=>n.tag==='input')[0]
  assert.equal(field('单位').value,'瓶');const extra=nodes(s.root,n=>n.tag==='details'&&String(n.props.class).includes('catalog-editor-extra'))[0];assert.ok(extra);assert.equal(extra.props.open,false);assert.ok(nodes(extra,n=>n.tag==='input'&&n.props.inputmode==='decimal').length)
  nodes(s.root,n=>n.tag==='form')[0].props.onInvalidCapture();await tick();assert.equal(extra.props.open,true);field('价格 (SGD)').props['onUpdate:modelValue']('12.50');field('编号').props['onUpdate:modelValue']('NEW-BOTTLE');field('中文名称').props['onUpdate:modelValue']('快速新增');nodes(s.root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('cat');extra.props.onToggle({target:{open:false}});await tick();nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick()
  const body=s.calls.find(c=>c.method==='POST').body;assert.equal(body.product.unit,'瓶');assert.equal(body.product.priceCents,1250);assert.deepEqual(body.product.channels,['storage']);s.unmount()
@@ -388,7 +388,7 @@ test('wine manager creates through the original editor with storage selected and
  const s=mount(StaffPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:created?[created]:[],total:created?1:0,page:0,size:12,hasMore:false}:url.endsWith('/products/editor')&&options?.method==='POST'?new Promise(resolve=>finish=()=>{const body=JSON.parse(options.body);created={...catalogProducts[0],...body.product,id:'new-wine'};resolve({product:created,barcodes:body.barcodes})}):catalogResponse(url,options),{actor});await tick()
  button(s.root,'设置').props.onClick();await tick();button(s.root,'管理寄存酒商品').props.onClick();await tick();assert.ok(button(s.root,'＋ 新增酒品'));button(s.root,'＋ 新增酒品').props.onClick();await tick()
  assert.deepEqual(nodes(s.root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.checked).map(n=>n.props.value),['storage']);assert.equal(button(s.root,'返回存酒设置').props.disabled,true)
- const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim().startsWith(label))[0],n=>n.tag==='input')[0]
+ const field=label=>nodes(nodes(s.root,n=>n.tag==='label'&&(text(n).trim()||n.props['aria-label']||'').startsWith(label))[0],n=>n.tag==='input')[0]
  field('编号').props['onUpdate:modelValue']('NEW-WINE');field('中文名称').props['onUpdate:modelValue']('新增寄存酒');nodes(s.root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('cat');await tick()
  const form=nodes(s.root,n=>n.tag==='form')[0];form.props.onSubmit({preventDefault(){}});form.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method==='POST').length,1);assert.equal(button(s.root,'保存商品与条码').props.disabled,true)
  const command=s.calls.find(c=>c.method==='POST');assert.equal(command.url,'/api/v1/stores/A/catalog/products/editor');assert.deepEqual(command.body.product.channels,['storage']);assert.equal(command.body.product.nameZh,'新增寄存酒');assert.ok(command.body.idempotencyKey);finish();await tick();assert.match(text(s.root),/商品信息与条码已保存/)
@@ -427,10 +427,10 @@ test('embedded wine search paginates on the server and resets store context with
 test('storage product manager remains available with storage closed and clears failed results without claiming zero matches',async()=>{
  const actor={...catalogActor,permissions:['catalog.view']};let fail=true
  const s=mount(StaffPage,false,'zh-CN',{...home,newBusinessEnabled:false},url=>url.includes('/storage-products?')?{items:catalogProducts,total:2,page:0,size:12,hasMore:false}:catalogResponse(url),{actor});await tick();button(s.root,'设置').props.onClick();await tick();const normalFetch=globalThis.fetch;globalThis.fetch=async(url,options)=>fail&&url.includes('/storage-products?')?{ok:false,status:503,json:async()=>({code:'TEMP',message:'查询失败'})}:normalFetch(url,options);button(s.root,'管理寄存酒商品').props.onClick();await tick();await tick();assert.match(text(s.root),/查询失败/);assert.doesNotMatch(text(s.root),/匹配商品: 0/)
- fail=false;const refreshes=nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新');refreshes.at(-1).props.onClick();await tick();assert.match(text(s.root),/酒品1/);assert.equal(button(s.root,'编辑'),undefined);assert.equal(button(s.root,'＋ 新增酒品'),undefined);button(s.root,'上下架管理').props.onClick();await tick();assert.equal(button(s.root,'本店停用'),undefined);s.unmount()
+ fail=false;const refreshes=nodes(s.root,n=>n.tag==='button'&&(text(n)==='刷新'||n.props['aria-label']==='刷新'));refreshes.at(-1).props.onClick();await tick();assert.match(text(s.root),/酒品1/);assert.equal(button(s.root,'编辑'),undefined);assert.equal(button(s.root,'＋ 新增酒品'),undefined);button(s.root,'上下架管理').props.onClick();await tick();assert.equal(button(s.root,'本店停用'),undefined);s.unmount()
 })
 function catalogResponse(url,options){if(url.endsWith('/categories'))return[{id:'cat',code:'C',nameZh:'酒类',nameEn:'Wine',enabled:true,version:0,sortOrder:0}];if(url.endsWith('/products'))return catalogProducts;if(url.endsWith('/editor')){const body=options?.body?JSON.parse(options.body):null;return{product:body?{...catalogProducts[0],...body.product,version:1,listingVersion:1}:catalogProducts[0],barcodes:body?body.barcodes:['06956367311355']}}return home}
-function button(root,label){return nodes(root,n=>n.tag==='button'&&text(n).trim().startsWith(label))[0]}
+function button(root,label){return nodes(root,n=>n.tag==='button'&&(text(n).trim()||n.props['aria-label']||'').startsWith(label))[0]}
 function typeField(input,value){input.value=value;(input.listeners.input??input.props.onInput)({target:input})}
 
 test('catalog operation areas are separate and list hides publication and editor actions',async()=>{
@@ -495,7 +495,7 @@ test('customer wallet hides unopened empty storage but retains closed product hi
  const person={id:'handoff-customer',displayName:'扫码顾客',phone:'80000000'}
  setScanHandoff({store:'A',actor:'handoff-staff',target:'storage',code:'WI.'+'A'.repeat(43),customerId:person.id,task:'withdraw'})
  const s=mount(StaffPage,false,'zh-CN',home,url=>url.endsWith('/customers/'+person.id)?person:home,{actor:{accountId:'handoff-staff',roles:[],permissions:home.permissions}});await tick()
- assert.match(text(s.root),/扫码顾客/);assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='取酒').length,1)
+ assert.match(text(s.root),/扫码顾客/);assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&!n.props.class?.includes('frontend-locale-switcher')&&text(n).trim()==='取酒').length,1)
  assert.equal(s.calls.filter(c=>c.url.endsWith('/customers/'+person.id)).length,1);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
  })
 
@@ -531,8 +531,8 @@ test('opened bottles lock both steppers to one and remaining-stock refresh clamp
  const s=mount(CustomerPage,true,'zh-CN',data,url=>url.includes('/product-options')?{items:[],categories:[],hasMore:false}:{...data});await tick();nodes(s.root,n=>n.tag==='button'&&text(n)==='我要取酒')[0].props.onClick();await tick()
  const input=()=>nodes(s.root,n=>n.tag==='input'&&n.props.type==='number')[0]
  input().props.onInput({target:{value:'3'}});await tick();assert.equal(input().props.value,3)
- data.items=[{...item,remaining:1}];await nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新')[0].props.onClick();await tick();assert.equal(input().props.value,1);assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='增加瓶数')[0].props.disabled,true)
- data.items=[{...item,opened:true}];await nodes(s.root,n=>n.tag==='button'&&text(n)==='刷新')[0].props.onClick();await tick();assert.equal(input().props.value,1);assert.equal(input().props.max,1);assert.equal(input().props.disabled,true);s.unmount()
+ data.items=[{...item,remaining:1}];await nodes(s.root,n=>n.tag==='button'&&(text(n)==='刷新'||n.props['aria-label']==='刷新'))[0].props.onClick();await tick();assert.equal(input().props.value,1);assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='增加瓶数')[0].props.disabled,true)
+ data.items=[{...item,opened:true}];await nodes(s.root,n=>n.tag==='button'&&(text(n)==='刷新'||n.props['aria-label']==='刷新'))[0].props.onClick();await tick();assert.equal(input().props.value,1);assert.equal(input().props.max,1);assert.equal(input().props.disabled,true);s.unmount()
 })
 
 test('merchant corner binds quantity and customer, prevents duplicate submits, then waits for customer confirmation',async()=>{
@@ -736,4 +736,14 @@ test('successful first issuance immediately marks verified even when refreshing 
  assert.ok(issued);button(s.root,'customerAuth.closeActivation').props.onClick();await tick()
  const verified=button(s.root,'customerAuth.alreadyVerified');assert.ok(verified);assert.equal(verified.props.disabled,true)
  assert.ok(button(s.root,'customerAuth.reissueActivationShort'));assert.equal(button(s.root,'核实并激活'),undefined);s.unmount()
+})
+
+
+test('compact storage header shows the current store once and switches only within the provided store list',async()=>{
+ const s=mount(StaffPage,false,'zh-CN',{...home,stores:[{id:'A',name:'QA Store'},{id:'B',name:'Branch B'}]});await tick()
+ const header=nodes(s.root,n=>n.tag==='header')[0]
+ assert.equal(text(header).split('QA Store').length-1,1)
+ const select=nodes(header,n=>n.tag==='select'&&n.props.class==='storage-header-switch')[0]
+ assert.ok(select);assert.equal(select.props.value,'A');assert.match(text(select),/切换门店/);assert.doesNotMatch(text(select),/QA Store/)
+ await select.props.onChange({target:{value:'B'}});assert.deepEqual(s.navigation,['/stores/B/wine-storage']);s.unmount()
 })

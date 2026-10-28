@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useLedgerI18n } from '../i18n'
 import { useAuthSessionStore } from '../../../stores/authSession'
-import StoreSwitcher from '../../../components/store/StoreSwitcher.vue'
-import FrontendLocaleSwitcher from '../../../components/common/FrontendLocaleSwitcher.vue'
+import LedgerPageHeader from './LedgerPageHeader.vue'
 import type { Branding } from '../types'
 import LedgerIcon from './LedgerIcon.vue'
 const { text } = useLedgerI18n()
@@ -13,7 +12,7 @@ const auth = useAuthSessionStore()
 <template>
   <div class="app-shell">
     <aside class="sidebar">
-      <RouterLink class="brand" :to="`/stores/${storeId}/staff`"><span class="brand-symbol" :class="{ 'custom-logo': branding?.logo_data }"><img v-if="branding?.logo_data" :src="branding.logo_data" :alt="text('门店 Logo')" /><LedgerIcon v-else name="book" /></span><span class="brand-copy">{{ branding?.store_name || text("每日营业记录") }}<small>{{ branding?.store_name_en || 'DAILY LEDGER' }}</small></span></RouterLink>
+
       <span class="nav-label">{{ text('工作台') }}</span>
       <nav :aria-label="text('账本工作台')">
         <button v-if="!historyOnly" class="nav-item" :class="{ active: tab === 'record' }" :aria-current="tab === 'record' ? 'page' : undefined" @click="$emit('navigate', 'record')"><LedgerIcon name="book" /><span>{{ text('营业记录') }}</span><i v-if="tab === 'record'"></i></button>
@@ -21,10 +20,10 @@ const auth = useAuthSessionStore()
         <template v-if="admin"><div class="nav-divider"></div><span class="nav-label">{{ text('管理') }}</span><button class="nav-item" :class="{ active: tab === 'settings' }" @click="$emit('navigate', 'settings')"><LedgerIcon name="settings" /><span>{{ text('记账设置') }}</span></button></template>
         <RouterLink v-if="auth.isTenantAdmin" class="nav-item" :to="`/stores/${storeId}/admin/staff`"><span class="people-icon">♧</span><span>{{ text('员工管理') }}</span></RouterLink>
       </nav>
-      <div class="sidebar-bottom"><div class="ledger-mode"><span class="status-dot saved"></span>{{ text('当日累计盘点模式') }}</div><div class="account"><span class="avatar">{{ (auth.user?.displayName || text("员")).slice(0, 1) }}</span><div><strong>{{ auth.user?.displayName }}</strong><small>{{ admin ? text("管理员") : text("员工") }}</small></div><RouterLink class="icon-button" :to="`/stores/${storeId}/staff`" :aria-label="text('员工首页')" :title="text('员工首页')">↪</RouterLink></div></div>
+      <div class="sidebar-bottom"><div class="ledger-mode"><span class="status-dot saved"></span>{{ text('当日累计盘点模式') }}</div></div>
     </aside>
     <div class="workspace">
-      <header class="topbar"><span>{{ text('门店营业管理') }} <span class="breadcrumb">/ {{ tab === 'history' ? text("历史账目") : text("每日记录") }}</span></span><div class="platform-tools"><StoreSwitcher surface="staff" /><span class="live-dot"></span><span>{{ currency || 'SGD' }}</span><span class="top-user">· {{ auth.user?.displayName }}</span><FrontendLocaleSwitcher /></div></header>
+      <LedgerPageHeader :branding="branding" :store-id="storeId" :tab="tab" :currency="currency"/>
       <main><slot /></main><footer class="page-footer"><span class="footer-brand">{{ branding?.store_name_en }}</span><span>{{ text('清楚记录每一天') }}</span></footer>
     </div>
   </div>
