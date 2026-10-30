@@ -31,6 +31,78 @@ async function mount(Page,{path='/stores/A/workforce/shifts/new',manager=false,p
 }
 afterEach(()=>{apps.splice(0).forEach(a=>a.unmount());calls.length=0;handler=async()=>({items:[],headOffice:true})})
 
+test('template management round trip preserves unsaved shift fields and rule edits without saving the shift',async()=>{
+ const root=await mount(ShiftForm)
+ nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].props['onUpdate:modelValue']('未保存的晚班')
+ checkbox(root,'启用多段休息与考勤规则').props['onUpdate:modelValue'](true);await settle()
+ checkbox(root,'次日开始（仍归所选营业日期）').props['onUpdate:modelValue'](true)
+ nodes(root,n=>n.tag==='input'&&n.props.type==='time')[0].props['onUpdate:modelValue']('01:00')
+ await button(root,'管理模板').props.onClick();await settle()
+ assert.ok(button(root,'返回班次编辑'));await button(root,'返回班次编辑').props.onClick();await settle()
+ assert.equal(nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].value,'未保存的晚班')
+ assert.equal(nodes(root,n=>n.tag==='input'&&n.props.type==='time')[0].value,'01:00')
+ assert.equal(checkbox(root,'次日开始（仍归所选营业日期）').checked,true)
+ assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+})
+
+test('new template saves and returns with refreshed options but does not replace the unsaved shift snapshot',async()=>{
+ const items=[];handler=async(path,body)=>{if(body){const item={id:path.split('/').at(-1),name:body.name,enabled:true,version:1,rules:body.rules};items.push(item);return item}return {items,headOffice:true}}
+ const root=await mount(ShiftForm);checkbox(root,'启用多段休息与考勤规则').props['onUpdate:modelValue'](true);await settle()
+ nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].props['onUpdate:modelValue']('我的班次')
+ await button(root,'新增模板').props.onClick();await settle()
+ assert.equal(nodes(root,n=>n.tag==='form').length,1,'template form must not be nested in the shift form')
+ nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].props['onUpdate:modelValue']('新的共享模板')
+ await button(root,'载入示例：11–23点，净工作8小时').props.onClick();await settle()
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ assert.equal(button(root,'返回班次编辑'),undefined)
+ assert.ok(nodes(root,n=>n.tag==='option'&&text(n).includes('新的共享模板')).length)
+ assert.equal(nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].value,'我的班次')
+ assert.match(text(root),/多段休息 0段/,'creating a shared template must not silently replace local rules')
+ assert.equal(calls.filter(c=>c.method==='PUT'&&c.path.startsWith('/shifts/')).length,0)
+ assert.equal(calls.filter(c=>c.method==='PUT').length,1)
+})
+
+test('manager can view templates and return but cannot start a new template',async()=>{
+ handler=async()=>({items:[],headOffice:false});const root=await mount(ShiftForm,{manager:true})
+ checkbox(root,'启用多段休息与考勤规则').props['onUpdate:modelValue'](true);await settle()
+ assert.equal(button(root,'新增模板'),undefined)
+ await button(root,'管理模板').props.onClick();await settle()
+ assert.equal(button(root,'新增模板'),undefined);assert.equal(nodes(root,n=>n.tag==='form').length,0)
+ await button(root,'返回班次编辑').props.onClick();await settle();assert.equal(nodes(root,n=>n.tag==='form').length,1)
+ assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+})
+
+test('editing an existing shift keeps its original ID, version and unsaved changes after returning',async()=>{
+ const shift={id:'original',version:7,name:'原班次',startTime:'01:00',endTime:'06:00',nextDay:false,startNextDay:true,breakMode:'none',breakMinutes:0,breakAfterMinutes:0,breakStartOffset:0,breakEndOffset:0,breakPaid:false,enabled:true,rules:defaultAttendanceRules()}
+ handler=async(path,body)=>body?body:path==='/shifts'?[shift]:{items:[],headOffice:true}
+ const root=await mount(ShiftForm,{path:'/stores/A/workforce/shifts/original'})
+ nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].props['onUpdate:modelValue']('修改后仍保留')
+ await button(root,'管理模板').props.onClick();await settle();await button(root,'返回班次编辑').props.onClick();await settle()
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ const written=calls.find(c=>c.method==='PUT');assert.equal(written.path,'/shifts/original');assert.equal(written.body.expectedVersion,7);assert.equal(written.body.name,'修改后仍保留');assert.equal(written.body.startNextDay,true)
+ assert.equal(calls.filter(c=>c.path==='/shifts'&&c.method==='GET').length,1,'returning must not reload and overwrite the draft')
+})
+
+test('failed template loading keeps a return path and the unsaved shift',async()=>{
+ const root=await mount(ShiftForm);checkbox(root,'启用多段休息与考勤规则').props['onUpdate:modelValue'](true);await settle()
+ nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].props['onUpdate:modelValue']('保留我的内容')
+ handler=async()=>{throw Error('offline')};await button(root,'管理模板').props.onClick();await settle()
+ assert.ok(nodes(root,n=>n.props?.role==='alert').length)
+ await button(root,'返回班次编辑').props.onClick();await settle()
+ assert.equal(nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].value,'保留我的内容')
+})
+
+test('template save in flight disables and guards returning, then returns on success',async()=>{
+ let release;handler=async(path,body)=>body?new Promise(resolve=>release=()=>resolve({id:'NEW',...body,version:1})):{items:[],headOffice:true}
+ const root=await mount(ShiftForm);checkbox(root,'启用多段休息与考勤规则').props['onUpdate:modelValue'](true);await settle()
+ await button(root,'新增模板').props.onClick();await settle()
+ nodes(root,n=>n.tag==='input'&&n.props.maxlength==='80')[0].props['onUpdate:modelValue']('保存中的模板')
+ const pending=nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ const back=button(root,'返回班次编辑');assert.equal(back.props.disabled,true)
+ await back.props.onClick();await settle();assert.ok(button(root,'返回班次编辑'))
+ release();await pending;await settle();assert.equal(button(root,'返回班次编辑'),undefined)
+})
+
 test('restaurant shift presets save early middle and overnight shifts using canonical midnight',async()=>{
  for(const [key,name,startTime,endTime,nextDay]of [['early','早班','11:00','23:00',false],['middle','中班','16:00','00:00',true],['late','晚班','23:00','06:00',true]]){
   const root=await mount(ShiftForm),picker=nodes(root,n=>n.tag==='select'&&nodes(n,o=>o.tag==='option'&&o.props.value===key).length)[0];assert.ok(picker,'restaurant preset selector');picker.props.onChange({target:{value:key}});await settle();await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle();const saved=calls.filter(c=>c.method==='PUT').at(-1).body;assert.equal(saved.name,name);assert.equal(saved.startTime,startTime);assert.equal(saved.endTime,endTime);assert.equal(saved.nextDay,nextDay)
