@@ -25,3 +25,11 @@
 ## 最终本地结果与发布决定
 
 后端最终专项24项通过（PostgreSQL20、API3、精确安全路径1），失败/错误/跳过均0；包含原有创建/绑定及账号维护回归。最终日志target/workforce-login-status-backend-final.log，前端证据target/workforce-login-status-frontend.log和账号组件11项。API/代码/生产准备复核通过：无迁移，权限与隔离明确，备份回退和白名单构建已准备。GO仅授权本修复发布，实际部署结果另行追加。
+
+## 生产结果及收尾
+
+GO：607a53c70414a781288c6ce19b80b5613d6a15f2已推送部署，前后端版本及制品哈希一致。独立归档3668文件精确核对，395前端文件与制品一致；迁移维持106/106/0。完整回退点/opt/rpb/backups/20261030-workforce-login-status-607a53c7-before，含停服dump并通过pg_restore目录验证；制品/opt/rpb/releases/20261030-workforce-login-status-607a53c7。后端PID3417044、NRestarts=0、active；环境和相邻服务身份不变，53项考勤/工资/权限/凭据及商业数据聚合指纹不变。
+
+公开员工页/排班/工资/登录/常用入口index及EmployeeForm资源哈希通过；匿名账号GET401且no-store、无写保护头的status PUT403。浏览器新验收页实际显示1001账号仍停用，并出现可用的“启用登录账号”按钮与独立状态说明；未点击启停、未改密码或保存员工。原用户编辑页及草稿未刷新。真实状态写入及认证仅在本地隔离schema验证，不声称真机/线上员工登录。
+
+证据target/workforce-login-status-20261030及target/workforce-login-status-*.log。原钱包和薪资方案MD排除哈希一致。发布工具cp -n仅出现可移植性提示，未报错；不调整服务器工具或扩大范围。此发布收尾后才开始第二部分本地薪资优化。
