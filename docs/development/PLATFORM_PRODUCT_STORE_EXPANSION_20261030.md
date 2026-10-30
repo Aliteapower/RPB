@@ -33,3 +33,7 @@ PlatformTenantBillingPage原本仅在wallet产品显示选店与追加入口；C
 - Vue类型检查通过；Vite对当前源码独立构建通过，产物source-dist及source-build.log。最初npm转发--outDir的命令参数被错误解释为构建根目录，已用Vite CLI显式outDir重新构建源码，不以那次产物作为本轮验证或发布包。
 - 差异检查使用core.whitespace=cr-at-eol匹配项目既有换行，通过；35个既有无关文件SHA256均未改变。
 - Code Review：已审范围无阻断项，APPROVE。无生产变更；待后续单独授权提交部署后，再用20000000做线上页面及商业记录验收。
+
+## 后续生产状态
+
+已按用户授权部署功能提交1e358d15，20000000牛车水店真实开通与单店续费、原店期限及历史快照不变验证通过。见[生产发布记录](PLATFORM_PRODUCT_STORE_EXPANSION_PRODUCTION_20261030.md)。上文本地状态保留为实施阶段证据。
