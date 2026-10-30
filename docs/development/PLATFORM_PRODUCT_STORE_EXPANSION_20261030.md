@@ -40,4 +40,4 @@ PlatformTenantBillingPage原本仅在wallet产品显示选店与追加入口；C
 
 ## 多产品后续核查
 
-其余五产品真实开通与单店续费、原店期间和历史不变证据，以及四处本地修复见[后续核查记录](PRODUCT_LINE_STORE_BILLING_AUDIT_20261030.md)。本轮新修复未提交部署。
+其余五产品真实开通与单店续费、原店期间和历史不变证据，以及四处修复见[后续核查记录](PRODUCT_LINE_STORE_BILLING_AUDIT_20261030.md)。四项修复及线上发现的取消恢复查询补丁已部署至9ee10f58，见[最终生产验收](PRODUCT_LINE_BILLING_FOLLOWUP_PRODUCTION_20261030.md)。

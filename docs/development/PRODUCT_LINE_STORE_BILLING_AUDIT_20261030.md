@@ -74,3 +74,5 @@ Code Review：本地修复APPROVE，未发现范围内阻断项。权限隔离�
 使用20000000下独立QA门店qa-followup-20261030验证新增备注、非钱包过期显示和取消续费。建店UI强制新增管理员凭据，因此取消表单，使用不创建账号的数据库夹具；所有夹具SQL限定QA UUID、备注和版本，不改原店。新店开通备注与旧订阅备注不同，已确认落入新明细和新事件。日账过期状态已在真实页面显示“已到期”。
 
 取消续费实测暴露后端遗漏：findByTenantSubscriptionAndId仍只查active/suspended，页面可选取消条目后请求返回404。补齐cancelled/expired状态；保留租户、订阅、门店、有效店及版本约束。新增真实PostgreSQL回归覆盖六产品各两种恢复状态、重放、旧版本拒绝、跨租户/订阅拒绝、停用店拒绝及旧行/旧快照保护；先复现SUBSCRIPTION_ITEM_NOT_FOUND，再修复。最终发布和验收结果见本轮生产记录，不能以33b6e201单独声称取消恢复已通过。
+
+最终9ee10f58已上线，16项受影响PostgreSQL集成全部通过。线上取消恢复、QA停店和全部原明细/事件/权限指纹保护已核实，详见[生产验收及回退记录](PRODUCT_LINE_BILLING_FOLLOWUP_PRODUCTION_20261030.md)。
