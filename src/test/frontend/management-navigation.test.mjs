@@ -49,3 +49,5 @@ test('shared layout renders the accessible breadcrumb and visible return without
  assert.ok(compileScript(descriptor,{id:'management-navigation-test',inlineTemplate:true}).content)
 })
 
+
+test('pay change return navigation is available for store governance or separate salary authority',()=>{const storeManager={employeeManage:true,headOffice:false},salaryOnly={employeeManage:false,headOffice:false};assert.ok(managementNavigation(route('workforce-pay-change-requests'),storeManager,null,'zh-CN'));assert.ok(managementNavigation(route('workforce-pay-change-requests','C'),salaryOnly,payroll,'en-SG'));assert.equal(managementNavigation(route('workforce-pay-change-requests','OTHER'),salaryOnly,payroll,'zh-CN'),null);assert.equal(managementNavigation(route('workforce-pay-change-requests'),salaryOnly,null,'zh-CN'),null)})

@@ -3,10 +3,11 @@ import type {Home} from './types'
 import type {PayrollHomeData} from './payrollTypes'
 
 type Caption=readonly [string,string]
-type Access='employee'|'headOffice'|'payroll'
+type Access='employee'|'headOffice'|'payroll'|'change'
 interface ManagementSection {path:string;label:Caption;access:Access;routes:Record<string,Caption|null>}
 // Explicit route names keep operation pages and employee calendar views out of management.
 const sections:ManagementSection[]=[
+ {path:'pay-change-requests',label:['工资变更申请','Pay change requests'],access:'change',routes:{'workforce-pay-change-requests':null}},
  {path:'attendance-rules',label:['休息与考勤规则','Break and attendance rules'],access:'employee',routes:{'workforce-attendance-rules':null}},
  {path:'review-explanations',label:['判定说明','Decision explanations'],access:'employee',routes:{'workforce-review-explanations':null}},
  {path:'clock-site',label:['门店打卡定位点','Store clock location'],access:'employee',routes:{'workforce-clock-site':null}},
@@ -28,8 +29,10 @@ export function managementNavigation(route:Pick<RouteLocationNormalizedLoaded,'n
  const name=typeof route.name==='string'?route.name:'',section=sections.find(s=>Object.hasOwn(s.routes,name))
  if(!home||!section)return null
  const requested=typeof route.query.companyId==='string'?route.query.companyId:''
- const companyId=section.access==='payroll'?(requested||payrollHome?.companies[0]?.id||''):requested
- if(section.access==='payroll'){
+ const companyId=section.access==='payroll'||section.access==='change'?(requested||payrollHome?.companies[0]?.id||''):requested
+ if(section.access==='change'){
+  if(!home.employeeManage&&!payrollHome?.companies.some(c=>c.id===companyId))return null
+ }else if(section.access==='payroll'){
   if(!companyId||!payrollHome?.companies.some(c=>c.id===companyId))return null
  }else if(!home.employeeManage||(section.access==='headOffice'&&!home.headOffice))return null
  const english=locale.startsWith('en'),caption=(c:Caption)=>c[english?1:0]

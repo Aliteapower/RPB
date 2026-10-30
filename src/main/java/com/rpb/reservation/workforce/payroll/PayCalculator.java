@@ -59,7 +59,7 @@ public final class PayCalculator {
             if(item.proration()!=null&&(!Set.of("full","payable").contains(item.proration())||!PayItemKinds.INCOME.contains(item.kind())))throw WorkforceException.invalid();
             BigDecimal amount=fixed&&rule.basis().equals("monthly")&&PayItemKinds.INCOME.contains(item.kind())&&!"full".equals(item.proration())?item.amount().multiply(units.payableDays()).divide(units.workingDays(),2,RoundingMode.HALF_UP):cents(item.amount());
             switch(item.kind()){
-                case "ow_allowance","ow_additional","ow_accommodation" -> allowances=allowances.add(amount);
+                case "ow_allowance","ow_additional","ow_accommodation","wage_event" -> allowances=allowances.add(amount);
                 case "reimbursement" -> reimbursements=reimbursements.add(amount);
                 case "deduction","cdac" -> deductions=deductions.add(amount);
                 case "employer_charge" -> employer=employer.add(amount);

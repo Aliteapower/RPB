@@ -51,11 +51,14 @@ public class PayrollBatchService {
  @Transactional public BatchDetail input(CurrentActor actor,UUID store,UUID id,UUID employee,InputWrite raw){
   gate.enter(actor,store);repository.lock(actor.tenantId(),id);var b=repository.find(actor.tenantId(),id).orElseThrow(WorkforceException::missing);access.enter(actor,store,b.company(),PayrollViews.stores(b.calculation()));if(!Set.of("draft","calculated").contains(b.status()))throw WorkforceException.conflict();var c=PayrollValues.input(raw);
   var capture=sources.capture(actor.tenantId(),b.company(),b.month(),repository.inputs(actor.tenantId(),id));access.enter(actor,store,b.company(),capture.stores());if(capture.lines().stream().noneMatch(l->l.employee().id().equals(employee)))throw WorkforceException.missing();
-  var old=repository.inputs(actor.tenantId(),id).stream().filter(i->i.employeeId().equals(employee)).findFirst().orElse(PayrollSources.defaultInput(employee));
+  var old=capture.lines().stream().filter(i->i.employee().id().equals(employee)).map(PayrollSources.CapturedLine::input).findFirst().orElse(PayrollSources.defaultInput(employee));
   var cdacReview=c.cdacReview()!=null?c.cdacReview():Boolean.TRUE.equals(c.cdacAutomatic())?null:old.cdacReview();
-  var next=new LineInput(employee,old.version()+1,c.workingDays(),c.payableDays(),c.unitsReviewed(),c.specialDaysReviewed(),c.items(),c.note(),cdacReview);
-  if(old.version()==c.expectedVersion()+1&&new LineInput(employee,old.version(),c.workingDays(),c.payableDays(),c.unitsReviewed(),c.specialDaysReviewed(),c.items(),c.note(),cdacReview).equals(old))return view(actor,store,b,capture);
-  if(old.version()!=c.expectedVersion())throw WorkforceException.conflict();repository.input(b,next);repository.update(b,"draft",null,actor.actorId(),clock.instant());var saved=repository.find(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"payroll.input",id,Map.of("employeeId",employee,"version",old.version()),Map.of("employeeId",employee,"version",next.version()));return view(actor,store,saved,capture);
+  var next=sources.reviewedInput(actor.tenantId(),b.company(),b.month(),old,new LineInput(employee,old.version()+1,c.workingDays(),c.payableDays(),c.unitsReviewed(),c.specialDaysReviewed(),c.items(),c.note(),cdacReview));
+  var persisted=repository.inputs(actor.tenantId(),id).stream().filter(i->i.employeeId().equals(employee)).findFirst().orElse(null);
+  if(persisted!=null&&persisted.version()==c.expectedVersion()+1&&new LineInput(employee,persisted.version(),next.workingDays(),next.payableDays(),next.unitsReviewed(),next.specialDaysReviewed(),next.items(),next.note(),next.cdacReview()).equals(persisted))return view(actor,store,b,capture);
+  var effective=sources.effectiveInput(actor.tenantId(),b.company(),employee,b.month());
+  if(effective.version()==c.expectedVersion()+1&&new LineInput(employee,effective.version(),next.workingDays(),next.payableDays(),next.unitsReviewed(),next.specialDaysReviewed(),next.items(),next.note(),next.cdacReview()).equals(effective))return view(actor,store,b,capture);
+  if(old.version()!=c.expectedVersion())throw WorkforceException.conflict();repository.input(b,next);repository.update(b,"draft",null,actor.actorId(),clock.instant());var saved=repository.find(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"payroll.input",id,Map.of("employeeId",employee,"version",old.version()),Map.of("employeeId",employee,"version",next.version()));return view(actor,store,saved,null);
  }
  private record ActionPreparation(PayrollRepository.State batch,PayrollSources.Capture capture,BatchDetail replay,PayrollComputation.State computation){}
  @Transactional(propagation=Propagation.NOT_SUPPORTED) public BatchDetail action(CurrentActor actor,UUID store,UUID id,UUID command,ActionWrite raw){
@@ -73,9 +76,11 @@ public class PayrollBatchService {
   return transactions.write(()->{
    gate.enter(actor,store);repository.lock(actor.tenantId(),id);var b=authorized(actor,store,id);var replay=replay(actor,store,b,command,c);if(replay!=null)return replay;
    calculable(b,c);repository.lockSources(actor.tenantId());
-   var fresh=capture(actor,store,b.company(),b.month(),repository.inputs(actor.tenantId(),id));unchanged(prepared.capture(),fresh);
+   var fresh=capture(actor,store,b.company(),b.month(),repository.inputs(actor.tenantId(),id));
+   if(c.action().equals("confirm")&&fresh.lines().stream().anyMatch(line->line.issues().contains(com.rpb.reservation.workforce.statutory.annual.AnnualWageRepository.OPENING_PAYROLL_CONFLICT)))throw new WorkforceException(com.rpb.reservation.workforce.statutory.annual.AnnualWageRepository.OPENING_PAYROLL_CONFLICT,409);
+   unchanged(prepared.capture(),fresh);
    var calculation=c.action().equals("confirm")?b.calculation():computed;
-   if(c.action().equals("confirm"))confirmable(actor,b,fresh,computed);
+   if(c.action().equals("confirm")){confirmable(actor,b,fresh,computed);repository.annual().consume(b);repository.annual().freeze(b,fresh);}
    var response=save(actor,store,b,command,c,c.action().equals("confirm")?"confirmed":"calculated",calculation,fresh);
    if(result!=null){var saved=repository.find(actor.tenantId(),id).orElseThrow();recordComputation(saved,b,prepared.computation(),result,fresh);}return response;
   });
@@ -109,7 +114,7 @@ public class PayrollBatchService {
   if(b.version()!=c.expectedVersion())throw WorkforceException.conflict();PayrollSnapshot calculation=b.calculation();String status;PayrollSources.Capture capture=null;
   switch(c.action()){
    case "publish" -> {if(!b.status().equals("confirmed"))throw WorkforceException.conflict();status="published";}
-   case "void" -> {if(!Set.of("draft","calculated","confirmed").contains(b.status())||!repository.payments(actor.tenantId(),id).isEmpty())throw WorkforceException.conflict();status="voided";}
+   case "void" -> {if(!Set.of("draft","calculated","confirmed").contains(b.status())||!repository.payments(actor.tenantId(),id).isEmpty())throw WorkforceException.conflict();repository.lockSources(actor.tenantId());repository.annual().release(actor.tenantId(),id);status="voided";}
    default -> throw WorkforceException.invalid();
   }
   return save(actor,store,b,command,c,status,calculation,capture);
@@ -121,6 +126,6 @@ public class PayrollBatchService {
   var inputs=repository.inputs(actor.tenantId(),b.id());var capture=known==null?sources.capture(actor.tenantId(),b.company(),b.month(),inputs):known;access.enter(actor,store,b.company(),capture.stores());
   boolean frozen=Set.of("confirmed","published","voided").contains(b.status())&&b.calculation()!=null;
   var people=frozen?PayrollViews.employees(b.calculation()):capture.lines().stream().map(l->new Option(l.employee().id(),l.employee().name()+" · "+l.employee().employeeNo())).toList();
-  return new BatchDetail(PayrollViews.summary(b,people.size()),people,inputs,b.calculation(),b.calculation()!=null&&!b.calculation().sourceFingerprint().equals(capture.fingerprint()),repository.payments(actor.tenantId(),b.id()));
+  return new BatchDetail(PayrollViews.summary(b,people.size()),people,frozen?inputs:capture.lines().stream().map(PayrollSources.CapturedLine::input).toList(),b.calculation(),b.calculation()!=null&&!b.calculation().sourceFingerprint().equals(capture.fingerprint()),repository.payments(actor.tenantId(),b.id()));
  }
 }

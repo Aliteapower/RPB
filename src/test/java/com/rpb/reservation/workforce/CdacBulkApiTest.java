@@ -23,4 +23,10 @@ class CdacBulkApiTest {
   when(service.apply(any(),any(),any(),any())).thenThrow(new WorkforceException("WORKFORCE_CDAC_BULK_CHANGED",409));
   mvc.perform(put(base+"/"+UUID.randomUUID()).header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WORKFORCE_CDAC_BULK_CHANGED"));
  }
+ @Test void reasonBindsSeparatelyAndPartialRequestsNeverPretendToBeEffectiveProfiles()throws Exception{
+  var actor=new CurrentActor(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of());when(actors.currentActor()).thenReturn(Optional.of(actor));var employee=UUID.randomUUID();var preview=new CdacBulk.Preview("a".repeat(64),"2026-12",List.of(),1,0,0);when(service.apply(any(),any(),any(),any())).thenReturn(new CdacBulk.Result(preview,List.of(),List.of(new CdacBulk.RequestResult(employee,null,"failed","WORKFORCE_CONFLICT"))));
+  String body="{\"selection\":{\"companyId\":\""+UUID.randomUUID()+"\",\"month\":\"2026-12\",\"employeeIds\":[\""+employee+"\"],\"cdac\":{\"status\":\"exempt\",\"reference\":\"legal proof\"}},\"fingerprint\":\""+"a".repeat(64)+"\",\"reason\":\"explicit bulk approval request\"}";
+  mvc.perform(put(base+"/"+UUID.randomUUID()).header("X-RPB-Workforce","1").contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.profiles").isEmpty()).andExpect(jsonPath("$.requests[0].status").value("failed")).andExpect(jsonPath("$.requests[0].error").value("WORKFORCE_CONFLICT"));
+  verify(service).apply(eq(actor),any(),any(),argThat(c->c.reason().equals("explicit bulk approval request")&&c.selection().cdac().reference().equals("legal proof")));
+ }
 }

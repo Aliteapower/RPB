@@ -6,6 +6,7 @@ import {usePositionText} from '../positionText'
 import {WorkforceApiError} from '../api'
 import type {Position} from '../types'
 import {useWorkModeText,type WorkMode} from '../workMode'
+import PositionSalaryDefaults from '../components/PositionSalaryDefaults.vue'
 import WorkModeFields from '../components/WorkModeFields.vue'
 const {w}=useWorkModeText(),attendanceMode=ref<WorkMode|undefined>(undefined)
 const {api,home,current}=useWorkforce(),{t,error}=useWorkforceText(),{j}=usePositionText()
@@ -21,9 +22,8 @@ function toggle(p:Position){return run(()=>api().put(`/positions/${p.id}`,{expec
 function remove(p:Position){return run(()=>api().put(`/positions/${p.id}/deletion`,{expectedVersion:p.version}),j('removed'))}
 </script>
 <template><section v-if="home?.headOffice" class="wf-panel">
- 
+
  <h2>{{j('title')}}</h2><p class="wf-hint">{{j('hint')}}</p><p v-if="failure" role="alert" class="wf-error">{{failure}}</p><p v-if="notice" role="status">{{notice}}</p><p v-if="loading" role="status">{{t('loading')}}</p>
  <template v-else><form @submit.prevent="save"><fieldset :disabled="busy"><legend>{{j(editing?'edit':'add')}}</legend><div class="wf-filters"><label>{{j('name')}}<input v-model="name" required maxlength="80"></label><WorkModeFields v-model="attendanceMode" optional/><label class="wf-check"><input v-model="enabled" type="checkbox">{{j('enabled')}}</label><button class="primary" :disabled="busy">{{j(busy?'saving':'save')}}</button><button v-if="editing" type="button" @click="reset">{{j('cancel')}}</button></div></fieldset></form>
- <div class="wf-table-wrap"><table><thead><tr><th>{{j('name')}}</th><th>{{w('mode')}}</th><th>{{t('status')}}</th><th>{{t('manage')}}</th></tr></thead><tbody><tr v-for="p in items" :key="p.id"><td>{{p.name}}</td><td>{{p.attendanceMode?w(p.attendanceMode):w('unchanged')}}</td><td><span class="wf-badge">{{j(p.enabled?'enabled':'disabled')}}</span></td><td><div class="wf-inline"><button :disabled="busy" @click="edit(p)">{{j('edit')}}</button><button :disabled="busy" @click="toggle(p)">{{j(p.enabled?'disable':'enable')}}</button><button :disabled="busy" @click="deleting=p.id">{{j('remove')}}</button></div><div v-if="deleting===p.id" class="wf-inline"><span>{{j('removeHint')}}</span><button :disabled="busy" @click="remove(p)">{{j('confirmRemove')}}</button><button :disabled="busy" @click="deleting=''">{{j('cancel')}}</button></div></td></tr><tr v-if="!items.length"><td colspan="4" class="wf-empty">{{j('empty')}}</td></tr></tbody></table></div></template>
+ <div class="wf-table-wrap"><table><thead><tr><th>{{j('name')}}</th><th>{{w('mode')}}</th><th>{{t('status')}}</th><th>{{t('manage')}}</th></tr></thead><tbody><tr v-for="p in items" :key="p.id"><td>{{p.name}}</td><td>{{p.attendanceMode?w(p.attendanceMode):w('unchanged')}}</td><td><span class="wf-badge">{{j(p.enabled?'enabled':'disabled')}}</span></td><td><div class="wf-inline"><button :disabled="busy" @click="edit(p)">{{j('edit')}}</button><button :disabled="busy" @click="toggle(p)">{{j(p.enabled?'disable':'enable')}}</button><button :disabled="busy" @click="deleting=p.id">{{j('remove')}}</button></div><div v-if="deleting===p.id" class="wf-inline"><span>{{j('removeHint')}}</span><button :disabled="busy" @click="remove(p)">{{j('confirmRemove')}}</button><button :disabled="busy" @click="deleting=''">{{j('cancel')}}</button></div><PositionSalaryDefaults :position-id="p.id"/></td></tr><tr v-if="!items.length"><td colspan="4" class="wf-empty">{{j('empty')}}</td></tr></tbody></table></div></template>
 </section><p v-else role="alert">{{t('noAccess')}}</p></template>
-

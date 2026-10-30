@@ -88,7 +88,7 @@ class PayrollReportPostgresTest extends WorkforcePayrollPostgresTest {
   assertThatThrownBy(()->reports.export(admin,store,"2026-10",List.of(company),"companies",once.fingerprint())).isInstanceOfSatisfying(WorkforceException.class,e->assertThat(e.code()).isEqualTo("WORKFORCE_REPORT_CHANGED"));
  }
  @Test void draftInputChangeInvalidatesExportEvenBeforeAnyCalculation(){
-  var b=create();var before=report();batches.input(admin,store,b.batch().id(),employee,new InputWrite(0L,null,null,true,false,List.of(),"Draft review only"));
+  var b=create();var before=report();approvedInput(admin,store,b.batch().id(),employee,new InputWrite(0L,null,null,true,false,List.of(),"Draft review only"));
   var after=report();assertThat(after.companies().getFirst().status()).isEqualTo("draft");assertThat(after.fingerprint()).isNotEqualTo(before.fingerprint());
   assertThatThrownBy(()->reports.export(admin,store,"2026-10",List.of(company),"companies",before.fingerprint())).isInstanceOfSatisfying(WorkforceException.class,e->assertThat(e.code()).isEqualTo("WORKFORCE_REPORT_CHANGED"));
  }

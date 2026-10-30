@@ -3,8 +3,8 @@ export class WorkforceApiError extends Error {
 }
 export function workforceApi(store:string){
  const base=`/api/v1/stores/${encodeURIComponent(store)}/workforce`
- async function request<T>(path:string,body?:unknown,signal?:AbortSignal):Promise<T>{
-  const response=await fetch(base+path,{signal,method:body===undefined?'GET':'PUT',credentials:'same-origin',cache:'no-store',
+ async function request<T>(path:string,body?:unknown,signal?:AbortSignal,method?:'POST'):Promise<T>{
+  const response=await fetch(base+path,{signal,method:method||(body===undefined?'GET':'PUT'),credentials:'same-origin',cache:'no-store',
    headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json','X-RPB-Workforce':'1'})},
    body:body===undefined?undefined:JSON.stringify(body)})
   const data=await response.json().catch(()=>({code:'WORKFORCE_PERSISTENCE_ERROR'}))
@@ -19,6 +19,6 @@ export function workforceApi(store:string){
   if(!type||!['image/jpeg','image/png','image/webp','application/pdf'].includes(type))throw new WorkforceApiError(400,'WORKFORCE_DOCUMENT_FILE_INVALID')
   const blob=await response.blob();if(!blob.size||blob.size>5*1024*1024)throw new WorkforceApiError(400,'WORKFORCE_DOCUMENT_FILE_INVALID');return blob
  }
- return {get:<T>(path:string,signal?:AbortSignal)=>request<T>(path,undefined,signal),put:<T>(path:string,body:unknown)=>request<T>(path,body),upload,file,url:(path:string)=>base+path}
+ return {post:<T>(path:string,body:unknown)=>request<T>(path,body,undefined,'POST'),get:<T>(path:string,signal?:AbortSignal)=>request<T>(path,undefined,signal),put:<T>(path:string,body:unknown)=>request<T>(path,body),upload,file,url:(path:string)=>base+path}
 }
 export type WorkforceApi=ReturnType<typeof workforceApi>

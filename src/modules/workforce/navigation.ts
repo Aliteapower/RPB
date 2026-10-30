@@ -12,7 +12,7 @@ export function useWorkforceNavigation(home:Ref<Home|null>,payrollHome?:Ref<Payr
  const {t}=useWorkforceText(),{p}=usePhaseText(),{q}=usePhaseThreeText(),{r}=usePayrollText(),{j}=usePositionText()
  return computed<WorkforceNavItem[]>(()=>{
   if(!home.value)return []
-  const payroll={label:r('payroll'),path:'payroll',matches:['payroll','payroll-reports','payroll-reconciliation','payroll-batches','payslips']}
+  const payroll={label:r('payroll'),path:'payroll',matches:['payroll','payroll-reports','payroll-reconciliation','payroll-batches','payslips','supplemental-payroll','statutory-settlement']}
   const management={label:j('management'),path:'management',matches:['management','clock-site','document-types','document-expiries','public-holidays','administrators','positions','companies','calendar','leave-types','shifts','salary-templates','pay-profiles']}
   const operations:WorkforceNavItem[]=home.value.employeeManage?[
    {label:t('employees'),path:'employees'},

@@ -9,8 +9,12 @@
 ## GET /payroll-batches/{id}/changes
 
 ChangeReport={batchId,batchVersion,status,sourceChanged,lastCalculation,previousMonth,pending,recalculated,reused}。
-Comparison={available,baselineMonth,baselineVersion,totalGrossDelta,totalNetDelta,totalEmployerCostDelta,lines}。
-LineChange={employeeId,employeeName,kind,reasons,basicPayDelta,grossPayDelta,netPayDelta,employeeCpfDelta,employerCostDelta}；kind=added/removed/changed，reasons=employee/profile/input/attendance/issues/policy/source/added/removed。差值用十进制字符串，未具备对比双方时Comparison.available=false且不伪造差值。
+Comparison={available,baselineMonth,baselineVersion,totalGrossDelta,totalNetDelta,totalEmployerCostDelta,lines,reasonBasis?}。
+LineChange={employeeId,employeeName,kind,reasons,basicPayDelta,grossPayDelta,netPayDelta,employeeCpfDelta,employerCostDelta}；kind=added/removed/changed，reasons=employee/profile/input/approval/attendance/leave/issues/policy/source/added/removed/legacy_comparison。差值用十进制字符串，未具备对比双方时Comparison.available=false且不伪造差值。
+比较理由只表示有保留证据支持的事实：input仅比较双方持久化输入version；policy比较双方完整政策或可核实UUID/vN身份，相同身份只补齐政策对象不算变更；approval比较核准version或双方证据可知的有效性；attendance比较双方SourceEvidence中的actualSeconds/startAt/endAt；leave仅比较双方current有效核准的请假秒数。自动生成单位、stale零占位、旧来源证据补全不能当人工输入/实际出勤事件，无法定位用source。
+
+新比较reasonBasis=snapshot_evidence_v1，保存的lastCalculation可识别其原因准则；紧邻上月比较现场使用相同准则。旧已存比较没有完整before证据且无该标记时，读取投影reasonBasis=legacy_unverified，各行reasons仅legacy_comparison，UI显示“历史比较结果（缺少完整前态，原因未验证）”；保留kind和全部原差额。不把旧结果维度当政策、人工输入、出勤事件，不回写旧比较/工资JSON。不新增写接口或迁移；历史权限仍先校验再投影。reasonBasis是可选新增字段，旧JSON缺失可读；未来旧服务若不识别优化缓存，可按既有不兼容缓存全量回退，不能重写冻结工资。
+
 PendingChange={employeeId,employeeName,reason}；reason=source/global/added/removed/baseline_unavailable。pending表示当前来源需要重算，不能把上次工资当实时工资。recalculated/reused为最近一次计算统计。
 
 本月lastCalculation比较最近两次计算；previousMonth只取同公司紧邻上月已确认/已发布批次。已冻结月份只做投影，不写缓存或工资。比较和回执涉及的历史来源门店必须再次授权，否则403，不降级返回敏感历史。

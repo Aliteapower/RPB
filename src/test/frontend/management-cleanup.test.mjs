@@ -54,7 +54,10 @@ for(const [page,endpoint] of [['SalaryTemplateList','salary-templates'],['PayPro
   select.props['onUpdate:modelValue']('C');select.props.onChange();await settle()
   assert.ok(requests.includes('/'+endpoint+'?companyId=C'))
   assert.equal(router.currentRoute.value.query.companyId,'C')
-  assert.ok(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/'+endpoint+'/new?companyId=C').length)
+  if(page==='SalaryTemplateList'){
+   assert.ok(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/pay-template-library?companyId=C').length,'authorized company context reaches the published template library')
+   assert.equal(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/salary-templates/new?companyId=C').length,0,'legacy shared-template creation was replaced by tenant master publication')
+  }else assert.ok(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/'+endpoint+'/new?companyId=C').length)
   assert.ok(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/'+endpoint+'/row?companyId=C').length)
  })
  test(page+' retains company selection after list failure and clears previous company rows',async()=>{
@@ -71,6 +74,7 @@ for(const [page,endpoint] of [['SalaryTemplateList','salary-templates'],['PayPro
   const requests=[];globalThis.fetch=async path=>{requests.push(path);return response(payroll)}
   const {root}=await mount(ui[page],'/stores/A/workforce/'+endpoint+'?companyId=OTHER')
   assert.deepEqual(requests,['/payroll-home']);assert.equal(nodes(root,n=>n.tag==='select').length,0)
+  if(page==='SalaryTemplateList')assert.equal(nodes(root,n=>n.tag==='a'&&String(n.props.href).includes('pay-template-library')).length,0,'unauthorized company must not expose the creation/library action')
   assert.ok(nodes(root,n=>n.props?.role==='alert').length)
  })
 }

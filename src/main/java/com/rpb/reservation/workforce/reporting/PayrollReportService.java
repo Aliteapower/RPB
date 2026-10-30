@@ -48,13 +48,13 @@ public class PayrollReportService {
             var paidByEmployee = new HashMap<UUID,BigDecimal>();
             for (var p : paymentRecords) paidByEmployee.merge(p.employeeId(),new BigDecimal(p.amount()).multiply(BigDecimal.valueOf(p.reversesId()==null?1:-1)),BigDecimal::add);
             var paid = paidByEmployee.values().stream().reduce(BigDecimal.ZERO,BigDecimal::add);
-            var totals = new Totals(c.totalGross(),c.totalNet(),c.totalEmployeeCpf(),c.totalEmployerCpf(),c.totalSdl(),c.totalEmployerCost(),PayrollReportValues.money(paid),PayrollReportValues.money(new BigDecimal(c.totalNet()).subtract(paid)));
+            var totals = new Totals(c.totalGross(),c.totalNet(),c.totalEmployeeCpf(),c.totalEmployerCpf(),c.totalSdl(),c.totalEmployerCost(),PayrollReportValues.money(paid),c.totalNet()==null?null:PayrollReportValues.money(new BigDecimal(c.totalNet()).subtract(paid)));
             companies.add(new CompanyRow(company,companyName,b.id(),b.status(),!c.sourceFingerprint().equals(capture.fingerprint()),c.lines().size(),totals,c.issues(),PayBreakdown.of(c)));
             var people = new HashMap<UUID,PayrollDtos.PayrollLine>();
             for (var line : c.lines()) {
                 people.put(line.employeeId(),line); var linePaid = paidByEmployee.getOrDefault(line.employeeId(),BigDecimal.ZERO);
-                var cost = new BigDecimal(line.grossPay()).add(new BigDecimal(line.reimbursements())).add(new BigDecimal(line.employerCpf())).add(new BigDecimal(line.sdl())).add(new BigDecimal(line.employerCharges()));
-                var amounts = new Totals(line.grossPay(),line.netPay(),line.employeeCpf(),line.employerCpf(),line.sdl(),PayrollReportValues.money(cost),PayrollReportValues.money(linePaid),PayrollReportValues.money(new BigDecimal(line.netPay()).subtract(linePaid)));
+                var cost = PayBreakdown.of(line).employerCost();
+                var amounts = new Totals(line.grossPay(),line.netPay(),line.employeeCpf(),line.employerCpf(),line.sdl(),cost,PayrollReportValues.money(linePaid),line.netPay()==null?null:PayrollReportValues.money(new BigDecimal(line.netPay()).subtract(linePaid)));
                 employees.add(new EmployeeRow(company,companyName,b.id(),b.status(),line.employeeId(),line.employeeNo(),line.employeeName(),line.workSeconds(),line.overtimeSeconds(),amounts,PayBreakdown.of(line),line.profile()==null||line.profile().payment()==null?"":line.profile().payment().method(),line.profile()==null||line.profile().payment()==null?"":line.profile().payment().bank()));
             }
             for (var p : paymentRecords) {

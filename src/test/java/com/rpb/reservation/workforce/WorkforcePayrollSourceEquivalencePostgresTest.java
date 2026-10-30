@@ -19,23 +19,43 @@ import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
-/** Database-backed old/new oracle: compare every captured field, including all hash inputs. */
+/** Independent old reader oracle for unchanged facts; new evidence and invalid-approval preview semantics are asserted separately. */
 class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPostgresTest {
  final YearMonth month=YearMonth.of(2026,10);
  WorkforceJson json(){return new WorkforceJson(new ObjectMapper().findAndRegisterModules());}
  PayrollSources.Capture equivalent(WorkModeResolver resolver,List<LineInput> inputs){
-  var json=json();var approvalRepository=new ApprovalRepository(jdbc,json);
+  var json=json();
+  // The legacy oracle models valid existing inputs; install them through real approval first.
+  for(var input:inputs){var requests=new com.rpb.reservation.workforce.payroll.governance.PayChangeRepository(jdbc,json);var current=requests.monthlyBaseline(tenant,company,input.employeeId(),month);if(!com.rpb.reservation.workforce.payroll.governance.EffectivePayGovernance.inputEconomic(current).equals(com.rpb.reservation.workforce.payroll.governance.EffectivePayGovernance.inputEconomic(input)))approveTest(new com.rpb.reservation.workforce.payroll.governance.PayChangeDtos.Write(0L,company,input.employeeId(),null,null,null,List.of(new com.rpb.reservation.workforce.payroll.governance.PayChangeDtos.MonthWrite(month.toString(),new InputWrite(current.version(),input.workingDays(),input.payableDays(),input.unitsReviewed(),input.specialDaysReviewed(),input.items(),input.note(),input.cdacReview()))),null,"Oracle fixture inputs"));}
+  var approvalRepository=new ApprovalRepository(jdbc,json);
   var modes=resolver==null?null:new WorkModeClock(new WorkModeRepository(jdbc,json),resolver,time);
   var approvalSources=new ApprovalSources(attendance,new LeaveRepository(jdbc),new CalendarRepository(jdbc),json,time,modes);
   var oldSources=new LegacyPayrollSources(payRepository,configs,repository,schedules,approvalRepository,approvalSources,json,resolver);
   var newSources=new PayrollSources(payRepository,configs,repository,schedules,approvalRepository,approvalSources,json,resolver);
   var expected=oldSources.capture(tenant,company,month,inputs);var actual=newSources.capture(tenant,company,month,inputs);
-  assertThat(actual).as("complete Capture, including fingerprint, employee/profile/input/source/issue order").isEqualTo(expected);
+  assertThat(actual.company()).isEqualTo(expected.company());assertThat(actual.stores()).isEqualTo(expected.stores());assertThat(actual.statutoryPolicy()).isEqualTo(expected.statutoryPolicy());assertThat(actual.lines()).hasSameSizeAs(expected.lines());
+  for(int n=0;n<actual.lines().size();n++){
+   var a=actual.lines().get(n);var e=expected.lines().get(n);assertThat(a.employee()).isEqualTo(e.employee());assertThat(a.profile()).isEqualTo(e.profile());assertThat(a.issues()).isEqualTo(e.issues());assertThat(a.specialDays()).isEqualTo(e.specialDays());assertThat(a.sources()).hasSameSizeAs(e.sources());
+   boolean allCurrent=true;
+   for(int r=0;r<a.sources().size();r++){
+    var x=a.sources().get(r);var y=e.sources().get(r);assertThat(x.evidence()).isNotNull();assertThat(x.evidence().actualSeconds()).isEqualTo(y.workSeconds());
+    assertThat(new SourceRef(x.scheduleId(),x.storeId(),x.workDate(),x.approvalVersion(),x.sourceFingerprint(),y.workSeconds(),y.paidLeaveSeconds(),y.unpaidLeaveSeconds(),x.payable())).as("unchanged source identity/order/fingerprint and current actual facts").isEqualTo(y);
+    if(x.evidence().approvalState().equals("current")){assertThat(x.workSeconds()).isEqualTo(y.workSeconds());assertThat(x.paidLeaveSeconds()).isEqualTo(y.paidLeaveSeconds());assertThat(x.unpaidLeaveSeconds()).isEqualTo(y.unpaidLeaveSeconds());assertThat(x.evidence().approvedSeconds()).isEqualTo(y.workSeconds());}
+    else {allCurrent=false;assertThat(x.evidence().approvedSeconds()).isNull();assertThat(x.workSeconds()).isZero();assertThat(x.paidLeaveSeconds()).isZero();assertThat(x.unpaidLeaveSeconds()).isZero();}
+   }
+   if(allCurrent||a.profile()==null||!PayrollGeneration.automatic(a.profile().rule()))assertThat(a.input()).isEqualTo(e.input());
+   else {assertThat(a.input().version()).isEqualTo(e.input().version());assertThat(a.input().items()).isEqualTo(e.input().items());assertThat(a.input().note()).isEqualTo(e.input().note());assertThat(a.input().workingDays()).isEqualTo(e.input().workingDays());assertThat(new java.math.BigDecimal(a.input().payableDays())).isLessThanOrEqualTo(new java.math.BigDecimal(e.input().payableDays()));}
+  }
+  if(actual.lines().stream().flatMap(l->l.sources().stream()).allMatch(r->r.evidence().approvalState().equals("current"))){
+   var oldResult=new LegacyPayrollCalculationService(time).calculate(expected,month);var newResult=new PayrollCalculationService(time).calculate(actual,month);
+   for(int n=0;n<newResult.lines().size();n++){var a=newResult.lines().get(n);var e=oldResult.lines().get(n);assertThat(List.of(a.basicPay(),a.overtimePay(),a.allowances(),a.reimbursements(),a.deductions(),a.grossPay(),a.employeeCpf(),a.employerCpf(),a.sdl(),a.employerCharges(),a.netPay())).as("valid approved monetary facts remain exactly equal to legacy").isEqualTo(List.of(e.basicPay(),e.overtimePay(),e.allowances(),e.reimbursements(),e.deductions(),e.grossPay(),e.employeeCpf(),e.employerCpf(),e.sdl(),e.employerCharges(),e.netPay()));}
+  }
+  assertThat(newSources.capture(tenant,company,month,inputs)).as("new evidence and fingerprints are deterministic").isEqualTo(actual);
   return actual;
  }
  void plan(Rule rule,CpfProfile cpf){
   var p=configs.findProfile(tenant,profile).orElseThrow();
-  configs.saveProfile(tenant,new PayProfile(p.id(),p.companyId(),p.employeeId(),p.employeeName(),p.effectiveFrom(),p.templateId(),p.templateVersion(),rule,cpf,p.version()+1,p.payment(),p.cdac()));
+  approvedProfile(admin,store,p.id(),new ProfileWrite(p.version(),p.companyId(),p.employeeId(),p.effectiveFrom(),p.templateId(),rule,cpf,p.payment(),p.cdac()));
  }
  Schedule scheduled(UUID shop,LocalDate date,String name){
   time.at(date.atStartOfDay(ZoneId.of("Asia/Singapore")).toInstant().toString());
@@ -62,7 +82,7 @@ class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPost
   var pending=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(worked.id(),2L,worked.startAt(),worked.endAt().minusSeconds(1800),List.of(),false,"Pending correction"));
   var first=equivalent(null,inputs);assertThat(first.stores()).contains(store,sibling);assertThat(first.lines().getFirst().specialDays()).isTrue();assertThat(first.lines().getFirst().issues()).contains("SOURCE_PENDING","APPROVAL_STALE");
   assertThat(first.lines().getFirst().sources()).extracting(SourceRef::scheduleId).doesNotContain(cancelled.id());
-  assertThat(first.lines().getFirst().sources()).filteredOn(s->s.scheduleId().equals(leaveDay.id())).singleElement().satisfies(s->{assertThat(s.paidLeaveSeconds()).isEqualTo(3600);assertThat(s.unpaidLeaveSeconds()).isEqualTo(3600);});
+  assertThat(first.lines().getFirst().sources()).filteredOn(s->s.scheduleId().equals(leaveDay.id())).singleElement().satisfies(s->{assertThat(s.evidence().approvalState()).isEqualTo("missing");assertThat(s.evidence().approvedSeconds()).isNull();assertThat(s.paidLeaveSeconds()).isZero();assertThat(s.unpaidLeaveSeconds()).isZero();});
   corrections.decide(admin,store,pending.id(),new DecisionWrite(1L,"rejected","Keep original"));equivalent(null,inputs);
   var accepted=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(worked.id(),2L,worked.startAt(),worked.endAt().minusSeconds(1800),List.of(),false,"Accepted correction"));
   corrections.decide(admin,store,accepted.id(),new DecisionWrite(1L,"approved","Corrected"));var corrected=equivalent(null,inputs);assertThat(corrected.fingerprint()).isNotEqualTo(first.fingerprint());
@@ -86,6 +106,8 @@ class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPost
   var inputs=List.of(new LineInput(employee,3,"22","21",true,false,List.of(),"Manual"));
   var first=equivalent(null,inputs);assertThat(first.lines().getFirst().sources()).extracting(SourceRef::scheduleId).containsExactly(context.id(),payable.id());
   assertThat(first.lines().getFirst().sources()).extracting(SourceRef::payable).containsExactly(false,true);
+  for(var schedule:List.of(context,payable)){UUID shop=schedule.id().equals(context.id())?store:sibling;var row=approvals.detail(admin,shop,schedule.id()).row();approvals.approve(admin,shop,schedule.id(),new ApprovalDtos.ApprovalWrite(0L,row.sourceFingerprint(),"Valid old/new monetary comparison"));}
+  var approved=equivalent(null,inputs);assertThat(approved.lines().getFirst().sources()).allSatisfy(r->assertThat(r.evidence().approvalState()).isEqualTo("current"));
   plan(new Rule("monthly","3000","8","44",true,"1.5",List.of(),new Generation("attendance",List.of(1,2,3,4,5))),cpf);
   var auto=equivalent(null,inputs);assertThat(auto.lines().getFirst().issues()).contains("AUTO_SCHEDULE_MISSING");
   plan(new Rule("monthly","3000","8","44",false,"1.5",List.of(),new Generation("fixed",List.of(1,2,3,4,5))),cpf);

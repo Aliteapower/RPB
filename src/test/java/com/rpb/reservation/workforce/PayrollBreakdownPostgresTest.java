@@ -11,7 +11,7 @@ class PayrollBreakdownPostgresTest extends WorkforcePayrollPostgresTest {
  @Test void snapshotCategoriesBankAndReportsAreFrozenAndPrivate(){
   var old=configs.findProfile(tenant,profile).orElseThrow();
   var rule=new Rule("hourly","100","8","44",false,"1.5",List.of(new Item("Extra ordinary pay","ow_additional","100"),new Item("Cash housing","ow_accommodation","200"),new Item("Travel allowance","ow_allowance","50"),new Item("Other deduction","deduction","40"),new Item("CDAC reviewed","cdac","0.50"),new Item("Employer only","employer_charge","30")));
-  configuration.saveProfile(admin,store,profile,new ProfileWrite(1L,company,employee,old.effectiveFrom(),template,rule,old.cpf(),new PaymentPreference("bank","DBS")));
+  approvedProfile(admin,store,profile,new ProfileWrite(1L,company,employee,old.effectiveFrom(),template,rule,old.cpf(),new PaymentPreference("bank","DBS")));
   jdbc.update("update workforce_employees set birth_date='1990-01-01' where tenant_id=? and id=?",tenant,employee);
   var b=published();String frozen=jdbc.queryForObject("select calculation::text from workforce_pay_batches where tenant_id=? and id=?",String.class,tenant,b.batch().id());
   var reports=new PayrollReportService(new PayrollAccess(access,directory,jdbc),new PayrollReportRepository(jdbc),payRepository,sources,new WorkforceJson(new ObjectMapper().findAndRegisterModules()),time);

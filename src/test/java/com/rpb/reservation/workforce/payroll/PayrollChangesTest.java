@@ -1,6 +1,7 @@
 package com.rpb.reservation.workforce.payroll;
 
 import static com.rpb.reservation.workforce.payroll.PayrollDtos.*;
+import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
 import java.time.Instant;
 import java.util.*;
@@ -32,5 +33,57 @@ class PayrollChangesTest {
         var changes=PayrollChanges.compare(before,1L,after).lines();
         assertThat(changes).extracting(PayrollProgressDtos.LineChange::kind).containsExactly("added","removed");
         assertThat(changes.get(1).grossPayDelta()).isEqualTo("-100");
+    }
+
+    PayrollLine evidenceLine(LineInput input,List<SourceRef> refs,long seconds){
+        return new PayrollLine(employee,"Employee","E1",null,input,seconds,seconds,0,0,0,"100","0","0","0","0","100","0","0","0","0","100","none",List.of(),refs,List.of());
+    }
+    PayrollSnapshot policySnapshot(PayrollLine line,String identity,com.rpb.reservation.workforce.statutory.StatutoryPolicies.Policy policy){
+        return new PayrollSnapshot("fingerprint","Company","2026-10",identity,List.of(line),List.of(),"100","100","0","0","0","100",Instant.EPOCH,policy);
+    }
+    @Test void samePolicyIdentityWithRicherEvidenceDoesNotInventPolicyChange(){
+        var policy=mock(com.rpb.reservation.workforce.statutory.StatutoryPolicies.Policy.class);var id=UUID.randomUUID();when(policy.id()).thenReturn(id);when(policy.version()).thenReturn(1L);
+        var line=evidenceLine(null,List.of(),0);
+        assertThat(PayrollChanges.compare(policySnapshot(line,id+"/v1",null),1L,policySnapshot(line,id+"/v1",policy)).lines()).isEmpty();
+    }
+    @Test void generatedUnitsWithSamePersistedInputVersionAreOnlySourceDifferences(){
+        var a=new LineInput(employee,1,"22","20",true,false,List.of(),"",null,"automatic");
+        var b=new LineInput(employee,1,"22","21",true,false,List.of(),"",null,"automatic");
+        var reasons=PayrollChanges.compare(policySnapshot(evidenceLine(a,List.of(),0),"v1",null),1L,policySnapshot(evidenceLine(b,List.of(),0),"v1",null)).lines().getFirst().reasons();
+        assertThat(reasons).contains("source").doesNotContain("input");
+    }
+    @Test void staleZeroPlaceholderIsApprovalChangeWithoutInventingAttendanceOrLeave(){
+        var schedule=UUID.randomUUID();var store=UUID.randomUUID();var day=java.time.LocalDate.of(2026,10,28);
+        var current=new SourceRef(schedule,store,day,1,"old",3600,1800,0,true,new SourceEvidence(3600,"current",3600L,Instant.EPOCH,Instant.EPOCH.plusSeconds(3600),List.of()));
+        var stale=new SourceRef(schedule,store,day,1,"new",0,0,0,true,new SourceEvidence(3600,"stale",null,Instant.EPOCH,Instant.EPOCH.plusSeconds(3600),List.of()));
+        var reasons=PayrollChanges.compare(policySnapshot(evidenceLine(null,List.of(current),3600),"v1",null),1L,policySnapshot(evidenceLine(null,List.of(stale),0),"v1",null)).lines().getFirst().reasons();
+        assertThat(reasons).contains("approval").doesNotContain("attendance","leave");
+    }
+    @Test void persistedInputAndKnownPolicyVersionChangesKeepPreciseReasons(){
+        var id=UUID.randomUUID();var a=new LineInput(employee,1,"22","20",true,false,List.of(),"");var b=new LineInput(employee,2,"22","21",true,false,List.of(),"");
+        var reasons=PayrollChanges.compare(policySnapshot(evidenceLine(a,List.of(),0),id+"/v1",null),1L,policySnapshot(evidenceLine(b,List.of(),0),id+"/v2",null)).lines().getFirst().reasons();
+        assertThat(reasons).contains("input","policy");
+    }
+
+    @Test void actualAttendanceAndCurrentApprovedLeaveKeepPreciseReasons(){
+        var schedule=UUID.randomUUID();var store=UUID.randomUUID();var day=java.time.LocalDate.of(2026,10,28);
+        var a=new SourceRef(schedule,store,day,1,"old",3600,0,0,true,new SourceEvidence(3600,"current",3600L,Instant.EPOCH,Instant.EPOCH.plusSeconds(3600),List.of()));
+        var b=new SourceRef(schedule,store,day,2,"new",7200,1800,0,true,new SourceEvidence(7200,"current",7200L,Instant.EPOCH,Instant.EPOCH.plusSeconds(7200),List.of()));
+        var result=PayrollChanges.compare(policySnapshot(evidenceLine(null,List.of(a),3600),"v1",null),1L,policySnapshot(evidenceLine(null,List.of(b),7200),"v1",null));
+        assertThat(result.lines().getFirst().reasons()).contains("approval","attendance","leave");
+        assertThat(PayrollChanges.readOnly(result)).isSameAs(result);
+    }
+    @Test void legacyUnverifiablePolicyAndMissingSourceEvidenceDoNotInventPreciseCauses(){
+        var schedule=UUID.randomUUID();var store=UUID.randomUUID();var day=java.time.LocalDate.of(2026,10,28);
+        var old=new SourceRef(schedule,store,day,1,"old",3600,0,0,true);
+        var current=new SourceRef(schedule,store,day,1,"new",0,0,0,true,new SourceEvidence(3600,"stale",null,Instant.EPOCH,Instant.EPOCH.plusSeconds(3600),List.of()));
+        var result=PayrollChanges.compare(policySnapshot(evidenceLine(null,List.of(old),3600),"LEGACY",null),1L,policySnapshot(evidenceLine(null,List.of(current),0),UUID.randomUUID()+"/v1",null));
+        assertThat(result.lines().getFirst().reasons()).containsExactly("source");
+    }
+
+    @Test void retainedPolicyIdentityOutranksUnverifiableDisplayLabels(){
+        var policy=mock(com.rpb.reservation.workforce.statutory.StatutoryPolicies.Policy.class);var id=UUID.randomUUID();when(policy.id()).thenReturn(id);when(policy.version()).thenReturn(2L);
+        var line=evidenceLine(null,List.of(),0);
+        assertThat(PayrollChanges.compare(policySnapshot(line,id+"/v1",null),1L,policySnapshot(line,"Legacy display label",policy)).lines().getFirst().reasons()).contains("policy");
     }
 }

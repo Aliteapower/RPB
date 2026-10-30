@@ -31,7 +31,7 @@ public class PayrollProgressService {
         access.enter(actor,store,batch.company(),capture.stores());
         var previous=repository.previous(actor.tenantId(),batch.company(),batch.month()).orElse(null);
         if(previous!=null)access.enter(actor,store,previous.company(),PayrollViews.stores(previous.calculation()));
-        var last=computation==null||computation.lastCalculation()==null?PayrollChanges.unavailable(batch.month().toString()):computation.lastCalculation();
+        var last=computation==null||computation.lastCalculation()==null?PayrollChanges.unavailable(batch.month().toString()):PayrollChanges.readOnly(computation.lastCalculation());
         var prior=PayrollChanges.compare(previous==null?null:previous.calculation(),previous==null?null:previous.version(),batch.calculation());
         if(!prior.available())prior=PayrollChanges.unavailable(batch.month().minusMonths(1).toString());
         var baseline=batch.calculation()!=null?batch.calculation():cache==null?null:cache.snapshot();

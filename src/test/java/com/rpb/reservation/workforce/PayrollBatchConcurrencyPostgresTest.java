@@ -46,7 +46,7 @@ class PayrollBatchConcurrencyPostgresTest extends WorkforcePayrollPostgresTest {
         try {
             var calculation=pool.submit(()->service.action(admin,store,initial.batch().id(),UUID.randomUUID(),new ActionWrite(initial.batch().version(),"calculate","Concurrent")));
             assertThat(entered.await(20,TimeUnit.SECONDS)).isTrue();
-            var edited=pool.submit(()->batches.input(admin,store,initial.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(),"New note"))).get(10,TimeUnit.SECONDS);
+            var edited=pool.submit(()->approvedInput(admin,store,initial.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(),"New note"))).get(10,TimeUnit.SECONDS);
             release.countDown();assertThatThrownBy(()->calculation.get(20,TimeUnit.SECONDS)).hasCauseInstanceOf(WorkforceException.class).rootCause().hasMessage("WORKFORCE_CONFLICT");
             assertThat(payRepository.find(tenant,initial.batch().id()).orElseThrow().version()).isEqualTo(edited.batch().version());
             assertThat(payRepository.inputs(tenant,initial.batch().id()).getFirst().note()).isEqualTo("New note");
@@ -62,7 +62,7 @@ class PayrollBatchConcurrencyPostgresTest extends WorkforcePayrollPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from workforce_pay_commands where tenant_id=? and id=?",Integer.class,tenant,command)).isZero();
     }
     @Test void failedAutomaticCreateDoesNotLeaveDraftAndRunsWithoutTransaction() {
-        configuration.saveProfile(admin,store,profile,new ProfileWrite(1L,company,employee,java.time.LocalDate.of(2026,10,1),template,
+        approvedProfile(admin,store,profile,new ProfileWrite(1L,company,employee,java.time.LocalDate.of(2026,10,1),template,
             new Rule("monthly","3000","8","44",false,"1.5",List.of(),new Generation("fixed",List.of())),
             new com.rpb.reservation.workforce.statutory.StatutoryDtos.CpfProfile("foreign",null,null,"GG","")));
         var service=instrument(new PayrollCalculationService(time){@Override public PayrollSnapshot calculate(PayrollSources.Capture c,YearMonth m){

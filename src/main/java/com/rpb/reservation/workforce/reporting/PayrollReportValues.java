@@ -23,13 +23,13 @@ final class PayrollReportValues {
         return ids.stream().sorted().toList();
     }
     static void limit(int count, int max) { if (count > max) throw new WorkforceException("WORKFORCE_REPORT_LIMIT", 413); }
-    static String money(BigDecimal n) { return n.setScale(2, RoundingMode.HALF_UP).toPlainString(); }
+    static String money(BigDecimal n) { return n==null?null:n.setScale(2, RoundingMode.HALF_UP).toPlainString(); }
     static BigDecimal decimal(String n) { return new BigDecimal(n); }
-    static List<String> values(Totals t) { return List.of(t.gross(), t.net(), t.employeeCpf(), t.employerCpf(), t.sdl(), t.employerCost(), t.paid(), t.remaining()); }
+    static List<String> values(Totals t) { return Arrays.asList(t.gross(), t.net(), t.employeeCpf(), t.employerCpf(), t.sdl(), t.employerCost(), t.paid(), t.remaining()); }
     static Totals totals(List<String> v) { return new Totals(v.get(0), v.get(1), v.get(2), v.get(3), v.get(4), v.get(5), v.get(6), v.get(7)); }
     static Totals sum(Collection<Totals> rows) {
         var sums = new BigDecimal[8]; Arrays.fill(sums, BigDecimal.ZERO);
-        for (var row : rows) { var v = values(row); for (int i = 0; i < 8; i++) sums[i] = sums[i].add(decimal(v.get(i))); }
+        for (var row : rows) { var v = values(row); for (int i = 0; i < 8; i++) sums[i] = sums[i]==null||v.get(i)==null?null:sums[i].add(decimal(v.get(i))); }
         return totals(Arrays.stream(sums).map(PayrollReportValues::money).toList());
     }
     static Totals expected(Totals raw) {

@@ -14,8 +14,8 @@ class WorkforcePayrollIncrementalPostgresTest extends WorkforcePayrollPostgresTe
   var initial=payRepository.computation(tenant,first.batch().id()).orElseThrow();assertThat(initial.recalculated()).isEqualTo(1);
   var same=action(first,"calculate");assertThat(payRepository.computation(tenant,same.batch().id()).orElseThrow().reused()).isEqualTo(1);
   assertThat(same.calculation()).isEqualTo(first.calculation());
-  var edited=batches.input(admin,store,same.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(new Item("Bonus","ow_additional","75")),"Bonus"));
-  assertThat(edited.calculation()).isNull();assertThat(payRepository.computation(tenant,edited.batch().id()).orElseThrow().cache().snapshot()).isEqualTo(same.calculation());
+  var edited=approvedInput(admin,store,same.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(new Item("Bonus","ow_additional","75")),"Bonus"));
+  assertThat(edited.calculation()).isEqualTo(same.calculation());assertThat(edited.sourceChanged()).isTrue();assertThat(payRepository.computation(tenant,edited.batch().id()).orElseThrow().cache().snapshot()).isEqualTo(same.calculation());
   var changed=action(edited,"calculate");var cache=payRepository.computation(tenant,changed.batch().id()).orElseThrow();
   assertThat(cache.recalculated()).isEqualTo(1);assertThat(cache.lastCalculation().totalGrossDelta()).isEqualTo("75.00");assertThat(changed.calculation().totalGross()).isEqualTo("875.00");
   var full=action(changed,"calculate_full");assertThat(full.calculation()).isEqualTo(changed.calculation());
@@ -38,17 +38,17 @@ class WorkforcePayrollIncrementalPostgresTest extends WorkforcePayrollPostgresTe
  }
  @Test void failedAuditRollsBackTheWageCacheAndReceiptTogether(){
   completed();var first=action(create(),"calculate");var oldCache=payRepository.computation(tenant,first.batch().id()).orElseThrow();
-  var edited=batches.input(admin,store,first.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(new Item("Bonus","ow_additional","75")),"Bonus"));
+  var edited=approvedInput(admin,store,first.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(new Item("Bonus","ow_additional","75")),"Bonus"));
   doThrow(new IllegalStateException("audit failure")).when(logs).append(any(com.rpb.reservation.common.scope.StoreScope.class),any());
   var command=UUID.randomUUID();assertThatThrownBy(()->batches.action(admin,store,edited.batch().id(),command,new ActionWrite(edited.batch().version(),"calculate","Audit"))).hasMessage("audit failure");
-  assertThat(payRepository.computation(tenant,first.batch().id())).contains(oldCache);var state=payRepository.find(tenant,first.batch().id()).orElseThrow();assertThat(state.version()).isEqualTo(edited.batch().version());assertThat(state.calculation()).isNull();
+  assertThat(payRepository.computation(tenant,first.batch().id())).contains(oldCache);var state=payRepository.find(tenant,first.batch().id()).orElseThrow();assertThat(state.version()).isEqualTo(edited.batch().version());assertThat(state.calculation()).isEqualTo(first.calculation());
   assertThat(jdbc.queryForObject("select count(*) from workforce_pay_commands where tenant_id=? and id=?",Integer.class,tenant,command)).isZero();
  }
  @Test void adjacentConfirmedMonthIsComparedWithoutRewritingItsSnapshot(){
   jdbc.update("update workforce_employees set hire_date='2026-09-01',company_effective_date='2026-09-01' where tenant_id=? and id=?",tenant,employee);
   jdbc.update("update workforce_company_history set effective_date='2026-09-01' where tenant_id=? and employee_id=?",tenant,employee);
   jdbc.update("update workforce_work_stores set started_on='2026-09-01' where tenant_id=? and employee_id=?",tenant,employee);
-  jdbc.update("update workforce_pay_profiles set effective_from='2026-09-01',snapshot=jsonb_set(snapshot,'{effectiveFrom}','\"2026-09-01\"'::jsonb) where tenant_id=? and id=?",tenant,profile);
+  var installed=configs.findProfile(tenant,profile).orElseThrow();legacyProfile(new PayProfile(installed.id(),company,employee,installed.employeeName(),java.time.LocalDate.of(2026,9,1),template,installed.templateVersion(),installed.rule(),installed.cpf(),installed.version()+1));
   time.at("2026-09-28T01:00:00Z");var shift=shifts.save(admin,store,UUID.randomUUID(),new com.rpb.reservation.workforce.scheduling.SchedulingDtos.ShiftWrite(0L,"September","09:00","17:00",false,"none",0,0,0,0,false,true));
   var schedule=roster.save(admin,store,UUID.randomUUID(),new com.rpb.reservation.workforce.scheduling.SchedulingDtos.ScheduleWrite(0L,employee,shift.id(),java.time.LocalDate.of(2026,9,28),"scheduled"));
   punches.punch(worker,store,UUID.randomUUID(),new com.rpb.reservation.workforce.attendance.AttendanceDtos.ClockWrite(schedule.id(),"IN"));time.at("2026-09-28T09:00:00Z");punches.punch(worker,store,UUID.randomUUID(),new com.rpb.reservation.workforce.attendance.AttendanceDtos.ClockWrite(schedule.id(),"OUT"));
@@ -56,7 +56,7 @@ class WorkforcePayrollIncrementalPostgresTest extends WorkforcePayrollPostgresTe
   time.at("2026-10-02T01:00:00Z");var previous=action(batches.create(admin,store,UUID.randomUUID(),new BatchWrite(company,"2026-09")),"calculate");previous=action(previous,"confirm");var previousId=previous.batch().id();
   var frozen=jdbc.queryForObject("select calculation::text from workforce_pay_batches where tenant_id=? and id=?",String.class,tenant,previousId);
   time.at("2026-10-28T01:00:00Z");completed();var current=action(create(),"calculate");
-  current=batches.input(admin,store,current.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(new Item("Bonus","ow_additional","75")),"Bonus"));current=action(current,"calculate");
+  current=approvedInput(admin,store,current.batch().id(),employee,new InputWrite(0L,null,null,false,false,List.of(new Item("Bonus","ow_additional","75")),"Bonus"));current=action(current,"calculate");
   var service=proxy(new PayrollProgressService(access,new PayrollAccess(access,directory,jdbc),payRepository,sources,new PayrollCalculationService(time)));var changes=service.changes(admin,store,current.batch().id());
   assertThat(changes.previousMonth().available()).isTrue();assertThat(changes.previousMonth().baselineMonth()).isEqualTo("2026-09");assertThat(changes.previousMonth().totalGrossDelta()).isEqualTo("75.00");assertThat(changes.previousMonth().totalNetDelta()).isEqualTo("60.00");
   assertThat(jdbc.queryForObject("select calculation::text from workforce_pay_batches where tenant_id=? and id=?",String.class,tenant,previousId)).isEqualTo(frozen);

@@ -75,7 +75,7 @@ class WorkforcePayrollPerformancePostgresTest extends WorkforcePostgresTest {
                 }
                 var row=new LinkedHashMap<String,Object>();row.put("employees",size);row.put("schedules",size*20);
                 row.put("legacy",summary(oldSamples));row.put("optimized",summary(newSamples));
-                row.put("snapshotsStrictlyEqual",true);row.put("sourceFingerprint",oracle.sourceFingerprint());
+                row.put("financialResultsEqual",true);row.put("evidenceSemantics","Governance evidence intentionally changes source fingerprints and line metadata.");row.put("sourceFingerprint",oracle.sourceFingerprint());
                 results.add(row);writeMetrics(Map.of("status","performance-measured"));
                 // The probe is an unrelated March schedule. It must not change February source evidence.
                 var probes=new ArrayList<Object>();
@@ -130,10 +130,13 @@ class WorkforcePayrollPerformancePostgresTest extends WorkforcePostgresTest {
         for(int i=0;i<ids.size();i++) {
             String basis=List.of("hourly","monthly","daily").get(i%3);
             var rule=new Rule(basis,basis.equals("monthly")?"3200.00":basis.equals("daily")?"160.00":"20.00","8","44",true,"1.5",List.of(new Item("Transport","ow_allowance","30.00")),new Generation("attendance",List.of(1,2,3,4,5)));
-            var template=new SalaryTemplate(UUID.randomUUID(),company,"Rule "+i,rule,true,1);configs.saveTemplate(tenant,template);
+            var template=new SalaryTemplate(UUID.randomUUID(),company,"Rule "+i,rule,true,1);jdbc.update("insert into workforce_pay_templates(id,tenant_id,company_id,name,snapshot,enabled,version) values(?,?,?,?,?::jsonb,true,1)",template.id(),tenant,company,template.name(),json.write(template));
             profiles.add(new PayProfile(UUID.randomUUID(),company,ids.get(i),"Employee "+i,LocalDate.of(2026,1,1),template.id(),1,rule,new StatutoryDtos.CpfProfile("citizen",LocalDate.of(1990,1,1),null,"GG",""),1));
         }
         jdbc.batchUpdate("insert into workforce_pay_profiles(id,tenant_id,company_id,employee_id,effective_from,template_id,template_version,snapshot,version) values(?,?,?,?,'2026-01-01',?,1,?::jsonb,1)",profiles,500,(p,profile)->{p.setObject(1,profile.id());p.setObject(2,tenant);p.setObject(3,company);p.setObject(4,profile.employeeId());p.setObject(5,profile.templateId());p.setString(6,json.write(profile));});
+        // Explicit installation compatibility seeds, outside timed intervals.
+        jdbc.update("insert into workforce_pay_effective_evidence(id,tenant_id,company_id,kind,subject_kind,subject_id,version,result) select gen_random_uuid(),tenant_id,company_id,'legacy-valid','template',id,version,snapshot from workforce_pay_templates where tenant_id=? and company_id=?",tenant,company);
+        jdbc.update("insert into workforce_pay_effective_evidence(id,tenant_id,company_id,kind,subject_kind,subject_id,version,result) select gen_random_uuid(),tenant_id,company_id,'legacy-valid','profile',id,version,snapshot from workforce_pay_profiles where tenant_id=? and company_id=?",tenant,company);
         jdbc.update("""
             insert into workforce_schedules(id,tenant_id,store_id,employee_id,company_id,shift_id,work_date,start_at,end_at,timezone,shift_snapshot,status,version)
             select gen_random_uuid(),e.tenant_id,e.main_store_id,e.id,e.company_id,?,d::date,
@@ -155,7 +158,7 @@ class WorkforcePayrollPerformancePostgresTest extends WorkforcePostgresTest {
     BatchDetail runOld(LegacyPayrollBatchService service){return service.action(admin,store,batch,UUID.randomUUID(),nextAction());}
     BatchDetail runNew(PayrollBatchService service){return service.action(admin,store,batch,UUID.randomUUID(),nextAction());}
     ActionWrite nextAction(){return new ActionWrite(payroll.find(tenant,batch).orElseThrow().version(),"calculate","Benchmark");}
-    void assertSnapshot(PayrollSnapshot value,PayrollSnapshot oracle,int size){assertThat(value).isEqualTo(oracle);assertThat(value.lines()).hasSize(size);assertThat(value.issues()).isEmpty();assertThat(value.lines()).allSatisfy(line->{assertThat(line.sources()).hasSize(20);assertThat(line.workSeconds()).isEqualTo(576000);assertThat(line.issues()).isEmpty();});}
+    void assertSnapshot(PayrollSnapshot value,PayrollSnapshot oracle,int size){assertThat(List.of(value.totalGross(),value.totalNet(),value.totalEmployeeCpf(),value.totalEmployerCpf(),value.totalSdl(),value.totalEmployerCost())).isEqualTo(List.of(oracle.totalGross(),oracle.totalNet(),oracle.totalEmployeeCpf(),oracle.totalEmployerCpf(),oracle.totalSdl(),oracle.totalEmployerCost()));for(int n=0;n<value.lines().size();n++){var a=value.lines().get(n);var b=oracle.lines().get(n);assertThat(List.of(a.basicPay(),a.overtimePay(),a.allowances(),a.reimbursements(),a.deductions(),a.grossPay(),a.employeeCpf(),a.employerCpf(),a.sdl(),a.netPay())).isEqualTo(List.of(b.basicPay(),b.overtimePay(),b.allowances(),b.reimbursements(),b.deductions(),b.grossPay(),b.employeeCpf(),b.employerCpf(),b.sdl(),b.netPay()));}assertThat(value.lines()).hasSize(size);assertThat(value.issues()).isEmpty();assertThat(value.lines()).allSatisfy(line->{assertThat(line.sources()).hasSize(20);assertThat(line.workSeconds()).isEqualTo(576000);assertThat(line.issues()).isEmpty();});}
 
     Sample measure(String mode,Callable<BatchDetail> run,PayrollSnapshot oracle,int size) throws Exception {
         var sample=new Sample(mode);active.set(sample);long began=System.nanoTime();

@@ -6,6 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.*;import java.time.*;import java.util.*;
 import org.junit.jupiter.api.Test;import static org.assertj.core.api.Assertions.*;
 class PayrollBreakdownTest {
+ @Test void wageEventIsIncludedInAdditionalDisplayWithoutChangingItsClassification()throws Exception{
+  var line=new ObjectMapper().readValue("""
+   {"basicPay":"3000.00","overtimePay":"0.00","allowances":"500.00","reimbursements":"0.00","deductions":"0.00","grossPay":"3500.00","employeeCpf":"700.00","employerCpf":"595.00","sdl":"8.75","employerCharges":"0.00","netPay":"2800.00","components":[{"label":"AWS","kind":"wage_event","amount":"500.00"}]}
+   """,PayrollDtos.PayrollLine.class);
+  var display=PayBreakdown.of(line);assertThat(display.additional()).isEqualTo("500.00");assertThat(n(display.basic()).add(n(display.overtime())).add(n(display.additional())).add(n(display.allowance())).add(n(display.accommodation()))).isEqualByComparingTo(display.gross());assertThat(display.items().getFirst().kind()).isEqualTo("wage_event");
+ }
  @Test void configurableIncomeDeductionAndEmployerCostsStaySeparate(){
   var c=new PayCalculator().calculate(new PayCalculator.Rule("monthly",n("1800"),n("8"),n("44"),false,n("1.5")),List.of(),new PayCalculator.Units(n("26"),n("26")),List.of(new PayCalculator.Item("Additional","ow_additional",n("100")),new PayCalculator.Item("Housing","ow_accommodation",n("200")),new PayCalculator.Item("CDAC","cdac",n("1"))),List.of(new PayCalculator.Item("Other","deduction",n("400")),new PayCalculator.Item("Levy","employer_charge",n("50")),new PayCalculator.Item("Claim","reimbursement",n("20"))));
   assertThat(c.grossPay()).isEqualByComparingTo("2100");assertThat(c.netBeforeCpf()).isEqualByComparingTo("1719");assertThat(c.deductions()).isEqualByComparingTo("401");assertThat(c.employerCharges()).isEqualByComparingTo("50");

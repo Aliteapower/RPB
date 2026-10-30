@@ -107,7 +107,7 @@ test('management page offers positions and administrator access as sibling entri
 test('employee manager retains attendance settings without head-office maintenance entries',async()=>{
  const {root}=await mount(WorkforceManagement,'/stores/A/workforce/management',{...home,headOffice:false})
  const links=nodes(root,n=>n.tag==='a').map(n=>n.props.href)
- assert.deepEqual(links,['/stores/A/workforce/clock-site','/stores/A/workforce/document-expiries','/stores/A/workforce/shifts','/stores/A/workforce/leave-types','/stores/A/workforce/public-holidays','/stores/A/workforce/calendar','/stores/A/workforce/attendance-rules','/stores/A/workforce/review-explanations'])
+ assert.deepEqual(links,['/stores/A/workforce/clock-site','/stores/A/workforce/document-expiries','/stores/A/workforce/pay-template-library','/stores/A/workforce/pay-change-requests','/stores/A/workforce/shifts','/stores/A/workforce/leave-types','/stores/A/workforce/public-holidays','/stores/A/workforce/calendar','/stores/A/workforce/attendance-rules','/stores/A/workforce/review-explanations'])
  assert.match(text(root),/考勤日历/)
 })
 test('ordinary employee has no management entry',async()=>{
@@ -133,13 +133,13 @@ test('payroll-only delegate retains management access scoped to authorized compa
  const payrollOnly={...home,headOffice:false,employeeManage:false}
  const {root}=await mount(WorkforceManagement,'/stores/A/workforce/management',payrollOnly,payrollDirectory)
  let links=nodes(root,n=>n.tag==='a').map(n=>n.props.href)
- assert.deepEqual(links,['/stores/A/workforce/salary-templates','/stores/A/workforce/pay-profiles'])
+ assert.deepEqual(links,['/stores/A/workforce/salary-templates','/stores/A/workforce/pay-profiles','/stores/A/workforce/pay-change-requests'])
  assert.equal(nodes(root,n=>n.tag==='select').length,0)
  assert.equal(nodes(root,n=>n.tag==='a'&&n.props.href.endsWith('/administrators')).length,0)
 })
 test('employee manager without salary delegation does not see salary settings',async()=>{
  const {root}=await mount(WorkforceManagement,'/stores/A/workforce/management',{...home,headOffice:false},{...payrollDirectory,companies:[]})
- assert.doesNotMatch(text(root),/工资模板|个人薪资方案/);assert.match(text(root),/班次管理|考勤日历/)
+ const links=nodes(root,n=>n.tag==='a').map(n=>n.props.href);assert.ok(!links.some(href=>/salary-templates|pay-profiles/.test(href)));assert.ok(links.includes('/stores/A/workforce/pay-template-library'));assert.ok(links.includes('/stores/A/workforce/pay-change-requests'));assert.match(text(root),/班次管理|考勤日历/)
 })
 test('payroll home retains calculation and report operations but no salary configuration cards',async()=>{
  globalThis.fetch=async()=>response(payrollDirectory)

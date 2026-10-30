@@ -30,58 +30,53 @@ public class PayrollConfigurationService {
                 List.of(policy.config().notes(),"SGD Ordinary Wages only; Additional Wages and cross-period adjustments are not supported.","Salary records do not submit CPF or transfer money."));
         return new PayrollHome(access.companies(actor,store),employees.byAccount(actor.tenantId(),actor.actorId()).map(e->e.id()).orElse(null),summary);
     }
-    public List<SalaryTemplate> listTemplates(CurrentActor actor,UUID store,UUID company){access.enter(actor,store,company);return repository.listTemplates(actor.tenantId(),company);}
+    public List<SalaryTemplate> listTemplates(CurrentActor actor,UUID store,UUID company){access.enter(actor,store,company);return repository.listTemplates(actor.tenantId(),company,store);}
     public ProfilePage profiles(CurrentActor actor,UUID store,UUID company){access.enter(actor,store,company);return new ProfilePage(repository.profiles(actor.tenantId(),company),repository.employees(actor.tenantId(),company),repository.employeeBirthDates(actor.tenantId(),company),repository.employeePrDocuments(actor.tenantId(),company));}
     @Transactional public SalaryTemplate saveTemplate(CurrentActor actor,UUID store,UUID id,TemplateWrite c){
         if(id==null||c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.enabled()==null)throw WorkforceException.invalid();
-        access.enter(actor,store,c.companyId());String name=text(c.name(),100,true);Rule rule=rule(c.rule());gate.sourceWrite(actor);repository.lock(id);
+        access.enter(actor,store,c.companyId());String name=text(c.name(),100,true);Rule rule=PayrollRules.normalize(c.rule());gate.sourceWrite(actor);repository.lock(id);
         var old=repository.findTemplate(actor.tenantId(),id).orElse(null);
+        if(repository.managedTemplate(actor.tenantId(),id))throw new WorkforceException("WORKFORCE_MANAGED_TEMPLATE_IMMUTABLE",409);
         if(old!=null&&!old.companyId().equals(c.companyId()))throw WorkforceException.forbidden();
-        if(old!=null&&(c.expectedVersion()==0||old.version()==c.expectedVersion()+1)&&old.name().equals(name)&&old.rule().equals(rule)&&old.enabled()==c.enabled())return old;
+        if(old!=null&&(c.expectedVersion()==0||old.version()==c.expectedVersion()+1)&&old.name().equals(name)&&old.rule().equals(rule)&&old.enabled()==c.enabled()){repository.effective().assertTemplate(actor.tenantId(),old);return old;}
         if((old==null?0:old.version())!=c.expectedVersion())throw WorkforceException.conflict();
-        var next=new SalaryTemplate(id,c.companyId(),name,rule,c.enabled(),c.expectedVersion()+1);repository.saveTemplate(actor.tenantId(),next);audit.changed(actor,store,"salary-template.save",id,old,next);return next;
+        var next=new SalaryTemplate(id,c.companyId(),name,rule,c.enabled(),c.expectedVersion()+1);repository.effective().unchangedTemplate(actor.tenantId(),next);repository.saveTemplate(actor.tenantId(),next);audit.changed(actor,store,"salary-template.save",id,old,next);return next;
     }
     @Transactional public PayProfile saveProfile(CurrentActor actor,UUID store,UUID id,ProfileWrite c){
         if(id==null||c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.employeeId()==null||c.effectiveFrom()==null||c.templateId()==null)throw WorkforceException.invalid();
-        access.enter(actor,store,c.companyId());Rule rule=rule(c.rule());gate.sourceWrite(actor);employees.lock(c.employeeId());repository.lock(id);access.employee(actor,c.companyId(),c.employeeId());
+        access.enter(actor,store,c.companyId());Rule rule=PayrollRules.normalize(c.rule());gate.sourceWrite(actor);repository.lockSubject(actor.tenantId(),c.companyId(),c.employeeId());repository.lockDefaults(actor.tenantId(),c.companyId());employees.lock(c.employeeId());repository.lock(id);access.employee(actor,c.companyId(),c.employeeId());
         var employee=employees.find(actor.tenantId(),c.employeeId()).orElseThrow(WorkforceException::missing);
         CpfProfile cpf=cpf(c.cpf(),employee.birthDate());
         if(cpf.prDocumentId()!=null){var evidence=repository.prDocument(actor.tenantId(),employee.id(),cpf.prDocumentId()).orElseThrow(WorkforceException::missing);if(!evidence.prEffectiveOn().equals(cpf.prDate()))throw WorkforceException.invalid();}
         var old=repository.findProfile(actor.tenantId(),id).orElse(null);
+        repository.assertTemplateAccess(actor.tenantId(),store,c.templateId(),old!=null&&old.templateId().equals(c.templateId()),c.effectiveFrom());
         var payment=PaymentPreferences.validate(c.payment()==null&&old!=null?old.payment():c.payment());
         var cdac=CdacPayroll.profile(c.cdac()==null&&old!=null?old.cdac():c.cdac(),cpf,rule);
         if(old!=null&&(!old.companyId().equals(c.companyId())||!old.employeeId().equals(c.employeeId())||!old.effectiveFrom().equals(c.effectiveFrom())))throw WorkforceException.forbidden();
-        if(old!=null&&(c.expectedVersion()==0||old.version()==c.expectedVersion()+1)&&old.templateId().equals(c.templateId())&&old.rule().equals(rule)&&old.cpf().equals(cpf)&&Objects.equals(old.payment(),payment)&&Objects.equals(old.cdac(),cdac))return old;
+        if(old!=null&&(c.expectedVersion()==0||old.version()==c.expectedVersion()+1)&&old.templateId().equals(c.templateId())&&(c.expectedTemplateVersion()==null||(old.origin()!=null&&old.templateVersion()==c.expectedTemplateVersion()&&Objects.equals(old.origin()==null?null:old.origin().defaultMappingId(),c.defaultMappingId())&&Objects.equals(old.origin()==null?null:old.origin().defaultVersion(),c.expectedDefaultVersion())))&&old.rule().equals(rule)&&old.cpf().equals(cpf)&&Objects.equals(old.payment(),payment)&&Objects.equals(old.cdac(),cdac)){repository.effective().assertProfile(actor.tenantId(),old);return old;}
         if((old==null?0:old.version())!=c.expectedVersion())throw WorkforceException.conflict();
         if(old!=null&&repository.lockedProfile(actor.tenantId(),id))throw new WorkforceException("WORKFORCE_PAYROLL_PROFILE_LOCKED",409);
         if(c.effectiveFrom().isBefore(employee.hireDate()))throw WorkforceException.invalid();
+        repository.lock(c.templateId());
         var template=repository.findTemplate(actor.tenantId(),c.templateId()).orElseThrow(WorkforceException::missing);
         if(!template.companyId().equals(c.companyId())||(!template.enabled()&&(old==null||!old.templateId().equals(template.id()))))throw WorkforceException.invalid();
-        var next=new PayProfile(id,c.companyId(),employee.id(),employee.name(),c.effectiveFrom(),template.id(),template.version(),rule,cpf,c.expectedVersion()+1,payment,cdac);
-        repository.saveProfile(actor.tenantId(),next);audit.changed(actor,store,"pay-profile.save",id,old,next);return next;
+        ProfileOrigin origin=old==null?null:old.origin();long templateVersion=old==null?template.version():old.templateVersion();
+        if(c.expectedTemplateVersion()!=null){
+            if(c.expectedTemplateVersion()!=template.version())throw WorkforceException.conflict();
+            if(!template.enabled())throw WorkforceException.invalid();
+            PositionSalaryDefault mapping=null;
+            if(c.defaultMappingId()!=null){
+                repository.lock(c.defaultMappingId());mapping=repository.findDefault(actor.tenantId(),c.defaultMappingId()).orElseThrow(WorkforceException::missing);
+                if(c.expectedDefaultVersion()==null||mapping.version()!=c.expectedDefaultVersion())throw WorkforceException.conflict();
+                if(!mapping.enabled()||!mapping.companyId().equals(c.companyId())||!mapping.positionId().equals(employee.positionId())||!mapping.templateId().equals(template.id())||mapping.effectiveFrom().isAfter(c.effectiveFrom()))throw WorkforceException.invalid();
+                var applicable=repository.defaults(actor.tenantId(),c.companyId(),employee.positionId()).stream().filter(d->!d.effectiveFrom().isAfter(c.effectiveFrom())).reduce((a,b)->b).orElse(null);
+                if(applicable==null||!applicable.id().equals(mapping.id()))throw WorkforceException.conflict();
+            }else if(c.expectedDefaultVersion()!=null)throw WorkforceException.invalid();
+            origin=new ProfileOrigin(template.name(),template.rule(),mapping==null?null:mapping.id(),mapping==null?null:mapping.version());templateVersion=template.version();
+        }else {if(c.defaultMappingId()!=null||c.expectedDefaultVersion()!=null)throw WorkforceException.invalid();if(old!=null&&!old.templateId().equals(template.id())){origin=null;templateVersion=template.version();}}
+        var next=new PayProfile(id,c.companyId(),employee.id(),employee.name(),c.effectiveFrom(),template.id(),templateVersion,rule,cpf,c.expectedVersion()+1,payment,cdac,origin);
+        repository.effective().directProfile(actor.tenantId(),store,next);repository.saveProfile(actor.tenantId(),next);audit.changed(actor,store,"pay-profile.save",id,old,next);return next;
     }
-    private Rule rule(Rule r){
-        if(r==null||!Set.of("monthly","daily","hourly").contains(r.basis()==null?"":r.basis())||r.items()==null||r.items().size()>20)throw WorkforceException.invalid();
-        BigDecimal rate=decimal(r.rate()),day=decimal(r.dayHours()),week=decimal(r.weekHours()),multiplier=decimal(r.overtimeMultiplier());
-        if(day.signum()<=0||day.compareTo(BigDecimal.valueOf(r.overtimeEnabled()?12:24))>0||week.signum()<=0||week.compareTo(BigDecimal.valueOf(r.overtimeEnabled()?44:168))>0||multiplier.signum()<=0||multiplier.compareTo(BigDecimal.TEN)>0||(r.overtimeEnabled()&&multiplier.compareTo(new BigDecimal("1.50"))<0))throw WorkforceException.invalid();
-        var generation=PayrollGeneration.validate(r);
-        var items=r.items().stream().map(i->{if(i==null||!PayItemKinds.supported(i.kind()))throw WorkforceException.invalid();return new Item(text(i.label(),100,true),i.kind(),decimal(i.amount()).toPlainString(),PayrollGeneration.proration(i));}).toList();
-        return new Rule(r.basis(),rate.toPlainString(),day.toPlainString(),week.toPlainString(),r.overtimeEnabled(),multiplier.toPlainString(),items,generation);
-    }
-    private BigDecimal decimal(String value){
-        if(value==null||!value.matches("[0-9]{1,8}(\\.[0-9]{1,2})?"))throw WorkforceException.invalid();
-        return new BigDecimal(value).setScale(2,RoundingMode.UNNECESSARY);
-    }
-    private CpfProfile cpf(CpfProfile p,LocalDate employeeBirthDate){
-        if(p!=null&&!"foreign".equals(p.citizenship())&&employeeBirthDate!=null)p=new CpfProfile(p.citizenship(),employeeBirthDate,p.prDate(),p.prMode(),p.electionReference(),p.prDocumentId());
-        if(p==null||!Set.of("citizen","spr","foreign").contains(p.citizenship()==null?"":p.citizenship())||!Set.of("GG","FG","FF").contains(p.prMode()==null?"":p.prMode()))throw WorkforceException.invalid();
-        LocalDate today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Singapore")));
-        if((!p.citizenship().equals("foreign")&&p.birthDate()==null)||(p.birthDate()!=null&&p.birthDate().isAfter(today)))throw WorkforceException.invalid();
-        String note=text(p.electionReference(),200,false);
-        if(p.citizenship().equals("spr")){
-            if(p.prDate()==null||p.prDate().isAfter(today)||p.prDate().isBefore(p.birthDate())||(!p.prMode().equals("GG")&&note.isBlank()))throw WorkforceException.invalid();
-        }else if(p.prDate()!=null||p.prDocumentId()!=null)throw WorkforceException.invalid();
-        return new CpfProfile(p.citizenship(),p.birthDate(),p.prDate(),p.prMode(),note,p.prDocumentId());
-    }
+    private CpfProfile cpf(CpfProfile p,LocalDate employeeBirthDate){return PayrollProfileValidation.cpf(p,employeeBirthDate,clock);}
     private String text(String s,int max,boolean required){var value=s==null?"":s.trim();if(value.length()>max||(required&&value.isBlank()))throw WorkforceException.invalid();return value;}
 }

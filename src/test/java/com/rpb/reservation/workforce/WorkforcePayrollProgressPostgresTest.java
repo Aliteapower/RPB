@@ -61,7 +61,7 @@ class WorkforcePayrollProgressPostgresTest extends WorkforcePayrollPostgresTest 
     @Test void projectionRetainsLastCalculationAcrossInputResetAndDoesNotWriteFrozenFacts(){
         completed();var b=action(create(),"calculate");
         var first=progress().changes(admin,store,b.batch().id());assertThat(first.pending()).isEmpty();assertThat(first.previousMonth().available()).isFalse();
-        b=batches.input(admin,store,b.batch().id(),employee,new InputWrite(0L,"","",true,true,List.of(new Item("Additional","ow_additional","20")),"Checked"));
+        b=approvedInput(admin,store,b.batch().id(),employee,new InputWrite(0L,"","",true,true,List.of(new Item("Additional","ow_additional","20")),"Checked"));
         var pending=progress().changes(admin,store,b.batch().id());assertThat(pending.pending()).extracting(PendingChange::employeeId).contains(employee);
         b=action(b,"calculate");assertThat(progress().changes(admin,store,b.batch().id()).lastCalculation().available()).isTrue();
         time.at("2026-11-02T01:00:00Z");b=action(b,"confirm");UUID id=b.batch().id();

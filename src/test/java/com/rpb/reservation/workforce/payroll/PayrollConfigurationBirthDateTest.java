@@ -15,7 +15,8 @@ class PayrollConfigurationBirthDateTest {
  final UUID tenant=UUID.randomUUID(),store=UUID.randomUUID(),company=UUID.randomUUID(),employee=UUID.randomUUID(),template=UUID.randomUUID();
  final CurrentActor actor=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of("tenant_admin"),Set.of("workforce.view"),Set.of(store));
  final WorkforceAccess gate=mock(WorkforceAccess.class);final PayrollAccess access=mock(PayrollAccess.class);final PayrollConfigurationRepository repository=mock(PayrollConfigurationRepository.class);final WorkforceEmployeeRepository employees=mock(WorkforceEmployeeRepository.class);
- final PayrollConfigurationService service=new PayrollConfigurationService(gate,access,repository,employees,mock(WorkforceAudit.class),Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"),ZoneOffset.UTC));
+ final WorkforceAudit audit=mock(WorkforceAudit.class);
+ final PayrollConfigurationService service=new PayrollConfigurationService(gate,access,repository,employees,audit,Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"),ZoneOffset.UTC));
  final Rule rule=new Rule("hourly","12.00","8.00","44.00",false,"1.50",List.of());
  void employee(LocalDate birth){when(employees.find(tenant,employee)).thenReturn(Optional.of(new WorkforceDtos.Employee(employee,"E1","Employee","","","",LocalDate.of(2026,1,1),null,"active",company,LocalDate.of(2026,1,1),store,List.of(store),null,1,true,null,birth,"",true)));when(repository.findTemplate(tenant,template)).thenReturn(Optional.of(new SalaryTemplate(template,company,"Template",rule,true,1)));}
  ProfileWrite command(CpfProfile cpf){return new ProfileWrite(0L,company,employee,LocalDate.of(2026,10,1),template,rule,cpf);}
@@ -28,4 +29,15 @@ class PayrollConfigurationBirthDateTest {
  @Test void homeUsesCurrentSingaporeMonthAndConfiguredPolicyRevision(){var t=OfficialStatutoryTemplates.forYear(2027);var id=UUID.randomUUID();when(repository.activePolicy(tenant,YearMonth.of(2027,1))).thenReturn(new StatutoryPolicies.Policy(id,t.name(),t.year(),t.currency(),t.effectiveFrom(),t.effectiveTo(),true,4,t.config()));var summary=service.home(actor,store).policy();assertThat(summary.version()).isEqualTo(id+"@4");assertThat(summary.year()).isEqualTo(2027);assertThat(summary.cpfSource()).isEqualTo(t.config().cpfSource());}
  @Test void homeNeverInvents2026PolicyWhenUnconfigured(){var summary=service.home(actor,store).policy();assertThat(summary.version()).isEqualTo("UNCONFIGURED");assertThat(summary.year()).isZero();assertThat(summary.owCeiling()).isEqualTo("0");}
  @Test void monthRangeSupportsSavedFuturePoliciesWithoutPermittingOutOfRangeYears(){assertThat(PayrollValues.month("2000-01")).isEqualTo(YearMonth.of(2000,1));assertThat(PayrollValues.month("2027-01")).isEqualTo(YearMonth.of(2027,1));assertThat(PayrollValues.month("2100-12")).isEqualTo(YearMonth.of(2100,12));for(var invalid:List.of("1999-12","2101-01","2027-13","2027-1"))assertThatThrownBy(()->PayrollValues.month(invalid)).isInstanceOf(WorkforceException.class);}
+ @Test void stalePreviewCannotTreatLegacySourceAsReplayAndValidVersionCapturesMissingSource(){
+  var birth=LocalDate.of(1990,1,1);employee(birth);var id=UUID.randomUUID();var cpf=new CpfProfile("citizen",birth,null,"GG","");var old=new PayProfile(id,company,employee,"Employee",LocalDate.of(2026,10,1),template,1,rule,cpf,1);
+  when(repository.findProfile(tenant,id)).thenReturn(Optional.of(old));
+  assertThatThrownBy(()->service.saveProfile(actor,store,id,new ProfileWrite(0L,company,employee,old.effectiveFrom(),template,rule,cpf,null,null,1L,null,null))).isInstanceOf(WorkforceException.class).hasMessage("WORKFORCE_CONFLICT");
+  var saved=service.saveProfile(actor,store,id,new ProfileWrite(1L,company,employee,old.effectiveFrom(),template,rule,cpf,null,null,1L,null,null));
+  assertThat(saved.origin()).isNotNull();assertThat(saved.version()).isEqualTo(2);assertThat(saved.origin().templateRule()).isEqualTo(rule);
+  when(repository.findProfile(tenant,id)).thenReturn(Optional.of(saved));
+  assertThat(service.saveProfile(actor,store,id,new ProfileWrite(1L,company,employee,old.effectiveFrom(),template,rule,cpf,null,null,1L,null,null))).isEqualTo(saved);
+  verify(repository,times(1)).saveProfile(eq(tenant),any());verify(audit,times(1)).changed(any(),any(),any(),any(),any(),any());
+  when(repository.findProfile(tenant,id)).thenReturn(Optional.of(old));when(repository.lockedProfile(tenant,id)).thenReturn(true);assertThatThrownBy(()->service.saveProfile(actor,store,id,new ProfileWrite(1L,company,employee,old.effectiveFrom(),template,rule,cpf,null,null,1L,null,null))).isInstanceOf(WorkforceException.class).hasMessage("WORKFORCE_PAYROLL_PROFILE_LOCKED");
+ }
 }

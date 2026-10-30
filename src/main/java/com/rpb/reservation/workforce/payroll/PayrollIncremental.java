@@ -12,7 +12,7 @@ import java.util.*;
 /** Pure row reuse over a complete source capture; never caches source reads or payroll facts. */
 public final class PayrollIncremental {
  /** Bump whenever row calculation, aggregation, or dependency serialization semantics change. */
- public static final String ENGINE_KEY="workforce-payroll-incremental-v1";
+ public static final String ENGINE_KEY="workforce-payroll-incremental-v5-opening-history";
  private static final ObjectMapper MAPPER=new ObjectMapper().registerModule(new JavaTimeModule())
   .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY,true)
   .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS,true)

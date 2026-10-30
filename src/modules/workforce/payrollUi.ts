@@ -1,3 +1,4 @@
+import {wageEvidenceValid} from './annualWages'
 import {validGeneration} from './payGeneration'
 import {WorkforceApiError} from './api'
 import {storeToday} from './time'
@@ -11,4 +12,4 @@ export function allowedPayrollActions(d:BatchDetail,employeeId:string|null,asOfM
 export function blankRule():PayRule{return {basis:'hourly',rate:'',dayHours:'8',weekHours:'44',overtimeEnabled:false,overtimeMultiplier:'1.5',items:[],generation:{mode:'attendance',workingWeekdays:[1,2,3,4,5]}}}
 export function emptyInput(employeeId:string):LineInput{return {employeeId,version:0,workingDays:null,payableDays:null,unitsReviewed:false,specialDaysReviewed:false,items:[],note:''}}
 export function copy<T>(v:T):T{return JSON.parse(JSON.stringify(v)) as T}
-export function inputValid(input:Partial<LineInput>){return (input.note||'').length<=500&&(input.items||[]).length<=20&&(input.items||[]).every(i=>!!i.label.trim()&&i.label.length<=100&&validMoney(i.amount))}
+export function inputValid(input:Partial<LineInput>){return (input.note||'').length<=500&&(input.items||[]).length<=20&&(input.items||[]).every(i=>!!i.label.trim()&&i.label.length<=100&&validMoney(i.amount)&&(i.kind!=='wage_event'||wageEvidenceValid(i.eventEvidence)))}

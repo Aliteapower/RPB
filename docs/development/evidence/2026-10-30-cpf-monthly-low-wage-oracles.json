@@ -1,0 +1,217 @@
+{
+  "checkedDateSingapore": "2026-10-30",
+  "purpose": "Synthetic public monthly CPF calculator baseline and evidence boundary; does NOT verify annual AW-capped low-wage ramp",
+  "publicPage": "https://www.cpf.gov.sg/employer/tools-and-services/calculators/cpf-contribution-calculator",
+  "publicEndpoint": "https://www.cpf.gov.sg/employer/tools-and-services/calculators/cpf-contribution-calculator/_jcr_content.contributionCalculator.json",
+  "method": "POST",
+  "headersForReproduction": {
+    "Content-Type": "application/json",
+    "Referer": "https://www.cpf.gov.sg/employer/tools-and-services/calculators/cpf-contribution-calculator",
+    "Action-ID": "fresh random UUID; no authentication"
+  },
+  "publicScript": "https://www.cpf.gov.sg/etc.clientlibs/web-forms/clientlibs/clientlib-base.min.8ea2bb4b1a0f746f17b60d4fcaee93d6.js",
+  "service": "CPF_CONTRIBUTION_SERVICE v1.0.0",
+  "knownPublicRequestKeys": [
+    "monthPaid",
+    "dateOfBirth",
+    "allocationTypeCode",
+    "employerContributionCode",
+    "employeeContributionCode",
+    "citizenshipTypeCode",
+    "yearOfSingaporePermanentResidentCode",
+    "ordinaryWage",
+    "additionalWage",
+    "calculatorData"
+  ],
+  "boundary": {
+    "noAnnualRemainingAwInput": true,
+    "noAnnualConsumedAwInput": true,
+    "noSeparateRawTwAndEligibleAwInput": true,
+    "annualCalculatorNotCalledForLowWages": true,
+    "noSyntheticUnsupportedApiParametersAdded": true,
+    "officialMonthlyWarning": "Annual total wages over SGD102000: use AW ceiling calculator.",
+    "officialAnnualWarning": "Every monthly TW must be above SGD750; otherwise request calculation via Write to us."
+  },
+  "cases": [
+    {
+      "caseId": "uncapped_TW500",
+      "startedAtUtc": "2026-10-30T14:06:59.992Z",
+      "completedAtUtc": "2026-10-30T14:07:00.474Z",
+      "httpStatus": 200,
+      "request": {
+        "monthPaid": "2026-10",
+        "dateOfBirth": "1990-01-01",
+        "allocationTypeCode": "PTE",
+        "employerContributionCode": "",
+        "employeeContributionCode": "",
+        "citizenshipTypeCode": "CTZ",
+        "yearOfSingaporePermanentResidentCode": "",
+        "ordinaryWage": "400",
+        "additionalWage": "100",
+        "calculatorData": "contributionCalculatorPayable"
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContributionPayable",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "contributionPayableResponseData": {
+                "employeeOrdinaryWageCeiling": "8000.00",
+                "npaaFromAge": "0",
+                "npaaToAge": "0",
+                "npaaEmployeeRateFactor1": "0.00",
+                "npaaTotalRateFactor1": "0.00",
+                "npaaTotalRateFactor2": "0.00",
+                "npaaTotalRateFactor3": "0.00",
+                "npaaTotalRateFactor4": "0.00",
+                "npaaTotalRateFactor5": "0.00",
+                "npaaTotalRateFactor6": "0.00",
+                "npaaTotalRateFactor7": "0.00",
+                "returnCode": "CPA0000_0000000",
+                "returnDescription": "Success.",
+                "totalContributionAmount": "85.00",
+                "employeeTotalContributionAmount": "0.00",
+                "fromAge": "35",
+                "toAge": "45",
+                "employeeRateFactor1": "0.0000",
+                "totalRateFactor1": "17.0000",
+                "totalRateFactor2": "0.0000",
+                "totalRateFactor3": "0.0000",
+                "totalRateFactor4": "0.0000",
+                "totalRateFactor5": "0.0000",
+                "totalRateFactor6": "0.0000",
+                "totalRateFactor7": "0.0000"
+              },
+              "type": "CARD_ONE",
+              "returnCode": "CPA0000_0000000",
+              "returnDescription": "Success."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "uncapped_TW600",
+      "startedAtUtc": "2026-10-30T14:07:00.474Z",
+      "completedAtUtc": "2026-10-30T14:07:00.727Z",
+      "httpStatus": 200,
+      "request": {
+        "monthPaid": "2026-10",
+        "dateOfBirth": "1990-01-01",
+        "allocationTypeCode": "PTE",
+        "employerContributionCode": "",
+        "employeeContributionCode": "",
+        "citizenshipTypeCode": "CTZ",
+        "yearOfSingaporePermanentResidentCode": "",
+        "ordinaryWage": "400",
+        "additionalWage": "200",
+        "calculatorData": "contributionCalculatorPayable"
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContributionPayable",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "contributionPayableResponseData": {
+                "employeeOrdinaryWageCeiling": "8000.00",
+                "npaaFromAge": "0",
+                "npaaToAge": "0",
+                "npaaEmployeeRateFactor1": "0.00",
+                "npaaTotalRateFactor1": "0.00",
+                "npaaTotalRateFactor2": "0.00",
+                "npaaTotalRateFactor3": "0.00",
+                "npaaTotalRateFactor4": "0.00",
+                "npaaTotalRateFactor5": "0.00",
+                "npaaTotalRateFactor6": "0.00",
+                "npaaTotalRateFactor7": "0.00",
+                "returnCode": "CPA0000_0000000",
+                "returnDescription": "Success.",
+                "totalContributionAmount": "162.00",
+                "employeeTotalContributionAmount": "60.00",
+                "fromAge": "35",
+                "toAge": "45",
+                "employeeRateFactor1": "0.0000",
+                "totalRateFactor1": "17.0000",
+                "totalRateFactor2": "0.0000",
+                "totalRateFactor3": "0.0000",
+                "totalRateFactor4": "0.0000",
+                "totalRateFactor5": "0.0000",
+                "totalRateFactor6": "0.6000",
+                "totalRateFactor7": "500.0000"
+              },
+              "type": "CARD_ONE",
+              "returnCode": "CPA0000_0000000",
+              "returnDescription": "Success."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "uncapped_TW750",
+      "startedAtUtc": "2026-10-30T14:07:00.727Z",
+      "completedAtUtc": "2026-10-30T14:07:01.101Z",
+      "httpStatus": 200,
+      "request": {
+        "monthPaid": "2026-10",
+        "dateOfBirth": "1990-01-01",
+        "allocationTypeCode": "PTE",
+        "employerContributionCode": "",
+        "employeeContributionCode": "",
+        "citizenshipTypeCode": "CTZ",
+        "yearOfSingaporePermanentResidentCode": "",
+        "ordinaryWage": "500",
+        "additionalWage": "250",
+        "calculatorData": "contributionCalculatorPayable"
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContributionPayable",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "contributionPayableResponseData": {
+                "employeeOrdinaryWageCeiling": "8000.00",
+                "npaaFromAge": "0",
+                "npaaToAge": "0",
+                "npaaEmployeeRateFactor1": "0.00",
+                "npaaTotalRateFactor1": "0.00",
+                "npaaTotalRateFactor2": "0.00",
+                "npaaTotalRateFactor3": "0.00",
+                "npaaTotalRateFactor4": "0.00",
+                "npaaTotalRateFactor5": "0.00",
+                "npaaTotalRateFactor6": "0.00",
+                "npaaTotalRateFactor7": "0.00",
+                "returnCode": "CPA0000_0000000",
+                "returnDescription": "Success.",
+                "totalContributionAmount": "278.00",
+                "employeeTotalContributionAmount": "150.00",
+                "fromAge": "35",
+                "toAge": "45",
+                "employeeRateFactor1": "0.0000",
+                "totalRateFactor1": "17.0000",
+                "totalRateFactor2": "0.0000",
+                "totalRateFactor3": "0.0000",
+                "totalRateFactor4": "0.0000",
+                "totalRateFactor5": "0.0000",
+                "totalRateFactor6": "0.6000",
+                "totalRateFactor7": "500.0000"
+              },
+              "type": "CARD_ONE",
+              "returnCode": "CPA0000_0000000",
+              "returnDescription": "Success."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

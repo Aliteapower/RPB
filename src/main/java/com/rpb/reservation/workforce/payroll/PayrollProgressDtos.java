@@ -10,7 +10,10 @@ public final class PayrollProgressDtos {
     public record ChangeReport(UUID batchId,long batchVersion,String status,boolean sourceChanged,
             Comparison lastCalculation,Comparison previousMonth,List<PendingChange> pending,int recalculated,int reused) {}
     public record Comparison(boolean available,String baselineMonth,Long baselineVersion,String totalGrossDelta,
-            String totalNetDelta,String totalEmployerCostDelta,List<LineChange> lines) {}
+            String totalNetDelta,String totalEmployerCostDelta,List<LineChange> lines,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String reasonBasis) {
+        public Comparison(boolean available,String month,Long version,String gross,String net,String cost,List<LineChange> lines){this(available,month,version,gross,net,cost,lines,null);}
+    }
     public record LineChange(UUID employeeId,String employeeName,String kind,List<String> reasons,String basicPayDelta,
             String grossPayDelta,String netPayDelta,String employeeCpfDelta,String employerCostDelta) {}
     public record PendingChange(UUID employeeId,String employeeName,String reason) {}
