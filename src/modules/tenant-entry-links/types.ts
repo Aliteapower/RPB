@@ -20,6 +20,8 @@ export interface EntryLinksContext {
 }
 export interface TenantEntry {
     key: string;
+    titleKey?: string;
+    descriptionKey?: string;
     audience: 'customer' | 'staff' | 'admin';
     url: string;
     available: boolean;

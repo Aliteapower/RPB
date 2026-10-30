@@ -28,7 +28,8 @@ class TenantEntryLinksTest {
         when(booking.getSettings(scope)).thenReturn(PublicBookingSettings.disabled());
         var result=service.get(scope);
         assertThat(result.identity().tenantName()).isEqualTo("统一租户名称");assertThat(result.identity().storeName()).isEqualTo("另一个门店名称");
-        assertThat(result.products()).hasSize(4).allMatch(TenantEntryLinksContext.Product::available);assertThat(result.publicBookingEnabled()).isFalse();
+        assertThat(result.products()).hasSize(6).allMatch(TenantEntryLinksContext.Product::available);assertThat(result.publicBookingEnabled()).isFalse();
+        assertThat(result.products()).extracting(TenantEntryLinksContext.Product::appKey).contains("wine_storage","workforce");
         verify(repository).find(scope);verifyNoMoreInteractions(repository);
     }
     @Test void disabledExpiredAndMissingProductsStayUnavailableAndDoNotAdvertiseBooking() {

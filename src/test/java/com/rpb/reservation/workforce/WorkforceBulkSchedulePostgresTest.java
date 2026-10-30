@@ -139,4 +139,14 @@ class WorkforceBulkSchedulePostgresTest extends WorkforcePostgresTest {
   assertThatThrownBy(()->plans.staffingEmployees(admin,store,from,from.plusDays(31),shift,null,"",50,0)).isInstanceOf(WorkforceException.class).extracting("status").isEqualTo(400);assertThatThrownBy(()->plans.staffingEmployees(admin,store,from,from,shift,null,"",101,0)).isInstanceOf(WorkforceException.class).extracting("status").isEqualTo(400);
   doAnswer(call->{var r=(com.rpb.reservation.appgate.application.AppGateAccessRequest)call.getArgument(0);return com.rpb.reservation.appgate.domain.AppGateDecision.deny(r.appKey(),r.tenantId(),r.storeId(),r.requiredPermission(),com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_NOT_ENABLED);}).when(gate).evaluate(any());assertThatThrownBy(()->plans.staffingEmployees(admin,store,from,from,shift,null,"",50,0)).isInstanceOf(WorkforceException.class).extracting("status").isEqualTo(403);
  }
+ @Test void dailyTotalsDeduplicateEmployeesAcrossShiftsAndIgnoreCancelledRows(){
+  var day=LocalDate.of(2026,10,29);var late=UUID.randomUUID();var mapper=new ObjectMapper().findAndRegisterModules();var audit=new WorkforceAudit(logs,mapper);
+  proxy(new ShiftService(access,scheduling,audit)).save(admin,store,late,new ShiftWrite(0L,"Late","18:00","23:00",false,"none",0,0,0,0,false,true));
+  schedules.save(admin,store,UUID.randomUUID(),new ScheduleWrite(0L,employee,shift,day,"scheduled"));
+  var second=schedules.save(admin,store,UUID.randomUUID(),new ScheduleWrite(0L,employee,late,day,"scheduled"));
+  var stats=plans.board(admin,store,LocalDate.of(2026,10,26),null,"",1,0).staffing();assertThat(stats.shifts()).hasSize(2);assertThat(stats.days()).allMatch(d->d.people()==1);assertThat(stats.dailyTotals()).containsExactly(new DailyTotal(day,1));
+  schedules.save(admin,store,second.id(),new ScheduleWrite(second.version(),employee,late,day,"cancelled"));
+  assertThat(plans.board(admin,store,LocalDate.of(2026,10,26),null,"",1,0).staffing().dailyTotals()).containsExactly(new DailyTotal(day,1));
+  assertThat(bulk.staffing(UUID.randomUUID(),store,day,day,null,"%").dailyTotals()).isEmpty();
+ }
 }

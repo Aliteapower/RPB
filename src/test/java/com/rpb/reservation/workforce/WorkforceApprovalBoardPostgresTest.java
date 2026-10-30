@@ -24,8 +24,8 @@ class WorkforceApprovalBoardPostgresTest extends WorkforceApprovalPostgresTest {
   var shift=shift(store,"none");var a=normal(shift,DATE);var b=normal(shift,DATE.plusDays(1));time.at("2026-10-31T10:00:00Z");
   var preview=board.preview(admin,store,new Selection(filter(),true,List.of(),List.of()));assertThat(preview.items()).hasSize(2);assertThat(preview.workSeconds()).isEqualTo(57600);
   jdbc.update("update workforce_attendance_sessions set out_at=out_at-interval '1 minute',version=version+1 where tenant_id=? and schedule_id=?",tenant,b.id());
-  var result=batch.commit(admin,store,new Commit("Checked",preview.items()));assertThat(result.succeeded()).isEqualTo(1);assertThat(result.failed()).isEqualTo(1);assertThat(approvalRecords.history(tenant,a.id())).hasSize(1);assertThat(approvalRecords.history(tenant,b.id())).isEmpty();
-  var retry=batch.commit(admin,store,new Commit("Checked",preview.items()));assertThat(retry.succeeded()).isEqualTo(1);assertThat(approvalRecords.history(tenant,a.id())).hasSize(1);
+  var result=batch.commit(admin,store,new Commit("",preview.items()));assertThat(result.succeeded()).isEqualTo(1);assertThat(result.failed()).isEqualTo(1);assertThat(approvalRecords.history(tenant,a.id())).hasSize(1);assertThat(approvalRecords.history(tenant,b.id())).isEmpty();assertThat(approvalRecords.history(tenant,a.id()).getFirst().note()).isEmpty();
+  var retry=batch.commit(admin,store,new Commit("",preview.items()));assertThat(retry.succeeded()).isEqualTo(1);assertThat(approvalRecords.history(tenant,a.id())).hasSize(1);
  }
  @Test void boardManagerRecordsRequireAdministratorOnOldAndNewInterfaces(){
   var actor=manager();admins.save(admin,store,employeeAccount,new WorkforceDtos.AdministratorWrite(0L,true,null));var s=normal(shift(store,"none"),DATE);time.at("2026-10-28T10:00:00Z");

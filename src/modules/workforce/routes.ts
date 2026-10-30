@@ -1,6 +1,8 @@
 import type {RouteRecordRaw} from 'vue-router'
 export const workforceRoutes:RouteRecordRaw[]=[{
  path: '/stores/:storeId/workforce',component:()=>import('./WorkforceLayout.vue'),children:[
+  {path:'attendance-rules',name:'workforce-attendance-rules',component:()=>import('./pages/AttendanceRuleTemplates.vue')},
+  {path:'review-explanations',name:'workforce-review-explanations',component:()=>import('./pages/ReviewExplanationSettings.vue')},
   {path:'statutory-policies',name:'workforce-statutory-policies',component:()=>import('./pages/StatutoryPolicySettings.vue')},
   {path:'public-holidays',name:'workforce-public-holidays',component:()=>import('./pages/PublicHolidayYear.vue')},
   {path:'document-expiries',name:'workforce-document-expiries',component:()=>import('./pages/DocumentExpiryList.vue')},

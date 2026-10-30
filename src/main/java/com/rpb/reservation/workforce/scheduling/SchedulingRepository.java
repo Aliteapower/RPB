@@ -64,7 +64,16 @@ public class SchedulingRepository {
         where e.tenant_id=? and e.id=? and e.status='active' and e.enabled=true and e.hire_date<=? and (e.leave_date is null or e.leave_date>=?)
         and w.store_id=? and w.started_on<=? and (w.ended_on is null or w.ended_on>?))
         """,Boolean.class,tenant,employee,date,date,store,date,date));}
-    public List<Option> employees(UUID tenant,UUID store){return jdbc.query("select e.id,e.name||' · '||e.employee_no from workforce_employees e where e.tenant_id=? and e.status='active' and e.enabled=true and exists(select 1 from workforce_work_stores w where w.tenant_id=e.tenant_id and w.employee_id=e.id and w.store_id=? and w.ended_on is null) order by e.employee_no",(r,n)->new Option(r.getObject(1,UUID.class),r.getString(2)),tenant,store);}
+    public boolean hasStoreAssignment(UUID tenant,UUID employee,UUID store){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_work_stores where tenant_id=? and employee_id=? and store_id=?)",Boolean.class,tenant,employee,store));}
+    /** Candidate dates intersect employment and the store assignment; ended_on is exclusive. */
+    public List<Option> employees(UUID tenant,UUID store,LocalDate from,LocalDate to){return jdbc.query("""
+        select e.id,e.name||' · '||e.employee_no from workforce_employees e
+        where e.tenant_id=? and e.status='active' and e.enabled=true
+          and exists(select 1 from workforce_work_stores w
+            where w.tenant_id=e.tenant_id and w.employee_id=e.id and w.store_id=?
+              and greatest(e.hire_date,w.started_on,?) <= least(coalesce(e.leave_date,'infinity'::date),coalesce(w.ended_on-1,'infinity'::date),?))
+        order by e.employee_no
+        """,(r,n)->new Option(r.getObject(1,UUID.class),r.getString(2)),tenant,store,from,to);}
     public boolean overlaps(UUID tenant,UUID employee,UUID except,Instant from,Instant to){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_schedules where tenant_id=? and employee_id=? and id<>? and status='scheduled' and start_at<? and end_at>?)",Boolean.class,tenant,employee,except,Timestamp.from(to),Timestamp.from(from)));}
     public boolean deleted(UUID tenant,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select deleted_at is not null from workforce_schedules where tenant_id=? and id=?",Boolean.class,tenant,id));}
     public void softDelete(UUID tenant,UUID store,UUID id,long version){if(jdbc.update("update workforce_schedules set status='cancelled',deleted_at=now(),updated_at=now(),version=version+1 where tenant_id=? and store_id=? and id=? and version=? and deleted_at is null",tenant,store,id,version)!=1)throw com.rpb.reservation.workforce.domain.WorkforceException.conflict();}

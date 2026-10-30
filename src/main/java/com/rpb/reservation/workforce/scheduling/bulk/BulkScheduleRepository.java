@@ -58,7 +58,8 @@ public class BulkScheduleRepository {
         String scope=staffingScope();
         var shifts=named.query("select s.shift_id,(array_agg(s.shift_snapshot->>'name' order by s.work_date desc,s.start_at desc,s.id desc))[1],count(distinct s.employee_id),count(distinct (s.employee_id,s.work_date)) "+scope+" group by s.shift_id order by 2,s.shift_id",p,(r,n)->new ShiftCount(r.getObject(1,UUID.class),r.getString(2),r.getLong(3),r.getLong(4)));
         var days=named.query("select s.shift_id,s.work_date,count(distinct s.employee_id) "+scope+" group by s.shift_id,s.work_date order by s.work_date,s.shift_id",p,(r,n)->new ShiftDayCount(r.getObject(1,UUID.class),r.getObject(2,LocalDate.class),r.getLong(3)));
-        return new Staffing(shifts,days);
+        var totals=named.query("select s.work_date,count(distinct s.employee_id) "+scope+" group by s.work_date order by s.work_date",p,(r,n)->new DailyTotal(r.getObject(1,LocalDate.class),r.getLong(2)));
+        return new Staffing(shifts,days,totals);
     }
     public StaffingEmployees staffingEmployees(UUID tenant,UUID store,LocalDate from,LocalDate to,UUID shift,UUID position,String search,int limit,int offset){
         var p=staffingParams(tenant,store,from,to,position,search).addValue("shift",shift).addValue("limit",limit).addValue("offset",offset);

@@ -25,13 +25,13 @@ public class ApprovalService {
  @Transactional public Approval approve(CurrentActor actor,UUID store,UUID id,ApprovalWrite c){
         gate.sourceWrite(actor);
   gate.enter(actor,store);gate.manage(actor,store);
-  if(c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.sourceFingerprint()==null||!c.sourceFingerprint().matches("[a-f0-9]{64}")||c.note()==null||c.note().isBlank()||c.note().trim().length()>500)throw WorkforceException.invalid();
+  if(c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.sourceFingerprint()==null||!c.sourceFingerprint().matches("[a-f0-9]{64}"))throw WorkforceException.invalid();
+  String note=ApprovalNotes.normalize(c.note());
   var initial=access.read(actor,store,id);repository.calendarLock(actor.tenantId(),store);employees.lock(initial.employeeId());var s=access.read(actor,store,id);
   var e=employees.find(actor.tenantId(),s.employeeId()).orElseThrow(WorkforceException::missing);var block=ApprovalReviewerPolicy.block(gate.isHeadOffice(actor),true,actor.actorId(),e.accountId(),repository.managerAccount(actor.tenantId(),e.accountId()));if(block!=null)throw new WorkforceException(block,403);
   var source=sources.read(actor.tenantId(),store,s);var history=repository.history(actor.tenantId(),id);var old=history.isEmpty()?null:history.getFirst();var row=sources.row(store,source,old);
   if(Boolean.TRUE.equals(row.exempt()))throw new WorkforceException("WORKFORCE_CLOCK_EXEMPT",409);
-  if(!row.sourceFingerprint().equals(c.sourceFingerprint()))throw WorkforceException.conflict();var decisions=sources.decisions(source,c.decisions());var reviewed=new Approval(id,0,row.sourceFingerprint(),0,0,0,source,actor.actorId(),c.note().trim(),clock.instant(),decisions);row=sources.row(store,source,reviewed);if(!row.issues().isEmpty())throw new WorkforceException("WORKFORCE_APPROVAL_BLOCKED",409);
-  String note=c.note().trim();
+  if(!row.sourceFingerprint().equals(c.sourceFingerprint()))throw WorkforceException.conflict();var decisions=sources.decisions(source,c.decisions());var reviewed=new Approval(id,0,row.sourceFingerprint(),0,0,0,source,actor.actorId(),note,clock.instant(),decisions);row=sources.row(store,source,reviewed);if(!row.issues().isEmpty())throw new WorkforceException("WORKFORCE_APPROVAL_BLOCKED",409);
   if(old!=null&&old.version()==c.expectedVersion()+1&&old.sourceFingerprint().equals(c.sourceFingerprint())&&old.reviewerId().equals(actor.actorId())&&old.note().equals(note)&&Objects.equals(old.decisions()==null?List.of():old.decisions(),decisions))return privacy==null?old:privacy.approval(actor,old);
   if((old==null?0:old.version())!=c.expectedVersion())throw WorkforceException.conflict();
   var next=new Approval(id,c.expectedVersion()+1,row.sourceFingerprint(),row.workSeconds(),row.paidLeaveSeconds(),row.unpaidLeaveSeconds(),source,actor.actorId(),note,clock.instant(),source.schedule().shift().rules()==null&&decisions.isEmpty()?null:decisions);

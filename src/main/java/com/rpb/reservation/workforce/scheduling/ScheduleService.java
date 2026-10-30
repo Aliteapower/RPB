@@ -17,7 +17,7 @@ public class ScheduleService {
     public SchedulePage list(CurrentActor actor,UUID store,LocalDate from,LocalDate to){
         access.enter(actor,store);range(from,to);boolean manager=access.managedStores(actor).contains(store);
         UUID employee=manager?null:employees.byAccount(actor.tenantId(),actor.actorId()).orElseThrow(WorkforceException::forbidden).id();
-        return new SchedulePage(repository.list(actor.tenantId(),store,from,to,employee,1000,0),manager?repository.employees(actor.tenantId(),store):List.of(),repository.timezone(actor.tenantId(),store));
+        return new SchedulePage(repository.list(actor.tenantId(),store,from,to,employee,1000,0),manager?repository.employees(actor.tenantId(),store,from,to):List.of(),repository.timezone(actor.tenantId(),store));
     }
     @Transactional public Schedule save(CurrentActor actor,UUID store,UUID id,ScheduleWrite c){
         access.sourceWrite(actor);
@@ -36,9 +36,16 @@ public class ScheduleService {
             repository.save(actor.tenantId(),store,cancelled);audit.changed(actor,store,"schedule.cancel",id,old,cancelled);return cancelled;
         }
         String zone=repository.timezone(actor.tenantId(),store);var today=LocalDate.now(clock.withZone(ZoneId.of(zone)));
-        if(c.workDate().isBefore(today)||c.workDate().isAfter(today.plusDays(90))||!repository.assigned(actor.tenantId(),c.employeeId(),store,c.workDate()))throw WorkforceException.invalid();
+        if(c.workDate().isBefore(today)||c.workDate().isAfter(today.plusDays(90)))throw invalid("WORKFORCE_SCHEDULE_DATE_OUT_OF_RANGE");
+        boolean assigned=repository.assigned(actor.tenantId(),c.employeeId(),store,c.workDate());
+        // Unknown/out-of-store IDs must not disclose another employee's employment state.
+        if(!assigned&&!repository.hasStoreAssignment(actor.tenantId(),c.employeeId(),store))throw invalid("WORKFORCE_SCHEDULE_STORE_ASSIGNMENT");
         var employee=employees.find(actor.tenantId(),c.employeeId()).orElseThrow(WorkforceException::missing);
-        var shift=repository.shift(actor.tenantId(),store,c.shiftId()).orElseThrow(WorkforceException::missing);if(!shift.enabled())throw WorkforceException.invalid();
+        if(!employee.enabled()||!"active".equals(employee.status()))throw invalid("WORKFORCE_SCHEDULE_EMPLOYEE_INACTIVE");
+        if(c.workDate().isBefore(employee.hireDate()))throw invalid("WORKFORCE_SCHEDULE_BEFORE_HIRE");
+        if(employee.leaveDate()!=null&&c.workDate().isAfter(employee.leaveDate()))throw invalid("WORKFORCE_SCHEDULE_EMPLOYEE_LEFT");
+        if(!assigned)throw invalid("WORKFORCE_SCHEDULE_STORE_ASSIGNMENT");
+        var shift=repository.shift(actor.tenantId(),store,c.shiftId()).orElseThrow(WorkforceException::missing);if(!shift.enabled())throw invalid("WORKFORCE_SCHEDULE_SHIFT_DISABLED");
         if(old!=null&&old.status().equals("cancelled")){
             if(!old.shiftId().equals(c.shiftId())||!old.workDate().equals(c.workDate()))throw WorkforceException.invalid();
             if(repository.overlaps(actor.tenantId(),employee.id(),id,old.startAt(),old.endAt()))throw error("WORKFORCE_SCHEDULE_OVERLAP");
@@ -66,5 +73,6 @@ public class ScheduleService {
     }
     public static void range(LocalDate from,LocalDate to){if(from==null||to==null||to.isBefore(from)||ChronoUnit.DAYS.between(from,to)>30)throw WorkforceException.invalid();}
     private WorkforceException error(String code){return new WorkforceException(code,409);}
+    private WorkforceException invalid(String code){return new WorkforceException(code,400);}
 }
 

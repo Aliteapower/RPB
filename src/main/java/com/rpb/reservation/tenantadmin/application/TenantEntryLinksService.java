@@ -4,6 +4,7 @@ import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.publicbooking.application.PublicBookingAdminService;
 import com.rpb.reservation.tenantadmin.persistence.TenantEntryLinksRepository;
+import com.rpb.reservation.common.product.ProductLineEntryRegistry;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +20,7 @@ public class TenantEntryLinksService {
     public TenantEntryLinksContext get(StoreScope scope) {
         var identity=repository.find(scope).orElseThrow(()->new TenantAdminServiceException(TenantAdminServiceErrorCode.TENANT_PROFILE_NOT_FOUND));
         String inactive=!"active".equals(identity.tenantStatus())?"TENANT_INACTIVE":!"active".equals(identity.storeStatus())?"STORE_INACTIVE":null;
-        var products=List.of("reservation_queue","wallet","payment","daily_ledger").stream().filter(key -> inactive==null && gate.isStoreProductProvisioned(key,scope.tenantId().value(),scope.storeId().value())).map(key->{
+        var products=ProductLineEntryRegistry.managedProducts().stream().filter(key -> inactive==null && gate.isStoreProductProvisioned(key,scope.tenantId().value(),scope.storeId().value())).map(key->{
             if(inactive!=null)return new Product(key,false,inactive);
             var decision=gate.evaluateCommercial(key,scope.tenantId().value(),scope.storeId().value());
             return new Product(key,decision.allowed(),decision.allowed()?null:decision.denyReason().name());

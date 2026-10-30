@@ -1,12 +1,13 @@
 import {before,after,test} from 'node:test'
 import assert from 'node:assert/strict'
-import {createServer} from 'vite'
+import {build} from 'esbuild'
 import {initialLoginEntry,entryTenantCode} from '../../utils/loginEntry.ts'
-let vite,buildTenantEntries
+let buildTenantEntries
 const context={success:true,identity:{tenantId:'tenant-a',tenantCode:'tenant-a',tenantName:'统一租户名称',tenantStatus:'active',storeId:'store-a',storeCode:'A',storeName:'门店甲',storeStatus:'active'},publicBookingEnabled:true,products:['wallet','reservation_queue','payment','daily_ledger'].map(appKey=>({appKey,available:true,denialReason:null}))}
 const loc=(hostname='booking.yumstone.sg')=>({hostname,protocol:'https:',port:'',origin:'https://'+hostname})
-before(async()=>{globalThis.window={__RPB_HOST_PREFIX_BASE_HOST__:'booking.yumstone.sg'};vite=await createServer({configFile:false,cacheDir:'target/tenant-entry-test-cache',server:{middlewareMode:true},appType:'custom',optimizeDeps:{noDiscovery:true,entries:[]}});({buildTenantEntries}=await vite.ssrLoadModule('/src/modules/tenant-entry-links/catalog.ts'))})
-after(async()=>{await vite?.close();delete globalThis.window})
+before(async()=>{globalThis.window={__RPB_HOST_PREFIX_BASE_HOST__:'booking.yumstone.sg'};const result=await build({entryPoints:['src/modules/tenant-entry-links/catalog.ts'],bundle:true,write:false,format:'esm',platform:'node',define:{'import.meta.env':'{}'}});({buildTenantEntries}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].contents).toString('base64')))})
+after(()=>{delete globalThis.window})
+
 test('every generated URL identifies the correct tenant and selected store and contains no credentials',()=>{
  for(const host of ['booking.yumstone.sg','platform.booking.yumstone.sg','other.booking.yumstone.sg','tenant-a.booking.yumstone.sg']){
   const entries=buildTenantEntries(context,loc(host));assert.equal(entries.length,7)
@@ -19,6 +20,16 @@ test('every generated URL identifies the correct tenant and selected store and c
 test('local development keeps its actual origin and port and supplies only a tenant hint for login',()=>{
  const rows=buildTenantEntries(context,{protocol:'http:',hostname:'127.0.0.1',port:'5178',origin:'http://127.0.0.1:5178'})
  assert.equal(new URL(rows[0].url).origin,'http://127.0.0.1:5178');assert.equal(new URL(rows[2].url).searchParams.get('tenantCode'),'tenant-a')
+})
+
+test('new product lines expose store-scoped wine and workforce entry links without opening unavailable products',()=>{
+ const products=['wallet','reservation_queue','payment','daily_ledger','wine_storage','workforce'].map(appKey=>({appKey,available:true,denialReason:null}))
+ const rows=buildTenantEntries({...context,products},loc())
+ for(const key of ['wineCustomer','wineStaff','workforce','workforceClock','workforceAdmin'])assert.ok(rows.some(e=>e.key===key),key)
+ assert.equal(new URL(rows.find(e=>e.key==='wineCustomer').url).pathname,'/wallet/store-a/wine-storage')
+ for(const key of ['wineStaff','workforce','workforceClock','workforceAdmin'])assert.match(new URL(rows.find(e=>e.key===key).url).searchParams.get('redirect'),/^\/stores\/store-a\//)
+ const closed=buildTenantEntries({...context,products:products.map(p=>p.appKey==='workforce'?{...p,available:false}:p)},loc())
+ assert.ok(closed.every(e=>!e.key.startsWith('workforce')))
 })
 test('unavailable products, closed booking and inactive stores never become distributable entry codes',()=>{
  const c={...context,publicBookingEnabled:false,products:[{appKey:'wallet',available:false,denialReason:'STORE_APP_EXPIRED'}]}

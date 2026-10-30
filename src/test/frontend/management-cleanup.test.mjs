@@ -79,7 +79,7 @@ test('duplicate management navigation is removed and attendance feature navigati
   const source=await readFile('src/modules/workforce/pages/'+page+'.vue','utf8')
   const {descriptor}=parse(source,{filename:page+'.vue'});assert.ok(compileScript(descriptor,{id:page,inlineTemplate:true}).content)
   assert.doesNotMatch(source,/<nav[^>]*wf-subnav[^>]*>.*?management/s)
-  if(['CalendarList','LeaveTypeList'].includes(page)){assert.match(source,/base\+'\/leave-types'/);assert.match(source,/base\+'\/calendar'/)}
+  if(['CalendarList','LeaveTypeList'].includes(page)){assert.match(source,/AttendanceSettingsNav/);const nav=await readFile('src/modules/workforce/components/AttendanceSettingsNav.vue','utf8');assert.match(nav,/path:'leave-types'/);assert.match(nav,/path:'public-holidays'/);assert.match(nav,/path:'calendar'/)}
  }
  const position=await readFile('src/modules/workforce/pages/PositionList.vue','utf8')
  for(const action of ['@submit.prevent="save"','@click="edit(p)"','@click="toggle(p)"','@click="remove(p)"'])assert.ok(position.includes(action))

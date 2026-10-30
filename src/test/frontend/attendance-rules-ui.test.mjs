@@ -8,6 +8,11 @@ import {workforceKey} from '../../modules/workforce/context.ts'
 import ShiftForm from '../../modules/workforce/pages/ShiftForm.vue'
 import ShiftList from '../../modules/workforce/pages/ShiftList.vue'
 import ScheduleEditor from '../../modules/workforce/components/ScheduleEditor.vue'
+import {WorkforceApiError} from '../../modules/workforce/api.ts'
+import ReviewExplanationField from '../../modules/workforce/components/ReviewExplanationField.vue'
+import ReviewExplanationSettings from '../../modules/workforce/pages/ReviewExplanationSettings.vue'
+import PublicHolidayYear from '../../modules/workforce/pages/PublicHolidayYear.vue'
+import DailyScheduleStaffing from '../../modules/workforce/components/DailyScheduleStaffing.vue'
 import WeekScheduleTable from '../../modules/workforce/components/WeekScheduleTable.vue'
 import Settings from '../../modules/workforce/components/AttendancePolicySettings.vue'
 import Editor from '../../modules/workforce/components/AttendanceRulesEditor.vue'
@@ -30,6 +35,110 @@ async function mount(Page,{path='/stores/A/workforce/shifts/new',manager=false,p
  app.use(router);app.use(createI18n({legacy:false,locale:'zh-CN',messages:{}}));app.provide(workforceKey,{store:ref('A'),home:ref({...home,headOffice:!manager}),api:()=>({get:async path=>{calls.push({path,method:'GET'});return handler(path)},put:async(path,body)=>{calls.push({path,method:'PUT',body:JSON.parse(JSON.stringify(body))});return handler(path,body)}}),refresh:async()=>{}});app.mount(root);apps.push(app);await settle();return root
 }
 afterEach(()=>{apps.splice(0).forEach(a=>a.unmount());calls.length=0;handler=async()=>({items:[],headOffice:true})})
+
+test('review explanation field filters enabled matching presets and allows selected manual or empty text',async()=>{
+ const emitted=[],items=[{id:'late',code:'LATE',text:'已核实交通延误',enabled:true},{id:'general',code:'GENERAL',text:'主管已核对',enabled:true},{id:'early',code:'EARLY',text:'提前离岗',enabled:true},{id:'off',code:'LATE',text:'已停用',enabled:false}]
+ const root=await mount(ReviewExplanationField,{props:{modelValue:'',code:'LATE',items,'onUpdate:modelValue':v=>emitted.push(v)}})
+ assert.deepEqual(nodes(root,n=>n.tag==='option').map(n=>n.props.value),['','late','general'])
+ const select=nodes(root,n=>n.tag==='select')[0];select.props['onUpdate:modelValue']('late');await settle();select.props.onChange();await settle();assert.equal(emitted.at(-1),'已核实交通延误')
+ const area=nodes(root,n=>n.tag==='textarea')[0];assert.equal(area.props.required,undefined);area.props['onUpdate:modelValue']('手写补充');area.props['onUpdate:modelValue']('');assert.equal(emitted.at(-1),'');assert.equal(calls.length,0)
+})
+
+test('decision explanation management separates saved rows and new draft and writes with a version',async()=>{
+ const items=[{id:'old',code:'LATE',text:'原说明',enabled:true,version:1}]
+ handler=async(path,body)=>{if(body){const item={...body,id:path.split('/').at(-1),version:1};items.push(item);return item}return {items,headOffice:true}}
+ const root=await mount(ReviewExplanationSettings);assert.match(text(root),/已保存的说明/);assert.equal(nodes(root,n=>n.tag==='form').length,0)
+ await button(root,'新增说明').props.onClick();await settle();assert.match(text(root),/新增说明草稿/)
+ nodes(root,n=>n.tag==='textarea')[0].props['onUpdate:modelValue']('新说明');await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ assert.equal(calls.find(c=>c.method==='PUT').body.expectedVersion,0);assert.equal(calls.find(c=>c.method==='PUT').body.text,'新说明');assert.equal(nodes(root,n=>n.tag==='form').length,0);assert.match(text(root),/新说明/)
+})
+
+test('store managers can read explanation settings but cannot create or edit tenant presets',async()=>{
+ handler=async()=>({items:[{id:'old',code:'LATE',text:'原说明',enabled:true,version:1}],headOffice:false})
+ const root=await mount(ReviewExplanationSettings,{manager:true});assert.match(text(root),/原说明/);assert.equal(button(root,'新增说明'),undefined);assert.equal(button(root,'编辑'),undefined)
+})
+
+test('annual holiday saved list stays unchanged while a draft is edited discarded or loaded',async()=>{
+ const saved={id:'saved',date:'2026-10-30',name:'已存假日',englishName:'Saved',enabled:true,observedOn:null,observedKind:'none',tentative:false}
+ let items=[saved]
+ handler=async(path,body)=>{if(body){items=body.items;return {year:2026,version:3,items}}if(path.includes('templates'))return {source:'https://example.test/fixture',items:[{...saved,id:'draft',name:'新草稿假日'}]};return {year:2026,version:2,items}}
+ const root=await mount(PublicHolidayYear),savedTable=()=>nodes(root,n=>n.tag==='table'&&n.props.class==='wf-saved-holidays')[0]
+ assert.match(text(savedTable()),/已存假日/);assert.equal(nodes(root,n=>n.tag==='form').length,1)
+ button(root,'编辑当年设置').props.onClick();await settle();assert.match(text(root),/编辑草稿/)
+ nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0].props['onUpdate:modelValue']('2026-10-31');await settle();assert.match(text(savedTable()),/2026-10-30/)
+ button(root,'放弃本次草稿').props.onClick();await settle();assert.equal(nodes(root,n=>n.tag==='form').length,1);assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+ button(root,'载入官方模板（草稿）').props.onClick();await settle();assert.match(text(savedTable()),/已存假日/);assert.ok(nodes(root,n=>n.tag==='input'&&n.value==='新草稿假日').length)
+ await nodes(root,n=>n.tag==='form').at(-1).props.onSubmit({preventDefault(){}});await settle();assert.match(text(savedTable()),/新草稿假日/);assert.equal(calls.find(c=>c.method==='PUT').body.expectedVersion,2)
+})
+
+test('daily staffing displays unique totals separately from per-shift counts',async()=>{
+ const value={shifts:[{shiftId:'early',name:'早班',people:2,personDays:2},{shiftId:'late',name:'晚班',people:4,personDays:4}],days:[{shiftId:'early',date:'2026-10-30',people:2},{shiftId:'late',date:'2026-10-30',people:4}],dailyTotals:[{date:'2026-10-30',people:4}]}
+ const root=await mount(DailyScheduleStaffing,{props:{value}});assert.match(text(root),/30\/10\/2026共\s*4\s*人/);assert.match(text(root),/早班\s*2\s*人/);assert.match(text(root),/晚班\s*4\s*人/)
+ const table=await mount(WeekScheduleTable,{props:{data:{items:[],employees:[],timezone:'Asia/Singapore',staffing:value},week:'2026-10-30',base:''}})
+ const total=nodes(table,n=>n.tag==='tr'&&text(n).includes('每日总人数（去重）'))[0];assert.match(text(total),/4 人/);assert.doesNotMatch(text(total),/6 人/)
+})
+
+const dayShift={id:'day',name:'早班',startTime:'11:00',endTime:'23:00',nextDay:false,enabled:true,version:1,breakMode:'none'}
+test('schedule options use the selected business date and reject a no-longer-eligible employee',async()=>{
+ handler=async path=>path==='/shifts'?[dayShift]:{items:[],employees:path.includes('from=2026-11-02&to=2026-11-02')?[]:[{id:'employee',name:'Alice'}],timezone:'Asia/Singapore'}
+ const root=await mount(ScheduleEditor,{props:{employeeId:'employee',workDate:'2026-11-01'}})
+ assert.ok(calls.some(c=>c.path==='/schedule?from=2026-11-01&to=2026-11-01'))
+ const shift=nodes(root,n=>n.tag==='select')[1];shift.props['onUpdate:modelValue']('day')
+ nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0].props['onUpdate:modelValue']('2026-11-02');await settle()
+ assert.ok(calls.some(c=>c.path==='/schedule?from=2026-11-02&to=2026-11-02'))
+ assert.match(text(root),/所选员工在该营业日期不可排班/)
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+})
+
+test('schedule save displays the specific employee leaving error rather than the 31-day hint',async()=>{
+ handler=async(path,body)=>{if(body)throw new WorkforceApiError(400,'WORKFORCE_SCHEDULE_EMPLOYEE_LEFT');return path==='/shifts'?[dayShift]:{items:[],employees:[{id:'employee',name:'Alice'}],timezone:'Asia/Singapore'}}
+ const root=await mount(ScheduleEditor,{props:{employeeId:'employee',workDate:'2026-11-01'}})
+ nodes(root,n=>n.tag==='select')[1].props['onUpdate:modelValue']('day');await settle()
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ assert.match(text(root),/排班日期晚于员工离职日期/);assert.doesNotMatch(text(root),/最多31天/)
+})
+
+test('schedule creation explains when no employees are eligible for the business date',async()=>{
+ handler=async path=>path==='/shifts'?[dayShift]:{items:[],employees:[],timezone:'Asia/Singapore'}
+ const root=await mount(ScheduleEditor,{props:{workDate:'2026-11-01'}})
+ assert.match(text(root),/该营业日期没有可排班员工/);assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+})
+
+test('out-of-order employee lookups cannot replace the options for the latest business date',async()=>{
+ const pending=new Map()
+ handler=async path=>{if(path==='/shifts')return [dayShift];if(path.includes('from=2026-11-02')||path.includes('from=2026-11-03'))return new Promise(resolve=>pending.set(path,resolve));return {items:[],employees:[{id:'employee',name:'Alice'}],timezone:'Asia/Singapore'}}
+ const root=await mount(ScheduleEditor,{props:{employeeId:'employee',workDate:'2026-11-01'}})
+ const date=nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0]
+ date.props['onUpdate:modelValue']('2026-11-02');await settle()
+ assert.equal(nodes(root,n=>n.tag==='select')[0].props.disabled,true)
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+ date.props['onUpdate:modelValue']('2026-11-03');await settle()
+ pending.get('/schedule?from=2026-11-03&to=2026-11-03')({items:[],employees:[{id:'latest',name:'Latest employee'}],timezone:'Asia/Singapore'});await settle()
+ pending.get('/schedule?from=2026-11-02&to=2026-11-02')({items:[],employees:[{id:'stale',name:'Stale employee'}],timezone:'Asia/Singapore'});await settle()
+ assert.match(text(root),/Latest employee/);assert.doesNotMatch(text(root),/Stale employee/)
+})
+
+test('failed employee lookup blocks saves and can be retried without losing the shift draft',async()=>{
+ let fail=true
+ handler=async path=>{if(path==='/shifts')return [dayShift];if(path.includes('from=2026-11-02')&&fail)throw new Error('network');return {items:[],employees:[{id:'employee',name:'Alice'}],timezone:'Asia/Singapore'}}
+ const root=await mount(ScheduleEditor,{props:{employeeId:'employee',workDate:'2026-11-01'}})
+ nodes(root,n=>n.tag==='select')[1].props['onUpdate:modelValue']('day')
+ nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0].props['onUpdate:modelValue']('2026-11-02');await settle()
+ assert.ok(button(root,'重新加载'));await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+ fail=false;await button(root,'重新加载').props.onClick();await settle()
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ assert.equal(calls.find(c=>c.method==='PUT').body.shiftId,'day');assert.equal(calls.find(c=>c.method==='PUT').body.workDate,'2026-11-02')
+})
+
+test('an ineligible employee stays visible in an existing snapshot and the schedule can still be cancelled',async()=>{
+ const old={id:'old',employeeId:'employee',employeeName:'Alice',shiftId:'day',workDate:'2026-11-01',status:'scheduled',version:2,shift:dayShift,timezone:'Asia/Singapore'}
+ handler=async(path,body)=>body?{...old,...body,version:3}:path==='/shifts'?[dayShift]:{items:[old],employees:[],timezone:'Asia/Singapore'}
+ const root=await mount(ScheduleEditor,{props:{id:'old'}})
+ assert.match(text(root),/Alice/);assert.match(text(root),/所选员工在该营业日期不可排班/)
+ await button(root,'取消排班').props.onClick();await settle()
+ const saved=calls.find(c=>c.method==='PUT').body;assert.equal(saved.status,'cancelled');assert.equal(saved.employeeId,'employee');assert.equal(saved.expectedVersion,2)
+})
 
 test('template management round trip preserves unsaved shift fields and rule edits without saving the shift',async()=>{
  const root=await mount(ShiftForm)

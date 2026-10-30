@@ -7,6 +7,8 @@ type Access='employee'|'headOffice'|'payroll'
 interface ManagementSection {path:string;label:Caption;access:Access;routes:Record<string,Caption|null>}
 // Explicit route names keep operation pages and employee calendar views out of management.
 const sections:ManagementSection[]=[
+ {path:'attendance-rules',label:['休息与考勤规则','Break and attendance rules'],access:'employee',routes:{'workforce-attendance-rules':null}},
+ {path:'review-explanations',label:['判定说明','Decision explanations'],access:'employee',routes:{'workforce-review-explanations':null}},
  {path:'clock-site',label:['门店打卡定位点','Store clock location'],access:'employee',routes:{'workforce-clock-site':null}},
  {path:'statutory-policies',label:['CPF／SDL／CDAC规则','CPF / SDL / CDAC rules'],access:'headOffice',routes:{'workforce-statutory-policies':null}},
  {path:'document-expiries',label:['证件到期','Document expiry'],access:'employee',routes:{'workforce-document-expiries':null}},
@@ -15,7 +17,7 @@ const sections:ManagementSection[]=[
  {path:'companies',label:['公司管理','Companies'],access:'headOffice',routes:{'workforce-companies':null,'workforce-company':['编辑公司','Edit company']}},
  {path:'administrators',label:['权限管理','Administrator permissions'],access:'headOffice',routes:{'workforce-administrators':null,'workforce-administrator':['编辑权限','Edit permissions']}},
  {path:'shifts',label:['班次管理','Shift management'],access:'employee',routes:{'workforce-shifts':null,'workforce-shift-new':['新增班次','New shift'],'workforce-shift':['编辑班次','Edit shift']}},
- {path:'calendar',label:['考勤设置','Attendance settings'],access:'employee',routes:{'workforce-calendar':null,'workforce-calendar-new':['新增日历事项','New calendar event'],'workforce-calendar-edit':['编辑日历事项','Edit calendar event']}},
+ {path:'calendar',label:['考勤日历','Attendance calendar'],access:'employee',routes:{'workforce-calendar':null,'workforce-calendar-new':['新增日历事项','New calendar event'],'workforce-calendar-edit':['编辑日历事项','Edit calendar event']}},
  {path:'public-holidays',label:['年度公共假期','Annual public holidays'],access:'employee',routes:{'workforce-public-holidays':null}},
  {path:'leave-types',label:['假期类型','Leave types'],access:'employee',routes:{'workforce-leave-types':null,'workforce-leave-type-new':['新增假期类型','New leave type'],'workforce-leave-type':['编辑假期类型','Edit leave type']}},
  {path:'salary-templates',label:['薪资模板','Salary templates'],access:'payroll',routes:{'workforce-salary-templates':null,'workforce-salary-template-new':['新增薪资模板','New salary template'],'workforce-salary-template':['编辑薪资模板','Edit salary template']}},

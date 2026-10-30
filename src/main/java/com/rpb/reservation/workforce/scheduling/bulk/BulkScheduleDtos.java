@@ -16,7 +16,10 @@ public final class BulkScheduleDtos {
     public record Result(UUID commandId,int created,int existing,int conflicts,List<UUID> scheduleIds) {}
     public record ShiftCount(UUID shiftId,String name,long people,long personDays) {}
     public record ShiftDayCount(UUID shiftId,LocalDate date,long people) {}
-    public record Staffing(List<ShiftCount> shifts,List<ShiftDayCount> days) {}
+    public record DailyTotal(LocalDate date,long people) {}
+    public record Staffing(List<ShiftCount> shifts,List<ShiftDayCount> days,List<DailyTotal> dailyTotals) {
+        public Staffing(List<ShiftCount> shifts,List<ShiftDayCount> days){this(shifts,days,List.of());}
+    }
     public record StaffingSchedule(UUID id,Instant startAt,Instant endAt,String timezone,long version) {}
     public record StaffingEmployee(UUID employeeId,String employeeNo,String name,LocalDate date,String shiftName,List<StaffingSchedule> schedules) {}
     public record StaffingEmployees(List<StaffingEmployee> items,long total,long people,int limit,int offset) {}

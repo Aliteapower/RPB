@@ -7,7 +7,7 @@ export function reviewDecisionsValid(row:ApprovalRow,decisions:ReviewDecision[])
  const findings=row.findings?.filter(f=>f.code!=='LEAVE'&&(f.status==='pending'||['LATE','EARLY','MISSING','BREAK_OVER','BREAK_SHORT'].includes(f.code)))||[]
  return findings.every(f=>{
   const d=decisions.filter(d=>d.code===f.code)
-  return d.length===1&&!!d[0]!.note.trim()&&d[0]!.note.length<=500&&(f.code==='MISSING'?absenceAllowed(row)&&d[0]!.outcome==='absence':['LATE','EARLY','BREAK_OVER','BREAK_SHORT'].includes(f.code)&&['confirmed','excused'].includes(d[0]!.outcome))
+  return d.length===1&&d[0]!.note.length<=500&&(f.code==='MISSING'?absenceAllowed(row)&&d[0]!.outcome==='absence':['LATE','EARLY','BREAK_OVER','BREAK_SHORT'].includes(f.code)&&['confirmed','excused'].includes(d[0]!.outcome))
  })
 }
 export function reviewAllowed(row:ApprovalRow,home:Pick<Home,'employeeManage'|'myself'>|null,decisions:ReviewDecision[]){

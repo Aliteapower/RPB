@@ -38,6 +38,44 @@ class WorkforceAttendancePostgresTest extends WorkforcePostgresTest {
     Shift shift(UUID shop,String mode){return shifts.save(admin,shop,UUID.randomUUID(),new ShiftWrite(0L,"Day","09:00","17:00",false,mode,30,360,120,180,false,true));}
     Schedule schedule(UUID shop,Shift shift,LocalDate day){return roster.save(admin,shop,UUID.randomUUID(),new ScheduleWrite(0L,employee,shift.id(),day,"scheduled"));}
     Session punch(Schedule s,String action){return punches.punch(worker,store,UUID.randomUUID(),new ClockWrite(s.id(),action));}
+    @Test void scheduleOptionsRespectEmploymentAndStoreDatesWithoutHidingHistory(){
+        var template=shift(store,"none");var existing=schedule(store,template,DATE);
+        jdbc.update("update workforce_employees set leave_date=? where tenant_id=? and id=?",DATE.minusDays(1),tenant,employee);
+        var page=roster.list(admin,store,DATE,DATE);
+        assertThat(page.employees()).extracting(WorkforceDtos.Option::id).doesNotContain(employee);
+        assertThat(page.items()).contains(existing);
+        jdbc.update("update workforce_employees set hire_date=?,company_effective_date=?,leave_date=? where tenant_id=? and id=?",DATE,DATE,DATE.plusDays(1),tenant,employee);
+        assertThat(roster.list(admin,store,DATE,DATE).employees()).extracting(WorkforceDtos.Option::id).contains(employee);
+        assertThat(roster.list(admin,store,DATE.plusDays(1),DATE.plusDays(1)).employees()).extracting(WorkforceDtos.Option::id).contains(employee);
+        assertThat(roster.list(admin,store,DATE.minusDays(1),DATE.minusDays(1)).employees()).extracting(WorkforceDtos.Option::id).doesNotContain(employee);
+        jdbc.update("update workforce_work_stores set started_on=?,ended_on=? where tenant_id=? and employee_id=? and store_id=?",DATE.plusDays(1),DATE.plusDays(2),tenant,employee,store);
+        assertThat(roster.list(admin,store,DATE,DATE).employees()).extracting(WorkforceDtos.Option::id).doesNotContain(employee);
+        assertThat(roster.list(admin,store,DATE.plusDays(1),DATE.plusDays(1)).employees()).extracting(WorkforceDtos.Option::id).contains(employee);
+        jdbc.update("update workforce_employees set leave_date=null where tenant_id=? and id=?",tenant,employee);
+        assertThat(roster.list(admin,store,DATE.plusDays(2),DATE.plusDays(2)).employees()).extracting(WorkforceDtos.Option::id).doesNotContain(employee);
+        assertThat(roster.list(worker,store,DATE,DATE).employees()).isEmpty();
+        assertThatThrownBy(()->roster.list(worker,otherStore,DATE,DATE)).isInstanceOf(WorkforceException.class);
+    }
+    @Test void scheduleRejectionNamesEmploymentAndAssignmentProblem(){
+        var template=shift(store,"none");
+        jdbc.update("update workforce_employees set leave_date=? where tenant_id=? and id=?",DATE.minusDays(1),tenant,employee);
+        assertThatThrownBy(()->schedule(store,template,DATE)).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_EMPLOYEE_LEFT");
+        jdbc.update("update workforce_employees set leave_date=null,hire_date=?,company_effective_date=? where tenant_id=? and id=?",DATE.plusDays(1),DATE.plusDays(1),tenant,employee);
+        assertThatThrownBy(()->schedule(store,template,DATE)).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_BEFORE_HIRE");
+        jdbc.update("update workforce_employees set hire_date=?,company_effective_date=?,enabled=false where tenant_id=? and id=?",DATE,DATE,tenant,employee);
+        assertThatThrownBy(()->schedule(store,template,DATE)).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_EMPLOYEE_INACTIVE");
+        jdbc.update("update workforce_employees set enabled=true where tenant_id=? and id=?",tenant,employee);
+        jdbc.update("update workforce_work_stores set started_on=? where tenant_id=? and employee_id=? and store_id=?",DATE.plusDays(1),tenant,employee,store);
+        assertThatThrownBy(()->schedule(store,template,DATE)).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_STORE_ASSIGNMENT");
+        assertThatThrownBy(()->schedule(store,template,DATE.minusDays(1))).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_DATE_OUT_OF_RANGE");
+    }
+    @Test void unrelatedEmployeeIdsDoNotDiscloseEmploymentState(){
+        var template=shift(store,"none");
+        jdbc.update("update workforce_employees set leave_date=? where tenant_id=? and id=?",DATE.minusDays(1),tenant,employee);
+        jdbc.update("delete from workforce_work_stores where tenant_id=? and employee_id=? and store_id=?",tenant,employee,store);
+        assertThatThrownBy(()->schedule(store,template,DATE)).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_STORE_ASSIGNMENT");
+        assertThatThrownBy(()->roster.save(admin,store,UUID.randomUUID(),new ScheduleWrite(0L,UUID.randomUUID(),template.id(),DATE,"scheduled"))).isInstanceOf(WorkforceException.class).extracting("code").isEqualTo("WORKFORCE_SCHEDULE_STORE_ASSIGNMENT");
+    }
     @Test void disabledEmployeeCannotStartOrReceiveNewSchedulesButCanFinishExistingSession(){
         var template=shift(store,"none");var first=schedule(store,template,DATE);var next=schedule(store,template,DATE.plusDays(1));punch(first,"IN");
         jdbc.update("update workforce_employees set enabled=false,version=version+1 where tenant_id=? and id=?",tenant,employee);

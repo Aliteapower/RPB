@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { EntryIdentity, TenantEntry } from './types';
 import TenantNameQr from './TenantNameQr.vue';
 const props = defineProps<{
     entry: TenantEntry;
     identity: EntryIdentity;
-}>(), { t } = useI18n(), feedback = ref('');
+}>(), { t,te } = useI18n(), feedback = ref('');
+const title=computed(()=>{const key=`tenantEntryLinks.entries.${props.entry.key}.title`;return t(te(key)?key:props.entry.titleKey||key)});
+const description=computed(()=>{const key=`tenantEntryLinks.entries.${props.entry.key}.description`;return t(te(key)?key:props.entry.descriptionKey||key)});
 let generation = 0;
 watch(() => props.entry.url, () => { generation++; feedback.value = ''; });
 onUnmounted(() => generation++);
@@ -25,16 +27,16 @@ catch {
     <header>
       <div>
         <span class="entry-audience">{{ t(`tenantEntryLinks.audiences.${entry.audience}`) }}</span>
-        <h3>{{ t(`tenantEntryLinks.entries.${entry.key}.title`) }}</h3>
+        <h3>{{ title }}</h3>
       </div>
       <span class="entry-badge" :class="{ 'is-active': entry.available }">
         {{ t(entry.available ? 'tenantEntryLinks.available' : 'tenantEntryLinks.unavailable') }}
       </span>
     </header>
-    <p class="entry-description">{{ t(`tenantEntryLinks.entries.${entry.key}.description`) }}</p>
+    <p class="entry-description">{{ description }}</p>
     <template v-if="entry.available">
       <label class="entry-url">
-        <span class="sr-only">{{ t(`tenantEntryLinks.entries.${entry.key}.title`) }} URL</span>
+        <span class="sr-only">{{ title }} URL</span>
         <input :value="entry.url" readonly spellcheck="false">
       </label>
       <div class="entry-actions">
@@ -45,7 +47,7 @@ catch {
       <TenantNameQr
         :value="entry.url"
         :tenant-name="identity.tenantName"
-        :caption="`${identity.storeName} · ${t(`tenantEntryLinks.entries.${entry.key}.title`)}`"
+        :caption="`${identity.storeName} · ${title}`"
         :file-name="`${identity.tenantCode}-${identity.storeCode}-${entry.key}.png`"
       />
     </template>
