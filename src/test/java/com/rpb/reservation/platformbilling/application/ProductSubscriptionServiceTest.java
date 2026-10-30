@@ -232,6 +232,28 @@ class ProductSubscriptionServiceTest {
     }
 
     @Test
+    void inactiveStoreCannotRenewAndItsPreservedItemDoesNotEnterOtherStoreAggregate() {
+        BillableStore branch = new BillableStore(UUID.randomUUID(), "branch", "Branch");
+        items.addStore(branch);
+        var purchased = service.purchase(TENANT_ID, durationCommand("inactive-purchase", "monthly", 1, null, null), OPERATOR).subscription();
+        var branchItem = purchased.items().stream().filter(i -> i.storeId().equals(branch.storeId())).findFirst().orElseThrow();
+        var mainItem = purchased.items().stream().filter(i -> !i.storeId().equals(branch.storeId())).findFirst().orElseThrow();
+        items.stores.remove(branch);
+        assertThatThrownBy(() -> service.renewItem(TENANT_ID, purchased.id(), branchItem.id(),
+            durationCommand("inactive-denied", "monthly", 1, null, branchItem.version()), OPERATOR))
+            .hasMessageContaining(PlatformBillingServiceErrorCode.SUBSCRIPTION_ITEM_NOT_FOUND.name());
+        var renewed = service.renewItem(TENANT_ID, purchased.id(), mainItem.id(),
+            durationCommand("active-only-renew", "monthly", 2, null, mainItem.version()), OPERATOR).subscription();
+        assertThat(renewed.amount()).isEqualByComparingTo("256.00");
+        assertThat(renewed.items()).filteredOn(i -> i.id().equals(branchItem.id())).containsExactly(branchItem);
+        items.addStore(branch);
+        var restored = service.renewItem(TENANT_ID, purchased.id(), mainItem.id(),
+            durationCommand("restored-recount", "monthly", 1, null, 1), OPERATOR).subscription();
+        assertThat(restored.amount()).isEqualByComparingTo("256.00");
+        assertThat(restored.items()).filteredOn(i -> i.id().equals(branchItem.id())).containsExactly(branchItem);
+    }
+
+    @Test
     void renewItemRejectsUnknownItemAndStaleItemVersion() {
         ProductSubscription purchased = service.purchase(
             TENANT_ID,

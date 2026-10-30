@@ -40,6 +40,8 @@ public class PlatformTenantAdminAccountRepository {
         }
         ensureTenantAdminRole(accountId);
         ensurePermission(accountId, TENANT_ADMIN_MANAGE);
+        ensurePermission(accountId, "workforce.view");
+        ensurePermission(accountId, "workforce.admin.manage");
         AppGateRequiredPermission.DAILY_LEDGER_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
         AppGateRequiredPermission.WALLET_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));
         AppGateRequiredPermission.WINE_STORAGE_ADMIN_PERMISSIONS.forEach(permission -> ensurePermission(accountId, permission));

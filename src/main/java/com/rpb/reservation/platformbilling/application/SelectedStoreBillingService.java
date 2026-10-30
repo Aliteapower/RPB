@@ -24,6 +24,7 @@ public class SelectedStoreBillingService {
     }
     @Transactional
     public ProductSubscriptionMutationResult purchase(UUID tenant,ProductSubscriptionCommand c,PlatformBillingOperator operator) {
+        subscriptions.lockTenantBilling(tenant);
         var selected=selected(tenant,c);
         return commands.run(tenant,"wallet.purchase",c.idempotencyKey(),c,()->{
             if(subscriptions.findByTenantIdAndAppKey(tenant,"wallet").isPresent())throw error(PlatformBillingServiceErrorCode.SUBSCRIPTION_CONFLICT);
@@ -37,6 +38,7 @@ public class SelectedStoreBillingService {
     @Transactional
     public ProductSubscriptionMutationResult addStores(UUID tenant,UUID id,ProductSubscriptionCommand c,PlatformBillingOperator operator) {return mutate(tenant,id,c,operator,true);}
     private ProductSubscriptionMutationResult mutate(UUID tenant,UUID id,ProductSubscriptionCommand c,PlatformBillingOperator operator,boolean add) {
+        subscriptions.lockTenantBilling(tenant);
         var selected=selected(tenant,c);String operation=add?"wallet.add_stores":"wallet.renew";
         return commands.run(tenant,operation,c.idempotencyKey(),Map.of("id",id,"command",c),()->{
             commands.lock(tenant,id);var s=current(tenant,id);
@@ -52,7 +54,8 @@ public class SelectedStoreBillingService {
                 var p=period(item.currentPeriodEnd(),c);
                 items.updateStoreItem(new ProductSubscriptionItemUpdate(tenant,id,item.id(),c.billingCycle(),"active",p.periodStart(),p.periodEnd(),q.unitAmount(),amounts.get(n),"SGD",c.paymentNote(),item.version()));
             }
-            var all=items.listByTenantId(tenant).stream().filter(i->i.subscriptionId().equals(id) && "active".equals(i.status())).toList();
+            var activeStoreIds=items.listActiveStores(tenant).stream().map(BillableStore::storeId).collect(java.util.stream.Collectors.toSet());
+            var all=items.listByTenantId(tenant).stream().filter(i->i.subscriptionId().equals(id) && "active".equals(i.status()) && activeStoreIds.contains(i.storeId())).toList();
             OffsetDateTime start=all.stream().map(ProductSubscriptionItem::currentPeriodStart).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElseThrow();
             OffsetDateTime end=all.stream().map(ProductSubscriptionItem::currentPeriodEnd).filter(Objects::nonNull).max(Comparator.naturalOrder()).orElseThrow();
             var aggregate=subscriptions.update(new ProductSubscriptionUpdate(tenant,id,c.billingCycle(),"active",start,end,all.stream().map(ProductSubscriptionItem::amount).reduce(BigDecimal.ZERO,BigDecimal::add),"SGD",c.paymentNote(),operator.userId(),s.version()));
@@ -61,6 +64,7 @@ public class SelectedStoreBillingService {
     }
     @Transactional
     public ProductSubscriptionMutationResult renewItem(UUID tenant,UUID id,UUID itemId,ProductSubscriptionCommand c,PlatformBillingOperator operator) {
+        subscriptions.lockTenantBilling(tenant);
         if(c==null)throw error(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         return commands.run(tenant,"wallet.renew_item",c.idempotencyKey(),Map.of("id",id,"itemId",itemId,"command",c),()->{
         commands.lock(tenant,id);var s=current(tenant,id);var item=items.findByTenantSubscriptionAndId(tenant,id,itemId).orElseThrow(()->error(PlatformBillingServiceErrorCode.SUBSCRIPTION_ITEM_NOT_FOUND));

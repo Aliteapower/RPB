@@ -340,6 +340,7 @@ function apiErrorText(error: unknown): string {
             <label>
               <span>{{ gt('generated.tenant-admin-profile.007') }}</span>
               <input v-model.trim="form.displayName" required />
+              <small>{{ locale.startsWith('en') ? 'Store name and public address apply to this store only.' : '门店名称和公共地址仅影响本店。' }}</small>
             </label>
             <label>
               <span>{{ gt('generated.tenant-admin-profile.008') }}</span>
@@ -348,6 +349,7 @@ function apiErrorText(error: unknown): string {
             <label>
               <span>{{ gt('generated.tenant-admin-profile.009') }}</span>
               <input v-model.trim="form.principalName" />
+              <small>{{ locale.startsWith('en') ? 'The principal and contact phone are shared by stores of this operating entity.' : '负责人及联系电话由本经营主体下门店共享。' }}</small>
             </label>
             <CountryPhoneField
               v-model="form.contactPhone"
@@ -357,6 +359,7 @@ function apiErrorText(error: unknown): string {
             <label class="wide-field">
               <span>{{ gt('generated.tenant-admin-profile.011') }}</span>
               <input v-model.trim="form.address" />
+              <small>{{ locale.startsWith('en') ? 'Public address for this store only; shared with clock location settings.' : '仅修改本店公共地址，与门店打卡定位设置共用同一地址。' }}</small>
             </label>
           </div>
         </section>
@@ -404,6 +407,7 @@ function apiErrorText(error: unknown): string {
           <div class="logo-control">
             <div class="section-heading">
               <h2>{{ gt('generated.tenant-admin-profile.021') }}</h2>
+              <p>{{ locale.startsWith('en') ? 'This logo is shared across all stores in this tenant.' : '此 Logo 由本租户所有门店共享，修改后影响整个租户。' }}</p>
             </div>
             <input
               ref="logoFileInput"

@@ -1,0 +1,9 @@
+import {onBeforeUnmount} from 'vue'
+import {usePhasePage} from './phasePage'
+import {usePayrollText} from './payrollText'
+import {useWorkforceText} from './text'
+import {usePhaseText} from './phaseText'
+import {WorkforceApiError} from './api'
+import {useReportText} from './reportText'
+export function usePayrollPage(){const {q}=useReportText(),page=usePhasePage(),{r,issue}=usePayrollText(),{error}=useWorkforceText(),{phaseError}=usePhaseText();let revision=0;onBeforeUnmount(()=>revision++);function message(e:unknown){if(e instanceof WorkforceApiError){const map:Record<string,string>={WORKFORCE_PAYROLL_BUSY:r('computeBusy'),WORKFORCE_REPORT_CHANGED:q('changed'),WORKFORCE_REPORT_LIMIT:q('limit'),WORKFORCE_PAYROLL_UNSUPPORTED:r('unsupported'),WORKFORCE_CPF_PARTIAL_MONTH:r('partialCpf'),WORKFORCE_PAYROLL_BLOCKED:r('blocked'),WORKFORCE_PAYROLL_SOURCE_CHANGED:r('sourceChanged'),WORKFORCE_PAYROLL_OVERPAYMENT:r('overpayment'),WORKFORCE_PAYROLL_PROFILE_LOCKED:r('profileLocked')};if(map[e.code])return map[e.code]}return phaseError(e)||error(e)}async function load<T>(request:()=>Promise<T>,accept:(data:T)=>void){const rev=++revision,store=page.store.value;page.loading.value=true;page.failure.value='';try{const data=await request();if(rev===revision&&page.current()&&store===page.store.value)accept(data)}catch(e){if(rev===revision&&page.current())page.failure.value=message(e)}finally{if(rev===revision&&page.current())page.loading.value=false}}async function write(request:()=>Promise<unknown>,done?:()=>void|Promise<void>){if(page.busy.value)return;page.busy.value=true;page.failure.value='';page.notice.value='';const store=page.store.value;try{await request();if(page.current()&&store===page.store.value){page.notice.value=r('saved');await done?.()}}catch(e){if(page.current()&&store===page.store.value)page.failure.value=message(e)}finally{if(page.current())page.busy.value=false}}return {...page,r,issue,load,write,message}}
+

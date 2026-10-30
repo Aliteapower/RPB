@@ -19,7 +19,7 @@ class ProductLineEntryRegistryTest {
         String router = Files.readString(Path.of("src/router/index.ts"));
         // Wallet routes are registered through the module; do not require moving them back into the root.
         assertThat(router).contains("import { walletRoutes } from '../modules/wallet/routes'", "...walletRoutes");
-        String mountedRoutes = router + Files.readString(Path.of("src/modules/wallet/routes.ts"));
+        String mountedRoutes = router + Files.readString(Path.of("src/modules/wallet/routes.ts")) + Files.readString(Path.of("src/modules/workforce/routes.ts"));
         assertThat(ProductLineEntryRegistry.entries()).extracting(ProductLineEntryRegistry.Entry::appKey).doesNotHaveDuplicates();
         assertThat(ProductLineEntryRegistry.entries()).extracting(ProductLineEntryRegistry.Entry::value).doesNotHaveDuplicates();
         for (var entry : ProductLineEntryRegistry.entries()) {

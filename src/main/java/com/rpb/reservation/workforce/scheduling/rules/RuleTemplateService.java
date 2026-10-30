@@ -1,0 +1,10 @@
+package com.rpb.reservation.workforce.scheduling.rules;
+import com.rpb.reservation.workforce.application.*;import com.rpb.reservation.workforce.domain.WorkforceException;import com.rpb.reservation.walkin.api.CurrentActor;import java.util.*;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;
+@Service @Transactional(readOnly=true)
+public class RuleTemplateService {
+ public record Page(List<RuleTemplateRepository.Template> items,boolean headOffice){}
+ public record Write(Long expectedVersion,String name,Boolean enabled,AttendanceRules rules){}
+ private final WorkforceAccess access;private final RuleTemplateRepository repository;private final WorkforceAudit audit;public RuleTemplateService(WorkforceAccess access,RuleTemplateRepository repository,WorkforceAudit audit){this.access=access;this.repository=repository;this.audit=audit;}
+ public Page list(CurrentActor actor,UUID store){access.enter(actor,store);access.manage(actor,store);return new Page(repository.list(actor.tenantId()),access.isHeadOffice(actor));}
+ @Transactional public RuleTemplateRepository.Template save(CurrentActor actor,UUID store,UUID id,Write c){access.sourceWrite(actor);access.enter(actor,store);access.headOffice(actor);if(id==null||c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.name()==null||c.name().isBlank()||c.name().trim().length()>100||c.enabled()==null)throw WorkforceException.invalid();AttendanceRules.validate(c.rules(),1440);repository.lock(actor.tenantId(),id);var old=repository.list(actor.tenantId()).stream().filter(t->t.id().equals(id)).findFirst().orElse(null);if(old!=null&&old.name().equals(c.name().trim())&&old.enabled()==c.enabled()&&old.rules().equals(c.rules())&&(old.version()==c.expectedVersion()||old.version()==c.expectedVersion()+1))return old;if((old==null?0:old.version())!=c.expectedVersion())throw WorkforceException.conflict();var next=new RuleTemplateRepository.Template(id,c.name().trim(),c.enabled(),c.expectedVersion()+1,c.rules());repository.save(actor.tenantId(),next);audit.changed(actor,store,"attendance-rule.save",id,old,next);return next;}
+}

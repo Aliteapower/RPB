@@ -82,7 +82,8 @@ const hasReservationQueue = computed(() =>
 const ledgerEntry = computed(() => findVisibleApp('daily_ledger'))
 const walletEntry = computed(() => findVisibleApp('wallet'))
 const wineEntry = computed(() => findVisibleApp('wine_storage'))
-const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined || walletEntry.value !== undefined || wineEntry.value !== undefined)
+const workforceEntry = computed(() => findVisibleApp('workforce'))
+const hasVisibleProductLine = computed(() => hasReservationQueue.value || paymentEntry.value !== undefined || ledgerEntry.value !== undefined || walletEntry.value !== undefined || wineEntry.value !== undefined || workforceEntry.value !== undefined)
 const reservationQueuePermissions = computed(() => reservationQueueEntry.value?.permissions ?? [])
 const paymentPermissions = computed(() => paymentEntry.value?.permissions ?? [])
 const canCheckInReservation = computed(() =>
@@ -98,7 +99,7 @@ const canCreatePaymentIntent = computed(() =>
   hasPaymentPermission('payment.intent.create')
 )
 const hasVisibleOperation = computed(
-  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value || ledgerEntry.value !== undefined || walletEntry.value !== undefined || wineEntry.value !== undefined
+  () => canCheckInReservation.value || canCallQueueTicket.value || canSeatCalledQueueTicket.value || canCreatePaymentIntent.value || ledgerEntry.value !== undefined || walletEntry.value !== undefined || wineEntry.value !== undefined || workforceEntry.value !== undefined
 )
 const appStatusLabel = computed(() => {
   if (visibleAppsLoading.value || isLoading.value) {
@@ -137,6 +138,9 @@ const paymentQuickPayRoute = computed(() => ({
   }
 }))
 const operationToolbarItems = computed<OperationToolbarItem[]>(() => compactToolbarItems([
+  workforceEntry.value
+    ? {id:'workforce',labelKey:'workforce.entry',descriptionKey:'workforce.description',symbolKey:'staffHome.actions.checkIn.symbol',to:workforceEntry.value.entryRoute,tone:'success'}
+    : null,
   wineEntry.value
     ? {id:'wine_storage',labelKey:'wineStorage.entry',descriptionKey:'wineStorage.description',symbolKey:'wallet.symbol',to:wineEntry.value.entryRoute,tone:'success'}
     : null,
@@ -314,7 +318,7 @@ const overviewHint = computed(() => {
   }
 
   if (!hasReservationQueue.value) {
-    return walletEntry.value ? t('wallet.description') : ledgerEntry.value ? t('dailyLedger.description') : paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
+    return workforceEntry.value ? t('workforce.description') : walletEntry.value ? t('wallet.description') : ledgerEntry.value ? t('dailyLedger.description') : paymentEntry.value ? t('staffHome.hints.paymentOnly') : t('staffHome.hints.noProductLine')
   }
 
   if (!overview.value) {

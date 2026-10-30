@@ -13,6 +13,7 @@ import {
   addSubscriptionStores
 } from '../api/platformProductLineBillingApi'
 import { listTenantStores, type PlatformStore } from '../api/platformApi'
+import PlatformSubscriptionHistory from '../components/platform/PlatformSubscriptionHistory.vue'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
 import { walletBillingWarning } from '../components/platform/storeBillingEligibility'
 import type {
@@ -24,7 +25,7 @@ import type {
 import { useAuthSessionStore } from '../stores/authSession'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthSessionStore()
 const tenantId = computed(() => String(route.params.tenantId || ''))
 const productLines = ref<PlatformProductLine[]>([])
@@ -66,7 +67,8 @@ const selectedStoreItem = computed(() => {
   if (storeItemRows.value.length === 0) {
     return null
   }
-  return storeItemRows.value.find(item => item.id === selectedStoreItemId.value) ?? storeItemRows.value[0]
+  const eligible = storeItemRows.value.filter(canRenewStoreItem)
+  return eligible.find(item => item.id === selectedStoreItemId.value) ?? eligible[0] ?? null
 })
 const singleStoreRenewalMode = computed(() => (
   selectedSubscription.value !== null &&
@@ -162,7 +164,7 @@ async function submitSelectedProductMutation(): Promise<void> {
 
 async function renewSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
   const item = selectedStoreItem.value
-  if (!item) {
+  if (!item || !canRenewStoreItem(item)) {
     savedText.value = ''
     errorText.value = t('platform.billing.storeItems.empty')
     return
@@ -222,11 +224,12 @@ function newIdempotencyKey(): string {
 }
 
 function selectStoreItem(item: TenantProductSubscriptionItem): void {
+  if (!canRenewStoreItem(item)) return
   selectedStoreItemId.value = item.id
 }
 
 function ensureSelectedStoreItem(subscription = selectedSubscription.value): void {
-  const rows = billingItemsForSubscription(subscription)
+  const rows = billingItemsForSubscription(subscription).filter(canRenewStoreItem)
   if (rows.length === 0) {
     selectedStoreItemId.value = null
     return
@@ -271,6 +274,10 @@ function formatDateTime(value: string | null): string {
 
 function formatAmount(value: number): string {
   return Number(value || 0).toFixed(2)
+}
+
+function canRenewStoreItem(item: TenantProductSubscriptionItem): boolean {
+  return tenantStores.value.some(store => store.id === item.storeId && store.status === 'active')
 }
 
 function storeItemName(item: TenantProductSubscriptionItem): string {
@@ -367,6 +374,7 @@ function apiErrorText(error: unknown): string {
 
         <form class="edit-panel" @submit.prevent="submitSelectedProductMutation">
           <h2>{{ $t('platform.billing.form.title') }}</h2>
+          <p class="muted-text">{{ locale.startsWith('en') ? 'Quotes and current totals count active stores. Disabling a product feature does not stop billing or issue a refund. Inactive stores retain purchase records and periods but cannot renew individually. Reactivation does not purchase or extend a period. Current totals are not refunds or bank receipts.' : '报价与当前汇总按活跃门店计算。关闭产品功能不会自动停账或退款；停用店保留已购记录及原期间，但不能单店续费，恢复也不会自动购买或延长期间。当前汇总不代表退款或银行实收。' }}</p>
           <label>
             <span>{{ $t('platform.billing.form.productLine') }}</span>
             <select v-model="form.appKey">
@@ -388,11 +396,12 @@ function apiErrorText(error: unknown): string {
                 type="button"
                 class="store-item-row"
                 :class="{ selected: selectedStoreItem?.id === item.id }"
+                :disabled="!canRenewStoreItem(item) || saving"
                 @click="selectStoreItem(item)"
               >
                 <div>
                   <strong>{{ storeItemName(item) }}</strong>
-                  <small>{{ item.storeCode || '-' }} / {{ storeItemStatus(item) }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
+                  <small>{{ item.storeCode || '-' }} / {{ canRenewStoreItem(item) ? storeItemStatus(item) : (locale.startsWith('en') ? 'Inactive store — renewal unavailable' : '停用门店，不能续费') }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
                 </div>
                 <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
               </button>
@@ -442,6 +451,7 @@ function apiErrorText(error: unknown): string {
             {{ saving ? $t('common.actions.saving') : primaryActionLabel }}
           </button>
         </form>
+        <PlatformSubscriptionHistory v-if="selectedSubscription" :key="`${tenantId}:${selectedSubscription.id}:${selectedSubscription.version}`" :tenant-id="tenantId" :subscription-id="selectedSubscription.id" />
       </div>
     </section>
   </main>

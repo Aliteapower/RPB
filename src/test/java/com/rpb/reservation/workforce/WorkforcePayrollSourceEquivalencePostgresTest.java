@@ -1,0 +1,110 @@
+package com.rpb.reservation.workforce;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rpb.reservation.workforce.application.*;
+import com.rpb.reservation.workforce.approval.*;
+import com.rpb.reservation.workforce.attendance.AttendanceDtos.*;
+import com.rpb.reservation.workforce.calendar.*;
+import com.rpb.reservation.workforce.documents.*;
+import com.rpb.reservation.workforce.leave.*;
+import com.rpb.reservation.workforce.payroll.*;
+import com.rpb.reservation.workforce.scheduling.SchedulingDtos.*;
+import com.rpb.reservation.workforce.statutory.StatutoryDtos.CpfProfile;
+import com.rpb.reservation.workforce.workmode.*;
+import static com.rpb.reservation.workforce.payroll.PayrollDtos.*;
+import static com.rpb.reservation.workforce.workmode.WorkModeDtos.*;
+import static org.assertj.core.api.Assertions.*;
+import java.sql.Timestamp;
+import java.time.*;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+
+/** Database-backed old/new oracle: compare every captured field, including all hash inputs. */
+class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPostgresTest {
+ final YearMonth month=YearMonth.of(2026,10);
+ WorkforceJson json(){return new WorkforceJson(new ObjectMapper().findAndRegisterModules());}
+ PayrollSources.Capture equivalent(WorkModeResolver resolver,List<LineInput> inputs){
+  var json=json();var approvalRepository=new ApprovalRepository(jdbc,json);
+  var modes=resolver==null?null:new WorkModeClock(new WorkModeRepository(jdbc,json),resolver,time);
+  var approvalSources=new ApprovalSources(attendance,new LeaveRepository(jdbc),new CalendarRepository(jdbc),json,time,modes);
+  var oldSources=new LegacyPayrollSources(payRepository,configs,repository,schedules,approvalRepository,approvalSources,json,resolver);
+  var newSources=new PayrollSources(payRepository,configs,repository,schedules,approvalRepository,approvalSources,json,resolver);
+  var expected=oldSources.capture(tenant,company,month,inputs);var actual=newSources.capture(tenant,company,month,inputs);
+  assertThat(actual).as("complete Capture, including fingerprint, employee/profile/input/source/issue order").isEqualTo(expected);
+  return actual;
+ }
+ void plan(Rule rule,CpfProfile cpf){
+  var p=configs.findProfile(tenant,profile).orElseThrow();
+  configs.saveProfile(tenant,new PayProfile(p.id(),p.companyId(),p.employeeId(),p.employeeName(),p.effectiveFrom(),p.templateId(),p.templateVersion(),rule,cpf,p.version()+1,p.payment(),p.cdac()));
+ }
+ Schedule scheduled(UUID shop,LocalDate date,String name){
+  time.at(date.atStartOfDay(ZoneId.of("Asia/Singapore")).toInstant().toString());
+  var shift=shifts.save(admin,shop,UUID.randomUUID(),new ShiftWrite(0L,name,"09:00","17:00",false,"none",0,0,0,0,false,true));
+  return roster.save(admin,shop,UUID.randomUUID(),new ScheduleWrite(0L,employee,shift.id(),date,"scheduled"));
+ }
+ void leave(UUID shop,Schedule schedule,boolean paid,String status,int startHour){
+  UUID type=UUID.randomUUID();jdbc.update("insert into workforce_leave_types(tenant_id,id,store_id,name,paid,enabled,version) values(?,?,?,?,?,true,1)",tenant,type,shop,paid?"Paid":"Unpaid",paid);
+  var from=schedule.startAt().plusSeconds(startHour*3600L);
+  jdbc.update("insert into workforce_leaves(id,tenant_id,store_id,schedule_id,employee_id,type_id,type_name,paid,start_at,end_at,reason,status,applicant_id,version) values(?,?,?,?,?,?,?,?,?,?,'Synthetic leave',?,?,1)",UUID.randomUUID(),tenant,shop,schedule.id(),employee,type,paid?"Paid":"Unpaid",paid,Timestamp.from(from),Timestamp.from(from.plusSeconds(3600)),status,employeeAccount);
+ }
+ @Test void complexMonthlySourcesMatchAcrossCorrectionAndPrEvidenceTransitions(){
+  var worked=completed();var cancelled=scheduled(store,LocalDate.of(2026,10,29),"Cancelled source");
+  roster.save(admin,store,cancelled.id(),new ScheduleWrite(1L,employee,cancelled.shiftId(),cancelled.workDate(),"cancelled"));
+  var leaveDay=scheduled(sibling,LocalDate.of(2026,10,30),"Mixed leave source");
+  leave(sibling,leaveDay,true,"approved",0);leave(sibling,leaveDay,false,"cancel_requested",2);leave(sibling,leaveDay,true,"rejected",4);
+  new CalendarRepository(jdbc).save(tenant,store,new CalendarDtos.CalendarEvent(UUID.randomUUID(),worked.workDate(),"public_holiday","Special",true,1));
+  var docs=proxy(new EmployeeDocumentService(access,repository,new DocumentRepository(jdbc),new WorkforceAudit(logs,new ObjectMapper().findAndRegisterModules())));
+  var type=docs.types(admin,store).getFirst().id();var prDate=LocalDate.of(2025,10,1);
+  var document=docs.save(admin,store,employee,UUID.randomUUID(),new DocumentDtos.Write(0L,type,"S0000000A",LocalDate.of(2030,1,1),"Synthetic",false,"Synthetic Worker",prDate.minusDays(10),prDate));
+  plan(new Rule("monthly","3000","8","44",true,"1.5",List.of()),new CpfProfile("spr",LocalDate.of(1990,1,1),prDate,"GG","",document.id()));
+  var inputs=List.of(new LineInput(employee,7,"22","20",true,true,List.of(new Item("One off","ow_additional","75")),"Reviewed"));
+  time.at("2026-11-02T01:00:00Z");
+  var pending=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(worked.id(),2L,worked.startAt(),worked.endAt().minusSeconds(1800),List.of(),false,"Pending correction"));
+  var first=equivalent(null,inputs);assertThat(first.stores()).contains(store,sibling);assertThat(first.lines().getFirst().specialDays()).isTrue();assertThat(first.lines().getFirst().issues()).contains("SOURCE_PENDING","APPROVAL_STALE");
+  assertThat(first.lines().getFirst().sources()).extracting(SourceRef::scheduleId).doesNotContain(cancelled.id());
+  assertThat(first.lines().getFirst().sources()).filteredOn(s->s.scheduleId().equals(leaveDay.id())).singleElement().satisfies(s->{assertThat(s.paidLeaveSeconds()).isEqualTo(3600);assertThat(s.unpaidLeaveSeconds()).isEqualTo(3600);});
+  corrections.decide(admin,store,pending.id(),new DecisionWrite(1L,"rejected","Keep original"));equivalent(null,inputs);
+  var accepted=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(worked.id(),2L,worked.startAt(),worked.endAt().minusSeconds(1800),List.of(),false,"Accepted correction"));
+  corrections.decide(admin,store,accepted.id(),new DecisionWrite(1L,"approved","Corrected"));var corrected=equivalent(null,inputs);assertThat(corrected.fingerprint()).isNotEqualTo(first.fingerprint());
+  jdbc.update("update workforce_employee_documents set pr_effective_on=? where tenant_id=? and id=?",prDate.minusYears(1),tenant,document.id());
+  assertThat(equivalent(null,inputs).lines().getFirst().issues()).contains("CPF_DOCUMENT_REVIEW_REQUIRED");
+  jdbc.update("update workforce_employee_documents set deleted_at=now() where tenant_id=? and id=?",tenant,document.id());equivalent(null,inputs);
+  jdbc.update("update stores set currency='USD' where tenant_id=? and id=?",tenant,sibling);
+  assertThat(equivalent(null,inputs).lines().getFirst().issues()).contains("UNSUPPORTED_STORE");
+ }
+ @Test void manualAutomaticAndFixedPlansMatchWithCrossMonthOvertimeContext(){
+  // Backdate this synthetic employee's entire company/store membership consistently.
+  jdbc.update("update workforce_employees set hire_date='2026-09-01',company_effective_date='2026-09-01' where tenant_id=? and id=?",tenant,employee);
+  jdbc.update("update workforce_company_history set effective_date='2026-09-01' where tenant_id=? and employee_id=?",tenant,employee);
+  jdbc.update("update workforce_work_stores set started_on='2026-09-01' where tenant_id=? and employee_id=?",tenant,employee);
+  jdbc.update("update workforce_pay_profiles set effective_from='2026-09-01',snapshot=jsonb_set(snapshot,'{effectiveFrom}','\"2026-09-01\"'::jsonb) where tenant_id=? and id=?",tenant,profile);
+  var context=scheduled(store,LocalDate.of(2026,9,30),"Prior month context");var payable=scheduled(sibling,LocalDate.of(2026,10,1),"Payable month");
+  attendance.save(tenant,new Session(UUID.randomUUID(),context.id(),employee,store,context.startAt(),context.endAt(),null,List.of(),false,1));
+  attendance.save(tenant,new Session(UUID.randomUUID(),payable.id(),employee,sibling,payable.startAt(),payable.endAt(),null,List.of(),false,1));
+  time.at("2026-11-02T01:00:00Z");
+  var cpf=new CpfProfile("foreign",null,null,"GG","");var manual=new Rule("monthly","3000","8","44",true,"1.5",List.of());plan(manual,cpf);
+  var inputs=List.of(new LineInput(employee,3,"22","21",true,false,List.of(),"Manual"));
+  var first=equivalent(null,inputs);assertThat(first.lines().getFirst().sources()).extracting(SourceRef::scheduleId).containsExactly(context.id(),payable.id());
+  assertThat(first.lines().getFirst().sources()).extracting(SourceRef::payable).containsExactly(false,true);
+  plan(new Rule("monthly","3000","8","44",true,"1.5",List.of(),new Generation("attendance",List.of(1,2,3,4,5))),cpf);
+  var auto=equivalent(null,inputs);assertThat(auto.lines().getFirst().issues()).contains("AUTO_SCHEDULE_MISSING");
+  plan(new Rule("monthly","3000","8","44",false,"1.5",List.of(),new Generation("fixed",List.of(1,2,3,4,5))),cpf);
+  var fixed=equivalent(null,inputs);assertThat(fixed.lines().getFirst().sources()).isEmpty();assertThat(fixed.lines().getFirst().input().workingDays()).isEqualTo("1");
+ }
+ @Test void workModeSnapshotsAndUnpunchedDatedAssignmentsMatchWithoutGeometryDependencies(){
+  var worked=completed();var home=scheduled(sibling,LocalDate.of(2026,10,29),"Home without punch");var free=scheduled(store,LocalDate.of(2026,10,30),"Free without punch");
+  var modes=new WorkModeRepository(jdbc,json());var resolver=new WorkModeResolver(modes);
+  var onsiteAssignment=new Assignment(UUID.randomUUID(),employee,LocalDate.of(2026,10,1),"onsite","personal",null,0,1);
+  modes.insert(tenant,onsiteAssignment);modes.insert(tenant,new Assignment(UUID.randomUUID(),employee,home.workDate(),"home","personal",null,0,2));modes.insert(tenant,new Assignment(UUID.randomUUID(),employee,free.workDate(),"free","personal",null,0,3));modes.insert(tenant,new Assignment(UUID.randomUUID(),employee,LocalDate.of(2026,11,1),"field","personal",null,0,4));
+  modes.site(tenant,store,new Site(new Point("Current site",1d,2d,100d),4));
+  var addressId=UUID.randomUUID();modes.insertHome(tenant,new HomeAddress(addressId,employee,new Point("Home",1d,2d,50d),LocalDate.of(2026,10,1),"pending",1,employeeAccount,null,null,time.instant()));
+  modes.decide(tenant,addressId,adminId,new HomeDecision(1L,"approved","Approved"));
+  var session=attendance.bySchedule(tenant,worked.id()).orElseThrow();var historical=new ClockPolicy("onsite",onsiteAssignment.id(),1,new Point("Historical site",3d,4d,60d),null,0,2L);
+  attendance.save(tenant,new Session(session.id(),session.scheduleId(),session.employeeId(),session.storeId(),session.inAt(),session.outAt(),session.breakStartedAt(),session.breaks(),session.overrideBreak(),session.version()+1,session.breakStartedRuleId(),historical));
+  time.at("2026-11-02T01:00:00Z");var first=equivalent(resolver,List.of());assertThat(first.lines().getFirst().issues()).contains("WORK_MODE_PAYROLL_MISMATCH");
+  var approvalSources=new ApprovalSources(attendance,new LeaveRepository(jdbc),new CalendarRepository(jdbc),json(),time,new WorkModeClock(modes,resolver,time));
+  var bulk=approvalSources.readAll(tenant,sibling,List.of(home));assertThat(bulk.get(home.id())).isEqualTo(approvalSources.read(tenant,sibling,home));assertThat(bulk.get(home.id()).clockPolicy().point()).isNull();
+  modes.site(tenant,store,new Site(new Point("Moved site",10d,20d,150d),5));jdbc.update("update workforce_home_addresses set point=?::jsonb where tenant_id=? and id=?",json().write(new Point("Moved home",5d,6d,75d)),tenant,addressId);
+  assertThat(equivalent(resolver,List.of())).as("unpunched geometry and current site do not rewrite historical policy").isEqualTo(first);
+ }
+}

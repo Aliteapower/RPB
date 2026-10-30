@@ -5,7 +5,7 @@ export const tenantProductsZh = {
   enabled: '已开启', disabled: '已关闭', enable: '开启', disable: '关闭', saving: '保存中…', saved: '已保存',
   loadFailed: '加载失败，请刷新重试。', saveFailed: '保存失败，当前状态未更改，请刷新后重试。', accessDenied: '当前账号无权管理此门店产品线。',
   unavailable: '当前不可开启，请联系平台管理员检查开通状态。',
-  names: { payment:'收款',reservation_queue:'预订排队',wallet: '钱包积分', daily_ledger: '每日营业记录', wine_storage:'酒水寄存' },
+  names: { workforce:'员工考勤与薪资',payment:'收款',reservation_queue:'预订排队',wallet: '钱包积分', daily_ledger: '每日营业记录', wine_storage:'酒水寄存' },
   reasons: {
     APP_DISABLED: '平台已停用此产品，暂不可开启。', TENANT_APP_NOT_ENABLED: '租户尚未开通或已暂停此产品。',
     TENANT_APP_EXPIRED: '租户授权已到期，请联系平台管理员。', STORE_APP_NOT_ENABLED: '当前门店尚未开通或订阅已暂停。',
@@ -19,7 +19,7 @@ export const tenantProductsEn = {
   enabled: 'On', disabled: 'Off', enable: 'Turn on', disable: 'Turn off', saving: 'Saving…', saved: 'Saved',
   loadFailed: 'Could not load products. Refresh to try again.', saveFailed: 'Could not save. The current state has not changed. Refresh and try again.', accessDenied: 'Your account cannot manage products for this store.',
   unavailable: 'This product cannot be turned on. Contact the platform administrator to check access.',
-  names: { payment:'Payments',reservation_queue:'Reservations and queue',wallet: 'Wallet and points', daily_ledger: 'Daily ledger', wine_storage:'Bottle storage' },
+  names: { workforce:'Attendance & payroll',payment:'Payments',reservation_queue:'Reservations and queue',wallet: 'Wallet and points', daily_ledger: 'Daily ledger', wine_storage:'Bottle storage' },
   reasons: {
     APP_DISABLED: 'The platform has disabled this product.', TENANT_APP_NOT_ENABLED: 'This product is not enabled for the tenant or has been suspended.',
     TENANT_APP_EXPIRED: 'Tenant access has expired. Contact the platform administrator.', STORE_APP_NOT_ENABLED: 'This store has not purchased the product or its subscription is suspended.',

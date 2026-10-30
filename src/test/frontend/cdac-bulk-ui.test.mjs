@@ -1,0 +1,30 @@
+import {test,before,afterEach} from 'node:test'
+import assert from 'node:assert/strict'
+import {createRenderer,h,nextTick,ref} from 'vue'
+import {createI18n} from 'vue-i18n'
+import {createRouter,createMemoryHistory} from 'vue-router'
+import {validCdacBulk} from '../../../src/modules/workforce/cdacBulk.ts'
+import {statutoryPolicyValid,copyPolicyYear} from '../../../src/modules/workforce/statutoryPolicy.ts'
+const mounted=[],originalFetch=globalThis.fetch
+let ui={}
+function element(tag){const n={tag,props:{},children:[],addEventListener(){},removeEventListener(){},getRootNode(){return {}},style:{}};Object.defineProperty(n,'options',{get(){return nodes(n,x=>x.tag==='option')}});return n}
+const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))]
+const text=n=>(n.text||'')+(n.children||[]).map(text).join(' ')
+const renderer=createRenderer({createElement:element,createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[]},patchProp:(n,k,o,v)=>{n.props[k]=v;if(k==='value')n.value=v},insert:(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n?.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:n=>{const a=n.parent?.children||[];return a[a.indexOf(n)+1]||null}})
+const settle=async()=>{for(let i=0;i<30;i++){await Promise.resolve();await nextTick()}}
+const response=(data,status=200)=>({ok:status<400,status,json:async()=>data})
+
+
+
+
+before(async()=>{globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document={};ui.Dialog=(await import('../../../src/modules/workforce/components/CdacBulkDialog.vue')).default;ui.key=(await import('../../../src/modules/workforce/context.ts')).workforceKey;ui.api=(await import('../../../src/modules/workforce/api.ts')).workforceApi})
+afterEach(()=>{mounted.splice(0).forEach(a=>a.unmount());globalThis.fetch=originalFetch})
+async function mount(){const router=createRouter({history:createMemoryHistory(),routes:[{path:'/',component:{render:()=>h('div')}}]});await router.push('/');await router.isReady();const root=element('root'),app=renderer.createApp({render:()=>h(ui.Dialog,{companyId:'C',employees:[{id:'E1',name:'Employee 1'},{id:'E2',name:'Employee 2'}]})});app.use(router);app.use(createI18n({legacy:false,locale:'zh-CN',messages:{}}));app.provide(ui.key,{store:ref('A'),home:ref({headOffice:true}),current:()=>true,api:()=>ui.api('A')});app.mount(root);mounted.push(app);await settle();return root}
+const button=(root,label)=>nodes(root,n=>n.tag==='button'&&text(n).includes(label))[0]
+const field=(root,label,tag)=>nodes(nodes(root,n=>n.tag==='label'&&text(n).trim().startsWith(label))[0],n=>n.tag===tag)[0]
+const preview={fingerprint:'a'.repeat(64),month:'2026-11',ready:1,unchanged:0,blocked:1,rows:[{employeeId:'E1',employeeName:'Employee 1',sourceEffectiveFrom:'2026-01-01',previousStatus:'legacy',nextEffectiveFrom:null,status:'ready',reason:''},{employeeId:'E2',employeeName:'Employee 2',sourceEffectiveFrom:null,previousStatus:'legacy',nextEffectiveFrom:null,status:'blocked',reason:'PROFILE_MISSING'}]}
+const choose=async root=>{button(root,'全选筛选结果').props.onClick();field(root,'生效月份','input').props['onUpdate:modelValue']('2026-11');await settle()}
+test('bulk input validation requires evidence, valid month and selected employees',()=>{const c={companyId:'C',month:'2026-11',employeeIds:['E'],cdac:{status:'applicable',reference:''}};assert.equal(validCdacBulk(c),true);for(const change of [v=>v.employeeIds=[],v=>v.month='2026-13',v=>v.cdac.status='exempt',v=>v.cdac.status='manual',v=>v.employeeIds=['E','E']]){const bad=structuredClone(c);change(bad);assert.equal(validCdacBulk(bad),false)}})
+test('exemption needs reference before preview and selection changes invalidate it',async()=>{const writes=[];globalThis.fetch=async(url,opt)=>{writes.push(JSON.parse(opt.body));return response(preview)};const root=await mount();await choose(root);field(root,'CDAC处理方式','select').props['onUpdate:modelValue']('exempt');await settle();assert.equal(button(root,'预览影响').props.disabled,true);field(root,'CDAC核对／豁免依据','textarea').props['onUpdate:modelValue']('Reviewed exemption');await settle();button(root,'预览影响').props.onClick();await settle();assert.equal(writes.length,1);assert.equal(writes[0].cdac.reference,'Reviewed exemption');assert.match(text(root),/没有生效薪资方案/);assert.match(text(root),/2026-11-01/);field(root,'生效月份','input').props['onUpdate:modelValue']('2026-12');await settle();assert.equal(button(root,'确认保存可变更员工'),undefined)})
+test('network uncertainty retries the identical command and immutable payload',async()=>{const calls=[];let attempts=0;globalThis.fetch=async(url,opt)=>{if(String(url).endsWith('/preview'))return response(preview);calls.push({url,body:JSON.parse(opt.body)});if(attempts++===0)throw Error('offline');return response({preview,profiles:['NEW']})};const root=await mount();await choose(root);button(root,'预览影响').props.onClick();await settle();button(root,'确认保存可变更员工').props.onClick();await settle();assert.match(text(root),/不会重复生成方案/);assert.equal(nodes(root,n=>n.tag==='fieldset')[0].props.disabled,true);button(root,'重试本次保存').props.onClick();await settle();assert.equal(calls.length,2);assert.deepEqual(calls[0],calls[1]);assert.deepEqual(calls[0].body.selection.employeeIds,['E1','E2'])})
+test('stale preview requires preview again and no automatic retry',async()=>{globalThis.fetch=async(url)=>String(url).endsWith('/preview')?response(preview):response({code:'WORKFORCE_CDAC_BULK_CHANGED'},409);const root=await mount();await choose(root);button(root,'预览影响').props.onClick();await settle();button(root,'确认保存可变更员工').props.onClick();await settle();assert.match(text(root),/重新预览/);assert.equal(button(root,'确认保存可变更员工'),undefined);assert.equal(nodes(root,n=>n.tag==='fieldset')[0].props.disabled,false)})

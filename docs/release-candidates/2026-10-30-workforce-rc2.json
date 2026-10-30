@@ -1,0 +1,4227 @@
+{
+  "candidate": "workforce-20261030-rc2",
+  "baselineGitSha": "d92107a0746f053df4d8247c14cbe496f5054eb8",
+  "baselineBlobsVerified": 2966,
+  "productionBaselineFile": "production-before.json",
+  "included": [
+    {
+      "path": "src/i18n/locales/en-SG.ts",
+      "sha256": "a6c2e68452d319f00657fdca97c6e3048f3d6edb12acc1f70ca5ecc8dd584cfc",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/i18n/locales/zh-CN.ts",
+      "sha256": "93daffe3d7f11e7c73289a9f090c03f455348f4cef5496776b0c1639f210467b",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/appgate/application/AppGateService.java",
+      "sha256": "1f2e0e33bbb15590c953fbea96425748b53027f94a3fb324eb7d2e39a422e61d",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platform/application/PlatformTenantStructureService.java",
+      "sha256": "e7020a1dc595f83f2d8c42d16ac6e4982e8132a1faae8b167877fd6992fb8687",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platform/persistence/PlatformStoreAdminAccountRepository.java",
+      "sha256": "39ec347fff799b8135611ac87751b2402cce4d729cb5b94e1a9b3c2f37194740",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platform/persistence/PlatformTenantAdminAccountRepository.java",
+      "sha256": "e0dc0469c5329e095e6041541c28af173dc50a6d3037cd4ec438cfe806afee79",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platform/persistence/PlatformTenantStructureRepository.java",
+      "sha256": "f708896c9f92cbba183d46fb6e1198d5d08e5e020784b60d1f58078d3387ce92",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/application/ProductSubscriptionService.java",
+      "sha256": "9a9eb240113c98b07f7a6f14f786b5446939f2e9e7fe31054d34b349660ce8da",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/application/SelectedStoreBillingService.java",
+      "sha256": "ecfca724b422552013b40b1f4dc1476efc88ed960d25278e5922ae49d3028c16",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/JdbcProductSubscriptionEventRepository.java",
+      "sha256": "581b74556da7b8df98d51261e55d11be423b420bb3e8fd13f0312ef06ad1de8e",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/JdbcProductSubscriptionItemRepository.java",
+      "sha256": "e5a8df733153fd45238ad31c8e8c0a5d1e0c235212dc98236c526f79530bfe19",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/JdbcProductSubscriptionRepository.java",
+      "sha256": "ccff9ca5e2e92c845da5132bb4076fbbed02acce37cc594e6ca7e09596a739d5",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/ProductSubscriptionRepository.java",
+      "sha256": "fa305e3684cf65b101b618fb826ca7617dca18c5d070bc30b6cfcbc925f24fc1",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/walkin/auth/LocalRuntimeSecurityConfiguration.java",
+      "sha256": "8c729676a21b8564409eb44c8678af80b8388f8458eb606b5744a254cf2930e8",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/resources/product-line-entries.json",
+      "sha256": "55c376d08d44d6d588a52385295352558cd9d8c4e2792ab417a19522b5413904",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/modules/tenant-products/locales.ts",
+      "sha256": "a70c19a46838c1db7006d3cce2bcc749c089106edac44553159a0c89595de249",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/modules/tenant-products/types.ts",
+      "sha256": "d0b9d7c9a1685edf1bf43f7925bd87d08ea3cc21cbd0079eb1916f71d18f9f1e",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/pages/PlatformTenantBillingPage.vue",
+      "sha256": "66a8a8316a2687bf5f2d26b26b880acc726146a7fb478df3b78fe0aef23afe32",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/pages/StoreStaffHomePage.vue",
+      "sha256": "5f6030f3be9218b9a273ccd53c651e39f00306d880ee82d3697fc997550abac7",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/pages/TenantAdminProfilePage.vue",
+      "sha256": "1ec874a82352c9cb065b8f24661dbb804c69a345c629b49a2ec74b02edd063f2",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/router/index.ts",
+      "sha256": "c918b80e3807ae9f8cf3bb855ddc29873d9d2b825580dc253967354a33d46d48",
+      "gitStatus": " M",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/appgate/application/StoreProductSettingsServiceTest.java",
+      "sha256": "07e65e2754b21b75ce7dddfc280c674611a64d0573802fb9bfadfc8bdd96b884",
+      "gitStatus": " M",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/appgate/domain/ProductLineEntryRegistryTest.java",
+      "sha256": "20e9c8a57301b4b06dca3727d06b942a1242c6d87578d92b49c4934d5e6210e9",
+      "gitStatus": " M",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/platformbilling/application/ProductSubscriptionServiceTest.java",
+      "sha256": "e54153aab9c2be6dfaca01832fe8fb71a1607fe62cc1294a753617b8f09f7f44",
+      "gitStatus": " M",
+      "role": "validation"
+    },
+    {
+      "path": "docs/api/2026-10-28-workforce-phase-five.md",
+      "sha256": "c1b0e318a8b09c4c18f5985a698433bebedb53654553850526814f14305dc0e8",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-28-workforce-phase-four.md",
+      "sha256": "1e96fe49b7156752f57a091f94a89a600c1381f6cf2d68053720c53b59016d1d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-28-workforce-phase-one.md",
+      "sha256": "6bc3ab08783ca2608cba36c261247598d459a290c1b60fd8f5cf86559df5e1f2",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-28-workforce-phase-three.md",
+      "sha256": "6ec641176fde84c4951f24505ee9f42772b5992fc36cf55682947ce6c372a3a1",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-28-workforce-phase-two.md",
+      "sha256": "ee03e59cfd019203ff926ea0b9cde90d376f0d4dac119a42b6de3388e0435fe0",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-approval-workbench.md",
+      "sha256": "3bc2e92b6aab36cc930f6537c0d91ccc67f5c020f96c2548cf8e068eafcad96c",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-attendance-rules.md",
+      "sha256": "568d26f156b3f8b15d9ab58862706a6eced213e156e20148a71aade6c4bd3d2c",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-bulk-adjust.md",
+      "sha256": "420059a4b998481d3b1ac6dd0d56c6ad05f43174afa1b1dab7432825da27d202",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-bulk-schedule.md",
+      "sha256": "9bc1bfef73070da403b28cb864944e79f1e24f81a6418cc3424bbc6615ba2dd0",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-diagnostics.md",
+      "sha256": "7745243716749ae13fd730d6c7a359e8d27837e04159317201387df6a286f1ec",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-document-expiries.md",
+      "sha256": "bfc9ac603b32f1f5a3bdc26bcd5584effe2764b8b364642514fdf41797cb1864",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-document-ocr.md",
+      "sha256": "0b8ec8ecf02b4d3499cfe532dda083b3cfa4c13bec193242c99e2e9074962d01",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-employee-documents.md",
+      "sha256": "3b53dd03de0acf549598a58fc761eab710e727e5c3a94abd37270940eeaf045d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-employee-expiry-badges.md",
+      "sha256": "67845c7e03e7d9d0491a8b700a92c4ce0ef3bfaed9ef2249b54670ce35310a83",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-holiday-years.md",
+      "sha256": "8ede61cefc362849a13bc7407573a6ec8a45143912f36659676e0d14772537c3",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-leave-batch.md",
+      "sha256": "e2acf9884659743a5cc73bd469ebf3fab0f453581a465568189cd50071c15eb8",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-leave-groups.md",
+      "sha256": "620f4d615d057ad995b2ccbeeeedb62c8cfee72b742ec1c37aa359d46c0534d1",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-positions.md",
+      "sha256": "e4106e6968161eedb50f74646b8c44f17ca0a37c3fa1da12e91aeb8c722d2aae",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-rest-swaps.md",
+      "sha256": "49f44d433269d787df2aed783c6c4984dc1a9bdb36b68914fd2ccd2ee562d170",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-schedule-restore.md",
+      "sha256": "2828e60b71328c9b9a7aa48ea0a1da553f57da4e75e32e539bd9c696d3f55992",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-staffing-detail.md",
+      "sha256": "15de2167fd8f6a7139a2e35aa462e88dc217bee541960d47f0d324b042c322a3",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-staffing-edit.md",
+      "sha256": "f9c606fd2a0c02938b3309a8759251f399f06fe62d089a9c854b7a8af4f73c66",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-staffing-sync.md",
+      "sha256": "71b7f990797b369190f0fdc1abe8933d98a8e3bfef491e8077ea04a235d8eccf",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-statutory-policies.md",
+      "sha256": "4e336fbe39ffad0230df20dba37bc229ba33e3ad3e889fcf74335cc4dd4aa7d4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-29-workforce-week-copy-bulk.md",
+      "sha256": "2274d5b834e547c0c5b29b417efa9d6ded4f4c9ebcae6127f48eac408e68d0f2",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-restaurant-shifts.md",
+      "sha256": "a729457bead4baa8e173568d8d0ab70f4dcb5d51a30623c4857420185e3fc78c",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-store-location-billing.md",
+      "sha256": "a9ae5728a06e80a5b4b75fc55fea5db62ebd903065920d59bd2af0ad7d652ae9",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-workforce-cdac-bulk.md",
+      "sha256": "a38ba2d32a2ddcc6c86ac2965898723332061bfcbe2e6921c21d13a4a783dcbc",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-workforce-cdac.md",
+      "sha256": "831ee2c48ab3a1b5eedfe1632fbf43033288b105172c082cc0cc19e448bed07a",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-workforce-payroll-breakdown.md",
+      "sha256": "3ff3f3cfd6f28f5b63307691c5700a2429201102bc63a17e36615043fa3587d9",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-workforce-payroll-incremental.md",
+      "sha256": "fa2668e479061eaac581b12ce82df764a8b339b1a992f6ebd70f947ba4a39798",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-workforce-recurring-payroll.md",
+      "sha256": "9d26b084e0c664c62f9f7e5ad16258dbf42465005a550d391235fd417d7c84b0",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/api/2026-10-30-workforce-workmode.md",
+      "sha256": "49658a32df33aa1391f3085d17a0e91d235d1d89ac47ab2ace5a5d5d4688c4de",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-bulk-dialog-month.md",
+      "sha256": "ea01c326c6fad5d062c6fcd613a9109e5c73cd9ec8eb43b9f40671d30f00bc42",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-bulk-schedule-validation.md",
+      "sha256": "1cae52b8bae28ebcbdb216796f155534ff6bc206db2e4dc46f9da7b0fee592aa",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-roster-cell-add.md",
+      "sha256": "67fb7fe3001d95649707bd5ac2068dac372c70256fc0c63f053c52228a1f2f8f",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-schedule-dialog.md",
+      "sha256": "6962b104235fd6ae360006e1d95204f53d8367713a1677db033bb5a3c9455538",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-schedule-restore-delete.md",
+      "sha256": "a0e89582851c9531aa490745df5fc4e1b5adc81fd7e72b0214560d0734db2fbf",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-staffing-detail.md",
+      "sha256": "347caa1eaa8ba7ef00bd82e419c7af1d4cc11f5a709d9078eaf94c76be5bd13a",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-staffing-edit.md",
+      "sha256": "99782041e815f4790cedaaac4e23384f3d8f22bb6f1252f4ecdac1cb66541f8d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-staffing-sync.md",
+      "sha256": "3ed86a82c9fda7555576f3b21da2a22f34133710a336dff716e9ef702c246c13",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/2026-10-29-workforce-week-copy-bulk.md",
+      "sha256": "425c9f24d0c6b02c3ec2a006f22a4cdee478a2a52e664093c401db0dbfb3bee4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/RESTAURANT_SHIFTS_20261030.md",
+      "sha256": "0326b30b11ec3f9eb7fc5b17196380d60ac31f839da5e5d42bcfc75c0719f7e4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/STORE_LOCATION_BILLING_20261030.md",
+      "sha256": "ce25f7d46425c043633bc85143e4e336c418ac648846fe743c195bda68e6f5e4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_ACCEPTANCE_20261029.md",
+      "sha256": "715906b03f8690adc4938c1f19a7bae5c701fb33bf1d05416dd341505753f523",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_ATTENDANCE_RULES_20261029.md",
+      "sha256": "e04d81f54c44e7b5240f54efd5a517a3b84d7b6914ce9e055a6e2a6aa85e1703",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_BROWSER_E2E_20261030.md",
+      "sha256": "fdf5d371abba973f931f3d72fad7bbe0ab9382484e43e6df317c98da5d2ad63d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_BULK_ADJUST_20261029.md",
+      "sha256": "f86b737f5798b2341244007ba58c2263c4cc45d211efe4aec2e8dccbd41d7493",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_CLOCK_POLICY_FIX_20261030.md",
+      "sha256": "29f0b6573e7346f5c8181526b5e0ef7b1719c8acab9ef2ca6b7c8da71215ac73",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_COMPACT_MANAGEMENT_PROFILE_20261029.md",
+      "sha256": "fe13f3483df3154fb2901cf2e680c4f9337d47ea2f38488fd079fe27775b58a6",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_DOCUMENT_EXPIRY_20261029.md",
+      "sha256": "299fe3139d16a51cad04740df56a2ca72aa03c89431ba3eb0a30dcd5f91cb5d1",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_DOCUMENT_OCR_20261029.md",
+      "sha256": "cbe12972aaa013ed16695578de59e77f209665d46a5cd3fd651552b0c04b6a6e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_E2E_HANDOFF_20261030.md",
+      "sha256": "5375fcf4efa6f467381394f8d2c4c292d58e46515d9383c643daecae1bc6fd2e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_EMPLOYEE_DOCUMENTS_20261029.md",
+      "sha256": "d9274db65a5b8e106d26f68a67e11cae3d5cac40dd982e2b926e1245eedeb0d8",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_EMPLOYEE_EXPIRY_BADGES_20261029.md",
+      "sha256": "de7c595cfe66f457773db490fea4716710738940acb4d2aa67a3d3d6bbfe7f5e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_HOLIDAY_YEARS_20261029.md",
+      "sha256": "4666e16067dcd6ef6de766605b907115cd219f453b8ce051f4efcf23899ebcd9",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_LOCAL_LOGIN_REPAIR_20261029.md",
+      "sha256": "a08e039580430f9814b392e39b922c1a0a475686d7a656bd06bc2d19d2da329f",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_MANAGEMENT_NAV_20261029.md",
+      "sha256": "d9d0ffa07e0ea6c663db08eb8cf3aba433a63dcbf0c2984ef7f478fa8bdb65dc",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PAYROLL_BREAKDOWN_20261030.md",
+      "sha256": "66833e9aa2e832381466c007236d6061bf9c6fc41500145c0ec210b10821541e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PAYROLL_COMPACT_20261029.md",
+      "sha256": "c48efbd9768c6b45d4b55bb7564c6f5853b8922a780e0abeb17032c885c75c55",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PAYROLL_INCREMENTAL_20261030.md",
+      "sha256": "0fe24edc6f881b99df43621e94a093dfd96fcf763a4c975a9a910d430a6df040",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PAYROLL_NAV_AND_IDENTITY_20261029.md",
+      "sha256": "ccb2dbb7807e04ad2c3660a5e479ea442429d732ca0717d9bb9447704810fe78",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PAYROLL_PERFORMANCE_20261030.md",
+      "sha256": "a9cb9bf562e9e638c425ed76245b58474623ac7dd6a0fa6127c811372157f4a8",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PHASE_FIVE_20261028.md",
+      "sha256": "bfe9bb7af9f0ae656e66558e3851c9fd783434da09eeb9b6c4a88471a54d7175",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PHASE_FOUR_20261028.md",
+      "sha256": "a6d0ccf7a85b1d625d39705900ab7bb13870e7ec34bbcc8f83b5b247e3b38705",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PHASE_ONE_20261028.md",
+      "sha256": "0fbd5c0362c43f3af0d4ac0ed9ba326758e2cc413b4e9a35c7e77612bcfe75bc",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PHASE_THREE_20261028.md",
+      "sha256": "fea496af4ea657504388cde4060736b024798ab6a83ad266c7a6276048d78057",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PHASE_TWO_20261028.md",
+      "sha256": "eebfb0710005e1235cce40d830e967a3f48e1b3e9264aff5b062b56b36e5bc4e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_POSITIONS_20261029.md",
+      "sha256": "ba64c15a9c165441d76334a5214a087178f63563c4e11fb6d1fefe159086f6c4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PRELAUNCH_AUDIT_20261030.md",
+      "sha256": "ebdb9b80bd4afac65f064e1af163e99d6ac64cc0c31977e0af60d41df4b7dfcd",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_PRODUCTION_READINESS_20261029.md",
+      "sha256": "837b08f1136ef8c142f774ecfdcf9c3941ba8105f9526d8e10f15025d75c0f4c",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_RECURRING_PAYROLL_20261030.md",
+      "sha256": "d3d9fa01e1165e8acbbb0096453bd208787371fcadb551615cbc0afc0fda62a9",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_REST_SWAP_20261029.md",
+      "sha256": "03bd4ab116ce6b953c3245868d322b71185cff4c9f99c8bba0c33128b67fe2ac",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_SCHEDULE_COMPACT_20261029.md",
+      "sha256": "61a7f02d97a3154b1b6c3547f0cabbf1507ff0b6515dbd7a47223f13ff1cfc5e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_STATUTORY_POLICIES_20261029.md",
+      "sha256": "7f03ffad59fdb6604075ed940a03bd49086d95855811a6e7eb3a5d362a4d5e8e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_UNIFIED_ENTRY_20261029.md",
+      "sha256": "583d42f519a391b71f110e784bba5f3b4742c252fd8e82f872ec9905ff38cf4d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/development/WORKFORCE_WORKMODE_20261030.md",
+      "sha256": "c9826d31490e04d1967e33c3b694b166b8b5ab0cfb51da9488625935608e0c40",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-28-workforce-phase-five.md",
+      "sha256": "1d8bdbb6d999de8b454644538528d89720c78897c264baa839a4e899421d3464",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-28-workforce-phase-four.md",
+      "sha256": "30bcd0b2376d2f726d3824de92ee359c0634be1afc763330b4ea9b9fbc2175b5",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-28-workforce-phase-one.md",
+      "sha256": "f8f489d53ce573a63b37451aa9b6de2fe52c18e5924a37e1ec0bc6210ae29512",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-28-workforce-phase-three.md",
+      "sha256": "0232dd6db832086f5209ac98f332824f28b871c01788b32c89d12b16d5618dc7",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-28-workforce-phase-two.md",
+      "sha256": "4b0820c1437cccb134680a7f1c9e891c5e32d95a814ee6de2ac435471d73975c",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-approval-workbench.md",
+      "sha256": "dfb26bd5213eaa93a48d2a13b30371edfa2fa616d8408ba93a54de7f42fa7920",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-attendance-rules.md",
+      "sha256": "46e37961e5f66f269a1046c89c7d552bfe49c022b86a7056392a39384d9a7006",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-document-dialog.md",
+      "sha256": "ea4259f2e4a4f64e876ed84b268445b937467ac91b04dfd5fac2a311a0bf9944",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-document-ocr.md",
+      "sha256": "b886d864118ffa032d3a110e2aecd20b3cac724c7b0ce2a5db621014edb57780",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-document-preview.md",
+      "sha256": "d8d9bce5ed76dd64e799abd7ba4646bc1b86880688d0de896a1a640336807ddb",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-group-cancellation.md",
+      "sha256": "d7423b0bd69b46aed3fd305befa4d145ec409d37ded285bfe85f842292ef8bb2",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-holiday-years.md",
+      "sha256": "89cde4b7d642e3e3f3abde343592fa4dbfbd7cdd03d5e15ab943eaafd2c344a3",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-leave-daily-edit.md",
+      "sha256": "3fdf127748d2109e4c5cf641b91e622845e05bece497c4694ad724312c3d1df6",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-leave-groups.md",
+      "sha256": "fd316327cd00d693324a3672bebc328892fc6dac22a64d04d2f163336e484055",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-leave-range.md",
+      "sha256": "4715e32248b104f6bf8fa86816f5f1ba1f26b99717838727c21e8b3b74f95db7",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-leave-shortcuts.md",
+      "sha256": "381957df7538991f6883a8df90dc4e8e550256e22337b667d4135bfefc5367f1",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-positions.md",
+      "sha256": "0293c362c255881ac225903a7b70e38f25ff1769dafec10a8d818ff172552573",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-readiness.md",
+      "sha256": "cb7bb9adb578c70f90880cd3f9612ac2e643198b06390732bc10c9148f0dc82d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-rest-swaps.md",
+      "sha256": "1a99618fd9c5f3bca83dd5b9a6ad3fec3e265f057b598831999d5f0be46c884f",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-schedule-restore-delete.md",
+      "sha256": "f78d8203a65982224c657f661ef4e4683629f7d82a655ae84757eb0e603337b4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-staffing-detail.md",
+      "sha256": "752ebd739f73ee11d5111ed622204aea1313b46d2672350275d965ec3db29587",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-staffing-edit.md",
+      "sha256": "fa14399278b5b01ba41f8e56b758d19ddb498a0ab408c58a97d2319f0e23f876",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-staffing-sync.md",
+      "sha256": "ca0c6807dc2168776f95cba3b8b35598d8ee6784bbeeb456e4e7fa06806d0874",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-statutory-policies.md",
+      "sha256": "72e70fe20057d176eda424b5e32721dec7827d4b762cb2745ded393946df58fd",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-29-workforce-week-copy-bulk.md",
+      "sha256": "3784b076b7c89ebee954fb7bf1301f9e65d2319327e5e43690b833d89a69c40a",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-restaurant-shifts.md",
+      "sha256": "c6488392b2028dca3ef217d7d08e0b437bff1d6306c30c2c0cdbd2d3639d633e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-store-location-billing.md",
+      "sha256": "ca65b76516c970d774592b8c1ba96c5fbe5996641bbea85c179bf7222c94c2e4",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-browser-e2e.md",
+      "sha256": "923c91e3762ef23183a13a82c3018cfa5ff3937e30c7befc37f41d71d53e5e58",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-cdac-bulk.md",
+      "sha256": "53bdfc6c08053bde614e5eb78161c3b8c3295fb7b8752587103e3ed1831f6c3f",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-cdac.md",
+      "sha256": "64874c0ed6284ccfb16f8b2beea5a671f01b75bd7458a9ddf72cf6ced0fc4444",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-clock-policy-fix.md",
+      "sha256": "9efd9b734dda66c5607b068ab7b120827e058b2b92089f6056e6b7be09d2f77e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-payroll-breakdown.md",
+      "sha256": "a413448afb1e20f7d167e1b0ea30cdb599676ba7f36ea78776b1c47638ad902d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-payroll-incremental.md",
+      "sha256": "5d183eee3fdee86938f2992e02e4efd644fbe561307ef2500c47357f08fdf314",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-payroll-performance.md",
+      "sha256": "dbd19b41c97c4475965c684fb74462a82d38ce60f8b40730548955fac1b12c72",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-recurring-payroll.md",
+      "sha256": "781b54dcd772396d7d1ceaa3b6852974ee4b0f236710a0c15f27d30d918d9288",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/release-notes/2026-10-30-workforce-workmode.md",
+      "sha256": "375f1fac3dbb14ea2838502b1c47eb78e39ffbda922ed3898df58d9fde302160",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-28-workforce-phase-five.md",
+      "sha256": "ed1a8c117945f3ec547091019f45cf72d54401109bef59db685a9c157a26868c",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-28-workforce-phase-four.md",
+      "sha256": "6490b8171951099f394c5b47c1d69b2cb7cb941360e06ad8e287b35f750c9687",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-28-workforce-phase-one.md",
+      "sha256": "1e0b531fd3f7a2530fc50b381e1003fb87427544e4f657d8738ae8b36cab2a1e",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-28-workforce-phase-three.md",
+      "sha256": "e45c4240dce4e3551ca42eeaedf6dfa44e61e16f5145d320fed45a236ea8a8ed",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-28-workforce-phase-two.md",
+      "sha256": "55e2e8e25ef1eef51dc57ba8cda3fdb7c96fd019c15206b921e5e9a76210166b",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-acceptance.md",
+      "sha256": "93a957ddbe28050b8e6fdb7235157d8bf342735c68e555db317abd74e7729121",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-attendance-rules.md",
+      "sha256": "05bda7a0388063ba94a628cd31d7bff3830030f86052b39280e0941bf9457202",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-bulk-schedule.md",
+      "sha256": "9d22f92837ebe16da9a6e6f9ab4c7652f47170552edd061ef66ac4af6939ddbb",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-document-dialog.md",
+      "sha256": "28558cca6e52f254dca4b4ab0c78b6f33506dad1687d695d9086d657cf8d527a",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-document-ocr.md",
+      "sha256": "7f4baab578f29df814eae287269173ede3b7cf44b342f5b4b4d40d9814dc5218",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-document-preview.md",
+      "sha256": "a7d1c8589569221d9d9076768be2411caa496f9d28a0036c79656f9a3e874470",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-positions.md",
+      "sha256": "94df81a7b1afde836633f755843b1e871e88789b96fe55e3d32e511f21ecbf04",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-rest-swap.md",
+      "sha256": "0af16482ebd8106d980c49f1297fcb067c4398257685847f6241ce57743dbc61",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-29-workforce-statutory-policies.md",
+      "sha256": "7207c5c2d1f84429e27be7e5d67c005fb387a6f4809dfc115203d9a8448a18bf",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-restaurant-shifts.md",
+      "sha256": "99ffd297a95357325d2f1f26842b8b976034713ed5a7544c91c35258a3fe7b91",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-store-location-billing.md",
+      "sha256": "f8401e8778990564adda36c1d6b2af582dc000c0e25f81d96c9d4c32ea419a81",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-workforce-browser-e2e.md",
+      "sha256": "09d86689894286a059a71d4e4fa6cd74fb67c1b2606cd66539e731c31bd6b0a2",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-workforce-cdac-bulk.md",
+      "sha256": "fd2a3163416343e7ee873e4937c1a5df14a1924de2fd06b6bdcb621be5be0a2b",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-workforce-payroll-incremental.md",
+      "sha256": "3740e94438eec2f68b496f368fd4f13fe11952590a873c2c41d1c2ad95d5814a",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-workforce-payroll-performance.md",
+      "sha256": "e683764f50f932f6bdea79188f4ce490760a2969271211ae3d50baa9d5e32a57",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-workforce-recurring-payroll.md",
+      "sha256": "8f4502e4facdd9a75da1343a5b57ca6a94afa5fcab1a78757e5c82cb32ad501d",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-30-workforce-workmode.md",
+      "sha256": "5aa2d5bc6897771e6577cbcff628d02160dae91e672e4b8fcd63c81ba11e1070",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-28-workforce-design.md",
+      "sha256": "6223126370b456157864539653b2968ab98d146e059ea83a03ec9b2e371ba45a",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-28-workforce-phase-five-design.md",
+      "sha256": "e0b096beb30b623406907477d1759cdf8a067b98b3a4010d122a18d429b07be9",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-28-workforce-phase-four-design.md",
+      "sha256": "f3c6dd0575360df1b8fbf478d634aa992f18a5b0991a66c880c23d5c5b099488",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-28-workforce-phase-three-design.md",
+      "sha256": "97e62fc60924f18b05642df0a363a0e646ba94ec9980a42507e69f024e1a777f",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-28-workforce-phase-two-design.md",
+      "sha256": "f9fa28e375e3569bc38eb9768cd74c132b80cc6beb43688f3d28debcf99eb4ba",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-30-workforce-recurring-payroll-design.md",
+      "sha256": "e9c173ffdf60c615c0be7145e59c9c6d7d5d88fdbe400c8fed7d5e5157fd0ea7",
+      "gitStatus": "??",
+      "role": "documentation"
+    },
+    {
+      "path": "scripts/tests/platform-subscription-history.test.mjs",
+      "sha256": "39700ad3eb11da60f2017057b6cf22fec1dd31596e93ba1fcb0fb5ca857db0b6",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-fixtures.mjs",
+      "sha256": "643511f1085d27220c691467bcaccf2738500973711ed404409c2250a9b0a814",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-loader.mjs",
+      "sha256": "967a7a668b2d30b409714384d47166b36fcb7efd341f83fc9babb80959eebbfb",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-phase2.test.mjs",
+      "sha256": "43ea7a23c236bd51ec47b3e3688fc91398279b5085036edcc55981dd47779c85",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-phase3.test.mjs",
+      "sha256": "b3424b54c40a45c4b30185ba5725fadc1c05a84f9bef55883f04ddc329ca80f6",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-phase4.test.mjs",
+      "sha256": "5c19b0178c276c389b3b2435538d7b5545f341a0b5e3e77b6fc0b5ec46024d99",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-phase5.test.mjs",
+      "sha256": "c978e25cf14a322f0e2c64e7ab94fafb47190d6d355779b96982be69468df036",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "scripts/tests/workforce-register.mjs",
+      "sha256": "c087482371fa9111b584c94ff0fe5cd65252c14a9c46969f4ac80aa6faee9420",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/api/platformSubscriptionHistoryApi.ts",
+      "sha256": "16e2094e49e45dfc2744100abcc2253c3ce4b972d51fedc96a9979ff6f281217",
+      "gitStatus": "??",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/components/platform/PlatformSubscriptionHistory.vue",
+      "sha256": "6927d2bb6c8897b0f4e19b0a28486b5c8efda2557aeb7de16639ff364f6e49ed",
+      "gitStatus": "??",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/components/platform/subscriptionHistoryText.ts",
+      "sha256": "ad069e9ab545f1a2fc52fb01611a3943ed2c6c0439293fc7d5b1dd987510da8b",
+      "gitStatus": "??",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/auth/application/WorkforceAccountProvisioner.java",
+      "sha256": "b8dba4bff31af4e0846801fa5dde301d95e6be4f448fd834f7743d5e82f6ba37",
+      "gitStatus": "??",
+      "role": "runtime-shared"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/api/PlatformSubscriptionHistoryController.java",
+      "sha256": "a8d111b01e58015561e90368870dc7ffbe4bb039052c524ecf800742e6a39d1c",
+      "gitStatus": "??",
+      "role": "runtime-store-billing"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/application/ProductSubscriptionHistoryEvent.java",
+      "sha256": "87098cfc7fa9a53261eb11dc8516762b5135da33839101dc07a81846221d32a9",
+      "gitStatus": "??",
+      "role": "runtime-store-billing"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/application/ProductSubscriptionHistoryService.java",
+      "sha256": "6f448187e09dfb95528b59378474bd5db856b2f827c58b2095b8a4877057ceb5",
+      "gitStatus": "??",
+      "role": "runtime-store-billing"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/JdbcProductSubscriptionHistoryRepository.java",
+      "sha256": "f3095d31406d837305ac1d5ae054ad1e6d8744d10e701fb33858c6d48d0ce33d",
+      "gitStatus": "??",
+      "role": "runtime-store-billing"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/ProductSubscriptionHistoryRepository.java",
+      "sha256": "9a2c96cb14059b4cca4215626fd328da01d6e039650aa1435b243d26e7b519d6",
+      "gitStatus": "??",
+      "role": "runtime-store-billing"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/platformbilling/persistence/ProductSubscriptionHistorySnapshotReader.java",
+      "sha256": "91c7364f714096f535823c94338a6003cec2502afe249393870ce24946b40529",
+      "gitStatus": "??",
+      "role": "runtime-store-billing"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceApprovalBoardController.java",
+      "sha256": "d664abe033fe62c8a0a0980e96a774e662c4c58aa42d2d396a2d750063d2de22",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceAttendanceController.java",
+      "sha256": "20c664905f745c4c5ccd8f7673077217fc68326ea04497264ef0d35d40de2520",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceBulkAdjustmentController.java",
+      "sha256": "6b558dcc879529aeba070c2cec827fb1bfc5acad8529983d228ea2b871676198",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceBulkScheduleController.java",
+      "sha256": "180748651f7309011f5090e4f65e51fd2574dacaf290203f2ea80e0b8a1108aa",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceCdacBulkController.java",
+      "sha256": "78551a6388ab016c25cdac1d4705cbd3ac10abac2697cdaacd3f0d0189d4db96",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceController.java",
+      "sha256": "e0fb5258ba04b01d154b563afe1856d19e6b79fd5456a1d0036f413f199ef654",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceDocumentController.java",
+      "sha256": "0f3cc128081c8fdb2209dc5d9655b3cd6e06e29f39063313fde7308ce8aa355d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceDocumentExpiryController.java",
+      "sha256": "71c502e1121cde9805ff8cb7354c68621d5876a33e5b50b94a88e9d934bd97e1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceDocumentRecognitionController.java",
+      "sha256": "a5f96d78da42031f1bef32afd21865500b3deed81fb40432b8f0a0b27509f22f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceEndpointSupport.java",
+      "sha256": "88125303f1283a949e2e7a3b7c4195e717ac881d6a1309b355c8e5d0cacb17e2",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceFailureDiagnostics.java",
+      "sha256": "beca81553c98e7bf961bdb9a0a27b52bb998a5a401eeeda41778ba81dc72fb44",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceHolidaySettingsController.java",
+      "sha256": "d95322c500f718412d47623564b6e51e27d6e2ad29cc104a09c73c5029ae1add",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceLeaveBatchController.java",
+      "sha256": "4fd005207885ebf1024896ed88a5403644949fe3650129a7bf93bbd556340d64",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceLeaveGroupController.java",
+      "sha256": "fd956b1f9c7e5c31bc019e4ac637b808d8bc37ccd675ea065c453dbc706cafa7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforcePayrollController.java",
+      "sha256": "9246287e96e029e95dd7b223f302c2b28460da7472b24212ef0c4e9edaab01fd",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforcePayrollProgressController.java",
+      "sha256": "68b671d9ab4fe6d157ec144dc4bb358fa7300bb9f022462557bcbdc1d9f372f4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforcePositionController.java",
+      "sha256": "df23fb13bec55c3efab977bbb49b174412a91aa90bf6b26b124d49d9a8776be7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceReportController.java",
+      "sha256": "d9d55064911bbb2605d3201131d05d1b2897e2c081ee9ad2a6a8f1ec28b0bb61",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceRestSwapController.java",
+      "sha256": "5ee46b5366310d78d6c38fee750a434515fe5ccd560f521582fa6451af198d03",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceRuleTemplateController.java",
+      "sha256": "b867b9bfefe972b7c2dfc21db060758e15aa9f9d964cfd315ba8259640000cf7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceScheduleDeletionController.java",
+      "sha256": "1a72a6ecf0abf49e7a9d05f64c6e8b100ff0732a3f99a9f9e7a8cd971bcad179",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceStatutoryPolicyController.java",
+      "sha256": "ae4891d1933a1a7858e7481e6e12c82a1293c0eb951afa0f75eef2f3063947c1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceStoreClockController.java",
+      "sha256": "1fe5be36faa66cfaa33e5b5e47401f261ce5e588d4c10a6df6361a6f2af781f0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceTimekeepingController.java",
+      "sha256": "14ca949f97cb1dc4ab3a7c9a7532beaa332516ee6a8cb1dc84d569c3e141662d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceWeekCopyController.java",
+      "sha256": "206ae10381e0ae527815c5fac567915090b10fb32d26249b862737ff8631c087",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/api/WorkforceWorkModeController.java",
+      "sha256": "ee85c8779d83ccfd8e6e4dc876f6d2e88147161281555af13734881a81137028",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/EmployeeProfileRules.java",
+      "sha256": "2e7ea4410fbfed92bb8a73c3087e7171e8ee5076548d0455a3e8dbb621e774b2",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceAccess.java",
+      "sha256": "3b7f23c45378ba9cffcf2dcbce381c4dcba9f391cc05e205a9e5a7f5bdbeb0f7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceAdminService.java",
+      "sha256": "279d6e2847b5428180b5214bfa241e4d1bf425c87eac827ddf09e174f3461fa1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceAudit.java",
+      "sha256": "6689d4ed8292a45f66246eaa8b04aacdda4881f970784f7116d67259d35a5807",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceCompanyService.java",
+      "sha256": "31309b3d85e06e4b4b6c3d709a7cb61f24f7f23d06c42c26e9fb4097be8b256d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceDtos.java",
+      "sha256": "67b764b6b8348b77888e4b55933d7cfe67a5a69e17ae56e1d1e60b5fc9c14c21",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceEmployeeService.java",
+      "sha256": "27884825fc092e9e3e31fd33d8260ffde625f4d7b148f57297c13fcd1f7d1fa9",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceHomeService.java",
+      "sha256": "3ca42a2575de2e6cdad908ccf2c814ee7f52e7a5274f3146f73ef347cf00389d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/application/WorkforceJson.java",
+      "sha256": "c61f2c0774429bf5362b7e3f380dcbcdd59f6466844d5f9e0e662b4282f21246",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalBatchService.java",
+      "sha256": "879463f5570066816db5e285c4fd003536dbc87d1b5e5b086559a845b2f5f07f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalBoardDtos.java",
+      "sha256": "7b1ba662974da3ea6be855208b2c593c17997b2f9ecfab150e3ee0ef3b2bed1e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalBoardRepository.java",
+      "sha256": "4a5d78dd570ec08f1527da50b780b8f4247352286237c79f9b78f61024a0af21",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalBoardService.java",
+      "sha256": "22101877b19ccc50f238457cc07ef465effc2a6a3f5b7a75661c3f2ae06c00c1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalCalculator.java",
+      "sha256": "7cd6705eb1e980a544add7371bb772bfe4b84419180c75cc5c3c3585db43e326",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalDtos.java",
+      "sha256": "c60fa5b112fd6d93e974d909fa59eb450caa5d92b9510ba7ec74c89f090cdc71",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalReadinessService.java",
+      "sha256": "d096be74ceddcfd772fdc60e5b29c66737c078ced7a9b5e171a8fdcfc2a6ae7f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalRepository.java",
+      "sha256": "bb00f84c818793f64974d19d504e2162ae9c954857399aa8fc5abb2f050a1b70",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalReviewerPolicy.java",
+      "sha256": "92f5c4c9262dc0138f63427f50a95fe86a162827cc82578b3225a6054ee08c25",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalService.java",
+      "sha256": "c55b0c60056f33e2d6a347da9655d29b99c71cd7b92411f6ae7daf763aaaead0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/ApprovalSources.java",
+      "sha256": "650c1f61b37a5465c3583e2e0ef94395dd835efe6d8c6824930db1f40f25dc1c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/AttendanceJudgement.java",
+      "sha256": "3742d0f88dc1aaa33e46c21ea6c23c6f0be7439127f355014fd187de6f151d35",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/approval/WorkSummaryService.java",
+      "sha256": "9c8b9c75b1a3b64a979bf28ccc66916a4f7520a1dddadfbae65db5ca16218dbf",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/AttendanceAccess.java",
+      "sha256": "aa11d770c18defd24ca6ba6741933b7f43b82821fd6e942515fd3d1410936e12",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/AttendanceCalculator.java",
+      "sha256": "790a5556185d9e1970cd3c7f8a65c773196edaa08f93f28f57321e5a5de39802",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/AttendanceDtos.java",
+      "sha256": "a994659f987a9f94bf2d9aa2e3eea4742e5a7d3590fdc6676186bf5bebcb6fb6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/AttendanceQueryService.java",
+      "sha256": "64900ad843f309d4d8cab19359d01453b33e92f0ebd6e3ae377d3f4102aad5f3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/AttendanceRepository.java",
+      "sha256": "068a3532cbafad760a2cad929669edb64dd65fa522f12e2097f11131a6a4d9a6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/BreakCalculator.java",
+      "sha256": "fea8d7562d38c301787672cb65d8ffdc71178e79708eb8338adfc40fd97a2ce4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/ClockService.java",
+      "sha256": "449334243854453f1948c06d3af3b33ace58f6dc3bdd209d4651eb985d64905c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/attendance/CorrectionService.java",
+      "sha256": "a0688afc1f3191688ec4c518f2cd2732b1dde0fcfe6d133f6aac4790cd585d13",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/CalendarDtos.java",
+      "sha256": "8b63b3d092c8cb75a818e93846b69419526cbb9dee1847cb3ffc46cc395a5d03",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/CalendarRepository.java",
+      "sha256": "3495dbaf8991f7098c6286abedd1fa61773a89821c1979d921a9a845505a1953",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/CalendarService.java",
+      "sha256": "26f4e0a0cb67d24e8a6b1425b5ef8a0984960f16bb2b993e7dae17a68c04146e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/annual/HolidayDtos.java",
+      "sha256": "eb85dabb3891a328d64749f2ef776d7090fa0fbd3f3a01ed0855bd50d37e27b1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/annual/HolidayYearRepository.java",
+      "sha256": "806c73e44f36ef07691d49802f9eaafa52fe60fd5ef7462f9aa1764a0333046c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/annual/PublicHolidayService.java",
+      "sha256": "b55679a704a5d4ad88b2f09487fcae45633a457f46682285fb765c2d703a7508",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/annual/SingaporeHolidayTemplates.java",
+      "sha256": "9036b2f7e417203def325e3d386c24e0bd840f635783457f4544aba889db226b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/calendar/annual/StoreRestMonthService.java",
+      "sha256": "ceca52396041b402f97bd3bdc693a2fa6238d96db64c99dbb4512de2e2c5cd61",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/DocumentDtos.java",
+      "sha256": "b143ca3a96d26cbab5f1c7d7e13ff45e07861c55942fed9c68e344742d3307ff",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/DocumentFileRules.java",
+      "sha256": "c15f852221d1a003997e6c86453b55bdfed7e94675c71322ab44aabb840041b4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/DocumentRepository.java",
+      "sha256": "24d78b7d86518390056f5dab5a2412fba086e76b969093a73288b069cf0cd541",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/EmployeeDocumentService.java",
+      "sha256": "3620faf44fa2d682a52156f57d2302dcb1b83654df700fe5ca617dc1130bbd51",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/expiry/DocumentExpiryDtos.java",
+      "sha256": "b93d81c1400215f6b79ec0b9e5a10efcad6b7f6fa34da56b1786e048207bef6b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/expiry/DocumentExpiryRepository.java",
+      "sha256": "5bf470ae9effdccd5c6234fa9d34e19e87d8e0227017ae8942b4554390f14d82",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/expiry/DocumentExpiryService.java",
+      "sha256": "e1dd2b5f813dda2e6acdf04dec725309333577843b60c0e08b520e871a10167f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/ocr/DocumentOcrEngine.java",
+      "sha256": "0872afa35cd7ef047e83aaed0073067cfac9321ae05660c453f0000b972ef345",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/ocr/DocumentOcrFields.java",
+      "sha256": "32b493d16cf796970432bedc9b6dc6dbebd9d6ded01d5eae27fbafb0333acbac",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/ocr/DocumentOcrParser.java",
+      "sha256": "9035b66cb102c059bbda49a62cd75e9d9cb5e41797dbe5f20ac51008aece25b5",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/ocr/DocumentRecognitionService.java",
+      "sha256": "1791c28554ef500e1173efac0802c88be3d8f90906c9c04482239924e4e17e2d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/documents/ocr/LocalDocumentOcrEngine.java",
+      "sha256": "87f2ea9f4884a4af44420dce24de4f61e1cdea8dbb1f7cc2c9cd8c19531ae0a7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/domain/WorkforceException.java",
+      "sha256": "3f085f887309a45553f28d950f1f37a190b12e3a07a151c3fe55627114f6f350",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveBatchService.java",
+      "sha256": "913464f599ca00d46b166b0ee31b7390e628300d438c992215d31d510f0c466a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveDtos.java",
+      "sha256": "73ebaa3299aec40cc7f9a99eb62ead673ccb4d62c1923e5cc98999d3a927ddd9",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveGroupRepository.java",
+      "sha256": "6c27d52a81521392bd389646ad84821411ca5b24a8c1e6a4197b64efeb3e96ad",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveGroupService.java",
+      "sha256": "981437ba7edf7f70ff22eb226c8a142d1828a94a1072e98a4591c2bdb44136f8",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveRepository.java",
+      "sha256": "ab3d38c9d38c8e7bba76daafec61530805ddca19ef6bbc1dee441aea0bb8f728",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveService.java",
+      "sha256": "070a22dc8c859d739769ca27a44cbf0cfbe22440d92f94717d227a3609e7e6a4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveTypeRepository.java",
+      "sha256": "1d4554ff14c176b902021c4e641c7965203ba69a38338487435a064c02019ab4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/leave/LeaveTypeService.java",
+      "sha256": "05809be005a276db3a2e1e7c861edaa531e7abe3199566c2493ce968e4dc0077",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/CdacBulk.java",
+      "sha256": "c9d19f9399ee391680a3de98eca6a9e837811d1379bb37f50f2ffcc80da1da65",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/CdacBulkRepository.java",
+      "sha256": "72046deda3ba8d24b2b7ff9dacd04ed306a0e233bd8701b01c4d690c054db385",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/CdacBulkService.java",
+      "sha256": "7346758ed587096cc2ecefc837516d4e2594a2e135b1a63749980b9368c40735",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/CdacPayroll.java",
+      "sha256": "3825070bc58e74d5d367380530bf219d0146a873ec57f91ab6b926a29cc079fb",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayBreakdown.java",
+      "sha256": "f0d186d0ce8aa19b183a8a540a6542e2e1a085eb7836be226d287c62389d82c9",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayCalculator.java",
+      "sha256": "dbff61d533bd70eae7cfbe3146c53285ae5935f3c89c80875e6aa59b521d55e1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayItemKinds.java",
+      "sha256": "cb22e5db46a2f1aad44f68a889ef3ee0d3ce2efeea2a5192c1eb5b6a78c89305",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PaymentPreferences.java",
+      "sha256": "13361420220bda3e24db181c586d50abac3f0f050a557e711308c6f1f7e1aa23",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollAccess.java",
+      "sha256": "9e99c9ba2d11c6855df7f71b68131b1bbdedaaec3fa56c2e9cd068580494dc63",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollBatchService.java",
+      "sha256": "0d352a6a986141c00df105f8f14e74c763dd932c0119394838a104a0fa25dc48",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollBulkService.java",
+      "sha256": "f80b1a3dc26e6dbd6faa0af6c3fa55aa61f066f875335800647a2b0ecb288680",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollCalculationService.java",
+      "sha256": "0b698bb5db3a8fa3199f15934c20d6fed19cf3692b4141ec6e34d2ffb773130b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollChanges.java",
+      "sha256": "274d9f137d7d30271a17d2e6119a07713008c087a9987324e2ca9809d9ee772b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollComputation.java",
+      "sha256": "d5de10048b0591a52117dc2906aeb5ab787d0c3bb4e832db1bf337764be4a836",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollComputationRepository.java",
+      "sha256": "a8b1c2544119bdb5854a4fa93ec33d1498aba0201605524a295665e8098ec035",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollComputeExecutor.java",
+      "sha256": "bb9b17e117d9cd2d442902691f105fa906a1ca756bf682a1fe35c77cdeec6209",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollConfigurationRepository.java",
+      "sha256": "d4c1a5fe9a095824f62dd8d854a79553e9a2a9836ebbd854efd62afd55dbe15a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollConfigurationService.java",
+      "sha256": "6628dc2ff74c1419b11245263757b9cf68e122e1c9b34134dda3dd37c6d2eba9",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollDtos.java",
+      "sha256": "e3d1312540319aa9791ef1d4567bb9bb55169af6be01fb13c2b34c3cfd01c138",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollGeneration.java",
+      "sha256": "72fbc8c4415cc4eeb19ac63e173330e0c98c70e862a39c44cf0ad8929a82defc",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollIncremental.java",
+      "sha256": "acdece9a941e612b90dd6afbe6a888e7421cecd9ad481927f16c4c2ed0da52df",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollPaymentService.java",
+      "sha256": "65d3f08380022f171a6895df3f0c98260cee34cf5dc819f290f651af79fa3a38",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollProgressDtos.java",
+      "sha256": "91e00bbf3cfd58443ae950c2c9f17b6c3f63ef730cd65a4f1bfa7acaf49f4769",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollProgressRepository.java",
+      "sha256": "0d33b41ef5f070ac428314dbb2d6d5b31268fc1eb5dd1a4f08736e907c8c0a09",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollProgressService.java",
+      "sha256": "5ddc19852327d5748dbfad29979774279fe7dafb5f785d3e1d7f11b1943d112c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollRepository.java",
+      "sha256": "aab1691669d90a8f75dadfdf5921734af5260711fb68b4a4f2f29efbbc3cfdcd",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollSources.java",
+      "sha256": "f5b2cf71f0e14d61fe7cc778e2dbb0c29b7adcacf0a1942e26279fd3e029c67a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollTransactions.java",
+      "sha256": "ece952a7fc7b5904ab3f9e65ae10b12afe73bab1d1beed99d3f42844c0e6366e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollValues.java",
+      "sha256": "3d9e17e7e91906175be0ac91da11ce900257b72cf469403eebe1f67d2815a737",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayrollViews.java",
+      "sha256": "bb39553b2bf55af10b06220a613ed88b6dadf41d6f327b4d1fa4d92a2ccfe44f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/payroll/PayslipService.java",
+      "sha256": "450db2ef0e11bcf8215cb307eab8604e702bb903aa6e8f21c027d08fc28c0a5a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/persistence/WorkforceAdminRepository.java",
+      "sha256": "440c21cf902eba1c2236df3826dbbfca2fb1d84b8527f0c84f534f676af70235",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/persistence/WorkforceCompanyRepository.java",
+      "sha256": "0cdf27deea8d650a6f7363a3014c900c24964f7b4395bddad4646e99a54515a3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/persistence/WorkforceDirectory.java",
+      "sha256": "baf7d629c37dabd93fdcd26d57a4c2e4efe8d4c9ab7d72138ba2372fcf1607e6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/persistence/WorkforceEmployeeRepository.java",
+      "sha256": "fa2e472af6463213d199817d47479979a7127785e2359be65875caee926a3c48",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/positions/EmployeePositionSelection.java",
+      "sha256": "5087123972f388cf592d4431e977e1963035a856e5621315436e22dbd194ae78",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/positions/PositionDtos.java",
+      "sha256": "98add27b48cbda73ee5af7458bb6db54b505a8824ecb216145eb6dba272d2b69",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/positions/PositionRepository.java",
+      "sha256": "d5e159684c2b12446157a9dba50b6b1b3ba95824cde80ace07bff350b2f6084f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/positions/PositionService.java",
+      "sha256": "5e8fce1f73b354f639da28d61e39ca1dece7fc0acce5a2c8e683cdfccb5bc222",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/reporting/PayrollCsv.java",
+      "sha256": "773705fe52648dd77cf35916aca105abf5c0ea2628407ae7575691b6ccab8326",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/reporting/PayrollReconciliationService.java",
+      "sha256": "b403cdda78ec0c0727e230b41adf5625493d0569533fcf68af21b6a633424ba0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/reporting/PayrollReportDtos.java",
+      "sha256": "964835075eaa6c1607218b73366f3345bcb8e4681ec67abae76f575813babffb",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/reporting/PayrollReportRepository.java",
+      "sha256": "1bea5a0bf184f2e0bf2e78f9d12ca56b4e93dd14852809905c70ce33aa55852e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/reporting/PayrollReportService.java",
+      "sha256": "3a5c71e3c5ad566a8f729a4b026794c81715177e6d01ca8d7160c8d6a23c03e0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/reporting/PayrollReportValues.java",
+      "sha256": "e53673dd464e9ef806e295776e13a79b66cb4c43a8482f9417ed6b101f53ec4f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/ScheduleDeletionDtos.java",
+      "sha256": "e99e6461efadbb98025ea69fa8459a932476b00d80a4ca9cad9ed2b0489a1601",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/ScheduleDeletionService.java",
+      "sha256": "78545e7e74c0b0dd3694ff4ee2e0e6c4e963b468cffd9766b6b94033741ef150",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/ScheduleService.java",
+      "sha256": "d8affadbb4833a9fc23f268fd48c8cddaa6e05cd6b09dfa465f8920d03869071",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/SchedulingDtos.java",
+      "sha256": "71667033d3567a5df268fe6e348ae2d4650aa9b61f9785bed306ef84fc3630e8",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/SchedulingRepository.java",
+      "sha256": "05b57cf33192bcaf10cdc3d083aa9343faa8a4a5b051d54db35fd0de7e49df88",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/ShiftService.java",
+      "sha256": "fd5310679b249404ecb5d59a141999ea3661bcba60ca61eb57317f8593fe455e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/ShiftTiming.java",
+      "sha256": "dab7c07ad7ef3e6cfb109c20424f49a17bd746e8310b8f70c2188b97c0317f73",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/adjustment/BulkAdjustmentDtos.java",
+      "sha256": "cdbc3a0999add6482cec00d4a12e9dcf522f9e3467ba255b43b44286669b50d6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/adjustment/BulkAdjustmentPlanService.java",
+      "sha256": "2067dad700d203f2dccb1dfe304e7c7e378d97ec1a83d548dc52bdcbbf62d85f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/adjustment/BulkAdjustmentService.java",
+      "sha256": "f633bfae35f2f95c1c4a7ce799d545d84c1416f9fbbdb1712e78928504802400",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/bulk/BulkScheduleDtos.java",
+      "sha256": "30661ef68b598253b7c44b982c02a5137e02c14aed985fb1970a70666cbad62b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/bulk/BulkSchedulePlanService.java",
+      "sha256": "b070e8084f49531ee2646d151b0d9dc29dde57800b720b8253be3dc1c8882a60",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/bulk/BulkScheduleRepository.java",
+      "sha256": "bd61bbe1a70614d3f50bfd4d8b0a25a62bbb3dade716a2efaaceddb2ba61880e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/bulk/BulkScheduleService.java",
+      "sha256": "aa21de9b0f0685a1edd44df1519ab0a3f41512a6c709d892c3b3e71e45c947cf",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/copy/WeekCopyDtos.java",
+      "sha256": "f4b0644a91acc14c83ab065e32a1d34a37e1a786c324b6358667454f12be6a5f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/copy/WeekCopyPlanService.java",
+      "sha256": "2c57c18232d7f94ad1f3c3cf05ec4be9fa28b42a41267d067dc60e89e74c3395",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/copy/WeekCopyService.java",
+      "sha256": "8f997bfa07a1c32895494f1e06a4efc5dc3ba24cae4ba9f2d3f331ebc8251eb1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/restswap/RestSwapDtos.java",
+      "sha256": "9941928fc02075b4dcdcee8ff2885e6ce12d307e584c5ef2aa9f96f60a53b8f2",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/restswap/RestSwapPlanService.java",
+      "sha256": "906a5a58d03fd527626994993d986cfb28462f7aa3d3f79ba071560d41b648ac",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/restswap/RestSwapRepository.java",
+      "sha256": "eaebcf6d502efb902c011df848718343effb893f201640ec8a01df1c938cbd40",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/restswap/RestSwapService.java",
+      "sha256": "56e7a5f6a37e86eabefb77135e14feacdd7a4f6dd8e8cca6b6ae6c0db96cc3b3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/rules/AttendanceRules.java",
+      "sha256": "964b56bd8d0627d7e0554d03ec2422686e1826300741dd3acde0765a3f0abb4c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/rules/RuleTemplateRepository.java",
+      "sha256": "949ad4658ed5edaa119b613f853e61353eb836f361499fa31ea0126e147091ab",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/scheduling/rules/RuleTemplateService.java",
+      "sha256": "e50ca847c248b2eebf50bf715a264fb855e4c1c6317e809839e814a6040aafa1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/CdacRules.java",
+      "sha256": "2143f115591dbfcbd805dac185697cc10749700e90cc58e3d2690ded7b9a5579",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/OfficialStatutoryTemplates.java",
+      "sha256": "d37e357ae3209767c7c43e265eeba98df94f841288334231451927311ac65be3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/StatutoryCalculator.java",
+      "sha256": "b4fbe21110b371dddfd19f1b6a48bc339916d09337107ada3c4ed3beb93ba808",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/StatutoryDtos.java",
+      "sha256": "6c63ae9579bdf1599212a09e6c55b78a002542719249a39e99bd2c668fc61825",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/StatutoryPolicies.java",
+      "sha256": "185dbce6d2f490e5f9429930322fa71b752dbde4ac84917828c9161f1b75b3da",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/StatutoryPolicyConfig.java",
+      "sha256": "dcdaec9065553a7007645d8e3a73c61b8ff55fb75a9620c5875de1138f8e674f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/StatutoryPolicyRepository.java",
+      "sha256": "936e5917f7ced9c885738c1e8c1e41dcda033f963b232cc1b787196104923c09",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/statutory/StatutoryPolicyService.java",
+      "sha256": "bd447053b49e1a77ee98b24e22562a583c7c8b28643cb310e3afd6389d69b81f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/HomeAddressService.java",
+      "sha256": "ded25d4dd5eaa43de92dee8efce22b31e0abf21ff3acf8ae77b123664ee12719",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/StoreClockSettings.java",
+      "sha256": "425cf434ced79c323e4606cd98cae3cedf7f5b12ffe8823ebd912b07c817aebf",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/StoreClockSettingsRepository.java",
+      "sha256": "211eb7423b4f69514f0198c343ba4c6aecc60382fb555dda44e1d2fe584d1971",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/StoreClockSettingsService.java",
+      "sha256": "e06e46c1c1472e77f52ba9dce797a816fb24d4eaf97c09a6eecfba3935f58897",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeAccess.java",
+      "sha256": "97df02072873977c17be21927d00b5512ed7a4c0c4e3d1c8d0d946e2888a4c15",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeClock.java",
+      "sha256": "c09b768a2bc01b2dd78de5e8cef7b9a203694273e34656f88e90656fc79f5f0f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeDtos.java",
+      "sha256": "36dfc9f22eaf3df46895e9b59b0bcc5628e08062ddc147902ac23a2e4392f973",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModePayroll.java",
+      "sha256": "c9c09f5d1f80d7aeeccca27b98ade02ca89025ef52097e73db83e663cba3882b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModePrivacy.java",
+      "sha256": "a80a326d210fbf2ce500951e09ff8463ad21c7b3a0671e6b2d03b4f06360f568",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeRepository.java",
+      "sha256": "caf55bed1d108e633f331a96165c0a9504be63ec639b23f81f616eb9f7ce8744",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeResolver.java",
+      "sha256": "3ee63156b9ee2498366d747843f58e84167946e6561901b1736ba6e811ee2908",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeRules.java",
+      "sha256": "2b0a7f7e41aab342e92897c7e24053330ff161a68caf7daaad6bbd8dbf49aef5",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/java/com/rpb/reservation/workforce/workmode/WorkModeService.java",
+      "sha256": "e6b84b2cbb5f04ba4cdd58cfe32aef8f6fba32e9696bfa089b71410033ecf3e6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/main/resources/db/migration/V088__workforce_foundation.sql",
+      "sha256": "80a71ee7abb58e7c0d74a5f70a99666c4851105990f3319a2119bf957835cebc",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V089__workforce_attendance.sql",
+      "sha256": "d4813bc63b2a847c7b0914e7ee3dfd879bfefe8686d3f9064b15da10a875624a",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V090__workforce_timekeeping.sql",
+      "sha256": "cbf14b420b08de7da35149464637608469ea316d988679e6249f8f915b887074",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V091__workforce_payroll.sql",
+      "sha256": "3f15e278144588371f57d186b9686dc7992dfe3a871fd22c1aed35607b1745fb",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V092__workforce_positions.sql",
+      "sha256": "f72093ab7bd35b93baea8afc42ac9435129fc42efad2bc217c3d24a51027357e",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V093__workforce_bulk_schedule.sql",
+      "sha256": "d2d748552064d0bd056b997c0affe9691cc4ae6a035cf869f04a47e8872f1cee",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V094__workforce_schedule_soft_delete.sql",
+      "sha256": "ff1613bd44c714a572ca6ef1be4491cf278a62d9dccec277635ecf4041751852",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V095__workforce_employee_documents.sql",
+      "sha256": "ba8e3276e1d90fc6b4d49485208af515d2422d490d1381dd5439dd31120af37c",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V096__workforce_holiday_years.sql",
+      "sha256": "5ed459ce5e35a9e8c989ad5d0905b68ac0586abbc03732f6254028758a271467",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V097__workforce_rest_swaps.sql",
+      "sha256": "c20ea43ccabad17ad95032cd6cc6a272182d408b370496a50efd5187b8ed9c4a",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V098__workforce_attendance_rules.sql",
+      "sha256": "79c24467fffc4ec0bf85663778af7d43dd6876f39e1bd5024a6f249c9e2e4915",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V099__workforce_statutory_policies.sql",
+      "sha256": "6b11bce843f1c053a94cc076a71106a2e26b22a617f493a0cc46843f23f1849d",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V100__workforce_document_approval_dates.sql",
+      "sha256": "aa9dd974305c90aa4f30657539f3749cbd3304d924fd33b821cae2b9f0b480df",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V101__workforce_leave_groups.sql",
+      "sha256": "a71c15555ddacb4018a3d7f2ff9616de6295ecb8bd8c7853ae8dd26a7974ad40",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V102__workforce_payment_bank.sql",
+      "sha256": "27f47c952f1d7e04d249913512cff9848d71e2c1e617a97b06386fb48ff55c12",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V103__workforce_cdac_bulk_commands.sql",
+      "sha256": "11a9ec5f35663a06b03f36d53ea6427a0afab5096bb56d98eda2783466a6e8e3",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V104__workforce_work_modes.sql",
+      "sha256": "28186270239328d9d8d1fbb09bb195df1dae1ca80ad31e43f1a051455a3eb37b",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/main/resources/db/migration/V105__workforce_payroll_computation.sql",
+      "sha256": "399ff4dae69fe29ddee89d0e78199f5621b5feb82bc50b17e06bcd0f876c5881",
+      "gitStatus": "??",
+      "role": "runtime-migration"
+    },
+    {
+      "path": "src/modules/workforce/WorkforceLayout.vue",
+      "sha256": "1bce7febc36404644c3387099429f71e5145cb4026013733dcdfff5d294e2f87",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/api.ts",
+      "sha256": "f8e5d419627ee89a9cd3ea2a8bd1e98e58093ac6703d3f9cd4444d79bfe3ec16",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/approvalWorkbench.ts",
+      "sha256": "befb3116227a1fe6ab756233649ea14c6d33f6b29f7851d9e10c0b5437651c7e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/attendanceReview.ts",
+      "sha256": "1b71cfc3b3dc199388761c8297b0e858d60779efd73f6608710dc75ca1dfd101",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/bulkAdjustmentTypes.ts",
+      "sha256": "919316dd7c74f415a07fa5180717a4b99575b752297ca7a88103367f0ea38add",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/bulkScheduleTypes.ts",
+      "sha256": "a6b4c43269e83da70719ba0a3e689efd725d87cf88af32b1bcbdd63a12846671",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/cdac.ts",
+      "sha256": "ccb369e6517ffe24082bb3eb857ccb7cf29db9749a23a34405446ddda48638af",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/cdacBulk.ts",
+      "sha256": "86f8b84354970442d733408f8656698dc5ee604beb6a4bb0844ca3d9c6591a32",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/clockPolicy.ts",
+      "sha256": "462070c15720560b3891924066a4b442e87cde3e54420b780f998d7595deb91f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/clockSite.ts",
+      "sha256": "9fbe24d2f37605fa7c51232807451a1ede76c7a392096f06a0996f7f0511fe57",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/clockSiteText.ts",
+      "sha256": "21d4405bf342c0e8a5d5b2bf0e791bbde93bd1a03e40fdfd8f88c5413ccb6f23",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/ApprovalBatchPreview.vue",
+      "sha256": "ef6af92d12fa7811e0ed2a3033874fa346dcb35eb29b24eea5d73f2a070fa5a7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/AttendancePolicySettings.vue",
+      "sha256": "029cfedbc4b934f59d49715bc39d1890b12b8a8b232c0163ccb425ed4d487d9b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/AttendanceRulesEditor.vue",
+      "sha256": "89256c66c67c7afe2414c55d044f303d35d08c34727222c9d7aae85e6d1947fe",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/BreakSummaryTable.vue",
+      "sha256": "1e5d1f0ba524df9a26a2f5341b35857ba2065059269522f313a277e1fa43d610",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/BulkAdjustmentDialog.vue",
+      "sha256": "084f9591703e593ed95013a34e5f3af93d5bba10f0589b3cb3ff67185284ad71",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/BulkScheduleDialog.vue",
+      "sha256": "c34b585bcd85bc893116ef91b2af0f25e6efdb7cec67aa0b0af6dd9be8edbb11",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/BulkScheduleEditor.vue",
+      "sha256": "d25d98e73a0a5c27099d836a9302a9b102e5002203f27c6907eafbeedc43a1eb",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/CalendarDateLabels.vue",
+      "sha256": "309205cce227222925ddb8cf307994c0a563e0a4a6589c72769aded212dfa1b8",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/CdacBulkDialog.vue",
+      "sha256": "349870621f902b838599e9e6d8c8417af56f4134db7ff2f304aad8f7087a19b0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/CdacCalculationDetails.vue",
+      "sha256": "79ea3fdaf5025c2452b1fa8b504d75c9f3b6b7731d2994aff59f06d96fcd4d33",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/CdacProfileFields.vue",
+      "sha256": "9420e438698a11417721aac5a1e5b7c5b026a05e127ec1cd572459b45db1fa65",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/CdacRuleFields.vue",
+      "sha256": "fbb913c15fa1effcd5eb49aa15a99d49a0d1f1468d5e21857640f08b0bd85ee1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/ClockLocationCheck.vue",
+      "sha256": "b9b1a2f9945efab5d7de1597ecdf5c8cd6145731b017cb80a68ac9edd19800a4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/DocumentAttachmentPreview.vue",
+      "sha256": "e34cd059cd9c5b7b8a66e88c4a90c1020d0c62d3104e20e6b357589ac7f7b2f3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/DocumentEditorDialog.vue",
+      "sha256": "feeba0d1ac0c0ac258b4120bc8c7142419379446dd44b1119558fbbe1b0655e3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/DocumentMaintenanceDialog.vue",
+      "sha256": "951b67e3588a72be257f4dff42998cf965bdf4c2ef411b36f7eb585035b5ab32",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/DocumentRecognitionReview.vue",
+      "sha256": "9e9fc2a63e65d2fcbf14f9b002b5e7d9c0d82f2d93d73ea915efd467bf61a1d8",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/EmployeeAccountFields.vue",
+      "sha256": "e274752833af31778d043f596a7c61ea0945cca4a2c4335017dbf6bab0e06f66",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/EmployeeDocuments.vue",
+      "sha256": "880e6c39f7ceab5ad1cc54469089d9278f481ff23c66fe8a0d3f644706bb0aae",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/EmployeeExpiryDialog.vue",
+      "sha256": "cea1a91fd05232efab5dba907975fd15a234b0f5042a8e2e5cd0b6e2a42e5418",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/LeaveGroupPanel.vue",
+      "sha256": "f16b3b36e5855a091a52c3d15ac3fcea1409de15984c6bd1c8069769322717b7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayBreakdownSummary.vue",
+      "sha256": "94b15d9ae63dc03b176091a445652f7288a60b2da261df3a4a57befa46bf49dd",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayGenerationFields.vue",
+      "sha256": "623def198ab6943e607573954d38c2980a577debfabaa78e2dbfbf87db83786b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayItemFields.vue",
+      "sha256": "31dea2c5f51ccffe3f0b66cd605b372150d405f750582452ffd74bcf562404c6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayRuleFields.vue",
+      "sha256": "35b08e26927ce4ffe927323d9d52a06849106c8914d00cae3125cd3f56e332a8",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayrollApprovalReadiness.vue",
+      "sha256": "8437b90b5be6a9b8e46924fd5d7c1b93ec2d1251a1c2c83dda986f6f542e873c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayrollBulkOperations.vue",
+      "sha256": "6021d37e8fe316c512958f8d8d3951a32fe0186db79cb31cd86bdd295d32b12d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayrollChangeComparison.vue",
+      "sha256": "e4ce18cf63e52550ae00a9518e4b61a762797f26fa6c9bfce8de450d82e8ed32",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayrollChangesPanel.vue",
+      "sha256": "88f07be4c19b7a3c431329cdf3354a32d3d917452aa07c41ca751c530a579481",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PayrollSettingsLinks.vue",
+      "sha256": "54a2aff279f951efe855571e362aaa1fc8c580b40113001f957a7d49fe5ce390",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/PhaseStatus.vue",
+      "sha256": "0c33ed7f8705f4765a69578e5b0d99869d5b06aa5a9b168f7f971c526750a70f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/RestSwapDialog.vue",
+      "sha256": "04bb88d24a417cd352bafefbabcdfaeb825a3155a60b15efdca0b989a6396886",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/RestSwapLabels.vue",
+      "sha256": "abc260cae0c05bd01c5d5c2f7a5a6b649d8430ee945af39dcbf2ed1139d9abd0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/ScheduleDialog.vue",
+      "sha256": "7b75f3f55f3babf8b4353b1c46a450e927de07bbc6ee33a0b92514d304b5f5a4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/ScheduleEditor.vue",
+      "sha256": "0c69e804e9a8b2f0a5988bb8c99a3314ebaee5697caa60d2b9566fea88ed6a5a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/ScheduleStaffing.vue",
+      "sha256": "cffd7d997401d7531947343ced71efe9458f2ac2b8671cc01e0db8de49508c8e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/ShiftPresetPicker.vue",
+      "sha256": "87ec50e4f822d43af53b3177987137e727c4b4286e210f9942530e72511b213d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/StaffingEmployeesDialog.vue",
+      "sha256": "9ba8c3a4750cfb257bd0c4b3bc0596dc7ab237c172fcd1726e6304b5f44125e4",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/StatutoryPolicyEditor.vue",
+      "sha256": "209db80f23afa6bc071ac8bb3cbed1b704742a6e9966ac31971e75767f014a43",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/StoreRestMonth.vue",
+      "sha256": "beed447753f78f3d1e6a5b8b2dd055781986b54cf4ab229569d6a06eab665dcb",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/WeekCopyDialog.vue",
+      "sha256": "bd4f676326ed17f639342ae51abb82dd51f188cf3e4226a4cf0c11ee031a6f97",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/WeekScheduleTable.vue",
+      "sha256": "cd56f3756e97fc1719e20740bab817964515b432aae6f61eddb0348ef9f9210c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/WorkModeFields.vue",
+      "sha256": "1793931bcb271a4ee89456946177838dd1a429d0ca22a551d7f2d743b479d80c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/components/WorkPointFields.vue",
+      "sha256": "5da5191b30daef94cb5207dc04d862598afb4e7fa78ae9195b9db4c56e79ab03",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/context.ts",
+      "sha256": "95eb8aa859ef5242cc826a37291e30004081fc1239b80f5ff0f3e6a05536b6ee",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/documentExpiry.ts",
+      "sha256": "884d451561020e278e0f428e0251f41780d69d87d945cdfdfd7bc73b72ad5083",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/documentImages.ts",
+      "sha256": "dffb1d10d837cce2160551b2fe4cea4de013bdbb29f6af6571232a7e7ec46bcb",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/documentText.ts",
+      "sha256": "37cbc9d7a293b09b8055a5369ded4fa2c6c7e9ba6f5e21bf4bf2beb957831cc9",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/documentTypes.ts",
+      "sha256": "11ce908e79aef4d1b3e53a57df1c628d539fe17c3e2dfde0e51d1579efa94277",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/employeeDraft.ts",
+      "sha256": "6fd7643316ecda668df0408cb4f467e7ef93eb6bae305a735e4f97af552f90ba",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/employeeExpiryCounts.ts",
+      "sha256": "aa922e6245004a3c3ecf2cd33c7983c8e03e8f219546a9edd27c796315de6964",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/holidayYears.ts",
+      "sha256": "74db8028e8c48bfaeced395940444b0da2853392ec099b22973dee5ed85a00a5",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/identity.ts",
+      "sha256": "8919bfca261e2f52e31f6501b4d91a4def964b449ffa86565e2d37b86e566166",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/leaveDuration.ts",
+      "sha256": "98b04870b580adb7c95417a1bffe1d1757cab4330c63753bfb8d5ba2a6da10ca",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/leaveGroups.ts",
+      "sha256": "81245789b867c316d26359007148aac52fed3b0c0a7624e94c22f05705b0f906",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/leavePlan.ts",
+      "sha256": "85e88d508728275d77af4b15f975722599628886adb5e4680f840e0b36ff9046",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/managementNavigation.ts",
+      "sha256": "9bea0503c4267d29be5e1dd3417b857eeebacdcf53ffb5455f71d6e29e40730c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/navigation.ts",
+      "sha256": "7acc8afa0560575faeb9b390940907a0d8edb78741057d709d312ceef6397a3b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/AdministratorForm.vue",
+      "sha256": "d008d8b57b6f02729e882f1120f8153cc738c047932903644c99dfa665c51818",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/AdministratorList.vue",
+      "sha256": "a67350199aad7a27cb73cf7df7119498cb333bdff14f4175e9607071917fc7e0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ApprovalDetail.vue",
+      "sha256": "93a795c006c856b05f3465080648698357b4b402d465715f806a48ae00ff04ea",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ApprovalList.vue",
+      "sha256": "90bb881c2badbc858b1f5c1ced94aea8d508b5819c569bff7eb62da660a93730",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/AttendanceDetail.vue",
+      "sha256": "18b60297f46e766125d16ad48dd08501ef35505ba6dd897cfce19b1275a6f4e0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/AttendanceList.vue",
+      "sha256": "02acad6da4b7bdbc10cefa1a027c214249a4a3670a3012ca1d24d92c69161523",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/BulkScheduleForm.vue",
+      "sha256": "5711c4363cf1f49afbacfc8b9f5f8ecc011e21768d4c1a3d3b52dd54424d7bdf",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CalendarForm.vue",
+      "sha256": "abd9eb7bccfd831ca93fd374643b32ed3c03729fc311341998af7227cfcd7c2f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CalendarList.vue",
+      "sha256": "d677b2a476e839ec2cce8db9b95b79a9d22ea01de6b8a8883b9c2256dd941fe6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ClockPage.vue",
+      "sha256": "31328a09162c49f3413ebd18fe19f9c352d2457bc85b807c6f3cdc72b42a198a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ClockSitePage.vue",
+      "sha256": "6a54e3aa8b65807aaca8e82a224d1eacb912039b6ab6896e26de60b2e661e91d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CompanyForm.vue",
+      "sha256": "ca9944326f31c8ab79f68576aeebf26ea19285fd84001b2dd7c8da923ab6a105",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CompanyList.vue",
+      "sha256": "37fd7be9cad99b5f8271057ec2cfd5a16528420546aff25569f705c0166a0c63",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CorrectionDetail.vue",
+      "sha256": "026fc6b63cf6cde1b75884d7661f9e1658d38a5d1d763d18894f1be3a5b5044e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CorrectionForm.vue",
+      "sha256": "ba952cb442237576a19fde7a934fd7111d1ebc5125bca3489ce2350d82e234ca",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/CorrectionList.vue",
+      "sha256": "761fdc4c04fd970c42cce6f9eb7da4c4eb1fbf7c7424fb671bebd7314f51c25a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/DocumentExpiryList.vue",
+      "sha256": "088232ef74649507052b6e8e36bf47705ad091aa1a5abc6306f8fe7ef70b4395",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/DocumentTypeList.vue",
+      "sha256": "b8be6aa1e764464f6e6f33f08d5462909303d35dd43307abe5a5b6310a6d095c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/EmployeeForm.vue",
+      "sha256": "da0d5ef2214e29ed969ae7d34f3ab060bd24090bb3b1d903a2a5e96d863dd386",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/EmployeeList.vue",
+      "sha256": "527d8795b392ac11ce685569998b993c134c06e2ee15381eb07dd999ba3c87a2",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/EmployeeStores.vue",
+      "sha256": "2980691d8938e194a88f0a3cd69aceaf610895894117fac6f25b574df9c509fc",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/LeaveDetail.vue",
+      "sha256": "4203e7532838fe1751371657db5b6a164b990aebd88e579558dc7acf16400cff",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/LeaveForm.vue",
+      "sha256": "15e42a9ebac1c0e4a2bd1fb75275cd1c904f04cf2d4b8025c26a78b7fb9dedff",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/LeaveList.vue",
+      "sha256": "910d9cd98a303e721b5158797a6156b791fe0ec9928e0ee0207275d74c19e7e6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/LeaveTypeForm.vue",
+      "sha256": "e03e804dad5fc391d467aaaaa44af42a8e767e6d62187c88db603c827c0b5a70",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/LeaveTypeList.vue",
+      "sha256": "692a83eda1b6e55f31e4317efec07f229bde70cc63e8cde73d16cc5b38a64da6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayProfileForm.vue",
+      "sha256": "6ae71dcc08bfe064f001f5923a10051d7deae0df1dc59653004c66cb2debd4d9",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayProfileList.vue",
+      "sha256": "948fb1da0667da6536a4128c7bdf9a39b7b6733104b210b37ae82b7306f2aa20",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PaymentForm.vue",
+      "sha256": "a22713cb322aa7b3317eb93f8800bbe485600723b721e99421100b0b37866159",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollBatchDetail.vue",
+      "sha256": "f3a491d7e3f5e38271bd6e127b0fadd86e5d919f4a785eaca21b696e9732a35d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollBatchList.vue",
+      "sha256": "e987f9a26fe526e109731c8d1aa04c61e898e74b34b9571400ed7be895df4f18",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollBatchNew.vue",
+      "sha256": "83a7d802a85e48fa6da0b23533399ba4449ed566a0cce8d87e4c60a39fec3f91",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollHome.vue",
+      "sha256": "a8ead7c91cbf1c761ebdc1a2110ea0dace5ea50442e41359aabf77d5d1bcf88e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollLineForm.vue",
+      "sha256": "359a56cdbb61d113e617492addd64a8898a9b0440a64d9c893eda9aa546e3e5b",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollReconciliation.vue",
+      "sha256": "12b360b41f1a5cf1d2ecf7130a785956e65b8678bf649c4e1e6356ae5fe6ed20",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayrollReports.vue",
+      "sha256": "03dc14f17090b8603373f3fed050e760ff27397e8b1ee5752665b2f368afd596",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayslipDetail.vue",
+      "sha256": "f9b966cbe65aaaf905a3688fc78f9470847a9346c0478756b5114daa965673d1",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PayslipList.vue",
+      "sha256": "24400090a5a5351eec5a1a74706757020a7068ab76dcd9b99dd6c82f6b617be3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PositionList.vue",
+      "sha256": "ef6e94dac47f52c1b132610bd55f3c72f45b083036919c377455d560921b2a6e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/PublicHolidayYear.vue",
+      "sha256": "ad5b2f922a9f942de299ddfe7cb6347a2ec82e8035158a0ab2dc4119d437bb05",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/SalaryTemplateForm.vue",
+      "sha256": "817ce9487774c03db86fbd54b5d7647084e6e2638111df646d05401da7e5b680",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/SalaryTemplateList.vue",
+      "sha256": "37939f0393e59fd622f70ab4befacb649026498c3e6973628fca03f71f1019a3",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ScheduleForm.vue",
+      "sha256": "66cff137f56081aec2ba94255248a58f8c3e24af699166ec2f5d30d1b31a97ae",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ScheduleList.vue",
+      "sha256": "e572d8b9f016645cfa2b9f6189e328efce3a107ea6a6a85c7d42ccad5b055451",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ShiftForm.vue",
+      "sha256": "050e03e6b35acf9bca2d76607c9fc94b744d984b22053768c81d383bcb627ecf",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/ShiftList.vue",
+      "sha256": "80d4c526085b856672508ae583b070dda15ae4e940321b22f4506b9383b6103d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/StatutoryPolicySettings.vue",
+      "sha256": "b0a780821b191995275c0fd7ced9c1e7811f595f8ff26bcc7550bb41afd3baef",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/WorkModePage.vue",
+      "sha256": "bf9a9bf4d2ea784a1f528f9a55617ac29fae0fb25bac8207c9a5bc5120e16949",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/WorkSummary.vue",
+      "sha256": "e54caaac1d74f4ad158b3080289a0efa2a407e3d848790d769d8ce157a647bc5",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/WorkforceHome.vue",
+      "sha256": "dffc36edccafb45ec324a1485e48e0b33107494c671b56ed9cd8c7f203a08a9a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/pages/WorkforceManagement.vue",
+      "sha256": "b96c26defbed3b5242d19288f279f1ea3c1518be1718ff4f8c423d627f674ac8",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payBreakdown.ts",
+      "sha256": "9af949973166fccaddbd0168c4155ca57c324196e461145d8a83a67829484a4d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payGeneration.ts",
+      "sha256": "709b959e1aa6f04d80a6574206a0f0dd7f9eec12b249267a47ec221c139bf826",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollBulkProgress.ts",
+      "sha256": "bbb825e93c0a5cfb65ccadb0a03f16a331b111c811b86e424502cf8ff0a4973e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollPage.ts",
+      "sha256": "54884d33eb29435dbfb6d0e67389b865a579accee4ae030830ff6ea81ca52173",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollProgressText.ts",
+      "sha256": "e8191433c254710219c378bbca1187781994bb3697249428b346c79b59aa8933",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollProgressTypes.ts",
+      "sha256": "c6757373e35a6a78071c7871ad0660e4032fcb0a5c4b437eac259d2245d8b3cb",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollText.ts",
+      "sha256": "acc00c13b42f36a7a06d716f187ce70ccd3bfb661c7a027980c233182e673f83",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollTypes.ts",
+      "sha256": "86cc07fdb503c3f7a9a84f0b9b5c1f75557bc8686158aa07bdeb32d548edac24",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/payrollUi.ts",
+      "sha256": "b331c53f3bd581d498db59961a6d78a0d1fc09e66f8a028871083e94acdb185f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/phasePage.ts",
+      "sha256": "ed53766df7de48eb06f37a0b4e7ff119b4c20083801b92608214753cef6de834",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/phaseText.ts",
+      "sha256": "14220ead3c2e603450ba2c1b3355df7fcd6abc0c00a0657975989b51a602db4a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/phaseThreeText.ts",
+      "sha256": "e12f353db5da5c9bafb903b9d1ce0584f531669aa229b25f14aeb7433d5d8315",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/phaseThreeTypes.ts",
+      "sha256": "ba0b9d6b5dafe23fcc79c02e6fb745ecc2ca935c1468504194614a0dd36aed49",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/positionText.ts",
+      "sha256": "1b395be514eaf34de514d2636d1ee7cdb48a49885caf3395046afe579fd6252f",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/reportDownload.ts",
+      "sha256": "bf2106bad3b655ef6f77443d41072e9335dd5353f03b5a40993785c4f9e8316c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/reportText.ts",
+      "sha256": "9c921c9d1317d2a8d8451f0a594eb90b880f735bd2eba91487e6d7ecba63f9a0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/reportTypes.ts",
+      "sha256": "f7e0f67f3f20b4703ce18c55bef0b66f5b9ab9a37c710decad05c4844ed1ed5c",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/reportUi.ts",
+      "sha256": "9135824fe3439e22ac14f9ebfae7dc29f91a43c7550d8348497fd9f4c3ce4201",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/restPolicy.ts",
+      "sha256": "5df4baa8ddf96772491d5cad81146ee02d4c0c2bc5bc666ead78a90950395103",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/restSwap.ts",
+      "sha256": "14a31f59d1da1966876ab56872a543ccd5cba3d06b44f4b76ad926bfeae58057",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/restaurantShifts.ts",
+      "sha256": "f45d9c2bf3c9ca92275557a06c963d2b488fb011424f1dbdf6c67ba656fff00a",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/routes.ts",
+      "sha256": "4aae062d88edaa76fe93046e1956766e7e75dcc34961d2505659d5efeef21246",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/scheduleSync.ts",
+      "sha256": "47da27addfce91a933b76dd95d7e73cc2aa4aa5279301fafb551abc398f33c6d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/scheduleText.ts",
+      "sha256": "f47c1e57715207dba2257213a39d4c77046fb231b716fe08b8e82c3efbfca43d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/staffingSelection.ts",
+      "sha256": "14fea6cee54aeb5ba7e993b27f6ae05745570e1b699313cca6d2256be0661fd7",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/statutoryPolicy.ts",
+      "sha256": "8cd429b8ace1828b2ad2f88912a835be274c49a708675873d645c92a239acd34",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/text.ts",
+      "sha256": "a7cefe1a5470af0e00411bb785f945ba5e2d5a719362fda5d1965db52ed41197",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/time.ts",
+      "sha256": "88e39dd55d9588c5d56c562546343d7489e1058afa969a615869eee209404094",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/timekeepingUi.ts",
+      "sha256": "8703402e85c128da2f45ed74beda2933799ef7cf1151eb0bf735d0ed49c8a9a0",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/types.ts",
+      "sha256": "a5289fd690de8956ff36fb0d90707338b9de3055699f0db7c0ed88a42b1683ee",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/weekCopyTypes.ts",
+      "sha256": "31294ffad3448522edafa129b877fd4c77f91731d024898d54f1032edfa8b42e",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/workMode.ts",
+      "sha256": "2f7b993795ce6af3545a40f7985c473a4fcafc5e765d65d07ca2c0a2397fb6e6",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/modules/workforce/workforce.css",
+      "sha256": "592301bffa20435d9d8a03f44d7f29a4580f313b6b6c4c86095ec3e38ffc3a6d",
+      "gitStatus": "??",
+      "role": "runtime-workforce"
+    },
+    {
+      "path": "src/test/frontend/approval-workbench-ui.test.mjs",
+      "sha256": "1f61d9f5bb6db57ef23a01594d9d8d7086905384c5f98a27edba2a68666e3a09",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/attendance-review-ui.test.mjs",
+      "sha256": "bd72dc3b2167ebf57926ee190762b2d8cf43d81a59c1ea050c8fc8f40b5cb8e9",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/attendance-rules-ui.test.mjs",
+      "sha256": "c52065c36c810bb5045efda84fbbce24d5f4126197e6fed611b776ec6e0249f3",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/cdac-bulk-ui.test.mjs",
+      "sha256": "d38ce1d668a7188929ac3b50ac81b35227dbf7d3282e708a807d933d930f9705",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/cdac-ui.test.mjs",
+      "sha256": "0ddf217879eb145bc0c9fe426baf4b4d4880edb124c50a84d0891e6d1d329d39",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/cpf-document-reference.test.mjs",
+      "sha256": "b966149a77ca9cfe619861326ec8bde60c272b8fa218b8f0d72335482b77dba1",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/cpf-profile-reference.test.mjs",
+      "sha256": "eb637629e50ad4109065ae0990b39856a83dae117f11a51f50d31d889266b326",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/document-ocr-ui.test.mjs",
+      "sha256": "645d906757b04f71a576caa0b8df9a1d60cc81b41278b4e43c865175b83945ae",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/leave-duration.test.mjs",
+      "sha256": "bf493d982e84c2f1ee417ec4900eaef3cee9cc0b5cf9fdf5ccb03d5165b90332",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/leave-groups-ui.test.mjs",
+      "sha256": "10b63080e363e96483f2af700bbc59f2dc8a6ed1e90bc4432a03c28940864208",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/leave-plan.test.mjs",
+      "sha256": "da89fa8a8440fe29892bfe96775fe81796c6946e0e2fc51c5a211f22d1e4738b",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/leave-ui.test.mjs",
+      "sha256": "ada3f0535431cd67a8583297a1f8c34411ab4c816b8ff3867ea287fa9aad65cd",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/management-cleanup.test.mjs",
+      "sha256": "273d013a1deddf2dd285e91c0f2475e5b4e3a8dd561bfc67fe54af31d5576d46",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/management-navigation.test.mjs",
+      "sha256": "6561ce8bf42356c69a4aa43200fa6513fb83fd6817bf532b8652b2aae4aa0bdc",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/payroll-breakdown-ui.test.mjs",
+      "sha256": "7afbe72d5d3ae1ffd42a36020558baa9db23aa6bd5fba370b3e40d6dad64f683",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/payroll-progress-ui.test.mjs",
+      "sha256": "4d33eebf6a24eb3b0df08efce086856dfc8ac319b5c117f58992b8d02e45efd9",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/payroll-recurring-ui.test.mjs",
+      "sha256": "313d363f4f79169846f5d9bab549aeb0c61484ea5f1034d1fca8db01e4cf8fbb",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/statutory-policy-ui.test.mjs",
+      "sha256": "bace1d51bd908377865d8a3a2d2dd3eb66a83a1a2e179690681d3dac2b80a620",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/workforce.test.mjs",
+      "sha256": "273937242488c79bc222577711eee7179de2e714718f5525ab770f2452c4160d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/frontend/workmode-ui.test.mjs",
+      "sha256": "9667bb38c7ce0fadeed81aa0dcafa53f898852fc7fe3cb500216d53c3fbfec88",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/platformbilling/StoreBillingConsistencyPostgresTest.java",
+      "sha256": "8a07b675533c958978e0ddceb085fea32676c68372d818c79a2576d0be7cdca2",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/platformbilling/api/PlatformSubscriptionHistoryControllerTest.java",
+      "sha256": "078d173e8c3b6be9f2a5d2c51f9af5558339c6baba5c5fe738fed695168ed8b4",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/platformbilling/api/PlatformSubscriptionHistoryLocalRuntimeTest.java",
+      "sha256": "f291a2e1e17fcaf10c6c817a26995409b4e20bd3de04dd3af99172e6ec6b1ceb",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/platformbilling/persistence/ProductSubscriptionHistorySnapshotReaderTest.java",
+      "sha256": "329d258f641b346f4fd3b6aa2a6588f2bf3277daf3b51ae47f0ff368ecaef8db",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/ApprovalCalculatorTest.java",
+      "sha256": "aaedf554c1ad581bea7531f17d6380b056390a9e9fb375a8c3185fb0dbadbe30",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/AttendanceCalculatorTest.java",
+      "sha256": "13b251ce506be1e9fb3bd33cf3c7434b6716b50f7439fd8963dbbd931d9fdd0e",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/AttendanceJudgementTest.java",
+      "sha256": "3b8081f634512ddba75af3a19110187dc93df4895c99adca0dbf14ee221af684",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/BreakRulesCalculatorTest.java",
+      "sha256": "c8bb2ed0fc34f6906e4be649f5a5d4c571eba946d7e1bd07556e3416cfd80363",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/CdacBulkApiTest.java",
+      "sha256": "f7a8cbae0c7665ba34600bc7b90c451174b29005a8bc39b426ab7f0f94efc876",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/CdacBulkPostgresTest.java",
+      "sha256": "df32273037cbb56834187a4f8ad2222d6409df37424baf529be80308292e014f",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/CdacPayrollTest.java",
+      "sha256": "759408dfa833d013cb8d9f92f296487e5609fd963d4b8cbd1f1f7529cd76301c",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/CdacPostgresTest.java",
+      "sha256": "49c3dded50892bb8e03e9e0f6eef81536d644078c41fed472500c5191d54989d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/CdacRulesTest.java",
+      "sha256": "f2dca553c82a22708984cb2d965c7afa18a2a1ce62bf22a9209e6a468045fb1a",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/ConfiguredStatutoryCalculatorTest.java",
+      "sha256": "f5c1fe3573bfdeb397e6dc16f4909da8b881f9549b94ba944dc6c66640a5763b",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/PayCalculatorTest.java",
+      "sha256": "cfa9c93038fc44506262c4c7620fd1d454af42b2a416db4ef9da171374822086",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/PayrollBatchConcurrencyPostgresTest.java",
+      "sha256": "668cb3648f2ac9de114183325dc6ac7307148ddbd993e5bd3bb4be6982efbaba",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/PayrollBreakdownPostgresTest.java",
+      "sha256": "eb09e55073921c552ca1813b67aa32ee79c13f0746cff73045bd03896e368b7d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/PayrollBreakdownTest.java",
+      "sha256": "403be9ef6b39a3cb1f65d892c23f279326a84cd6508a2a8c5edac2acd993b9ef",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/PayrollCsvTest.java",
+      "sha256": "602b56f347a15760b337b739ca5342d05b0d23ef72171a8cda3fd33ce3b7343d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/PayrollReportPostgresTest.java",
+      "sha256": "04c2b5f964b9500f7d7b7e7330f424403d576bf4fd535964430de69b6f55d0f7",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/RestaurantBusinessDatePostgresTest.java",
+      "sha256": "94051535a10db95854357b7500ea768102c058f7f9c7a94c2d10a6056c4e3db7",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/ShiftTimingTest.java",
+      "sha256": "5d744cf2242e89e6f9f0efbaf253b121255fe0b76e327e7a448632cfa91018f4",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/StatutoryCalculatorTest.java",
+      "sha256": "f20463d3f9b4834a097bbc71cdb8055a5af0e38e21645d22d4c1e10893e7b348",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/StatutoryPolicyPostgresTest.java",
+      "sha256": "0c56a64920a2777a57beee1f9fcbbff988478f35ba69bb9d17593c8b09c840ce",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/StoreClockSettingsApiTest.java",
+      "sha256": "38af3075652df6bd57c52c2f266fe2d7fc575a78e42d86ee59cdc04375c2fc2d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/StoreClockSettingsLocalRuntimeTest.java",
+      "sha256": "520e8920fc3bc44600d00e186019933528339f6846e3d247eb0abcbd41d3e46d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/StoreClockSettingsPostgresTest.java",
+      "sha256": "c5ad453922d8c577b4227c9fedf3606f019e52f7ba8d0c85ebe6c02b2cad8add",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceAccessTest.java",
+      "sha256": "2c6138341c5fa633d3c0463279e0d0c7f63c3e18011a97284523f31e8df4c1d1",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceApiTest.java",
+      "sha256": "29104cebc5e03f8fef0981aa7bcfd1843590ba8d0d2836a1305836780c75ea15",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceAppGateTest.java",
+      "sha256": "89aba97578a4b0fdfae3d9490fd762a3181445ed513efd95d271defde553ede7",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceApprovalBoardLocalRuntimeSecurityTest.java",
+      "sha256": "3a9fa6cc6074d59324012f5fe9d4771efd5874d2aac3eee6bd9c1b88ef4967e4",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceApprovalBoardPostgresTest.java",
+      "sha256": "083fa79edf02dfe44d9519586949ec22f5eeb3df8691f18fd98bb94d17119307",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceApprovalPostgresTest.java",
+      "sha256": "8cc5cebf7558e45a156e425a5f1a19127b47f7767c0138800aa29ee81b6e0e3d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceAttendancePostgresTest.java",
+      "sha256": "69ceb8dcd9298bb3b87ef3b2ff5598dbf51ba162a1da1c46fe7697f8828326ea",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceAttendanceRulesPostgresTest.java",
+      "sha256": "49f8d1fe861a5f99186a20fd130ff5f5ada6e0a5fd58299f64397bd17976071a",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkAdjustmentApiTest.java",
+      "sha256": "8f7e2c228a5be89e6576a352e27bbf45165f3b420c2380754a56b4312da84c20",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkAdjustmentLocalRuntimeSecurityTest.java",
+      "sha256": "8dc1d3f8425c20f4b89ac3e19bcffe9b33eb9dc20880516c725f99691383d525",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkAdjustmentPostgresTest.java",
+      "sha256": "a259d3fe39dc5306e5dc10e773e0954e103dc50dc1718033a7502d7476d0d30c",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkLocalRuntimeSecurityTest.java",
+      "sha256": "c5e5dfb6ec218ce799126bdb802ee8607ff2ebcc3f128a7d7d55228df4d5ec40",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkScheduleApiTest.java",
+      "sha256": "39d43884f74a61bbbb073e90001b838feb9d38f3a25c52fecbe2bb595f9e2f21",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkScheduleMigrationTest.java",
+      "sha256": "eab7de79ebc3d87892d5d3e8b44ff0903be71367e3abd3dc1435812c70de4416",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceBulkSchedulePostgresTest.java",
+      "sha256": "3439014c2b6421d7e1921a247bfd1d12fecb0a1ab18126a2a57482c6f268a907",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDiagnosticsTest.java",
+      "sha256": "e0e715f613200e8fbbc27d67d9b05e01aa2c527948eeab471b968693be3bf4d3",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDocumentApiTest.java",
+      "sha256": "60de9d81a7282d1ec707c3b5b04229ccd4b1fd8c59b9c520a63d4dfc3e546c21",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDocumentExpiryApiTest.java",
+      "sha256": "870c499dbb019201157f2a1249611840c90d748f5b4838fcaeeaf398d56338df",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDocumentExpiryLocalRuntimeSecurityTest.java",
+      "sha256": "6a89fc548a0a5d6072d496300ca3857f67394fd4c8a2d70d8d0bbf6bf56cece2",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDocumentExpiryPostgresTest.java",
+      "sha256": "a0fb3ccd82c7f629f8ff9cd0f3dc98b6b99df10018f41b4b8c18d5677351affc",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDocumentLocalRuntimeSecurityTest.java",
+      "sha256": "0b6974990ef5a6e86a5c9d8e080173e276ed7dfe54128bb9af38c4d5d4ea67c6",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceDocumentMetadataPostgresTest.java",
+      "sha256": "d2835ebec2b695d89a8298504f95ca816aed97618ec060a3be07983a59e53b6f",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceEmployeeDocumentsPostgresTest.java",
+      "sha256": "fd2bf0a6065680ba59936f3c56a866b0332485e500795b18eaeed9776eabd4c1",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceHolidaySettingsApiTest.java",
+      "sha256": "f0113f22155786f5155cd70353a14792d0baaad733a6b05ad0ad05da456e58a8",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceHolidaySettingsLocalRuntimeSecurityTest.java",
+      "sha256": "d68d6ae61daa261611ed72a74a8c0b0066b4f106fa7fb8bc7db0d4bd128750e7",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceHolidayYearPostgresTest.java",
+      "sha256": "cb3c39fc3f124460a19c3c113cefe4851d85328676e01a947fb4e3b30af93124",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeaveBatchApiTest.java",
+      "sha256": "6911f0980cdd2af83047d7ee87279d205e2d11c815b4641d609490d11b50e6e5",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeaveBatchLocalRuntimeSecurityTest.java",
+      "sha256": "98983e8926ca28809352bae06712742d102333fd20ad3d441fd676e6938372c5",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeaveBatchPostgresTest.java",
+      "sha256": "815b4de94a5ccb6c16169732f21956427ec3e3a02e816e09403e86a6350dd6ce",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeaveGroupCancellationPostgresTest.java",
+      "sha256": "7a7483f723acb9e2f86d89905e57f68bff1bbb604074a2c3ffd1931971f16f7b",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeaveGroupLocalRuntimeSecurityTest.java",
+      "sha256": "ebec72264bd58c61bbb8c4c23a55b4cfa3969c036bd0104a51f25efffc58643a",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeaveGroupPostgresTest.java",
+      "sha256": "bed27873736debdd453c23d23eafc36748fc5891edb3a895ee38949695c6e1d5",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceLeavePostgresTest.java",
+      "sha256": "ccb1e9a802008af4599e547e89d5bcc10c402620c4ad49cb19d0810bb8500ccf",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollApiTest.java",
+      "sha256": "ace722fa97329394924afe2c4382a975893490d0fecb6139a9589501cb970883",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollComputationMigrationTest.java",
+      "sha256": "c8206b495eca0f77f01c403e7b0ae2b1e9a76ffb7b43f465908e075b344bdf6d",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollConfigurationPostgresTest.java",
+      "sha256": "d8183af0bc6eae87d586727b8498d3c47b3e8446365f5ca906cb5457c2aeedad",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollIncrementalPostgresTest.java",
+      "sha256": "4b651b0294fe43a04d5f1e98213b9c83768c685ab44ec565c6742fb817dbdfb8",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollIncrementalScalePostgresTest.java",
+      "sha256": "85a0ad7a7df88dd405aa4d4dabc89d533ea366d20504f06c81c9025f50624dbe",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollNaturalConcurrencyPostgresTest.java",
+      "sha256": "6ca0d88b8e3722d1a0a9005674f43e407e14ffa24a8424943d4b6f1ff99e16b7",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollPerformancePostgresTest.java",
+      "sha256": "d24f9eb33e6cc60674c29309e4d164a41be4c3ff8f9f69cf52cc0c41d4633db3",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollPostgresTest.java",
+      "sha256": "aa64eef63aa8aa6616f819d135a911d22ef5ac00f698f1bea6204d8c76210cd1",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollProgressApiTest.java",
+      "sha256": "8d5dafa3bf353a8fef91882dc08ef9e7c56d5ef9123e1f779951b79c14dfc49f",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollProgressLocalRuntimeSecurityTest.java",
+      "sha256": "04963887ab08f75b023cac8cbc2b4cf4d447ae2289c44d29d8a185aab4523218",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollProgressPostgresTest.java",
+      "sha256": "6d6d7d62f969b128866368d0f93db6941f9346181ef1ccf649f149e7dce1c3c5",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePayrollSourceEquivalencePostgresTest.java",
+      "sha256": "83f601d18704a1735b5e8ea756b434575f1733aec75ea0cacc9cc9ac2c2e9603",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePositionApiTest.java",
+      "sha256": "2c697588e32f0dec34c449cd490ddcec0ab520cb6d2b34ac0eb9f237442d2c00",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePositionMigrationTest.java",
+      "sha256": "543f0ef644847efbb261d3978ed5dbed740cf631124b0d9dac07e1af708b2066",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePositionPostgresTest.java",
+      "sha256": "afb633a3ec6ef33d116804394d6cbc787e239a3cf39d48538e30976dc7f1f653",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforcePostgresTest.java",
+      "sha256": "20445939be3c412403b015c3d5c2575fd84928984c036b4aeca127b877f1b0ba",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceRecurringPayrollPostgresTest.java",
+      "sha256": "782c46a2d31b77ed6a9b191ebd4399f9d26291e5c211389a670066ba489e0275",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceReportApiTest.java",
+      "sha256": "ed84f8877b84c1af0ec401684c2aaa87a1b87cf5cb6b475f039ccf0ec4da905e",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceRestSwapApiTest.java",
+      "sha256": "4811bff25e639822a210dfb2ff98e41eea3253c4333171abbb5b8fd4b80a19ee",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceRestSwapPostgresTest.java",
+      "sha256": "9998780bcff59db96c8a9cc26dd55b7486411b209b498f67e4f947e8adbb3884",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceRuleTemplateApiTest.java",
+      "sha256": "92c5d704f2d1ebf6cd23746a2cd155290450a88d93f43214bad1f346a3a4f452",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceScheduleDeletionApiTest.java",
+      "sha256": "e9840e553163bdb250d90bace30d22b1f9b26e60709e77e2aa9da1135b3de617",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceScheduleDeletionLocalRuntimeSecurityTest.java",
+      "sha256": "45d576ba086fc7465dde12a798b7458fe59d46b7610e9fd97d1ee11f17220b6f",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceStatutoryPolicyApiTest.java",
+      "sha256": "23bfe52e6062c0b80515b6a28ce86cbe0eb5efd81d040a5e507964e6b08aa192",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceTimekeepingApiTest.java",
+      "sha256": "4194d5c43027ace1468c10bb731880776a7c9e61be00e5051705514e49c46ba1",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceUpgradePostgresTest.java",
+      "sha256": "7a6c7ba0a777c88c39ef030e12bbf8e24d2c69c186bfa033273be99d294cf6cc",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWeekCopyApiTest.java",
+      "sha256": "c8b2bdeb5a548a42c4c5421aa66eb0eb5b092a826cb433445c2bde2e1baedcbd",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWeekCopyLocalRuntimeSecurityTest.java",
+      "sha256": "6d7924a562d27c14601d1034da0081d44759bbbb020c0f6c58db2eb1d2f3ec74",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWeekCopyPostgresTest.java",
+      "sha256": "2e22bb0f46014b2399bf3d30a222ac03c886ebe1791d150d214bb5e0ecd8778e",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWorkModeApiTest.java",
+      "sha256": "0664582dec956d61e402beadc3d9a94146b07c5291ae22a10e60611a661d46bf",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWorkModeLocalRuntimeSecurityTest.java",
+      "sha256": "c61a8c11a54b320088014b9725a3fb92b06d8f5ee8a849a78d7854c8d1cb51fd",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWorkModeMigrationTest.java",
+      "sha256": "ac171a7ac8de116a13ea1eb0102f758c97b706d0e891c0235b1c7f6625e93c10",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/WorkforceWorkModePostgresTest.java",
+      "sha256": "0be44d332d5d02e5bcdb56fa0147a728bb0817b8c66426a6fbc5949a09a9fb6c",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/documents/ocr/DocumentOcrParserTest.java",
+      "sha256": "ec349ed112f11bd8ddbea02d05bbbf4f5780504bd562b7fa500b088fec40cd2f",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/documents/ocr/DocumentRecognitionServiceTest.java",
+      "sha256": "b2afd1778ae801f4f00a195c4d1aea6ecf4c9d4b78c4919af7a4c674c7566dc8",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/documents/ocr/LocalDocumentOcrEngineTest.java",
+      "sha256": "57953d9c021fde292e26cbc784e9dc1321cf9db5e667996bf77e4f5de85222c1",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/documents/ocr/WorkforceDocumentRecognitionApiTest.java",
+      "sha256": "1de557202613ed30903e62de7848fe2c879ab05e1098795ec319f3a56ad907fc",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/LegacyPayrollBatchService.java",
+      "sha256": "e270b2005be2785164bc770dfe64557b901f26cd00adab8c55a578b6b58f74e7",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/LegacyPayrollCalculationService.java",
+      "sha256": "5d3221bb7651ea2ca0f4b37d4befa71d0cd92ec21b458f66c60d53af83c391aa",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/LegacyPayrollSources.java",
+      "sha256": "e802c47c76e92d0923e89d4f8a58da7c713d86c1da6f3165ae3993e21bb1a63f",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollBulkServiceTest.java",
+      "sha256": "aac6a78a390b1281f52f7e47cd1be101c4737f052189bd3a860fd4872bf0e809",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollCalculationParallelTest.java",
+      "sha256": "dbd0dc0814f0fc21bd21add5de9b7c16b605635143987b2b548193af3cdf521b",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollChangesTest.java",
+      "sha256": "edf42fcd999b71d2c9b0d3c7b287a447a11a8918cca2913917d38b7d7e1819f8",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollComputeExecutorTest.java",
+      "sha256": "5097ea5c3d4d9983cc81ca9f9244a7d6c4d01ecdd8935a92e52e4f3489b6d34c",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollConfigurationBirthDateTest.java",
+      "sha256": "47b11bda8c61c70e470166969eda2c0d18da2de8806d90adb114cd73de40e8b5",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollGenerationTest.java",
+      "sha256": "11adb2ab970693e0cc40c0d7d5228ca04ecdbee625d2c74dd8a2d453d205baa2",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollIncrementalTest.java",
+      "sha256": "dc7b8cfaea976523a70826c7c07dbe88444cb3861dd078321855b8ffcc078a39",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/payroll/PayrollProgressServiceTest.java",
+      "sha256": "26f3963f43db78d092f0f71b989462d4ee943b9edbd34d2aecd799a5ec998d92",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/reporting/PayrollReportValuesTest.java",
+      "sha256": "7b1f39e894959217b34c5fb7d0c609a8274d3a715fbcd582727767f400b68393",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/workmode/WorkModeApprovalBatchTest.java",
+      "sha256": "a984626023d41d6790d81c9218b70f74b4aa4df7ecec0bf9cf05c9e4312d0991",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/workmode/WorkModeApprovalPolicyTest.java",
+      "sha256": "4e8f50c684d269f11be6ec0bdf956e14eb57fea3191afc5c8f7b238a6650f427",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/workmode/WorkModePayrollTest.java",
+      "sha256": "990a97295540b1eeea6c85b937d6c4213478b45ef6dd058bd797e737c4eb10cb",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/test/java/com/rpb/reservation/workforce/workmode/WorkModeRulesTest.java",
+      "sha256": "0fc98429c56f3d3c0f741520c72331732b02137c5c9598ff75f545f0537cb504",
+      "gitStatus": "??",
+      "role": "validation"
+    },
+    {
+      "path": "src/types/platformSubscriptionHistory.ts",
+      "sha256": "32d1ab297bc3de3833a9cc2ca6b9ac4724be080bcc672dde9482debd53f26515",
+      "gitStatus": "??",
+      "role": "runtime-shared"
+    }
+  ],
+  "excluded": [
+    {
+      "path": "src/modules/wallet/components/WalletChargePreview.vue",
+      "sha256": "41ca1814e6bd03c516e3d6fe5e074f35fbbeb45ee3451e833bdeb88ee39a82b5",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletCustomerSummary.vue",
+      "sha256": "00fa03c4ea3e7080c175ef59f1bdb206adea31c7a691d63f2c2743c8d7315253",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletIcon.vue",
+      "sha256": "8d7c6076e394ef25edc345c27a43a51d8d940ccb4561498f81a8b1471aa0e41b",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletLocaleControl.vue",
+      "sha256": "9f6af9fdebc7206a41035d8ba2e45b6f62ab091ef6f6bde7ca5466815955a6c6",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletPayNowSettings.vue",
+      "sha256": "f1f411d18816f1af18e1cebdaf15bb7140c6bb035f88a7c6c2c58824ccaaae51",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletPointsEntries.vue",
+      "sha256": "587a9fee01e3c178812e3e6c6492812866e4a4daf30fdf9399a8b17e6de47776",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletQrDisplay.vue",
+      "sha256": "dee49dcb8603ded469450f93c49a5b790ad699dd84134936d81a2ae07642401c",
+      "gitStatus": " M"
+    },
+    {
+      "path": "src/modules/wallet/components/WalletRecordRow.vue",
+      "sha256": "e4c9c5613a4fa722734d9ec71dbe754d56022680399310dc040361cba97cf2dd",
+      "gitStatus": " M"
+    },
+    {
+      "path": "docs/development/PRODUCT_LINE_ACCESS_BROWSER_ACCEPTANCE_20261022.md",
+      "sha256": "88646e36d7b6c02cd04180fedb2b0a0b7881fd7929c39ebfa56d8a6511c8f34b",
+      "gitStatus": "??"
+    },
+    {
+      "path": "docs/development/WALLET_QR_END_TO_END_ACCEPTANCE_20261023.md",
+      "sha256": "bff7d0ec6f2e5b7a5c80a64135ea1e687ffea359c701d4ccb4a004283875b79a",
+      "gitStatus": "??"
+    },
+    {
+      "path": "docs/development/WALLET_UNBOUND_MERCHANT_ORDER_FLOW_RECHECK_20261024.md",
+      "sha256": "6d1ffead474763585f6e856da758b2c9b0204500c4ccb9cff6cc263f3b14850d",
+      "gitStatus": "??"
+    },
+    {
+      "path": "ops/__pycache__/rpb_backup_retention.cpython-312.pyc",
+      "sha256": "b157bdfda73f5b4b063aeaae26975958ffb08ab301de9fc30471526f8410f463",
+      "gitStatus": "??"
+    },
+    {
+      "path": "ops/tests/__pycache__/test_backup_retention.cpython-312.pyc",
+      "sha256": "5e6f91c7d533ab9c7bdd2628f33808204901ec38ca5fa661ef8c748b5f28c049",
+      "gitStatus": "??"
+    },
+    {
+      "path": "rpb信息.txt",
+      "sha256": "17121cd0a39ed1a14f70901091d92c5501a79f104315708656cc7ff3ef168726",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-acceptance-api.mjs",
+      "sha256": "92a8fca9a07f1e45307d3a501b2a0332ee9308683076d23ceee99799bce3e978",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-acceptance-csv.mjs",
+      "sha256": "d0d84fbbc9fca966ca07f6ec6df2d08171cf6767dfd062da8e063e1580dfe7f2",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-api-acceptance.mjs",
+      "sha256": "d20be7bd310f4c5994df096e1228368f9a61b2c2c888f525c9244d6223dfff86",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-bulk-local.mjs",
+      "sha256": "24da017eeded33f63fe61b0553fe1add80d79c268ff427d5f2d6171eea86baac",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-bulk-smoke.mjs",
+      "sha256": "748f103e15d76dd32becd826d2a15f739c261edcafa939b96fa3358f87df0749",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-e2e-seed.mjs",
+      "sha256": "d96ac35edda9a09b24466e4e656ca20c9090b221c656040cf9f5d68d168a6033",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-e2e-verify.mjs",
+      "sha256": "5ab93ec8a2152ae748c28d5ace3e308ebe0236fd22c38c10938ff708c83feca2",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-fixture-session.mjs",
+      "sha256": "0c6056da9bceb785c4d57458f142749417ff4bf4251bac462db0a34a608ee903",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-fixture.mjs",
+      "sha256": "8b4bfc910c210040318b7834f2262ad4198d7b335b0fb494c6b7a6644a89ea9b",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-package.ps1",
+      "sha256": "93d2deb668e03f419c5d9a7065c5cd697ed9beecf0eb60fd957a620590105074",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-phase-five-api.mjs",
+      "sha256": "f6879a465022ebfd364d73fd8fbed53a52e3ef3f3abbb9de50ad294d241f2065",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-phase-four-api.mjs",
+      "sha256": "2937524efd5cad845e9849054a830c8adf882b555b8626397f0724ecd4aa6110",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-phase-three-api.mjs",
+      "sha256": "5110ddcbc7b08efdd630782f00d6b97ed358b9b4a34d7c6c0dd9039871bcbbf3",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-phase-two-api.mjs",
+      "sha256": "278ecc2acd696ffe265ad9bf7d10021d88ec1fc56392b22f03e857a30d858721",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-positions-local.mjs",
+      "sha256": "b1403be8e8408a49a62e8d84cc4bf4bc87d9b8bce0ae8c072779eee932e35311",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-positions-smoke.mjs",
+      "sha256": "6df37ee7ee18b9fbb950de7f9a6a817a1cc790918b31b524601539ffa4695e7a",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-proxy.mjs",
+      "sha256": "1be1d00f04482a229b1db6e85c7ee73804e5c2f5fefaa05e12bbc5f3874fe253",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-restaurant-acceptance.mjs",
+      "sha256": "da4f454802787c832bb164da634299505311de4dcfad6eeb25f51422144b2ca7",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-rollback-acceptance.mjs",
+      "sha256": "10dcbbc9191ee99906765de5cfe1db194304607befb68abb0a2565a0d7058761",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-session-smoke.mjs",
+      "sha256": "0d8754326f54197d7d22add2f11854bfb5ea93cec5b6a7c58ad2a6bc1273a216",
+      "gitStatus": "??"
+    },
+    {
+      "path": "scripts/validation/workforce-start.ps1",
+      "sha256": "8c91cb166b884dee74abff7138d85c2fcf44cd7b9240af21c972cc45a75bd214",
+      "gitStatus": "??"
+    }
+  ],
+  "noCommitPushDeploy": true,
+  "scope": "Immutable local release candidate, not production release approval",
+  "artifactFiles": [
+    {
+      "path": "target/workforce-release-20261030/backend.jar",
+      "sha256": "e27da78337b98dd1da5accc88dde75db649120e028fbf1b9196979b94367de7d"
+    },
+    {
+      "path": "target/workforce-release-20261030/frontend.tgz",
+      "sha256": "d8ccc17c1feb8909fde2956fc1361f547643663b8847635344b2de4b6a339734"
+    },
+    {
+      "path": "target/workforce-release-20261030/candidate-source.tgz",
+      "sha256": "dba64feea1e4e25b6558073a60d9a3a8331159dbd74b369bca08669f3ea33fd8"
+    },
+    {
+      "path": "target/workforce-release-20261030/artifacts.json",
+      "sha256": "66548a5457869ede3047719d46f5d038f934741c9ee0a5604bac9057ad473ee8"
+    },
+    {
+      "path": "target/workforce-release-20261030/candidate-files-r2.json",
+      "sha256": "28ee3022e670122551d84c7524a17c3c2f8adb2cb02ebedc50d571f111992272"
+    },
+    {
+      "path": "target/workforce-release-20261030/frontend-files.json",
+      "sha256": "935ddfef92d674cd23ef60536a32cbf14b6dc73763b3d4c1b9392e777a706356"
+    }
+  ],
+  "verificationTools": [
+    {
+      "path": "scripts/validation/workforce-candidate-verify.mjs",
+      "sha256": "90628be36b142ca231744afbf4469efa5dd87d9269019f22cb3c3f6717ab88a3"
+    },
+    {
+      "path": "scripts/tests/workforce-candidate-verify.test.mjs",
+      "sha256": "cfa1b5a001fbb34d718e6dc1076d78cb328e2504ef17458dc754c8cc191f0fa1"
+    }
+  ],
+  "tests": {
+    "candidateFrontend": 359,
+    "candidateFrontendFailures": 0,
+    "freezeVerifier": 2,
+    "typecheckAndBuild": true,
+    "mavenPackage": true,
+    "allBackendTestsRerun": false,
+    "runtimeClassAndLibraryEquivalenceForReusedEvidence": true
+  },
+  "releaseDecision": "NO_GO: real device and business acceptance plus actual cutover conditions pending",
+  "integration": {
+    "allowDescendantOfBaseline": true,
+    "metadataPaths": [
+      "scripts/validation/workforce-candidate-verify.mjs",
+      "scripts/tests/workforce-candidate-verify.test.mjs",
+      "docs/release-candidates/2026-10-30-workforce-rc2.json",
+      "docs/development/WORKFORCE_RELEASE_FREEZE_RECOVERY_20261030.md",
+      "docs/development/WORKFORCE_DATABASE_RECOVERY_RUNBOOK.md",
+      "docs/development/WORKFORCE_REAL_DEVICE_ACCEPTANCE_20261030.md",
+      "docs/release-notes/2026-10-30-workforce-release-preparation.md",
+      "docs/development/WORKFORCE_CONTROLLED_RELEASE_20261030.md",
+      "docs/development/WORKFORCE_PRODUCTION_RELEASE_20261030.md",
+      "docs/release-notes/2026-10-30-workforce-production-release.md"
+    ],
+    "authorization": "User authorized commit and deployment, testing tenant 20000000 on 2026-10-30"
+  }
+}

@@ -154,7 +154,12 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
     @Override
     public void replaceStoreItems(ProductSubscription subscription, List<BillableStore> billableStores, SubscriptionQuote quote) {
         jdbc.update(
-            "delete from tenant_product_subscription_items where tenant_id = ? and subscription_id = ?",
+            """
+            delete from tenant_product_subscription_items item
+            where item.tenant_id = ? and item.subscription_id = ?
+              and exists (select 1 from stores store where store.id = item.store_id
+                and store.tenant_id = item.tenant_id and store.status = 'active' and store.deleted_at is null)
+            """,
             subscription.tenantId(),
             subscription.id()
         );

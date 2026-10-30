@@ -80,7 +80,7 @@ class StoreProductSettingsServiceTest {
             when(settings.findByTenantIdAndStoreIdAndAppKey(tenant,store,key)).thenReturn(Optional.of(setting(key,false)));
             service.setEnabled(scope,actor,key,true);verify(commands).enableStoreApp(tenant,store,key,actor.actorId(),"tenant_admin");
         }
-        assertThat(service.list(scope)).hasSize(5);
+        assertThat(service.list(scope)).hasSize(com.rpb.reservation.common.product.ProductLineEntryRegistry.managedProducts().size());
     }
 }
 

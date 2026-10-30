@@ -65,6 +65,7 @@ public class PlatformTenantStructureService {
         PlatformOperatingEntityMutationCommand request,
         PlatformOperator operator
     ) {
+        structureRepository.lockTenantBilling(tenantId);
         requireTenant(tenantId);
         NormalizedOperatingEntityInput input = normalizeOperatingEntityCreate(request);
         try {
@@ -93,6 +94,7 @@ public class PlatformTenantStructureService {
         PlatformOperatingEntityMutationCommand request,
         PlatformOperator operator
     ) {
+        structureRepository.lockTenantBilling(tenantId);
         requireTenant(tenantId);
         PlatformOperatingEntity existing = structureRepository.findOperatingEntity(tenantId, operatingEntityId)
             .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.OPERATING_ENTITY_NOT_FOUND));
@@ -125,6 +127,7 @@ public class PlatformTenantStructureService {
 
     @Transactional
     public PlatformStore createStore(UUID tenantId, PlatformStoreMutationCommand request, PlatformOperator operator) {
+        structureRepository.lockTenantBilling(tenantId);
         requireTenant(tenantId);
         NormalizedStoreInput input = normalizeStoreCreate(tenantId, request);
         try {
@@ -173,6 +176,7 @@ public class PlatformTenantStructureService {
         PlatformStoreMutationCommand request,
         PlatformOperator operator
     ) {
+        structureRepository.lockTenantBilling(tenantId);
         requireTenant(tenantId);
         PlatformStore existing = structureRepository.findStore(tenantId, storeId)
             .orElseThrow(() -> new PlatformTenantServiceException(PlatformTenantServiceErrorCode.STORE_NOT_FOUND));
@@ -206,6 +210,9 @@ public class PlatformTenantStructureService {
                 "store",
                 store.status()
             );
+            if (!existing.status().equals(store.status())) {
+                structureRepository.refreshStoreSubscriptionAggregates(tenantId, storeId);
+            }
             auditService.recordStoreUpdated(existing, store, operator);
             return store;
         } catch (DataIntegrityViolationException exception) {
@@ -215,6 +222,7 @@ public class PlatformTenantStructureService {
 
     @Transactional
     public PlatformStore deleteStore(UUID tenantId, UUID storeId, PlatformOperator operator) {
+        structureRepository.lockTenantBilling(tenantId);
         requireTenant(tenantId);
         if (storeId == null) {
             throw new PlatformTenantServiceException(PlatformTenantServiceErrorCode.REQUEST_INVALID);

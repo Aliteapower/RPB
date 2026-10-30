@@ -93,6 +93,15 @@
     ]
   },
   {
+    "appKey": "workforce",
+    "value": "/stores/:storeId/workforce",
+    "labelKey": "workforce.entry",
+    "descriptionKey": "workforce.description",
+    "permissions": ["workforce.view"],
+    "historyRoute": "",
+    "historyPermissions": []
+  },
+  {
     "appKey": "daily_ledger",
     "value": "/stores/:storeId/daily-ledger",
     "labelKey": "platform.productLines.entryRoutes.dailyLedger.label",
