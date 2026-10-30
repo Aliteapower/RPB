@@ -24,7 +24,7 @@ public interface ProductSubscriptionItemRepository {
 
     default ProductSubscriptionItem insertStoreItem(ProductSubscription subscription, BillableStore store,
         com.rpb.reservation.platformbilling.application.BillingPeriodCalculation period,
-        String cycle, java.math.BigDecimal unitAmount, java.math.BigDecimal amount) {
+        String cycle, java.math.BigDecimal unitAmount, java.math.BigDecimal amount, String paymentNote) {
         throw new UnsupportedOperationException("selected store billing unavailable");
     }
 }

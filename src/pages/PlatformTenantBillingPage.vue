@@ -297,13 +297,13 @@ function storeItemName(item: TenantProductSubscriptionItem): string {
   return item.operatingEntityName ? `${name} / ${item.operatingEntityName}` : name
 }
 function storeItemStatus(item: TenantProductSubscriptionItem): string {
-  return form.appKey==='wallet' && item.status==='active' && item.currentPeriodEnd && Date.parse(item.currentPeriodEnd)<=Date.now()
+  return item.status==='active' && item.currentPeriodEnd && Date.parse(item.currentPeriodEnd)<=Date.now()
     ? t('platform.billing.status.expired') : item.status
 }
 
 function billingItemsForSubscription(subscription: TenantProductSubscription | null): TenantProductSubscription['items'] {
   return subscription ? subscription.items.filter(item => (
-    item.storeId && item.status !== 'cancelled' && item.status !== 'expired'
+    item.storeId
   )) : []
 }
 

@@ -37,3 +37,7 @@ PlatformTenantBillingPage原本仅在wallet产品显示选店与追加入口；C
 ## 后续生产状态
 
 已按用户授权部署功能提交1e358d15，20000000牛车水店真实开通与单店续费、原店期限及历史快照不变验证通过。见[生产发布记录](PLATFORM_PRODUCT_STORE_EXPANSION_PRODUCTION_20261030.md)。上文本地状态保留为实施阶段证据。
+
+## 多产品后续核查
+
+其余五产品真实开通与单店续费、原店期间和历史不变证据，以及四处本地修复见[后续核查记录](PRODUCT_LINE_STORE_BILLING_AUDIT_20261030.md)。本轮新修复未提交部署。

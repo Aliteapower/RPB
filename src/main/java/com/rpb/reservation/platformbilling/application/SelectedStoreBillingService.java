@@ -93,7 +93,7 @@ public class SelectedStoreBillingService {
         return new BillingPeriodCalculation(start,"monthly".equals(c.billingCycle())?start.plusMonths(c.durationCount()):start.plusYears(c.durationCount()));
     }
     private void insert(ProductSubscription s,List<BillableStore> selected,ProductSubscriptionCommand c,SubscriptionQuote q,BillingPeriodCalculation period) {
-        var amounts=allocate(q.finalAmount(),selected.size());for(int n=0;n<selected.size();n++)items.insertStoreItem(s,selected.get(n),period,c.billingCycle(),q.unitAmount(),amounts.get(n));
+        var amounts=allocate(q.finalAmount(),selected.size());for(int n=0;n<selected.size();n++)items.insertStoreItem(s,selected.get(n),period,c.billingCycle(),q.unitAmount(),amounts.get(n),c.paymentNote());
     }
     private ProductSubscriptionMutationResult finish(ProductSubscription s,ProductSubscriptionCommand c,PlatformBillingOperator operator,SubscriptionQuote q,String event,List<BillableStore> selected) {
         String payload=q.eventPayloadJson().trim();payload=payload.substring(0,payload.length()-1)+",\"selectedStoreIds\":["+String.join(",",selected.stream().map(store->"\""+store.storeId()+"\"").toList())+"]}";

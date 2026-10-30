@@ -4,8 +4,14 @@ import {useRoute,useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 import {useStaffWallet} from '../useStaffWallet'
 import {cashierActions} from '../cashierNavigation'
+import {walletNeedsSetup} from '../accessState'
 const route=useRoute(),router=useRouter(),{t}=useI18n(),{store,context,can}=useStaffWallet()
-const target=computed(()=>!context.value?undefined:cashierActions(store.value,can).find(action=>action.id==='points'||(context.value?.transactionsEnabled&&context.value.program))?.target)
+const target=computed(()=>{
+ if(!context.value)return undefined
+ if(route.query.history==='1')return {path:`/stores/${store.value}/wallet/transactions`,query:{history:'1'}}
+ if(walletNeedsSetup(context.value)&&can('wallet.view')&&can('wallet.settings.manage'))return {path:`/stores/${store.value}/wallet/settings`}
+ return cashierActions(store.value,can).find(action=>action.id==='points'||(context.value?.transactionsEnabled&&context.value.program))?.target
+})
 // Context is refreshed every five seconds. Compare the destination, not each freshly allocated target object.
 const targetKey=computed(()=>JSON.stringify(target.value??null)),failed=ref(false),opening=ref(false)
 let revision=0,timer:ReturnType<typeof setTimeout>|undefined

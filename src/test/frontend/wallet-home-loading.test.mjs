@@ -18,8 +18,8 @@ before(async()=>{
  }}]});await mkdir('target',{recursive:true});await writeFile('target/wallet-home-loading-test.mjs',b.outputFiles[0].contents);recoveryLocales=await import(pathToFileURL(process.cwd()+'/target/wallet-home-loading-test.mjs'));Home=recoveryLocales.default
 })
 afterEach(()=>{mounted.forEach(app=>app.unmount());mounted.length=0;delete globalThis.__walletHomeWorkspace})
-async function mount(guard,permissions=['wallet.charge.create','wallet.collection.confirm','wallet.view','wallet.topup.create','wallet.points.view'],initialContext={program:{},transactionsEnabled:true}){
- const router=createRouter({history:createMemoryHistory(),routes:[{path:'/stores/:storeId/wallet',name:'wallet-workbench',component:Home},{path:'/stores/:storeId/wallet/collect',name:'wallet-collect',component:{}},{path:'/stores/:storeId/wallet/topup',name:'wallet-topup',component:{}},{path:'/other',name:'other',component:{}}]});await router.push('/stores/A/wallet');await router.isReady();if(guard)router.beforeEach(guard)
+async function mount(guard,permissions=['wallet.charge.create','wallet.collection.confirm','wallet.view','wallet.topup.create','wallet.points.view'],initialContext={program:{},transactionsEnabled:true},history=false){
+ const router=createRouter({history:createMemoryHistory(),routes:[{path:'/stores/:storeId/wallet',name:'wallet-workbench',component:Home},{path:'/stores/:storeId/wallet/collect',name:'wallet-collect',component:{}},{path:'/stores/:storeId/wallet/topup',name:'wallet-topup',component:{}},{path:'/stores/:storeId/wallet/settings',name:'wallet-settings',component:{}},{path:'/stores/:storeId/wallet/transactions',name:'wallet-staff-transactions',component:{}},{path:'/other',name:'other',component:{}}]});await router.push('/stores/A/wallet'+(history?'?history=1':''));await router.isReady();if(guard)router.beforeEach(guard)
  const context=ref(initialContext),access=ref(permissions);globalThis.__walletHomeWorkspace={store:ref('A'),context,can:p=>access.value.includes(p)}
  router.onError(()=>{});const root={children:[]},app=renderer.createApp({render:()=>h(Home)});app.use(router);app.use(createI18n({legacy:false,locale:'en-SG',messages:{'en-SG':{wallet:{loading:'Loading',noRights:'No rights',navigationFailed:'Unable to open cashier. Retry.',navigationRetry:'Retry'}}}}));app.mount(root);mounted.push(app);await tick();return{router,context,root,app,access}
 }
@@ -54,4 +54,12 @@ test('a hung navigation shows recovery after fifteen seconds and a retry can sup
  assert.match(text(s.root),/Loading/);t.mock.timers.tick(15000);await tick();assert.match(text(s.root),/Unable to open cashier/)
  const retry=nodes(s.root,n=>n.tag==='button'&&text(n)==='Retry')[0];retry.props.onClick();await tick();assert.equal(guards.length,2)
  guards[1](true);guards[0](true);await tick();assert.equal(s.router.currentRoute.value.name,'wallet-collect')
+})
+
+test('newly purchased wallet without a program routes an administrator to setup rather than disabled points',async()=>{
+ const s=await mount(undefined,['wallet.view','wallet.settings.manage','wallet.points.view'],{program:null,transactionsEnabled:false,denialReason:null});assert.equal(s.router.currentRoute.value.name,'wallet-settings')
+})
+
+test('explicit history mode never redirects a new-wallet administrator into writable setup',async()=>{
+ const s=await mount(undefined,['wallet.view','wallet.settings.manage','wallet.points.view'],{program:null,transactionsEnabled:false,denialReason:null},true);assert.equal(s.router.currentRoute.value.name,'wallet-staff-transactions');assert.equal(s.router.currentRoute.value.query.history,'1')
 })

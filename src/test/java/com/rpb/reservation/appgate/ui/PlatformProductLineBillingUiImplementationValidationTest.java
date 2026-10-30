@@ -176,7 +176,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("platform.billing.form.storeUnitAmount")
             .contains("platform.billing.storeItems.title")
             .contains("subscription.items")
-            .contains("item.status !== 'cancelled' && item.status !== 'expired'")
+            .contains("item.storeId")
             .contains("storeItemRows")
             .contains("selectedStoreItemId")
             .contains("selectedStoreItem")

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { walletHeaderTitleKey } from './headerTitle'
+import { walletHistoryOnly } from './accessState'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -21,7 +22,7 @@ import WalletTransactionDetail from './pages/WalletTransactionDetail.vue'
 import './wallet.css'
 import {useAuthSessionStore} from '../../stores/authSession'
 const route=useRoute(),{t}=useI18n(),{store,context,pointsContext,busy,error,run,refresh,can}=provideStaffWallet()
-const historyOnly=computed(()=>route.query.history==='1'||!!context.value&&!context.value.transactionsEnabled)
+const historyOnly=computed(()=>walletHistoryOnly(context.value,route.query.history==='1'))
 const pointsOnly=computed(()=>can('wallet.points.view')&&!can('wallet.view'))
 const auth=useAuthSessionStore()
 const headerStore=computed(()=>context.value?.store??auth.authorizedStores.find(item=>item.storeId===store.value))

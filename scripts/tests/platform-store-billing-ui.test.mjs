@@ -18,10 +18,10 @@ const apps=[];const oldFetch=globalThis.fetch;let calls=[]
 afterEach(()=>{apps.splice(0).forEach(app=>app.unmount());globalThis.fetch=oldFetch;calls=[]})
 const stores=[{id:'old',storeName:'食刻演示',storeCode:'main',status:'active',operatingEntityId:'entity'},{id:'new',storeName:'牛车水店',storeCode:'chinatown',status:'active',operatingEntityId:'entity'},{id:'inactive',storeName:'停用店',status:'inactive',operatingEntityId:'entity'}]
 const item={id:'item',storeId:'old',storeName:'食刻演示',storeCode:'main',status:'active',amount:30,currency:'SGD',version:2}
-async function mount({appKey='workforce',purchased=true,denied=false,inactivePrice=false,multiple=false,itemStatus='active'}={}){
+async function mount({appKey='workforce',purchased=true,denied=false,inactivePrice=false,multiple=false,itemStatus='active',itemEnd=null}={}){
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document={}
  const router=createRouter({history:createMemoryHistory(),routes:[{path:'/platform/tenants/:tenantId/billing',component:Page},{path:'/:pathMatch(.*)*',component:{render:()=>null}}]});await router.push('/platform/tenants/T/billing')
- globalThis.fetch=async(url,opts={})=>{calls.push({url,opts,body:opts.body?JSON.parse(opts.body):null});if(denied)return new Response(JSON.stringify({success:false,error:{code:'FORBIDDEN',messageKey:'forbidden'}}),{status:403});let body={};if(url.includes('/history'))body={events:[]};else if(url.endsWith('/stores'))body={stores};else if(url.endsWith('/product-lines'))body={productLines:[{appKey,displayName:appKey,prices:[{billingCycle:'monthly',amount:30,currency:'SGD',status:inactivePrice?'inactive':'active'}]},...(multiple?[{appKey:'daily_ledger',displayName:'daily_ledger',prices:[{billingCycle:'monthly',amount:30,currency:'SGD',status:'active'}]}]:[])]};else if(url.endsWith('/product-subscriptions'))body={subscriptions:purchased?[{id:'sub',appKey,version:3,billingCycle:'monthly',status:'active',items:[{...item,status:itemStatus}]}]:[]};return new Response(JSON.stringify(body))}
+ globalThis.fetch=async(url,opts={})=>{calls.push({url,opts,body:opts.body?JSON.parse(opts.body):null});if(denied)return new Response(JSON.stringify({success:false,error:{code:'FORBIDDEN',messageKey:'forbidden'}}),{status:403});let body={};if(url.includes('/history'))body={events:[]};else if(url.endsWith('/stores'))body={stores};else if(url.endsWith('/product-lines'))body={productLines:[{appKey,displayName:appKey,prices:[{billingCycle:'monthly',amount:30,currency:'SGD',status:inactivePrice?'inactive':'active'}]},...(multiple?[{appKey:'daily_ledger',displayName:'daily_ledger',prices:[{billingCycle:'monthly',amount:30,currency:'SGD',status:'active'}]}]:[])]};else if(url.endsWith('/product-subscriptions'))body={subscriptions:purchased?[{id:'sub',appKey,version:3,billingCycle:'monthly',status:'active',items:[{...item,status:itemStatus,currentPeriodEnd:itemEnd}]}]:[]};return new Response(JSON.stringify(body))}
  const root=element('root');const app=renderer.createApp({render:()=>h(Page)});app.use(createPinia());app.use(router);app.use(createI18n({legacy:false,locale:'zh-CN',messages:{'zh-CN':zh,en},missingWarn:false,fallbackWarn:false}));app.mount(root);apps.push(app);await settle();return root
 }
 const form=root=>nodes(root,n=>n.tag==='form')[0]
@@ -53,4 +53,15 @@ test('switching product clears store selection and add mode',async()=>{
 
 test('cancelled purchased item is not offered as an additional new store',async()=>{
  const root=await mount({itemStatus:'cancelled'});labelInput(root,'开通新增门店').props['onUpdate:modelValue'](true);await settle();assert.equal(labelInput(root,'食刻演示'),undefined);assert.ok(labelInput(root,'牛车水店'))
+})
+
+test('all products retain cancelled and expired items for explicit single-store renewal',async()=>{
+ for(const appKey of ['daily_ledger','wine_storage','reservation_queue','payment','wallet','workforce'])for(const itemStatus of ['cancelled','expired']){
+  const root=await mount({appKey,itemStatus});await submit(root);const sent=calls.findLast(c=>c.opts.method==='POST');assert.ok(sent,`${appKey}/${itemStatus}`);assert.match(sent.url,/items\/item\/renew$/);assert.deepEqual(sent.body.storeIds,['old']);calls=[]
+ }
+})
+test('all product lines show expired end dates rather than active state',async()=>{
+ for(const appKey of ['daily_ledger','wine_storage','reservation_queue','payment','wallet','workforce']){
+  const root=await mount({appKey,itemEnd:'2020-01-01T00:00:00Z'});assert.match(text(root),/已到期/,appKey)
+ }
 })

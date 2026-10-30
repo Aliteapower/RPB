@@ -218,5 +218,54 @@ class StoreBillingConsistencyPostgresTest {
         assertThat(items.listByTenantId(tenant)).hasSize(1);assertThat(items.listByTenantId(other)).isEmpty();
     }
 
+    @Test void addedStoreUsesCurrentOperationNoteInsteadOfOriginalStoreNote() {
+        var first=new ProductSubscriptionCommand("note-buy","daily_ledger","monthly",null,null,null,"SGD","original purchase",1,null,List.of(main));
+        var s=wallet.purchase(tenant,first,operator).subscription();
+        var add=new ProductSubscriptionCommand("note-add","daily_ledger","monthly",null,null,null,"SGD","new branch purchase",1,s.version(),List.of(branch));
+        var result=wallet.addStores(tenant,s.id(),add,operator);
+        assertThat(result.subscription().items().stream().filter(i->i.storeId().equals(branch)).findFirst().orElseThrow().paymentNote()).isEqualTo("new branch purchase");
+        assertThat(result.subscription().items()).contains(s.items().getFirst());
+    }
+
+    @Test void everyProductHasIndependentPricesPeriodsEntriesAndStorePermissionBoundaries() {
+        var clock=Clock.fixed(Instant.parse("2026-10-30T00:00:00Z"),ZoneOffset.UTC);
+        var prices=new JdbcPlatformProductLinePriceRepository(jdbc,new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var service=proxy(new SelectedStoreBillingService(subscriptions,new JdbcProductSubscriptionEventRepository(jdbc),items,new JdbcTenantProductEntitlementSyncGateway(jdbc),new SubscriptionQuoteService(prices),new SelectedBillingCommandRepository(jdbc,new ObjectMapper().findAndRegisterModules()),new SharedStoreIdentityQuery(new PlatformTenantStructureRepository(jdbc)),clock));
+        var gate=StoreBillingGateTestSupport.gate(jdbc,clock);
+        var entries=com.rpb.reservation.common.product.ProductLineEntryRegistry.entries().stream().filter(e->!e.appKey().isBlank()).toList();
+        var permissions=entries.stream().flatMap(e->e.permissions().stream()).collect(java.util.stream.Collectors.toSet());
+        var actor=com.rpb.reservation.walkin.api.CurrentActor.storeStaff(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),permissions,Set.of(main,branch));
+        var opened=new HashSet<String>();int index=0;
+        for(var entry:entries) {
+            String app=entry.appKey(),permission=entry.permissions().stream().sorted().findFirst().orElseThrow();
+            BigDecimal unit=BigDecimal.valueOf(10+(++index));
+            jdbc.update("insert into platform_product_line_prices(app_key,billing_cycle,amount,currency,status) values(?,'monthly',?,'SGD','active') on conflict(app_key,billing_cycle) do update set amount=excluded.amount,status='active'",app,unit);
+            var s=service.purchase(tenant,command("matrix-buy-"+app,app,null,List.of(main)),operator).subscription();
+            var mainItem=s.items().getFirst();
+            assertThat(gate.evaluate(new com.rpb.reservation.appgate.application.AppGateAccessRequest(app,tenant,main,permission,actor)).allowed()).as(app).isTrue();
+            assertThat(gate.evaluate(new com.rpb.reservation.appgate.application.AppGateAccessRequest(app,tenant,branch,permission,actor)).allowed()).as("unbought "+app).isFalse();
+            var before=items.listByTenantId(tenant);var history=jdbc.queryForList("select id,md5(row_to_json(e)::text) digest from tenant_product_subscription_events e where tenant_id=?",tenant);
+            var added=service.addStores(tenant,s.id(),command("matrix-add-"+app,app,s.version(),List.of(branch)),operator);
+            assertThat(added.quote().finalAmount()).isEqualByComparingTo(unit);
+            assertThat(items.listByTenantId(tenant)).containsAll(before);
+            var branchItem=added.subscription().items().stream().filter(i->i.storeId().equals(branch)).findFirst().orElseThrow();
+            var renewed=service.renewItem(tenant,s.id(),branchItem.id(),command("matrix-renew-"+app,app,branchItem.version(),List.of(branch)),operator);
+            assertThat(renewed.quote().finalAmount()).isEqualByComparingTo(unit);
+            var nowItems=items.listByTenantId(tenant);assertThat(nowItems).containsAll(before).contains(mainItem);
+            var renewedItem=nowItems.stream().filter(i->i.id().equals(branchItem.id())).findFirst().orElseThrow();
+            assertThat(renewedItem.currentPeriodEnd()).isEqualTo(branchItem.currentPeriodEnd().plusMonths(1));
+            assertThat(jdbc.queryForList("select id,md5(row_to_json(e)::text) digest from tenant_product_subscription_events e where tenant_id=?",tenant)).containsAll(history);
+            opened.add(app);
+            assertThat(gate.visibleApps(actor,branch).stream().map(e->e.appKey()).collect(java.util.stream.Collectors.toSet())).isEqualTo(opened);
+            for(var denied:List.of(
+                com.rpb.reservation.walkin.api.CurrentActor.storeStaff(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),permissions,Set.of(main)),
+                com.rpb.reservation.walkin.api.CurrentActor.storeStaff(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),Set.of(),Set.of(branch)),
+                com.rpb.reservation.walkin.api.CurrentActor.storeStaff(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of("store_staff"),permissions,Set.of(branch)))) {
+                assertThat(gate.evaluate(new com.rpb.reservation.appgate.application.AppGateAccessRequest(app,tenant,branch,permission,denied)).allowed()).isFalse();
+                assertThat(gate.visibleApps(denied,branch)).isEmpty();
+            }
+        }
+    }
+
     String payload(UUID subscription){return jdbc.queryForObject("select event_payload::text from tenant_product_subscription_events where tenant_id=? and subscription_id=? order by created_at,id limit 1",String.class,tenant,subscription);}
 }
