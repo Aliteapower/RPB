@@ -829,6 +829,7 @@ export const zhCN = {
         convert: '转付费',
         reactivate: '重新开通',
         resumeRenew: '恢复并续费',
+        addStores: '开通新增门店',
         renewStore: '续费当前门店',
         renew: '续费',
         suspend: '暂停',
@@ -867,6 +868,10 @@ export const zhCN = {
         empty: '暂无产品线'
       },
       form: {
+        priceRequired: '请先配置并启用该产品的价格。',
+        selectStoresHint: '请勾选本次要开通的门店。',
+        selectStores: '选择开通门店',
+        selectedStoresHelp: '仅为勾选门店计费并开通本产品，不改变其他门店已购期限。',
         title: '手工购买 / 续费',
         productLine: '产品线',
         billingCycle: '计费周期',

@@ -202,6 +202,20 @@ class PlatformTenantProductSubscriptionControllerTest {
         );
     }
 
+    @Test void explicitStoresRouteToSelectedServiceAndKeepPlatformPermissionGate() throws Exception {
+        var result=new ProductSubscriptionMutationResult(false,subscription("monthly","active",OffsetDateTime.parse("2026-11-30T00:00:00Z")));
+        when(selectedStoreBillingService.purchase(eq(TENANT_ID),any(),any())).thenReturn(result);
+        when(selectedStoreBillingService.addStores(eq(TENANT_ID),eq(SUBSCRIPTION_ID),any(),any())).thenReturn(result);
+        String body="{\"idempotencyKey\":\"selected\",\"appKey\":\"reservation_queue\",\"billingCycle\":\"monthly\",\"durationCount\":1,\"version\":0,\"storeIds\":[\"20000000-0000-0000-0000-000000000983\"]}";
+        mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/product-subscriptions/purchase",TENANT_ID).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/product-subscriptions/{id}/add-stores",TENANT_ID,SUBSCRIPTION_ID).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+        org.mockito.Mockito.verify(selectedStoreBillingService).purchase(eq(TENANT_ID),any(),any());
+        org.mockito.Mockito.verify(selectedStoreBillingService).addStores(eq(TENANT_ID),eq(SUBSCRIPTION_ID),any(),any());
+        org.mockito.Mockito.verifyNoInteractions(subscriptionService);
+        mockMvc.perform(post("/api/v1/platform/tenants/{tenantId}/product-subscriptions/{id}/add-stores",TENANT_ID,SUBSCRIPTION_ID).header("X-Test-Permissions","reservation.today_view").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        org.mockito.Mockito.verifyNoMoreInteractions(selectedStoreBillingService);
+    }
+
     private static String mutationJson(
         String idempotencyKey,
         String billingCycle,

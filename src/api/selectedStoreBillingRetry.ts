@@ -1,6 +1,6 @@
 import type { ProductSubscriptionMutation } from '../types/platformProductLineBilling'
 
-/** Preserve an uncertain wallet billing command across retries, without persisting its note or store IDs. */
+/** Preserve an uncertain selected-store billing command across retries, without persisting its note or store IDs. */
 export async function selectedStoreBillingRetry<T>(path: string, input: ProductSubscriptionMutation, send: (body: ProductSubscriptionMutation) => Promise<T>): Promise<T> {
   const { idempotencyKey: initialKey, ...content } = input
   const normalized = { ...content, storeIds: content.storeIds ? [...content.storeIds].sort() : undefined }

@@ -53,7 +53,7 @@ public class PlatformTenantProductSubscriptionController {
     ) {
         PlatformBillingOperator operator = requireOperator();
         return ResponseEntity.status(201).body(ProductSubscriptionResponse.from(
-            request!=null && "wallet".equals(request.appKey()) ? selectedStores.purchase(tenantId,toCommand(request),operator) : subscriptionService.purchase(tenantId, toCommand(request), operator)
+            request!=null && ("wallet".equals(request.appKey()) || request.storeIds()!=null) ? selectedStores.purchase(tenantId,toCommand(request),operator) : subscriptionService.purchase(tenantId, toCommand(request), operator)
         ));
     }
 
@@ -65,7 +65,7 @@ public class PlatformTenantProductSubscriptionController {
     ) {
         PlatformBillingOperator operator = requireOperator();
         return ResponseEntity.ok(ProductSubscriptionResponse.from(
-            request!=null && "wallet".equals(request.appKey()) ? selectedStores.renew(tenantId,subscriptionId,toCommand(request),operator) : subscriptionService.renew(tenantId, subscriptionId, toCommand(request), operator)
+            request!=null && ("wallet".equals(request.appKey()) || request.storeIds()!=null) ? selectedStores.renew(tenantId,subscriptionId,toCommand(request),operator) : subscriptionService.renew(tenantId, subscriptionId, toCommand(request), operator)
         ));
     }
 
@@ -78,7 +78,7 @@ public class PlatformTenantProductSubscriptionController {
     ) {
         PlatformBillingOperator operator = requireOperator();
         return ResponseEntity.ok(ProductSubscriptionResponse.from(
-            request!=null && "wallet".equals(request.appKey()) ? selectedStores.renewItem(tenantId,subscriptionId,itemId,toCommand(request),operator) : subscriptionService.renewItem(tenantId, subscriptionId, itemId, toCommand(request), operator)
+            request!=null && ("wallet".equals(request.appKey()) || request.storeIds()!=null) ? selectedStores.renewItem(tenantId,subscriptionId,itemId,toCommand(request),operator) : subscriptionService.renewItem(tenantId, subscriptionId, itemId, toCommand(request), operator)
         ));
     }
 

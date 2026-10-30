@@ -829,6 +829,7 @@ export const enSG = {
         convert: 'Convert to paid',
         reactivate: 'Reactivate',
         resumeRenew: 'Resume and renew',
+        addStores: 'Activate additional stores',
         renewStore: 'Renew selected store',
         renew: 'Renew',
         suspend: 'Suspend',
@@ -867,6 +868,10 @@ export const enSG = {
         empty: 'No product lines'
       },
       form: {
+        priceRequired: 'Configure and enable a price for this product first.',
+        selectStoresHint: 'Select the stores to activate for this purchase.',
+        selectStores: 'Select stores to activate',
+        selectedStoresHelp: 'Only selected stores are charged and activated for this product. Other purchased periods remain unchanged.',
         title: 'Manual purchase / renewal',
         productLine: 'Product line',
         billingCycle: 'Billing cycle',

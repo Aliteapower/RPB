@@ -149,5 +149,74 @@ class StoreBillingConsistencyPostgresTest {
             assertThat(result.items()).extracting(ProductSubscriptionItem::storeId).containsExactly(main);
         } finally {release.countDown();executor.shutdownNow();}
     }
+    @Test void allProductsCanPurchaseSelectedStoresAndAddWithoutRenewingOthers() {
+        for(String app:List.of("reservation_queue","workforce","daily_ledger","wine_storage","payment","wallet")) {
+            var s=wallet.purchase(tenant,command("buy-"+app,app,null,List.of(main)),operator).subscription();
+            assertThat(s.items()).extracting(ProductSubscriptionItem::storeId).containsExactly(main);
+            var original=s.items().getFirst();String history=payload(s.id());
+            var add=command("add-"+app,app,s.version(),List.of(branch));
+            var result=wallet.addStores(tenant,s.id(),add,operator);
+            assertThat(result.subscription().items()).hasSize(2).contains(original);
+            assertThat(result.quote().storeCount()).isEqualTo(1);
+            assertThat(result.quote().finalAmount()).isEqualByComparingTo("128");
+            assertThat(payload(s.id())).isEqualTo(history);
+            assertThat(wallet.addStores(tenant,s.id(),add,operator).replayed()).isTrue();
+        }
+    }
+    @Test void selectedGenericBillingRejectsWrongScopeDuplicatesInactiveAndStaleVersion() {
+        var s=wallet.purchase(tenant,command("buy-selected","workforce",null,List.of(main)),operator).subscription();
+        assertThatThrownBy(()->wallet.addStores(tenant,s.id(),command("wrong-app","daily_ledger",s.version(),List.of(branch)),operator)).isInstanceOf(PlatformBillingServiceException.class);
+        assertThatThrownBy(()->wallet.addStores(tenant,s.id(),command("same-store","workforce",s.version(),List.of(main)),operator)).hasMessageContaining("SUBSCRIPTION_CONFLICT");
+        assertThatThrownBy(()->wallet.addStores(tenant,s.id(),command("cross-store","workforce",s.version(),List.of(UUID.randomUUID())),operator)).hasMessageContaining("REQUEST_INVALID");
+        assertThatThrownBy(()->wallet.addStores(tenant,s.id(),command("stale","workforce",99,List.of(branch)),operator)).hasMessageContaining("VERSION_CONFLICT");
+        status(branch,"inactive");
+        assertThatThrownBy(()->wallet.addStores(tenant,s.id(),command("inactive","workforce",s.version(),List.of(branch)),operator)).hasMessageContaining("REQUEST_INVALID");
+        assertThat(subscriptions.findByTenantIdAndId(tenant,s.id()).orElseThrow().version()).isEqualTo(s.version());
+    }
+    @Test void selectedPurchaseAndAddSyncOnlyPurchasedStoresAndPreserveClosedProduct() {
+        var priceRepository=mock(PlatformProductLinePriceRepository.class);
+        when(priceRepository.findActivePrice(anyString(),anyString())).thenAnswer(c->Optional.of(new PlatformProductLinePrice(c.getArgument(0),c.getArgument(1),new BigDecimal("128.00"),"SGD","active",0)));
+        var service=proxy(new SelectedStoreBillingService(subscriptions,new JdbcProductSubscriptionEventRepository(jdbc),items,new JdbcTenantProductEntitlementSyncGateway(jdbc),new SubscriptionQuoteService(priceRepository),new SelectedBillingCommandRepository(jdbc,new ObjectMapper().findAndRegisterModules()),new SharedStoreIdentityQuery(new PlatformTenantStructureRepository(jdbc)),Clock.fixed(Instant.parse("2026-10-30T00:00:00Z"),ZoneOffset.UTC)));
+        var s=service.purchase(tenant,command("sync-buy","reservation_queue",null,List.of(main)),operator).subscription();
+        assertThat(jdbc.queryForObject("select count(*) from store_app_settings where tenant_id=? and app_key='reservation_queue' and is_enabled",Integer.class,tenant)).isEqualTo(1);
+        jdbc.update("update store_app_settings set is_enabled=false,disabled_at=now() where tenant_id=? and store_id=? and app_key='reservation_queue'",tenant,main);
+        var original=s.items().getFirst();String history=payload(s.id());
+        var result=service.addStores(tenant,s.id(),command("sync-add","reservation_queue",s.version(),List.of(branch)),operator);
+        assertThat(result.subscription().items()).contains(original);
+        assertThat(jdbc.queryForObject("select is_enabled from store_app_settings where tenant_id=? and store_id=? and app_key='reservation_queue'",Boolean.class,tenant,main)).isFalse();
+        assertThat(jdbc.queryForObject("select is_enabled from store_app_settings where tenant_id=? and store_id=? and app_key='reservation_queue'",Boolean.class,tenant,branch)).isTrue();
+        assertThat(payload(s.id())).isEqualTo(history);
+    }
+    @Test void concurrentAddsWithSameVersionChargeOnce() throws Exception {
+        var s=wallet.purchase(tenant,command("concurrent-buy","workforce",null,List.of(main)),operator).subscription();
+        var executor=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a=executor.submit(()->wallet.addStores(tenant,s.id(),command("concurrent-a","workforce",s.version(),List.of(branch)),operator));
+            var b=executor.submit(()->wallet.addStores(tenant,s.id(),command("concurrent-b","workforce",s.version(),List.of(branch)),operator));
+            int success=0,conflict=0;
+            for(var future:List.of(a,b))try {future.get(10,java.util.concurrent.TimeUnit.SECONDS);success++;}catch(java.util.concurrent.ExecutionException e){assertThat(e.getCause()).hasMessageContaining("VERSION_CONFLICT");conflict++;}
+            assertThat(success).isEqualTo(1);assertThat(conflict).isEqualTo(1);
+            assertThat(items.listByTenantId(tenant)).hasSize(2).contains(s.items().getFirst());
+            assertThat(jdbc.queryForObject("select count(*) from tenant_product_subscription_events where tenant_id=?",Integer.class,tenant)).isEqualTo(2);
+        } finally {executor.shutdownNow();}
+    }
+
+    @Test void walletKeepsEntityCurrencyConstraintsWhileOtherProductsUseTheirOwnPrice() {
+        jdbc.update("update stores set operating_entity_id=null where id=?",branch);
+        assertThat(wallet.quote(tenant,command("generic-unassigned","workforce",null,List.of(branch))).storeCount()).isEqualTo(1);
+        assertThatThrownBy(()->wallet.purchase(tenant,command("wallet-unassigned","wallet",null,List.of(branch)),operator)).hasMessageContaining("REQUEST_INVALID");
+        var invalidCurrency=new ProductSubscriptionCommand("wallet-currency","wallet","monthly",null,null,null,"USD",null,1,null,List.of(main));
+        assertThatThrownBy(()->wallet.purchase(tenant,invalidCurrency,operator)).hasMessageContaining("REQUEST_INVALID");
+    }
+    @Test void foreignTenantStoresAndSubscriptionIdsAreRejected() {
+        var other=UUID.randomUUID();var foreign=UUID.randomUUID();
+        jdbc.update("insert into tenants(id,tenant_code,display_name,status) values(?,?,'Other','active')",other,"t-"+other);
+        jdbc.update("insert into stores(id,tenant_id,store_code,display_name,status,timezone,locale,date_format,time_format,currency) values(?,?,?,'Other Store','active','Asia/Singapore','zh-CN','DD-MM-YYYY','HH:mm','SGD')",foreign,other,"s-"+foreign);
+        var s=wallet.purchase(tenant,command("scope-buy","workforce",null,List.of(main)),operator).subscription();
+        assertThatThrownBy(()->wallet.addStores(tenant,s.id(),command("foreign-store","workforce",s.version(),List.of(foreign)),operator)).hasMessageContaining("REQUEST_INVALID");
+        assertThatThrownBy(()->wallet.addStores(other,s.id(),command("foreign-subscription","workforce",s.version(),List.of(foreign)),operator)).hasMessageContaining("SUBSCRIPTION_NOT_FOUND");
+        assertThat(items.listByTenantId(tenant)).hasSize(1);assertThat(items.listByTenantId(other)).isEmpty();
+    }
+
     String payload(UUID subscription){return jdbc.queryForObject("select event_payload::text from tenant_product_subscription_events where tenant_id=? and subscription_id=? order by created_at,id limit 1",String.class,tenant,subscription);}
 }

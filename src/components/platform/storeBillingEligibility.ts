@@ -14,3 +14,10 @@ export function walletBillingWarning(stores: Store[], selectedCount: number, eli
   if (active.some(store => !store.operatingEntityId)) return 'unassignedStores'
   return 'noAdditionalStores'
 }
+
+/** Shared store master data; product subscriptions only determine whether a store is already purchased. */
+export function selectableBillingStores<T extends Store & { deleted?: boolean }>(stores: T[], appKey: string, purchasedIds: string[] = []): T[] {
+  const purchased = new Set(purchasedIds)
+  return stores.filter(store => store.status === 'active' && !store.deleted && !purchased.has(store.id)
+    && (appKey !== 'wallet' || Boolean(store.operatingEntityId)))
+}
