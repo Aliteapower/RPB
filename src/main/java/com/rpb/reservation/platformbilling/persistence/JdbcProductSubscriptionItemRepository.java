@@ -142,7 +142,7 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
               and item.subscription_id = ?
               and item.id = ?
               and item.scope_type = 'store'
-              and item.status in ('active', 'suspended')
+              and item.status in ('active', 'suspended', 'cancelled', 'expired')
             """,
             (rs, rowNum) -> item(rs),
             tenantId,

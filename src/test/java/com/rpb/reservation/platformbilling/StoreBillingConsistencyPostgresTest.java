@@ -218,6 +218,37 @@ class StoreBillingConsistencyPostgresTest {
         assertThat(items.listByTenantId(tenant)).hasSize(1);assertThat(items.listByTenantId(other)).isEmpty();
     }
 
+    @Test void cancelledAndExpiredItemsCanRenewWithoutChangingOtherStoresOrHistory() {
+        for (var app : List.of("reservation_queue", "payment", "daily_ledger", "wallet", "wine_storage", "workforce")) {
+            var s = wallet.purchase(tenant, command("recover-buy-"+app, app, null, List.of(main, branch)), operator).subscription();
+            var original = s.items().stream().filter(i -> i.storeId().equals(main)).findFirst().orElseThrow();
+            var selected = s.items().stream().filter(i -> i.storeId().equals(branch)).findFirst().orElseThrow();
+            for (var state : List.of("cancelled", "expired")) {
+                jdbc.update("update tenant_product_subscription_items set status=?,current_period_start='2026-09-29T00:00:00Z',current_period_end='2026-10-29T00:00:00Z',version=version+1 where id=?", state, selected.id());
+                var version = jdbc.queryForObject("select version from tenant_product_subscription_items where id=?", Integer.class, selected.id());
+                var history = jdbc.queryForList("select id,md5(row_to_json(e)::text) digest from tenant_product_subscription_events e where tenant_id=?", tenant);
+                assertThat(items.findByTenantSubscriptionAndId(UUID.randomUUID(), s.id(), selected.id())).isEmpty();
+                assertThat(items.findByTenantSubscriptionAndId(tenant, UUID.randomUUID(), selected.id())).isEmpty();
+                assertThatThrownBy(() -> wallet.renewItem(tenant, s.id(), selected.id(), command("stale-"+app+state, app, version-1, List.of(branch)), operator)).hasMessageContaining("VERSION_CONFLICT");
+                var request = command("recover-"+app+state, app, version, List.of(branch));
+                var result = wallet.renewItem(tenant, s.id(), selected.id(), request, operator);
+                var restored = result.subscription().items().stream().filter(i -> i.id().equals(selected.id())).findFirst().orElseThrow();
+                assertThat(restored.status()).isEqualTo("active");
+                assertThat(restored.version()).isEqualTo(version+1);
+                assertThat(restored.currentPeriodStart().toInstant()).isEqualTo(Instant.parse("2026-10-30T00:00:00Z"));
+                assertThat(restored.currentPeriodEnd().toInstant()).isEqualTo(Instant.parse("2026-11-30T00:00:00Z"));
+                assertThat(result.subscription().items()).contains(original);
+                wallet.renewItem(tenant, s.id(), selected.id(), request, operator);
+                assertThat(items.listByTenantId(tenant)).contains(restored, original);
+                assertThat(jdbc.queryForList("select id,md5(row_to_json(e)::text) digest from tenant_product_subscription_events e where tenant_id=?", tenant)).containsAll(history);
+            }
+            jdbc.update("update tenant_product_subscription_items set status='cancelled' where id=?", selected.id());
+            status(branch, "inactive");
+            assertThat(items.findByTenantSubscriptionAndId(tenant, s.id(), selected.id())).isEmpty();
+            status(branch, "active");
+        }
+    }
+
     @Test void addedStoreUsesCurrentOperationNoteInsteadOfOriginalStoreNote() {
         var first=new ProductSubscriptionCommand("note-buy","daily_ledger","monthly",null,null,null,"SGD","original purchase",1,null,List.of(main));
         var s=wallet.purchase(tenant,first,operator).subscription();
