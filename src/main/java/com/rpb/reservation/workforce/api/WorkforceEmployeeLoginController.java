@@ -12,4 +12,5 @@ public class WorkforceEmployeeLoginController extends WorkforceEndpointSupport {
  @GetMapping public WorkforceEmployeeLoginService.Account get(@PathVariable UUID storeId,@PathVariable UUID id){return service.get(actor(),storeId,id);}
  @PutMapping public WorkforceEmployeeLoginService.Account reset(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody WorkforceEmployeeLoginService.Write c){return service.reset(actor(),storeId,id,c);}
  @PutMapping("/employee-number") public WorkforceEmployeeLoginService.Account useEmployeeNumber(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody WorkforceEmployeeLoginService.NumberWrite c){return service.useEmployeeNumber(actor(),storeId,id,c);}
+ @PutMapping("/status") public WorkforceEmployeeLoginService.Account changeStatus(@PathVariable UUID storeId,@PathVariable UUID id,@RequestBody WorkforceEmployeeLoginService.StatusWrite c){return service.changeStatus(actor(),storeId,id,c);}
 }

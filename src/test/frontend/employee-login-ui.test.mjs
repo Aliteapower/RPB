@@ -28,6 +28,24 @@ afterEach(()=>{apps.splice(0).forEach(a=>a.unmount());calls.length=0;handler=asy
 
 
 const info={accountId:'account',username:'clock-alice',status:'active',version:0,workforceAccess:true,canReset:true}
+test('dedicated disabled account can be explicitly enabled independently from employee availability',async()=>{
+ handler=async(path,body)=>({...info,status:body?'active':'disabled',version:body?1:0,canChangeStatus:true});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.ok(button(root,'启用登录账号'));await button(root,'启用登录账号').props.onClick();await settle()
+ assert.deepEqual(calls.find(c=>c.method==='PUT'),{path:'/employees/E/login-account/status',method:'PUT',body:{expectedVersion:0,status:'active'}})
+ assert.match(text(root),/登录账号已启用/);assert.ok(button(root,'停用登录账号'))
+})
+test('shared account cannot toggle login status from employee settings',async()=>{
+ handler=async()=>({...info,status:'disabled',canChangeStatus:false});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.equal(button(root,'启用登录账号'),undefined);assert.match(text(root),/账号管理/)
+})
+test('status conflict retains employee draft and refresh retries with current version then disables',async()=>{
+ const draft=ref({name:'尚未保存的员工草稿'});let version=0,status='disabled',fail=true
+ handler=async(path,body)=>{if(body){if(fail){fail=false;version=2;throw new WorkforceApiError(409,'WORKFORCE_CONFLICT')}assert.equal(body.expectedVersion,version);status=body.status;version++}return {...info,status,version,canChangeStatus:true}}
+ const root=await mount({setup:()=>()=>h('div',[h('input',{value:draft.value.name,onInput:e=>draft.value.name=e.target.value}),h(EmployeeLoginSettings,{employeeId:'E'})])})
+ await button(root,'启用登录账号').props.onClick();await settle();assert.match(text(root),/已被其他人修改/);assert.equal(draft.value.name,'尚未保存的员工草稿')
+ await button(root,'刷新账号').props.onClick();await settle();await button(root,'启用登录账号').props.onClick();await settle();await button(root,'停用登录账号').props.onClick();await settle()
+ assert.equal(status,'disabled');assert.equal(draft.value.name,'尚未保存的员工草稿');assert.ok(calls.filter(c=>c.method==='PUT').every(c=>c.path==='/employees/E/login-account/status'))
+})
 test('employee account shows username and status without any existing password; blank causes no write',async()=>{
  handler=async()=>({...info});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
  assert.match(text(root),/clock-alice/);assert.match(text(root),/可登录/);assert.match(text(root),/已授权/)

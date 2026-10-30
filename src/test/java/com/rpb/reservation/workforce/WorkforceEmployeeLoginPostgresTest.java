@@ -79,4 +79,31 @@ class WorkforceEmployeeLoginPostgresTest extends WorkforcePostgresTest {
   jdbc.update("delete from auth_account_permissions where account_id=? and permission_code='wallet.view'",e.accountId());jdbc.update("update auth_accounts set username='legacy-clock' where id=?",e.accountId());UUID other=account("store_staff",Set.of(store),Set.of("workforce.view"));jdbc.update("update auth_accounts set username=? where id=?",e.employeeNo(),other);
   assertThatThrownBy(()->login.useEmployeeNumber(admin,store,e.id(),new WorkforceEmployeeLoginService.NumberWrite(info.version()))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);assertThat(login.get(admin,store,e.id()).username()).isEqualTo("legacy-clock");
  }
+ @Test void dedicatedAccountStatusIsExplicitIdempotentAndDoesNotChangeEmployeeOrPassword(){
+  var e=employee();var session=signIn(e.employeeNo(),"123456");var before=login.get(admin,store,e.id());
+  String password=jdbc.queryForObject("select password_hash from auth_accounts where id=?",String.class,e.accountId());
+  clearInvocations(logs);var disable=new WorkforceEmployeeLoginService.StatusWrite(before.version(),"disabled");var disabled=login.changeStatus(admin,store,e.id(),disable);
+  assertThat(disabled.status()).isEqualTo("disabled");assertThat(login.changeStatus(admin,store,e.id(),disable)).isEqualTo(disabled);
+  assertThat(disabled.version()).isEqualTo(before.version()+1);verify(logs,times(1)).append(any(com.rpb.reservation.common.scope.StoreScope.class),any());
+  assertThat(jdbc.queryForObject("select status from auth_user_sessions where session_hash=?",String.class,AuthApplicationService.hashSessionToken(session.sessionToken()))).isEqualTo("revoked");
+  assertThatThrownBy(()->signIn(e.employeeNo(),"123456")).isInstanceOf(AuthApiException.class);
+  assertThatThrownBy(()->login.changeStatus(admin,store,e.id(),new WorkforceEmployeeLoginService.StatusWrite(before.version(),"active"))).isInstanceOf(WorkforceException.class).extracting("status").isEqualTo(409);
+  var current=login.get(admin,store,e.id());var enabled=login.changeStatus(admin,store,e.id(),new WorkforceEmployeeLoginService.StatusWrite(current.version(),"active"));assertThat(enabled.status()).isEqualTo("active");
+  assertThat(jdbc.queryForObject("select password_hash from auth_accounts where id=?",String.class,e.accountId())).isEqualTo(password);
+  assertThat(employees.get(admin,store,e.id())).isEqualTo(e);
+  assertThat(signIn(e.employeeNo(),"123456").principal().permissions()).containsExactly("workforce.view");
+ }
+ @Test void statusRejectsSharedSelfPartialScopePrivilegedAndForeignAndAuditFailureRollsBack(){
+  var e=employee();var info=login.get(admin,store,e.id());var command=new WorkforceEmployeeLoginService.StatusWrite(info.version(),"disabled");
+  var self=new CurrentActor(tenant,e.accountId(),"staff",admin.roles(),admin.permissions(),Set.of(store));assertThatThrownBy(()->login.changeStatus(self,store,e.id(),command)).isInstanceOf(WorkforceException.class);
+  var foreign=new CurrentActor(UUID.randomUUID(),admin.actorId(),"staff",admin.roles(),admin.permissions(),Set.of(store));assertThatThrownBy(()->login.changeStatus(foreign,store,e.id(),command)).isInstanceOf(WorkforceException.class);
+  jdbc.update("insert into auth_account_permissions(account_id,permission_code) values(?,'wallet.view')",e.accountId());assertThat(login.get(admin,store,e.id()).canChangeStatus()).isFalse();assertThatThrownBy(()->login.changeStatus(admin,store,e.id(),command)).isInstanceOf(WorkforceException.class).extracting("status").isEqualTo(403);
+  jdbc.update("delete from auth_account_permissions where account_id=? and permission_code='wallet.view'",e.accountId());
+  var partial=new CurrentActor(tenant,admin.actorId(),"staff",admin.roles(),admin.permissions(),Set.of(store));jdbc.update("insert into auth_account_store_access(account_id,tenant_id,store_id) values(?,?,?)",e.accountId(),tenant,otherStore);assertThatThrownBy(()->login.changeStatus(partial,store,e.id(),command)).isInstanceOf(WorkforceException.class);jdbc.update("delete from auth_account_store_access where account_id=? and store_id=?",e.accountId(),otherStore);
+  jdbc.update("insert into auth_account_roles(account_id,role_code) values(?,'tenant_admin')",e.accountId());assertThatThrownBy(()->login.changeStatus(admin,store,e.id(),command)).isInstanceOf(WorkforceException.class);jdbc.update("delete from auth_account_roles where account_id=? and role_code='tenant_admin'",e.accountId());
+  var session=signIn(e.employeeNo(),"123456");var current=login.get(admin,store,e.id());var rollbackCommand=new WorkforceEmployeeLoginService.StatusWrite(current.version(),"disabled");
+  doThrow(new IllegalStateException("audit unavailable")).when(logs).append(any(com.rpb.reservation.common.scope.StoreScope.class),any());assertThatThrownBy(()->login.changeStatus(admin,store,e.id(),rollbackCommand)).isInstanceOf(IllegalStateException.class);assertThat(login.get(admin,store,e.id())).isEqualTo(current);
+  assertThat(jdbc.queryForObject("select status from auth_user_sessions where session_hash=?",String.class,AuthApplicationService.hashSessionToken(session.sessionToken()))).isEqualTo("active");
+  reset(logs);doReturn(com.rpb.reservation.appgate.domain.AppGateDecision.deny("workforce",tenant,store,"workforce.view",com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_NOT_ENABLED)).when(gate).evaluate(any());assertThatThrownBy(()->login.changeStatus(admin,store,e.id(),command)).isInstanceOf(WorkforceException.class).extracting("status").isEqualTo(403);
+ }
 }

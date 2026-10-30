@@ -30,6 +30,8 @@ class WorkforceEmployeeLoginSecurityTest {
   mvc.perform(get(base)).andExpect(status().isOk());verify(explanations).get(any(),any(),any());
   mvc.perform(put(base).header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isOk());verify(explanations).reset(any(),any(),any(),any());
   mvc.perform(put(base+"/employee-number").header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isOk());verify(explanations).useEmployeeNumber(any(),any(),any(),any());
+  mvc.perform(put(base+"/status").header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isOk());verify(explanations).changeStatus(any(),any(),any(),any());
+  mvc.perform(delete(base+"/status")).andExpect(status().isForbidden());
   mvc.perform(delete(base)).andExpect(status().isForbidden());mvc.perform(post(base)).andExpect(status().isForbidden());
  }
 }

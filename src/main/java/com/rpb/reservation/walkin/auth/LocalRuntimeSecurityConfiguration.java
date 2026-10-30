@@ -48,7 +48,7 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/schedule-board","/api/v1/stores/*/workforce/schedule-bulk/options","/api/v1/stores/*/workforce/schedule-staffing/employees").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/schedule-bulk/preview","/api/v1/stores/*/workforce/schedule-bulk/*").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/employees/*/login-account").permitAll()
-                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/employees/*/login-account","/api/v1/stores/*/workforce/employees/*/login-account/employee-number").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/employees/*/login-account","/api/v1/stores/*/workforce/employees/*/login-account/employee-number","/api/v1/stores/*/workforce/employees/*/login-account/status").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/review-explanations").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/review-explanations/*").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/shifts","/api/v1/stores/*/workforce/schedule","/api/v1/stores/*/workforce/clock","/api/v1/stores/*/workforce/attendance","/api/v1/stores/*/workforce/attendance/*","/api/v1/stores/*/workforce/corrections").permitAll()

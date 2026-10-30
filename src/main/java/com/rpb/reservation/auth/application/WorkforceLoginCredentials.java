@@ -47,6 +47,14 @@ public class WorkforceLoginCredentials {
   revoke(tenant,locked.accountId());
   return new Changed(find(tenant,locked.accountId(),false).orElseThrow(),true);
  }
+ public Changed changeStatus(UUID tenant,Info locked,long expectedVersion,String status){
+  if(locked.version()==expectedVersion+1&&locked.status().equals(status))return new Changed(locked,false);
+  if(locked.version()!=expectedVersion)throw new Conflict();
+  if(locked.status().equals(status))return new Changed(locked,false);
+  int updated=jdbc.update("update auth_accounts set status=?,version=version+1,updated_at=now() where tenant_id=? and id=? and version=? and status in ('active','disabled') and deleted_at is null",status,tenant,locked.accountId(),expectedVersion);
+  if(updated!=1)throw new Conflict();revoke(tenant,locked.accountId());
+  return new Changed(find(tenant,locked.accountId(),false).orElseThrow(),true);
+ }
  private void revoke(UUID tenant,UUID account){jdbc.update("""
    update auth_user_sessions set status='revoked',revoked_at=now(),updated_at=now(),version=version+1
    where tenant_id=? and account_id=? and status='active' and deleted_at is null
