@@ -19,6 +19,7 @@ class WorkforceEmployeeLoginApiTest {
     }
     @Test void writeRejectsMissingHeaderAndCrossSiteBeforeService()throws Exception{
         mvc.perform(put(path).contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        mvc.perform(put(path+"/employee-number").contentType("application/json").content("{}")).andExpect(status().isForbidden());
         mvc.perform(put(path).header("X-RPB-Workforce","1").header("Sec-Fetch-Site","cross-site").contentType("application/json").content("{}")).andExpect(status().isForbidden());verifyNoInteractions(service);
     }
     @Test void staleEditKeepsStable409AndNoCache()throws Exception{

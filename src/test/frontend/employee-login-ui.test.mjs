@@ -6,6 +6,7 @@ import {createRouter,createMemoryHistory} from 'vue-router'
 import {workforceKey} from '../../modules/workforce/context.ts'
 import {WorkforceApiError} from '../../modules/workforce/api.ts'
 import EmployeeLoginSettings from '../../modules/workforce/components/EmployeeLoginSettings.vue'
+import EmployeeAccountFields from '../../modules/workforce/components/EmployeeAccountFields.vue'
 import EmployeePasswordInput from '../../modules/workforce/components/EmployeePasswordInput.vue'
 const apps=[],calls=[]
 const element=tag=>({tag,props:{},children:[],style:{},addEventListener(){},removeEventListener(){},getRootNode(){return {}},get options(){return nodes(this,n=>n.tag==='option')}})
@@ -55,4 +56,17 @@ test('disabled or privileged account has metadata but no password form',async()=
 test('failed account load offers retry and no editable password form',async()=>{
  handler=async()=>{throw new Error('offline')};const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
  assert.equal(nodes(root,n=>n.props?.role==='alert').length,1);assert.equal(nodes(root,n=>n.tag==='form').length,0);assert.ok(button(root,'刷新账号'))
+})
+
+test('new attendance account follows employee number and has no separate editable username',async()=>{
+ const draft={employeeNo:'1005',accountId:null};const root=await mount(EmployeeAccountFields,{props:{draft,accounts:[]}})
+ nodes(root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('create');await settle();assert.equal(draft.username,'1005');assert.equal(nodes(root,n=>n.tag==='input'&&n.props.readonly!==undefined)[0].props.value,'1005')
+})
+test('disabled employee can reset password while page clearly explains it stays disabled',async()=>{
+ handler=async()=>({...info,status:'disabled',canReset:true});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.match(text(root),/改密不会自动启用账号/);assert.equal(nodes(root,n=>n.tag==='form').length,1)
+})
+test('dedicated account offers explicit employee-number sync and updates displayed login without password',async()=>{
+ handler=async(path,body)=>({...info,employeeNo:'1005',canUseEmployeeNumber:true,username:body?'1005':'legacy-clock',version:body?1:0});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ await button(root,'改为员工编号').props.onClick();await settle();assert.deepEqual(calls.find(c=>c.method==='PUT'),{path:'/employees/E/login-account/employee-number',method:'PUT',body:{expectedVersion:0}});assert.match(text(root),/登录账号已改为员工编号/);assert.equal(button(root,'改为员工编号'),undefined)
 })

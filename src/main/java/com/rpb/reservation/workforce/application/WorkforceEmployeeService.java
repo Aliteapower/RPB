@@ -90,8 +90,8 @@ public class WorkforceEmployeeService {
                 accounts.allowEntry(actor.tenantId(),account);
             }
         }else if(!c.username().isBlank()){
-            if(!c.username().matches("[A-Za-z0-9._-]{1,40}")||!c.password().matches("[A-Za-z0-9]{6}"))throw WorkforceException.invalid();
-            account=accounts.create(actor.tenantId(),c.username(),c.name(),c.password(),c.mainStoreId(),c.storeIds());
+            if(!c.employeeNo().matches("[A-Za-z0-9._-]{1,40}")||!c.password().matches("[A-Za-z0-9]{6}"))throw WorkforceException.invalid();
+            account=accounts.create(actor.tenantId(),c.employeeNo(),c.name(),c.password(),c.mainStoreId(),c.storeIds());
         }else if(!c.password().isBlank())throw WorkforceException.invalid();
         repository.save(actor.tenantId(),id,c,account,old,today);
         var saved=repository.find(actor.tenantId(),id).orElseThrow();
@@ -100,7 +100,7 @@ public class WorkforceEmployeeService {
         audit.changed(actor,store,"employee.save",id,old,saved);return saved;
     }
     private boolean same(UUID tenant,Employee e,EmployeeWrite c){
-        boolean account=c.username().isBlank()?Objects.equals(e.accountId(),c.accountId()):c.accountId()==null&&accounts.matchesUsername(tenant,e.accountId(),c.username());
+        boolean account=c.username().isBlank()?Objects.equals(e.accountId(),c.accountId()):c.accountId()==null&&accounts.matchesUsername(tenant,e.accountId(),c.employeeNo());
         return account&&e.employeeNo().equals(c.employeeNo())&&e.name().equals(c.name())&&e.phone().equals(c.phone())&&e.email().equals(c.email())&&e.jobTitle().equals(c.jobTitle())&&Objects.equals(e.positionId(),c.positionId())
             &&Objects.equals(e.birthDate(),c.birthDate())&&e.englishName().equals(c.englishName())&&e.enabled()==c.enabled()
             &&e.hireDate().equals(c.hireDate())&&Objects.equals(e.leaveDate(),c.leaveDate())&&e.status().equals(c.status())&&e.companyId().equals(c.companyId())
