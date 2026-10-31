@@ -2,7 +2,7 @@
 
 ## 结果与范围
 
-修复当前RPB工作树的8项npm安全审计提示（高危5、中危3）。全量 `npm audit --json` 与 `npm audit --omit=dev --json` 均exit0、漏洞0；不代表未公开或审计数据库未覆盖的问题也不存在。本轮未提交、推送或部署，已上线的薪资发布不在此处静默替换。
+修复当前RPB工作树的8项npm安全审计提示（高危5、中危3）。全量 `npm audit --json` 与 `npm audit --omit=dev --json` 均exit0、漏洞0；不代表未公开或审计数据库未覆盖的问题也不存在。已按授权提交并完成前端部署，详见[生产发布记录](../development/FRONTEND_SECURITY_PRODUCTION_RELEASE_20261031.md)。
 
 - vue-i18n及@intlify同版本链：11.4.6 → 11.4.16，保留11.x主版本。
 - vue-tsc：实际安装2.2.12 → 3.3.14（声明从^2.2.0调整为^3.3.14）；language-core升级为3.3.14，新官方依赖链不再引用minimatch，原minimatch9.0.9/brace-expansion/balanced-match被移除。
