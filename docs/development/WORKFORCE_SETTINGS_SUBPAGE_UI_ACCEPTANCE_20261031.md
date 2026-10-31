@@ -1,6 +1,6 @@
 # 设置子页UI与业务引导验收（2026-10-31）
 
-本轮本地完成，未提交或生产部署。项目：workforce-guided-payroll/RPB。
+本记录描述本轮本地验收，随后已于同日提交部署，详见[生产发布记录](WORKFORCE_SETTINGS_SUBPAGES_PRODUCTION_RELEASE_20261031.md)。项目：workforce-guided-payroll/RPB。
 
 ## 改动与业务边界
 
