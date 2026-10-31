@@ -67,3 +67,13 @@ UI Review：窄屏员工顶栏溢出已按最终DOM几何复验消除，顾客�
 Release Notes：修复酒水入口及顾客页停留状态陈旧、只读快捷入口目标、员工窄屏顶栏溢出；无迁移、API、环境或权限新增，原单与领取规则不变。回退只恢复本次前端备份index和FRONTEND_RELEASE_SHA，保留不可变资产；不回滚数据库或后端。发布前要求线上前端e8fcedd6、后端d23a94f4、V113及既有索引摘要，发布后仅前端版本变化。
 
 ![顾客酒水自然到期后保留历史](evidence/product-entry-staff-customer-20261031/customer390-wine-natural-expiry.jpg)
+
+## 生产发布结果
+
+- 提交/前端发布474c72a43b0ded31b04a91b1e0bd38035f25d7d1，已推送codex/paynow-payment-product-line-staging。7个源/测试与干净候选一致（仅Git换行归一化）；原钱包8文件未混入。
+- 419份前端文件服务端逐一核验，仅原子更新index及FRONTEND_RELEASE_SHA，保留旧资产。归档SHA256：5744b5771d1be3c9810f56960f536a662e2f28dd208b2405b207dc345fcaf1b9；索引摘要同上。
+- 后端仍d23a94f4，JAR SHA256 37e4a5676eca343b65308dc902e8d4ca1bb5b37ca3864ca5b276cfac92eabc56。环境及所有服务状态、PID、InvocationID前后一致；后端PID3626821、NRestarts0。数据库113|113|0，无订阅/数据库写入，无服务重启。
+- 公网7个页面返回本次index，19份受影响JS/CSS哈希一致，包含员工顶栏CSS、顾客钱包、酒水页面、共享刷新helper；匿名管理员接口401、匿名产品目录为空。由于上述浏览器安全检查中止，发布后未再进行登录浏览器操作，不把公网资源核验称为线上交互验收。
+- 回退集：/opt/rpb/backups/20261031-product-entry-staff-customer-474c72a4-before；阶段制品：/opt/rpb/releases/20261031-product-entry-staff-customer-474c72a4。未触发回退。回退仅旧index/前端标记，无后端或数据库回滚。
+- 本地证据：committed-source-proof.json、verification-final.json、artifacts.json、deploy-result.json、public-result.json及浏览器DOM/几何/截图。最终49张商业表、26张工资/事件表指纹与初始化后相同；35份排除材料哈希不变。
+- 已打开页面刷新一次加载新JS后自动同步；到期写请求由后端即时拒绝，不等待前端轮询。真实订阅、付款、钱包金额及历史工资未修改。
