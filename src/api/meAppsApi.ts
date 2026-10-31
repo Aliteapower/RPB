@@ -23,6 +23,7 @@ export async function fetchMeApps(
   try {
     response = await fetcher(endpoint, {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         Accept: 'application/json'
       }

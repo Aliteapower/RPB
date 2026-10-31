@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 
 import { fetchMeApps } from '../api/meAppsApi'
 import type { MeAppEntry } from '../types/meApps'
@@ -9,41 +9,68 @@ export function useStoreVisibleApps(storeId: Ref<string | undefined>) {
   const loaded = ref(false)
   const loading = ref(false)
   let loadSequence = 0
+  let disposed = false
+  let timer: ReturnType<typeof setInterval> | undefined
+  let browserWindow: Window | undefined
+  let browserDocument: Document | undefined
 
-  watch(
-    storeId,
-    async nextStoreId => {
-      const sequence = ++loadSequence
-      apps.value = []; historyApps.value = []
-      loaded.value = false
+  async function refresh() {
+    const nextStoreId = storeId.value
+    const sequence = ++loadSequence
+    const current = () => !disposed && sequence === loadSequence && storeId.value === nextStoreId
 
-      if (!nextStoreId) {
+    if (!nextStoreId) {
+      loading.value = false
+      loaded.value = true
+      return
+    }
+
+    loading.value = true
+
+    try {
+      const result = await fetchMeApps(nextStoreId)
+
+      if (current()) {
+        apps.value = result.apps; historyApps.value = result.historyApps ?? []
+      }
+    } catch {
+      if (current()) {
+        apps.value = []; historyApps.value = []
+      }
+    } finally {
+      if (current()) {
         loading.value = false
         loaded.value = true
-        return
       }
+    }
+  }
 
-      loading.value = true
+  watch(storeId, () => {
+    apps.value = []; historyApps.value = []
+    loaded.value = false
+    void refresh()
+  }, { immediate: true })
 
-      try {
-        const result = await fetchMeApps(nextStoreId)
-
-        if (sequence === loadSequence) {
-          apps.value = result.apps; historyApps.value = result.historyApps ?? []
-        }
-      } catch {
-        if (sequence === loadSequence) {
-          apps.value = []; historyApps.value = []
-        }
-      } finally {
-        if (sequence === loadSequence) {
-          loading.value = false
-          loaded.value = true
-        }
-      }
-    },
-    { immediate: true }
-  )
+  function refreshVisiblePage() {
+    if (!disposed && !loading.value && browserDocument?.visibilityState !== 'hidden') void refresh()
+  }
+  onMounted(() => {
+    if (typeof window === 'undefined') return
+    browserWindow = window
+    browserDocument = typeof document === 'undefined' ? undefined : document
+    browserWindow.addEventListener('focus', refreshVisiblePage)
+    browserWindow.addEventListener('pageshow', refreshVisiblePage)
+    browserDocument?.addEventListener('visibilitychange', refreshVisiblePage)
+    timer = setInterval(refreshVisiblePage, 30_000)
+  })
+  onUnmounted(() => {
+    disposed = true
+    loadSequence++
+    if (timer !== undefined) clearInterval(timer)
+    browserWindow?.removeEventListener('focus', refreshVisiblePage)
+    browserWindow?.removeEventListener('pageshow', refreshVisiblePage)
+    browserDocument?.removeEventListener('visibilitychange', refreshVisiblePage)
+  })
 
   const visibleApps = computed(() => apps.value.filter(app => app.entryVisible))
   const visibleAppKeys = computed(() => new Set(visibleApps.value.map(app => app.appKey)))

@@ -9,6 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import StoreSwitcher from '../store/StoreSwitcher.vue'
 import { useStoreVisibleApps } from '../../composables/useStoreVisibleApps'
 import { useAuthSessionStore } from '../../stores/authSession'
+import productLineEntries from '../../main/resources/product-line-entries.json'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,7 +20,11 @@ const loggingOut = ref(false)
 
 const storeId = computed(() => String(route.params.storeId || auth.user?.defaultStoreId || auth.user?.storeIds[0] || ''))
 const currentStoreId = computed(() => storeId.value || undefined)
-const { hasVisibleApp, historyApps } = useStoreVisibleApps(currentStoreId)
+const { hasVisibleApp, visibleApps, historyApps } = useStoreVisibleApps(currentStoreId)
+const productNavItems = computed(() => visibleApps.value
+  .filter(app => !['reservation_queue', 'payment'].includes(app.appKey))
+  .filter(app => app.appKey !== 'wine_storage' || auth.user?.permissions.includes('wine_storage.view'))
+  .map(app => ({ ...app, labelKey: productLineEntries.find(entry => entry.appKey === app.appKey)?.labelKey })))
 const hasPaymentProductLine = computed(() =>
   hasVisibleApp('payment')
 )
@@ -73,9 +78,7 @@ async function logoutFromTenantAdmin(): Promise<void> {
         <StoreSwitcher class="tenant-store-switcher" surface="tenant-admin" />
       </div>
       <nav class="nav-list"><RouterLink v-if="auth.user?.permissions.includes('catalog.view')" class="nav-item" :to="`/stores/${storeId}/catalog`">{{ct('catalog')}}</RouterLink>
-        <RouterLink v-if="hasVisibleApp('wine_storage') && auth.user?.permissions.includes('wine_storage.view')" class="nav-item" :to="`/stores/${storeId}/wine-storage`">{{t('wineStorage.entry')}}</RouterLink>
-        <RouterLink v-if="hasVisibleApp('daily_ledger')" class="nav-item" :to="`/stores/${storeId}/daily-ledger`">{{ t('dailyLedger.entry') }}</RouterLink>
-        <RouterLink v-if="hasVisibleApp('wallet')" class="nav-item" :to="`/stores/${storeId}/wallet`">{{ t('wallet.entry') }}</RouterLink>
+        <RouterLink v-for="app in productNavItems" :key="app.appKey" class="nav-item" :to="app.entryRoute">{{ app.labelKey ? t(app.labelKey) : app.appName }}</RouterLink>
         <RouterLink
           v-for="item in primaryNavItems"
           :key="item.to"
