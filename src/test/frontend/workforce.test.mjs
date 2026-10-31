@@ -133,7 +133,7 @@ test('payroll-only delegate retains management access scoped to authorized compa
  const payrollOnly={...home,headOffice:false,employeeManage:false}
  const {root}=await mount(WorkforceManagement,'/stores/A/workforce/management',payrollOnly,payrollDirectory)
  let links=nodes(root,n=>n.tag==='a').map(n=>n.props.href)
- assert.deepEqual(links,['position-pay-plans','salary-templates','pay-profiles','pay-change-requests','payroll'].map(p=>'/stores/A/workforce/'+p))
+ assert.deepEqual(links,['position-pay-plans','salary-templates','pay-profiles','pay-change-requests','payroll'].map(p=>'/stores/A/workforce/'+p+'?companyId=C'))
  assert.equal(nodes(root,n=>n.tag==='select').length,0)
  assert.equal(nodes(root,n=>n.tag==='a'&&n.props.href.endsWith('/administrators')).length,0)
 })
@@ -487,3 +487,5 @@ test('bulk selection disables multiple segments and other dates while preserving
 
 
 
+
+test('payroll home defaults to the authorized current-store company',async()=>{const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return response(String(url).includes('/payroll-home')?payrollDirectory:{companyId:'D',month:'2026-09',rows:[],issues:[],totals:null})};await mount(PayrollHome,'/stores/A/workforce/payroll',{...home,stores:[{id:'A',companyId:'D'}]});assert.ok(requests.some(u=>u.includes('/employee-payroll-board?companyId=D')));assert.ok(!requests.some(u=>u.includes('/employee-payroll-board?companyId=C')))});

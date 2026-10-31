@@ -14,7 +14,7 @@ import {attendanceSettingsText as a} from '../attendanceSettingsText'
 import {explanationText} from '../reviewExplanations'
 import PayrollSettingsLinks from '../components/PayrollSettingsLinks.vue'
 const {home,store,payrollHome,payrollFailure,refresh}=useWorkforce(),{t}=useWorkforceText(),{j}=usePositionText(),{p,english}=usePhaseText()
-const route=useRoute(),selectedCompany=computed(()=>payrollHome?.value?.companies.find(c=>c.id===String(route.query.companyId||''))?.id)
+const route=useRoute(),selectedCompany=computed(()=>payrollHome?.value?.companies.find(c=>c.id===String(route.query.companyId||home.value?.stores?.find(s=>s.id===store.value)?.companyId||''))?.id)
 const requestedStep=Number(route.query.step)
 const initialStep=()=>[1,2,3,4].includes(requestedStep)&&(home.value?.employeeManage||requestedStep>=3)?requestedStep:(home.value?.employeeManage?1:3)
 const activeStep=ref(initialStep())

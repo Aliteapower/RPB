@@ -18,7 +18,7 @@ public class PayrollBoardService {
   boolean frozen=batch!=null&&Set.of("confirmed","published").contains(batch.status());
   var rows=new ArrayList<Row>();var issues=new LinkedHashSet<String>();boolean changed=false;
   if(frozen){
-   issues.addAll(saved.issues());for(var line:saved.lines())rows.add(row(line,"",line.issues(),true,List.of(),null));
+   issues.addAll(saved.issues());for(var line:saved.lines())rows.add(row(line,line.positionName(),line.issues(),true,List.of(),null));
   }else{
    var capture=sources.capture(actor.tenantId(),company,month,batch==null?List.of():repository.inputs(actor.tenantId(),batch.id()));access.enter(actor,store,company,capture.stores());
    var validation=calculator.calculate(capture,month);issues.addAll(validation.issues());changed=saved!=null&&!saved.sourceFingerprint().equals(capture.fingerprint());

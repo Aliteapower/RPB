@@ -22,3 +22,11 @@ test('every settings section has business instructions and unknown routes have n
  for(const page of ['position-pay-plans','pay-template-library','pay-change-requests','attendance-rules','review-explanations','clock-site','statutory-policies','document-expiries','document-types','positions','companies','administrators','shifts','calendar','public-holidays','leave-types','salary-templates','pay-profiles'])assert.equal(settingsSubpageGuidance(page,admin,'C',false,false).steps.length,3,page)
  assert.equal(settingsSubpageGuidance('payroll',admin,'C',false,false),null)
 })
+
+
+test('store company is preferred when entering the template journey without explicit company context',()=>{
+ const multi={...admin,companyIds:['C','D'],storeCompanyId:'D'}
+ assert.equal(settingsSubpageGuidance('pay-template-library',multi,'',false,false).next.companyId,'D')
+ assert.equal(settingsSubpageGuidance('pay-template-library',multi,'C',false,false).next.companyId,'C')
+ assert.equal(settingsSubpageGuidance('pay-template-library',{...multi,companyIds:['C']},'',false,false).next.companyId,'C')
+})

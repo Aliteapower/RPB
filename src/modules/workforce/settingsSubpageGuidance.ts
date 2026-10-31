@@ -1,5 +1,5 @@
 /** Business guidance only: no readiness inference, API calls or permission grants. */
-interface Access {employeeManage:boolean;headOffice:boolean;companyIds:string[]}
+interface Access {employeeManage:boolean;headOffice:boolean;companyIds:string[];storeCompanyId?:string|null}
 type Instructions=readonly [string,string,string]
 interface Task {zh:Instructions;en:Instructions;next:string;access:'employee'|'headOffice'|'payroll'}
 const tasks:Record<string,Task>={
@@ -22,9 +22,10 @@ const tasks:Record<string,Task>={
  'document-types':{zh:['先确认需要收集的证件类别。','维护类型名称及相关要求，供员工资料选用。','接着检查证件到期提醒，并到员工资料维护。'],en:['Identify required document types.','Maintain types and requirements for employee records.','Review expiry reminders, then maintain employee records.'],next:'document-expiries',access:'employee'},
  'document-expiries':{zh:['先选择门店和需要关注的到期范围。','查看临期及已过期证件，定位对应员工处理。','到员工资料更新证件，保留原有审批与历史。'],en:['Select the store and expiry range.','Review expiring or expired documents and identify employees needing action.','Update employee documents with existing approval and history retained.'],next:'employees',access:'employee'}
 }
+export function settingsCompanyId(requested:string,allowed:string[],storeCompany?:string|null){return allowed.includes(requested)?requested:storeCompany&&allowed.includes(storeCompany)?storeCompany:allowed[0]}
 export function settingsSubpageGuidance(section:string,access:Access,requestedCompany:string,isForm:boolean,english:boolean){
  const task=tasks[section];if(!task)return null
- const companyId=access.companyIds.includes(requestedCompany)?requestedCompany:access.companyIds[0]
+ const companyId=settingsCompanyId(requestedCompany,access.companyIds,access.storeCompanyId)
  const allowed=task.access==='payroll'?!!companyId:task.access==='headOffice'?access.headOffice&&access.employeeManage:access.employeeManage
  const fallback=access.employeeManage?'clock-site':'management'
  const nextPath=allowed?task.next:section==='positions'?fallback:'management'

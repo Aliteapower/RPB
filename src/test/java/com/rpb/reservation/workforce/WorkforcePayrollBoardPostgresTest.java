@@ -12,15 +12,21 @@ class WorkforcePayrollBoardPostgresTest extends WorkforcePayrollPostgresTest {
   assertThat(b.rows().getFirst().net()).isNull();assertThat(b.rows().getFirst().breakdown()).isNull();assertThat(b.totals()).isNull();
   assertThatThrownBy(()->board().read(worker,store,company,"2026-10")).hasMessage("WORKFORCE_FORBIDDEN");
  }
- @Test void calculatedAmountsAreAuthoritativeAndFrozenNamesNeverFollowCurrentEmployee(){
-  completed();var b=action(create(),"calculate");var view=board().read(admin,store,company,"2026-10");
+ @Test void calculatedAmountsAreAuthoritativeAndFrozenNamesNeverFollowCurrentEmployee()throws Exception{
+  jdbc.update("update workforce_positions set name='Frozen Service' where tenant_id=? and id=(select position_id from workforce_employees where tenant_id=? and id=?)",tenant,tenant,employee);completed();var b=action(create(),"calculate");var view=board().read(admin,store,company,"2026-10");
   assertThat(view.rows().getFirst().net()).isEqualTo(b.calculation().lines().getFirst().netPay());
   assertThat(view.totals().sdl()).isEqualTo(b.calculation().totalSdl());
   time.at("2026-11-02T01:00:00Z");b=action(b,"confirm");
   var frozen=board().read(admin,store,company,"2026-10");
-  jdbc.update("update workforce_employees set name='CHANGED' where tenant_id=? and id=?",tenant,employee);
+  assertThat(frozen.rows().getFirst().positionName()).isEqualTo("Frozen Service");
+  jdbc.update("update workforce_employees set name='CHANGED',job_title='Changed position' where tenant_id=? and id=?",tenant,employee);
+  jdbc.update("update workforce_positions set name='Changed position' where tenant_id=? and id=(select position_id from workforce_employees where tenant_id=? and id=?)",tenant,tenant,employee);
   var after=board().read(admin,store,company,"2026-10");
   assertThat(after.frozen()).isTrue();assertThat(after.rows()).isEqualTo(frozen.rows());
+  var mapper=new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+  var oldLine=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.valueToTree(b.calculation().lines().getFirst());oldLine.remove("positionName");
+  var compatible=mapper.treeToValue(oldLine,com.rpb.reservation.workforce.payroll.PayrollDtos.PayrollLine.class);
+  assertThat(compatible.positionName()).isNull();assertThat(compatible.netPay()).isEqualTo(b.calculation().lines().getFirst().netPay());
  }
  @Test void staleOrBlockedCalculationHasUnknownBoardAmounts(){
   completed();action(create(),"calculate");

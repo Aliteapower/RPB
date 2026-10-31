@@ -22,11 +22,11 @@ before(async()=>{
  ui.workforceKey=(await import('../../../src/modules/workforce/context.ts')).workforceKey
 })
 afterEach(()=>{mounted.splice(0).forEach(app=>app.unmount());globalThis.fetch=originalFetch})
-async function mount(Page,path='/stores/A/workforce/management',payrollData=payroll){
+async function mount(Page,path='/stores/A/workforce/management',payrollData=payroll,basicHome={employeeManage:true,headOffice:true}){
  const router=createRouter({history:createMemoryHistory(),routes:[{path:'/stores/:storeId/workforce/:page/:id?',component:Page}]});await router.push(path);await router.isReady()
  const root=element('root'),app=renderer.createApp({render:()=>h(Page)})
  app.use(router);app.use(createI18n({legacy:false,locale:'zh-CN',messages:{}}))
- app.provide(ui.workforceKey,{store:ref('A'),home:ref({employeeManage:true,headOffice:true}),payrollHome:ref(payrollData),payrollFailure:ref(''),current:()=>true,api:()=>({get:async path=>(await globalThis.fetch(path)).json()}),refresh:async()=>{}})
+ app.provide(ui.workforceKey,{store:ref('A'),home:ref(basicHome),payrollHome:ref(payrollData),payrollFailure:ref(''),current:()=>true,api:()=>({get:async path=>(await globalThis.fetch(path)).json()}),refresh:async()=>{}})
  app.mount(root);mounted.push(app);await settle();return {root,router}
 }
 test('management removes company selector and keeps authorized payroll entries and position management',async()=>{
@@ -127,4 +127,10 @@ test('position setup keeps the selected company for the next business task',asyn
  const select=nodes(root,n=>n.tag==='select'&&nodes(n,o=>o.tag==='option'&&o.props.value==='D').length)[0]
  select.props['onUpdate:modelValue']('D');select.props.onChange();await settle()
  assert.equal(router.currentRoute.value.query.companyId,'D')
+})
+
+
+test('settings menu defaults payroll links to the current store company, not the first company',async()=>{
+ const {root}=await mount(ui.WorkforceManagement,'/stores/A/workforce/management',payroll,{employeeManage:true,headOffice:true,stores:[{id:'A',name:'Store',companyId:'D'}]})
+ for(const page of ['position-pay-plans','salary-templates','pay-profiles'])assert.ok(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/'+page+'?companyId=D').length)
 })
