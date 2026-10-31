@@ -26,6 +26,12 @@ public class WorkModeRepository {
  public Site site(UUID tenant,UUID store){return jdbc.query("select point,version from workforce_clock_sites where tenant_id=? and store_id=?",(r,n)->new Site(json.read(r.getString(1),Point.class),r.getLong(2)),tenant,store).stream().findFirst().orElse(new Site(null,0));}
  public void site(UUID tenant,UUID store,Site s){jdbc.update("insert into workforce_clock_sites(tenant_id,store_id,point,version) values(?,?,?::jsonb,?) on conflict(tenant_id,store_id) do update set point=excluded.point,version=excluded.version,updated_at=now()",tenant,store,json.write(s.point()),s.version());}
  public List<HomeAddress> addresses(UUID tenant,UUID employee){return jdbc.query("select * from workforce_home_addresses where tenant_id=? and employee_id=? order by effective_from,created_at,id",this::home,tenant,employee);}
+ /** Display-only names: keep historical disabled/deleted accounts, scoped to this tenant and employee. */
+ public Map<UUID,String> reviewerNames(UUID tenant,UUID employee){
+  var names=new HashMap<UUID,String>();
+  jdbc.query("select distinct a.id,a.display_name from workforce_home_addresses h join auth_accounts a on a.tenant_id=h.tenant_id and a.id=h.reviewer_id where h.tenant_id=? and h.employee_id=?",(org.springframework.jdbc.core.RowCallbackHandler)r->{var name=r.getString("display_name");if(name!=null&&!name.isBlank())names.put(r.getObject("id",UUID.class),name.trim());},tenant,employee);
+  return Map.copyOf(names);
+ }
  public Optional<HomeAddress> address(UUID tenant,UUID id){return jdbc.query("select * from workforce_home_addresses where tenant_id=? and id=?",this::home,tenant,id).stream().findFirst();}
  private HomeAddress home(ResultSet r,int n)throws SQLException{return new HomeAddress(r.getObject("id",UUID.class),r.getObject("employee_id",UUID.class),json.read(r.getString("point"),Point.class),r.getObject("effective_from",LocalDate.class),r.getString("status"),r.getLong("version"),r.getObject("applicant_id",UUID.class),r.getObject("reviewer_id",UUID.class),r.getString("review_note"),r.getTimestamp("created_at").toInstant());}
  public void insertHome(UUID tenant,HomeAddress h){jdbc.update("insert into workforce_home_addresses(id,tenant_id,employee_id,point,effective_from,status,version,applicant_id) values(?,?,?,?::jsonb,?,'pending',1,?)",h.id(),tenant,h.employeeId(),json.write(h.point()),h.effectiveFrom(),h.applicantId());}

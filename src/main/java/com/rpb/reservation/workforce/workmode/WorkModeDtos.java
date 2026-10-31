@@ -18,5 +18,5 @@ public final class WorkModeDtos {
   public ClockPolicy(String mode,UUID assignmentId,long assignmentVersion,Point point,UUID addressId,long addressVersion,Long siteVersion){this(mode,assignmentId,assignmentVersion,point,addressId,addressVersion,siteVersion,null);}
   public ClockPolicy(String mode,UUID assignmentId,long assignmentVersion,Point point,UUID addressId,long addressVersion){this(mode,assignmentId,assignmentVersion,point,addressId,addressVersion,null,null);}
  }
- public record WorkModePage(UUID employeeId,String employeeName,boolean canManage,boolean canReview,LocalDate serverDate,List<Assignment> assignments,List<HomeAddress> addresses,ClockPolicy policy){}
+ public record WorkModePage(UUID employeeId,String employeeName,boolean canManage,boolean canReview,LocalDate serverDate,List<Assignment> assignments,List<HomeAddress> addresses,ClockPolicy policy,Map<UUID,String> reviewerNames){public WorkModePage(UUID employeeId,String employeeName,boolean canManage,boolean canReview,LocalDate serverDate,List<Assignment> assignments,List<HomeAddress> addresses,ClockPolicy policy){this(employeeId,employeeName,canManage,canReview,serverDate,assignments,addresses,policy,Map.of());}}
 }

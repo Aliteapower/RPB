@@ -11,7 +11,7 @@
 - Site：point:Point|null,version:number（0表示未设置）。
 - HomeAddress：id,employeeId,point,effectiveFrom,status（pending/approved/rejected）,version,applicantId,reviewerId,reviewNote,createdAt。
 - ClockPolicy：mode,assignmentId,assignmentVersion,point:Point|null,addressId:UUID|null,addressVersion:number,siteVersion:number|null（现场站点版本）；legacy可为null（旧数据兼容）。
-- WorkModePage：employeeId,employeeName,canManage,canReview,serverDate,assignments:Assignment[],addresses:HomeAddress[],policy:ClockPolicy。
+- WorkModePage：employeeId,employeeName,canManage,canReview,serverDate,assignments:Assignment[],addresses:HomeAddress[],policy:ClockPolicy,reviewerNames:Record<UUID,string>（可选、只读）。姓名只查询当前租户该员工地址记录的审批账号，停用账号仍可显示；缺失姓名由前端显示“姓名暂不可用”，不回退显示 ID。不改变历史记录和审批命令响应。
 
 ## 路由
 

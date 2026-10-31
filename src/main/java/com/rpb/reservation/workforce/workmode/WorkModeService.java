@@ -14,7 +14,7 @@ public class WorkModeService {
  private LocalDate today(){return LocalDate.now(clock.withZone(ZoneId.of("Asia/Singapore")));}
  public WorkModePage page(CurrentActor actor,UUID store,UUID employee){var e=WorkModeAccess.manage(gate,employees,actor,store,employee);return page(actor,store,e,true);}
  public WorkModePage self(CurrentActor actor,UUID store){return page(actor,store,WorkModeAccess.self(gate,employees,actor,store),false);}
- private WorkModePage page(CurrentActor actor,UUID store,WorkforceDtos.Employee e,boolean manage){return new WorkModePage(e.id(),e.name(),manage,manage&&!actor.actorId().equals(e.accountId()),today(),repository.assignments(actor.tenantId(),e.id()),repository.addresses(actor.tenantId(),e.id()),resolver.resolve(actor.tenantId(),e.id(),store,today()));}
+ private WorkModePage page(CurrentActor actor,UUID store,WorkforceDtos.Employee e,boolean manage){return new WorkModePage(e.id(),e.name(),manage,manage&&!actor.actorId().equals(e.accountId()),today(),repository.assignments(actor.tenantId(),e.id()),repository.addresses(actor.tenantId(),e.id()),resolver.resolve(actor.tenantId(),e.id(),store,today()),repository.reviewerNames(actor.tenantId(),e.id()));}
  @Transactional public Assignment save(CurrentActor actor,UUID store,UUID employee,UUID id,AssignmentWrite c){
   gate.sourceWrite(actor);WorkModeAccess.manage(gate,employees,actor,store,employee);if(id==null||c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.effectiveFrom()==null||c.inheritPosition()==null)throw WorkforceException.invalid();
   positions.lock(actor.tenantId());employees.lock(employee);var e=WorkModeAccess.manage(gate,employees,actor,store,employee);
