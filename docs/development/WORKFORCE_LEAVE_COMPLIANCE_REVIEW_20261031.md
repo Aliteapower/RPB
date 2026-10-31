@@ -2,7 +2,7 @@
 
 ## Scope
 
-本地合同政策、假期账本、工时核准及未休年假折现，接入现有请假、工资变更、月度／分段／补发和工资单。规格见 [业务规格](WORKFORCE_LEAVE_CONTRACT_COMPLIANCE_SPEC_20261031.md)，接口见 [API 契约](../api/2026-10-31-workforce-leave-compliance.md)。本批未生产发布。
+本地合同政策、假期账本、工时核准及未休年假折现，接入现有请假、工资变更、月度／分段／补发和工资单。规格见 [业务规格](WORKFORCE_LEAVE_CONTRACT_COMPLIANCE_SPEC_20261031.md)，接口见 [API 契约](../api/2026-10-31-workforce-leave-compliance.md)。开发审查时未发布；现已按后续明确授权发布，见[生产记录](WORKFORCE_LEAVE_COMPLIANCE_PRODUCTION_RELEASE_20261031.md)。
 
 ## P0 - Must Fix
 
