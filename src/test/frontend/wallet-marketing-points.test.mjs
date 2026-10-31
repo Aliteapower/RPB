@@ -823,3 +823,15 @@ test('direct cashier cannot start the camera before a valid amount is entered',a
  const form=nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-amount-card')[0];form.props.onSubmit(submitEvent());await tick();assert.equal(nodes(scope.root,n=>n.props?.['data-scan']).length,0)
  await enterNumber(scope.root,5);await tick();form.props.onSubmit(submitEvent());await tick();assert.equal(nodes(scope.root,n=>n.props?.['data-scan']).length,1);scope.unmount()
 })
+
+test('customer wallet automatically rechecks transactions on focus and polling without overlapping same-store reads',async t=>{
+ const oldWin=globalThis.window,oldDoc=globalThis.document,win=new EventTarget(),doc=new EventTarget();doc.visibilityState='visible';globalThis.window=win;globalThis.document=doc;t.mock.timers.enable({apis:['setInterval']});let scope
+ t.after(()=>{scope?.unmount();globalThis.window=oldWin;globalThis.document=oldDoc})
+ let allowed=true,reads=0;globalThis.fetch=async url=>{if(url.endsWith('/me')){reads++;return response({context:{...staffContext,transactionsEnabled:allowed},accounts:[],pendingBills:[]})}return response({})}
+ scope=mount({render:()=>null},'customer',reactive({params:{storeId:'A'},hash:'',query:{}}));await tick();assert.equal(scope.workspace.home.value.context.transactionsEnabled,true)
+ allowed=false;win.dispatchEvent(new Event('focus'));await tick();assert.equal(scope.workspace.home.value.context.transactionsEnabled,false)
+ doc.visibilityState='hidden';const count=reads;t.mock.timers.tick(15000);await tick();assert.equal(reads,count)
+ doc.visibilityState='visible';let resolve;globalThis.fetch=()=>{reads++;return new Promise(done=>resolve=done)};win.dispatchEvent(new Event('focus'));await tick();t.mock.timers.tick(15000);win.dispatchEvent(new Event('focus'));await tick();assert.equal(reads,count+1)
+ resolve(response({context:{...staffContext,transactionsEnabled:true},accounts:[],pendingBills:[]}));await tick();assert.equal(scope.workspace.home.value.context.transactionsEnabled,true)
+ scope.unmount();scope=null;const after=reads;win.dispatchEvent(new Event('focus'));t.mock.timers.tick(15000);await tick();assert.equal(reads,after)
+})

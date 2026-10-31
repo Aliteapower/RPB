@@ -1,6 +1,7 @@
-import {computed,ref,watch} from 'vue'
+import {computed,onUnmounted,ref,watch} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useStorageCodeRefresh} from './useStorageCodeRefresh'
+import {useVisiblePageRefresh} from '../../../composables/useVisiblePageRefresh'
 import {storageApi,StorageApiError} from '../api'
 import type {Home,Intent} from '../types'
 import {useCustomerStorageText} from './text'
@@ -12,7 +13,7 @@ export function useCustomerStorage(){
  let generation=0,homeRequest=0
  watch(()=>route.query.view,v=>{view.value=parseView(v)})
  function open(target:CustomerStorageView,record?:string){if(busy.value)return;view.value=target;error.value='';if(target!=='records')notice.value='';void router.push({query:{...route.query,view:target,record:record??undefined}})}
- function fail(e:unknown){error.value=e instanceof Error?e.message:String(e);if(e instanceof StorageApiError&&e.status===401){generation++;login.value=true;home.value=null;activeIntent.value=null;scannedCode.value='';notice.value='';loading.value=false;busy.value=false;error.value=t('signIn')}pending.value=!!api.value.pending()}
+ function fail(e:unknown){if(e instanceof StorageApiError&&[403,404].includes(e.status)){home.value=null;activeIntent.value=null;scannedCode.value=''}error.value=e instanceof Error?e.message:String(e);if(e instanceof StorageApiError&&e.status===401){generation++;login.value=true;home.value=null;activeIntent.value=null;scannedCode.value='';notice.value='';loading.value=false;busy.value=false;error.value=t('signIn')}pending.value=!!api.value.pending()}
  async function load(){const g=generation,request=++homeRequest;loading.value=true;try{const data=await api.value.get<Home>('/home');if(g!==generation||request!==homeRequest)return;home.value=data;syncCode(data);error.value='';login.value=false;pending.value=!!api.value.pending();const hash=new URLSearchParams(route.hash.slice(1)).get('storage');if(hash&&/^WS\.[A-Za-z0-9_-]{43}$/.test(hash)){await router.replace({hash:''});if(g===generation)await scan(hash)}}catch(e){if(g===generation&&request===homeRequest)fail(e)}finally{if(g===generation&&request===homeRequest)loading.value=false}}
  function syncCode(data:Home){if(!activeIntent.value)return;const current=data.intents.find(i=>i.id===activeIntent.value!.id);if(!current){activeIntent.value=null;scannedCode.value='';return}if(!['authorized','awaiting_authorization'].includes(current.status)){activeIntent.value={...current,code:null};scannedCode.value='';if(current.status==='completed')notice.value=t('usedCodeHint')}}
  async function refreshCode(){if(loading.value||busy.value||pending.value||login.value)return;const g=generation,request=++homeRequest;try{const data=await api.value.get<Home>('/home');if(g!==generation||request!==homeRequest)return;home.value=data;syncCode(data)}catch(e){if(g===generation&&request===homeRequest&&e instanceof StorageApiError&&e.status===401)fail(e)}}
@@ -24,5 +25,7 @@ export function useCustomerStorage(){
  function quickCreated(intent:Intent){activeIntent.value=intent;notice.value=t('codeCreated');void load()}
  function applied(){notice.value=t('applicationSent');open('records','requests');void load()}
  watch(store,()=>{generation++;home.value=null;error.value='';notice.value='';login.value=false;busy.value=false;activeIntent.value=null;scannedCode.value='';view.value=parseView(route.query.view);void load()},{immediate:true})
+ onUnmounted(()=>{generation++;homeRequest++})
+ useVisiblePageRefresh(load,()=>!loading.value&&!busy.value&&!pending.value&&!login.value)
  return{route,store,api,home,loading,busy,login,pending,error,notice,view,activeIntent,scannedCode,open,load,run,scan,recover,created,quickCreated,applied,fail}
 }

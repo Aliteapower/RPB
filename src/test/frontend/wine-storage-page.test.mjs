@@ -747,3 +747,36 @@ test('compact storage header shows the current store once and switches only with
  assert.ok(select);assert.equal(select.props.value,'A');assert.match(text(select),/切换门店/);assert.doesNotMatch(text(select),/QA Store/)
  await select.props.onChange({target:{value:'B'}});assert.deepEqual(s.navigation,['/stores/B/wine-storage']);s.unmount()
 })
+
+function entryBrowser(t){const oldWin=globalThis.window,oldDoc=globalThis.document,win=new EventTarget(),doc=new EventTarget();doc.visibilityState='visible';globalThis.window=win;globalThis.document=doc;t.after(()=>{for(const app of mounted)app.unmount();mounted.clear();globalThis.window=oldWin;globalThis.document=oldDoc});t.mock.timers.enable({apis:['setInterval']});return{win,doc}}
+test('wallet storage entry auto-syncs activation and closure, preserving only existing history for each identity',async t=>{
+ const{win,doc}=entryBrowser(t)
+ for(const customer of [true,false]){
+  let data={...home,newBusinessEnabled:false,items:[],applications:[],intents:[],events:[]};const s=mount(Summary,customer,'zh-CN',undefined,()=>data);await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,0)
+  data={...data,newBusinessEnabled:true};t.mock.timers.tick(30000);await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,1)
+  doc.visibilityState='hidden';data={...data,newBusinessEnabled:false};t.mock.timers.tick(30000);await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,1)
+  doc.visibilityState='visible';doc.dispatchEvent(new Event('visibilitychange'));await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,0)
+  data={...data,events:[{id:'old'}]};win.dispatchEvent(new Event('focus'));await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,1)
+  const count=s.calls.length;s.unmount();win.dispatchEvent(new Event('focus'));t.mock.timers.tick(30000);await tick();assert.equal(s.calls.length,count)
+ }
+})
+test('storage entry clears after failed permission read and recovers, without overlapping or accepting late responses after unmount',async t=>{
+ const{win}=entryBrowser(t);const s=mount(Summary,true);await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,1)
+ let reject,calls=0;globalThis.fetch=()=>{calls++;return new Promise((_,no)=>reject=no)};win.dispatchEvent(new Event('focus'));await tick();t.mock.timers.tick(60000);win.dispatchEvent(new Event('focus'));await tick();assert.equal(calls,1)
+ reject(Error('denied'));await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,0)
+ globalThis.fetch=async()=>({ok:true,json:async()=>home});win.dispatchEvent(new Event('focus'));await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,1);s.unmount()
+})
+
+test('closed storage shortcuts open existing record views rather than a new deposit task',async()=>{
+ const closed={...home,newBusinessEnabled:false};for(const customer of [true,false]){const s=mount(Summary,customer,'zh-CN',closed);await tick();assert.equal(nodes(s.root,n=>n.tag==='a')[0].props.href,customer?'/wallet/A/wine-storage?view=records':'/stores/A/wine-storage?task=records&history=1');s.unmount()}
+})
+test('customer storage refreshes commercial state while preserving historical records on closure',async t=>{
+ const{win}=entryBrowser(t);let data=home;const s=mount(CustomerPage,true,'zh-CN',undefined,()=>data);await tick();assert.ok(nodes(s.root,n=>n.tag==='form').length)
+ data={...home,newBusinessEnabled:false};win.dispatchEvent(new Event('focus'));await tick();assert.equal(nodes(s.root,n=>n.tag==='form').length,0);assert.match(text(s.root),/已关闭|停用|不可|未开通/);s.unmount()
+})
+
+test('storage shortcut clears during store and identity changes and rejects late previous-scope results',async()=>{
+ const props=reactive({store:'A',customer:true}),s=mount(Summary,true,'zh-CN',home,undefined,{props});await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,1)
+ const requests=[];globalThis.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));props.store='B';await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,0);props.customer=false;await tick();assert.equal(requests.length,2)
+ requests[1].resolve({ok:true,json:async()=>({...home,newBusinessEnabled:false,items:[],applications:[],intents:[],events:[]})});await tick();requests[0].resolve({ok:true,json:async()=>home});await tick();assert.equal(nodes(s.root,n=>n.tag==='a').length,0);assert.match(requests[0].url,/public\/stores\/B/);assert.doesNotMatch(requests[1].url,/public/);s.unmount()
+})

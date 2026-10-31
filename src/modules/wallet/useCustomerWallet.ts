@@ -7,11 +7,12 @@ import { customerWalletPath, legacyWalletTarget } from './navigation'
 import type { CustomerHome } from './types'
 import {useI18n} from 'vue-i18n'
 import {logoutCustomer} from '../../api/customerAuthApi'
+import {useVisiblePageRefresh} from '../../composables/useVisiblePageRefresh'
 
 function createWorkspace() {
   const route=useRoute(),router=useRouter(),store=computed(()=>String(route.params.storeId))
   const home=ref<CustomerHome|null>(null),needsLogin=ref(false),error=ref(''),linkError=ref(''),loading=ref(false)
-  const loggingOut=ref(false),{t}=useI18n()
+  const loggingOut=ref(false),refreshing=ref(false),{t}=useI18n()
   const account=computed(()=>home.value?.accounts[0]??null)
   let generation=0,sequence=0,legacyRunning=false,lastLegacyAttempt=''
   async function scan(value:string,replace=false) {
@@ -38,6 +39,7 @@ function createWorkspace() {
   async function refresh() {
     if(loggingOut.value)return
     const current=generation,request=++sequence,id=store.value
+    refreshing.value=true
     loading.value=!home.value
     try {
       const result=await walletApi(id,true).get<CustomerHome>('/me')
@@ -47,12 +49,12 @@ function createWorkspace() {
       if(current!==generation || request!==sequence)return
       if(e instanceof WalletApiError && e.status===401){home.value=null;needsLogin.value=true;error.value=''}
       else{if(e instanceof WalletApiError && [403,404].includes(e.status))home.value=null;error.value=e instanceof Error?e.message:String(e)}
-    }finally{if(current===generation && request===sequence)loading.value=false}
+    }finally{if(current===generation && request===sequence){loading.value=false;refreshing.value=false}}
   }
   async function authenticated(){needsLogin.value=false;error.value='';await refresh()}
   async function logout(){
     if(loggingOut.value)return
-    loggingOut.value=true;generation++;sequence++;error.value='';linkError.value=''
+    loggingOut.value=true;generation++;sequence++;refreshing.value=false;error.value='';linkError.value=''
     try{
       await logoutCustomer()
       generation++;sequence++;home.value=null;needsLogin.value=true;loading.value=false;lastLegacyAttempt=''
@@ -62,8 +64,8 @@ function createWorkspace() {
   }
   watch(store,()=>{generation++;home.value=null;needsLogin.value=false;error.value='';linkError.value='';lastLegacyAttempt='';void refresh()},{immediate:true})
   watch(()=>route.hash,()=>{lastLegacyAttempt='';linkError.value='';void legacy()})
-  const timer=window.setInterval(()=>{if(!needsLogin.value && document.visibilityState==='visible')void refresh()},5000)
-  onUnmounted(()=>{generation++;window.clearInterval(timer)})
+  useVisiblePageRefresh(refresh,()=>!needsLogin.value&&!loggingOut.value&&!refreshing.value,5000)
+  onUnmounted(()=>{generation++;sequence++})
   return{store,home,account,needsLogin,error:computed(()=>linkError.value||error.value),loading,refresh,scan,authenticated,logout,loggingOut}
 }
 type Workspace=ReturnType<typeof createWorkspace>
