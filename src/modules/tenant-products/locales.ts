@@ -1,5 +1,5 @@
 export const tenantProductsZh = {
-  cardHistory:'卡业务历史',businessDate:'营业日期',queueHistory:'排队历史记录',historyTitle:'历史查询',historyOnly:'只读查询',closedHistory:'产品已关闭，仅可查询历史记录。',title: '产品线管理', hint: '设置当前门店已开通产品的使用状态，不影响其他门店。',
+  cardHistory:'卡业务历史',businessDate:'营业日期',queueHistory:'排队历史记录',historyTitle:'历史查询',historyOnly:'只读查询',closedHistory:'当前为只读历史查询，不能新增或修改业务。',title: '产品线管理', hint: '设置当前门店已开通产品的使用状态，不影响其他门店。',
   retention: '关闭后隐藏入口并停止新业务，余额、积分与历史记录保留，重新开启后可继续使用。关闭不会取消订阅或停止计费。',
   empty:'当前门店暂无已开通产品。', storageRetention:'酒水寄存关闭后停止新申请和收存，历史及有效物品受控领取保留。',
   enabled: '已开启', disabled: '已关闭', enable: '开启', disable: '关闭', saving: '保存中…', saved: '已保存',
@@ -13,7 +13,7 @@ export const tenantProductsZh = {
   }
 }
 export const tenantProductsEn = {
-  cardHistory:'Card history',businessDate:'Business date',queueHistory:'Queue history',historyTitle:'Historical records',historyOnly:'Read only',closedHistory:'This product is closed. Historical records are read only.',title: 'Product lines', hint: 'Manage purchased products for the current store. Other stores are unaffected.',
+  cardHistory:'Card history',businessDate:'Business date',queueHistory:'Queue history',historyTitle:'Historical records',historyOnly:'Read only',closedHistory:'Read-only history. New business and changes are unavailable in this view.',title: 'Product lines', hint: 'Manage purchased products for the current store. Other stores are unaffected.',
   retention: 'Turning a product off hides its entry and stops new business. Balances, points and history are retained for use when turned on again. This does not cancel the subscription or stop billing.',
   empty:'No products have been opened for this store.', storageRetention:'Bottle storage blocks new intake while keeping history and controlled collection.',
   enabled: 'On', disabled: 'Off', enable: 'Turn on', disable: 'Turn off', saving: 'Saving…', saved: 'Saved',

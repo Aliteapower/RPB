@@ -13,6 +13,6 @@ const section=computed(()=>/^\/(transactions|bills|topups|refunds|points)(\/|$)/
 </script>
 <template><nav class="wallet-bottom-nav" :aria-label="t('wallet.ui.navigation')">
   <RouterLink v-if="!historyOnly" :to="href('')" :class="{'is-current':section==='home'}"><WalletIcon name="wallet" /><span>{{ t(customer ? 'wallet.ui.myWallet' : 'wallet.ui.cashier') }}</span></RouterLink>
-  <RouterLink :to="href('transactions')+(customer?'?category=all':'')" :class="{'is-current':section==='transactions'}"><WalletIcon name="bill" /><span>{{ t('wallet.transactions.title') }}</span></RouterLink>
+  <RouterLink :to="href('transactions')+(customer?'?category=all':historyOnly?'?history=1':'')" :class="{'is-current':section==='transactions'}"><WalletIcon name="bill" /><span>{{ t('wallet.transactions.title') }}</span></RouterLink>
   <RouterLink v-if="!customer&&!historyOnly" :to="href('more')" :class="{'is-current':section==='other'}"><WalletIcon :name="customer ? 'history' : 'more'" /><span>{{ t(customer ? 'wallet.ui.entries' : 'wallet.ui.more') }}</span></RouterLink>
 </nav></template>

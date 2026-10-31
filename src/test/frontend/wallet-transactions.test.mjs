@@ -59,6 +59,24 @@ test('safe cross-store return preserves exact filters and pagination while rejec
  for(const value of ['https://evil.test','//evil.test','/wallet/A/transactions','/stores/A/wallet/transactions#evil','/stores/A/wallet/transactions\\evil','/stores/A/wallet/transactions%0a'])assert.equal(query.safeTransactionReturn(value,'B'),'/stores/B/wallet/transactions')
  assert.equal(query.safeTransactionReturn('/wallet/A/transactions?type=points_grant','B',true),'/wallet/A/transactions?type=points_grant')
 })
+
+test('staff history mode survives transaction filters and pagination without entering backend or customer query parameters',()=>{
+ const input={history:'1',period:'today',cursor:'page-two',category:'points'}
+ assert.equal(query.transactionQuery(input).history,'1')
+ assert.equal(query.switchTransactionFilter(input,'topup',true).history,'1')
+ assert.equal(query.switchTransactionFilter(input,'in',false).history,'1')
+ assert.equal(query.transactionQuery({...input,history:'0'}).history,undefined)
+ assert.equal(query.transactionQuery(input,true).history,undefined)
+ assert.equal(new URLSearchParams(query.transactionSearch(input)).has('history'),false)
+ assert.equal(new URLSearchParams(query.transactionSearch(input)).get('cursor'),'page-two')
+})
+
+test('historical transaction detail links retain the explicit read-only mode and original return address',()=>{
+ const back='/stores/A/wallet/transactions?history=1&category=points&cursor=old'
+ assert.deepEqual(query.transactionDetailTarget(row(),false,back),{path:'/stores/B/wallet/bills/record',query:{returnTo:back,history:'1'}})
+ const customerBack='/wallet/A/transactions?category=all'
+ assert.deepEqual(query.transactionDetailTarget(row(),true,customerBack),{path:'/wallet/B/bills/record',query:{returnTo:customerBack}})
+})
 test('old independent lists are absent with no alias or redirect while operation and detail routes stay',()=>{
  for(const workspace of walletRoutes){for(const route of workspace.children){assert.ok(!['bills','history','points','topups','refunds'].includes(route.path));assert.equal(route.alias,undefined);assert.equal(route.redirect,undefined)}assert.ok(workspace.children.some(r=>r.path==='transactions'));assert.ok(workspace.children.some(r=>r.path==='topup'));assert.ok(workspace.children.some(r=>r.path==='bills/:billId'))}
 })

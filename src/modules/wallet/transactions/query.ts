@@ -3,11 +3,12 @@ export const queryKeys=['period','year','month','startDate','endDate','type','st
 export function transactionQuery(query:Record<string,unknown>, customer=false):Record<string,string> {
  const result:Record<string,string>={}
  for(const key of queryKeys){const value=query[key];if(typeof value==='string'&&value&&!(customer&&key==='customerQuery'))result[key]=value}
+ if(!customer&&query.history==='1')result.history='1'
  result.period ||= 'month'; result.type ||= 'all'; result.status ||= 'all'
  result.category ||= 'auto';result.direction ||= 'all'
  return result
 }
-export function transactionSearch(query:Record<string,unknown>,customer=false){return new URLSearchParams(transactionQuery(query,customer)).toString()}
+export function transactionSearch(query:Record<string,unknown>,customer=false){const result=transactionQuery(query,customer);delete result.history;return new URLSearchParams(result).toString()}
 export function transactionListPath(store:string,customer=false){return customer?`/wallet/${encodeURIComponent(store)}/transactions`:`/stores/${encodeURIComponent(store)}/wallet/transactions`}
 /** Only same-role internal transaction lists, including another authorized store. Server checks store authorization. */
 export function safeTransactionReturn(value:unknown,store:string,customer=false):string {
@@ -20,7 +21,7 @@ export function safeTransactionReturn(value:unknown,store:string,customer=false)
 export function transactionDetailTarget(row:Transaction,customer:boolean,returnTo:string){
  const base=customer?`/wallet/${encodeURIComponent(row.storeId)}`:`/stores/${encodeURIComponent(row.storeId)}/wallet`
  const page=row.sourceType==='bill'?`bills/${row.id}`:!customer&&row.sourceType==='topup'?`topups/${row.id}`:!customer&&row.sourceType==='refund'?`refunds/${row.id}`:`transactions/${row.sourceType}/${row.id}`
- return {path:`${base}/${page}`,query:{returnTo}}
+ return {path:`${base}/${page}`,query:{returnTo,...(!customer&&new URLSearchParams(returnTo.split('?')[1]??'').get('history')==='1'?{history:'1'}:{})}}
 }
 export function availableCategories(c:Capabilities,customer=false){
  if(customer)return ['all',...(c.money||c.refunds||c.reversals?['money']:[]),...(c.points?['points']:[])]

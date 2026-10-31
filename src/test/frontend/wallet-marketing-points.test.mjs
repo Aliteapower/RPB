@@ -605,6 +605,14 @@ test('reversal detail entry is hidden without permission or for a reversal or al
  globalThis.fetch=async()=>response(staffContext)
  for(const [permissions,detail,count] of [[['wallet.view'],{transaction:originalPointsRow,related:[]},0],[['wallet.points.reverse'],{transaction:{...originalPointsRow,type:'reversal'},related:[]},0],[['wallet.points.reverse'],{transaction:originalPointsRow,related:[{type:'reversal',originalId:'entry-original'}]},0],[['wallet.points.reverse'],{transaction:originalPointsRow,related:[]},1]]){const scope=mount(ReversalAction,'staff',reactive({params:{storeId:'A'},query:{},hash:''}),{store:'A',detail,returnTo:'/stores/A/wallet/transactions?category=points'},permissions);await tick();assert.equal(nodes(scope.root,n=>n.tag==='a').length,count);scope.unmount()}
 })
+
+test('explicit history mode hides a permitted reversal action until the user leaves read-only mode',async()=>{
+ globalThis.fetch=async()=>response(staffContext)
+ const route=reactive({params:{storeId:'A'},query:{history:'1'},hash:''})
+ const scope=mount(ReversalAction,'staff',route,{store:'A',detail:{transaction:originalPointsRow,related:[]},returnTo:'/stores/A/wallet/transactions?history=1'},['wallet.points.reverse'])
+ await tick();assert.equal(nodes(scope.root,n=>n.tag==='a').length,0)
+ route.query={};await tick();assert.equal(nodes(scope.root,n=>n.tag==='a').length,1);scope.unmount()
+})
 test('dedicated reversal confirms the original record without a transaction ID input and preserves current version',async()=>{
  const writes=[];globalThis.fetch=async(url,options={})=>{if(options.method==='POST'){writes.push({url,body:JSON.parse(options.body)});return response({account:{balance:7,version:4},entry:{id:'reversal-new',kind:'reversal',quantity:3}})}return response(url.endsWith('/context')?staffContext:url.includes('/transactions/')?{transaction:originalPointsRow,related:[],events:[]}:{accountId:'p',balance:10,version:3})}
  const scope=mount(ReversalPage,'staff',reactive({params:{storeId:'A',entryId:'entry-original'},query:{returnTo:'/stores/A/wallet/transactions?category=points'},hash:''}));await tick()
