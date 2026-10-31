@@ -1,5 +1,7 @@
 # 满勤待遇测算与月津贴（本地实施）
 
+生产发布更新：本批已于2026-10-31提交并部署，前后端版本 `cbebedf0`、Flyway V115。以下保留开发时的本地验收状态；最新上线证据与回退边界见[生产发布记录](../development/WORKFORCE_GUIDED_PAYROLL_PRODUCTION_RELEASE_20261031.md)。
+
 范围：当前隔离工作树 workforce-guided-payroll。未提交、未推送、未生产部署；原工资快照、付款和审批流程不回写。
 
 ## 业务变化
