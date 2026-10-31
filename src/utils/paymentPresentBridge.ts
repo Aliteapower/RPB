@@ -1,0 +1,683 @@
+import type { PaymentIntentCreateResponse } from '../types/payment'
+import { extractPayNowQrPayload } from './paymentQrPayloads'
+
+export const PAYMENT_PRESENT_TTL_SECONDS = 120
+export const MAX_PRESENT_PAYMENTS = 6
+export const DEFAULT_RECENT_EXPIRED_HOLD_SECONDS = 20
+
+const CHANNEL_PREFIX = 'rpb-payment-present'
+const ACTIVE_PREFIX = 'rpb.payment.present.active'
+const RECENT_PREFIX = 'rpb.payment.present.recent'
+const PRESET_PREFIX = 'rpb.payment.quickPay.presets'
+const SETTINGS_PREFIX = 'rpb.payment.present.settings'
+const DEFAULT_PRESET_AMOUNTS = ['5', '10', '20', '50', '100', '200']
+const MAX_RECENT_ITEMS = 6
+const MAX_RECENT_EXPIRED_HOLD_SECONDS = 3600
+const DEFAULT_PRESENT_SETTINGS: PaymentPresentSettings = {
+  maxPayments: 1,
+  qrPerPayment: 1,
+  primaryQr: 'sgqr',
+  recentExpiredHoldSeconds: DEFAULT_RECENT_EXPIRED_HOLD_SECONDS
+}
+
+export type PresentMaxPayments = 1 | 2 | 3 | 4 | 5 | 6
+export type PresentQrPerPayment = 1
+export type PresentPrimaryQr = 'sgqr'
+
+export interface PaymentPresentPayload {
+  storeId: string
+  terminalCode: string
+  sessionNo: string
+  intentNo: string
+  paymentReference: string
+  displayNumber: number
+  businessDate: string
+  status: string
+  amount: string
+  currency: string
+  qrPayload: string
+  createdAtMs: number
+}
+
+export interface PaymentPresentRecentItem {
+  sessionNo: string
+  intentNo: string
+  paymentReference: string
+  displayNumber: number
+  amount: string
+  currency: string
+  status: string
+  createdAtMs: number
+}
+
+export type PaymentPresentPayment = PaymentPresentPayload | PaymentPresentRecentItem
+
+export interface PaymentPresentSettings {
+  maxPayments: PresentMaxPayments
+  qrPerPayment: PresentQrPerPayment
+  primaryQr: PresentPrimaryQr
+  recentExpiredHoldSeconds: number
+}
+
+export interface QuickPayTerminalConfig {
+  referencePrefix: string
+  dailyStartNumber: number
+  presetAmounts: string[]
+}
+
+interface PaymentPresentBroadcastMessage {
+  kind: 'payloads' | 'settings'
+  payloads?: PaymentPresentPayload[]
+  settings?: PaymentPresentSettings
+}
+
+export function paymentPresentChannelName(storeId: string, terminalCode: string): string {
+  return `${CHANNEL_PREFIX}:${normalizeKeyPart(storeId)}:${normalizeKeyPart(terminalCode)}`
+}
+
+export function paymentPresentUrl(storeId: string, terminalCode: string): string {
+  return `/stores/${encodeURIComponent(storeId)}/payments/present/${encodeURIComponent(normalizeTerminalCode(terminalCode))}`
+}
+
+export function normalizeTerminalCode(value: string | null | undefined): string {
+  return String(value || '').trim() || 'T1'
+}
+
+export function buildPaymentPresentPayload(
+  response: PaymentIntentCreateResponse,
+  storeId: string,
+  terminalCode: string
+): PaymentPresentPayload {
+  return {
+    storeId,
+    terminalCode: normalizeTerminalCode(terminalCode),
+    sessionNo: response.session.sessionNo,
+    intentNo: response.intent.intentNo,
+    paymentReference: response.intent.paymentReference,
+    displayNumber: response.session.displayNumber,
+    businessDate: response.session.businessDate,
+    status: response.session.status || response.intent.status || 'pending',
+    amount: response.intent.amount,
+    currency: response.intent.currency,
+    qrPayload: extractPayNowQrPayload(response.session.qrPayloadsJson),
+    createdAtMs: Date.now()
+  }
+}
+
+export function publishPaymentPresentPayload(payload: PaymentPresentPayload): void {
+  const settings = readPaymentPresentSettings(payload.storeId, payload.terminalCode)
+  const existing = readPaymentPresentPayloads(payload.storeId, payload.terminalCode)
+    .filter(value => value.sessionNo !== payload.sessionNo && isPaymentPresentPayloadActive(value))
+  const next = [payload, ...existing].slice(0, settings.maxPayments)
+  safeSetJson(activeStorageKey(payload.storeId, payload.terminalCode), next)
+  pushPaymentPresentRecent(payload)
+  postPaymentPresentMessage(payload.storeId, payload.terminalCode, {
+    kind: 'payloads',
+    payloads: next
+  })
+}
+
+export function subscribePaymentPresentPayloads(
+  storeId: string,
+  terminalCode: string,
+  onPayloads: (payloads: PaymentPresentPayload[]) => void
+): () => void {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const channelName = paymentPresentChannelName(storeId, normalizedTerminal)
+  const storageKey = activeStorageKey(storeId, normalizedTerminal)
+  let channel: BroadcastChannel | null = null
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    channel = new BroadcastChannel(channelName)
+    channel.onmessage = event => {
+      const message = parseBroadcastMessage(event.data)
+      if (!message || message.kind !== 'payloads') {
+        return
+      }
+      onPayloads(parsePaymentPresentPayloads(message.payloads))
+    }
+  }
+
+  const storageListener = (event: StorageEvent) => {
+    if (event.key !== storageKey) {
+      return
+    }
+    onPayloads(parsePaymentPresentPayloads(event.newValue))
+  }
+
+  window.addEventListener('storage', storageListener)
+
+  return () => {
+    window.removeEventListener('storage', storageListener)
+    channel?.close()
+  }
+}
+
+export function subscribePaymentPresentPayload(
+  storeId: string,
+  terminalCode: string,
+  onPayload: (payload: PaymentPresentPayload | null) => void
+): () => void {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const channelName = paymentPresentChannelName(storeId, normalizedTerminal)
+  const storageKey = activeStorageKey(storeId, normalizedTerminal)
+  let channel: BroadcastChannel | null = null
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    channel = new BroadcastChannel(channelName)
+    channel.onmessage = event => {
+      const payloads = parsePaymentPresentPayloadsFromMessage(event.data)
+      onPayload(payloads[0] || null)
+    }
+  }
+
+  const storageListener = (event: StorageEvent) => {
+    if (event.key !== storageKey) {
+      return
+    }
+    onPayload(readPaymentPresentPayload(storeId, normalizedTerminal))
+  }
+
+  window.addEventListener('storage', storageListener)
+
+  return () => {
+    window.removeEventListener('storage', storageListener)
+    channel?.close()
+  }
+}
+
+export function readPaymentPresentPayload(storeId: string, terminalCode: string): PaymentPresentPayload | null {
+  return readPaymentPresentPayloads(storeId, terminalCode)[0] || null
+}
+
+export function readPaymentPresentPayloads(storeId: string, terminalCode: string): PaymentPresentPayload[] {
+  return parsePaymentPresentPayloads(safeGet(activeStorageKey(storeId, terminalCode)))
+}
+
+export function clearPaymentPresentPayload(storeId: string, terminalCode: string): void {
+  clearPaymentPresentPayloads(storeId, terminalCode)
+}
+
+export function clearPaymentPresentPayloads(storeId: string, terminalCode: string): void {
+  try {
+    window.localStorage.removeItem(activeStorageKey(storeId, terminalCode))
+  } catch {
+    // Ignore storage restrictions in private browsing or locked-down kiosks.
+  }
+  postPaymentPresentMessage(storeId, terminalCode, {
+    kind: 'payloads',
+    payloads: []
+  })
+}
+
+export function isPaymentPresentPayloadActive(payload: PaymentPresentPayload, nowMs = Date.now()): boolean {
+  return isPaymentPresentRecentPending(payload) && nowMs - payload.createdAtMs < PAYMENT_PRESENT_TTL_SECONDS * 1000
+}
+
+export function isPaymentPresentRecentPending(item: Pick<PaymentPresentRecentItem, 'status'>): boolean {
+  return item.status === 'pending' || item.status === 'awaiting_verification'
+}
+
+export function paymentPresentSecondsRemaining(payload: PaymentPresentPayload, nowMs = Date.now()): number {
+  const expiresAtMs = payload.createdAtMs + PAYMENT_PRESENT_TTL_SECONDS * 1000
+  return Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000))
+}
+
+export function readPaymentPresentSettings(storeId: string, terminalCode: string): PaymentPresentSettings {
+  const parsed = safeGet(settingsStorageKey(storeId, terminalCode))
+  if (!parsed) {
+    return { ...DEFAULT_PRESENT_SETTINGS }
+  }
+  return normalizePaymentPresentSettings(safeParseJson(parsed))
+}
+
+export function savePaymentPresentSettings(
+  storeId: string,
+  terminalCode: string,
+  settings: Partial<PaymentPresentSettings>
+): PaymentPresentSettings {
+  const next = normalizePaymentPresentSettings(settings)
+  safeSetJson(settingsStorageKey(storeId, terminalCode), next)
+  const activePayloads = readPaymentPresentPayloads(storeId, terminalCode)
+    .filter(payload => isPaymentPresentPayloadActive(payload))
+    .slice(0, next.maxPayments)
+  safeSetJson(activeStorageKey(storeId, terminalCode), activePayloads)
+  prunePaymentPresentRecent(storeId, terminalCode, next)
+  return next
+}
+
+export function publishPaymentPresentSettings(
+  storeId: string,
+  terminalCode: string,
+  settings: Partial<PaymentPresentSettings>
+): PaymentPresentSettings {
+  const next = savePaymentPresentSettings(storeId, terminalCode, settings)
+  postPaymentPresentMessage(storeId, terminalCode, {
+    kind: 'settings',
+    settings: next
+  })
+  postPaymentPresentMessage(storeId, terminalCode, {
+    kind: 'payloads',
+    payloads: readPaymentPresentPayloads(storeId, terminalCode).slice(0, next.maxPayments)
+  })
+  return next
+}
+
+export function subscribePaymentPresentSettings(
+  storeId: string,
+  terminalCode: string,
+  onSettings: (settings: PaymentPresentSettings) => void
+): () => void {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const channelName = paymentPresentChannelName(storeId, normalizedTerminal)
+  const storageKey = settingsStorageKey(storeId, normalizedTerminal)
+  let channel: BroadcastChannel | null = null
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    channel = new BroadcastChannel(channelName)
+    channel.onmessage = event => {
+      const message = parseBroadcastMessage(event.data)
+      if (!message || message.kind !== 'settings') {
+        return
+      }
+      onSettings(normalizePaymentPresentSettings(message.settings))
+    }
+  }
+
+  const storageListener = (event: StorageEvent) => {
+    if (event.key !== storageKey) {
+      return
+    }
+    onSettings(readPaymentPresentSettings(storeId, normalizedTerminal))
+  }
+
+  window.addEventListener('storage', storageListener)
+
+  return () => {
+    window.removeEventListener('storage', storageListener)
+    channel?.close()
+  }
+}
+
+export function readPaymentPresentRecent(storeId: string, terminalCode: string): PaymentPresentRecentItem[] {
+  return prunePaymentPresentRecent(storeId, terminalCode, readPaymentPresentSettings(storeId, terminalCode))
+}
+
+export function findPaymentPresentPayment(
+  storeId: string,
+  terminalCode: string,
+  paymentReference: string | null | undefined,
+  sessionNo: string | null | undefined = null
+): PaymentPresentPayment | null {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const normalizedReference = normalizePaymentReference(paymentReference)
+  const normalizedSession = String(sessionNo || '').trim()
+  const matchesPayment = (item: Pick<PaymentPresentPayment, 'paymentReference' | 'sessionNo'>): boolean => {
+    if (normalizedSession && item.sessionNo === normalizedSession) {
+      return true
+    }
+    return Boolean(normalizedReference && normalizePaymentReference(item.paymentReference) === normalizedReference)
+  }
+  return readPaymentPresentPayloads(storeId, normalizedTerminal).find(matchesPayment)
+    || readPaymentPresentRecent(storeId, normalizedTerminal).find(matchesPayment)
+    || null
+}
+
+export function recentVisibleUntilMs(
+  item: PaymentPresentRecentItem,
+  settings: PaymentPresentSettings = DEFAULT_PRESENT_SETTINGS
+): number {
+  return item.createdAtMs + (PAYMENT_PRESENT_TTL_SECONDS + settings.recentExpiredHoldSeconds) * 1000
+}
+
+export function prunePaymentPresentRecent(
+  storeId: string,
+  terminalCode: string,
+  settings: PaymentPresentSettings = readPaymentPresentSettings(storeId, terminalCode),
+  nowMs = Date.now()
+): PaymentPresentRecentItem[] {
+  const value = safeGet(recentStorageKey(storeId, terminalCode))
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value)
+    const items = Array.isArray(parsed) ? parsed.map(parseRecentItem).filter(isPresentRecentItem).slice(0, MAX_RECENT_ITEMS) : []
+    const visible = items.filter(item => recentVisibleUntilMs(item, settings) > nowMs)
+      .filter(isPaymentPresentRecentPending)
+    if (visible.length !== items.length) {
+      safeSetJson(recentStorageKey(storeId, terminalCode), visible)
+    }
+    return visible
+  } catch {
+    return []
+  }
+}
+
+export function pushPaymentPresentRecent(payload: PaymentPresentPayload): PaymentPresentRecentItem[] {
+  const item: PaymentPresentRecentItem = {
+    sessionNo: payload.sessionNo,
+    intentNo: payload.intentNo,
+    paymentReference: payload.paymentReference,
+    displayNumber: payload.displayNumber,
+    amount: payload.amount,
+    currency: payload.currency,
+    status: payload.status,
+    createdAtMs: payload.createdAtMs
+  }
+  const existing = readPaymentPresentRecent(payload.storeId, payload.terminalCode)
+  const next = [item, ...existing.filter(value => value.sessionNo !== item.sessionNo)].slice(0, MAX_RECENT_ITEMS)
+  safeSetJson(recentStorageKey(payload.storeId, payload.terminalCode), next)
+  return next
+}
+
+export function confirmPaymentPresentPayment(
+  storeId: string,
+  terminalCode: string,
+  sessionNo: string
+): PaymentPresentRecentItem[] {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const activePayloads = readPaymentPresentPayloads(storeId, normalizedTerminal)
+    .filter(payload => payload.sessionNo !== sessionNo && isPaymentPresentPayloadActive(payload))
+  safeSetJson(activeStorageKey(storeId, normalizedTerminal), activePayloads)
+
+  const recent = readPaymentPresentRecent(storeId, normalizedTerminal)
+  const next = recent.filter(item => item.sessionNo !== sessionNo)
+  safeSetJson(recentStorageKey(storeId, normalizedTerminal), next)
+  postPaymentPresentMessage(storeId, normalizedTerminal, {
+    kind: 'payloads',
+    payloads: activePayloads
+  })
+  return next
+}
+
+export function confirmPaymentPresentPaymentByReference(
+  storeId: string,
+  terminalCode: string,
+  paymentReference: string | null | undefined
+): PaymentPresentRecentItem[] {
+  const normalizedTerminal = normalizeTerminalCode(terminalCode)
+  const normalizedReference = normalizePaymentReference(paymentReference)
+  if (!normalizedReference) {
+    return readPaymentPresentRecent(storeId, normalizedTerminal)
+  }
+  const activePayloads = readPaymentPresentPayloads(storeId, normalizedTerminal)
+    .filter(payload => normalizePaymentReference(payload.paymentReference) !== normalizedReference && isPaymentPresentPayloadActive(payload))
+  safeSetJson(activeStorageKey(storeId, normalizedTerminal), activePayloads)
+
+  const recent = readPaymentPresentRecent(storeId, normalizedTerminal)
+  const next = recent.filter(item => normalizePaymentReference(item.paymentReference) !== normalizedReference)
+  safeSetJson(recentStorageKey(storeId, normalizedTerminal), next)
+  postPaymentPresentMessage(storeId, normalizedTerminal, {
+    kind: 'payloads',
+    payloads: activePayloads
+  })
+  return next
+}
+
+export function readQuickPayPresetAmounts(storeId: string, defaultValues = DEFAULT_PRESET_AMOUNTS): string[] {
+  const parsed = safeGet(presetStorageKey(storeId))
+  if (!parsed) {
+    return defaultValues
+  }
+  try {
+    const values = normalizePresetAmounts(JSON.parse(parsed))
+    return values.length ? values : defaultValues
+  } catch {
+    return defaultValues
+  }
+}
+
+export function saveQuickPayPresetAmounts(storeId: string, values: string[]): string[] {
+  const next = normalizePresetAmounts(values)
+  safeSetJson(presetStorageKey(storeId), next)
+  return next
+}
+
+export function parsePresetAmountText(value: string): string[] {
+  return normalizePresetAmounts(String(value || '').split(/[,\s，]+/))
+}
+
+export function readQuickPayConfigFromProfileConfigJson(configJson: string | null | undefined): QuickPayTerminalConfig {
+  const root = typeof configJson === 'string' && configJson.trim() ? safeParseJson(configJson) : {}
+  const source = root && typeof root === 'object' && !Array.isArray(root)
+    ? root as Record<string, unknown>
+    : {}
+  const quickPay = source.quickPay && typeof source.quickPay === 'object' && !Array.isArray(source.quickPay)
+    ? source.quickPay as Record<string, unknown>
+    : source
+  return normalizeQuickPayTerminalConfig(quickPay)
+}
+
+export function mergeQuickPayConfigIntoProfileConfigJson(
+  configJson: string | null | undefined,
+  config: Partial<QuickPayTerminalConfig>
+): string {
+  const parsed = typeof configJson === 'string' && configJson.trim() ? safeParseJson(configJson) : {}
+  const root = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+  const current = root.quickPay && typeof root.quickPay === 'object' && !Array.isArray(root.quickPay)
+    ? root.quickPay as Record<string, unknown>
+    : {}
+  return JSON.stringify({
+    ...root,
+    quickPay: {
+      ...current,
+      ...normalizeQuickPayTerminalConfig(config)
+    }
+  })
+}
+
+function parsePaymentPresentPayload(value: unknown): PaymentPresentPayload | null {
+  const raw = typeof value === 'string' ? safeParseJson(value) : value
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+  const source = raw as Record<string, unknown>
+  const payload: PaymentPresentPayload = {
+    storeId: String(source.storeId || ''),
+    terminalCode: normalizeTerminalCode(String(source.terminalCode || '')),
+    sessionNo: String(source.sessionNo || ''),
+    intentNo: String(source.intentNo || ''),
+    paymentReference: String(source.paymentReference || source.intentNo || ''),
+    displayNumber: Number(source.displayNumber || 0),
+    businessDate: String(source.businessDate || ''),
+    status: String(source.status || 'pending'),
+    amount: String(source.amount || ''),
+    currency: String(source.currency || 'SGD'),
+    qrPayload: String(source.qrPayload || ''),
+    createdAtMs: Number(source.createdAtMs || 0)
+  }
+  if (!payload.storeId || !payload.sessionNo || !payload.qrPayload || !Number.isFinite(payload.createdAtMs)) {
+    return null
+  }
+  return payload
+}
+
+function parsePaymentPresentPayloads(value: unknown): PaymentPresentPayload[] {
+  const raw = typeof value === 'string' ? safeParseJson(value) : value
+  if (Array.isArray(raw)) {
+    return raw.map(parsePaymentPresentPayload).filter(isPresentPayload).slice(0, MAX_PRESENT_PAYMENTS)
+  }
+  const message = parseBroadcastMessage(raw)
+  if (message?.kind === 'payloads') {
+    return parsePaymentPresentPayloads(message.payloads)
+  }
+  const single = parsePaymentPresentPayload(raw)
+  return single ? [single] : []
+}
+
+function parsePaymentPresentPayloadsFromMessage(value: unknown): PaymentPresentPayload[] {
+  const message = parseBroadcastMessage(value)
+  if (message?.kind === 'payloads') {
+    return parsePaymentPresentPayloads(message.payloads)
+  }
+  return parsePaymentPresentPayloads(value)
+}
+
+function isPresentPayload(value: PaymentPresentPayload | null): value is PaymentPresentPayload {
+  return value !== null
+}
+
+function parseRecentItem(value: unknown): PaymentPresentRecentItem | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const source = value as Record<string, unknown>
+  const item: PaymentPresentRecentItem = {
+    sessionNo: String(source.sessionNo || ''),
+    intentNo: String(source.intentNo || ''),
+    paymentReference: String(source.paymentReference || source.intentNo || ''),
+    displayNumber: Number(source.displayNumber || 0),
+    amount: String(source.amount || ''),
+    currency: String(source.currency || 'SGD'),
+    status: String(source.status || 'pending'),
+    createdAtMs: Number(source.createdAtMs || 0)
+  }
+  return item.sessionNo ? item : null
+}
+
+function isPresentRecentItem(value: PaymentPresentRecentItem | null): value is PaymentPresentRecentItem {
+  return value !== null
+}
+
+function normalizePaymentPresentSettings(value: unknown): PaymentPresentSettings {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const maxPayments = Number(source.maxPayments || DEFAULT_PRESENT_SETTINGS.maxPayments)
+  return {
+    maxPayments: normalizeMaxPayments(maxPayments),
+    qrPerPayment: 1,
+    primaryQr: 'sgqr',
+    recentExpiredHoldSeconds: normalizeRecentExpiredHoldSeconds(source.recentExpiredHoldSeconds)
+  }
+}
+
+function normalizeMaxPayments(value: number): PresentMaxPayments {
+  if (value === 2 || value === 3 || value === 4 || value === 5 || value === 6) {
+    return value
+  }
+  return 1
+}
+
+function normalizeRecentExpiredHoldSeconds(value: unknown): number {
+  const numberValue = Number(value ?? DEFAULT_RECENT_EXPIRED_HOLD_SECONDS)
+  if (!Number.isFinite(numberValue)) {
+    return DEFAULT_RECENT_EXPIRED_HOLD_SECONDS
+  }
+  return Math.max(0, Math.min(Math.trunc(numberValue), MAX_RECENT_EXPIRED_HOLD_SECONDS))
+}
+
+function normalizePaymentReference(value: string | null | undefined): string {
+  return String(value || '').trim().toUpperCase()
+}
+
+function normalizePresetAmounts(values: unknown): string[] {
+  const source = Array.isArray(values) ? values : []
+  const next = source
+    .map(value => Number(String(value).trim()))
+    .filter(value => Number.isFinite(value) && value > 0)
+    .map(value => formatPresetAmount(value))
+  return Array.from(new Set(next)).slice(0, 6)
+}
+
+function normalizeQuickPayTerminalConfig(value: unknown): QuickPayTerminalConfig {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+  const presetAmounts = normalizePresetAmounts(source.presetAmounts)
+  return {
+    referencePrefix: normalizeReferencePrefix(source.referencePrefix),
+    dailyStartNumber: normalizeDailyStartNumber(source.dailyStartNumber),
+    presetAmounts: presetAmounts.length ? presetAmounts : DEFAULT_PRESET_AMOUNTS
+  }
+}
+
+function normalizeReferencePrefix(value: unknown): string {
+  const cleaned = String(value ?? 'QP').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+  return (cleaned || 'QP').slice(0, 3)
+}
+
+function normalizeDailyStartNumber(value: unknown): number {
+  const numberValue = Number(value ?? 0)
+  if (!Number.isFinite(numberValue)) {
+    return 0
+  }
+  return Math.max(0, Math.min(Math.trunc(numberValue), 9999))
+}
+
+function formatPresetAmount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+
+function activeStorageKey(storeId: string, terminalCode: string): string {
+  return `${ACTIVE_PREFIX}:${normalizeKeyPart(storeId)}:${normalizeKeyPart(terminalCode)}`
+}
+
+function recentStorageKey(storeId: string, terminalCode: string): string {
+  return `${RECENT_PREFIX}:${normalizeKeyPart(storeId)}:${normalizeKeyPart(terminalCode)}`
+}
+
+function presetStorageKey(storeId: string): string {
+  return `${PRESET_PREFIX}:${normalizeKeyPart(storeId)}`
+}
+
+function settingsStorageKey(storeId: string, terminalCode: string): string {
+  return `${SETTINGS_PREFIX}:${normalizeKeyPart(storeId)}:${normalizeKeyPart(terminalCode)}`
+}
+
+function normalizeKeyPart(value: string): string {
+  return encodeURIComponent(String(value || '').trim())
+}
+
+function postPaymentPresentMessage(storeId: string, terminalCode: string, message: PaymentPresentBroadcastMessage): void {
+  if (typeof BroadcastChannel === 'undefined') {
+    return
+  }
+  const channel = new BroadcastChannel(paymentPresentChannelName(storeId, terminalCode))
+  try {
+    channel.postMessage(message)
+  } finally {
+    channel.close()
+  }
+}
+
+function parseBroadcastMessage(value: unknown): PaymentPresentBroadcastMessage | null {
+  const raw = typeof value === 'string' ? safeParseJson(value) : value
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+  const source = raw as Record<string, unknown>
+  if (source.kind !== 'payloads' && source.kind !== 'settings') {
+    return null
+  }
+  return {
+    kind: source.kind,
+    payloads: Array.isArray(source.payloads) ? parsePaymentPresentPayloads(source.payloads) : undefined,
+    settings: source.settings ? normalizePaymentPresentSettings(source.settings) : undefined
+  }
+}
+
+function safeGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function safeSetJson(key: string, value: unknown): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Ignore storage quota/security failures. Broadcast still covers active windows.
+  }
+}
+
+function safeParseJson(value: string): unknown {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}

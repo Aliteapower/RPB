@@ -32,6 +32,15 @@ public class CustomerAuthJdbcRepository implements
     }
 
     @Override
+    public java.util.Set<UUID> activeCustomerIds(UUID tenantId, java.util.List<UUID> customerIds) {
+        if (customerIds.isEmpty()) return java.util.Set.of();
+        var args = new java.util.ArrayList<Object>(); args.add(tenantId); args.addAll(customerIds);
+        String placeholders = String.join(",",java.util.Collections.nCopies(customerIds.size(),"?"));
+        return new java.util.HashSet<>(jdbc.query("select distinct customer_id from customer_auth_accounts where tenant_id=? and status='active' and deleted_at is null and customer_id in ("+placeholders+")",
+            (rs,n)->rs.getObject("customer_id",UUID.class),args.toArray()));
+    }
+
+    @Override
     public void createEmailCode(
         UUID id,
         UUID tenantId,
@@ -129,6 +138,15 @@ public class CustomerAuthJdbcRepository implements
     }
 
     @Override
+    public Optional<CustomerAuthAccountRecord> findAccountByCustomerId(UUID tenantId, UUID customerId) {
+        return jdbc.query("""
+            select id, tenant_id, customer_id, email, display_name, status from customer_auth_accounts
+            where tenant_id = ? and customer_id = ? and deleted_at is null
+            order by created_at, id limit 1
+            """, (rs,n) -> account(rs), tenantId, customerId).stream().findFirst();
+    }
+
+    @Override
     public Optional<CustomerAuthAccountRecord> findAccountByEmail(UUID tenantId, String email) {
         return jdbc.query(
             """
@@ -172,13 +190,14 @@ public class CustomerAuthJdbcRepository implements
             insert into customer_auth_accounts (
                 id, tenant_id, customer_id, email, display_name, status, email_verified_at
             )
-            values (?, ?, ?, ?, ?, 'active', now())
+            values (?, ?, ?, ?, ?, 'active', case when cast(? as text) is null then null else now() end)
             """,
             accountId,
             tenantId,
             customerId,
             email,
-            displayName
+            displayName,
+            email
         );
         return new CustomerAuthAccountRecord(accountId, tenantId, customerId, email, displayName, "active");
     }
@@ -260,6 +279,7 @@ public class CustomerAuthJdbcRepository implements
             select
                 session.id as session_id,
                 session.expires_at,
+                session.password_change_required,
                 account.id,
                 account.tenant_id,
                 account.customer_id,
@@ -278,7 +298,8 @@ public class CustomerAuthJdbcRepository implements
             (rs, rowNum) -> new CustomerAuthSessionRecord(
                 rs.getObject("session_id", UUID.class),
                 account(rs),
-                rs.getTimestamp("expires_at").toInstant()
+                rs.getTimestamp("expires_at").toInstant(),
+                rs.getBoolean("password_change_required")
             ),
             sessionHash
         ).stream().findFirst();
@@ -297,6 +318,10 @@ public class CustomerAuthJdbcRepository implements
             """,
             sessionId
         );
+    }
+
+    @Override public void requirePasswordChange(UUID sessionId) {
+        jdbc.update("update customer_auth_sessions set password_change_required=true where id=?", sessionId);
     }
 
     @Override

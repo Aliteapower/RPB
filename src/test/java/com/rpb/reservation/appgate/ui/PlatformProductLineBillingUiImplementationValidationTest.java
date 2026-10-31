@@ -158,8 +158,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
 
         assertThat(productLineCatalog)
             .contains("defaultEntryRouteOptions")
-            .contains("platform.productLines.entryRoutes.none.label")
-            .contains("/stores/:storeId/staff")
+            .contains("main/resources/product-line-entries.json")
             .contains("normalizeProductLineAppKey")
             .contains("isProductLineAppKeyValid");
 
@@ -177,7 +176,7 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .contains("platform.billing.form.storeUnitAmount")
             .contains("platform.billing.storeItems.title")
             .contains("subscription.items")
-            .contains("item.status !== 'cancelled' && item.status !== 'expired'")
+            .contains("item.storeId")
             .contains("storeItemRows")
             .contains("selectedStoreItemId")
             .contains("selectedStoreItem")
@@ -204,7 +203,8 @@ class PlatformProductLineBillingUiImplementationValidationTest {
             .doesNotContain("toggleProductLine")
             .doesNotContain("isProductLineChecked")
             .doesNotContain("@change=\"toggleProductLine(row, $event)\"")
-            .doesNotContain("type=\"checkbox\"")
+            .contains("v-model=\"selectedStoreIds\"")
+            .contains("platform.billing.actions.addStores")
             .doesNotContain("platform.billing.table.columns.actions")
             .doesNotContain("@submit.prevent=\"purchaseSelectedProduct\"")
             .doesNotContain(":checked=\"row.subscription?.status === 'active'\" disabled")

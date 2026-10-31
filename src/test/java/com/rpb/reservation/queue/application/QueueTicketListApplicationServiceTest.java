@@ -192,6 +192,15 @@ class QueueTicketListApplicationServiceTest {
         );
     }
 
+    @Test void explicitHistoryDateIsScopedAndInvalidDatesAreRejected(){
+        var q=query(null,"25","0");
+        var dated=new QueueTicketListQuery(q.tenantId(),q.storeId(),q.actorId(),q.actorType(),q.status(),q.limit(),q.offset(),q.tableArea(),q.partySize(),q.phone(),"2025-01-02");
+        assertThat(service.listQueueTickets(dated).success()).isTrue();
+        assertThat(queueTicketRepository.lastBusinessDate.value()).isEqualTo(LocalDate.of(2025,1,2));
+        var bad=new QueueTicketListQuery(q.tenantId(),q.storeId(),q.actorId(),q.actorType(),q.status(),q.limit(),q.offset(),q.tableArea(),q.partySize(),q.phone(),"2025-02-30");
+        assertThat(service.listQueueTickets(bad).error()).isEqualTo(QueueTicketListError.INVALID_QUERY);
+    }
+
     private static final class FakeStoreRepository implements StoreRepositoryPort {
         private Optional<Store> store = Optional.of(Store.skeleton(
             new StoreId(STORE_ID),

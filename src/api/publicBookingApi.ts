@@ -98,8 +98,8 @@ export async function loginCustomerWithOAuth(
   })
 }
 
-export async function getCustomerMe(fetcher?: PublicBookingFetcher): Promise<CustomerAuthMeResponse> {
-  return requestJson('/api/v1/public/customer-auth/me', { method: 'GET', fetcher })
+export async function getCustomerMe(fetcher?: PublicBookingFetcher, storeId?: string): Promise<CustomerAuthMeResponse> {
+  return requestJson('/api/v1/public/customer-auth/me' + (storeId ? `?storeId=${encodeURIComponent(storeId)}` : ''), { method: 'GET', fetcher })
 }
 
 export async function createPublicBooking(

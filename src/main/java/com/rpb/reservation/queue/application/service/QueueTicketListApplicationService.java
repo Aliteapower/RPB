@@ -106,8 +106,11 @@ public class QueueTicketListApplicationService {
             return QueueTicketListResult.failure(QueueTicketListError.STORE_ACCESS_DENIED);
         }
 
+        LocalDate selectedDate;
+        try { selectedDate=query.businessDate()==null || query.businessDate().isBlank()?LocalDate.now(clock.withZone(zoneId(store.timezone()))):LocalDate.parse(query.businessDate()); }
+        catch (java.time.format.DateTimeParseException error) { return QueueTicketListResult.failure(QueueTicketListError.INVALID_QUERY); }
         try {
-            BusinessDate businessDate = new BusinessDate(LocalDate.now(clock.withZone(zoneId(store.timezone()))));
+            BusinessDate businessDate = new BusinessDate(selectedDate);
             QueueTicketListRows rows = queueTicketRepository.findQueueTicketList(
                 scope,
                 statusFilter.status(),
@@ -123,7 +126,7 @@ public class QueueTicketListApplicationService {
                 .toList();
             return QueueTicketListResult.success(items, new QueueTicketListPage(limit, offset, rows.total()));
         } catch (RuntimeException exception) {
-            LOGGER.warn("queue_ticket_list_read_failed: {}", exception.toString());
+            LOGGER.warn("queue_ticket_list_read_failed: {}", exception.getClass().getSimpleName());
             return QueueTicketListResult.failure(QueueTicketListError.PERSISTENCE_ERROR);
         }
     }

@@ -6,6 +6,10 @@ import java.util.UUID;
 
 public interface CustomerAuthRepositoryPort {
 
+    default java.util.Set<UUID> activeCustomerIds(UUID tenantId, java.util.List<UUID> customerIds) {
+        return java.util.Set.of();
+    }
+
     void createEmailCode(
         UUID id,
         UUID tenantId,
@@ -26,6 +30,10 @@ public interface CustomerAuthRepositoryPort {
     void markEmailCodeExpired(UUID codeId);
 
     Optional<CustomerAuthAccountRecord> findAccountByEmail(UUID tenantId, String email);
+
+    default Optional<CustomerAuthAccountRecord> findAccountByCustomerId(UUID tenantId, UUID customerId) {
+        return Optional.empty();
+    }
 
     Optional<CustomerAuthAccountRecord> findAccountByIdentity(UUID tenantId, String provider, String providerSubject);
 
@@ -55,6 +63,8 @@ public interface CustomerAuthRepositoryPort {
 
     void touchSession(UUID sessionId);
 
+    default void requirePasswordChange(UUID sessionId) { throw new UnsupportedOperationException("restricted_session_not_implemented"); }
+
     void revokeSession(String sessionHash);
 
     record EmailCodeRecord(
@@ -83,7 +93,11 @@ public interface CustomerAuthRepositoryPort {
     record CustomerAuthSessionRecord(
         UUID sessionId,
         CustomerAuthAccountRecord account,
-        Instant expiresAt
+        Instant expiresAt,
+        boolean passwordChangeRequired
     ) {
+        public CustomerAuthSessionRecord(UUID sessionId, CustomerAuthAccountRecord account, Instant expiresAt) {
+            this(sessionId, account, expiresAt, false);
+        }
     }
 }

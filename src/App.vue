@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import FrontendLocaleSwitcher from './components/common/FrontendLocaleSwitcher.vue'
+import { routeViewKey } from './router/viewKey'
 </script>
 
 <template>
   <FrontendLocaleSwitcher />
-  <RouterView :key="$route.path" />
+  <RouterView :key="routeViewKey($route)" />
 </template>
 
 <style>
@@ -32,7 +33,8 @@ body,
 }
 
 body {
-  min-width: 320px;
+  /* Classic vertical scrollbars can leave less than 320px of layout width. */
+  min-width: min(320px, 100%);
 }
 
 button,

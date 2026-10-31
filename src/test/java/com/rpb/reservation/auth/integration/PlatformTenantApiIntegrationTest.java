@@ -75,6 +75,7 @@ class PlatformTenantApiIntegrationTest {
         jdbc.update("delete from auth_accounts where username like 'codex-%'");
         jdbc.update("delete from tenant_product_subscriptions where app_key like 'codex-%'");
         jdbc.update("delete from tenant_app_entitlements where app_key like 'codex-%'");
+        jdbc.update("delete from tenant_app_entitlements where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from store_app_settings where app_key like 'codex-%'");
         jdbc.update("delete from platform_product_line_prices where app_key like 'codex-%'");
         jdbc.update("delete from platform_apps where app_key like 'codex-%'");
@@ -100,6 +101,31 @@ class PlatformTenantApiIntegrationTest {
             """);
         jdbc.update("delete from tenant_host_aliases where alias_code like 'codex-%'");
         jdbc.update("delete from tenant_host_aliases where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
+        jdbc.update("""
+            delete from queue_groups
+            where store_id in (select id from stores where store_code like 'codex-%')
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
+        jdbc.update("""
+            delete from audit_logs
+            where store_id in (
+                select id
+                from stores
+                where store_code like 'codex-%'
+                   or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            )
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
+        jdbc.update("""
+            delete from store_app_settings
+            where store_id in (
+                select id
+                from stores
+                where store_code like 'codex-%'
+                   or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            )
+               or tenant_id in (select id from tenants where tenant_code like 'codex-%')
+            """);
         jdbc.update("delete from stores where store_code like 'codex-%'");
         jdbc.update("delete from stores where tenant_id in (select id from tenants where tenant_code like 'codex-%')");
         jdbc.update("delete from operating_entities where entity_code like 'codex-%'");
@@ -149,6 +175,53 @@ class PlatformTenantApiIntegrationTest {
             AuthPostgresTestDatabase.VALIDATION_STORE_ID,
             AuthPostgresTestDatabase.VALIDATION_TENANT_ID,
             AuthPostgresTestDatabase.VALIDATION_STORE_ID
+        );
+    }
+
+    @Test
+    void platformAdminCreatesTenantWithDefaultQueueGroups() throws Exception {
+        Cookie session = login("sysadmin");
+
+        UUID tenantId = createTenant(session, "codex-queue-defaults", "Codex 排队默认组租户");
+        UUID storeId = jdbc.queryForObject(
+            "select id from stores where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+
+        assertThat(defaultQueueGroups(tenantId, storeId)).containsExactly(
+            new QueueGroupRow("1-2", 1, 2, "queue.group.1_2", "active", 1),
+            new QueueGroupRow("3-4", 3, 4, "queue.group.3_4", "active", 2),
+            new QueueGroupRow("5-6", 5, 6, "queue.group.5_6", "active", 3),
+            new QueueGroupRow("7+", 7, null, "queue.group.7_plus", "active", 4)
+        );
+    }
+
+    @Test
+    void platformAdminCreatesStoreWithDefaultQueueGroups() throws Exception {
+        Cookie session = login("sysadmin");
+        UUID tenantId = createGroupTenant(session, "codex-queue-store", "Codex 排队分店集团", "abc123");
+        UUID operatingEntityId = jdbc.queryForObject(
+            "select id from operating_entities where tenant_id = ? and deleted_at is null",
+            UUID.class,
+            tenantId
+        );
+
+        UUID storeId = createStore(
+            session,
+            tenantId,
+            operatingEntityId,
+            "codex-queue-store-a",
+            "Codex 排队分店 A",
+            null,
+            null
+        );
+
+        assertThat(defaultQueueGroups(tenantId, storeId)).containsExactly(
+            new QueueGroupRow("1-2", 1, 2, "queue.group.1_2", "active", 1),
+            new QueueGroupRow("3-4", 3, 4, "queue.group.3_4", "active", 2),
+            new QueueGroupRow("5-6", 5, 6, "queue.group.5_6", "active", 3),
+            new QueueGroupRow("7+", 7, null, "queue.group.7_plus", "active", 4)
         );
     }
 
@@ -428,6 +501,28 @@ class PlatformTenantApiIntegrationTest {
             AppGateRequiredPermission.RESERVATION_TODAY_VIEW
         )).isEqualTo(1);
         assertThat(countWhere("""
+            with required_permissions(permission_code) as (
+                values
+                    ('payment.settings.manage'),
+                    ('payment.intent.view'),
+                    ('payment.intent.create'),
+                    ('payment.verification.review')
+            )
+            select count(*)
+            from required_permissions permission
+            where not exists (
+                select 1
+                from auth_account_permissions existing
+                join auth_accounts account on account.id = existing.account_id
+                where account.tenant_id = ?
+                  and account.username = 'codex-login'
+                  and account.actor_type = 'tenant_admin'
+                  and account.deleted_at is null
+                  and existing.permission_code = permission.permission_code
+                  and existing.deleted_at is null
+            )
+            """, tenantId)).isZero();
+        assertThat(countWhere("""
             select count(*)
             from tenant_host_aliases
             where tenant_id = ?
@@ -617,6 +712,32 @@ class PlatformTenantApiIntegrationTest {
               and role.deleted_at is null
               and permission.deleted_at is null
             """, tenantId)).isEqualTo(1);
+        assertThat(countWhere("""
+            with required_permissions(permission_code) as (
+                values
+                    ('payment.settings.manage'),
+                    ('payment.intent.view'),
+                    ('payment.intent.create'),
+                    ('payment.verification.review')
+            )
+            select count(*)
+            from required_permissions permission
+            where not exists (
+                select 1
+                from auth_accounts account
+                join auth_account_roles role on role.account_id = account.id
+                join auth_account_permissions existing on existing.account_id = account.id
+                where account.tenant_id = ?
+                  and account.username = 'codex-branch-a-admin'
+                  and account.actor_type = 'staff'
+                  and account.status = 'active'
+                  and role.role_code = 'store_manager'
+                  and existing.permission_code = permission.permission_code
+                  and account.deleted_at is null
+                  and role.deleted_at is null
+                  and existing.deleted_at is null
+            )
+            """, tenantId)).isZero();
 
         login("codex-branch-admin", "abc123");
         expectLoginRejected("codex-branch-a-admin", "abc123");
@@ -1848,6 +1969,29 @@ class PlatformTenantApiIntegrationTest {
         return jdbc.queryForObject(sql, Integer.class, args);
     }
 
+    private java.util.List<QueueGroupRow> defaultQueueGroups(UUID tenantId, UUID storeId) {
+        return jdbc.query(
+            """
+            select group_code, min_party_size, max_party_size, display_i18n_key, status, sort_order
+            from queue_groups
+            where tenant_id = ?
+              and store_id = ?
+              and deleted_at is null
+            order by sort_order, group_code
+            """,
+            (rs, rowNum) -> new QueueGroupRow(
+                rs.getString("group_code"),
+                rs.getInt("min_party_size"),
+                rs.getObject("max_party_size", Integer.class),
+                rs.getString("display_i18n_key"),
+                rs.getString("status"),
+                rs.getInt("sort_order")
+            ),
+            tenantId,
+            storeId
+        );
+    }
+
     private JsonNode storeById(JsonNode stores, UUID storeId) {
         for (JsonNode store : stores) {
             if (storeId.toString().equals(store.path("storeId").asText())) {
@@ -1979,6 +2123,15 @@ class PlatformTenantApiIntegrationTest {
         );
     }
 
+    private record QueueGroupRow(
+        String groupCode,
+        int minPartySize,
+        Integer maxPartySize,
+        String displayI18nKey,
+        String status,
+        int sortOrder
+    ) {
+    }
     private record SliderTarget(String challengeId, int targetX) {
     }
 }

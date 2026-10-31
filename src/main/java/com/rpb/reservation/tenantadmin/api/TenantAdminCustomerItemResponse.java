@@ -13,9 +13,13 @@ public record TenantAdminCustomerItemResponse(
     String email,
     String status,
     OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    OffsetDateTime updatedAt,
+    String activationState
 ) {
     public static TenantAdminCustomerItemResponse from(CustomerManagementItem customer) {
+        return from(customer,"unknown");
+    }
+    public static TenantAdminCustomerItemResponse from(CustomerManagementItem customer,String activationState) {
         return new TenantAdminCustomerItemResponse(
             customer.id(),
             customer.customerCode(),
@@ -25,7 +29,8 @@ public record TenantAdminCustomerItemResponse(
             customer.email(),
             customer.status(),
             customer.createdAt(),
-            customer.updatedAt()
+            customer.updatedAt(),
+            activationState
         );
     }
 }

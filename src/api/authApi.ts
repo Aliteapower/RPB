@@ -65,11 +65,16 @@ export async function logout(fetcher?: AuthFetcher): Promise<AuthLogoutResponse>
   })
 }
 
+export async function changeStaffPassword(currentPassword: string, newPassword: string, fetcher?: AuthFetcher): Promise<{success: true}> {
+  return requestJson('/api/v1/auth/password-change', { method: 'POST', body: {currentPassword, newPassword}, headers: {'X-RPB-Account': '1'}, fetcher })
+}
+
 async function requestJson<T>(
   endpoint: string,
   options: {
     method: 'GET' | 'POST'
     body?: unknown
+    headers?: Record<string, string>
     fetcher?: AuthFetcher
   }
 ): Promise<T> {
@@ -97,12 +102,14 @@ async function sendRequest(
   options: {
     method: 'GET' | 'POST'
     body?: unknown
+    headers?: Record<string, string>
     fetcher?: AuthFetcher
   }
 ): Promise<TextResponse> {
   const headers = {
     Accept: 'application/json',
-    ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' })
+    ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    ...options.headers
   }
   const body = options.body === undefined ? undefined : JSON.stringify(options.body)
   const fetcher = options.fetcher ?? resolveFetch()
@@ -114,6 +121,7 @@ async function sendRequest(
       return await fetcher(endpoint, {
         method: options.method,
         credentials: 'include',
+        cache: 'no-store',
         headers,
         body,
         signal: controller.signal

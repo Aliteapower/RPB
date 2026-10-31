@@ -2,6 +2,7 @@ package com.rpb.reservation.tenantadmin.application;
 
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.tenantadmin.persistence.TenantAdminStaffRepository;
+import com.rpb.reservation.walkin.api.CurrentActor;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -53,9 +54,22 @@ public class TenantAdminStaffService {
     }
 
     @Transactional
+    public TenantAdminStaff createStaff(StoreScope scope, CurrentActor actor, TenantAdminStaffMutationCommand command) {
+        NormalizedStaffInput input = normalizeCreate(scope, command);
+        validateStoreAccess(scope, input.storeIds(), input.defaultStoreId());
+        StaffStoreAccessPolicy.requireCreate(scope, actor, input.storeIds(), input.defaultStoreId());
+        return insertStaff(scope, input);
+    }
+
+    /** Internal compatibility for the tenant-scoped ledger seed importer; HTTP callers must supply the actor. */
+    @Transactional
     public TenantAdminStaff createStaff(StoreScope scope, TenantAdminStaffMutationCommand command) {
         NormalizedStaffInput input = normalizeCreate(scope, command);
         validateStoreAccess(scope, input.storeIds(), input.defaultStoreId());
+        return insertStaff(scope, input);
+    }
+
+    private TenantAdminStaff insertStaff(StoreScope scope, NormalizedStaffInput input) {
         try {
             return repository.insert(
                 scope,
@@ -74,11 +88,13 @@ public class TenantAdminStaffService {
     }
 
     @Transactional
-    public TenantAdminStaff updateStaff(StoreScope scope, UUID staffId, TenantAdminStaffMutationCommand command) {
-        TenantAdminStaff existing = repository.findById(scope, staffId)
+    public TenantAdminStaff updateStaff(StoreScope scope, CurrentActor actor, UUID staffId, TenantAdminStaffMutationCommand command) {
+        StaffStoreAccessPolicy.requireActor(scope, actor);
+        TenantAdminStaff existing = repository.findByIdForUpdate(scope, staffId)
             .orElseThrow(() -> new TenantAdminServiceException(TenantAdminServiceErrorCode.STAFF_NOT_FOUND));
         NormalizedStaffInput input = normalizeUpdate(existing, command);
         validateStoreAccess(scope, input.storeIds(), input.defaultStoreId());
+        StaffStoreAccessPolicy.requireUpdate(scope, actor, existing.storeIds(), existing.defaultStoreId(), input.storeIds(), input.defaultStoreId());
         return repository.update(
                 scope,
                 staffId,

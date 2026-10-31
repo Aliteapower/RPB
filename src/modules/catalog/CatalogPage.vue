@@ -1,0 +1,67 @@
+<script setup lang="ts">
+import {computed,ref,watch,onUnmounted} from 'vue'
+import {useRoute} from 'vue-router'
+import {useAuthSessionStore} from '../../stores/authSession'
+import {moduleRequest,ModuleApiError} from './api'
+import {useCatalogText} from './text'
+import {displayName} from '../shared-commerce/format'
+import type {Category,Product,ProductPage} from './types'
+import type {ProductDetail} from './editor/useCatalogProductEditor'
+import CatalogProductList from './CatalogProductList.vue'
+import CatalogCategories from './CatalogCategories.vue'
+import CatalogAvailability from './CatalogAvailability.vue'
+import CatalogProductEditor from './editor/CatalogProductEditor.vue'
+import '../shared-commerce/commerce.css'
+import './catalog-page.css'
+import './catalog-embedded.css'
+const props=defineProps<{storeId?:string;storageOnly?:boolean;embedded?:boolean;disabled?:boolean}>(),emit=defineEmits<{'busy-change':[boolean]}>()
+const {t,locale}=useCatalogText(),route=useRoute(),auth=useAuthSessionStore(),store=computed(()=>props.storeId??String(route.params.storeId)),base=computed(()=>`/api/v1/stores/${store.value}/catalog`)
+const products=ref<Product[]>([]),categories=ref<Category[]>([]),view=ref<'products'|'categories'|'availability'|'editor'>('products'),editingId=ref<string|null>(null),loading=ref(false),childBusy=ref(false),error=ref(''),choice=ref<{product:Product;action:string}|null>(null),pending=ref<{path:string;body:Record<string,unknown>}|null>(null)
+const storageLoaded=ref(false),storageQuery=ref(''),storageFilter=ref(''),storagePage=ref(0),storageTotal=ref(0),storageHasMore=ref(false)
+const visibleProducts=computed(()=>props.storageOnly?products.value.filter(p=>p.channels.includes('storage')):products.value)
+const globalCatalog=computed(()=>auth.user?.roles.includes('tenant_admin')===true),can=(p:string)=>auth.user?.permissions.includes(p)===true,blocked=computed(()=>loading.value||childBusy.value||!!pending.value||props.disabled===true)
+const scopeAllowed=computed(()=>!props.storageOnly||(globalCatalog.value&&can('catalog.view')&&auth.user?.storeIds.includes(store.value)===true))
+const workspaceBusy=computed(()=>loading.value||childBusy.value||!!pending.value||(props.embedded===true&&view.value==='editor'))
+watch(workspaceBusy,value=>emit('busy-change',value),{immediate:true})
+onUnmounted(()=>{generation++;emit('busy-change',false)})
+let generation=0
+async function load(){const own=generation;storageLoaded.value=false;if(!scopeAllowed.value){products.value=[];categories.value=[];error.value=t('noCatalogPermission');return}loading.value=true;error.value='';try{const[c,result]=await Promise.all([moduleRequest<Category[]>(base.value,'/categories'),props.storageOnly?moduleRequest<ProductPage>(base.value,'/storage-products?'+new URLSearchParams({query:storageFilter.value,page:String(storagePage.value),size:'12'})):moduleRequest<Product[]>(base.value,'/products')]);if(own===generation){categories.value=c;storageLoaded.value=true;if(Array.isArray(result))products.value=result;else{products.value=result.items;storageTotal.value=result.total;storageHasMore.value=result.hasMore}}}catch(e){if(own===generation){error.value=e instanceof Error?e.message:String(e);if(props.storageOnly){products.value=[];storageTotal.value=0;storageHasMore.value=false}}}finally{if(own===generation)loading.value=false}}
+function searchStorage(){if(blocked.value)return;storageFilter.value=storageQuery.value.trim();storagePage.value=0;void load()}
+function turnStorage(offset:number){if(blocked.value)return;storagePage.value+=offset;void load()}
+function closeEditor(){view.value='products';childBusy.value=false;if(props.storageOnly)void load()}
+function edit(p?:Product){if(props.storageOnly&&(!scopeAllowed.value||(p?!p.channels.includes('storage'):!can('catalog.manage'))))return;editingId.value=p?.id??null;view.value='editor';error.value=''}
+function saved(value:ProductDetail){editingId.value=value.product.id;const i=products.value.findIndex(p=>p.id===value.product.id);if(i<0)products.value.unshift(value.product);else products.value[i]=value.product}
+async function apply(){if(!choice.value||loading.value)return;const own=generation,{product:p,action}=choice.value;pending.value??={path:`/products/${p.id}/${action==='listing'?'listing':'status'}`,body:action==='listing'?{priceCents:p.priceCents,channels:p.channels,enabled:!p.listingEnabled,expectedVersion:p.listingVersion,idempotencyKey:crypto.randomUUID()}:{status:action,expectedVersion:p.version,idempotencyKey:crypto.randomUUID()}};loading.value=true;error.value='';try{const result=await moduleRequest<Product>(base.value,pending.value.path,'POST',pending.value.body);if(own===generation){pending.value=null;choice.value=null;saved({product:result,barcodes:[]})}}catch(e){if(own===generation){error.value=e instanceof Error?e.message:String(e);if(e instanceof ModuleApiError&&e.status<500)pending.value=null}}finally{if(own===generation)loading.value=false}}
+watch([store,()=>props.storageOnly,scopeAllowed],()=>{generation++;storagePage.value=0;storageQuery.value='';storageFilter.value='';view.value='products';products.value=[];categories.value=[];childBusy.value=false;pending.value=null;choice.value=null;void load()},{immediate:true})
+</script>
+<template>
+ <component :is="embedded?'section':'main'" class="cards-page catalog-page" :class="{'catalog-embedded':embedded}">
+  <header class="catalog-heading">
+   <div class="catalog-heading-title">
+    <RouterLink v-if="!embedded" class="catalog-back" :to="`/stores/${store}/wallet/more`">← {{t('back')}}</RouterLink>
+    <component :is="embedded?'h2':'h1'">{{t(storageOnly?'storageCatalog':'catalog')}}</component>
+   </div>
+   <div class="catalog-heading-actions">
+    <button v-if="view!=='editor'" :disabled="blocked" @click="load">{{t('refresh')}}</button>
+    <button v-if="storageOnly&&view==='products'&&globalCatalog&&can('catalog.manage')&&scopeAllowed" class="primary" :disabled="blocked" @click="edit()">＋ {{t('newWine')}}</button>
+   </div>
+  </header>
+  <p v-if="error" class="cards-error" role="alert">{{error}}</p><p v-if="loading" role="status">{{t('loading')}}</p>
+  <template v-if="view!=='editor'">
+   <nav class="catalog-view-tabs" :aria-label="t('catalog')"><button v-for="item in (storageOnly?['products','availability']:['products','categories','availability']) as ('products'|'categories'|'availability')[]" :key="item" :class="{primary:view===item}" :aria-pressed="view===item" :disabled="blocked" @click="view=item;choice=null">{{t(item==='products'?'productList':item==='categories'?'categoryManage':'availabilityManage')}}</button></nav>
+   <template v-if="storageOnly">
+    <form class="catalog-storage-toolbar" @submit.prevent="searchStorage"><label>{{t('search')}}<input v-model="storageQuery" maxlength="120" :disabled="blocked"></label><button :disabled="blocked">{{t('searchAction')}}</button><p v-if="storageLoaded" class="catalog-match-count">{{t('matchingProducts')}}: {{storageTotal}}</p></form>
+    <details class="catalog-guidance"><summary>{{t('storageCatalogGuide')}}</summary><p class="cards-muted">{{t('storageCatalogHint')}}</p></details>
+   </template>
+   <section v-if="view==='products'">
+    <div v-if="!storageOnly" class="cards-actions catalog-section-heading"><h2>{{t('productList')}}</h2><button v-if="globalCatalog&&can('catalog.manage')" class="primary" :disabled="blocked" @click="edit()">＋ {{t('newProduct')}}</button></div>
+    <CatalogProductList v-if="!storageOnly||storageLoaded" :hide-filters="storageOnly" :products="visibleProducts" :categories="categories" :can-edit="can('catalog.manage')" :disabled="blocked" @edit="edit"/>
+   </section>
+   <CatalogCategories v-if="view==='categories'" :key="base" :base="base" :categories="categories" :can-edit="globalCatalog&&can('catalog.manage')" @saved="load" @busy="childBusy=$event"/>
+   <CatalogAvailability v-if="view==='availability'&&(!storageOnly||storageLoaded)" :products="visibleProducts" :global-publish="globalCatalog&&can('catalog.publish')" :can-manage="can('catalog.manage')" :disabled="blocked" @change="(product,action)=>choice={product,action}"/>
+   <div v-if="storageOnly&&(storagePage>0||storageHasMore)" class="cards-actions"><button :disabled="blocked||storagePage===0" @click="turnStorage(-1)">{{t('previousPage')}}</button><span>{{storagePage+1}} / {{Math.max(1,Math.ceil(storageTotal/12))}}</span><button :disabled="blocked||!storageHasMore" @click="turnStorage(1)">{{t('nextPage')}}</button></div>
+   <section v-if="choice" role="dialog" :aria-label="t('confirmChange')" class="cards-panel"><h3>{{t('confirmChange')}}</h3><p>{{displayName(choice.product,locale)}} · {{choice.product.code}}</p><p>{{t(choice.action==='listing'?(choice.product.listingEnabled?'storeOff':'storeOn'):choice.action)}}</p><button :disabled="loading" @click="apply">{{t(pending?'recover':'confirm')}}</button><button :disabled="blocked" @click="choice=null">{{t('cancel')}}</button></section>
+  </template>
+  <CatalogProductEditor v-else :key="base" :base="base" :product-id="editingId" :categories="categories" :global-edit="globalCatalog" :default-channels="storageOnly?['storage']:undefined" :default-unit="storageOnly?'瓶':undefined" :default-category-id="storageOnly?categories.find(c=>c.enabled&&c.nameZh.trim()==='酒水')?.id:undefined" :compact="storageOnly" @saved="saved" @busy="childBusy=$event" @cancel="closeEditor"/>
+ </component>
+</template>

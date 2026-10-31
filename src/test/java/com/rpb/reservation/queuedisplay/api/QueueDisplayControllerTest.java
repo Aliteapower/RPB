@@ -75,6 +75,8 @@ class QueueDisplayControllerTest {
             .andExpect(jsonPath("$.tenantLogoUrl").value("/api/v1/stores/" + STORE_ID + "/queue-display/media/8a000000-0000-0000-0000-000000000973"))
             .andExpect(jsonPath("$.currentCall.queueTicketId").value(TICKET_ID.toString()))
             .andExpect(jsonPath("$.currentCall.displayNumber").value("A7"))
+            .andExpect(jsonPath("$.currentCall.customerDisplayName").value("赵***"))
+            .andExpect(jsonPath("$.waiting.preview[0].customerDisplayName").value("钱***"))
             .andExpect(jsonPath("$.waiting.count").value(1))
             .andExpect(jsonPath("$.ads.statePollSeconds").value(3))
             .andExpect(jsonPath("$.ads.slides[0].title").value("欢迎光临"));

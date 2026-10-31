@@ -101,9 +101,13 @@ public class CustomerAuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me(HttpServletRequest request) {
+    public ResponseEntity<?> me(HttpServletRequest request, @RequestParam(value="storeId",required=false) UUID storeId) {
         Optional<CustomerAuthPrincipal> principal = cookieService.readSessionToken(request)
-            .flatMap(service::authenticateSession);
+            .flatMap(service::authenticatePasswordManagementSession);
+        if (storeId != null) {
+            var store = storeRepository.findActiveStoreProfileByStoreId(storeId);
+            principal = principal.filter(p -> store.isPresent() && store.get().scope().tenantId().value().equals(p.tenantId()));
+        }
         if (principal.isEmpty()) {
             return authError(CustomerAuthError.UNAUTHENTICATED);
         }
@@ -135,9 +139,11 @@ public class CustomerAuthController {
             .orElseThrow(() -> new CustomerAuthServiceException(CustomerAuthError.REQUEST_INVALID));
     }
 
-    private static ResponseEntity<CustomerAuthErrorResponse> authError(CustomerAuthError error) {
+    static ResponseEntity<CustomerAuthErrorResponse> authError(CustomerAuthError error) {
         HttpStatus status = switch (error) {
-            case ACCOUNT_DISABLED, UNAUTHENTICATED, PROVIDER_TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case ACCOUNT_DISABLED, UNAUTHENTICATED, PROVIDER_TOKEN_INVALID, INVALID_CREDENTIALS -> HttpStatus.UNAUTHORIZED;
+            case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case EMAIL_CHANNEL_NOT_CONFIGURED, PROVIDER_NOT_CONFIGURED -> HttpStatus.CONFLICT;
             case EMAIL_DELIVERY_FAILED -> HttpStatus.BAD_GATEWAY;
             case PERSISTENCE_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
@@ -192,14 +198,18 @@ public class CustomerAuthController {
         UUID tenantId,
         UUID customerId,
         String email,
-        String displayName
+        String displayName,
+        String phoneE164,
+        boolean passwordChangeRequired
     ) {
         static PrincipalResponse from(CustomerAuthPrincipal principal) {
             return new PrincipalResponse(
                 principal.tenantId(),
                 principal.customerId(),
-                principal.email(),
-                principal.displayName()
+                principal.passwordChangeRequired() ? null : principal.email(),
+                principal.passwordChangeRequired() ? null : principal.displayName(),
+                principal.passwordChangeRequired() ? null : principal.phoneE164(),
+                principal.passwordChangeRequired()
             );
         }
     }

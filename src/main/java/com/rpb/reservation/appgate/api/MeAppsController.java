@@ -29,6 +29,6 @@ public class MeAppsController {
 
     private MeAppsResponse responseFor(CurrentActor actor, UUID storeId) {
         List<AppGateAppEntry> apps = appGateService.visibleApps(actor, storeId);
-        return MeAppsResponse.of(apps);
+        return MeAppsResponse.of(apps,appGateService.historyApps(actor,storeId));
     }
 }

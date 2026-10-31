@@ -2,6 +2,8 @@ package com.rpb.reservation.auth.api;
 
 import com.rpb.reservation.auth.application.AuthPrincipal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public record AuthUserResponse(
     String accountId,
@@ -12,7 +14,8 @@ public record AuthUserResponse(
     String defaultStoreId,
     List<String> storeIds,
     List<String> roles,
-    List<String> permissions
+    List<String> permissions,
+    Map<String, List<String>> storePermissions
 ) {
     public static AuthUserResponse from(AuthPrincipal principal) {
         return new AuthUserResponse(
@@ -24,7 +27,9 @@ public record AuthUserResponse(
             principal.defaultStoreId() == null ? null : principal.defaultStoreId().toString(),
             principal.storeIds().stream().map(Object::toString).sorted().toList(),
             principal.roles().stream().sorted().toList(),
-            principal.permissions().stream().sorted().toList()
+            principal.permissions().stream().sorted().toList(),
+            principal.storePermissions().entrySet().stream().collect(Collectors.toUnmodifiableMap(
+                entry -> entry.getKey().toString(), entry -> entry.getValue().stream().sorted().toList()))
         );
     }
 }

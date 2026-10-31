@@ -15,6 +15,7 @@ import com.rpb.reservation.appgate.persistence.repository.TenantAppEntitlementJp
 import com.rpb.reservation.walkin.api.CurrentActor;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -39,7 +40,8 @@ class AppGateServiceTest {
         platformApps = mock(PlatformAppJpaRepository.class);
         entitlements = mock(TenantAppEntitlementJpaRepository.class);
         storeSettings = mock(StoreAppSettingJpaRepository.class);
-        service = new AppGateService(platformApps, entitlements, storeSettings);
+        service = new AppGateService(platformApps, entitlements, storeSettings,
+            mock(com.rpb.reservation.appgate.persistence.repository.StoreAppSubscriptionRepository.class), java.time.Clock.systemUTC());
         allowPlatformTenantAndStore();
     }
 
@@ -277,6 +279,24 @@ class AppGateServiceTest {
         assertThat(apps.get(0).permissions()).containsExactly("queue.view");
     }
 
+    @Test
+    void visibleAppsRecognizesPaymentIntentCreateAsPaymentPermission() {
+        when(entitlements.findAllByTenantId(TENANT_ID)).thenReturn(List.of(entitlementFor("payment", "enabled", null)));
+        when(storeSettings.findAllByTenantIdAndStoreId(TENANT_ID, STORE_ID)).thenReturn(List.of(storeSettingFor("payment", true, true)));
+        when(platformApps.findAllByStatusOrderBySortOrderAscAppKeyAsc("active"))
+            .thenReturn(List.of(platformAppFor("payment", "PayNow 支付产线", "/stores/:storeId/payments", "active", 30)));
+
+        List<AppGateAppEntry> apps = service.visibleApps(
+            actor(Set.of(STORE_ID), Set.of("payment.intent.create")),
+            STORE_ID
+        );
+
+        assertThat(apps).hasSize(1);
+        assertThat(apps.get(0).appKey()).isEqualTo("payment");
+        assertThat(apps.get(0).entryRoute()).isEqualTo("/stores/" + STORE_ID + "/payments");
+        assertThat(apps.get(0).permissions()).containsExactly("payment.intent.create");
+    }
+
     private void allowPlatformTenantAndStore() {
         when(platformApps.findByAppKey(APP_KEY)).thenReturn(Optional.of(platformApp("active")));
         when(entitlements.findByTenantIdAndAppKey(TENANT_ID, APP_KEY))
@@ -315,12 +335,30 @@ class AppGateServiceTest {
         return PlatformAppEntity.of(UUID.randomUUID(), APP_KEY, "订位排号系统", status, "/stores/:storeId/staff", null, 10, "{}");
     }
 
+    private static PlatformAppEntity platformAppFor(
+        String appKey,
+        String appName,
+        String defaultEntryRoute,
+        String status,
+        int sortOrder
+    ) {
+        return PlatformAppEntity.of(UUID.randomUUID(), appKey, appName, status, defaultEntryRoute, null, sortOrder, "{}");
+    }
+
     private static TenantAppEntitlementEntity entitlement(String status, OffsetDateTime validUntil) {
         return TenantAppEntitlementEntity.of(UUID.randomUUID(), TENANT_ID, APP_KEY, status, OffsetDateTime.now().minusDays(1), validUntil, "{}", null, null);
     }
 
+    private static TenantAppEntitlementEntity entitlementFor(String appKey, String status, OffsetDateTime validUntil) {
+        return TenantAppEntitlementEntity.of(UUID.randomUUID(), TENANT_ID, appKey, status, OffsetDateTime.now().minusDays(1), validUntil, "{}", null, null);
+    }
+
     private static StoreAppSettingEntity storeSetting(boolean enabled, boolean visible) {
         return StoreAppSettingEntity.of(UUID.randomUUID(), TENANT_ID, STORE_ID, APP_KEY, enabled, visible, "{}", null, null, null);
+    }
+
+    private static StoreAppSettingEntity storeSettingFor(String appKey, boolean enabled, boolean visible) {
+        return StoreAppSettingEntity.of(UUID.randomUUID(), TENANT_ID, STORE_ID, appKey, enabled, visible, "{}", null, null, null);
     }
 
     private static void assertDenied(AppGateDecision decision, AppGateDenyReason reason, String messageKey) {
@@ -328,5 +366,39 @@ class AppGateServiceTest {
         assertThat(decision.denyReason()).isEqualTo(reason);
         assertThat(decision.messageKey()).isEqualTo(messageKey);
         assertThat(decision.details()).isEmpty();
+    }
+    @Test void managementProvisioningKeepsPastAccessButNeverGrantsOperationalAccess(){
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.empty());
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isFalse();
+        var unopened=entitlement("disabled",null);
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.of(unopened));
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isFalse();
+        unopened.updateStatus("enabled",null,OffsetDateTime.now().minusDays(2));unopened.updateStatus("disabled",null,OffsetDateTime.now());
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isTrue();
+        assertThat(service.evaluate(request(actor(Set.of(STORE_ID),Set.of(PERMISSION)))).allowed()).isFalse();
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.of(entitlement("expired",OffsetDateTime.now().minusDays(1))));
+        assertThat(service.isStoreProductProvisioned(APP_KEY,TENANT_ID,STORE_ID)).isTrue();
+        assertThat(service.isStoreProductProvisioned(APP_KEY,UUID.randomUUID(),STORE_ID)).isFalse();
+    }
+    @Test void purchasedProductsRequireThisStoresItemAndIgnoreOnlyTheOperationalSwitch(){
+        var subscriptions=mock(com.rpb.reservation.appgate.persistence.repository.StoreAppSubscriptionRepository.class);
+        var gated=new AppGateService(platformApps,entitlements,storeSettings,subscriptions,java.time.Clock.systemUTC());
+        for(String key:List.of("wallet","wine_storage")){
+            when(entitlements.findByTenantIdAndAppKey(TENANT_ID,key)).thenReturn(Optional.of(entitlementFor(key,"enabled",null)));
+            assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isFalse();
+            when(subscriptions.findByTenantAndStore(TENANT_ID,STORE_ID)).thenReturn(Map.of(key,new com.rpb.reservation.appgate.domain.StoreAppSubscription("active",null,null)));
+            assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isFalse();
+            when(subscriptions.findByTenantAndStore(TENANT_ID,STORE_ID)).thenReturn(Map.of(key,new com.rpb.reservation.appgate.domain.StoreAppSubscription("expired","expired",OffsetDateTime.now().minusDays(1))));
+            assertThat(gated.isStoreProductProvisioned(key,TENANT_ID,STORE_ID)).isTrue();
+        }
+    }
+    @Test void closedProductKeepsOnlyRegisteredHistoryPermission(){
+        var setting=storeSetting(false,false);setting.enable(ACTOR_ID,OffsetDateTime.now());setting.disable(OffsetDateTime.now());
+        when(storeSettings.findByTenantIdAndStoreIdAndAppKey(TENANT_ID,STORE_ID,APP_KEY)).thenReturn(Optional.of(setting));
+        var query=new AppGateAccessRequest(APP_KEY,TENANT_ID,STORE_ID,"reservation.today_view",actor(Set.of(STORE_ID),Set.of("reservation.today_view")));
+        assertThat(service.evaluate(query).allowed()).isFalse();assertThat(service.evaluateHistory(query).allowed()).isTrue();
+        assertThat(service.evaluateHistory(request(actor(Set.of(STORE_ID),Set.of(PERMISSION)))).allowed()).isFalse();
+        assertThat(service.evaluateHistory(new AppGateAccessRequest(APP_KEY,TENANT_ID,OTHER_STORE_ID,"reservation.today_view",query.actor())).allowed()).isFalse();
+        when(entitlements.findByTenantIdAndAppKey(TENANT_ID,APP_KEY)).thenReturn(Optional.empty());assertThat(service.evaluateHistory(query).allowed()).isFalse();
     }
 }

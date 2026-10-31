@@ -21,6 +21,11 @@ public class TenantAdminStaffRepository {
     private static final String STAFF_ACCOUNT_TYPE = "staff";
     private static final String TENANT_ADMIN = "tenant_admin";
     private static final List<String> STAFF_PERMISSIONS = List.of(
+        "wallet.view",
+        "wallet.topup.create",
+        "wallet.charge.create",
+        "daily_ledger.view",
+        "daily_ledger.write",
         "reservation.create",
         "reservation.check_in",
         "reservation.seat",
@@ -38,6 +43,9 @@ public class TenantAdminStaffRepository {
         "table.view",
         "table.switch",
         "customer.lookup",
+        "payment.intent.view",
+        "payment.intent.create",
+        "payment.proof.review",
         "walkin.direct_seating.create",
         "walkin.queue.create",
         "cleaning.start",
@@ -86,6 +94,14 @@ public class TenantAdminStaffRepository {
     }
 
     public Optional<TenantAdminStaff> findById(StoreScope scope, UUID staffId) {
+        return findById(scope, staffId, false);
+    }
+
+    public Optional<TenantAdminStaff> findByIdForUpdate(StoreScope scope, UUID staffId) {
+        return findById(scope, staffId, true);
+    }
+
+    private Optional<TenantAdminStaff> findById(StoreScope scope, UUID staffId, boolean lock) {
         return jdbc.query(
             """
             select account.id, account.username, account.display_name, account.status, account.default_store_id,
@@ -99,7 +115,7 @@ public class TenantAdminStaffRepository {
               and access.tenant_id = ?
               and access.store_id = ?
               and access.deleted_at is null
-            """,
+            """ + (lock ? " for update of account" : ""),
             this::staff,
             staffId,
             scope.tenantId().value(),

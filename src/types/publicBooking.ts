@@ -66,8 +66,10 @@ export interface CustomerAuthEmailCodeResponse {
 export interface CustomerAuthPrincipal {
   tenantId: string
   customerId: string
-  email: string
+  email: string | null
   displayName: string | null
+  phoneE164?: string | null
+  passwordChangeRequired?: boolean
 }
 
 export interface CustomerAuthLoginResponse {

@@ -1,0 +1,36 @@
+export const walletUiZh = {
+  navigation:'钱包导航', myCards:'我的卡', myWallet:'钱包', cashier:'收银台', staffWallet:'钱包收银台', back:'返回', more:'更多', entries:'资金流水',
+  cashierTitle:'发起钱包收款', cashierHint:'先输入消费金额和说明，再扫描顾客个人钱包码；超限由顾客在原账单明确确认。', scanStart:'识别顾客付款码', selectStart:'查找已认证顾客',
+  customerCollect:'选择顾客收款', customerTopup:'为顾客充值', offlineChannels:'现金 · PayNow · 信用卡', collectRecords:'收款账单',
+  recordsHint:'查看消费、充值、退款和积分记录', pendingTopups:'待核实充值', pendingTopupsHint:'核对商户实际到账后入账', managementHint:'退款、对账与设置',
+  cardsEntry:'持卡与核销', cardsHint:'免费领卡、集次与卡权益核销', storageEntry:'酒水寄存管理', storageHint:'办理寄存、领取交付与查看记录',
+  changeCustomer:'更换', rescan:'重新扫码', noAccount:'该顾客尚无本店钱包，请先办理充值开通', scannedIdentity:'已识别付款码；有效期较短，请尽快发起收款。扫码不会直接扣款。',
+  collect:'向顾客收款', receivable:'本次应收金额', collectConsent:'发起后由顾客在本人钱包核对并确认，余额不足部分仍需补付。', startCollection:'发起钱包收款',
+  topupNotCredited:'这笔充值尚未入账。请核对实际收款，再确认入账。', nextConfirm:'下一步，核实收款', walletCollection:'钱包消费',
+  recordType:'账单类型', filterStatus:'账单状态', noMatchingRecords:'暂无符合条件的账单', transactionInfo:'交易信息',
+  scanPay:'扫一扫', scanPayHint:'扫描商户的消费付款码或积分兑换码，核对内容后确认。', pendingNotice:'有 {count} 笔账单待处理，点此查看',
+  customerBillsHint:'查看消费、充值、退款和积分记录', entriesHint:'逐笔查看充值、消费和退款记录', offlineTopupHint:'可提交自助充值申请，或到店办理；请按商户启用的收款科目付款，实际到账后由商户核实入账。',
+  customerNoAccount:'尚无钱包；商户开启自助充值后，可提交充值申请，也可到店联系员工办理。已有顾客资料会统一复用。', secureWallet:'统一顾客身份 · 储值钱包',
+  codePrivate:'付款码仅供现场收银员识别，请勿转发。', viewBill:'查看原账单', confirmAmount:'确认付款金额', hideCollection:'收起补付表单',
+  supplementHint:'钱包付款后仍需支付 {amount}，请向门店补付并由员工核实。',
+  filters:{all:'全部',pending:'待处理',completed:'已完成',closed:'已关闭'},
+  status:{waiting:'待顾客确认',due:'待补付',paid:'已完成',closed:'已关闭',pending:'待核实'}
+}
+export const walletUiEn = {
+  navigation:'Wallet navigation', myCards:'My cards', myWallet:'Wallet', cashier:'Cashier', staffWallet:'Wallet cashier', back:'Back', more:'More', entries:'Activity',
+  cashierTitle:'Start a wallet payment', cashierHint:'Enter the amount and description before scanning the personal wallet code. Payments above the limit require customer approval of the original bill.', scanStart:'Read the customer’s payment code', selectStart:'Find a verified customer',
+  customerCollect:'Select customer', customerTopup:'Top up a customer', offlineChannels:'Cash · PayNow · Card', collectRecords:'Payment bills',
+  recordsHint:'Payments, top-ups, refunds and points', pendingTopups:'Unverified top-ups', pendingTopupsHint:'Verify merchant receipt before crediting', managementHint:'Refunds, reconciliation and settings',
+  cardsEntry:'Cards & redemption', cardsHint:'Enroll, add stamps and redeem card benefits', storageEntry:'Bottle storage management', storageHint:'Receive stored bottles, hand over collections and view records',
+  changeCustomer:'Change', rescan:'Scan again', noAccount:'No wallet at this store yet. Start with a top-up.', scannedIdentity:'Payment code identified. Start promptly before it expires. Scanning does not debit the wallet.',
+  collect:'Collect from customer', receivable:'Amount to collect', collectConsent:'The customer reviews and confirms in their own wallet. Any shortfall remains payable.', startCollection:'Request wallet payment',
+  topupNotCredited:'This top-up has not been credited. Check actual receipt before confirming.', nextConfirm:'Next: verify receipt', walletCollection:'Wallet purchase',
+  recordType:'Bill type', filterStatus:'Bill status', noMatchingRecords:'No matching transactions', transactionInfo:'Transaction details',
+  scanPay:'Scan', scanPayHint:'Scan a merchant payment or points redemption code, review, then confirm.', pendingNotice:'{count} bill(s) need attention. View bills',
+  customerBillsHint:'Payments, top-ups, refunds and points', entriesHint:'Individual top-ups, payments and refunds', offlineTopupHint:'Request a top-up or visit the store. Use an enabled collection subject; the merchant must verify actual receipt before crediting.',
+  customerNoAccount:'No wallet yet. If the merchant enables self-service, submit a top-up request, or ask staff at the store. Your existing customer profile is reused.', secureWallet:'Shared customer identity · Wallet',
+  codePrivate:'Only show this code to the cashier. Do not forward it.', viewBill:'View bill', confirmAmount:'Review payment amount', hideCollection:'Hide receipt form',
+  supplementHint:'{amount} remains payable after wallet payment. Pay the store and ask staff to verify receipt.',
+  filters:{all:'All',pending:'Pending',completed:'Completed',closed:'Closed'},
+  status:{waiting:'Awaiting confirmation',due:'Balance due',paid:'Completed',closed:'Closed',pending:'Unverified'}
+}

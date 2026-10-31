@@ -1,0 +1,7 @@
+<script setup lang="ts">
+import {useCdacText,type CdacRule} from '../cdac'
+const props=defineProps<{rule:CdacRule}>(),{d}=useCdacText()
+function add(){if(props.rule.bands.length>=20)return;const last=props.rule.bands.at(-1)!;last.upperWage=String(Number(props.rule.bands.at(-2)?.upperWage||0)+1000);props.rule.bands.push({upperWage:null,amount:last.amount})}
+function remove(i:number){if(props.rule.bands.length<=1)return;props.rule.bands.splice(i,1);props.rule.bands.at(-1)!.upperWage=null}
+</script>
+<template><p class="wf-hint">{{d('ruleHint')}}</p><div class="wf-grid"><label>{{d('from')}}<input v-model="rule.effectiveFrom" type="date" required></label><label>{{d('to')}}<input v-model="rule.effectiveTo" type="date" required></label></div><label>{{d('source')}}<input v-model="rule.source" type="url" required maxlength="1000"></label><div class="wf-table-wrap"><table><thead><tr><th>{{d('upper')}}</th><th>{{d('amount')}}</th><th></th></tr></thead><tbody><tr v-for="(band,i) in rule.bands" :key="i"><td><span v-if="i===rule.bands.length-1">{{d('unlimited')}}</span><input v-else v-model="band.upperWage" :aria-label="d('upper')+' '+(i+1)" required inputmode="decimal"></td><td><input v-model="band.amount" :aria-label="d('amount')+' '+(i+1)" required inputmode="decimal"></td><td><button type="button" :disabled="rule.bands.length<=1" @click="remove(i)">{{d('remove')}}</button></td></tr></tbody></table></div><button type="button" :disabled="rule.bands.length>=20" @click="add">{{d('add')}}</button></template>

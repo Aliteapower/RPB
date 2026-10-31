@@ -4,6 +4,8 @@
 
 For any non-trivial development task, Codex must check the relevant skill before implementation.
 
+For new product lines or changes to product-entry visibility/synchronization across administrator, employee and customer surfaces, use `docs/skills/rpb-product-entry-sync/SKILL.md`. Reuse synthetic fixtures; do not change real subscriptions for acceptance testing.
+
 Recommended flow:
 1. Read related existing docs and code.
 2. Use architecture-review before changing module boundaries.
@@ -14,6 +16,10 @@ Recommended flow:
 7. Use release-note after completed implementation.
 8. Use troubleshooting for bugs or failing tests.
 9. Use production-readiness before deployment-related work.
+
+## Page Layout Consistency
+
+Before adding or changing an RPB page layout, read `docs/frontend/PAGE_LAYOUT_CONSISTENCY_GUIDE.md` and inspect a comparable page in the same module. Reuse the owning Layout, shared container, panel and action styles; do not introduce arbitrary page-specific widths or floating save bars. Verify adjacent-page alignment and authenticated desktop/mobile viewport behavior, and report any unverified visual scope explicitly. This does not authorize unrelated page refactors or production deployment.
 
 ## Documentation-Only Scope
 

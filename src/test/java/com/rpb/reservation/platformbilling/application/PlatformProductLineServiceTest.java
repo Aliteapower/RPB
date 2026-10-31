@@ -167,6 +167,31 @@ class PlatformProductLineServiceTest {
     }
 
     @Test
+    void createsDailyLedgerWithItsImplementedEntryRoute() {
+        var command = new PlatformProductLineCreateCommand("daily_ledger", "每日营业记录", "active",
+            "/stores/:storeId/daily-ledger", null, 40);
+        var created = productLine("daily_ledger", "每日营业记录", "active", command.defaultEntryRoute());
+        when(repository.create(command)).thenReturn(created);
+        when(prices.findByAppKeys(List.of("daily_ledger"))).thenReturn(List.of());
+        assertThat(service.createProductLine(command).defaultEntryRoute()).isEqualTo(command.defaultEntryRoute());
+    }
+
+    @Test
+    void editingNamePreservesDailyLedgerAndPaymentRoutes() {
+        for (String appKey : List.of("daily_ledger", "payment")) {
+            String route = "/stores/:storeId/" + (appKey.equals("payment") ? "payments" : "daily-ledger");
+            var existing = productLine(appKey, "旧名称", "active", route);
+            var expected = new PlatformProductLineMutationCommand("新名称", "active", route, null, 40);
+            when(repository.findByAppKey(appKey)).thenReturn(Optional.of(existing));
+            when(repository.update(appKey, expected)).thenReturn(productLine(appKey, "新名称", "active", route));
+            when(prices.findByAppKeys(List.of(appKey))).thenReturn(List.of());
+            assertThat(service.updateProductLine(appKey,
+                new PlatformProductLineMutationCommand("新名称", "active", null, 40)).defaultEntryRoute()).isEqualTo(route);
+            verify(repository).update(appKey, expected);
+        }
+    }
+
+    @Test
     void rejectsUnknownProductLineAndInvalidStatus() {
         when(repository.findByAppKey("missing_app")).thenReturn(Optional.empty());
 

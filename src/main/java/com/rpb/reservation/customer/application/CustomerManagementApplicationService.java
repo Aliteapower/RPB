@@ -3,6 +3,7 @@ package com.rpb.reservation.customer.application;
 import com.rpb.reservation.common.scope.TenantScope;
 import com.rpb.reservation.common.value.E164Phone;
 import com.rpb.reservation.customer.application.port.out.CustomerRepositoryPort;
+import com.rpb.reservation.customer.application.port.out.CustomerLifecycleGuard;
 import com.rpb.reservation.customer.domain.Customer;
 import com.rpb.reservation.customer.value.CustomerId;
 import java.util.Objects;
@@ -18,9 +19,15 @@ public class CustomerManagementApplicationService {
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     private final CustomerRepositoryPort customerRepository;
+    private final java.util.List<CustomerLifecycleGuard> lifecycleGuards;
 
     public CustomerManagementApplicationService(CustomerRepositoryPort customerRepository) {
+        this(customerRepository,java.util.List.of());
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public CustomerManagementApplicationService(CustomerRepositoryPort customerRepository,java.util.List<CustomerLifecycleGuard> lifecycleGuards) {
         this.customerRepository = customerRepository;
+        this.lifecycleGuards=java.util.List.copyOf(lifecycleGuards);
     }
 
     @Transactional(readOnly = true)
@@ -45,7 +52,7 @@ public class CustomerManagementApplicationService {
     @Transactional
     public CustomerManagementItem create(TenantScope scope, CustomerManagementCommand command) {
         NormalizedCustomerInput input = normalize(command);
-        ensureHasIdentityHint(input);
+        ensurePhonePresent(input);
         E164Phone phone = parsePhone(input.phoneE164());
         if (phone.isPresent() && customerRepository.findByPhone(scope, phone).isPresent()) {
             throw new CustomerManagementException(CustomerManagementError.CUSTOMER_PHONE_CONFLICT);
@@ -72,7 +79,7 @@ public class CustomerManagementApplicationService {
         Customer existing = customerRepository.findById(scope, new CustomerId(Objects.requireNonNull(customerId)))
             .orElseThrow(() -> new CustomerManagementException(CustomerManagementError.CUSTOMER_NOT_FOUND));
         NormalizedCustomerInput input = normalize(command);
-        ensureHasIdentityHint(input);
+        ensurePhonePresent(input);
         E164Phone phone = parsePhone(input.phoneE164());
         if (phone.isPresent()) {
             customerRepository.findByPhone(scope, phone)
@@ -102,6 +109,7 @@ public class CustomerManagementApplicationService {
         if (customerRepository.findManagementItem(scope, id).isEmpty()) {
             throw new CustomerManagementException(CustomerManagementError.CUSTOMER_NOT_FOUND);
         }
+        lifecycleGuards.forEach(guard->guard.beforeArchive(scope,id));
         customerRepository.archive(scope, id);
     }
 
@@ -121,8 +129,8 @@ public class CustomerManagementApplicationService {
         );
     }
 
-    private static void ensureHasIdentityHint(NormalizedCustomerInput input) {
-        if (input.displayName() == null && input.phoneE164() == null && input.email() == null) {
+    private static void ensurePhonePresent(NormalizedCustomerInput input) {
+        if (input.phoneE164() == null) {
             throw new CustomerManagementException(CustomerManagementError.REQUEST_INVALID);
         }
     }

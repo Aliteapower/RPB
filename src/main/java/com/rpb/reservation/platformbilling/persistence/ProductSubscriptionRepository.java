@@ -9,6 +9,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ProductSubscriptionRepository {
+    /** Serialize store lifecycle and billing mutations before subscription/item locks. */
+    default void lockTenantBilling(UUID tenantId) {}
+
     boolean existsActiveTenant(UUID tenantId);
 
     Optional<PlatformProductLine> findProductLine(String appKey);

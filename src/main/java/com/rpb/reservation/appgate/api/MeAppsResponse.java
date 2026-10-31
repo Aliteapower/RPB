@@ -6,14 +6,17 @@ import java.util.Set;
 
 public record MeAppsResponse(
     boolean success,
-    List<AppEntryResponse> apps
+    List<AppEntryResponse> apps,
+    List<AppEntryResponse> historyApps
 ) {
     public static MeAppsResponse of(List<AppGateAppEntry> apps) {
-        return new MeAppsResponse(true, apps.stream().map(AppEntryResponse::from).toList());
+        return of(apps,List.of());
     }
 
+    public static MeAppsResponse of(List<AppGateAppEntry> apps,List<AppGateAppEntry> historyApps) { return new MeAppsResponse(true,apps.stream().map(AppEntryResponse::from).toList(),historyApps.stream().map(AppEntryResponse::from).toList()); }
+
     public static MeAppsResponse empty() {
-        return new MeAppsResponse(true, List.of());
+        return new MeAppsResponse(true, List.of(), List.of());
     }
 
     public record AppEntryResponse(

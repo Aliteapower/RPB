@@ -9,10 +9,13 @@ import {
   listProductLines,
   listTenantProductSubscriptions,
   purchaseProductSubscription,
-  renewProductSubscriptionItem
+  renewProductSubscriptionItem,
+  addSubscriptionStores
 } from '../api/platformProductLineBillingApi'
 import { listTenantStores, type PlatformStore } from '../api/platformApi'
+import PlatformSubscriptionHistory from '../components/platform/PlatformSubscriptionHistory.vue'
 import PlatformAdminNav from '../components/platform/PlatformAdminNav.vue'
+import { walletBillingWarning, selectableBillingStores } from '../components/platform/storeBillingEligibility'
 import type {
   PlatformProductLine,
   ProductBillingCycle,
@@ -22,7 +25,7 @@ import type {
 import { useAuthSessionStore } from '../stores/authSession'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthSessionStore()
 const tenantId = computed(() => String(route.params.tenantId || ''))
 const productLines = ref<PlatformProductLine[]>([])
@@ -33,6 +36,8 @@ const saving = ref(false)
 const errorText = ref('')
 const savedText = ref('')
 const selectedStoreItemId = ref<string | null>(null)
+const selectedStoreIds = ref<string[]>([])
+const addStoresMode = ref(false)
 const form = reactive({
   appKey: 'reservation_queue',
   billingCycle: 'monthly' as ProductBillingCycle,
@@ -62,14 +67,28 @@ const selectedStoreItem = computed(() => {
   if (storeItemRows.value.length === 0) {
     return null
   }
-  return storeItemRows.value.find(item => item.id === selectedStoreItemId.value) ?? storeItemRows.value[0]
+  const eligible = storeItemRows.value.filter(canRenewStoreItem)
+  return eligible.find(item => item.id === selectedStoreItemId.value) ?? eligible[0] ?? null
 })
 const singleStoreRenewalMode = computed(() => (
   selectedSubscription.value !== null &&
+  !addStoresMode.value &&
   selectedSubscription.value.billingCycle !== 'legacy_grant'
 ))
-const quoteStoreCount = computed(() => (singleStoreRenewalMode.value ? (selectedStoreItem.value ? 1 : 0) : activeBillableStoreCount.value))
-const billingDisabled = computed(() => (singleStoreRenewalMode.value ? selectedStoreItem.value === null : activeBillableStoreCount.value <= 0))
+const selectableStores = computed(() => selectableBillingStores(tenantStores.value, form.appKey,
+  addStoresMode.value ? (selectedSubscription.value?.items ?? []).map(item => item.storeId).filter((id): id is string => Boolean(id)) : []))
+const selectedBillableStoreIds = computed(() => selectedStoreIds.value.filter(id => selectableStores.value.some(store => store.id === id)))
+const legacyConversionMode = computed(() => selectedSubscription.value?.billingCycle === 'legacy_grant')
+const quoteStoreCount = computed(() => singleStoreRenewalMode.value ? (selectedStoreItem.value ? 1 : 0)
+  : legacyConversionMode.value ? activeBillableStoreCount.value : selectedBillableStoreIds.value.length)
+const billingDisabled = computed(() => loading.value || quoteStoreCount.value <= 0 || selectedPrice.value?.status !== 'active')
+const walletWarning = computed(() => walletBillingWarning(tenantStores.value, quoteStoreCount.value, selectableStores.value.length, selectedPrice.value?.status === 'active'))
+const billingWarningKey = computed(() => {
+  if (form.appKey === 'wallet') return `platform.billing.storeEligibility.${walletWarning.value}`
+  if (selectedPrice.value?.status !== 'active') return 'platform.billing.form.priceRequired'
+  if (!singleStoreRenewalMode.value && selectableStores.value.length > 0) return 'platform.billing.form.selectStoresHint'
+  return addStoresMode.value ? 'platform.billing.storeEligibility.noAdditionalStores' : 'platform.billing.form.noBillableStores'
+})
 const storeUnitAmount = computed(() => selectedUnitPrice.value * safeDurationCount.value)
 const calculatedAmount = computed(() => storeUnitAmount.value * quoteStoreCount.value)
 const durationUnitLabel = computed(() => (
@@ -78,6 +97,7 @@ const durationUnitLabel = computed(() => (
     : t('platform.billing.units.month')
 ))
 const primaryActionLabel = computed(() => {
+  if (addStoresMode.value) return t('platform.billing.actions.addStores')
   const subscription = selectedSubscription.value
   if (!subscription) {
     return t('platform.billing.actions.purchase')
@@ -102,6 +122,7 @@ onMounted(() => {
 })
 
 watch(() => form.appKey, () => {
+  selectedStoreIds.value = []; addStoresMode.value = false
   ensureSelectedStoreItem()
 })
 
@@ -109,6 +130,7 @@ async function loadBilling(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
+    const previousAppKey = form.appKey
     const [lineResponse, subscriptionResponse, storesResponse] = await Promise.all([
       listProductLines(),
       listTenantProductSubscriptions(tenantId.value),
@@ -117,7 +139,7 @@ async function loadBilling(): Promise<void> {
     productLines.value = lineResponse.productLines
     subscriptions.value = subscriptionResponse.subscriptions
     tenantStores.value = storesResponse.stores
-    const firstLine = lineResponse.productLines.find(item => item.appKey === 'reservation_queue') ?? lineResponse.productLines[0]
+    const firstLine = lineResponse.productLines.find(item => item.appKey === previousAppKey) ?? lineResponse.productLines.find(item => item.appKey === 'reservation_queue') ?? lineResponse.productLines[0]
     if (firstLine) {
       form.appKey = firstLine.appKey
     }
@@ -134,6 +156,7 @@ async function purchaseSelectedProduct(): Promise<void> {
 }
 
 async function submitSelectedProductMutation(): Promise<void> {
+  if (saving.value || billingDisabled.value) return
   const subscription = selectedSubscription.value
   if (!subscription) {
     await purchaseSelectedProduct()
@@ -143,12 +166,17 @@ async function submitSelectedProductMutation(): Promise<void> {
     await convertLegacyProduct(subscription)
     return
   }
+  if (addStoresMode.value) {
+    const saved = await saveMutation(() => addSubscriptionStores(tenantId.value, subscription.id, mutationPayload(subscription.version)))
+    if(saved) { addStoresMode.value = false; selectedStoreIds.value = [] }
+    return
+  }
   await renewSelectedProduct(subscription)
 }
 
 async function renewSelectedProduct(subscription: TenantProductSubscription): Promise<void> {
   const item = selectedStoreItem.value
-  if (!item) {
+  if (!item || !canRenewStoreItem(item)) {
     savedText.value = ''
     errorText.value = t('platform.billing.storeItems.empty')
     return
@@ -170,9 +198,9 @@ async function convertLegacyProduct(subscription: TenantProductSubscription): Pr
   await saveMutation(() => convertLegacyProductSubscription(tenantId.value, subscription.id, mutationPayload(subscription.version, subscription.appKey)))
 }
 
-async function saveMutation(action: () => Promise<unknown>): Promise<void> {
+async function saveMutation(action: () => Promise<unknown>): Promise<boolean> {
   if (saving.value) {
-    return
+    return false
   }
   saving.value = true
   errorText.value = ''
@@ -181,8 +209,10 @@ async function saveMutation(action: () => Promise<unknown>): Promise<void> {
     await action()
     savedText.value = t('platform.billing.messages.saved')
     await loadBilling()
+    return true
   } catch (error) {
     errorText.value = apiErrorText(error)
+    return false
   } finally {
     saving.value = false
   }
@@ -190,6 +220,7 @@ async function saveMutation(action: () => Promise<unknown>): Promise<void> {
 
 function mutationPayload(version?: number, appKey = form.appKey) {
   return {
+    ...(!legacyConversionMode.value ? { storeIds: singleStoreRenewalMode.value ? (selectedStoreItem.value?.storeId ? [selectedStoreItem.value.storeId] : []) : selectedBillableStoreIds.value } : {}),
     idempotencyKey: newIdempotencyKey(),
     appKey,
     billingCycle: form.billingCycle,
@@ -205,11 +236,12 @@ function newIdempotencyKey(): string {
 }
 
 function selectStoreItem(item: TenantProductSubscriptionItem): void {
+  if (!canRenewStoreItem(item)) return
   selectedStoreItemId.value = item.id
 }
 
 function ensureSelectedStoreItem(subscription = selectedSubscription.value): void {
-  const rows = billingItemsForSubscription(subscription)
+  const rows = billingItemsForSubscription(subscription).filter(canRenewStoreItem)
   if (rows.length === 0) {
     selectedStoreItemId.value = null
     return
@@ -256,14 +288,22 @@ function formatAmount(value: number): string {
   return Number(value || 0).toFixed(2)
 }
 
+function canRenewStoreItem(item: TenantProductSubscriptionItem): boolean {
+  return tenantStores.value.some(store => store.id === item.storeId && store.status === 'active' && !store.deleted)
+}
+
 function storeItemName(item: TenantProductSubscriptionItem): string {
   const name = item.storeName || item.storeCode || item.storeId?.slice(0, 8) || '-'
   return item.operatingEntityName ? `${name} / ${item.operatingEntityName}` : name
 }
+function storeItemStatus(item: TenantProductSubscriptionItem): string {
+  return item.status==='active' && item.currentPeriodEnd && Date.parse(item.currentPeriodEnd)<=Date.now()
+    ? t('platform.billing.status.expired') : item.status
+}
 
 function billingItemsForSubscription(subscription: TenantProductSubscription | null): TenantProductSubscription['items'] {
   return subscription ? subscription.items.filter(item => (
-    item.storeId && item.status !== 'cancelled' && item.status !== 'expired'
+    item.storeId
   )) : []
 }
 
@@ -346,14 +386,17 @@ function apiErrorText(error: unknown): string {
 
         <form class="edit-panel" @submit.prevent="submitSelectedProductMutation">
           <h2>{{ $t('platform.billing.form.title') }}</h2>
+          <p class="muted-text">{{ locale.startsWith('en') ? 'Quotes and current totals count active stores. Disabling a product feature does not stop billing or issue a refund. Inactive stores retain purchase records and periods but cannot renew individually. Reactivation does not purchase or extend a period. Current totals are not refunds or bank receipts.' : '报价与当前汇总按活跃门店计算。关闭产品功能不会自动停账或退款；停用店保留已购记录及原期间，但不能单店续费，恢复也不会自动购买或延长期间。当前汇总不代表退款或银行实收。' }}</p>
           <label>
             <span>{{ $t('platform.billing.form.productLine') }}</span>
-            <select v-model="form.appKey">
+            <select v-model="form.appKey" :disabled="loading || saving">
               <option v-for="productLine in productLines" :key="productLine.appKey" :value="productLine.appKey">
                 {{ productLine.displayName }}
               </option>
             </select>
           </label>
+          <label v-if="selectedSubscription && !legacyConversionMode"><span><input v-model="addStoresMode" type="checkbox" :disabled="saving || loading"> {{ $t('platform.billing.actions.addStores') }}</span></label>
+          <section v-if="!singleStoreRenewalMode && !legacyConversionMode"><h3>{{ $t('platform.billing.form.selectStores') }}</h3><p class="muted-text">{{ $t('platform.billing.form.selectedStoresHelp') }}</p><label v-for="store in selectableStores" :key="store.id"><span><input v-model="selectedStoreIds" type="checkbox" :value="store.id" :disabled="saving || loading"> {{ store.storeName }} · {{ store.storeCode }}</span></label></section>
           <section v-if="singleStoreRenewalMode" class="store-items" :aria-label="$t('platform.billing.storeItems.title')">
             <h3>{{ $t('platform.billing.storeItems.title') }}</h3>
             <p v-if="storeItemRows.length === 0" class="muted-text">{{ $t('platform.billing.storeItems.empty') }}</p>
@@ -364,11 +407,12 @@ function apiErrorText(error: unknown): string {
                 type="button"
                 class="store-item-row"
                 :class="{ selected: selectedStoreItem?.id === item.id }"
+                :disabled="!canRenewStoreItem(item) || saving"
                 @click="selectStoreItem(item)"
               >
                 <div>
                   <strong>{{ storeItemName(item) }}</strong>
-                  <small>{{ item.storeCode || '-' }} / {{ item.status }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
+                  <small>{{ item.storeCode || '-' }} / {{ canRenewStoreItem(item) ? storeItemStatus(item) : (locale.startsWith('en') ? 'Inactive store — renewal unavailable' : '停用门店，不能续费') }} / {{ formatDateTime(item.currentPeriodEnd) }}</small>
                 </div>
                 <span>{{ formatAmount(item.amount) }} {{ item.currency }}</span>
               </button>
@@ -396,7 +440,8 @@ function apiErrorText(error: unknown): string {
             <span>{{ $t('platform.billing.form.storeCount') }}</span>
             <strong>{{ quoteStoreCount }}</strong>
           </div>
-          <p v-if="billingDisabled" class="warning-text">{{ $t('platform.billing.form.noBillableStores') }}</p>
+          <p v-if="billingDisabled" class="warning-text">{{ $t(billingWarningKey) }}</p>
+          <router-link v-if="form.appKey === 'wallet' && tenantStores.some(store => !store.operatingEntityId)" :to="{ name: 'platform-tenant-edit', params: { tenantId }, hash: '#tenant-structure' }">{{ $t('platform.billing.storeEligibility.manageStructure') }}</router-link>
           <div class="quote-summary">
             <span>{{ $t('platform.billing.form.storeUnitAmount') }}</span>
             <strong>{{ formatAmount(storeUnitAmount) }} {{ selectedCurrency }}</strong>
@@ -417,6 +462,7 @@ function apiErrorText(error: unknown): string {
             {{ saving ? $t('common.actions.saving') : primaryActionLabel }}
           </button>
         </form>
+        <PlatformSubscriptionHistory v-if="selectedSubscription" :key="`${tenantId}:${selectedSubscription.id}:${selectedSubscription.version}`" :tenant-id="tenantId" :subscription-id="selectedSubscription.id" />
       </div>
     </section>
   </main>

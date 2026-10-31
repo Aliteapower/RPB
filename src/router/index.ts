@@ -1,3 +1,6 @@
+import {catalogRoutes} from '../modules/catalog/routes'
+import {workforceRoutes} from '../modules/workforce/routes'
+import { walletRoutes } from '../modules/wallet/routes'
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthSessionStore } from '../stores/authSession'
@@ -6,6 +9,7 @@ const CleaningCompletePage = () => import('../pages/CleaningCompletePage.vue')
 const LoginPage = () => import('../pages/LoginPage.vue')
 const PlatformCallScreenSeedPage = () => import('../pages/PlatformCallScreenSeedPage.vue')
 const PlatformI18nCatalogPage = () => import('../pages/PlatformI18nCatalogPage.vue')
+const PlatformPaymentProofTemplatesPage = () => import('../pages/PlatformPaymentProofTemplatesPage.vue')
 const PlatformProductLinesPage = () => import('../pages/PlatformProductLinesPage.vue')
 const PlatformProfilePage = () => import('../pages/PlatformProfilePage.vue')
 const PlatformReservationMealPeriodSeedPage = () => import('../pages/PlatformReservationMealPeriodSeedPage.vue')
@@ -13,6 +17,11 @@ const PlatformReservationShareTemplateSeedPage = () => import('../pages/Platform
 const PlatformTenantBillingPage = () => import('../pages/PlatformTenantBillingPage.vue')
 const PlatformTenantFormPage = () => import('../pages/PlatformTenantFormPage.vue')
 const PlatformTenantsPage = () => import('../pages/PlatformTenantsPage.vue')
+const PaymentDisplayPage = () => import('../pages/PaymentDisplayPage.vue')
+const PaymentPresentPage = () => import('../pages/PaymentPresentPage.vue')
+const PaymentProofReviewPage = () => import('../pages/PaymentProofReviewPage.vue')
+const PaymentQuickPayPage = () => import('../pages/PaymentQuickPayPage.vue')
+const PaymentQuickPayReportPage = () => import('../pages/PaymentQuickPayReportPage.vue')
 const PublicBookingPage = () => import('../pages/PublicBookingPage.vue')
 const QueueCallPage = () => import('../pages/QueueCallPage.vue')
 const QueueDisplayPage = () => import('../pages/QueueDisplayPage.vue')
@@ -28,6 +37,9 @@ const TableResourceListPage = () => import('../pages/TableResourceListPage.vue')
 const TenantAdminCallScreenPage = () => import('../pages/TenantAdminCallScreenPage.vue')
 const TenantAdminCustomersPage = () => import('../pages/TenantAdminCustomersPage.vue')
 const TenantAdminI18nCatalogPage = () => import('../pages/TenantAdminI18nCatalogPage.vue')
+const TenantAdminPaymentRecordsPage = () => import('../pages/TenantAdminPaymentRecordsPage.vue')
+const TenantAdminPaymentProofTemplatesPage = () => import('../pages/TenantAdminPaymentProofTemplatesPage.vue')
+const TenantAdminPaymentSettingsPage = () => import('../pages/TenantAdminPaymentSettingsPage.vue')
 const TenantAdminProfilePage = () => import('../pages/TenantAdminProfilePage.vue')
 const TenantAdminPublicBookingPage = () => import('../pages/TenantAdminPublicBookingPage.vue')
 const TenantAdminReservationSharePage = () => import('../pages/TenantAdminReservationSharePage.vue')
@@ -45,6 +57,20 @@ const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationS
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    ...workforceRoutes,
+    {path:'/stores/:storeId/admin/customer-activation',name:'customer-activation',component:()=>import('../pages/TenantAdminCustomerActivationPage.vue'),meta:{requiresTenantAdmin:true}},
+    {path:'/stores/:storeId/admin/customer-email',name:'customer-email-settings',component:()=>import('../pages/TenantAdminCustomerEmailPage.vue'),meta:{requiresTenantAdmin:true}},
+    {path:'/stores/:storeId/scan',name:'staff-scan',component:()=>import('../modules/staff-scan/StaffScanPage.vue')},
+    { path: '/stores/:storeId/wine-storage',name:'wine-storage',component:()=>import('../modules/wine-storage/WineStorageStaffPage.vue')},
+    {path:'/wallet/:storeId/wine-storage',name:'wine-storage-customer',component:()=>import('../modules/wine-storage/WineStorageCustomerPage.vue'),meta:{public:true}},
+    ...walletRoutes,
+    ...catalogRoutes,
+    {path:'/customers/register',name:'public-customer-register',component:()=>import('../modules/customers/PublicCustomerRegistrationPage.vue'),meta:{public:true}},
+    {
+      path: '/stores/:storeId/daily-ledger',
+      name: 'daily-ledger',
+      component: () => import('../modules/daily-ledger/DailyLedgerPage.vue')
+    },
     {
       path: '/login',
       name: 'login',
@@ -125,6 +151,12 @@ export const router = createRouter({
       meta: { requiresPlatformAdmin: true }
     },
     {
+      path: '/platform/payment/proof-templates',
+      name: 'platform-payment-proof-templates',
+      component: PlatformPaymentProofTemplatesPage,
+      meta: { requiresPlatformAdmin: true }
+    },
+    {
       path: '/platform/call-screen/text-seed',
       name: 'platform-call-screen-text-seed',
       component: PlatformCallScreenSeedPage,
@@ -148,11 +180,42 @@ export const router = createRouter({
       component: StoreStaffHomePage
     },
     {
+      path: '/stores/:storeId/payments',
+      name: 'payment-quick-pay',
+      component: PaymentQuickPayPage
+    },
+    {
+      path: '/stores/:storeId/payments/proof-review',
+      name: 'payment-proof-review',
+      component: PaymentProofReviewPage
+    },
+    {
+      path: '/stores/:storeId/payments/report/:terminalCode',
+      name: 'payment-quick-pay-report',
+      component: PaymentQuickPayReportPage
+    },
+    {
+      path: '/stores/:storeId/payments/present/:terminalCode',
+      name: 'payment-present',
+      component: PaymentPresentPage
+    },
+    {
+      path: '/stores/:storeId/payments/display/:sessionNo',
+      name: 'payment-display',
+      component: PaymentDisplayPage
+    },
+    {
       path: '/stores/:storeId/admin',
       redirect: to => ({
         name: 'tenant-admin-profile',
         params: { storeId: to.params.storeId }
       })
+    },
+    {
+      path: '/stores/:storeId/admin/product-lines',
+      name: 'tenant-admin-product-lines',
+      component: () => import('../modules/tenant-products/TenantProductsPage.vue'),
+      meta: { requiresTenantAdmin: true }
     },
     {
       path: '/stores/:storeId/admin/profile',
@@ -187,6 +250,7 @@ export const router = createRouter({
     {
       path: '/stores/:storeId/admin/customers',
       name: 'tenant-admin-customers',
+      beforeEnter: to => to.query.action==='activation' ? {path:`/stores/${encodeURIComponent(String(to.params.storeId))}/admin/customer-activation`,query:{accessSource:to.query.accessSource}} : true,
       component: TenantAdminCustomersPage,
       meta: { requiresTenantAdmin: true }
     },
@@ -215,9 +279,53 @@ export const router = createRouter({
       meta: { requiresTenantAdmin: true }
     },
     {
-      path: '/stores/:storeId/admin/i18n-catalog',
-      name: 'tenant-admin-i18n-catalog',
+      path: '/stores/:storeId/admin/entry-links',
+      name: 'tenant-admin-entry-links',
+      component: () => import('../modules/tenant-entry-links/TenantEntryLinksPage.vue'),
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/settings',
+      name: 'tenant-admin-payment-settings',
+      component: TenantAdminPaymentSettingsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/payments/records',
+      name: 'payment-records',
+      component: TenantAdminPaymentRecordsPage
+    },
+    {
+      path: '/stores/:storeId/admin/payment/records',
+      name: 'tenant-admin-payment-records',
+      component: TenantAdminPaymentRecordsPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/proof-templates',
+      name: 'tenant-admin-payment-proof-templates',
+      component: TenantAdminPaymentProofTemplatesPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/payment/i18n-catalog',
+      name: 'tenant-admin-payment-i18n-catalog',
       component: TenantAdminI18nCatalogPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/reservation-queue/i18n-catalog',
+      name: 'tenant-admin-reservation-queue-i18n-catalog',
+      component: TenantAdminI18nCatalogPage,
+      meta: { requiresTenantAdmin: true }
+    },
+    {
+      path: '/stores/:storeId/admin/i18n-catalog',
+      name: 'tenant-admin-i18n-catalog-legacy',
+      redirect: to => ({
+        name: 'tenant-admin-reservation-queue-i18n-catalog',
+        params: { storeId: to.params.storeId }
+      }),
       meta: { requiresTenantAdmin: true }
     },
     {
@@ -323,7 +431,7 @@ router.beforeEach(async to => {
     return true
   }
 
-  await auth.ensureCurrentUser()
+  await auth.refreshStorePermissions(String(to.params.storeId || ''))
   if (!auth.isAuthenticated) {
     return {
       name: 'login',

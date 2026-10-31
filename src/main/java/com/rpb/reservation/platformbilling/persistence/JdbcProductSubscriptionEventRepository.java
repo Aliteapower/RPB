@@ -48,7 +48,31 @@ public class JdbcProductSubscriptionEventRepository implements ProductSubscripti
                 amount, currency, payment_note, idempotency_key,
                 operator_user_id, event_payload
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?::jsonb || jsonb_build_object(
+                    'storeSnapshotVersion', 1,
+                    'storeSnapshots', coalesce((
+                        select jsonb_agg(jsonb_build_object(
+                            'storeId', item.store_id,
+                            'storeCode', store.store_code,
+                            'storeName', store.display_name,
+                            'operatingEntityId', store.operating_entity_id,
+                            'operatingEntityName', entity.display_name,
+                            'storeStatus', store.status,
+                            'itemStatus', item.status,
+                            'quantity', item.quantity,
+                            'unitAmount', item.unit_amount::text,
+                            'amount', item.amount::text,
+                            'currency', item.currency,
+                            'periodStart', item.current_period_start,
+                            'periodEnd', item.current_period_end
+                        ) order by item.store_id, item.id)
+                        from tenant_product_subscription_items item
+                        left join stores store on store.id = item.store_id and store.tenant_id = item.tenant_id
+                        left join operating_entities entity on entity.id = store.operating_entity_id and entity.tenant_id = item.tenant_id
+                        where item.tenant_id = ? and item.subscription_id = ? and item.scope_type = 'store'
+                    ), '[]'::jsonb)
+                ))
             """,
             draft.subscriptionId(),
             draft.tenantId(),
@@ -63,7 +87,9 @@ public class JdbcProductSubscriptionEventRepository implements ProductSubscripti
             draft.paymentNote(),
             draft.idempotencyKey(),
             draft.operatorUserId(),
-            draft.eventPayloadJson() == null || draft.eventPayloadJson().isBlank() ? "{}" : draft.eventPayloadJson()
+            draft.eventPayloadJson() == null || draft.eventPayloadJson().isBlank() ? "{}" : draft.eventPayloadJson(),
+            draft.tenantId(),
+            draft.subscriptionId()
         );
     }
 }

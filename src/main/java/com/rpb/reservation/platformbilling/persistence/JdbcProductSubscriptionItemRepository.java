@@ -28,6 +28,16 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
     }
 
     @Override
+    public ProductSubscriptionItem insertStoreItem(ProductSubscription subscription,BillableStore store,
+        com.rpb.reservation.platformbilling.application.BillingPeriodCalculation period,
+        String cycle,BigDecimal unitAmount,BigDecimal amount,String paymentNote) {
+        UUID id=UUID.randomUUID();
+        jdbc.update("insert into tenant_product_subscription_items(id,subscription_id,tenant_id,app_key,scope_type,store_id,billing_cycle,current_period_start,current_period_end,quantity,unit_amount,amount,currency,status,payment_note) values(?,?,?,?,'store',?,?,?,?,1,?,?,?,'active',?)",
+            id,subscription.id(),subscription.tenantId(),subscription.appKey(),store.storeId(),cycle,period.periodStart(),period.periodEnd(),unitAmount,amount,subscription.currency(),paymentNote);
+        return findByTenantSubscriptionAndId(subscription.tenantId(),subscription.id(),id).orElseThrow();
+    }
+
+    @Override
     public List<BillableStore> listActiveStores(UUID tenantId) {
         return jdbc.query(
             """
@@ -132,7 +142,7 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
               and item.subscription_id = ?
               and item.id = ?
               and item.scope_type = 'store'
-              and item.status in ('active', 'suspended')
+              and item.status in ('active', 'suspended', 'cancelled', 'expired')
             """,
             (rs, rowNum) -> item(rs),
             tenantId,
@@ -144,7 +154,12 @@ public class JdbcProductSubscriptionItemRepository implements ProductSubscriptio
     @Override
     public void replaceStoreItems(ProductSubscription subscription, List<BillableStore> billableStores, SubscriptionQuote quote) {
         jdbc.update(
-            "delete from tenant_product_subscription_items where tenant_id = ? and subscription_id = ?",
+            """
+            delete from tenant_product_subscription_items item
+            where item.tenant_id = ? and item.subscription_id = ?
+              and exists (select 1 from stores store where store.id = item.store_id
+                and store.tenant_id = item.tenant_id and store.status = 'active' and store.deleted_at is null)
+            """,
             subscription.tenantId(),
             subscription.id()
         );

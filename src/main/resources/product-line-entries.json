@@ -1,0 +1,118 @@
+[
+  {
+    "appKey": "",
+    "value": "",
+    "labelKey": "platform.productLines.entryRoutes.none.label",
+    "descriptionKey": "platform.productLines.entryRoutes.none.description",
+    "permissions": [],
+    "historyRoute": "",
+    "historyPermissions": []
+  },
+  {
+    "appKey": "reservation_queue",
+    "value": "/stores/:storeId/staff",
+    "labelKey": "platform.productLines.entryRoutes.staffHome.label",
+    "descriptionKey": "platform.productLines.entryRoutes.staffHome.description",
+    "permissions": [
+      "reservation.create",
+      "reservation.check_in",
+      "reservation.seat",
+      "reservation.today_view",
+      "reservation.queue",
+      "reservation.cancel",
+      "reservation.no_show",
+      "reservation.complete",
+      "queue.view",
+      "queue.call",
+      "queue.seat",
+      "queue.skip",
+      "queue.rejoin",
+      "queue.cancel",
+      "queue.display.view",
+      "table.view",
+      "table.switch",
+      "customer.lookup",
+      "walkin.direct_seating.create",
+      "walkin.queue.create",
+      "cleaning.start",
+      "cleaning.complete"
+    ],
+    "historyRoute": "/stores/:storeId/reservations/today?history=1",
+    "historyPermissions": [
+      "reservation.today_view",
+      "queue.view"
+    ]
+  },
+  {
+    "appKey": "payment",
+    "value": "/stores/:storeId/payments",
+    "labelKey": "platform.productLines.entryRoutes.payment.label",
+    "descriptionKey": "platform.productLines.entryRoutes.payment.description",
+    "permissions": [
+      "payment.intent.view",
+      "payment.intent.create",
+      "payment.verification.review",
+      "payment.proof.review",
+      "payment.proof_template.manage"
+    ],
+    "historyRoute": "/stores/:storeId/payments/records?history=1",
+    "historyPermissions": [
+      "payment.intent.view"
+    ]
+  },
+  {
+    "appKey": "wallet",
+    "value": "/stores/:storeId/wallet",
+    "labelKey": "wallet.entry",
+    "descriptionKey": "wallet.description",
+    "permissions": [
+      "wallet.view",
+      "wallet.topup.create",
+      "wallet.charge.create",
+      "wallet.points.view"
+    ],
+    "historyRoute": "/stores/:storeId/wallet/transactions?history=1",
+    "historyPermissions": [
+      "wallet.view",
+      "wallet.points.view"
+    ]
+  },
+  {
+    "appKey": "wine_storage",
+    "value": "/stores/:storeId/wine-storage",
+    "labelKey": "wineStorage.entry",
+    "descriptionKey": "wineStorage.description",
+    "permissions": [
+      "wine_storage.view",
+      "wine_storage.receive",
+      "wine_storage.deliver"
+    ],
+    "historyRoute": "/stores/:storeId/wine-storage?task=records&history=1",
+    "historyPermissions": [
+      "wine_storage.view"
+    ]
+  },
+  {
+    "appKey": "workforce",
+    "value": "/stores/:storeId/workforce",
+    "labelKey": "workforce.entry",
+    "descriptionKey": "workforce.description",
+    "permissions": ["workforce.view"],
+    "historyRoute": "",
+    "historyPermissions": []
+  },
+  {
+    "appKey": "daily_ledger",
+    "value": "/stores/:storeId/daily-ledger",
+    "labelKey": "platform.productLines.entryRoutes.dailyLedger.label",
+    "descriptionKey": "platform.productLines.entryRoutes.dailyLedger.description",
+    "permissions": [
+      "daily_ledger.view",
+      "daily_ledger.write"
+    ],
+    "historyRoute": "/stores/:storeId/daily-ledger?history=1",
+    "historyPermissions": [
+      "daily_ledger.view"
+    ]
+  }
+]

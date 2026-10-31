@@ -18,6 +18,10 @@ const APP_GATE_ERROR_MESSAGES: Record<string, { titleKey: string; messageKey: st
     titleKey: 'appGate.errors.storeAppNotEnabled.title',
     messageKey: 'appGate.errors.storeAppNotEnabled.message'
   },
+  STORE_APP_EXPIRED: {
+    titleKey: 'appGate.errors.storeAppExpired.title',
+    messageKey: 'appGate.errors.storeAppExpired.message'
+  },
   PERMISSION_DENIED: {
     titleKey: 'appGate.errors.permissionDenied.title',
     messageKey: 'appGate.errors.permissionDenied.message'

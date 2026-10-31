@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storesForEntity } from './storeBillingEligibility'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -52,10 +53,7 @@ const selectedOperatingEntity = computed(() =>
 )
 const selectedOperatingEntityIsActive = computed(() => selectedOperatingEntity.value?.status === 'active')
 const visibleStores = computed(() => {
-  if (!selectedOperatingEntityId.value) {
-    return props.stores
-  }
-  return props.stores.filter(store => store.operatingEntityId === selectedOperatingEntityId.value)
+  return storesForEntity(props.stores, selectedOperatingEntityId.value)
 })
 const visibleAdminStoreOptions = computed(() => {
   if (!selectedOperatingEntityId.value) {
@@ -196,7 +194,7 @@ function editStore(store: PlatformStore): void {
   storeFormOpen.value = true
   Object.assign(storeForm, {
     id: store.id,
-    operatingEntityId: store.operatingEntityId || activeOperatingEntities.value[0]?.id || '',
+    operatingEntityId: store.operatingEntityId || '',
     storeCode: store.storeCode,
     storeName: store.storeName,
     status: store.status,
@@ -475,6 +473,15 @@ function adminStoreDisplayName(store: PlatformTenantStoreAccessStore): string {
           </button>
         </div>
 
+        <label class="store-filter">
+          {{ $t('platform.billing.storeEligibility.filter') }}
+          <select v-model="selectedOperatingEntityId">
+            <option value="">{{ $t('platform.billing.storeEligibility.allStores') }}</option>
+            <option value="unassigned">{{ $t('platform.billing.storeEligibility.unassignedFilter') }}</option>
+            <option v-for="entity in operatingEntities" :key="entity.id" :value="entity.id">{{ operatingEntityLabel(entity) }}</option>
+          </select>
+        </label>
+        <p v-if="selectedOperatingEntityId === 'unassigned'">{{ $t('platform.billing.storeEligibility.unassignedStores') }}</p>
         <div v-if="visibleStores.length === 0" class="empty-state">
           <strong>{{ $t('platform.tenants.structure.stores.empty') }}</strong>
           <span>

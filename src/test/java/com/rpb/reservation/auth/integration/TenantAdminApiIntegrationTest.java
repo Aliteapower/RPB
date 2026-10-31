@@ -69,6 +69,7 @@ class TenantAdminApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.update("delete from customer_privacy_consents where tenant_id = ?", VALIDATION_TENANT_ID);
         jdbc.update("delete from auth_user_sessions");
         jdbc.update("delete from auth_slider_captcha_challenges");
         jdbc.update("delete from audit_logs where operation_code = 'tenant_admin.account.self_update'");
@@ -1000,7 +1001,7 @@ class TenantAdminApiIntegrationTest {
     }
 
     @Test
-    void tenantAdminMaintainsCustomersWithOptionalPhoneAndArchive() throws Exception {
+    void tenantAdminMaintainsCustomersWithUniquePhoneAndArchive() throws Exception {
         Cookie session = login("20000000");
 
         MvcResult created = mockMvc.perform(post(basePath() + "/customers")
@@ -1009,7 +1010,8 @@ class TenantAdminApiIntegrationTest {
                     {
                       "displayName":"Codex 王小明",
                       "nickname":"先生",
-                      "email":"codex-customer-001@example.test"
+                      "phoneE164":"+6598880001",
+                      "email":"codex-customer-001@example.test", "privacyConsent":{"accepted":true,"noticeVersion":"customer-profile-v1","entrySource":"tenant_admin"}
                     }
                     """)
                 .cookie(session))
@@ -1017,7 +1019,7 @@ class TenantAdminApiIntegrationTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.customer.displayName").value("Codex 王小明"))
             .andExpect(jsonPath("$.customer.nickname").value("先生"))
-            .andExpect(jsonPath("$.customer.phoneE164").doesNotExist())
+            .andExpect(jsonPath("$.customer.phoneE164").value("+6598880001"))
             .andExpect(jsonPath("$.customer.email").value("codex-customer-001@example.test"))
             .andReturn();
         UUID customerId = UUID.fromString(objectMapper.readTree(created.getResponse().getContentAsString())
@@ -1087,7 +1089,7 @@ class TenantAdminApiIntegrationTest {
                       "displayName":"Codex 另一位顾客",
                       "nickname":"先生",
                       "phoneE164":"+6598880002",
-                      "email":"codex-customer-003@example.test"
+                      "email":"codex-customer-003@example.test", "privacyConsent":{"accepted":true,"noticeVersion":"customer-profile-v1","entrySource":"tenant_admin"}
                     }
                     """)
                 .cookie(session))
@@ -1130,7 +1132,7 @@ class TenantAdminApiIntegrationTest {
                       "displayName":"%s",
                       "nickname":"%s",
                       "phoneE164":"%s",
-                      "email":"%s"
+                      "email":"%s", "privacyConsent":{"accepted":true,"noticeVersion":"customer-profile-v1","entrySource":"tenant_admin"}
                     }
                     """.formatted(displayName, nickname, phoneE164, email))
                 .cookie(session))

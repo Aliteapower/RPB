@@ -23,6 +23,7 @@ export async function fetchMeApps(
   try {
     response = await fetcher(endpoint, {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         Accept: 'application/json'
       }
@@ -103,7 +104,8 @@ function isMeAppsResponse(payload: unknown): payload is MeAppsResponse {
   return (
     candidate.success === true &&
     Array.isArray(candidate.apps) &&
-    candidate.apps.every(isMeAppEntry)
+    candidate.apps.every(isMeAppEntry) &&
+    (candidate.historyApps === undefined || Array.isArray(candidate.historyApps) && candidate.historyApps.every(isMeAppEntry))
   )
 }
 

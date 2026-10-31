@@ -10,6 +10,8 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalized = id.replace(/\\/g, '/')
+          // Barcode decoding is optional; keep it out of the wallet's initial vendor download.
+          if (normalized.includes('/node_modules/@zxing/')) return 'product-barcode-decoder'
           if (normalized.includes('/node_modules/')) {
             return 'vendor'
           }

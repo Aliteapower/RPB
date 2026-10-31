@@ -1,5 +1,6 @@
 export type I18nCatalogScopeLevel = 'tenant' | 'store'
 export type I18nCatalogMessageStatus = 'active' | 'inactive'
+export type I18nCatalogProductLineScope = 'payment' | 'reservation_queue'
 
 export interface I18nCatalogMessage {
   message: string

@@ -1,0 +1,1 @@
+export interface Redemption {id:string;storeId:string;customerId:string;quantity:number;description:string;status:'pending'|'completed'|'cancelled'|'expired';expiresAt:string;entryId:string|null;balance:number;expectedVersion:number}

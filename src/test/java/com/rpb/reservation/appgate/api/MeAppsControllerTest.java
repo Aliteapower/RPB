@@ -84,6 +84,12 @@ class MeAppsControllerTest {
             .andExpect(jsonPath("$.apps").isEmpty());
     }
 
+    @Test void closedHistoryIsSeparateFromNormalApps() throws Exception {
+        when(appGateService.visibleApps(actorProvider.actor,STORE_ID)).thenReturn(List.of());
+        when(appGateService.historyApps(actorProvider.actor,STORE_ID)).thenReturn(List.of(new AppGateAppEntry("reservation_queue","Reservations","history","/stores/"+STORE_ID+"/reservations/today?history=1",true,Set.of("reservation.today_view"))));
+        mockMvc.perform(get("/api/me/apps").param("storeId",STORE_ID.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.apps").isEmpty()).andExpect(jsonPath("$.historyApps[0].status").value("history"));
+    }
+
     private static CurrentActor actor() {
         return CurrentActor.storeStaff(
             TENANT_ID,

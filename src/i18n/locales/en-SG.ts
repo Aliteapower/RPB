@@ -1,4 +1,16 @@
+import { ledgerMessages } from '../../modules/daily-ledger/locales/en-SG'
+import { walletEn } from '../../modules/wallet/locales'
+import { customerAuthEn } from '../../components/customer-auth/locales'
+import { tenantEntryLinksEn } from '../../modules/tenant-entry-links/locales'
+import { tenantProductsEn } from '../../modules/tenant-products/locales'
 export const enSG = {
+  workforce:{entry:'Attendance & payroll',description:'Employee profiles, cross-store attendance and company payroll'},
+  wineStorage:{entry:'Bottle storage',description:'Storage cards, receipt and collection'},
+  tenantProducts: tenantProductsEn,
+  customerAuth: customerAuthEn,
+  tenantEntryLinks: tenantEntryLinksEn,
+  wallet: walletEn,
+  dailyLedger: { messages: ledgerMessages, entry: 'Daily Ledger', description: 'Cash counts, handover and history', symbol: '$' },
   common: {
     actions: {
       login: 'Sign in',
@@ -55,7 +67,8 @@ export const enSG = {
       reservation_share: 'Reservation share',
       queue: 'Queue',
       call_screen: 'Call screen',
-      reservation_meal_period: 'Reservation meal periods'
+      reservation_meal_period: 'Reservation meal periods',
+      payment: 'PayNow payment'
     },
     categories: {
       cancellation: 'Cancellation',
@@ -68,7 +81,8 @@ export const enSG = {
       template: 'Template',
       display: 'Display copy',
       display_name: 'Display name',
-      restaurant_default: 'Restaurant default'
+      restaurant_default: 'Restaurant default',
+      quick_pay: 'Quick payment'
     },
     textKinds: {
       label: 'Label',
@@ -102,6 +116,7 @@ export const enSG = {
       billing: 'Tenant billing',
       profile: 'Platform profile',
       productLines: 'Product lines',
+      paymentProofTemplates: 'PayNow Proof Templates',
       i18nCatalog: 'I18n catalog',
       callScreenSeed: 'Call screen templates',
       mealPeriodSeed: 'Reservation meal periods',
@@ -116,6 +131,13 @@ export const enSG = {
       customers: 'Customers',
       tables: 'Tables',
       settings: 'Settings',
+      paymentProductLine: 'Pay / PayNow',
+      paymentSettings: 'Settings',
+      paymentRecords: 'Quick Payment Records',
+      paymentProofTemplates: 'Proof Templates',
+      paymentI18nCatalog: 'PayNow I18n',
+      reservationQueueProductLine: 'Reservation Queue',
+      reservationQueueI18nCatalog: 'Reservation Queue I18n',
       i18nCatalog: 'I18n catalog',
       shareTemplate: 'Booking share',
       publicBooking: 'Public booking',
@@ -126,7 +148,8 @@ export const enSG = {
       home: 'Home',
       reservation: 'Bookings',
       queue: 'Queue',
-      table: 'Tables'
+      table: 'Tables',
+      payment: 'Pay'
     }
   },
   login: {
@@ -195,6 +218,10 @@ export const enSG = {
       tenantAppExpired: {
         title: 'Product subscription has expired',
         message: 'Ask a platform admin to renew the reservation queue product before using it.'
+      },
+      storeAppExpired: {
+        title: 'This store product has expired',
+        message: 'Ask an admin to renew the product subscription for this store.'
       },
       storeAppNotEnabled: {
         title: 'Current store is not enabled',
@@ -591,6 +618,14 @@ export const enSG = {
         staffHome: {
           label: 'Store staff home',
           description: 'Default entry for the reservation queue product'
+        },
+        payment: {
+          label: 'PayNow collection',
+          description: 'Store PayNow payment product entry'
+        },
+        dailyLedger: {
+          label: 'Daily ledger',
+          description: 'Store daily business ledger entry'
         }
       },
       status: {
@@ -762,6 +797,13 @@ export const enSG = {
       }
     },
     billing: {
+      storeEligibility: {
+        filter: 'Store scope', allStores: 'All existing stores', unassignedFilter: 'Existing stores without an entity',
+        noStores: 'This tenant has no stores. Create a store in tenant structure.', noActiveStores: 'Existing stores are not active. Enable them in tenant structure.',
+        unassignedStores: 'Existing stores need an operating entity. In tenant structure, filter stores without an entity, edit the existing store and select its entity. No new store is needed.',
+        selectStores: 'Select the stores to open wallet billing for.', noAdditionalStores: 'There are no additional eligible stores. Renew subscribed stores individually in subscription details.',
+        inactivePrice: 'Configure and activate the wallet price template first.', manageStructure: 'Open tenant structure to associate existing stores'
+      },
       page: {
         kicker: 'Tenant management',
         title: 'Subscription / billing'
@@ -787,6 +829,7 @@ export const enSG = {
         convert: 'Convert to paid',
         reactivate: 'Reactivate',
         resumeRenew: 'Resume and renew',
+        addStores: 'Activate additional stores',
         renewStore: 'Renew selected store',
         renew: 'Renew',
         suspend: 'Suspend',
@@ -825,6 +868,10 @@ export const enSG = {
         empty: 'No product lines'
       },
       form: {
+        priceRequired: 'Configure and enable a price for this product first.',
+        selectStoresHint: 'Select the stores to activate for this purchase.',
+        selectStores: 'Select stores to activate',
+        selectedStoresHelp: 'Only selected stores are charged and activated for this product. Other purchased periods remain unchanged.',
         title: 'Manual purchase / renewal',
         productLine: 'Product line',
         billingCycle: 'Billing cycle',
@@ -943,6 +990,7 @@ export const enSG = {
       refreshing: 'Refreshing',
       unavailable: 'Unavailable',
       home: 'Home',
+      payment: 'Pay',
       available: 'App available'
     },
     topbar: {
@@ -967,6 +1015,11 @@ export const enSG = {
         label: 'Seat queue',
         description: 'Seat a called ticket at a table',
         symbol: 'Seat'
+      },
+      quickPay: {
+        label: 'Quick pay',
+        description: 'Enter an amount and show a PayNow QR code',
+        symbol: 'Pay'
       }
     },
     store: {
@@ -992,6 +1045,8 @@ export const enSG = {
     hints: {
       unavailable: 'Today overview is unavailable',
       loading: 'Reading today’s operations',
+      paymentOnly: 'Only the PayNow product line is enabled for this store',
+      noProductLine: 'No product line is available for this store',
       queuePressure: '{groups} queue groups. Check waiting and called tickets first.',
       calm: 'No queue pressure right now'
     },

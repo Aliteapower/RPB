@@ -19,6 +19,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class I18nCatalogService {
     private static final List<String> SUPPORTED_LOCALES = List.of("zh-CN", "en-SG");
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{\\s*([^{}]+?)\\s*}}");
+    private static final Map<String, Set<String>> TENANT_PRODUCT_LINE_NAMESPACES = Map.of(
+        "payment", Set.of("payment"),
+        "reservation_queue", Set.of(
+            "reason",
+            "public_booking",
+            "reservation_share",
+            "queue",
+            "call_screen",
+            "reservation_meal_period"
+        )
+    );
 
     private final I18nCatalogRepository repository;
 
@@ -55,7 +66,12 @@ public class I18nCatalogService {
 
     @Transactional(readOnly = true)
     public I18nCatalogView tenantCatalog(StoreScope scope) {
-        return buildView(repository.findTenantEditableActiveKeys(), scope);
+        return tenantCatalog(scope, null);
+    }
+
+    @Transactional(readOnly = true)
+    public I18nCatalogView tenantCatalog(StoreScope scope, String productLine) {
+        return buildView(tenantKeysForProductLine(repository.findTenantEditableActiveKeys(), productLine), scope);
     }
 
     @Transactional
@@ -64,8 +80,20 @@ public class I18nCatalogService {
         String scopeLevel,
         List<I18nCatalogMessageCommand> commands
     ) {
+        return updateTenantCatalog(scope, scopeLevel, null, commands);
+    }
+
+    @Transactional
+    public I18nCatalogView updateTenantCatalog(
+        StoreScope scope,
+        String scopeLevel,
+        String productLine,
+        List<I18nCatalogMessageCommand> commands
+    ) {
         String normalizedScopeLevel = normalizeScopeLevel(scopeLevel);
-        Map<String, I18nCatalogKey> allowedKeys = keysByName(repository.findTenantEditableActiveKeys());
+        Map<String, I18nCatalogKey> allowedKeys = keysByName(
+            tenantKeysForProductLine(repository.findTenantEditableActiveKeys(), productLine)
+        );
         UUID tenantId = scope.tenantId().value();
         UUID storeId = "store".equals(normalizedScopeLevel) ? scope.storeId().value() : null;
         for (I18nCatalogMessageCommand command : normalizeCommands(commands)) {
@@ -86,7 +114,21 @@ public class I18nCatalogService {
                 throw new I18nCatalogServiceException(I18nCatalogServiceErrorCode.VERSION_CONFLICT);
             }
         }
-        return tenantCatalog(scope);
+        return tenantCatalog(scope, productLine);
+    }
+
+    private static List<I18nCatalogKey> tenantKeysForProductLine(List<I18nCatalogKey> keys, String productLine) {
+        String normalized = clean(productLine);
+        if (normalized.isBlank()) {
+            return keys;
+        }
+        Set<String> namespaces = TENANT_PRODUCT_LINE_NAMESPACES.get(normalized);
+        if (namespaces == null) {
+            throw new I18nCatalogServiceException(I18nCatalogServiceErrorCode.REQUEST_INVALID);
+        }
+        return keys.stream()
+            .filter(key -> namespaces.contains(key.namespace()))
+            .toList();
     }
 
     private I18nCatalogView buildView(List<I18nCatalogKey> keys, StoreScope scope) {

@@ -1,0 +1,9 @@
+import type {PayItem,PayBreakdown} from './payrollTypes'
+export function estimateDays(month:string,weekdays:number[]|undefined){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||!weekdays?.length)return '';const [y,m]=month.split('-').map(Number);let days=0;for(let d=1;d<=new Date(Date.UTC(y!,m!,0)).getUTCDate();d++){const wd=new Date(Date.UTC(y!,m!-1,d)).getUTCDay()||7;if(weekdays.includes(wd))days++}return days||''}
+export type AllowancePreset='duty'|'housing'|'attendance'|'other'
+export function addMonthlyAllowance(items:PayItem[],preset:AllowancePreset,en:boolean){const names:Record<AllowancePreset,[string,string]>={duty:['职务津贴','Duty allowance'],housing:['现金住宿津贴','Cash housing allowance'],attendance:['全勤奖','Full attendance bonus'],other:['其他月津贴','Other monthly allowance']};const pair=names[preset],label=pair[en?1:0];if(items.length>=20||items.some(i=>pair.includes(i.label)))return;items.push({itemId:crypto.randomUUID(),label,kind:preset==='housing'?'ow_accommodation':preset==='attendance'?'ow_attendance':'ow_allowance',amount:'',proration:'full'})}
+export interface PayPlanEstimateResult {month:string;days:number;dayHours:string;workSeconds:number;breakdown:PayBreakdown;policy:string;assumptions:string[]}
+
+export function estimateDeductions(b:PayBreakdown){let amount=0n;for(const value of [b.otherDeductions,b.cdac,b.employeeCpf]){if(value==null||!/^\d+(\.\d{1,2})?$/.test(value))return null;const [a,c='']=value.split('.');amount+=BigInt(a!)*100n+BigInt(c.padEnd(2,'0'))}return `${amount/100n}.${String(amount%100n).padStart(2,'0')}`}
+
+export function initialEstimateMonth(effectiveFrom:string,requested:string,today:string){const valid=(s:string)=>/^\d{4}-(0[1-9]|1[0-2])$/.test(s);if(valid(requested))return requested;const effective=effectiveFrom.slice(0,7),current=today.slice(0,7);return valid(effective)&&effective>current?effective:current}

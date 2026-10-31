@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {useCustomerAccessText} from '../modules/customers/accessText'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -27,6 +28,7 @@ import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
 import type { ReservationMealPeriod } from '../types/reservationMealPeriod'
 import type {
   TenantAdminCustomerEmailSettingsMutation,
+  TenantAdminCustomerEmailSettingsResponse,
   TenantAdminCustomerOAuthProviderSettingsMutation,
   TenantAdminPublicBookingAvailabilityRule,
   TenantAdminPublicBookingAvailabilityRuleMutation,
@@ -35,6 +37,9 @@ import type {
 import { useGeneratedText } from '../i18n/generatedText'
 import { publicBookingUrlForTenant } from '../utils/hostContext'
 
+const props=defineProps<{emailOnly?:boolean}>()
+const {t:accessText}=useCustomerAccessText()
+const emailLoaded=ref(false)
 const { gt } = useGeneratedText()
 
 const route = useRoute()
@@ -57,7 +62,7 @@ const availabilityRules = ref<TenantAdminPublicBookingAvailabilityRule[]>([])
 type PublicBookingPanel = 'settings' | 'email' | 'google' | 'facebook' | 'rules'
 
 const storeId = computed(() => String(route.params.storeId || ''))
-const activePanel = ref<PublicBookingPanel>('settings')
+const activePanel = ref<PublicBookingPanel>(props.emailOnly?'email':'settings')
 
 const form = reactive<TenantAdminPublicBookingSettingsMutation>({
   enabled: false,
@@ -137,7 +142,7 @@ const facebookSettingsComplete = computed(() => (
 const emailLoginReady = computed(() => emailForm.enabled && emailSettingsComplete.value)
 const googleLoginReady = computed(() => googleForm.enabled && googleSettingsComplete.value)
 const facebookLoginReady = computed(() => facebookForm.enabled && facebookSettingsComplete.value)
-const canSaveEmail = computed(() => !savingEmail.value && (!emailForm.enabled || emailSettingsComplete.value))
+const canSaveEmail = computed(() => !savingEmail.value && (!props.emailOnly||emailLoaded.value) && (!emailForm.enabled || emailSettingsComplete.value))
 const canSaveGoogle = computed(() => !savingGoogle.value && (!googleForm.enabled || googleSettingsComplete.value))
 const canSaveFacebook = computed(() => !savingFacebook.value && (!facebookForm.enabled || facebookSettingsComplete.value))
 
@@ -152,10 +157,12 @@ function openPanel(panel: PublicBookingPanel): void {
 }
 
 async function loadSettings(): Promise<void> {
+  emailLoaded.value=false
   loading.value = true
   errorText.value = ''
   savedText.value = ''
   try {
+    if(props.emailOnly){applyEmailSettings(await getTenantAdminCustomerEmailSettings(storeId.value));return}
     const [settings, email, google, facebook, mealPeriodResponse, rulesResponse, tenantProfileResponse] = await Promise.all([
       getTenantAdminPublicBookingSettings(storeId.value),
       getTenantAdminCustomerEmailSettings(storeId.value),
@@ -175,17 +182,7 @@ async function loadSettings(): Promise<void> {
       minLeadMinutes: settings.minLeadMinutes,
       maxAdvanceDays: settings.maxAdvanceDays
     })
-    Object.assign(emailForm, {
-      enabled: email.enabled,
-      fromEmail: email.fromEmail || '',
-      fromName: email.fromName || '',
-      smtpHost: email.smtpHost || '',
-      smtpPort: email.smtpPort,
-      smtpUsername: email.smtpUsername || '',
-      smtpPassword: '',
-      smtpStartTls: email.smtpStartTls
-    })
-    emailSecretConfigured.value = email.secretConfigured
+    applyEmailSettings(email)
     Object.assign(googleForm, {
       enabled: google.enabled,
       clientId: google.clientId || '',
@@ -208,6 +205,21 @@ async function loadSettings(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+function applyEmailSettings(email:TenantAdminCustomerEmailSettingsResponse){
+    Object.assign(emailForm, {
+      enabled: email.enabled,
+      fromEmail: email.fromEmail || '',
+      fromName: email.fromName || '',
+      smtpHost: email.smtpHost || '',
+      smtpPort: email.smtpPort,
+      smtpUsername: email.smtpUsername || '',
+      smtpPassword: '',
+      smtpStartTls: email.smtpStartTls
+    })
+    emailSecretConfigured.value = email.secretConfigured
+    emailLoaded.value=true
 }
 
 async function saveEmailSettings(): Promise<void> {
@@ -575,23 +587,24 @@ function apiErrorText(error: unknown): string {
 </script>
 
 <template>
-  <main class="tenant-shell">
-    <TenantAdminNav />
+  <main class="tenant-shell" :class="{'customer-email-only':emailOnly}">
+    <TenantAdminNav v-if="!emailOnly" />
 
     <section class="tenant-workspace">
       <header class="page-heading">
         <div>
           <span>{{ gt('generated.tenant-admin-public-booking.001') }}</span>
-          <h1>{{ gt('generated.tenant-admin-public-booking.002') }}</h1>
+          <h1>{{ emailOnly?accessText('email'):gt('generated.tenant-admin-public-booking.002') }}</h1><p v-if="emailOnly">{{accessText('shared')}}</p>
         </div>
       </header>
 
       <p v-if="errorText" class="error-banner" role="alert">{{ errorText }}</p>
+      <button v-if="emailOnly&&!emailLoaded&&!loading" @click="loadSettings">{{accessText('retry')}}</button>
       <p v-if="savedText" class="success-banner" role="status">{{ savedText }}</p>
       <p v-if="loading" class="loading-line">{{ gt('generated.tenant-admin-public-booking.003') }}</p>
 
-      <section v-else class="settings-layout">
-        <section class="public-entry-panel" :aria-label="gt('generated.tenant-admin-public-booking.004')">
+      <section v-else-if="!emailOnly||emailLoaded" class="settings-layout">
+        <section v-if="!emailOnly" class="public-entry-panel" :aria-label="gt('generated.tenant-admin-public-booking.004')">
           <div class="public-entry-panel__content">
             <span>{{ gt('generated.tenant-admin-public-booking.005') }}</span>
             <strong>{{ publicBookingUrl }}</strong>
@@ -608,7 +621,7 @@ function apiErrorText(error: unknown): string {
           />
         </section>
 
-        <section class="settings-operation-list" :aria-label="gt('generated.tenant-admin-public-booking.012')">
+        <section v-if="!emailOnly" class="settings-operation-list" :aria-label="gt('generated.tenant-admin-public-booking.012')">
           <h2 class="operation-list-title">{{ gt('generated.tenant-admin-public-booking.013') }}</h2>
 
           <article class="operation-card" :class="{ 'operation-card--active': activePanel === 'settings' }">
@@ -740,17 +753,17 @@ function apiErrorText(error: unknown): string {
 
         <form v-else-if="activePanel === 'email'" class="form-panel" @submit.prevent="saveEmailSettings">
           <div class="form-panel__wide panel-heading-row">
-            <h2>{{ gt('generated.tenant-admin-public-booking.049') }}</h2>
+            <h2>{{ emailOnly?accessText('emailPanel'):gt('generated.tenant-admin-public-booking.049') }}</h2>
             <strong class="status-chip" :class="{ 'status-chip--ready': emailLoginReady }">
               {{ emailLoginReady ? gt('generated.tenant-admin-public-booking.050') : gt('generated.tenant-admin-public-booking.051') }}
             </strong>
           </div>
-          <p class="form-panel__wide panel-note">{{ gt('generated.tenant-admin-public-booking.052') }}</p>
+          <p class="form-panel__wide panel-note">{{ emailOnly?accessText('emailDescription'):gt('generated.tenant-admin-public-booking.052') }}</p>
 
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="emailForm.enabled" type="checkbox" />
-              <span>{{ gt('generated.tenant-admin-public-booking.053') }}</span>
+              <span>{{ emailOnly?accessText('emailEnable'):gt('generated.tenant-admin-public-booking.053') }}</span>
             </label>
             <span class="secret-hint">{{ emailSecretConfigured ? gt('generated.tenant-admin-public-booking.054') : gt('generated.tenant-admin-public-booking.055') }}</span>
           </section>
@@ -795,7 +808,7 @@ function apiErrorText(error: unknown): string {
 
           <div class="form-actions">
             <button class="primary-button" type="submit" :disabled="!canSaveEmail">
-              {{ savingEmail ? gt('generated.tenant-admin-public-booking.061') : gt('generated.tenant-admin-public-booking.062') }}
+              {{ savingEmail ? gt('generated.tenant-admin-public-booking.061') : emailOnly?accessText('emailSave'):gt('generated.tenant-admin-public-booking.062') }}
             </button>
           </div>
         </form>
@@ -959,6 +972,9 @@ function apiErrorText(error: unknown): string {
 </template>
 
 <style scoped>
+.tenant-shell.customer-email-only{display:block;min-height:0}
+.customer-email-only .tenant-workspace{padding:16px}
+.customer-email-only .page-heading>div>span{display:none}
 .tenant-shell {
   background: #f3f6f8;
   color: #102033;

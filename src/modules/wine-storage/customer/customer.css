@@ -1,0 +1,94 @@
+/* Customer-only density: keep shared merchant and Wallet layouts independent. */
+.storage-customer-page {
+  max-width: 820px;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 16px 20px 32px;
+}
+.storage-customer-page .storage-page-header { margin: 0 0 16px; gap: 12px; align-items: flex-end; }
+.storage-customer-page .storage-heading { display: grid; gap: 8px; min-width: 0; }
+.storage-customer-page .storage-heading > a { width: fit-content; min-height: 44px; display: inline-flex; align-items: center; font-size: 13px; }
+.storage-customer-page .storage-heading > div { gap: 2px; }
+.storage-customer-page h1 { font-size: 22px; letter-spacing: -.4px; }
+.storage-customer-page .storage-customer-store { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.storage-customer-page h2 { margin-bottom: 12px; font-size: 16px; line-height: 1.45; }
+.storage-customer-page h3 { margin: 0 0 8px; font-size: 15px; line-height: 1.45; }
+.storage-customer-page p { margin-bottom: 10px; }
+.storage-customer-page button { font-size: 14px; padding: 9px 12px; }
+.storage-customer-page .storage-panel { margin: 12px 0; padding: 14px; border-radius: 12px; box-shadow: none; }
+.storage-customer-page .storage-panel > :last-child { margin-bottom: 0; }
+.storage-customer-page .storage-panel .storage-panel { border-radius: 9px; background: #f8faf9; }
+.storage-customer-page :is(.storage-customer-tasks, .storage-record-tabs) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 4px;
+  border: 1px solid var(--wallet-line);
+  border-radius: 12px;
+  background: #f1f5f4;
+}
+.storage-customer-page :is(.storage-customer-tasks, .storage-record-tabs) button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #486267;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.storage-customer-page .storage-customer-tasks button.primary { background: #155f52; color: #fff; }
+.storage-customer-page .storage-record-tabs { background: transparent; padding: 0; border: 0; gap: 6px; }
+.storage-customer-page .storage-record-tabs button { font-size: 13px; }
+.storage-customer-page .storage-record-tabs button.primary { background: #e5f3ed; color: #155f52; }
+.storage-customer-page .storage-customer-hint { margin-bottom: 12px; font-size: 13px; }
+.storage-customer-page :is(.storage-notice, .storage-error) { padding: 10px 12px; font-size: 13px; }
+.storage-customer-page .storage-customer-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.storage-customer-page .storage-customer-fields > label { min-width: 0; font-size: 13px; }
+.storage-customer-page .storage-customer-fields:has(> label:nth-child(2):last-child) { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.storage-customer-page :is(input:not([type=checkbox]), select, textarea) { min-width: 0; min-height: 44px; font-size: 16px; padding: 9px 10px; }
+.storage-customer-page textarea { min-height: 72px; }
+.storage-customer-page .storage-inline h3 { flex: 1; margin-bottom: 0; }
+.storage-customer-page .storage-inline { gap: 8px; }
+.storage-customer-page .storage-wine-rows { gap: 6px; margin: 12px 0; }
+.storage-customer-page .storage-wine-rows button { padding: 10px 12px; background: #fff; }
+.storage-customer-page .storage-wine-rows button > span:first-child { gap: 2px; }
+.storage-customer-page .storage-grid { grid-template-columns: 1fr; gap: 10px; }
+.storage-customer-page .storage-grid .storage-panel { margin: 0; background: #fff; }
+.storage-customer-page .storage-customer-bottle { padding: 12px; }
+.storage-customer-page .storage-bottle-heading { gap: 12px; }
+.storage-customer-page .storage-bottle-info { min-width: 0; flex: 1; }
+.storage-customer-page .storage-bottle-info h3 { margin-bottom: 8px; overflow-wrap: anywhere; }
+.storage-customer-page .storage-bottle-remaining { margin-bottom: 8px; color: #486267; }
+.storage-customer-page .storage-bottle-remaining strong { font-size: 20px; color: #155f52; font-variant-numeric: tabular-nums; }
+.storage-customer-page .storage-bottle-info small { font-size: 12px; margin-top: 4px; }
+.storage-customer-page .storage-bottle-code { flex: 0 0 148px; max-width: 50%; padding-left: 12px; border-left: 1px solid var(--wallet-line); }
+.storage-customer-page .storage-bottle-code .storage-quantity-field { margin: 0 0 8px; gap: 0; }
+.storage-customer-page .storage-bottle-code .storage-quantity { grid-template-columns: 40px minmax(0, 1fr) 40px; margin-top: 4px; }
+.storage-customer-page .storage-quantity button { min-height: 44px; font-size: 20px; padding: 4px; }
+.storage-customer-page .storage-quantity input { padding: 8px 0; }
+.storage-customer-page .storage-bottle-code > button { background: #155f52; color: #fff; }
+.storage-customer-page .storage-bottle-code:has(.wallet-qr) > button { background: #fff; color: #486267; }
+.storage-customer-page .storage-bottle-code > small { font-size: 11px; margin-top: 6px; }
+.storage-customer-page .storage-customer-scan summary { min-height: 44px; align-content: center; font-size: 13px; }
+.storage-customer-page .storage-customer-scan { padding-top: 4px; padding-bottom: 4px; }
+.storage-customer-page .storage-customer-scan[open] { padding-bottom: 12px; }
+.storage-customer-page .storage-empty { padding: 20px 8px; font-size: 13px; }
+.storage-customer-page .storage-customer-primary { margin-top: 14px; width: 100%; }
+@media (max-width: 640px) {
+  .storage-customer-page { padding: 12px 12px 28px; }
+  .storage-customer-page .storage-page-header { margin-bottom: 12px; }
+  .storage-customer-page .storage-panel { padding: 12px; }
+  .storage-customer-page .storage-customer-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .storage-customer-page .storage-customer-fields > label:first-child:nth-last-child(3) { grid-column: 1 / -1; }
+  .storage-customer-page .storage-bottle-code { flex-basis: 138px; padding-left: 10px; }
+  .storage-customer-page .storage-bottle-heading { gap: 10px; }
+}
+@media (max-width: 360px) {
+  .storage-customer-page .storage-bottle-code { flex-basis: 132px; padding-left: 8px; }
+  .storage-customer-page .storage-customer-fields { grid-template-columns: 1fr; }
+  .storage-customer-page .storage-customer-fields:has(> label:nth-child(2):last-child) { grid-template-columns: 1fr; }
+}

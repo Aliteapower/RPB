@@ -120,3 +120,7 @@ defaultAmount = storeUnitAmount * active billable store count
 Purchase, bulk renewal, and legacy conversion replace the subscription's store item rows using active stores in the tenant. Suspend and cancel update the item status with the subscription status. Single-store item renewal updates only the selected store item and recomputes the aggregate tenant subscription from active item rows.
 
 No reservation, queue, queue display, cleaning, walk-in, or App Gate table reads these item rows.
+
+### Selected-store recovery renewal (2026-10-30)
+
+Single-store renewal may explicitly select an `active`, `suspended`, `cancelled`, or `expired` purchased item. The store must still be active, not deleted, and belong to the requested tenant and subscription. Renewal retains item-version checks and idempotency, restores only the selected item to active, starts at the later of now or its previous period end, and leaves other store items and existing event snapshots unchanged. Inactive/deleted stores remain unavailable. This requires no schema migration or permission change.

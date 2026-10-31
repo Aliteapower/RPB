@@ -53,7 +53,7 @@ public record QueueDisplayResponse(
             return new CurrentCallResponse(
                 call.queueTicketId(),
                 call.displayNumber(),
-                call.customerDisplayName(),
+                maskDisplayName(call.customerDisplayName()),
                 call.partySize(),
                 call.partySizeGroup(),
                 call.calledAt(),
@@ -72,8 +72,17 @@ public record QueueDisplayResponse(
         String partySizeGroup
     ) {
         private static WaitingPreviewItemResponse from(QueueDisplayWaitingPreviewItem item) {
-            return new WaitingPreviewItemResponse(item.displayNumber(), item.customerDisplayName(), item.partySize(), item.partySizeGroup());
+            return new WaitingPreviewItemResponse(item.displayNumber(), maskDisplayName(item.customerDisplayName()), item.partySize(), item.partySizeGroup());
         }
+    }
+
+    private static String maskDisplayName(String name) {
+        if (name == null || name.isBlank()) return "顾客";
+        String value = name.strip();
+        if ("顾客".equals(value)) return value;
+        if (value.codePointCount(0, value.length()) < 2 || value.contains("@")
+            || value.codePoints().anyMatch(Character::isDigit)) return "***";
+        return value.substring(0, value.offsetByCodePoints(0, 1)) + "***";
     }
 
     public record AdsResponse(String mode, int slideDurationSeconds, int statePollSeconds, List<AdSlideResponse> slides) {

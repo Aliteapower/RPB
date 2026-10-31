@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {useI18n} from 'vue-i18n'
+import ProductHistoryNotice from '../modules/tenant-products/ProductHistoryNotice.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
@@ -42,6 +44,7 @@ import type { TableResourceItem } from '../types/tableResource'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const {t}=useI18n()
 
 type UiStatusFilter =
   | 'all'
@@ -60,6 +63,8 @@ type QueueTicketDisplaySource = {
 }
 
 const route = useRoute()
+const historyDateLabel=computed(()=>t('tenantProducts.businessDate'))
+const historyOnly=computed(()=>route.query.history==='1'), historyDate=ref('')
 const storeContext = useStoreContextStore()
 const { currentBusinessDate, currentTimeText } = useCurrentClock()
 
@@ -152,6 +157,7 @@ const cancelErrorCodesThatRefresh = new Set([
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
+watch(historyOnly,()=>{historyDate.value='';response.value=null;void loadQueueTickets()})
 const items = computed(() => response.value?.items ?? [])
 const visibleItems = computed(() => {
   if (selectedPartySizeGroup.value === allPartySizeGroupsValue) {
@@ -246,6 +252,7 @@ const reservationQueueEntry = computed(() =>
   apps.value.find(app => app.appKey === 'reservation_queue' && app.entryVisible)
 )
 const appStatusLabel = computed(() => {
+  if(historyOnly.value)return t('tenantProducts.historyOnly')
   if (appsLoading.value) {
     return gt('generated.queue-ticket-list.093')
   }
@@ -253,22 +260,22 @@ const appStatusLabel = computed(() => {
   return reservationQueueEntry.value ? gt('generated.queue-ticket-list.094') : gt('generated.queue-ticket-list.095')
 })
 const canSkipQueueTicket = computed(
-  () => reservationQueueEntry.value?.permissions.includes('queue.skip') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('queue.skip') ?? false)
 )
 const canRejoinQueueTicket = computed(
-  () => reservationQueueEntry.value?.permissions.includes('queue.rejoin') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('queue.rejoin') ?? false)
 )
 const canCallQueueTicket = computed(
-  () => reservationQueueEntry.value?.permissions.includes('queue.call') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('queue.call') ?? false)
 )
 const canSeatCalledQueueTicket = computed(
-  () => reservationQueueEntry.value?.permissions.includes('queue.seat') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('queue.seat') ?? false)
 )
 const canCancelQueueTicket = computed(
-  () => reservationQueueEntry.value?.permissions.includes('queue.cancel') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('queue.cancel') ?? false)
 )
 const canOpenQueueDisplay = computed(
-  () => reservationQueueEntry.value?.permissions.includes('queue.display.view') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('queue.display.view') ?? false)
 )
 const queueDisplayRoute = computed<RouteLocationRaw>(() => ({
   name: 'queue-display',
@@ -341,6 +348,7 @@ async function loadQueueTickets(): Promise<QueueTicketListResponse | null> {
   let loadedResponse: QueueTicketListResponse | null = null
 
   const query: QueueTicketListQuery = {
+    businessDate: historyOnly.value&&historyDate.value?historyDate.value:undefined,
     limit: todayListLimit,
     offset: 0
   }
@@ -1083,6 +1091,8 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 
 <template>
   <main class="staff-workbench-shell queue-workbench">
+    <ProductHistoryNotice v-if="historyOnly" />
+    <label v-if="historyOnly">{{historyDateLabel}}<input v-model="historyDate" type="date" @change="loadQueueTickets" /></label>
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :business-date="currentBusinessDate"
