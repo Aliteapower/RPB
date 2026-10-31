@@ -4,6 +4,8 @@
 
 For any non-trivial development task, Codex must check the relevant skill before implementation.
 
+For new product lines or changes to product-entry visibility/synchronization across administrator, employee and customer surfaces, use `docs/skills/rpb-product-entry-sync/SKILL.md`. Reuse synthetic fixtures; do not change real subscriptions for acceptance testing.
+
 Recommended flow:
 1. Read related existing docs and code.
 2. Use architecture-review before changing module boundaries.

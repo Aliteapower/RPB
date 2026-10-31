@@ -4,6 +4,8 @@ This directory contains reusable RPB skills for Codex-assisted engineering work.
 
 ## Skill Index
 
+- [Product Entry Sync](rpb-product-entry-sync/SKILL.md): 新增RPB产品线或排查管理员、员工、顾客开通/到期/停用/切店后的入口同步、权限隔离和只读历史；使用合成数据，不改真实订阅。
+
 - Architecture Review: use `docs/architecture/ARCHITECTURE.md`, governance docs, and `docs/skills/reservation-system/SKILL.md` when module boundaries or the reservation workflow are affected.
 - [Code Review](code-review/SKILL.md)
 - [API Review](api-review/SKILL.md)
