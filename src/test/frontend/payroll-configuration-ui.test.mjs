@@ -15,7 +15,7 @@ const response=(data,status=200)=>({ok:status<400,status,json:async()=>data})
 
 before(async()=>{globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document={};
  for(const name of ['PayProfileForm','PayrollLineForm','PayslipDetail','EmployeeForm'])ui[name]=(await import('../../../src/modules/workforce/pages/'+name+'.vue')).default
- for(const name of ['PayItemFields','PayGenerationFields','EmployeePaySummary','PositionSalaryDefaults','GuidedPayrollBoard'])ui[name]=(await import('../../../src/modules/workforce/components/'+name+'.vue')).default
+ for(const name of ['PayItemFields','PayGenerationFields','PayRuleFields','PayRuleSummary','EmployeePaySummary','PositionSalaryDefaults','GuidedPayrollBoard'])ui[name]=(await import('../../../src/modules/workforce/components/'+name+'.vue')).default
  ui.key=(await import('../../../src/modules/workforce/context.ts')).workforceKey;ui.api=(await import('../../../src/modules/workforce/api.ts')).workforceApi
 })
 afterEach(()=>{mounted.splice(0).forEach(a=>a.unmount());globalThis.fetch=originalFetch})
@@ -65,3 +65,45 @@ test('real RouterView returns from salary setup to the original payroll month fi
  const router=createRouter({history:createMemoryHistory(),routes:[{path:'/stores/:storeId/workforce/payroll',component:{render:()=>h(ui.GuidedPayrollBoard,{companyId:'C',month:'2026-09'})}},{path:'/stores/:storeId/workforce/pay-profiles/new',component:ui.PayProfileForm},{path:'/:pathMatch(.*)*',component:{render:()=>h('div')}}]});await router.push('/stores/A/workforce/payroll?companyId=C&month=2026-09&paySearch=张三&payEmployee=E');const root=element('root'),app=renderer.createApp({render:()=>h(RouterView,{key:router.currentRoute.value.path})});app.use(router);app.use(createI18n({legacy:false,locale:'zh-CN',messages:{}}));app.provide(ui.key,{store:ref('A'),home:ref({headOffice:true,employeeManage:true,companies:[{id:'C'}],stores:[{id:'A',companyId:'C'}]}),payrollHome:ref({companies:[{id:'C'}]}),current:()=>true,api:()=>ui.api('A')});app.mount(root);mounted.push(app);await settle();
  const link=nodes(root,n=>n.tag==='a'&&text(n).includes('配置薪资'))[0];assert.ok(link);await router.push(link.props.href);await settle();select(root,'foreign').props['onUpdate:modelValue']('foreign');select(root,'not_applicable').props['onUpdate:modelValue']('not_applicable');await settle();for(let i=0;i<2;i++){nodes(root,n=>n.tag==='button'&&text(n).includes('下一步'))[0].props.onClick();await settle()}await submit(root);await settle();assert.equal(router.currentRoute.value.path,'/stores/A/workforce/payroll');assert.equal(router.currentRoute.value.query.month,'2026-09');assert.equal(router.currentRoute.value.query.paySearch,'张三');assert.equal(router.currentRoute.value.query.payEmployee,'E');assert.ok(boardReads>=2);assert.equal(profileWrite.effectiveFrom,'2026-09-15')
 });
+
+
+test('position defaults explain missing templates and preserve company scope when opening template setup',async()=>{
+ globalThis.fetch=async()=>response([])
+ const {root}=await mount(ui.PositionSalaryDefaults,undefined,{positionId:'P',companyId:'C'},[{id:'C',name:'Company'}])
+ assert.match(text(root),/暂无匹配的启用模板/)
+ const link=nodes(root,n=>n.tag==='a'&&String(n.props.href).includes('salary-templates'))[0]
+ assert.equal(link.props.href,'/stores/A/workforce/salary-templates?companyId=C')
+ assert.equal(link.props.target,'_blank','template setup must retain the current position draft')
+ assert.equal(nodes(root,n=>n.tag==='button'&&text(n)==='保存默认')[0].props.disabled,true)
+})
+test('position template preview is read-only and selecting it does not write payroll data',async()=>{
+ const writes=[]
+ globalThis.fetch=async(url,options)=>{if(options?.method==='PUT'){writes.push(url);return response({})}return response(String(url).includes('salary-templates')?[{id:'T',name:'时薪模板',enabled:true,version:1,rule}]:[])}
+ const {root}=await mount(ui.PositionSalaryDefaults,undefined,{positionId:'P',companyId:'C'},[{id:'C',name:'Company'}])
+ const basis=nodes(root,n=>n.tag==='select'&&n.props['aria-label']==='计薪方式')[0]
+ basis.props['onUpdate:modelValue']('hourly');await settle()
+ const template=nodes(root,n=>n.tag==='select'&&n.props['aria-label']==='模板')[0]
+ template.props['onUpdate:modelValue']('T');await settle()
+ assert.match(text(root),/查看所选模板金额、津贴与加班依据/)
+ assert.ok(nodes(root,n=>n.tag==='section'&&n.props['aria-label']==='工资规则明细（只读）').length)
+ assert.equal(nodes(root,n=>n.tag==='button'&&text(n).includes('添加项目')).length,0)
+ assert.equal(writes.length,0)
+})
+
+
+test('read-only pay rule details retain amounts, attendance conditions and source labels without editable controls',async()=>{
+ const value={...rule,generation:{mode:'attendance',workingWeekdays:[1,3,5]},items:[{label:'全勤',kind:'ow_attendance',amount:'100',proration:'full'},{label:'补充事件',kind:'wage_event',amount:'20'}]}
+ const before=JSON.stringify(value);let calls=0;globalThis.fetch=async()=>{calls++;return response({})}
+ const {root}=await mount(ui.PayRuleSummary,undefined,{rule:value})
+ assert.match(text(root),/周一、周三、周五/);assert.match(text(root),/全勤奖按当月核准结果判断/);assert.match(text(root),/工资事件/)
+ assert.equal(nodes(root,n=>['input','select','button'].includes(n.tag)).length,0)
+ assert.equal(JSON.stringify(value),before);assert.equal(calls,0)
+})
+
+
+test('advanced personal differences keep hours editable without duplicating pay basis and rate',async()=>{
+ const {root}=await mount(ui.PayRuleFields,undefined,{rule:{...rule},basisLocked:true,hideItems:true,hidePayTerms:true})
+ assert.equal(nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal').length,2,'advanced details expose day and week hours, not a second pay rate')
+ assert.doesNotMatch(text(root),/基本工资标准/)
+ assert.match(text(root),/标准日小时/)
+})

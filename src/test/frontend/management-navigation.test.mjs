@@ -38,7 +38,7 @@ test('management return respects employee, head-office and company access separa
  assert.equal(managementNavigation(route('workforce-pay-profiles'),manager,null,'zh-CN'),null)
  const nav=managementNavigation(route('workforce-salary-template'),employee,payroll,'en-SG')
  assert.equal(nav.backTo.query.companyId,'C')
- assert.deepEqual(nav.crumbs.map(c=>c.label),['Settings','Salary templates','Edit salary template'])
+ assert.deepEqual(nav.crumbs.map(c=>c.label),['Settings','Salary templates','View salary template'])
 })
 test('shared layout renders the accessible breadcrumb and visible return without changing business pages',async()=>{
  const source=await readFile('src/modules/workforce/WorkforceLayout.vue','utf8')

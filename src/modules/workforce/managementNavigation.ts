@@ -23,8 +23,8 @@ const sections:ManagementSection[]=[
  {path:'calendar',label:['考勤日历','Attendance calendar'],access:'employee',routes:{'workforce-calendar':null,'workforce-calendar-new':['新增日历事项','New calendar event'],'workforce-calendar-edit':['编辑日历事项','Edit calendar event']}},
  {path:'public-holidays',label:['年度公共假期','Annual public holidays'],access:'employee',routes:{'workforce-public-holidays':null}},
  {path:'leave-types',label:['假期类型','Leave types'],access:'employee',routes:{'workforce-leave-types':null,'workforce-leave-type-new':['新增假期类型','New leave type'],'workforce-leave-type':['编辑假期类型','Edit leave type']}},
- {path:'salary-templates',label:['薪资模板','Salary templates'],access:'payroll',routes:{'workforce-salary-templates':null,'workforce-salary-template-new':['新增薪资模板','New salary template'],'workforce-salary-template':['编辑薪资模板','Edit salary template']}},
- {path:'pay-profiles',label:['员工薪资','Employee pay profiles'],access:'payroll',routes:{'workforce-pay-profiles':null,'workforce-pay-profile-new':['新增员工薪资','New employee pay profile'],'workforce-pay-profile':['编辑员工薪资','Edit employee pay profile']}}
+ {path:'salary-templates',label:['薪资模板','Salary templates'],access:'payroll',routes:{'workforce-salary-templates':null,'workforce-salary-template-new':['新增薪资模板','New salary template'],'workforce-salary-template':['查看工资模板','View salary template']}},
+ {path:'pay-profiles',label:['个人薪资方案','Employee pay plans'],access:'payroll',routes:{'workforce-pay-profiles':null,'workforce-pay-profile-new':['新增薪资方案','New pay plan'],'workforce-pay-profile':['编辑薪资方案','Edit pay plan']}}
 ]
 export interface ManagementCrumb {label:string;to?:RouteLocationRaw}
 export function managementNavigation(route:Pick<RouteLocationNormalizedLoaded,'name'|'params'|'query'>,home:Pick<Home,'employeeManage'|'headOffice'>|null,payrollHome:Pick<PayrollHomeData,'companies'>|null,locale:string){
@@ -43,6 +43,6 @@ export function managementNavigation(route:Pick<RouteLocationNormalizedLoaded,'n
  const backTo={path:base+'/management',query:{...query,step}}
  const action=section.routes[name],crumbs:ManagementCrumb[]=[{label:english?'Settings':'设置',to:backTo},{label:caption(section.label),...(action?{to:{path:base+'/'+section.path,query}}:{})}]
  if(action)crumbs.push({label:caption(action)})
- return {backTo,backLabel:english?'← Back to settings':'← 返回设置',ariaLabel:english?'Breadcrumb':'当前位置',crumbs}
+ return {section:section.path,isForm:!!action,backTo,backLabel:english?'← Back to settings':'← 返回设置',ariaLabel:english?'Breadcrumb':'当前位置',crumbs}
 }
 

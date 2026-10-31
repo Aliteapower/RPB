@@ -165,7 +165,8 @@ test('payroll-only delegate gets management navigation without gaining employee 
  const links=nodes(root,n=>n.tag==='a')
  assert.ok(links.some(n=>n.props.href==='management'));assert.ok(!links.some(n=>n.props.href==='employees'||n.props.href==='schedule'))
  assert.match(links.find(n=>n.props.href==='management').props['data-matches'],/salary-templates,pay-profiles/)
- assert.doesNotMatch(links.find(n=>n.props.href==='payroll').props['data-matches'],/salary-templates|pay-profiles/)
+ assert.doesNotMatch(links.find(n=>n.props.href==='payroll').props['data-matches'],/salary-templates|pay-profiles|position-pay-plans/)
+ for(const path of ['position-pay-plans','pay-template-library','pay-change-requests','attendance-rules','review-explanations','statutory-policies'])assert.ok(links.find(n=>n.props.href==='management').props['data-matches'].split(',').includes(path))
  assert.ok(!links.some(n=>text(n)==='首页'))
 })
 test('my profile does not expose employee maintenance for an unlinked administrator',async()=>{

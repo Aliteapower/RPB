@@ -6,6 +6,7 @@ import {workforceApi} from './api'
 import {workforceKey} from './context'
 import {useWorkforceText} from './text'
 import {useWorkforceNavigation} from './navigation'
+import SettingsTaskGuide from './components/SettingsTaskGuide.vue'
 import {managementNavigation} from './managementNavigation'
 import type {PayrollHomeData} from './payrollTypes'
 import {usePayrollText} from './payrollText'
@@ -26,7 +27,7 @@ const managementNav=computed(()=>managementNavigation(route,home.value,payrollHo
 const switchStores=computed(()=>{const value=home.value;if(!value)return [];return route.path.endsWith('/workforce/clock')||!value.employeeManage?(value.clockStores??value.stores):value.stores})
 function switchStore(e:Event){void router.push(`/stores/${encodeURIComponent((e.target as HTMLSelectElement).value)}/workforce`)}
 </script>
-<template><main class="workforce-page">
+<template><main class="workforce-page" :class="{'wf-settings-context':!!managementNav}">
  <ProductPageHeader :title="t('title')" :caption="roleCaption" :back-to="`/stores/${store}/staff`" :back-label="t('back')" :refresh-label="t('refresh')" :refresh-disabled="loading" @refresh="refresh">
   <template #navigation><select v-if="switchStores.length>1" :value="store" :aria-label="t('stores')" @change="switchStore"><option v-for="s in switchStores" :key="s.id" :value="s.id">{{s.name}}</option></select></template>
  </ProductPageHeader>
@@ -37,6 +38,7 @@ function switchStore(e:Event){void router.push(`/stores/${encodeURIComponent((e.
    <RouterLink class="wf-button wf-management-return" :to="managementNav.backTo">{{managementNav.backLabel}}</RouterLink>
    <nav :aria-label="managementNav.ariaLabel"><ol><li v-for="crumb in managementNav.crumbs" :key="crumb.label"><RouterLink v-if="crumb.to" :to="crumb.to">{{crumb.label}}</RouterLink><span v-else aria-current="page">{{crumb.label}}</span></li></ol></nav>
   </div>
+  <SettingsTaskGuide v-if="managementNav" :section="managementNav.section" :form="managementNav.isForm"/>
   <RouterView :key="`${store}:${route.name==='workforce-payroll'?route.path:route.fullPath}`"/>
  </template>
 </main></template>

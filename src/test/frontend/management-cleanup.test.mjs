@@ -17,7 +17,7 @@ const response=(data,status=200)=>({ok:status<400,status,json:async()=>data})
 const payroll={companies:[{id:'C',name:'Company C'},{id:'D',name:'Company D'}]}
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document={}
- const names=['WorkforceManagement','SalaryTemplateList','PayProfileList','PositionList']
+ const names=['WorkforceManagement','SalaryTemplateList','PayProfileList','PositionList','PositionPayPlans']
  ui=Object.fromEntries(await Promise.all(names.map(async name=>[name,(await import('../../../src/modules/workforce/pages/'+name+'.vue')).default])))
  ui.workforceKey=(await import('../../../src/modules/workforce/context.ts')).workforceKey
 })
@@ -118,4 +118,13 @@ test('returning from a salary setting restores step three and invalid steps fall
  assert.notEqual(nodes(root,n=>n.props?.id==='setup-step-3')[0].style.display,'none')
  const invalid=await mount(ui.WorkforceManagement,'/stores/A/workforce/management?step=999')
  assert.notEqual(nodes(invalid.root,n=>n.props?.id==='setup-step-1')[0].style.display,'none')
+})
+
+
+test('position setup keeps the selected company for the next business task',async()=>{
+ globalThis.fetch=async path=>response(path==='/payroll-home'?payroll:[])
+ const {root,router}=await mount(ui.PositionPayPlans,'/stores/A/workforce/position-pay-plans?companyId=C')
+ const select=nodes(root,n=>n.tag==='select'&&nodes(n,o=>o.tag==='option'&&o.props.value==='D').length)[0]
+ select.props['onUpdate:modelValue']('D');select.props.onChange();await settle()
+ assert.equal(router.currentRoute.value.query.companyId,'D')
 })

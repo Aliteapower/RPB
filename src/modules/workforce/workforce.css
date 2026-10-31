@@ -57,3 +57,17 @@
 .workforce-page button.wf-count-button{padding:2px 4px;min-height:28px;border:0;border-radius:3px;background:transparent;color:#245a7c;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-align:left;white-space:normal;overflow-wrap:anywhere}.workforce-page button.wf-count-button:hover{background:#e5eff6}.workforce-page button.wf-count-button:focus-visible{outline:2px solid #245a7c;outline-offset:2px}.workforce-page .wf-staffing-dialog{width:min(760px,calc(100vw - 28px))}.workforce-page .wf-staffing-dialog h2{margin:0}.workforce-page .wf-staffing-dialog>.wf-toolbar{gap:12px}.workforce-page .wf-staffing-dialog table{min-width:500px}
 
 .workforce-page .wf-staffing-slot-picker{margin-top:6px;min-width:210px;white-space:normal}.workforce-page .wf-staffing-slot-picker p{font-size:12px;margin:4px 0}
+
+/* Settings pages use the same module panel and flow actions. */
+.workforce-page .wf-settings-guide{margin-bottom:14px;background:#f7f9fc}
+.workforce-page .wf-settings-guide ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.workforce-page .wf-settings-guide li{min-width:0;overflow-wrap:anywhere}
+.workforce-page .wf-settings-guide p{margin:5px 0 10px;color:#657186;font-size:12px}
+.workforce-page .wf-settings-guide>.wf-button{margin-top:6px}
+.workforce-page .wf-task-section{margin:18px 0;padding-top:14px;border-top:1px solid #e0e5ec;min-width:0}
+.workforce-page .wf-task-section summary{cursor:pointer;font-weight:600;padding:8px 0}
+.workforce-page .wf-settings-guide .wf-button{white-space:normal;text-align:left}
+@media(max-width:700px){.workforce-page .wf-settings-guide ol{grid-template-columns:1fr;gap:6px}}
+
+.workforce-page.wf-settings-context>.wf-form-panel{max-width:none}
+.workforce-page .wf-settings-guide summary{cursor:pointer;font-weight:600;margin-bottom:8px}
