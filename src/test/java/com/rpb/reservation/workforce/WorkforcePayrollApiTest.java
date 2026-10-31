@@ -13,7 +13,7 @@ class WorkforcePayrollApiTest {
  String base="/api/v1/stores/"+UUID.randomUUID()+"/workforce",company=UUID.randomUUID().toString();
  MockMvc mvc=MockMvcBuilders.standaloneSetup(new WorkforcePayrollController(actors,configuration,batches,payments,slips)).build();
  @Test void payrollAndPublishedSlipReadsRequireActorAndPreventCaching()throws Exception{
-  when(actors.currentActor()).thenReturn(Optional.empty());for(String path:List.of("/payroll-home","/salary-templates?companyId="+company,"/pay-profiles?companyId="+company,"/payroll-batches?companyId="+company,"/payroll-batches/"+UUID.randomUUID(),"/my-payslips?year=2026","/my-payslips/"+UUID.randomUUID()))mvc.perform(get(base+path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
+  when(actors.currentActor()).thenReturn(Optional.empty());for(String path:List.of("/my-latest-payslip","/payroll-home","/salary-templates?companyId="+company,"/pay-profiles?companyId="+company,"/payroll-batches?companyId="+company,"/payroll-batches/"+UUID.randomUUID(),"/my-payslips?year=2026","/my-payslips/"+UUID.randomUUID()))mvc.perform(get(base+path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
  }
  @Test void monetaryWritesRejectCrossSiteAndMissingHeaderBeforeBusinessServices()throws Exception{
   for(String path:List.of("/salary-templates/"+UUID.randomUUID(),"/pay-profiles/"+UUID.randomUUID(),"/payroll-batches/"+UUID.randomUUID(),"/payroll-batches/"+UUID.randomUUID()+"/actions/"+UUID.randomUUID(),"/payroll-batches/"+UUID.randomUUID()+"/payments/"+UUID.randomUUID())){

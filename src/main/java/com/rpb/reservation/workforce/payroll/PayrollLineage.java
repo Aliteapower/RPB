@@ -60,7 +60,8 @@ final class PayrollLineage {
    boolean prorated=recurring&&!PayrollGeneration.fixed(r)&&r.basis().equals("monthly")&&PayItemKinds.INCOME.contains(item.kind())&&!"full".equals(item.proration());
    String amount=prorated?ratio(new BigDecimal(item.amount()).multiply(new BigDecimal(input.payableDays())),new BigDecimal(input.workingDays())):item.amount();
    var keys=List.of(origin+":"+sourceId+"/v"+version+":"+id+(source==null||source.eventId()==null?"":":"+source.eventId()));
-   var lineage=new Lineage(origin,sourceId,version,id,month.toString(),prorated?"recurring_payable_v1":"fixed_amount_v1","1","item",item.amount(),"1",prorated?input.payableDays()+"/"+input.workingDays():"full",amount,"HALF_UP_2",PayrollValues.money(value.amount()),keys);
+   if(item.kind().equals("ow_attendance"))amount=value.amount().toPlainString();
+   var lineage=new Lineage(origin,sourceId,version,id,month.toString(),item.kind().equals("ow_attendance")?"attendance_"+Objects.toString(s.attendanceBonusStatus(),"pending")+"_v1":prorated?"recurring_payable_v1":"fixed_amount_v1","1","item",item.amount(),"1",prorated?input.payableDays()+"/"+input.workingDays():"full",amount,"HALF_UP_2",PayrollValues.money(value.amount()),keys);
    out.add(new Component(value.label(),value.kind(),PayrollValues.money(value.amount()),lineage));
   }}return List.copyOf(out);
  }

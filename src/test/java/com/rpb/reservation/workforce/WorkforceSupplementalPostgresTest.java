@@ -119,4 +119,20 @@ class WorkforceSupplementalPostgresTest extends WorkforceAnnualWagesPostgresTest
   var a=approve(s);assertThat(a.status()).isEqualTo("approved");
   assertThat(requestRepository.proofs(tenant,a.id())).anySatisfy(proof->{assertThat(proof.kind()).isEqualTo("supplemental");assertThat(proof.subjectId()).isEqualTo(p.id());assertThat(proof.hash()).isEqualTo(a.hash());});
  }
+ @Test void monthlySupplementSummaryCountsConfirmedUnpaidOnceAndDoesNotRewriteOriginal(){
+  var original=normal("1004");evidence("200","0.50");
+  var before=jdbc.queryForObject("select calculation::text from workforce_pay_batches where id=?",String.class,original.batch().id());
+  var first=action(action(draft("101"),"calculate"),"confirm");
+  assertThat(new PayrollRepository(jdbc,json).latestSupplementalMonth(tenant,employee)).isNull();
+  first=action(first,"publish");assertThat(new PayrollRepository(jdbc,json).latestSupplementalMonth(tenant,employee)).isEqualTo("2026-10");
+  action(draft("101"),"calculate");
+  var summary=supplements().monthSummary(admin,store,company,"2026-10");
+  assertThat(summary.records()).hasSize(1);assertThat(summary.employeeCount()).isEqualTo(1);
+  assertThat(summary.supplementalGross()).isEqualTo("101.00");assertThat(summary.supplementalNet()).isEqualTo("80.00");
+  assertThat(summary.formalGross()).isEqualTo("1105.00");
+  assertThat(summary.formalNet()).isEqualTo(new java.math.BigDecimal(original.calculation().totalNet()).add(new java.math.BigDecimal("80")).setScale(2).toPlainString());
+  assertThat(summary.records().getFirst().id()).isEqualTo(first.batch().id());
+  assertThat(jdbc.queryForObject("select calculation::text from workforce_pay_batches where id=?",String.class,original.batch().id())).isEqualTo(before);
+ }
+
 }

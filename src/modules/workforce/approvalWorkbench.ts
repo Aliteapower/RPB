@@ -1,8 +1,8 @@
 import type {ApprovalRow,ApprovalDetail} from './phaseThreeTypes'
 export type ReviewCategory='all'|'normal'|'manager'|'exception'|'waiting'|'stale'|'current'|'exempt'
-export interface ReviewFilter {from:string;to:string;positionId:string|null;search:string;category:ReviewCategory}
+export interface ReviewFilter {from:string;to:string;positionId:string|null;search:string;category:ReviewCategory;employeeId?:string|null}
 export interface ReviewEntry {row:ApprovalRow;inAt:string|null;outAt:string|null;category:ReviewCategory;canReview:boolean;reviewBlock:string|null;managerEmployee:boolean}
-export interface ReviewBoard {items:ReviewEntry[];total:number;limit:number;offset:number;counts:Record<ReviewCategory,number>;days:{date:string;total:number;current:number;normal:number;waiting:number;exceptions:number;stale:number;managers:number}[];positions:{id:string;name:string}[];timezone:string;eligible:number}
+export interface ReviewBoard {items:ReviewEntry[];total:number;limit:number;offset:number;counts:Record<ReviewCategory,number>;days:{date:string;total:number;current:number;normal:number;waiting:number;exceptions:number;stale:number;managers:number}[];positions:{id:string;name:string}[];timezone:string;eligible:number;employees?:{employeeId:string;employeeName:string;employeeNo:string;records:number;pending:number;scheduledSeconds:number;actualSeconds:number|null;approvedSeconds:number|null}[]}
 export interface ReviewCandidate {scheduleId:string;employeeName:string;employeeNo:string;date:string;expectedVersion:number;sourceFingerprint:string;workSeconds:number;paidLeaveSeconds:number;unpaidLeaveSeconds:number}
 export interface ReviewPreview {items:ReviewCandidate[];workSeconds:number;paidLeaveSeconds:number;unpaidLeaveSeconds:number}
 export interface ReviewOutcome {scheduleId:string;success:boolean;code:string}

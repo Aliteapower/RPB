@@ -3,7 +3,7 @@ import type {ProfileOrigin} from './payrollConfigurationTypes'
 import type {Option} from './types'
 import type {CdacSetting,CdacReview,CdacCalculation} from './cdac'
 export type PayBasis='monthly'|'daily'|'hourly'
-export type ItemKind='ow_allowance'|'ow_additional'|'ow_accommodation'|'reimbursement'|'deduction'|'cdac'|'employer_charge'|'wage_event'
+export type ItemKind='ow_attendance'|'ow_allowance'|'ow_additional'|'ow_accommodation'|'reimbursement'|'deduction'|'cdac'|'employer_charge'|'wage_event'
 export interface PayItem {label:string;kind:ItemKind;amount:string;proration?:'full'|'payable'|null;itemId?:string|null;source?:ItemSource|null;eventEvidence?:WageEventEvidence|null}
 export interface PayGeneration {mode:'manual'|'attendance'|'fixed';workingWeekdays:number[]}
 export interface PayRule {basis:PayBasis;rate:string;dayHours:string;weekHours:string;overtimeEnabled:boolean;overtimeMultiplier:string;items:PayItem[];generation?:PayGeneration|null}

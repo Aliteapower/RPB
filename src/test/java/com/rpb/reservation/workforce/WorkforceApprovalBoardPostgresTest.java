@@ -79,4 +79,22 @@ class WorkforceApprovalBoardPostgresTest extends WorkforceApprovalPostgresTest {
    org.mockito.Mockito.doReturn(com.rpb.reservation.appgate.domain.AppGateDecision.deny("workforce",tenant,store,"workforce.view",reason)).when(gate).evaluate(org.mockito.ArgumentMatchers.any());assertThatThrownBy(()->board.board(admin,store,filter(),50,0)).isInstanceOf(WorkforceException.class);
   }
  }
+ @Test void employeeSummaryUsesWholeRangeNotJustPageAndOnlyValidApprovals(){
+  var shift=shift(store,"none");normal(shift,DATE);normal(shift,DATE.plusDays(1));time.at("2026-11-05T01:00:00Z");
+  var v=board.board(admin,store,filter(),1,0);assertThat(v.employees()).hasSize(1);assertThat(v.employees().getFirst().records()).isEqualTo(2);
+  assertThat(v.employees().getFirst().approvedSeconds()).isNull();assertThat(v.employees().getFirst().actualSeconds()).isEqualTo(16*3600L);
+  assertThat(board.board(admin,store,new Filter(DATE,DATE.plusDays(3),null,"","exception"),1,0).employees()).isEmpty();
+ }
+
+ @Test void employeeDrilldownAndBatchPreviewUseExactIdDespiteSimilarNumbers(){
+  var first=employee;jdbc.update("update workforce_employees set employee_no='E1' where tenant_id=? and id=?",tenant,first);
+  var shift=shift(store,"none");var firstSchedule=normal(shift,DATE);var second=UUID.randomUUID();
+  employees.save(admin,store,second,new WorkforceDtos.EmployeeWrite(0L,"E10","Other E1 Person","","","Service",DATE,null,"active",company,DATE,store,List.of(store),null,null,null));
+  employee=second;var otherSchedule=normal(shift,DATE);employee=first;time.at("2026-10-28T10:00:00Z");
+  var exact=new Filter(DATE,DATE.plusDays(1),null,"E1","all",first);
+  var v=board.board(admin,store,exact,1,0);assertThat(v.items()).hasSize(1);assertThat(v.total()).isEqualTo(1);assertThat(v.eligible()).isEqualTo(1);
+  assertThat(board.preview(admin,store,new Selection(exact,true,List.of(),List.of())).items()).extracting(Candidate::scheduleId).containsExactly(firstSchedule.id());
+  assertThatThrownBy(()->board.preview(admin,store,new Selection(exact,false,List.of(otherSchedule.id()),List.of()))).hasMessage("WORKFORCE_INVALID");
+ }
+
 }

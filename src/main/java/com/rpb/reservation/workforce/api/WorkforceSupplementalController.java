@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 public class WorkforceSupplementalController extends WorkforceEndpointSupport {
  private final SupplementalService service;
  public WorkforceSupplementalController(CurrentActorProvider actors,SupplementalService service){super(actors);this.service=service;}
+ @GetMapping("/supplemental-month-summary") public SupplementalDtos.MonthlySummary summary(@PathVariable UUID storeId,@RequestParam UUID companyId,@RequestParam String month){return service.monthSummary(actor(),storeId,companyId,month);}
  @GetMapping("/supplemental-sources") public SupplementalDtos.SourcePage source(@PathVariable UUID storeId,@RequestParam UUID companyId,@RequestParam UUID employeeId,@RequestParam String month){return service.source(actor(),storeId,companyId,employeeId,month);}
  @GetMapping("/supplemental-batches") public List<SupplementalDtos.Batch> list(@PathVariable UUID storeId,@RequestParam UUID companyId){return service.list(actor(),storeId,companyId);}
  @GetMapping("/supplemental-batches/{id}") public SupplementalDtos.Detail detail(@PathVariable UUID storeId,@PathVariable UUID id){return service.detail(actor(),storeId,id);}

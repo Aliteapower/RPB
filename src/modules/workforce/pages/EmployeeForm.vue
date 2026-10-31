@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {usePayrollReturn} from '../payrollReturn'
+const payrollReturn=usePayrollReturn()
 import {computed,onMounted,ref} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useWorkforce} from '../context'
@@ -21,7 +23,7 @@ const {d}=useDocumentText(),{j}=usePositionText(),positions=ref<Position[]>([]),
 const employmentSummary=computed(()=>draft.value?[positions.value.find(p=>p.id===draft.value!.positionId)?.name||ee('unassigned'),t(draft.value.status),draft.value.enabled===false?d('disabled'):d('enabled')].join(' · '):'')
 function revealInvalid(event:Event){let section=(event.target as HTMLElement)?.closest<HTMLDetailsElement>('details');while(section){section.open=true;section=section.parentElement?.closest<HTMLDetailsElement>('details')||null}}
 onMounted(async()=>{try{const e=existing?await api().get<Employee>(`/employees/${id}`):undefined;if(!current())return;editable.value=e?.editable??true;linked.value=!!e?.accountId;if(editable.value&&home.value?.employeeManage){const options=await api().get<Position[]>('/positions');if(!current())return;positions.value=options;originalPosition.value=e?.positionId??null;draft.value=employeeDraft(home.value,store.value,e);draft.value.positionId=e?.positionId??null}}catch(e){if(current())failure.value=error(e)}finally{if(current())loading.value=false}})
-async function save(){if(!draft.value||busy.value)return;busy.value=true;failure.value='';try{const c={...draft.value,birthDate:draft.value.birthDate||null,companyEffectiveDate:existing?draft.value.companyEffectiveDate:draft.value.hireDate};await api().put(`/employees/${id}`,c);if(current())await router.push(existing?`/stores/${store.value}/workforce/employees`:`/stores/${store.value}/workforce/employees/${id}/edit`)}catch(e){if(current())failure.value=e instanceof WorkforceApiError&&e.code==='WORKFORCE_POSITION_UNAVAILABLE'?j('unavailable'):e instanceof WorkforceApiError&&e.code==='WORKFORCE_HIRE_DATE_IN_USE'?d('hireInUse'):error(e)}finally{if(current())busy.value=false}}
+async function save(){if(!draft.value||busy.value)return;busy.value=true;failure.value='';try{const c={...draft.value,birthDate:draft.value.birthDate||null,companyEffectiveDate:existing?draft.value.companyEffectiveDate:draft.value.hireDate};await api().put(`/employees/${id}`,c);if(current())await router.push(payrollReturn.value||(existing?`/stores/${store.value}/workforce/employees`:`/stores/${store.value}/workforce/employees/${id}/edit`))}catch(e){if(current())failure.value=e instanceof WorkforceApiError&&e.code==='WORKFORCE_POSITION_UNAVAILABLE'?j('unavailable'):e instanceof WorkforceApiError&&e.code==='WORKFORCE_HIRE_DATE_IN_USE'?d('hireInUse'):error(e)}finally{if(current())busy.value=false}}
 </script>
 <template>
  <div class="wf-panel employee-editor">
@@ -53,7 +55,7 @@ async function save(){if(!draft.value||busy.value)return;busy.value=true;failure
      </EmployeeTaskSection>
      <EmployeeTaskSection v-if="!linked" :title="ee('account')" :description="ee('accountHint')" data-employee-task="account"><EmployeeAccountFields :draft="draft" :accounts="home?.accounts||[]"/></EmployeeTaskSection>
     </fieldset>
-    <footer class="wf-form-actions employee-savebar"><p class="wf-hint">{{ee('saveHint')}}</p><div class="wf-inline"><RouterLink class="wf-button" :to="`/stores/${store}/workforce/employees`">{{t('cancel')}}</RouterLink><button class="primary" :disabled="busy">{{busy?t('saving'):ee('save')}}</button></div></footer>
+    <footer class="wf-form-actions employee-savebar"><p class="wf-hint">{{ee('saveHint')}}</p><div class="wf-inline"><RouterLink class="wf-button" :to="payrollReturn||`/stores/${store}/workforce/employees`">{{t('cancel')}}</RouterLink><button class="primary" :disabled="busy">{{busy?t('saving'):ee('save')}}</button></div></footer>
    </form>
    <template v-if="existing"><h3 class="employee-other-title">{{ee('more')}}</h3>
     <EmployeeTaskSection v-if="linked" :title="ee('login')" :description="ee('loginHint')" lazy data-employee-task="login"><EmployeeLoginSettings :employee-id="id" embedded/></EmployeeTaskSection>

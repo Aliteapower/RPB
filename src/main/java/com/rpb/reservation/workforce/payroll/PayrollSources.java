@@ -13,9 +13,10 @@ import org.springframework.stereotype.Service;
 /** Captures the complete company/month, including unapproved rows; never silently drops a liability. */
 @Service
 public class PayrollSources {
- public record CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays,EffectiveSources governance,com.rpb.reservation.workforce.statutory.annual.AnnualWageDtos.Context annual){public CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays,EffectiveSources governance){this(employee,profile,input,sources,issues,specialDays,governance,null);}public CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays){this(employee,profile,input,sources,issues,specialDays,null);}}
+ public record CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays,EffectiveSources governance,com.rpb.reservation.workforce.statutory.annual.AnnualWageDtos.Context annual,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String attendanceBonusStatus){public CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays,EffectiveSources governance,com.rpb.reservation.workforce.statutory.annual.AnnualWageDtos.Context annual){this(employee,profile,input,sources,issues,specialDays,governance,annual,null);}public CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays,EffectiveSources governance){this(employee,profile,input,sources,issues,specialDays,governance,null);}public CapturedLine(Employee employee,PayProfile profile,LineInput input,List<SourceRef> sources,List<String> issues,boolean specialDays){this(employee,profile,input,sources,issues,specialDays,null);}}
  public record Assumptions(UUID requestId,long revision,String hash,List<PayProfile> profiles,Map<UUID,LineInput> monthlyOverrides){}
- public record Capture(String fingerprint,PayrollRepository.CompanyInfo company,List<CapturedLine> lines,Set<UUID> stores,com.rpb.reservation.workforce.statutory.StatutoryPolicies.Policy statutoryPolicy){}
+ public record SegmentSdlContext(String individual,String recognised,boolean policyCurrent){}
+ public record Capture(String fingerprint,PayrollRepository.CompanyInfo company,List<CapturedLine> lines,Set<UUID> stores,com.rpb.reservation.workforce.statutory.StatutoryPolicies.Policy statutoryPolicy,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) SegmentSdlContext segmentSdl){public Capture(String fingerprint,PayrollRepository.CompanyInfo company,List<CapturedLine> lines,Set<UUID> stores,com.rpb.reservation.workforce.statutory.StatutoryPolicies.Policy policy){this(fingerprint,company,lines,stores,policy,null);}}
  private final PayrollRepository repository;private final PayrollConfigurationRepository configs;private final WorkforceEmployeeRepository employees;private final SchedulingRepository schedules;private final ApprovalRepository approvals;private final ApprovalSources sources;private final WorkforceJson json;
  private final com.rpb.reservation.workforce.workmode.WorkModeResolver workModes;
  public PayrollSources(PayrollRepository repository,PayrollConfigurationRepository configs,WorkforceEmployeeRepository employees,SchedulingRepository schedules,ApprovalRepository approvals,ApprovalSources sources,WorkforceJson json){this(repository,configs,employees,schedules,approvals,sources,json,null);}
@@ -26,11 +27,17 @@ public class PayrollSources {
  public Capture captureAssuming(UUID tenant,UUID company,YearMonth month,List<LineInput> inputs,Assumptions assumptions){
   Objects.requireNonNull(assumptions);var r=configs.effective().assumption(tenant,company,month,assumptions);return captureEffective(tenant,company,month,inputs,assumptions);
  }
- private Capture captureEffective(UUID tenant,UUID company,YearMonth month,List<LineInput> inputs,Assumptions hypothetical){
+ public Capture captureSegment(UUID tenant,UUID company,UUID employee,YearMonth month,LocalDate cutoff){return captureEffective(tenant,company,month,List.of(),null,employee,cutoff);}
+ private Capture captureEffective(UUID tenant,UUID company,YearMonth month,List<LineInput> inputs,Assumptions hypothetical){return captureEffective(tenant,company,month,inputs,hypothetical,null,null);}
+ public Capture captureIncludingSegments(UUID tenant,UUID company,YearMonth month){return captureEffective(tenant,company,month,List.of(),null,null,null,true);}
+ private Capture captureEffective(UUID tenant,UUID company,YearMonth month,List<LineInput> inputs,Assumptions hypothetical,UUID segmentEmployee,LocalDate cutoff){return captureEffective(tenant,company,month,inputs,hypothetical,segmentEmployee,cutoff,false);}
+ private Capture captureEffective(UUID tenant,UUID company,YearMonth month,List<LineInput> inputs,Assumptions hypothetical,UUID segmentEmployee,LocalDate cutoff,boolean includeSettled){
   var assumptions=hypothetical==null?List.<PayProfile>of():hypothetical.profiles();
   var statutoryPolicy=repository.statutoryPolicy(tenant,month);
-  LocalDate from=month.atDay(1),context=from.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),to=month.atEndOfMonth();
-  var ids=repository.employeeIds(tenant,company,month);if(ids.size()>500)throw new WorkforceException("WORKFORCE_PAYROLL_UNSUPPORTED",400);
+  LocalDate from=month.atDay(1),context=from.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),to=cutoff==null?month.atEndOfMonth():cutoff;
+  var segmentRows=segmentEmployee==null&&!includeSettled?repository.segmentFormal(tenant,company,month):List.<com.rpb.reservation.workforce.payroll.segment.SegmentRepository.State>of();
+  var settledIds=segmentRows.stream().map(com.rpb.reservation.workforce.payroll.segment.SegmentRepository.State::employee).collect(java.util.stream.Collectors.toSet());
+  var ids=repository.employeeIds(tenant,company,month).stream().filter(id->segmentEmployee==null?!settledIds.contains(id):id.equals(segmentEmployee)).toList();if(ids.size()>500)throw new WorkforceException("WORKFORCE_PAYROLL_UNSUPPORTED",400);
   var records=repository.scheduleIds(tenant,company,context,to);if(records.size()>10000)throw new WorkforceException("WORKFORCE_PAYROLL_UNSUPPORTED",400);
   var governanceContext=configs.effective().context(tenant,company,month);var invalidProfiles=new HashSet<UUID>();var proofs=new HashMap<UUID,com.rpb.reservation.workforce.payroll.governance.EffectivePayGovernance.Evidence>();var actualPlans=new ArrayList<PayProfile>();
   for(var p:configs.profiles(tenant,company)){var proof=governanceContext.profile(p);if(proof==null){if(!p.effectiveFrom().isAfter(to))invalidProfiles.add(p.employeeId());}else{actualPlans.add(p);proofs.put(p.id(),proof);}}
@@ -43,7 +50,7 @@ public class PayrollSources {
   // Load projections once, then retain the original records/employee iteration order for hashing.
   var scoped=new HashMap<UUID,SchedulingRepository.ScopedSchedule>();schedules.scoped(tenant,records).forEach(s->scoped.put(s.schedule().id(),s));
   var selectedRecords=new ArrayList<UUID>();var byStore=new LinkedHashMap<UUID,List<Schedule>>();
-  for(var id:records){var entry=Objects.requireNonNull(scoped.get(id));var s=entry.schedule();var selected=currentPlans.get(s.employeeId());if(selected!=null&&PayrollGeneration.fixed(selected.rule()))continue;
+  for(var id:records){var entry=Objects.requireNonNull(scoped.get(id));var s=entry.schedule();if(segmentEmployee!=null&&!s.employeeId().equals(segmentEmployee)||segmentEmployee==null&&settledIds.contains(s.employeeId()))continue;var selected=currentPlans.get(s.employeeId());if(selected!=null&&PayrollGeneration.fixed(selected.rule())&&!FullAttendanceBonus.configured(selected))continue;
    if(s.workDate().isBefore(from)){var plan=plansByEmployee.getOrDefault(s.employeeId(),List.of()).stream().max(Comparator.comparing(PayProfile::effectiveFrom)).orElse(null);if(!employeeIds.contains(s.employeeId())||plan==null||!plan.rule().overtimeEnabled())continue;}
    selectedRecords.add(id);stores.add(entry.store());byStore.computeIfAbsent(entry.store(),k->new ArrayList<>()).add(s);
   }
@@ -60,7 +67,7 @@ public class PayrollSources {
    if(payable&&row.workSeconds()>0&&source.calendar().stream().anyMatch(c->c.enabled()))special.add(s.employeeId());
    boolean valid=latest!=null&&!row.requiresReview()&&row.issues().isEmpty();
    var session=source.session();var eventIds=row.findings()==null?List.<String>of():row.findings().stream().filter(f->Set.of("LATE","EARLY","BREAK_OVER","MISSING").contains(f.code())).map(f->id+":"+f.code()).toList();
-   var evidence=new SourceEvidence(row.workSeconds(),latest==null?"missing":valid?"current":"stale",valid?latest.workSeconds():null,session==null?null:session.inAt(),session==null?null:session.outAt(),eventIds);
+   var evidence=new SourceEvidence(row.workSeconds(),latest==null?"missing":valid?"current":"stale",valid?latest.workSeconds():null,session==null?null:session.inAt(),session==null?null:session.outAt(),eventIds,FullAttendanceBonus.configured(currentPlans.get(s.employeeId()))?row.fullAttendanceStatus():null);
    refs.computeIfAbsent(s.employeeId(),x->new ArrayList<>()).add(new SourceRef(id,shop,s.workDate(),latest==null?0:latest.version(),row.sourceFingerprint(),valid?latest.workSeconds():0,valid?latest.paidLeaveSeconds():0,valid?latest.unpaidLeaveSeconds():0,payable,evidence));
   }
   var result=new ArrayList<CapturedLine>();var employeeTokens=new ArrayList<Employee>();var evidenceTokens=new ArrayList<Object>();
@@ -85,7 +92,7 @@ public class PayrollSources {
    var effectiveSources=new EffectiveSources(profile==null?null:proofs.get(profile.id()),inputProof);var list=refs.getOrDefault(id,List.of());
    if(profile!=null&&PayrollGeneration.automatic(profile.rule())){
     evidenceTokens.add(List.of(id,periods));if(periods.size()>1)issues.add("PROFILE_MULTIPLE");
-    var generated=PayrollGeneration.generate(profile.rule(),input,list,month,periods.isEmpty()?null:periods.getFirst().from(),periods.isEmpty()?null:periods.getLast().to());input=generated.input();issues.addAll(generated.issues());
+    var generated=PayrollGeneration.generate(profile.rule(),input,list,month,periods.isEmpty()?null:periods.getFirst().from(),periods.isEmpty()?null:(periods.getLast().to().isAfter(to)?to:periods.getLast().to()));input=generated.input();issues.addAll(generated.issues());
    }
    if(workModes!=null&&profile!=null){var history=modeAssignments.getOrDefault(id,List.of()).stream().filter(a->!a.effectiveFrom().isAfter(to)).toList();if(!history.isEmpty()){
     evidenceTokens.add(List.of("work-mode",id,history));var companyPeriods=periods.isEmpty()?employment.periods().getOrDefault(id,List.of()):periods;
@@ -93,10 +100,10 @@ public class PayrollSources {
    }}
    configs.annual().opening(tenant,company,id,month).ifPresent(opening->{issues.add(com.rpb.reservation.workforce.statutory.annual.AnnualWageRepository.OPENING_PAYROLL_CONFLICT);evidenceTokens.add(List.of("annual-opening",id,opening));});
    var annual=input.items().stream().anyMatch(i->i.eventEvidence()!=null&&i.eventEvidence().classification().equals("AW"))&&profile!=null&&!"foreign".equals(profile.cpf().citizenship())?(hypothetical==null?configs.annual().captureForPayroll(tenant,company,id,month):configs.annual().captureForPayrollAssuming(tenant,company,id,month,hypothetical)):null;
-   result.add(new CapturedLine(e,profile,input,List.copyOf(list),List.copyOf(issues),special.contains(id),effectiveSources,annual));
+   result.add(new CapturedLine(e,profile,input,List.copyOf(list),List.copyOf(issues),special.contains(id),effectiveSources,annual,FullAttendanceBonus.configured(profile)?FullAttendanceBonus.status(list,month,to):null));
   }
-  var companyInfo=repository.company(tenant,company);Object policyToken=statutoryPolicy==null?"STATUTORY_POLICY_MISSING":statutoryPolicy;var raw=new ArrayList<Object>(List.of(policyToken,companyInfo,month.toString(),employeeTokens,plans,tokens,inputs,result));if(!evidenceTokens.isEmpty())raw.add(evidenceTokens);if(hypothetical!=null)raw.add(hypothetical);
-  return new Capture(hash(json.write(raw)),companyInfo,List.copyOf(result),Collections.unmodifiableSet(stores),statutoryPolicy);
+  var companyInfo=repository.company(tenant,company);Object policyToken=statutoryPolicy==null?"STATUTORY_POLICY_MISSING":statutoryPolicy;var raw=new ArrayList<Object>(List.of(policyToken,companyInfo,month.toString(),employeeTokens,plans,tokens,inputs,result));if(!evidenceTokens.isEmpty())raw.add(evidenceTokens);if(hypothetical!=null)raw.add(hypothetical);var segmentSdl=segmentRows.isEmpty()?null:repository.segmentSdl(tenant,company,month);if(!segmentRows.isEmpty())raw.add(List.of(segmentRows,segmentSdl));if(segmentEmployee!=null)raw.add(List.of("segment",segmentEmployee,to));
+  return new Capture(hash(json.write(raw)),companyInfo,List.copyOf(result),Collections.unmodifiableSet(stores),statutoryPolicy,segmentSdl);
  }
  public static LineInput defaultInput(UUID employee){return new LineInput(employee,0,null,null,false,false,List.of(),"");}
  /** Persist only review metadata when the client echoes generated facts; never hide arbitrary units. */

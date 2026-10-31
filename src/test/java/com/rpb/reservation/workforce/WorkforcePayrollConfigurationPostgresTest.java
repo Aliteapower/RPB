@@ -179,4 +179,34 @@ class WorkforcePayrollConfigurationPostgresTest extends WorkforcePostgresTest {
         assertThat(approvedProfile(admin,store,id,command)).isEqualTo(saved);assertThat(configuration.findProfile(tenant,id).orElseThrow()).isEqualTo(saved);
         verify(logs,times(1)).append(any(com.rpb.reservation.common.scope.StoreScope.class),any());
     }
+    @Test void basisSpecificDefaultsCoexistAndDisabledDoesNotResurrectLegacy() {
+        var defaults=proxy(new PositionSalaryDefaultsService(access,payrollAccess,configuration,repository,new com.rpb.reservation.workforce.positions.PositionRepository(jdbc),new WorkforceAudit(logs,new ObjectMapper().findAndRegisterModules())));
+        assertThat(defaults.options(admin,store,company)).isNotEmpty();
+        var h=template();var m=legacyTemplate("Monthly",new Rule("monthly","2500.00","8.00","44.00",false,"1.50",List.of()));
+        var pos=repository.find(tenant,employee).orElseThrow().positionId();var date=LocalDate.of(2026,10,1);
+        var old=defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date,h.id(),true));
+        assertThat(defaults.preview(admin,store,company,employee,date,null,"hourly").template().id()).isEqualTo(h.id());
+        assertThat(defaults.preview(admin,store,company,employee,date,null,"monthly").template()).isNull();
+        var md=defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date,m.id(),true,"monthly"));
+        var hd=defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date,h.id(),false,"hourly"));
+        assertThat(defaults.preview(admin,store,company,employee,date,null,"monthly").defaultMapping()).isEqualTo(md);
+        assertThat(defaults.preview(admin,store,company,employee,date,null,"hourly").template()).isNull();
+        assertThat(defaults.preview(admin,store,company,employee,date,null).defaultMapping()).isEqualTo(old);
+        assertThatThrownBy(()->defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date,h.id(),true,"monthly"))).hasMessage("WORKFORCE_INVALID");
+        assertThat(defaults.list(admin,store,company,pos,"hourly")).containsExactly(hd);
+        defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date.plusMonths(1),h.id(),true,"hourly"));
+        assertThat(defaults.preview(admin,store,company,employee,date,null,"hourly").template()).isNull();
+        assertThat(defaults.preview(admin,store,company,employee,date.plusMonths(1),null,"hourly").template().id()).isEqualTo(h.id());
+    }
+
+    @Test void newBasisPreviewCannotSubmitLegacyFallbackAfterANewDefaultTakesOver(){
+        var defaults=proxy(new PositionSalaryDefaultsService(access,payrollAccess,configuration,repository,new com.rpb.reservation.workforce.positions.PositionRepository(jdbc),new WorkforceAudit(logs,new ObjectMapper().findAndRegisterModules())));
+        var t=template();var pos=repository.find(tenant,employee).orElseThrow().positionId();var date=LocalDate.of(2026,10,1);
+        var legacy=defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date,t.id(),true));
+        assertThat(defaults.preview(admin,store,company,employee,date,null,"hourly").defaultMapping().id()).isEqualTo(legacy.id());
+        defaults.save(admin,store,UUID.randomUUID(),new DefaultWrite(0L,company,pos,date,t.id(),false,"hourly"));
+        var c=new ProfileWrite(0L,company,employee,date,t.id(),t.rule(),cpf(),null,new CdacProfile("not_applicable","explicit"),t.version(),legacy.id(),legacy.version(),"hourly");
+        assertThatThrownBy(()->payroll.saveProfile(admin,store,UUID.randomUUID(),c)).hasMessage("WORKFORCE_CONFLICT");
+    }
+
 }

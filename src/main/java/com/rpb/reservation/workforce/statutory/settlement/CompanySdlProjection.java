@@ -19,6 +19,7 @@ public final class CompanySdlProjection {
  public CompanySdl read(UUID tenant,UUID company,YearMonth month,UUID proposedEmployee,BigDecimal addedGross){
   var saved=saved(tenant,company,month);var payroll=new PayrollRepository(jdbc,json);var b=payroll.forMonth(tenant,company,month).orElse(null);var ids=new LinkedHashSet<UUID>();String base=null;var issues=new ArrayList<String>();
   if(b!=null&&Set.of("confirmed","published").contains(b.status())&&b.calculation()!=null){b.calculation().lines().forEach(l->ids.add(l.employeeId()));base=b.calculation().totalSdl();}
+  var segmentRows=new com.rpb.reservation.workforce.payroll.segment.SegmentRepository(jdbc,json).formal(tenant,company,month);if(!segmentRows.isEmpty()){segmentRows.forEach(v->ids.add(v.employee()));var segmentSdl=segmentRows.stream().map(v->number(v.calculation().companySdlDelta())).reduce(BigDecimal.ZERO,BigDecimal::add);base=money((base==null?BigDecimal.ZERO:number(base)).add(segmentSdl));}
   var normalIds=Set.copyOf(ids);
   if(saved.evidence()!=null){ids.addAll(saved.evidence().employeeIds());if(base==null)base=saved.evidence().recognisedSdl();}
   ids.addAll(jdbc.queryForList("select distinct employee_id from workforce_supplemental_batches where tenant_id=? and company_id=? and origin_month=? and status in ('confirmed','published')",UUID.class,tenant,company,month.atDay(1)));

@@ -20,6 +20,7 @@ public class WorkforcePayrollController extends WorkforceEndpointSupport {
  @PutMapping("/payroll-batches/{id}/inputs/{employeeId}") public BatchDetail input(@PathVariable UUID storeId,@PathVariable UUID id,@PathVariable UUID employeeId,@RequestBody InputWrite c){return batches.input(actor(),storeId,id,employeeId,c);}
  @PutMapping("/payroll-batches/{id}/actions/{commandId}") public BatchDetail action(@PathVariable UUID storeId,@PathVariable UUID id,@PathVariable UUID commandId,@RequestBody ActionWrite c){return batches.action(actor(),storeId,id,commandId,c);}
  @PutMapping("/payroll-batches/{id}/payments/{paymentId}") public BatchDetail payment(@PathVariable UUID storeId,@PathVariable UUID id,@PathVariable UUID paymentId,@RequestBody PaymentWrite c){return payments.register(actor(),storeId,id,paymentId,c);}
+ @GetMapping("/my-latest-payslip") public LatestPayslip latest(@PathVariable UUID storeId){return slips.latest(actor(),storeId);}
  @GetMapping("/my-payslips") public List<PayslipSummary> mine(@PathVariable UUID storeId,@RequestParam int year){return slips.mine(actor(),storeId,year);}
  @GetMapping("/my-payslips/{id}") public Payslip mine(@PathVariable UUID storeId,@PathVariable UUID id){return slips.mineDetail(actor(),storeId,id);}
  @GetMapping("/payroll-batches/{id}/payslips/{employeeId}") public Payslip preview(@PathVariable UUID storeId,@PathVariable UUID id,@PathVariable UUID employeeId){return slips.preview(actor(),storeId,id,employeeId);}

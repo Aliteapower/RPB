@@ -3,7 +3,7 @@ import type {PayItem,Payment} from './payrollTypes'
 import type {CdacSetting,CdacReview} from './cdac'
 import {storeToday} from './time'
 
-export interface SupplementalSource {kind:'normal'|'opening'|'employment-zero';batchId:string|null;openingVersion:number|null;snapshotHash:string}
+export interface SupplementalSource {kind:'normal'|'segment'|'opening'|'employment-zero';batchId:string|null;openingVersion:number|null;snapshotHash:string}
 export interface SupplementalSourcePage {companyId:string;employeeId:string;month:string;source:SupplementalSource|null;grossPay:string|null;originalCashRemaining:string|null;issues:string[]}
 export interface SupplementalProposal {id:string;originMonth:string;settlementMonth:string;source:SupplementalSource;items:PayItem[];evidenceReference:string}
 export interface StatutoryBalance {target:string|null;recognised:string|null;deducted:string|null;remitted:string|null;liabilityDelta:string|null;deductionDelta:string|null;remittanceBalance:string|null}
@@ -39,4 +39,4 @@ export function settlementIssue(code:string,en=false):string{
  return labels[code]?.[en?1:0]||code
 }
 
-export const supplementalSourceName=(kind:string,en=false)=>({normal:en?'Published original payroll':'已发布原工资',opening:en?'Actual opening revision':'外部实际修订','employment-zero':en?'Evidenced zero payroll after employment ended':'离职后原期有凭证零工资'}[kind]||kind)
+export const supplementalSourceName=(kind:string,en=false)=>({segment:en?'Independent formal settlement':'独立正式结薪',normal:en?'Published original payroll':'已发布原工资',opening:en?'Actual opening revision':'外部实际修订','employment-zero':en?'Evidenced zero payroll after employment ended':'离职后原期有凭证零工资'}[kind]||kind)

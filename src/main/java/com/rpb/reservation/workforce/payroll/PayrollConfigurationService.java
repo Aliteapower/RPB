@@ -66,14 +66,16 @@ public class PayrollConfigurationService {
             if(!template.enabled())throw WorkforceException.invalid();
             PositionSalaryDefault mapping=null;
             if(c.defaultMappingId()!=null){
+                if(c.defaultBasis()!=null&&!c.defaultBasis().equals(template.rule().basis()))throw WorkforceException.invalid();
                 repository.lock(c.defaultMappingId());mapping=repository.findDefault(actor.tenantId(),c.defaultMappingId()).orElseThrow(WorkforceException::missing);
                 if(c.expectedDefaultVersion()==null||mapping.version()!=c.expectedDefaultVersion())throw WorkforceException.conflict();
+                if(mapping.basis()!=null&&!mapping.basis().equals(template.rule().basis()))throw WorkforceException.invalid();
                 if(!mapping.enabled()||!mapping.companyId().equals(c.companyId())||!mapping.positionId().equals(employee.positionId())||!mapping.templateId().equals(template.id())||mapping.effectiveFrom().isAfter(c.effectiveFrom()))throw WorkforceException.invalid();
-                var applicable=repository.defaults(actor.tenantId(),c.companyId(),employee.positionId()).stream().filter(d->!d.effectiveFrom().isAfter(c.effectiveFrom())).reduce((a,b)->b).orElse(null);
+                var applicable=repository.applicableDefault(actor.tenantId(),c.companyId(),employee.positionId(),c.defaultBasis()!=null?c.defaultBasis():mapping.basis(),c.effectiveFrom());
                 if(applicable==null||!applicable.id().equals(mapping.id()))throw WorkforceException.conflict();
-            }else if(c.expectedDefaultVersion()!=null)throw WorkforceException.invalid();
+            }else if(c.expectedDefaultVersion()!=null||c.defaultBasis()!=null)throw WorkforceException.invalid();
             origin=new ProfileOrigin(template.name(),template.rule(),mapping==null?null:mapping.id(),mapping==null?null:mapping.version());templateVersion=template.version();
-        }else {if(c.defaultMappingId()!=null||c.expectedDefaultVersion()!=null)throw WorkforceException.invalid();if(old!=null&&!old.templateId().equals(template.id())){origin=null;templateVersion=template.version();}}
+        }else {if(c.defaultMappingId()!=null||c.expectedDefaultVersion()!=null||c.defaultBasis()!=null)throw WorkforceException.invalid();if(old!=null&&!old.templateId().equals(template.id())){origin=null;templateVersion=template.version();}}
         var next=new PayProfile(id,c.companyId(),employee.id(),employee.name(),c.effectiveFrom(),template.id(),templateVersion,rule,cpf,c.expectedVersion()+1,payment,cdac,origin);
         repository.effective().directProfile(actor.tenantId(),store,next);repository.saveProfile(actor.tenantId(),next);audit.changed(actor,store,"pay-profile.save",id,old,next);return next;
     }

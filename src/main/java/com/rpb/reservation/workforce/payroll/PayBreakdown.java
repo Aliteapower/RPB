@@ -7,7 +7,7 @@ public final class PayBreakdown {
  public record Values(String basic,String overtime,String additional,String allowance,String accommodation,String reimbursements,String otherDeductions,String cdac,String employeeCpf,String employerCpf,String sdl,String employerCharges,String gross,String net,String employerCost,List<Component> items){}
  public static Values of(PayrollLine l){
   var items=l.components()==null?List.<Component>of():l.components();
-  return new Values(l.basicPay(),l.overtimePay(),amount(items,"ow_additional","wage_event"),amount(items,"ow_allowance"),amount(items,"ow_accommodation"),l.reimbursements(),amount(items,"deduction"),amount(items,"cdac"),l.employeeCpf(),l.employerCpf(),l.sdl(),l.employerCharges(),l.grossPay(),l.netPay(),money(add(l.grossPay(),l.reimbursements(),l.employerCpf(),l.sdl(),l.employerCharges())),List.copyOf(items));
+  return new Values(l.basicPay(),l.overtimePay(),amount(items,"ow_additional","wage_event"),amount(items,"ow_allowance","ow_attendance"),amount(items,"ow_accommodation"),l.reimbursements(),amount(items,"deduction"),amount(items,"cdac"),l.employeeCpf(),l.employerCpf(),l.sdl(),l.employerCharges(),l.grossPay(),l.netPay(),money(add(l.grossPay(),l.reimbursements(),l.employerCpf(),l.sdl(),l.employerCharges())),List.copyOf(items));
  }
  public static Values of(PayrollSnapshot snapshot){var v=sum(snapshot.lines().stream().map(PayBreakdown::of).toList());return new Values(v.basic(),v.overtime(),v.additional(),v.allowance(),v.accommodation(),v.reimbursements(),v.otherDeductions(),v.cdac(),v.employeeCpf(),v.employerCpf(),snapshot.totalSdl(),v.employerCharges(),snapshot.totalGross(),snapshot.totalNet(),snapshot.totalEmployerCost(),v.items());}
  public static Values sum(Collection<Values> rows){

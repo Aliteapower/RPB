@@ -37,7 +37,7 @@ function switchStore(e:Event){void router.push(`/stores/${encodeURIComponent((e.
    <RouterLink class="wf-button wf-management-return" :to="managementNav.backTo">{{managementNav.backLabel}}</RouterLink>
    <nav :aria-label="managementNav.ariaLabel"><ol><li v-for="crumb in managementNav.crumbs" :key="crumb.label"><RouterLink v-if="crumb.to" :to="crumb.to">{{crumb.label}}</RouterLink><span v-else aria-current="page">{{crumb.label}}</span></li></ol></nav>
   </div>
-  <RouterView :key="`${store}:${route.fullPath}`"/>
+  <RouterView :key="`${store}:${route.name==='workforce-payroll'?route.path:route.fullPath}`"/>
  </template>
 </main></template>
 <style scoped>

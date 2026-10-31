@@ -29,8 +29,25 @@ public class PayrollConfigurationRepository {
     public void lockSubject(UUID tenant,UUID company,UUID employee){new com.rpb.reservation.workforce.payroll.governance.PayChangeRepository(jdbc,json).lock("subject:"+tenant+":"+company+":"+employee);}
     public void lockDefaults(UUID tenant,UUID company){jdbc.queryForObject("select pg_advisory_xact_lock(hashtextextended(?,0))",Object.class,"workforce.pay.defaults:"+tenant+":"+company);}
     public List<PositionSalaryDefault> defaults(UUID tenant,UUID company,UUID position){return jdbc.query("select snapshot from workforce_position_salary_defaults where tenant_id=? and company_id=? and position_id=? order by effective_from,id",(r,n)->json.read(r.getString(1),PositionSalaryDefault.class),tenant,company,position);}
-    public Optional<PositionSalaryDefault> findDefault(UUID tenant,UUID id){return jdbc.query("select snapshot from workforce_position_salary_defaults where tenant_id=? and id=?",(r,n)->json.read(r.getString(1),PositionSalaryDefault.class),tenant,id).stream().findFirst();}
+    public List<PositionSalaryDefault> defaults(UUID tenant,UUID company,UUID position,String basis){
+        if(basis==null)return defaults(tenant,company,position);
+        return jdbc.query("select snapshot from workforce_position_basis_salary_defaults where tenant_id=? and company_id=? and position_id=? and basis=? order by effective_from,id",(r,n)->json.read(r.getString(1),PositionSalaryDefault.class),tenant,company,position,basis);
+    }
+    public PositionSalaryDefault applicableDefault(UUID tenant,UUID company,UUID position,String basis,LocalDate on){
+        var current=defaults(tenant,company,position,basis).stream().filter(d->!d.effectiveFrom().isAfter(on)).reduce((a,b)->b).orElse(null);
+        if(current!=null||basis==null)return current;
+        var legacy=defaults(tenant,company,position).stream().filter(d->!d.effectiveFrom().isAfter(on)).reduce((a,b)->b).orElse(null);
+        return legacy!=null&&findTemplate(tenant,legacy.templateId()).map(t->basis.equals(t.rule().basis())).orElse(false)?legacy:null;
+    }
+    public Optional<PositionSalaryDefault> findDefault(UUID tenant,UUID id){
+        var rows=jdbc.query("select snapshot from workforce_position_salary_defaults where tenant_id=? and id=? union all select snapshot from workforce_position_basis_salary_defaults where tenant_id=? and id=?",(r,n)->json.read(r.getString(1),PositionSalaryDefault.class),tenant,id,tenant,id);
+        if(rows.size()>1)throw WorkforceException.conflict();return rows.stream().findFirst();
+    }
     public void saveDefault(UUID tenant,PositionSalaryDefault d){
+        if(d.basis()!=null){
+            int changed=jdbc.update("insert into workforce_position_basis_salary_defaults(id,tenant_id,company_id,position_id,basis,effective_from,template_id,template_version,enabled,version,snapshot) values(?,?,?,?,?,?,?,?,?,?,?::jsonb) on conflict(id) do update set template_id=excluded.template_id,template_version=excluded.template_version,enabled=excluded.enabled,version=excluded.version,snapshot=excluded.snapshot,updated_at=now() where workforce_position_basis_salary_defaults.tenant_id=excluded.tenant_id and workforce_position_basis_salary_defaults.company_id=excluded.company_id and workforce_position_basis_salary_defaults.position_id=excluded.position_id and workforce_position_basis_salary_defaults.basis=excluded.basis and workforce_position_basis_salary_defaults.effective_from=excluded.effective_from and workforce_position_basis_salary_defaults.version+1=excluded.version",d.id(),tenant,d.companyId(),d.positionId(),d.basis(),d.effectiveFrom(),d.templateId(),d.templateVersion(),d.enabled(),d.version(),json.write(d));
+            if(changed!=1)throw WorkforceException.conflict();return;
+        }
         int changed=jdbc.update("insert into workforce_position_salary_defaults(id,tenant_id,company_id,position_id,effective_from,template_id,template_version,enabled,version,snapshot) values(?,?,?,?,?,?,?,?,?,?::jsonb) on conflict(id) do update set template_id=excluded.template_id,template_version=excluded.template_version,enabled=excluded.enabled,version=excluded.version,snapshot=excluded.snapshot,updated_at=now() where workforce_position_salary_defaults.tenant_id=excluded.tenant_id and workforce_position_salary_defaults.company_id=excluded.company_id and workforce_position_salary_defaults.position_id=excluded.position_id and workforce_position_salary_defaults.effective_from=excluded.effective_from",d.id(),tenant,d.companyId(),d.positionId(),d.effectiveFrom(),d.templateId(),d.templateVersion(),d.enabled(),d.version(),json.write(d));
         if(changed!=1)throw WorkforceException.conflict();
     }
@@ -83,8 +100,8 @@ public class PayrollConfigurationRepository {
     }
     public boolean lockedProfile(UUID tenant,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("""
         select exists(select 1 from workforce_pay_batches b cross join lateral jsonb_array_elements(coalesce(b.calculation->'lines','[]'::jsonb)) l
-        where b.tenant_id=? and b.status in ('confirmed','published') and l->'profile'->>'id'=? )
-        """,Boolean.class,tenant,id.toString()));}
+        where b.tenant_id=? and b.status in ('confirmed','published') and l->'profile'->>'id'=? ) or exists(select 1 from workforce_pay_segments s where s.tenant_id=? and s.status in ('confirmed','published') and s.snapshot->'cumulative'->'lines'->0->'profile'->>'id'=?)
+        """,Boolean.class,tenant,id.toString(),tenant,id.toString()));}
     /** The same authorized company eligibility as the employee picker; missing birthdays remain absent. */
     public Map<UUID,LocalDate> employeeBirthDates(UUID tenant,UUID company){
         var dates=new LinkedHashMap<UUID,LocalDate>();
@@ -114,7 +131,7 @@ public class PayrollConfigurationRepository {
         values.replaceAll((key,list)->List.copyOf(list));return Map.copyOf(values);
     }
     public List<Option> employees(UUID tenant,UUID company){return jdbc.query("""
-        select e.id,e.name||' · '||e.employee_no from workforce_employees e where e.tenant_id=? and
+        select e.id,e.name||' 路 '||e.employee_no from workforce_employees e where e.tenant_id=? and
         (e.company_id=? or exists(select 1 from workforce_company_history h where h.tenant_id=e.tenant_id and h.employee_id=e.id and h.company_id=?))
         order by e.employee_no,e.id
         """,(r,n)->new Option(r.getObject(1,UUID.class),r.getString(2)),tenant,company,company);}

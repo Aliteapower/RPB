@@ -17,6 +17,10 @@ Recommended flow:
 8. Use troubleshooting for bugs or failing tests.
 9. Use production-readiness before deployment-related work.
 
+## Page Layout Consistency
+
+Before adding or changing an RPB page layout, read `docs/frontend/PAGE_LAYOUT_CONSISTENCY_GUIDE.md` and inspect a comparable page in the same module. Reuse the owning Layout, shared container, panel and action styles; do not introduce arbitrary page-specific widths or floating save bars. Verify adjacent-page alignment and authenticated desktop/mobile viewport behavior, and report any unverified visual scope explicitly. This does not authorize unrelated page refactors or production deployment.
+
 ## Documentation-Only Scope
 
 When a task is explicitly documentation-only, keep edits inside the requested documentation paths and do not change business code, database schema, migrations, API behavior, dependency files, or runtime configuration.

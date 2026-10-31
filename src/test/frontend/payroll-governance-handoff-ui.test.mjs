@@ -23,7 +23,7 @@ async function mount(Page,path='/stores/A/workforce/pay-profiles/new',props={},s
 const rule={basis:'hourly',rate:'20',dayHours:'8',weekHours:'44',overtimeEnabled:false,overtimeMultiplier:'1.5',items:[]}
 const home={companies:[{id:'C',name:'Company'}],employeeId:null}
 function select(root,value){return nodes(root,n=>n.tag==='select'&&nodes(n,x=>x.tag==='option'&&x.props.value===value).length)[0]}
-const submit=async root=>{nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()}
+const submit=async root=>{for(let i=0;i<2;i++){const next=nodes(root,n=>n.tag==='button'&&/下一步：|Next:/.test(text(n)))[0];if(!next)break;next.props.onClick();await settle()}if(nodes(root,n=>n.tag==='button'&&/下一步：|Next:/.test(text(n))).length)return;nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()}
 
 
 const click=async(root,label)=>{const b=nodes(root,n=>n.tag==='button'&&text(n).trim()===label)[0];assert.ok(b,'missing '+label);b.props.onClick?.();if(b.props.type==='submit')await submit(root);await settle()}
@@ -46,4 +46,18 @@ test('employee payslip hides governance evidence and internal explanations even 
 
 test('blocked payroll with missing profile or ambiguous input evidence renders unresolved source instead of crashing or inventing legacy validity',async()=>{const {root}=await mount(ui.PayrollEvidence,undefined,{line:{components:[],input:{},issues:['WORKFORCE_PAYROLL_INPUT_AMBIGUOUS'],governance:{profile:null,input:null}}});assert.match(text(root),/来源证明不足/);assert.match(text(root),/多个不同基线/);assert.doesNotMatch(text(root),/安装前有效资料|批准有效版本/)})
 
-test('new citizen CDAC declaration error keeps entered profile, requests no approval, and accepts explicit standard declaration',async()=>{for(const [locale,status,expected] of [['zh-CN','applicable',/请选择CDAC标准适用性/],['en','not_applicable',/Select the standard CDAC applicability/]]){const writes=[],normal=api(writes,{code:'WORKFORCE_PAYROLL_CDAC_DECLARATION_REQUIRED'});globalThis.fetch=async(url,opt)=>{if(opt?.method==='PUT'&&writes.length){writes.push({url:String(url),body:JSON.parse(opt.body)});return response({})}if(String(url).includes('/pay-profile-preview'))return response({template:{id:'T',version:7,rule:{...rule,rate:'88.00'}}});if(String(url).includes('/salary-templates'))return response([{id:'T',version:7,name:'Template',enabled:true,rule:{...rule,rate:'88.00'}}]);if(String(url).includes('/pay-profiles?'))return response({items:[],employees:[{id:'E',name:'Alice'}],employeeBirthDates:{E:'1990-01-02'}});return normal(url,opt)};const {root,router}=await mount(ui.PayProfileForm,'/stores/A/workforce/pay-profiles/new?companyId=C&employeeId=E',{},[],locale);nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal')[0].props['onUpdate:modelValue']('88.00');await settle();await submit(root);assert.equal(writes.length,1);assert.match(text(root),expected);assert.equal(nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal')[0].value,'88.00');assert.equal(writes[0].body.employeeId,'E');assert.equal(nodes(root,n=>n.tag==='form').length,1);assert.doesNotMatch(text(root),/申请草稿|Change draft/);assert.equal(writes.some(w=>w.url.includes('/pay-change-requests')),false);select(root,'not_applicable').props['onUpdate:modelValue'](status);await settle();await submit(root);assert.equal(writes.length,2);assert.equal(writes[1].body.cdac.status,status);assert.equal(writes[1].body.rule.rate,'88.00');assert.match(router.currentRoute.value.path,/\/pay-profiles$/)}})
+test('new citizen CDAC declaration is required before saving and preserves entered profile',async()=>{
+ for(const [locale,status,expected] of [['zh-CN','applicable',/请选择CDAC标准适用性/],['en','not_applicable',/Select the standard CDAC applicability/]]){
+  const writes=[],normal=api(writes);globalThis.fetch=async(url,opt)=>{
+   if(opt?.method==='PUT'){writes.push({url:String(url),body:JSON.parse(opt.body)});return response({})}
+   if(String(url).includes('/pay-profile-preview'))return response({template:{id:'T',version:7,rule:{...rule,rate:'88.00'}}});
+   if(String(url).includes('/salary-templates'))return response([{id:'T',version:7,name:'Template',enabled:true,rule:{...rule,rate:'88.00'}}]);
+   if(String(url).includes('/pay-profiles?'))return response({items:[],employees:[{id:'E',name:'Alice'}],employeeBirthDates:{E:'1990-01-02'}});return normal(url,opt)
+  };
+  const {root,router}=await mount(ui.PayProfileForm,'/stores/A/workforce/pay-profiles/new?companyId=C&employeeId=E',{},[],locale);
+  select(root,'citizen').props['onUpdate:modelValue']('citizen');nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal')[0].props['onUpdate:modelValue']('88.00');await settle();await submit(root);
+  assert.equal(writes.length,0);assert.match(text(root),expected);assert.equal(nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal')[0].value,'88.00');
+  assert.doesNotMatch(text(root),/申请草稿|Change draft/);select(root,'not_applicable').props['onUpdate:modelValue'](status);await settle();await submit(root);
+  assert.equal(writes.length,1);assert.equal(writes[0].body.cdac.status,status);assert.equal(writes[0].body.employeeId,'E');assert.equal(writes[0].body.rule.rate,'88.00');assert.equal(writes.some(w=>w.url.includes('/pay-change-requests')),false);assert.match(router.currentRoute.value.path,/\/pay-profiles$/)
+ }
+})

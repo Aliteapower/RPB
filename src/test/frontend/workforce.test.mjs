@@ -186,8 +186,8 @@ test('payroll company selection still scopes calculation and payment entry',asyn
  const {root}=await mount(PayrollHome,'/stores/A/workforce/payroll')
  assert.match(text(root),/计薪与付款/)
  const select=nodes(root,n=>n.tag==='select')[0];select.props['onUpdate:modelValue']('D');await settle()
- assert.ok(nodes(root,n=>n.tag==='a').some(n=>n.props.href==='/stores/A/workforce/payroll-batches?companyId=D'))
- const policy=nodes(root,n=>n.tag==='details')[0];assert.ok(policy);assert.ok(!policy.props.open);assert.match(text(policy),/缴费规则/)
+ assert.ok(nodes(root,n=>n.tag==='a').some(n=>typeof n.props.href==='string'&&new URL(n.props.href,'http://test').pathname==='/stores/A/workforce/payroll-batches'&&new URL(n.props.href,'http://test').searchParams.get('companyId')==='D'))
+ const policy=nodes(root,n=>n.tag==='details'&&text(n).includes('缴费规则'))[0];assert.ok(policy);assert.ok(!policy.props.open);assert.match(text(policy),/缴费规则/)
 })
 test('employee payroll page retains only own payslips without payroll administration links',async()=>{
  globalThis.fetch=async()=>response({...payrollDirectory,companies:[],employeeId:'employee'})

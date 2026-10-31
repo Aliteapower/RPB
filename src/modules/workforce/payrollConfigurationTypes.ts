@@ -1,6 +1,6 @@
 import type {PayProfile,PayRule,SalaryTemplate} from './payrollTypes'
 export interface ProfileOrigin {templateName:string;templateRule:PayRule;defaultMappingId:string|null;defaultVersion:number|null}
-export interface PositionSalaryDefault {id:string;companyId:string;positionId:string;effectiveFrom:string;templateId:string;templateVersion:number;enabled:boolean;version:number}
+export interface PositionSalaryDefault {id:string;companyId:string;positionId:string;effectiveFrom:string;templateId:string;templateVersion:number;enabled:boolean;version:number;basis?:'monthly'|'hourly'|'daily'|null}
 export interface ProfilePreview {template:SalaryTemplate|null;defaultMapping:PositionSalaryDefault|null}
 export interface ProfilePeriod {profile:PayProfile;effectiveTo:string|null;state:'current'|'future'|'history';sourceComplete:boolean}
 export interface EmployeePaySummaryData {employeeId:string;companyId:string;on:string;profiles:ProfilePeriod[]}
