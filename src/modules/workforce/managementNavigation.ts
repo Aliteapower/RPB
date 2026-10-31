@@ -7,6 +7,8 @@ type Access='employee'|'headOffice'|'payroll'|'change'
 interface ManagementSection {path:string;label:Caption;access:Access;routes:Record<string,Caption|null>}
 // Explicit route names keep operation pages and employee calendar views out of management.
 const sections:ManagementSection[]=[
+ {path:'position-pay-plans',label:['岗位薪资标准','Position pay standards'],access:'payroll',routes:{'workforce-position-pay-plans':null}},
+ {path:'pay-template-library',label:['门店工资模板库','Store pay template library'],access:'employee',routes:{'workforce-pay-template-library':null}},
  {path:'pay-change-requests',label:['工资变更申请','Pay change requests'],access:'change',routes:{'workforce-pay-change-requests':null}},
  {path:'attendance-rules',label:['休息与考勤规则','Break and attendance rules'],access:'employee',routes:{'workforce-attendance-rules':null}},
  {path:'review-explanations',label:['判定说明','Decision explanations'],access:'employee',routes:{'workforce-review-explanations':null}},
@@ -37,9 +39,10 @@ export function managementNavigation(route:Pick<RouteLocationNormalizedLoaded,'n
  }else if(!home.employeeManage||(section.access==='headOffice'&&!home.headOffice))return null
  const english=locale.startsWith('en'),caption=(c:Caption)=>c[english?1:0]
  const base=`/stores/${encodeURIComponent(String(route.params.storeId))}/workforce`,query=companyId?{companyId}:{}
- const backTo={path:base+'/management',query}
- const action=section.routes[name],crumbs:ManagementCrumb[]=[{label:english?'Management':'管理',to:backTo},{label:caption(section.label),...(action?{to:{path:base+'/'+section.path,query}}:{})}]
+ const step=['clock-site','attendance-rules','review-explanations','shifts','calendar','public-holidays','leave-types'].includes(section.path)?'2':['pay-change-requests','statutory-policies','salary-templates','pay-profiles','position-pay-plans','pay-template-library'].includes(section.path)?'3':'1'
+ const backTo={path:base+'/management',query:{...query,step}}
+ const action=section.routes[name],crumbs:ManagementCrumb[]=[{label:english?'Settings':'设置',to:backTo},{label:caption(section.label),...(action?{to:{path:base+'/'+section.path,query}}:{})}]
  if(action)crumbs.push({label:caption(action)})
- return {backTo,backLabel:english?'← Back to management':'← 返回管理',ariaLabel:english?'Breadcrumb':'当前位置',crumbs}
+ return {backTo,backLabel:english?'← Back to settings':'← 返回设置',ariaLabel:english?'Breadcrumb':'当前位置',crumbs}
 }
 

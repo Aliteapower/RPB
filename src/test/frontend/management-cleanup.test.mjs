@@ -89,3 +89,33 @@ test('duplicate management navigation is removed and attendance feature navigati
  for(const action of ['@submit.prevent="save"','@click="edit(p)"','@click="toggle(p)"','@click="remove(p)"'])assert.ok(position.includes(action))
 })
 
+
+
+test('setup guide shows one step at a time and one pay change entry with company context',async()=>{
+ const {root}=await mount(ui.WorkforceManagement,'/stores/A/workforce/management?companyId=D')
+ const steps=nodes(root,n=>n.tag==='button'&&n.props['aria-controls'])
+ assert.equal(steps.length,4)
+ assert.equal(steps[0].props['aria-current'],'step')
+ assert.equal(nodes(root,n=>n.tag==='a'&&String(n.props.href).includes('/pay-change-requests')).length,1)
+ assert.equal(nodes(root,n=>n.tag==='a'&&String(n.props.href).includes('/pay-change-requests'))[0].props.href,'/stores/A/workforce/pay-change-requests?companyId=D')
+ const section=id=>nodes(root,n=>n.props?.id==='setup-step-'+id)[0]
+ assert.notEqual(section(1).style.display,'none')
+ assert.equal(section(3).style.display,'none')
+ steps[2].props.onClick();await settle()
+ assert.equal(section(1).style.display,'none')
+ assert.notEqual(section(3).style.display,'none')
+ assert.equal(steps[2].props['aria-current'],'step')
+ const next=nodes(root,n=>n.tag==='button'&&text(n).includes('下一步：'))[0]
+ next.props.onClick();await settle()
+ assert.notEqual(section(4).style.display,'none')
+ assert.ok(nodes(root,n=>n.tag==='a'&&n.props.href==='/stores/A/workforce/payroll?companyId=D').length)
+})
+
+
+test('returning from a salary setting restores step three and invalid steps fall back',async()=>{
+ const {root}=await mount(ui.WorkforceManagement,'/stores/A/workforce/management?companyId=D&step=3')
+ assert.equal(nodes(root,n=>n.props?.id==='setup-step-1')[0].style.display,'none')
+ assert.notEqual(nodes(root,n=>n.props?.id==='setup-step-3')[0].style.display,'none')
+ const invalid=await mount(ui.WorkforceManagement,'/stores/A/workforce/management?step=999')
+ assert.notEqual(nodes(invalid.root,n=>n.props?.id==='setup-step-1')[0].style.display,'none')
+})

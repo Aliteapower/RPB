@@ -14,9 +14,9 @@ const payroll={companies:[{id:'C',name:'Company C'}]}
 const route=(name,companyId)=>({name,params:{storeId:'A B'},query:companyId?{companyId}:{}})
 test('shift edit returns to current store management and links its section',()=>{
  const nav=managementNavigation(route('workforce-shift','C'),manager,payroll,'zh-CN')
- assert.equal(nav.backLabel,'← 返回管理')
- assert.deepEqual(nav.backTo,{path:'/stores/A%20B/workforce/management',query:{companyId:'C'}})
- assert.deepEqual(nav.crumbs.map(c=>c.label),['管理','班次管理','编辑班次'])
+ assert.equal(nav.backLabel,'← 返回设置')
+ assert.deepEqual(nav.backTo,{path:'/stores/A%20B/workforce/management',query:{companyId:'C',step:'2'}})
+ assert.deepEqual(nav.crumbs.map(c=>c.label),['设置','班次管理','编辑班次'])
  assert.equal(nav.crumbs[1].to.path,'/stores/A%20B/workforce/shifts')
  assert.equal(nav.crumbs[2].to,undefined)
 })
@@ -38,7 +38,7 @@ test('management return respects employee, head-office and company access separa
  assert.equal(managementNavigation(route('workforce-pay-profiles'),manager,null,'zh-CN'),null)
  const nav=managementNavigation(route('workforce-salary-template'),employee,payroll,'en-SG')
  assert.equal(nav.backTo.query.companyId,'C')
- assert.deepEqual(nav.crumbs.map(c=>c.label),['Management','Salary templates','Edit salary template'])
+ assert.deepEqual(nav.crumbs.map(c=>c.label),['Settings','Salary templates','Edit salary template'])
 })
 test('shared layout renders the accessible breadcrumb and visible return without changing business pages',async()=>{
  const source=await readFile('src/modules/workforce/WorkforceLayout.vue','utf8')
@@ -51,3 +51,14 @@ test('shared layout renders the accessible breadcrumb and visible return without
 
 
 test('pay change return navigation is available for store governance or separate salary authority',()=>{const storeManager={employeeManage:true,headOffice:false},salaryOnly={employeeManage:false,headOffice:false};assert.ok(managementNavigation(route('workforce-pay-change-requests'),storeManager,null,'zh-CN'));assert.ok(managementNavigation(route('workforce-pay-change-requests','C'),salaryOnly,payroll,'en-SG'));assert.equal(managementNavigation(route('workforce-pay-change-requests','OTHER'),salaryOnly,payroll,'zh-CN'),null);assert.equal(managementNavigation(route('workforce-pay-change-requests'),salaryOnly,null,'zh-CN'),null)})
+
+
+test('settings subpages return to their guided step with the same company',()=>{
+ for(const [name,step] of [['positions','1'],['attendance-rules','2'],['pay-template-library','3'],['position-pay-plans','3'],['pay-change-requests','3']]){
+  const nav=managementNavigation(route('workforce-'+name,'C'),manager,payroll,'zh-CN')
+  assert.equal(nav.backTo.query.step,step)
+  assert.equal(nav.backTo.query.companyId,'C')
+ }
+ assert.equal(managementNavigation(route('workforce-position-pay-plans','OTHER'),manager,payroll,'zh-CN'),null)
+ assert.equal(managementNavigation(route('workforce-pay-template-library'),{employeeManage:false,headOffice:false},payroll,'zh-CN'),null)
+})
