@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {useI18n} from 'vue-i18n'
+const {locale}=useI18n()
 import {usePayrollReturn} from '../payrollReturn'
 const payrollReturn=usePayrollReturn()
 import {computed,onMounted,ref} from 'vue'
@@ -57,7 +59,7 @@ async function save(){if(!draft.value||busy.value)return;busy.value=true;failure
     </fieldset>
     <footer class="wf-form-actions employee-savebar"><p class="wf-hint">{{ee('saveHint')}}</p><div class="wf-inline"><RouterLink class="wf-button" :to="payrollReturn||`/stores/${store}/workforce/employees`">{{t('cancel')}}</RouterLink><button class="primary" :disabled="busy">{{busy?t('saving'):ee('save')}}</button></div></footer>
    </form>
-   <template v-if="existing"><h3 class="employee-other-title">{{ee('more')}}</h3>
+   <template v-if="existing"><p class="wf-section"><RouterLink class="wf-button" :to="`/stores/${store}/workforce/employees/${id}/leave-settings`">{{locale.startsWith('en')?'Contract & leave balances':'合同与假期额度'}}</RouterLink></p><h3 class="employee-other-title">{{ee('more')}}</h3>
     <EmployeeTaskSection v-if="linked" :title="ee('login')" :description="ee('loginHint')" lazy data-employee-task="login"><EmployeeLoginSettings :employee-id="id" embedded/></EmployeeTaskSection>
     <EmployeeTaskSection :title="ee('pay')" :description="ee('payHint')" lazy data-employee-task="pay"><EmployeePaySummary :employee-id="id" :company-id="draft.companyId" :saved="true" embedded/></EmployeeTaskSection>
     <EmployeeTaskSection :title="ee('documents')" :description="ee('documentsHint')" lazy data-employee-task="documents"><EmployeeDocuments :employee-id="id" embedded/></EmployeeTaskSection>

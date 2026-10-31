@@ -25,7 +25,10 @@ public class LeaveService {
     private final LeaveRepository repository;
     private final WorkforceAudit audit;
     private final Clock clock;
-    public LeaveService(WorkforceAccess gate,AttendanceAccess access,WorkforceEmployeeRepository employees,SchedulingRepository schedules,LeaveTypeRepository types,LeaveRepository repository,WorkforceAudit audit,Clock clock){this.gate=gate;this.access=access;this.employees=employees;this.schedules=schedules;this.types=types;this.repository=repository;this.audit=audit;this.clock=clock;}
+    private final com.rpb.reservation.workforce.leave.account.LeaveAccountBridge balances;
+    public LeaveService(WorkforceAccess gate,AttendanceAccess access,WorkforceEmployeeRepository employees,SchedulingRepository schedules,LeaveTypeRepository types,LeaveRepository repository,WorkforceAudit audit,Clock clock){this(gate,access,employees,schedules,types,repository,audit,clock,null);}
+    @org.springframework.beans.factory.annotation.Autowired
+    public LeaveService(WorkforceAccess gate,AttendanceAccess access,WorkforceEmployeeRepository employees,SchedulingRepository schedules,LeaveTypeRepository types,LeaveRepository repository,WorkforceAudit audit,Clock clock,com.rpb.reservation.workforce.leave.account.LeaveAccountBridge balances){this.balances=balances;this.gate=gate;this.access=access;this.employees=employees;this.schedules=schedules;this.types=types;this.repository=repository;this.audit=audit;this.clock=clock;}
     public List<Leave> list(CurrentActor actor,UUID store,LocalDate from,LocalDate to){
         gate.enter(actor,store);ScheduleService.range(from,to);
         var result=repository.leaves(actor.tenantId(),store,from,to,access.manager(actor,store)?null:access.self(actor,store).id());
@@ -34,20 +37,21 @@ public class LeaveService {
     @Transactional public Leave submit(CurrentActor actor,UUID store,UUID id,LeaveWrite c){
         gate.sourceWrite(actor);
         if(id==null||c==null||c.scheduleId()==null||c.typeId()==null||c.startAt()==null||c.endAt()==null||c.reason()==null||c.reason().isBlank()||c.reason().trim().length()>500)throw WorkforceException.invalid();
-        c=new LeaveWrite(c.scheduleId(),c.typeId(),c.startAt().truncatedTo(ChronoUnit.MICROS),c.endAt().truncatedTo(ChronoUnit.MICROS),c.reason().trim());
+        c=new LeaveWrite(c.scheduleId(),c.typeId(),c.startAt().truncatedTo(ChronoUnit.MICROS),c.endAt().truncatedTo(ChronoUnit.MICROS),c.reason().trim(),c.medicalReference()==null?null:c.medicalReference().trim());
+        if(c.medicalReference()!=null&&(c.medicalReference().isBlank()||c.medicalReference().length()>500))throw WorkforceException.invalid();
         var self=access.self(actor,store);employees.lock(self.id());var s=access.read(actor,store,c.scheduleId());
         if(!self.id().equals(s.employeeId()))throw WorkforceException.forbidden();
         var old=repository.find(actor.tenantId(),id).orElse(null);
         if(old!=null){
-            if(old.applicantId().equals(actor.actorId())&&old.scheduleId().equals(c.scheduleId())&&old.typeId().equals(c.typeId())&&old.startAt().equals(c.startAt())&&old.endAt().equals(c.endAt())&&old.reason().equals(c.reason()))return old;
+            if(old.applicantId().equals(actor.actorId())&&old.scheduleId().equals(c.scheduleId())&&old.typeId().equals(c.typeId())&&old.startAt().equals(c.startAt())&&old.endAt().equals(c.endAt())&&old.reason().equals(c.reason())&&Objects.equals(old.medicalReference(),c.medicalReference()))return old;
             throw WorkforceException.conflict();
         }
         if(!s.status().equals("scheduled")||c.startAt().isBefore(s.startAt())||c.endAt().isAfter(s.endAt())||!c.endAt().isAfter(c.startAt()))throw WorkforceException.invalid();
         schedules.lock("workforce.leave-type:"+c.typeId());
         var type=types.find(actor.tenantId(),store,c.typeId()).orElseThrow(WorkforceException::missing);if(!type.enabled())throw WorkforceException.invalid();
         if(repository.forSchedule(actor.tenantId(),s.id()).stream().anyMatch(l->Set.of("pending","cancel_requested").contains(l.status())))throw WorkforceException.conflict();
-        var next=new Leave(id,s.id(),self.id(),self.name(),type.id(),type.name(),type.paid(),c.startAt(),c.endAt(),c.reason(),"pending",actor.actorId(),null,null,1,clock.instant());
-        repository.create(actor.tenantId(),store,next);var saved=repository.find(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"leave.submit",id,null,saved);return saved;
+        var next=new Leave(id,s.id(),self.id(),self.name(),type.id(),type.name(),type.paid(),c.startAt(),c.endAt(),c.reason(),"pending",actor.actorId(),null,null,1,clock.instant(),c.medicalReference());
+        if(balances!=null)balances.reserve(actor,store,next,s);repository.create(actor.tenantId(),store,next);var saved=repository.find(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"leave.submit",id,null,saved);return saved;
     }
     @Transactional public Leave decide(CurrentActor actor,UUID store,UUID id,DecisionWrite c){
         gate.sourceWrite(actor);
@@ -71,6 +75,7 @@ public class LeaveService {
         if(!allowed)throw WorkforceException.conflict();
         if(c.status().equals("approved")&&repository.forSchedule(actor.tenantId(),old.scheduleId()).stream().anyMatch(l->!l.id().equals(id)&&Set.of("approved","cancel_requested").contains(l.status())&&l.startAt().isBefore(old.endAt())&&l.endAt().isAfter(old.startAt())))throw new WorkforceException("WORKFORCE_LEAVE_OVERLAP",409);
         if(c.status().equals("cancel_requested")&&repository.forSchedule(actor.tenantId(),old.scheduleId()).stream().anyMatch(l->!l.id().equals(id)&&Set.of("pending","cancel_requested").contains(l.status())))throw WorkforceException.conflict();
+        if(balances!=null)balances.decision(actor,store,old,access.read(actor,store,old.scheduleId()),c.status());
         repository.decision(actor.tenantId(),id,target,c.status(),actor.actorId(),note,old.version()+1);
         var saved=repository.find(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"leave."+c.status(),id,old,saved);return saved;
     }

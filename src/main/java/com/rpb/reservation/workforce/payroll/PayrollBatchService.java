@@ -12,6 +12,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Service
 @Transactional(readOnly=true)
 public class PayrollBatchService {
+ private com.rpb.reservation.workforce.leave.encashment.LeaveEncashmentBridge encashments;
+ @org.springframework.beans.factory.annotation.Autowired public void encashments(com.rpb.reservation.workforce.leave.encashment.LeaveEncashmentBridge bridge){this.encashments=bridge;}
  private final WorkforceAccess gate;private final PayrollAccess access;private final PayrollRepository repository;private final PayrollSources sources;private final PayrollCalculationService calculator;private final WorkforceEmployeeRepository employees;private final WorkforceAudit audit;private final Clock clock;
  private final PayrollTransactions transactions;
  private final PayrollIncremental incremental;
@@ -80,7 +82,7 @@ public class PayrollBatchService {
    if(c.action().equals("confirm")&&fresh.lines().stream().anyMatch(line->line.issues().contains(com.rpb.reservation.workforce.statutory.annual.AnnualWageRepository.OPENING_PAYROLL_CONFLICT)))throw new WorkforceException(com.rpb.reservation.workforce.statutory.annual.AnnualWageRepository.OPENING_PAYROLL_CONFLICT,409);
    unchanged(prepared.capture(),fresh);
    var calculation=c.action().equals("confirm")?b.calculation():computed;
-   if(c.action().equals("confirm")){confirmable(actor,b,fresh,computed);repository.annual().consume(b);repository.annual().freeze(b,fresh);}
+   if(c.action().equals("confirm")){confirmable(actor,b,fresh,computed);if(encashments!=null)for(var line:fresh.lines())encashments.consume(actor,b.company(),line.employee().id(),b.id(),"monthly",line.input().items());repository.annual().consume(b);repository.annual().freeze(b,fresh);}
    var response=save(actor,store,b,command,c,c.action().equals("confirm")?"confirmed":"calculated",calculation,fresh);
    if(result!=null){var saved=repository.find(actor.tenantId(),id).orElseThrow();recordComputation(saved,b,prepared.computation(),result,fresh);}return response;
   });
@@ -114,7 +116,7 @@ public class PayrollBatchService {
   if(b.version()!=c.expectedVersion())throw WorkforceException.conflict();PayrollSnapshot calculation=b.calculation();String status;PayrollSources.Capture capture=null;
   switch(c.action()){
    case "publish" -> {if(!b.status().equals("confirmed"))throw WorkforceException.conflict();status="published";}
-   case "void" -> {if(!Set.of("draft","calculated","confirmed").contains(b.status())||!repository.payments(actor.tenantId(),id).isEmpty())throw WorkforceException.conflict();repository.lockSources(actor.tenantId());repository.annual().release(actor.tenantId(),id);status="voided";}
+   case "void" -> {if(!Set.of("draft","calculated","confirmed").contains(b.status())||!repository.payments(actor.tenantId(),id).isEmpty())throw WorkforceException.conflict();repository.lockSources(actor.tenantId());if(encashments!=null)encashments.assertVoidable(actor.tenantId(),id);repository.annual().release(actor.tenantId(),id);status="voided";}
    default -> throw WorkforceException.invalid();
   }
   return save(actor,store,b,command,c,status,calculation,capture);
