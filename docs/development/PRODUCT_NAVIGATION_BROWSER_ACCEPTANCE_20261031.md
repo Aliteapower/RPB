@@ -48,6 +48,16 @@ Checklist：测试、类型、构建通过，候选排除无关改动，服务�
 
 发布前核实backend=d23a94f4、frontend=61b0a890、V113及JAR/环境/服务摘要；发布后只允许前端版本变化，不重启后端。生产结果完成后补录。
 
+## 生产发布结果
+
+- 功能提交及前端发布：e8fcedd6f856371e9dfaaa940d645fd74490ad80，已推送codex/paynow-payment-product-line-staging。7份源/测试与干净候选逐字对应（仅Git换行归一化），未包含钱包原有8文件。
+- 418份前端文件在服务端逐一核验，只原子切换index及FRONTEND_RELEASE_SHA；旧不可变资源保留。归档SHA256：19cf984be0ad44672da4990cb239a610f996aae19b8ecc830bcdf5b8f1754bc3；索引摘要同上。
+- 后端d23a94f4、JAR摘要37e4a5676eca343b65308dc902e8d4ca1bb5b37ca3864ca5b276cfac92eabc56、环境摘要、全部服务状态/进程/InvocationID均前后一致。后端PID3626821、NRestarts0；数据库迁移仍113|113|0，无数据库写入或重启。
+- 公网5个页面返回本次索引，13份相关JS/CSS哈希一致；匿名管理员资料/产品设置接口401，匿名产品目录为空。部署后浏览器只读确认线上资料页钱包、酒水、日账、员工考勤与薪资等入口可见；未操作真实订阅或开关。
+- 回退集：/opt/rpb/backups/20261031-product-navigation-browser-e8fcedd6-before；阶段制品：/opt/rpb/releases/20261031-product-navigation-browser-e8fcedd6。未触发回退。
+- 证据：target/product-navigation-browser-20261031/下committed-source-proof.json、verification-final.json、deploy-result.json、public-result.json、live-after-deploy.json。最终35份排除材料哈希未变。
+- 已打开旧页面需刷新一次取得新JS，之后可见页每30秒核验，恢复页面立即核验；后端到期拦截不等待轮询。实体手机、微信与真实订阅切换仍未实操。
+
 ![390像素钱包历史只读](evidence/product-navigation-browser-20261031/final-wallet-narrow390-direct.jpg)
 
 ![约320像素到期后历史入口](evidence/product-navigation-browser-20261031/narrow320-after-natural-expiry.jpg)
