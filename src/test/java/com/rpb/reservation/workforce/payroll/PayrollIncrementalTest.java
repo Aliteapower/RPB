@@ -57,7 +57,7 @@ class PayrollIncrementalTest {
  }
  @Test void completeCapturedLineIncludingCrossMonthContextIssuesAndSpecialDaysInvalidatesCache() {
   var a=line(0);var old=engine.calculate(capture(List.of(a)),month,null,false).cache();var ref=a.sources().getFirst();
-  var context=new SourceRef(ref.scheduleId(),ref.storeId(),month.atDay(1).minusDays(1),2,"prior-month-edited",72000,0,0,false);
+  var context=new SourceRef(ref.sourceId(),ref.storeId(),month.atDay(1).minusDays(1),2,"prior-month-edited",72000,0,0,false);
   var refs=new ArrayList<>(a.sources());refs.addFirst(context);
   var crossMonth=new PayrollSources.CapturedLine(a.employee(),a.profile(),a.input(),refs,a.issues(),a.specialDays());
   var issues=new PayrollSources.CapturedLine(a.employee(),a.profile(),a.input(),a.sources(),List.of("SOURCE_PENDING"),a.specialDays());

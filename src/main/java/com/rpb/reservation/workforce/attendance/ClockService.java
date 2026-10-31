@@ -25,6 +25,7 @@ public class ClockService {
         var replay=repository.replay(actor.tenantId(),command,employee.id(),store,c);if(replay.isPresent())return replay.get();
         var schedule=access.read(actor,store,c.scheduleId());if(!schedule.employeeId().equals(employee.id()))throw WorkforceException.forbidden();
         Instant now=clock.instant().truncatedTo(ChronoUnit.MICROS);Session old=repository.bySchedule(actor.tenantId(),schedule.id()).orElse(null),next;
+        if(workModes!=null&&workModes.exempt(actor.tenantId(),employee.id(),store,schedule.workDate(),old))throw new WorkforceException("WORKFORCE_CLOCK_EXEMPT",409);
         var policy=workModes==null?null:workModes.policy(actor.tenantId(),employee.id(),store,schedule.workDate(),old);var selectedPolicy=com.rpb.reservation.workforce.workmode.WorkModeOptions.select(policy,c.mode());if(workModes!=null)workModes.verify(selectedPolicy,c.location());
         if("IN".equals(c.action())){
             // Reload after the shared employee lock so employment/membership edits cannot race a punch.

@@ -30,9 +30,9 @@ public final class PayrollChanges {
                 if(!Objects.equals(a.employeeName(),b.employeeName())||!Objects.equals(a.employeeNo(),b.employeeNo()))reasons.add("employee");
                 if(!Objects.equals(a.profile(),b.profile()))reasons.add("profile");
                 if(PayrollSourceReasons.inputChanged(a.input(),b.input()))reasons.add("input");
-                var refs=new HashMap<UUID,SourceRef>();a.sources().forEach(r->refs.put(r.scheduleId(),r));
+                var refs=new HashMap<UUID,SourceRef>();a.sources().forEach(r->refs.put(r.sourceId(),r));
                 for(var ref:b.sources()){
-                    var previous=refs.remove(ref.scheduleId());
+                    var previous=refs.remove(ref.sourceId());
                     if(previous==null)reasons.add("source");else reasons.addAll(PayrollSourceReasons.sourceKinds(previous,ref));
                 }
                 if(!refs.isEmpty())reasons.add("source");

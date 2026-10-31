@@ -47,6 +47,7 @@ public class LeaveService {
             throw WorkforceException.conflict();
         }
         if(!s.status().equals("scheduled")||c.startAt().isBefore(s.startAt())||c.endAt().isAfter(s.endAt())||!c.endAt().isAfter(c.startAt()))throw WorkforceException.invalid();
+        if(repository.overlapsDailyException(actor.tenantId(),self.id(),c.startAt(),c.endAt()))throw new WorkforceException("WORKFORCE_LEAVE_OVERLAP",409);
         schedules.lock("workforce.leave-type:"+c.typeId());
         var type=types.find(actor.tenantId(),store,c.typeId()).orElseThrow(WorkforceException::missing);if(!type.enabled())throw WorkforceException.invalid();
         if(repository.forSchedule(actor.tenantId(),s.id()).stream().anyMatch(l->Set.of("pending","cancel_requested").contains(l.status())))throw WorkforceException.conflict();
@@ -73,6 +74,7 @@ public class LeaveService {
             default -> false;
         };
         if(!allowed)throw WorkforceException.conflict();
+        if(c.status().equals("approved")&&repository.overlapsDailyException(actor.tenantId(),old.employeeId(),old.startAt(),old.endAt()))throw new WorkforceException("WORKFORCE_LEAVE_OVERLAP",409);
         if(c.status().equals("approved")&&repository.forSchedule(actor.tenantId(),old.scheduleId()).stream().anyMatch(l->!l.id().equals(id)&&Set.of("approved","cancel_requested").contains(l.status())&&l.startAt().isBefore(old.endAt())&&l.endAt().isAfter(old.startAt())))throw new WorkforceException("WORKFORCE_LEAVE_OVERLAP",409);
         if(c.status().equals("cancel_requested")&&repository.forSchedule(actor.tenantId(),old.scheduleId()).stream().anyMatch(l->!l.id().equals(id)&&Set.of("pending","cancel_requested").contains(l.status())))throw WorkforceException.conflict();
         if(balances!=null)balances.decision(actor,store,old,access.read(actor,store,old.scheduleId()),c.status());

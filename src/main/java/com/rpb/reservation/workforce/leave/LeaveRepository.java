@@ -12,6 +12,7 @@ public class LeaveRepository {
     private final JdbcTemplate jdbc;
     public LeaveRepository(JdbcTemplate jdbc){this.jdbc=jdbc;}
     private static final String SELECT="select l.*,e.name employee_name from workforce_leaves l join workforce_employees e on e.id=l.employee_id and e.tenant_id=l.tenant_id ";
+    public boolean overlapsDailyException(UUID tenant,UUID employee,Instant start,Instant end){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_attendance_exceptions where tenant_id=? and employee_id=? and status in ('pending','approved','cancel_requested') and start_at<? and end_at>?)",Boolean.class,tenant,employee,Timestamp.from(end),Timestamp.from(start)));}
     public Optional<Leave> find(UUID tenant,UUID id){return jdbc.query(SELECT+"where l.tenant_id=? and l.id=?",this::map,tenant,id).stream().findFirst();}
     public List<Leave> leaves(UUID tenant,UUID store,LocalDate from,LocalDate to,UUID employee){return jdbc.query(SELECT+"join workforce_schedules s on s.id=l.schedule_id and s.tenant_id=l.tenant_id where l.tenant_id=? and l.store_id=? and s.work_date between ? and ? and (?::uuid is null or l.employee_id=?::uuid) order by s.work_date,l.start_at,l.id limit 1001",this::map,tenant,store,from,to,employee,employee);}
     public List<Leave> forSchedule(UUID tenant,UUID schedule){return jdbc.query(SELECT+"where l.tenant_id=? and l.schedule_id=? order by l.start_at,l.id",this::map,tenant,schedule);}

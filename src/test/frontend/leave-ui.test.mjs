@@ -43,7 +43,7 @@ test('leave form displays configured enabled types and quick duration submits ex
  const type=nodes(root,n=>n.tag==='select')[1];assert.match(text(type),/Custom leave/);assert.doesNotMatch(text(type),/Disabled/)
  button(root,'2小时').props.onClick();await settle()
  assert.deepEqual(times(root).map(n=>n.value),['2026-10-29T11:00','2026-10-29T13:00'])
- await submit(root);assert.deepEqual(writes[0],{scheduleId:'S',typeId:'T',startAt:'2026-10-29T03:00:00.000Z',endAt:'2026-10-29T05:00:00.000Z',reason:'Reason'})
+ await submit(root);assert.deepEqual(writes[0],{scheduleId:'S',typeId:'T',startAt:'2026-10-29T03:00:00.000Z',endAt:'2026-10-29T05:00:00.000Z',reason:'Reason',medicalReference:null})
 })
 test('custom duration uses edited start, invalid duration blocks save, whole shift preserves original bounds',async()=>{
  const writes=fixture();const {root}=await mount(ui.LeaveForm,'/stores/A/workforce/leaves/new')

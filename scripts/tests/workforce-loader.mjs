@@ -8,6 +8,8 @@ export async function resolve(specifier, context, nextResolve) {
 }
 export async function load(url,context,nextLoad) {
  if(url.endsWith('.css'))return {format:'module',source:'export default {}',shortCircuit:true}
+ // Match Vite's JSON imports while retaining Node's native JSON parsing.
+ if(url.endsWith('.json'))return nextLoad(url,{...context,importAttributes:{...context.importAttributes,type:'json'}})
  if (/\.(ts|vue)$/.test(url)) {
   let source=await readFile(new URL(url),'utf8')
   if(url.endsWith('.vue')){const {descriptor}=parse(source,{filename:url});source=compileScript(descriptor,{id:url,inlineTemplate:true}).content}

@@ -94,6 +94,12 @@ public class LocalRuntimeSecurityConfiguration {
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/leave-groups/*/decision").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/approval-board","/api/v1/stores/*/workforce/approval-readiness").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/approval-board/preview","/api/v1/stores/*/workforce/approval-board/commit").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/attendance-month","/api/v1/stores/*/workforce/attendance-exceptions").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/attendance-days/*/review","/api/v1/stores/*/workforce/attendance-month/refresh","/api/v1/stores/*/workforce/attendance-exceptions/*","/api/v1/stores/*/workforce/attendance-exceptions/*/decision").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/leave-entitlements").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/employees/*/leave-entitlements/*").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/attendance-policy-defaults","/api/v1/stores/*/workforce/attendance-policy","/api/v1/stores/*/workforce/employees/*/attendance-policy").permitAll()
+                .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/attendance-policy-defaults/*","/api/v1/stores/*/workforce/employees/*/attendance-policies/*").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/v1/stores/*/workforce/work-mode","/api/v1/stores/*/workforce/clock-site","/api/v1/stores/*/workforce/clock-site/settings","/api/v1/stores/*/workforce/employees/*/work-mode").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/clock-site","/api/v1/stores/*/workforce/clock-site/settings","/api/v1/stores/*/workforce/employees/*/work-modes/*","/api/v1/stores/*/workforce/home-addresses/*","/api/v1/stores/*/workforce/home-addresses/*/decision","/api/v1/stores/*/workforce/clock-site/check").permitAll()
                 // Workforce verifies the authenticated actor, exact scope and AppGate in its application services.

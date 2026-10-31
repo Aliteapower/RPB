@@ -29,8 +29,8 @@ function mount(component,kind,route) {
 const response=body=>({ok:true,status:200,json:async()=>body})
 const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' ')
 before(async()=>{
- globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible'})
- globalThis.window={setInterval:()=>1,clearInterval:()=>{}}
+ globalThis.Document=class extends EventTarget {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible'})
+ globalThis.window=Object.assign(new EventTarget(),{setInterval:()=>1,clearInterval:()=>{}})
  const {build}=await import('esbuild'),{mkdir,writeFile,readFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
  const source=`export {default as CodePage} from './src/modules/wallet/pages/WalletCustomerCode.vue';export {default as TopupPage} from './src/modules/wallet/pages/WalletStaffTopup.vue';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as messages from './src/modules/wallet/locales.ts'`
  const result=await build({stdin:{contents:source,loader:'ts',resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',external:['vue','vue-i18n','vue-router','pinia'],plugins:[{name:'real-vue-components',setup(build){build.onLoad({filter:/\.vue$/},async({path})=>{

@@ -19,13 +19,13 @@ public final class PayrollSourceReasons {
    if(!Objects.equals(before.profile(),line.profile()))reasons.add(reason(id,"profile",line.profile()==null?null:line.profile().id().toString(),before.profile()==null?null:Long.toString(before.profile().version()),line.profile()==null?null:Long.toString(line.profile().version())));
    if(!Objects.equals(before.governance(),line.governance()))reasons.add(reason(id,"governance",id.toString(),before.governance()==null?null:before.governance().toString(),line.governance()==null?null:line.governance().toString()));
    if(inputChanged(before.input(),line.input()))reasons.add(reason(id,"monthly_input",id.toString(),Long.toString(before.input().version()),Long.toString(line.input().version())));
-   var refs=new HashMap<UUID,SourceRef>();before.sources().forEach(s->refs.put(s.scheduleId(),s));
+   var refs=new HashMap<UUID,SourceRef>();before.sources().forEach(s->refs.put(s.sourceId(),s));
    for(var source:line.sources()){
-    var prev=refs.remove(source.scheduleId());if(Objects.equals(prev,source))continue;
+    var prev=refs.remove(source.sourceId());if(Objects.equals(prev,source))continue;
     if(prev==null){reasons.add(sourceReason(id,"source",source,null,source.sourceFingerprint()));continue;}
-    for(String kind:sourceKinds(prev,source))reasons.add(sourceReason(id,kind,source,"approval".equals(kind)?Long.toString(prev.approvalVersion()):prev.sourceFingerprint(),"approval".equals(kind)?Long.toString(source.approvalVersion()):source.sourceFingerprint()));
+    for(String kind:sourceKinds(prev,source))reasons.add(sourceReason(id,kind,source,"approval".equals(kind)?Long.toString(prev.sourceVersion()):prev.sourceFingerprint(),"approval".equals(kind)?Long.toString(source.sourceVersion()):source.sourceFingerprint()));
    }
-   refs.values().forEach(s->reasons.add(reason(id,"source",s.scheduleId().toString(),s.sourceFingerprint(),null)));
+   refs.values().forEach(s->reasons.add(reason(id,"source",s.sourceId().toString(),s.sourceFingerprint(),null)));
   }
   old.keySet().forEach(id->reasons.add(reason(id,"removed",id.toString(),null,null)));
   if(reasons.isEmpty())reasons.add(reason(null,"source",null,baseline.sourceFingerprint(),capture.fingerprint()));
@@ -46,12 +46,12 @@ public final class PayrollSourceReasons {
  static boolean inputChanged(LineInput before,LineInput after){return before!=null&&after!=null&&before.version()!=after.version();}
  static List<String> sourceKinds(SourceRef before,SourceRef after){
   if(Objects.equals(before,after))return List.of();var kinds=new ArrayList<String>();
-  if(before.approvalVersion()!=after.approvalVersion()||(before.evidence()!=null&&after.evidence()!=null&&!Objects.equals(state(before),state(after))))kinds.add("approval");
-  if(before.evidence()!=null&&after.evidence()!=null&&(before.evidence().actualSeconds()!=after.evidence().actualSeconds()||!Objects.equals(before.evidence().startAt(),after.evidence().startAt())||!Objects.equals(before.evidence().endAt(),after.evidence().endAt())))kinds.add("attendance");
+  if(before.sourceVersion()!=after.sourceVersion()||(before.evidence()!=null&&after.evidence()!=null&&!Objects.equals(state(before),state(after))))kinds.add("approval");
+  if(before.evidence()!=null&&after.evidence()!=null&&(!Objects.equals(before.evidence().actualSeconds(),after.evidence().actualSeconds())||!Objects.equals(before.evidence().startAt(),after.evidence().startAt())||!Objects.equals(before.evidence().endAt(),after.evidence().endAt())))kinds.add("attendance");
   if("current".equals(state(before))&&"current".equals(state(after))&&(before.paidLeaveSeconds()!=after.paidLeaveSeconds()||before.unpaidLeaveSeconds()!=after.unpaidLeaveSeconds()))kinds.add("leave");
   return kinds.isEmpty()?List.of("source"):List.copyOf(kinds);
  }
- private static Reason sourceReason(UUID employee,String kind,SourceRef ref,String before,String after){return new Reason(employee,kind,ref.scheduleId().toString(),shorten(before),shorten(after),ref.payable()?"employee":"week_context","approval",ref.storeId(),ref.workDate());}
+ private static Reason sourceReason(UUID employee,String kind,SourceRef ref,String before,String after){return new Reason(employee,kind,ref.sourceId().toString(),shorten(before),shorten(after),ref.payable()?"employee":"week_context","attendance",ref.storeId(),ref.workDate());}
  private static String state(SourceRef ref){return ref.evidence()==null?null:ref.evidence().approvalState();}
  private static Reason reason(UUID employee,String kind,String source,String before,String after){return new Reason(employee,kind,source,shorten(before),shorten(after),employee==null?"company":"employee",switch(kind){case "profile"->"profile";case "monthly_input"->"input";case "approval","attendance","leave"->"approval";case "statutory_policy"->"policy";default->"review";},null,null);}
  private static String shorten(String s){return s!=null&&s.length()>64?s.substring(0,16):s;}

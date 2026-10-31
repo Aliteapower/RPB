@@ -107,7 +107,7 @@ test('management page offers positions and administrator access as sibling entri
 test('employee manager retains attendance settings without head-office maintenance entries',async()=>{
  const {root}=await mount(WorkforceManagement,'/stores/A/workforce/management',{...home,headOffice:false})
  const links=nodes(root,n=>n.tag==='a').map(n=>n.props.href)
- assert.deepEqual([...links].sort(),['document-expiries','clock-site','attendance-rules','shifts','leave-types','public-holidays','calendar','review-explanations','pay-template-library','pay-change-requests','approvals'].map(p=>'/stores/A/workforce/'+p).sort())
+ assert.deepEqual([...links].sort(),['employees','document-expiries','clock-site','attendance-rules','shifts','leave-types','public-holidays','calendar','review-explanations','pay-template-library','pay-change-requests','approvals'].map(p=>'/stores/A/workforce/'+p).sort())
  assert.match(text(root),/考勤日历/)
 })
 test('ordinary employee has no management entry',async()=>{
@@ -179,7 +179,7 @@ test('my profile shows only the linked person even when employee management is g
  globalThis.fetch=async()=>response({types:[],items:[]})
  const {root}=await mount(WorkforceProfile,'/stores/A/workforce',{...home,myself:employee})
  assert.match(text(root),/Alice/);assert.match(text(root),/E001/);assert.match(text(root),/Service/)
- assert.equal(nodes(root,n=>n.tag==='a').length,0)
+ assert.deepEqual(nodes(root,n=>n.tag==='a').map(n=>n.props.href),['/stores/'+employee.mainStoreId+'/workforce/employees/'+employee.id+'/leave-settings'])
  assert.match(text(root),/证件管理/);assert.doesNotMatch(text(root),/既有员工|员工维护/)
 })
 test('payroll company selection still scopes calculation and payment entry',async()=>{

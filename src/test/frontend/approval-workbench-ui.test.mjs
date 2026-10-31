@@ -55,18 +55,18 @@ function fixture(rows,options={}){
 async function normalPreview(root){button(root,'选择筛选范围全部正常记录').props.onClick();await settle();button(root,'预览批量核准').props.onClick();await settle()}
 async function confirm(root){nodes(root,n=>n.tag==='textarea').at(-1).props['onUpdate:modelValue']('Verified normal records');await settle();button(root,'确认核准').props.onClick();await settle()}
 test('cross-page all selection excludes a later-page item and per-item failures remain visible',async()=>{
- let selection;const f=fixture(Array.from({length:65},(_,i)=>entry(i)),{onPreview:c=>selection=c,failId:'S0'});const {root}=await mount(ui.ApprovalList,'/stores/A/workforce/approvals',admin)
+ let selection;const f=fixture(Array.from({length:65},(_,i)=>entry(i)),{onPreview:c=>selection=c,failId:'S0'});const {root}=await mount(ui.ApprovalList,'/stores/A/workforce/approvals?category=all',admin)
  button(root,'选择筛选范围全部正常记录').props.onClick();button(root,'下一页').props.onClick();await settle()
  const box=nodes(root,n=>n.tag==='input'&&n.props['aria-label']==='0050 2026-10-28')[0];box.props.onChange({target:{checked:false}});await settle();button(root,'预览批量核准').props.onClick();await settle();assert.equal(selection.all,true);assert.deepEqual(selection.excluded,['S50']);await confirm(root)
  assert.equal(f.commits[0].items.length,64);assert.ok(!f.commits[0].items.some(i=>i.scheduleId==='S50'));assert.match(text(root),/核准成功\s*63/);assert.match(text(root),/未核准\s*1/);assert.match(text(root),/Employee 0/)
 })
 test('unknown first chunk freezes controls and retries same 100 before processing remaining chunks',async()=>{
- const f=fixture(Array.from({length:205},(_,i)=>entry(i)),{loseFirst:true});const {root}=await mount(ui.ApprovalList,'/stores/A/workforce/approvals',admin);await normalPreview(root);await confirm(root)
+ const f=fixture(Array.from({length:205},(_,i)=>entry(i)),{loseFirst:true});const {root}=await mount(ui.ApprovalList,'/stores/A/workforce/approvals?category=all',admin);await normalPreview(root);await confirm(root)
  assert.equal(f.commits.length,1);assert.equal(nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0].props.disabled,true);assert.ok(button(root,'重试原批次'));button(root,'重试原批次').props.onClick();await settle()
  assert.deepEqual(f.commits.map(c=>c.items.length),[100,100,100,5]);assert.deepEqual(f.commits[1],f.commits[0]);assert.match(text(root),/核准成功\s*205/)
 })
 test('manager-only row cannot be selected or approved through inline legacy detail',async()=>{
- fixture([entry(0,'manager',false)]);const {root}=await mount(ui.ApprovalList,'/stores/A/workforce/approvals',{employeeManage:true,headOffice:false,myself:null})
+ fixture([entry(0,'manager',false)]);const {root}=await mount(ui.ApprovalList,'/stores/A/workforce/approvals?category=all',{employeeManage:true,headOffice:false,myself:null})
  const box=nodes(root,n=>n.tag==='input'&&n.props['aria-label']==='0000 2026-10-28')[0];assert.equal(box.props.disabled,true);button(root,'展开核准').props.onClick();await settle();assert.match(text(root),/经理工时须管理员核准/);assert.equal(button(root,'确认工时'),undefined)
 })
 test('exception can be judged and approved inline without losing workbench filter and query context',async()=>{

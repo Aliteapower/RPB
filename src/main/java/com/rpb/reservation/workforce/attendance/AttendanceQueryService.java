@@ -41,7 +41,7 @@ public class AttendanceQueryService {
             if(latest.isPresent())attendance=attendance(actor.tenantId(),schedules.find(actor.tenantId(),latest.get().scheduleId()).orElseThrow());
         }
         if(workModes==null)return new ClockHome(available,active,attendance,actions,now);
-        var policy=workModes.current(actor.tenantId(),employee.id(),store,today);var policies=new LinkedHashMap<UUID,com.rpb.reservation.workforce.workmode.WorkModeDtos.ClockPolicy>();
+        var policy=active==null?workModes.current(actor.tenantId(),employee.id(),store,today):workModes.policy(actor.tenantId(),employee.id(),store,schedules.find(actor.tenantId(),active.scheduleId()).orElseThrow().workDate(),active);var policies=new LinkedHashMap<UUID,com.rpb.reservation.workforce.workmode.WorkModeDtos.ClockPolicy>();
         for(var s:available)policies.put(s.id(),workModes.current(actor.tenantId(),employee.id(),store,s.workDate()));
         if(active==null){available=available.stream().filter(s->!policies.get(s.id()).mode().equals("free")).toList();if(available.isEmpty())actions.remove("IN");}
         return new ClockHome(available,active,attendance,actions,now,policy,policies);
@@ -55,5 +55,3 @@ public class AttendanceQueryService {
         return new Attendance(s,session,result.grossSeconds(),result.breakSeconds(),result.workSeconds(),anomalies,new BreakCalculator().summary(s.shift(),s.startAt(),session));
     }
 }
-
-

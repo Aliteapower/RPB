@@ -28,7 +28,7 @@ public class PayrollWorkbenchService {
    if(line.profile()!=null&&PayrollGeneration.fixed(line.profile().rule()))exempt++;
    var codes=validation.lines().stream().filter(l->l.employeeId().equals(id)).findFirst().orElseThrow().issues();
    for(String code:codes)if(!Set.of("APPROVAL_MISSING","APPROVAL_STALE","SOURCE_PENDING").contains(code))missing.add(new Missing(id,name,category(code),code,line.profile()==null?null:line.profile().id(),action(code)));
-   for(var ref:line.sources())if(ref.evidence()!=null&&!"current".equals(ref.evidence().approvalState()))approvals.add(new Approval(id,name,ref.scheduleId(),ref.storeId(),ref.workDate(),ref.evidence().approvalState(),!ref.payable()));
+   for(var ref:line.sources())if(ref.evidence()!=null&&!"current".equals(ref.evidence().approvalState()))approvals.add(new Approval(id,name,ref.sourceId(),ref.storeId(),ref.workDate(),ref.evidence().approvalState(),!ref.payable()));
   }
   for(String code:validation.issues())if(missing.stream().noneMatch(m->m.code().equals(code))&&Set.of("NO_EMPLOYEES","STATUTORY_POLICY_MISSING").contains(code))missing.add(new Missing(null,"",category(code),code,null,action(code)));
   var report=batch==null?null:progress.changes(actor,store,batch.id());

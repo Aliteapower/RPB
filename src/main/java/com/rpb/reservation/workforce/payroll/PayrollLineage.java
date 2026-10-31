@@ -10,9 +10,9 @@ final class PayrollLineage {
  private PayrollLineage(){}
  static List<String> issues(PayrollSources.CapturedLine line){
   var result=new LinkedHashSet<String>();var schedules=new HashSet<UUID>();var refs=line.sources();
-  for(var ref:refs)if(!schedules.add(ref.scheduleId()))result.add("SOURCE_DUPLICATE");
+  for(var ref:refs)if(!schedules.add(ref.sourceId()))result.add("SOURCE_DUPLICATE");
   for(int i=0;i<refs.size();i++)for(int j=i+1;j<refs.size();j++){
-   var a=refs.get(i);var b=refs.get(j);if(a.scheduleId().equals(b.scheduleId()))continue;
+   var a=refs.get(i);var b=refs.get(j);if(a.sourceId().equals(b.sourceId()))continue;
    var x=a.evidence();var y=b.evidence();
    if(x!=null&&y!=null&&x.startAt()!=null&&x.endAt()!=null&&y.startAt()!=null&&y.endAt()!=null&&x.startAt().isBefore(y.endAt())&&y.startAt().isBefore(x.endAt()))result.add("SOURCE_ACTUAL_OVERLAP");
   }
@@ -26,7 +26,7 @@ final class PayrollLineage {
    if(!seen.add(key))issues.add("ITEM_SOURCE_DUPLICATE");
    if(s==null)continue;
    if(Set.of("approved_work","paid_leave").contains(s.origin())){
-    var ref=refs.stream().filter(r->r.payable()&&r.scheduleId().toString().equals(s.sourceId())&&r.approvalVersion()==s.version()).findFirst().orElse(null);
+    var ref=refs.stream().filter(r->r.payable()&&r.sourceId().toString().equals(s.sourceId())&&r.sourceVersion()==s.version()).findFirst().orElse(null);
     if(ref==null||ref.evidence()==null||!"current".equals(ref.evidence().approvalState())||(s.eventId()!=null&&!ref.evidence().eventIds().contains(s.eventId())))issues.add("ITEM_SOURCE_INVALID");
     if((s.origin().equals("paid_leave")&&(ref==null||ref.paidLeaveSeconds()<=0||s.eventId()!=null))||(s.origin().equals("approved_work")&&i.kind().equals("deduction")&&s.eventId()==null))issues.add("ITEM_SOURCE_INVALID");
     if(i.kind().equals("deduction")&&s.eventId()!=null&&ref!=null&&ref.evidence()!=null&&ref.evidence().eventIds().contains(s.eventId())&&(s.independentReason()==null||s.independentReason().isBlank()))issues.add("ATTENDANCE_DEDUCTION_EXPLANATION_REQUIRED");
@@ -35,25 +35,29 @@ final class PayrollLineage {
  }
  static Hours hours(PayrollSources.CapturedLine s,PayCalculator.Calculation c){
   if(s.profile()!=null&&PayrollGeneration.fixed(s.profile().rule()))return new Hours(null,null,"not_applicable","fixed",null,null,null,null,null);
+  if(s.profile()!=null&&PayrollGeneration.contract(s.profile().rule()))return new Hours(null,null,"not_applicable","contract",null,null,c==null?null:c.overtimeSeconds(),s.input().workingDays(),s.input().payableDays());
   var payable=s.sources().stream().filter(SourceRef::payable).toList();
   boolean evidence=payable.stream().allMatch(r->r.evidence()!=null),current=evidence&&payable.stream().allMatch(r->"current".equals(r.evidence().approvalState()));
   String state=!evidence||payable.isEmpty()?"unavailable":current?"current":payable.stream().anyMatch(r->"stale".equals(r.evidence().approvalState()))?"stale":"missing";
-  Long actual=evidence&&!payable.isEmpty()?payable.stream().mapToLong(r->r.evidence().actualSeconds()).sum():null;
-  Long approved=current&&!payable.isEmpty()?payable.stream().mapToLong(r->r.evidence().approvedSeconds()).sum():null;
+  Long actual=evidence&&!payable.isEmpty()&&payable.stream().allMatch(r->r.evidence().actualSeconds()!=null)?payable.stream().mapToLong(r->r.evidence().actualSeconds()).sum():null;
+  Long approved=current&&!payable.isEmpty()&&payable.stream().allMatch(r->r.evidence().approvedSeconds()!=null)?payable.stream().mapToLong(r->r.evidence().approvedSeconds()).sum():null;
   String basis=s.profile()==null?"unknown":s.profile().rule().basis();boolean hourly=basis.equals("hourly");
   return new Hours(actual,approved,state,basis,hourly&&c!=null?c.normalSeconds():null,hourly&&c!=null?c.paidLeaveSeconds():null,hourly&&c!=null?c.overtimeSeconds():null,hourly?null:s.input().workingDays(),hourly?null:s.input().payableDays());
  }
  static List<Component> components(PayrollSources.CapturedLine s,YearMonth month,PayCalculator.Calculation c){
   if(c==null)return List.of();var out=new ArrayList<Component>();var r=s.profile().rule();var input=s.input();var raw=c.components();
-  var sourceKeys=s.sources().stream().map(x->x.scheduleId()+"/v"+x.approvalVersion()+":"+(x.payable()?"payable":"context")).toList();
+  var sourceKeys=s.sources().stream().map(x->x.sourceId()+"/v"+x.sourceVersion()+":"+(x.payable()?"payable":"context")).toList();
   var rate=new BigDecimal(r.rate());var basicQuantity=r.basis().equals("hourly")?Long.toString(c.normalSeconds()+c.paidLeaveSeconds()):input.payableDays();String unit=r.basis().equals("hourly")?"seconds":"days";
-  boolean fixed=PayrollGeneration.fixed(r),manualUnits=!fixed&&!r.basis().equals("hourly")&&!PayrollGeneration.automatic(r);var basicKeys=manualUnits?List.of("profile:"+s.profile().id()+"/v"+s.profile().version()+":rate","monthly_input:"+s.employee().id()+"/v"+input.version()+":units"):sourceKeys;String basicFormula=fixed?"fixed_full_v1":r.basis()+"_basic_v1";String prorate=r.basis().equals("monthly")?input.payableDays()+"/"+input.workingDays():"none";
+  boolean fixed=PayrollGeneration.fixed(r),contract=PayrollGeneration.contract(r),manualUnits=!fixed&&!r.basis().equals("hourly")&&!PayrollGeneration.automatic(r);var basicKeys=manualUnits?List.of("profile:"+s.profile().id()+"/v"+s.profile().version()+":rate","monthly_input:"+s.employee().id()+"/v"+input.version()+":units"):sourceKeys;String basicFormula=fixed?"fixed_full_v1":contract?"contract_"+r.basis()+"_v1":r.basis()+"_basic_v1";String prorate=r.basis().equals("monthly")?input.payableDays()+"/"+input.workingDays():"none";
   BigDecimal basicNumerator=r.basis().equals("hourly")?rate.multiply(BigDecimal.valueOf(c.normalSeconds()+c.paidLeaveSeconds())):rate.multiply(new BigDecimal(input.payableDays()));BigDecimal basicDenominator=r.basis().equals("hourly")?new BigDecimal("3600"):r.basis().equals("monthly")?new BigDecimal(input.workingDays()):BigDecimal.ONE;
-  out.add(component(raw.get(0),s,fixed?"profile":manualUnits?"monthly_input":"approved_work","basic",month,basicFormula,fixed?"1":basicQuantity,fixed?"fixed_salary":unit,r.rate(),"1",fixed?"full":prorate,ratio(basicNumerator,basicDenominator),fixed?List.of(s.profile().id()+"/v"+s.profile().version()+":basic"):basicKeys));
+  out.add(component(raw.get(0),s,fixed?"profile":contract?"contract":manualUnits?"monthly_input":s.sources().stream().anyMatch(x->"arrangement".equals(x.sourceType()))?"arrangement":"approved_work","basic",month,basicFormula,fixed?"1":basicQuantity,fixed?"fixed_salary":unit,r.rate(),"1",fixed?"full":prorate,(contract?c.basicPay().toPlainString():ratio(basicNumerator,basicDenominator)),fixed?List.of(s.profile().id()+"/v"+s.profile().version()+":basic"):basicKeys));
   var otNum=rate.multiply(BigDecimal.valueOf(c.overtimeSeconds())).multiply(new BigDecimal(r.overtimeMultiplier()));var otDen=new BigDecimal("3600");
   if(r.basis().equals("monthly")){otNum=otNum.multiply(new BigDecimal("12"));otDen=otDen.multiply(new BigDecimal("52")).multiply(new BigDecimal("44"));}else if(r.basis().equals("daily"))otDen=otDen.multiply(new BigDecimal(r.dayHours()));
-  out.add(component(raw.get(1),s,fixed?"profile":"approved_work","overtime",month,r.basis()+"_overtime_v1",Long.toString(c.overtimeSeconds()),fixed?"not_applicable":"seconds",r.rate(),r.overtimeMultiplier(),"none",ratio(otNum,otDen),sourceKeys));
-  int offset=2;
+  out.add(component(raw.get(1),s,fixed?"profile":contract?"contract":"approved_work","overtime",month,(contract?"contract_":"")+r.basis()+"_overtime_v1",Long.toString(c.overtimeSeconds()),fixed?"not_applicable":"seconds",r.rate(),r.overtimeMultiplier(),"none",contract||s.compliance()!=null?c.overtimePay().toPlainString():ratio(otNum,otDen),sourceKeys));
+  int offset=raw.size()-r.items().size()-input.items().size();
+  for(int index=2;index<offset;index++){
+   var extra=raw.get(index);out.add(component(extra,s,"contract","additional_regular",month,"part_time_additional_regular_v1",null,"seconds",r.rate(),"1","none",extra.amount().toPlainString(),sourceKeys));
+  }
   for(boolean recurring:new boolean[]{true,false}){var items=recurring?r.items():input.items();for(int index=0;index<items.size();index++){
    var item=items.get(index);var value=raw.get(offset++);var source=item.source();String origin=source==null?(recurring?"profile":"monthly_input"):source.origin();String id=item.itemId()==null?"legacy:"+index:item.itemId().toString();
    String sourceId=source==null?(recurring?s.profile().id().toString():s.employee().id().toString()):source.sourceId();long version=source==null?(recurring?s.profile().version():input.version()):source.version();

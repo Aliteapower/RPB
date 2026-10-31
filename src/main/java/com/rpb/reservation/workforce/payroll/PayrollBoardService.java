@@ -26,7 +26,7 @@ public class PayrollBoardService {
    var employment=repository.employmentSources(actor.tenantId(),company,capture.lines().stream().map(l->l.employee().id()).toList(),month).periods();
    var savedLines=new HashMap<UUID,PayrollLine>();if(saved!=null)saved.lines().forEach(l->savedLines.put(l.employeeId(),l));
    for(var source:capture.lines()){
-    var approvals=source.sources().stream().filter(r->r.evidence()!=null&&!"current".equals(r.evidence().approvalState())).map(r->new ApprovalTarget(r.scheduleId(),r.storeId(),r.workDate(),r.evidence().approvalState())).toList();
+    var approvals=source.sources().stream().filter(r->r.evidence()!=null&&!"current".equals(r.evidence().approvalState())).map(r->new ApprovalTarget(r.sourceId(),r.storeId(),r.workDate(),r.evidence().approvalState(),r.sourceType(),r.sourceVersion())).toList();
     var periods=employment.getOrDefault(source.employee().id(),List.of());var suggested=periods.size()==1?periods.getFirst().from():null;
     var check=validLines.get(source.employee().id());var line=savedLines.get(source.employee().id());
     if(line==null){var p=source.profile();rows.add(new Row(source.employee().id(),source.employee().name(),source.employee().employeeNo(),source.employee().jobTitle(),p==null?null:p.rule().basis(),p==null?null:p.id(),null,null,null,check.issues(),null,null,approvals,suggested));}

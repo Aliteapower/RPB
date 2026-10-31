@@ -55,6 +55,7 @@ test('new citizen CDAC declaration is required before saving and preserves enter
    if(String(url).includes('/pay-profiles?'))return response({items:[],employees:[{id:'E',name:'Alice'}],employeeBirthDates:{E:'1990-01-02'}});return normal(url,opt)
   };
   const {root,router}=await mount(ui.PayProfileForm,'/stores/A/workforce/pay-profiles/new?companyId=C&employeeId=E',{},[],locale);
+  select(root,'hourly').props['onUpdate:modelValue']('hourly');await settle();nodes(root,n=>n.tag==='button'&&(/预览并应用岗位默认|Preview.*default/i.test(text(n))))[0].props.onClick();await settle();
   select(root,'citizen').props['onUpdate:modelValue']('citizen');nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal')[0].props['onUpdate:modelValue']('88.00');await settle();await submit(root);
   assert.equal(writes.length,0);assert.match(text(root),expected);assert.equal(nodes(root,n=>n.tag==='input'&&n.props.inputmode==='decimal')[0].value,'88.00');
   assert.doesNotMatch(text(root),/申请草稿|Change draft/);select(root,'not_applicable').props['onUpdate:modelValue'](status);await settle();await submit(root);

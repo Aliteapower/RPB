@@ -60,7 +60,7 @@ test('statutory policies share management breadcrumbs and remain head-office onl
  const {managementNavigation}=await import('../../../src/modules/workforce/managementNavigation.ts')
  const route={name:'workforce-statutory-policies',params:{storeId:'A'},query:{}}
  assert.equal(managementNavigation(route,{employeeManage:true,headOffice:false},null,'zh-CN'),null)
- assert.deepEqual(managementNavigation(route,{employeeManage:true,headOffice:true},null,'zh-CN').crumbs.map(c=>c.label),['管理','CPF／SDL／CDAC规则'])
+ assert.deepEqual(managementNavigation(route,{employeeManage:true,headOffice:true},null,'zh-CN').crumbs.map(c=>c.label),['设置','CPF／SDL／CDAC规则'])
 })
 for(const [code,expected] of [['WORKFORCE_STATUTORY_OVERLAP','启用规则的生效日期与现有规则重叠'],['WORKFORCE_CONFLICT','规则版本已改变']])test(code+' retains draft and reports policy-specific failure',async()=>{
  const calls=fixture(),original=globalThis.fetch,{WorkforceApiError}=await import('../../../src/modules/workforce/api.ts')

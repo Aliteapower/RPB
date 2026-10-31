@@ -9,6 +9,7 @@ import WorkModeFields from '../components/WorkModeFields.vue'
 import WorkPointFields from '../components/WorkPointFields.vue'
 import PhaseStatus from '../components/PhaseStatus.vue'
 import WorkModePolicyList from '../components/WorkModePolicyList.vue'
+import AttendancePolicySettings from '../components/EmployeeAttendancePolicySettings.vue'
 import {groupAssignments,workModeDisplayText} from '../workModeDisplay'
 const {error}=useWorkforceText()
 const {api,home,base,current,loading,busy,failure,notice,load,english}=usePhasePage(),route=useRoute(),{w}=useWorkModeText()
@@ -16,7 +17,7 @@ const pointBusy=ref(false)
 const data=ref<WorkModeData|null>(null),mode=ref<WorkMode>('legacy'),allowedModes=ref<WorkMode[]|undefined>(undefined),inherit=ref(true),effectiveFrom=ref(''),addressDate=ref(''),point=ref(emptyPoint()),notes=ref<Record<string,string>>({})
 type Pending={path:string;body:unknown;assignmentVersion?:number};const pending=ref<Pending|null>(null)
 const employeeId=String(route.params.employeeId||''),self=computed(()=>!!data.value&&home.value?.myself?.id===data.value.employeeId),minimum=computed(()=>data.value?tomorrow(data.value.serverDate):''),assignmentMinimum=computed(()=>{const dates=data.value?.assignments.map(a=>a.effectiveFrom)||[];return dates.reduce((max,d)=>d>=max?tomorrow(d):max,minimum.value)})
-const tab=ref<'settings'|'addresses'|'history'>('settings')
+const tab=ref<'settings'|'addresses'|'history'|'attendance'>('settings')
 const ui=computed(()=>workModeDisplayText(english()))
 const policyGroups=computed(()=>groupAssignments(data.value?.assignments||[],data.value?.serverDate||''))
 const currentAssignment=computed(()=>policyGroups.value.find(g=>g.status==='current')?.assignment)
@@ -41,7 +42,8 @@ onMounted(refresh)
   <PhaseStatus :failure="failure" :notice="notice" :loading="loading"/>
   <div v-if="pending" role="status"><p>{{w('unknown')}}</p><button :disabled="busy" @click="send()">{{w('retry')}}</button></div>
   <template v-if="data&&!loading">
-   <nav class="wm-nav" :aria-label="w('title')"><button v-for="key in (['settings','addresses','history'] as const)" :key="key" :data-workmode-tab="key" :aria-pressed="tab===key" :aria-controls="'wm-'+key" :disabled="busy||pointBusy" @click="tab=key">{{ui[key]}}<span v-if="key==='addresses'&&pendingAddresses.length" class="wf-badge wf-badge-warning">{{pendingAddresses.length}}</span></button></nav>
+   <nav class="wm-nav" :aria-label="w('title')"><button data-workmode-tab="attendance" :aria-pressed="tab==='attendance'" :disabled="busy||pointBusy" @click="tab='attendance'">{{english()?'Attendance policy':'考勤计薪方式'}}</button><button v-for="key in (['settings','addresses','history'] as const)" :key="key" :data-workmode-tab="key" :aria-pressed="tab===key" :aria-controls="'wm-'+key" :disabled="busy||pointBusy" @click="tab=key">{{key==='settings'?(english()?'Clock location settings':'打卡位置设置'):ui[key]}}<span v-if="key==='addresses'&&pendingAddresses.length" class="wf-badge wf-badge-warning">{{pendingAddresses.length}}</span></button></nav>
+   <AttendancePolicySettings v-if="tab==='attendance'" :employee-id="employeeId||undefined"/>
    <section v-if="tab==='settings'" id="wm-settings">
     <article class="wm-current-summary"><header><h3>{{ui.currentPolicy}}</h3><span class="wf-badge wm-current">{{ui.current}}</span></header><strong>{{(data.policy?.options?.map(o=>o.mode)||[data.policy?.mode||'legacy']).map(m=>w(m)).join(' / ')}}</strong><p v-if="(data.policy?.options?.length||0)>1">{{w('defaultMode')}}: {{w(data.policy!.mode)}}</p><p v-if="currentAssignment">{{w('effectiveFrom')}}: {{currentAssignment.effectiveFrom}} · {{w(currentAssignment.origin==='position'?'position':'personal')}}</p><p class="wf-hint">{{ui.settingsHint}}</p></article>
     <section v-if="upcoming.length" class="wm-section"><h3>{{ui.upcomingPolicies}}</h3><WorkModePolicyList :groups="upcoming"/></section>
@@ -55,7 +57,7 @@ onMounted(refresh)
     </section>
     <details class="wm-section" data-address-group="history"><summary>{{ui.addressHistory}} · {{reviewedAddresses.length}}</summary><p v-if="!reviewedAddresses.length" class="wf-empty">{{w('empty')}}</p><article v-for="a in reviewedAddresses" :key="a.id" class="wm-address-card"><header><strong>{{a.point.label}}</strong><span class="wf-badge">{{addressStatus(a)}}</span></header><p>{{w('effectiveFrom')}}: {{a.effectiveFrom}}</p><p v-if="a.reviewerId">{{w('reviewer')}}: {{data.reviewerNames?.[a.reviewerId]?.trim()||ui.unknownReviewer}}</p><p v-if="a.reviewNote">{{w('reviewNote')}}: {{a.reviewNote}}</p><details><summary>{{ui.coordinates}}</summary><p>{{a.point.latitude}}, {{a.point.longitude}} · {{a.point.radiusMeters}} m</p></details></article></details>
    </section>
-   <section v-else id="wm-history"><h3>{{w('history')}}</h3><p class="wf-hint">{{ui.historyHint}}</p><WorkModePolicyList :groups="policyGroups"/><p v-if="!policyGroups.length" class="wf-empty">{{w('empty')}}</p></section>
+   <section v-else-if="tab==='history'" id="wm-history"><h3>{{w('history')}}</h3><p class="wf-hint">{{ui.historyHint}}</p><WorkModePolicyList :groups="policyGroups"/><p v-if="!policyGroups.length" class="wf-empty">{{w('empty')}}</p></section>
   </template>
  </section>
 </template>

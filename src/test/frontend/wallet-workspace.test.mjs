@@ -16,8 +16,8 @@ function mount(setup,route={params:{storeId:'A'},hash:'',query:{}},pinia=createP
   return{state,unmount:()=>app.unmount()}
 }
 before(async()=>{
-  globalThis.window={setInterval:fn=>{timers.set(++timer,fn);return timer},clearInterval:id=>timers.delete(id),location:{origin:'http://127.0.0.1:5178'}}
-  globalThis.document={visibilityState:'visible'}
+  globalThis.window=Object.assign(new EventTarget(),{setInterval:fn=>{timers.set(++timer,fn);return timer},clearInterval:id=>timers.delete(id),location:{origin:'http://127.0.0.1:5178'}})
+  globalThis.document=Object.assign(new EventTarget(),{visibilityState:'visible'})
   // Bundle the production modules together so their injection keys retain identity without a dev server.
   const {build}=await import('esbuild'),{mkdir,writeFile}=await import('node:fs/promises'),{pathToFileURL}=await import('node:url')
   const source=`export * as historyModule from './src/modules/wallet/transactions/useTransactions.ts';export * as recordModule from './src/modules/wallet/useWalletRecord.ts';export * as staffModule from './src/modules/wallet/useStaffWallet.ts';export * as customerModule from './src/modules/wallet/useCustomerWallet.ts';export * as authModule from './src/stores/authSession.ts';export * as receiptModule from './src/modules/wallet/useWalletCodeReceipt.ts';export * as codeModule from './src/modules/wallet/useCustomerWalletCode.ts'`

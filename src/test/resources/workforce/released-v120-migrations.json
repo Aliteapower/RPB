@@ -1,0 +1,726 @@
+{
+  "releasedCommit": "e2457db5b48d60bd3ad70f57f221c5a34eac35b3",
+  "description": "Read-only online Flyway baseline and released JAR resources verified 2026-10-31; LF/CRLF normalized only. No business data.",
+  "migrations": [
+    {
+      "version": "1",
+      "script": "V001__reservation_platform_bootstrap.sql",
+      "checksum": 1552340154,
+      "normalizedSha256": "fe37b8118f743a7f536f39114dba4ce8fc21d9dee18398b6517ae26e9982b624"
+    },
+    {
+      "version": "2",
+      "script": "V002__app_gate_foundation.sql",
+      "checksum": 2078486921,
+      "normalizedSha256": "20e08a6a1fcd5327c301cb7f2dd3d09da5d9a1a760d784db1c9b05382e8fa3fb"
+    },
+    {
+      "version": "3",
+      "script": "V003__auth_minimal_login.sql",
+      "checksum": -1205558705,
+      "normalizedSha256": "a7dc1f1ff4567dc96a4409123b205ac900a695ea3e1173f2f954d118720fdae5"
+    },
+    {
+      "version": "4",
+      "script": "V004__platform_tenant_admin_bootstrap.sql",
+      "checksum": 1465737924,
+      "normalizedSha256": "c20956958253ced453e592213531031a1ed53ff42e44eac564caa1a5b6214af4"
+    },
+    {
+      "version": "5",
+      "script": "V005__platform_tenant_contact_account_fields.sql",
+      "checksum": 1209158019,
+      "normalizedSha256": "661e1f626de6323d810428d818045f4a51807abc215c272632b276d039f9d812"
+    },
+    {
+      "version": "6",
+      "script": "V006__tenant_admin_management_foundation.sql",
+      "checksum": -446004293,
+      "normalizedSha256": "1e4005031022e512773724f0dd89428fe520bce54fa0a8cddfaa3d7917dd5d91"
+    },
+    {
+      "version": "7",
+      "script": "V007__queue_display_ad_config.sql",
+      "checksum": 1100117539,
+      "normalizedSha256": "29ead93e7afd8eb1dd8fad1b052745ab27dda19ed88580a2174087551332f79f"
+    },
+    {
+      "version": "8",
+      "script": "V008__platform_product_line_billing.sql",
+      "checksum": 1370206061,
+      "normalizedSha256": "a0b08fa65373db842d7c02abe799bc252dccfb222f48f573720bf30466028660"
+    },
+    {
+      "version": "9",
+      "script": "V009__call_screen_media_carousel.sql",
+      "checksum": 1634098703,
+      "normalizedSha256": "45730fac8d319f755408dd4838062208e2860b065764632ea160bb7d585af6d2"
+    },
+    {
+      "version": "10",
+      "script": "V010__platform_product_line_prices.sql",
+      "checksum": -1445208775,
+      "normalizedSha256": "a21165865e53b6d0d90afe44e6352ddc938bafcbe3fea7766232bb7600de337a"
+    },
+    {
+      "version": "11",
+      "script": "V011__tenant_table_sort_order.sql",
+      "checksum": 121994250,
+      "normalizedSha256": "7253480928d8aad9a9fad17ceccd2962692937fa2edd888a4567c5b700efeecd"
+    },
+    {
+      "version": "12",
+      "script": "V012__platform_branding_profile.sql",
+      "checksum": 464638899,
+      "normalizedSha256": "071cf171ddb39e33b4adc0a8959f0062f75ad41f622a437b2e8ffe633ec5d19d"
+    },
+    {
+      "version": "13",
+      "script": "V013__store_reservation_share_profile.sql",
+      "checksum": -1914893390,
+      "normalizedSha256": "4002b07504f6140625a62352382b25b2acc0a587ed5def9e67c71997f3ca4572"
+    },
+    {
+      "version": "14",
+      "script": "V014__platform_reservation_share_template_seed.sql",
+      "checksum": -2144944084,
+      "normalizedSha256": "eb4146ce9c54731ec2dfadb592814ebff9e61956e715598ff63ddb5afb03c1a4"
+    },
+    {
+      "version": "15",
+      "script": "V015__platform_reservation_share_template_permission.sql",
+      "checksum": -1692946951,
+      "normalizedSha256": "63124c930af331e8f74d64a55ae32d7250c37c85d7115ab3854340f472c37aef"
+    },
+    {
+      "version": "16",
+      "script": "V016__normalize_store_date_format.sql",
+      "checksum": -1546111706,
+      "normalizedSha256": "847d3b7ccd9e505bd369d860e1f272e7ffec091eed5b03eadaeb6aaacb786713"
+    },
+    {
+      "version": "17",
+      "script": "V017__reservation_public_share_tokens.sql",
+      "checksum": 534198882,
+      "normalizedSha256": "f07fb660d9cfce1444a29ce9c2923a43ddce1cebcaa1bf78504ad9dec884a166"
+    },
+    {
+      "version": "18",
+      "script": "V018__dedupe_reservation_share_template.sql",
+      "checksum": 156267078,
+      "normalizedSha256": "799d4aa1d2ef515a307dc7b5608879a093c7c29235402cc50d3969eb0b51ed82"
+    },
+    {
+      "version": "19",
+      "script": "V019__reservation_meal_period_schedule.sql",
+      "checksum": -1651663546,
+      "normalizedSha256": "974ce182e6fd35902ce5312373f1fc30b1e6c4d33a394225659fa149c9dbca0f"
+    },
+    {
+      "version": "20",
+      "script": "V020__store_whatsapp_share_profile.sql",
+      "checksum": 358461440,
+      "normalizedSha256": "5af4ef2a1efccb9f989662a09e13a19cebcd9aa39824224ba4738e1329cf59ae"
+    },
+    {
+      "version": "21",
+      "script": "V021__store_share_email.sql",
+      "checksum": -1097485547,
+      "normalizedSha256": "2c855d8022a6f7cb758cd9a64d526f583e49b3359dc8997c4ed1435e6cb9d70f"
+    },
+    {
+      "version": "22",
+      "script": "V022__tenant_onboarding_default_store_backfill.sql",
+      "checksum": 1353867824,
+      "normalizedSha256": "9b0763ff0585008ae76a99aa212f46d0012ff030373632005cf6fa6ce124778e"
+    },
+    {
+      "version": "23",
+      "script": "V023__tenant_subscription_zero_amount_price_backfill.sql",
+      "checksum": 727780512,
+      "normalizedSha256": "96f9d704a7dc8cc280165f3f346bb31750e3114500ce79fc10d00e7c26fd5666"
+    },
+    {
+      "version": "24",
+      "script": "V024__public_booking_customer_auth.sql",
+      "checksum": 1047480481,
+      "normalizedSha256": "9e08f44a8e8b77713ba41f3432309774ada7c2fa2b5b7ad37b3db9770d96b651"
+    },
+    {
+      "version": "25",
+      "script": "V025__customer_auth_integration_settings.sql",
+      "checksum": 280641653,
+      "normalizedSha256": "f90bd704e063b24e43bf500bae2506670b5b6733be524c203ce808c869ca9fce"
+    },
+    {
+      "version": "26",
+      "script": "V026__public_booking_availability_rules.sql",
+      "checksum": -941985212,
+      "normalizedSha256": "762c308d8578ccec425bab4d8342e3675c2570f6203e492ed9577ef44ba65e47"
+    },
+    {
+      "version": "27",
+      "script": "V027__refresh_legacy_reservation_share_defaults.sql",
+      "checksum": 164758197,
+      "normalizedSha256": "db886fc661f2ddac50b8b1bbba0605e453aeb0a326424d10d96e7b6a7632f9e4"
+    },
+    {
+      "version": "28",
+      "script": "V028__i18n_message_catalog_registry.sql",
+      "checksum": 605577858,
+      "normalizedSha256": "a6e042650c3b4f8f8aa1d0a10df5d4355d4adc6dd7d883c7ea09b72fe9a4b890"
+    },
+    {
+      "version": "29",
+      "script": "V029__normalize_i18n_template_escaped_newlines.sql",
+      "checksum": 490672345,
+      "normalizedSha256": "ced34ab80a101ba57a5ab213e187f7fb11c2bb1616c7258bfc02a008bb270adb"
+    },
+    {
+      "version": "30",
+      "script": "V030__auth_account_scoped_username.sql",
+      "checksum": -1385985563,
+      "normalizedSha256": "522adb2d135bd34696e033d0eb5e9677e247825e059bce7d711158a4da06b173"
+    },
+    {
+      "version": "31",
+      "script": "V031__english_reservation_share_default_template.sql",
+      "checksum": 39298627,
+      "normalizedSha256": "5217549aba548b25e29a691ce427b8b3ee1c51cd20ed1829032d764ec840bddc"
+    },
+    {
+      "version": "32",
+      "script": "V032__catch_up_english_reservation_share_seed.sql",
+      "checksum": 1442784859,
+      "normalizedSha256": "7b5c1d921c35d7865cef1a7ac108694e884ac1c72f450197d866108446d8dadc"
+    },
+    {
+      "version": "33",
+      "script": "V033__ensure_chinese_reservation_share_platform_template.sql",
+      "checksum": 1015901353,
+      "normalizedSha256": "3bb99f36ab4a456a919707dc8babeffa6d2d9a5598f8cca6a1c932b4a4c250c4"
+    },
+    {
+      "version": "34",
+      "script": "V034__allow_public_booking_operation_source.sql",
+      "checksum": -1260503003,
+      "normalizedSha256": "072c17ac24065f92293d7f969c8ff13f7dc03a15afdcfc259226799dbed37e3a"
+    },
+    {
+      "version": "35",
+      "script": "V035__tenant_operating_entities_and_store_structure.sql",
+      "checksum": -146138178,
+      "normalizedSha256": "090de033cfc718d73e07e5029d2463d66ccc8be79b9f34bcf3461c67fdff7685"
+    },
+    {
+      "version": "36",
+      "script": "V036__tenant_subscription_store_billing_items.sql",
+      "checksum": 321828484,
+      "normalizedSha256": "2f1fed04018f8b3e94e173379b0dffb5222b4c13025f6877b3099aac17816d2a"
+    },
+    {
+      "version": "37",
+      "script": "V037__tenant_store_host_alias_backfill.sql",
+      "checksum": -1329927462,
+      "normalizedSha256": "aaa281c1d004c7659526f07167360ac9f212e8fd1cd4a460bf32dbb40d6cb4b8"
+    },
+    {
+      "version": "38",
+      "script": "V038__tenant_default_operating_entity_backfill.sql",
+      "checksum": -1531454700,
+      "normalizedSha256": "2b1cf3dc048c80190e5cfeffa512addf786e6f7db71fff85d3946877a765d633"
+    },
+    {
+      "version": "39",
+      "script": "V039__tenant_host_alias_backfill.sql",
+      "checksum": 1214015505,
+      "normalizedSha256": "5010ad032954d60c8a00051193578486dffcbdc162cf17a3427b6a9e619b1fe6"
+    },
+    {
+      "version": "40",
+      "script": "V040__public_host_bindings.sql",
+      "checksum": -1520719295,
+      "normalizedSha256": "115260c9f8047d495d9f7490623f7f8792d3ebe6714b8abf7cbe538bbfc19a1f"
+    },
+    {
+      "version": "41",
+      "script": "V041__store_level_subscription_item_periods.sql",
+      "checksum": 1820058786,
+      "normalizedSha256": "35933a06f5dfdbb85496d8b0e0b93997af99b715435c2dc77269c61a4f9a8771"
+    },
+    {
+      "version": "42",
+      "script": "V042__allow_store_item_subscription_events.sql",
+      "checksum": -890624892,
+      "normalizedSha256": "eebb325e4d1aa3c837f0ca2218aa224009dc1aaaf172c25e83ce0bd8fef56bb4"
+    },
+    {
+      "version": "43",
+      "script": "V043__admin_dual_entry_login_backfill.sql",
+      "checksum": -1463382542,
+      "normalizedSha256": "d798bafc6425d3bdec2804847fd985eb2baf906aae50e568d38fefec8b0ce0a8"
+    },
+    {
+      "version": "44",
+      "script": "V044__sync_active_store_subscription_app_settings.sql",
+      "checksum": -1043924414,
+      "normalizedSha256": "7dea62b5bc779c2f81e59d82a13761890bc6adaa80a951e88b35ad78faabb9e1"
+    },
+    {
+      "version": "45",
+      "script": "V045__reservation_active_preassignment_uniqueness.sql",
+      "checksum": -762750483,
+      "normalizedSha256": "1dc70c8b29c319b63a8ccfd623cd7e9eb8b64c93468d689aa5d74a226094d0fc"
+    },
+    {
+      "version": "46",
+      "script": "V046__backfill_default_queue_groups.sql",
+      "checksum": 1993618175,
+      "normalizedSha256": "88d07a213da984decd77d876e9063eaa110b2d4680ee0829e681d3236cd70b6c"
+    },
+    {
+      "version": "47",
+      "script": "V047__payment_product_line_foundation.sql",
+      "checksum": -999032380,
+      "normalizedSha256": "33d3c8a89f80c412f724e3d9efae3d0db08a0db6880875392ac32f4ce5b82bff"
+    },
+    {
+      "version": "48",
+      "script": "V048__paynow_existing_tenant_admin_permissions.sql",
+      "checksum": 855311604,
+      "normalizedSha256": "cbc8db23818acd86b117979309e23e582ea4c3e08165bf9a910a0890d4733d05"
+    },
+    {
+      "version": "49",
+      "script": "V049__paynow_existing_store_staff_permissions.sql",
+      "checksum": -471369261,
+      "normalizedSha256": "b2d49f2913da3955f5ef68c134194e0ed9665c2bb28ab40a6e4d4d44e74d6c47"
+    },
+    {
+      "version": "50",
+      "script": "V050__paynow_recent_tenant_admin_permissions.sql",
+      "checksum": 855311604,
+      "normalizedSha256": "cbc8db23818acd86b117979309e23e582ea4c3e08165bf9a910a0890d4733d05"
+    },
+    {
+      "version": "51",
+      "script": "V051__payment_i18n_catalog_product_line_scope.sql",
+      "checksum": -1388879886,
+      "normalizedSha256": "1d735fd95d3232148eb8ce703bcd9eb971a2079b178b1eed7980b1725b49347a"
+    },
+    {
+      "version": "52",
+      "script": "V052__payment_business_days.sql",
+      "checksum": 371379396,
+      "normalizedSha256": "27b01d4bf2b5dc6ad7f27d0b5921ead9d0aa6300e2909b711711196641bd89fb"
+    },
+    {
+      "version": "53",
+      "script": "V053__paynow_payment_proof_review_permissions.sql",
+      "checksum": 1048241650,
+      "normalizedSha256": "436856924a45abc4f31bab5b3fec2c202c6e3c43a6a900d8ccab240e755ac1b7"
+    },
+    {
+      "version": "54",
+      "script": "V054__paynow_payment_proof_template_library.sql",
+      "checksum": -1816941833,
+      "normalizedSha256": "44f71f72a30555aaef3b360bb08e6d8805959148efc0dada628140828a7be6a4"
+    },
+    {
+      "version": "55",
+      "script": "V055__paynow_platform_proof_template_contributions.sql",
+      "checksum": 835044326,
+      "normalizedSha256": "41144dd237bbeb0e8aebb3bc424c7642f215aca26bebad559aa8db3ff914e92e"
+    },
+    {
+      "version": "56",
+      "script": "V056__daily_ledger_product_line.sql",
+      "checksum": -279840915,
+      "normalizedSha256": "504363eecc5e5ad4108537f3e6d4ffced702394550957d003331a01804f7c87c"
+    },
+    {
+      "version": "57",
+      "script": "V057__wallet_product_line.sql",
+      "checksum": 329528180,
+      "normalizedSha256": "432ddebed8a6e1d78dad7d624c2d6379dd4067330b710ed83bcd3013c634b617"
+    },
+    {
+      "version": "58",
+      "script": "V058__shared_customer_password_login.sql",
+      "checksum": -691956514,
+      "normalizedSha256": "933bafe1ccd94df4d762e6ed577cf82dd597215f85290fa5cc049fd0d14d9d26"
+    },
+    {
+      "version": "59",
+      "script": "V059__wallet_funding_components.sql",
+      "checksum": 97582962,
+      "normalizedSha256": "1388047dac9ff6382398a9a5873e81dd72ecc099be963c99f4a653be027266e3"
+    },
+    {
+      "version": "60",
+      "script": "V060__wallet_marketing.sql",
+      "checksum": -1580611723,
+      "normalizedSha256": "0d0edc16cbffe82b1e42247cf88b7ea6fb8167fe565e6f713724c5ce8e184556"
+    },
+    {
+      "version": "61",
+      "script": "V061__wallet_manual_points.sql",
+      "checksum": -70725374,
+      "normalizedSha256": "59180aca90c798690c7b449127ef78e2e6582f0521ebea46d8adcf92005b2c72"
+    },
+    {
+      "version": "62",
+      "script": "V062__wallet_marketing_manager_permissions.sql",
+      "checksum": 426175898,
+      "normalizedSha256": "5bc35ad7b73bff0954527f59501e25f045fc4e98c0d6b158975405e6a9862721"
+    },
+    {
+      "version": "63",
+      "script": "V063__wallet_customer_identity_codes.sql",
+      "checksum": -605797313,
+      "normalizedSha256": "09f9e97862cb203106e323ba3692eb8d7ac42420d101da6a74c0c26d298ac3db"
+    },
+    {
+      "version": "64",
+      "script": "V064__wallet_personal_payment.sql",
+      "checksum": -482799545,
+      "normalizedSha256": "e5ad320dda4f1c54c9a53d173ea853823ae0775273af3ff5b1402cea9dc54915"
+    },
+    {
+      "version": "65",
+      "script": "V065__wallet_points_redemption_requests.sql",
+      "checksum": 1056197552,
+      "normalizedSha256": "af730172ec7f7102d7c5be96319efd70e744c8fceda7df41891ffa290544c49b"
+    },
+    {
+      "version": "66",
+      "script": "V066__wallet_unbound_merchant_orders.sql",
+      "checksum": -1172263170,
+      "normalizedSha256": "821e8fa937fa854c9be89a4cfdb5b4b2d58f248b55a39d48db4c793b34c13e47"
+    },
+    {
+      "version": "67",
+      "script": "V067__shared_customer_privacy_consents.sql",
+      "checksum": -1573135764,
+      "normalizedSha256": "bc7504d0966e824fe064ff8428e4a1925122495e94dffce821b0046f052bf49b"
+    },
+    {
+      "version": "68",
+      "script": "V068__wallet_collection_methods.sql",
+      "checksum": -1983922245,
+      "normalizedSha256": "152c2c1edc2e41efbc83d89a56f434c86e2ba7ae035ef27d50043f7308b6d7e1"
+    },
+    {
+      "version": "69",
+      "script": "V069__wallet_collection_proofs.sql",
+      "checksum": -1601125609,
+      "normalizedSha256": "715b877eb1d07b3adea55ccc0d6a4bc03b07a5aeffdb67b7cd09385804e96e13"
+    },
+    {
+      "version": "70",
+      "script": "V070__wallet_customer_collection_proofs.sql",
+      "checksum": 1707375798,
+      "normalizedSha256": "fcfe27cc438af157e41c4e96a414eeac107ee777d1014d48f650e1e5f3655c94"
+    },
+    {
+      "version": "71",
+      "script": "V071__shared_catalog.sql",
+      "checksum": 560976235,
+      "normalizedSha256": "a545956e10d9f210d3107cf774b275127a3f0ca16355faa30c776c9f0df20b79"
+    },
+    {
+      "version": "72",
+      "script": "V072__wallet_cards.sql",
+      "checksum": -129816302,
+      "normalizedSha256": "1c76c646f4df86f84827031cb6e9234abbb647ff1e659fe94951737b882e297b"
+    },
+    {
+      "version": "73",
+      "script": "V073__shared_offline_receipt_claims.sql",
+      "checksum": -1651859587,
+      "normalizedSha256": "d459645ed6b9f8a18a1fc9dafd36966daa7159c8b7e9eeef281513b1a873d5b1"
+    },
+    {
+      "version": "74",
+      "script": "V074__card_payment_exceptions.sql",
+      "checksum": 386977795,
+      "normalizedSha256": "7cf0c7ba773478046ae4e5a5a1f4b4dca8b7c4a36fdd701e966342a08f3b091c"
+    },
+    {
+      "version": "75",
+      "script": "V075__card_authorization_business_day.sql",
+      "checksum": 769928473,
+      "normalizedSha256": "ae82b30918c8e4e488df4a677b7dad20c1e8e14fc70a8ab4981fe7c74292e00e"
+    },
+    {
+      "version": "76",
+      "script": "V076__catalog_store_listing_lifecycle.sql",
+      "checksum": -88183262,
+      "normalizedSha256": "a703f25e3c4725bde9f4c41442e1e302a16d2180da61bf1820a370fd0a68445e"
+    },
+    {
+      "version": "77",
+      "script": "V077__wine_storage.sql",
+      "checksum": 141871042,
+      "normalizedSha256": "ee240385b65aead64d8e5ffa3c361963cbf4a2a34c03445c3de964acbdc19a02"
+    },
+    {
+      "version": "78",
+      "script": "V078__wine_storage_custodians.sql",
+      "checksum": -835176492,
+      "normalizedSha256": "9cec63f080bbb6a6c5fe9af1787239699c02acf6354d712ddc86914d1c9fe979"
+    },
+    {
+      "version": "79",
+      "script": "V079__catalog_product_barcodes.sql",
+      "checksum": 2005204824,
+      "normalizedSha256": "803746915cec6c1e32528f9c79afe4b5a5222e4332dab77be3bb5ba408b8495b"
+    },
+    {
+      "version": "80",
+      "script": "V080__catalog_raw_barcode.sql",
+      "checksum": 1277709591,
+      "normalizedSha256": "81a8c57b5444c9000a5c86908318bbfd85a446a11350cdbcc3585b684ea745b0"
+    },
+    {
+      "version": "81",
+      "script": "V081__wine_storage_locations.sql",
+      "checksum": 1228622995,
+      "normalizedSha256": "a4e8fdc2c6bd169f53a2cf44df55e4396bf7d21887e52ea1f62897707d469627"
+    },
+    {
+      "version": "82",
+      "script": "V082__customer_password_security.sql",
+      "checksum": 247678074,
+      "normalizedSha256": "7510c53a42d9212627eebfbeafe3fc2dc7ad2c98060e0049b90c74d0a040dab8"
+    },
+    {
+      "version": "83",
+      "script": "V083__customer_in_person_activation.sql",
+      "checksum": -1356057606,
+      "normalizedSha256": "969ae81acf0fb06144dd7d56f834a282727fa08dd8be0318903e7e4c867cc665"
+    },
+    {
+      "version": "84",
+      "script": "V084__wine_storage_operation_mode.sql",
+      "checksum": 483713648,
+      "normalizedSha256": "4e75505daba0b11fcef356d3abf6a31aad5734714bb55371f157196a9caa997f"
+    },
+    {
+      "version": "85",
+      "script": "V085__legacy_storage_short_codes.sql",
+      "checksum": 1247989905,
+      "normalizedSha256": "b03c1862b3dce20e57d4c16839909204f5bdd558521c1754f3a89fac18df2af5"
+    },
+    {
+      "version": "86",
+      "script": "V086__card_daily_expiry.sql",
+      "checksum": 78672697,
+      "normalizedSha256": "4ca1b4f99d89d512ed05289019df0edead0a6bd2483deca656f300a3c37f720f"
+    },
+    {
+      "version": "87",
+      "script": "V087__staff_store_permissions.sql",
+      "checksum": -1808776169,
+      "normalizedSha256": "6a400e20c0fedf58a0c3248861e8b13a293aca77325b84ceec67ce45beed1881"
+    },
+    {
+      "version": "88",
+      "script": "V088__workforce_foundation.sql",
+      "checksum": 1823283134,
+      "normalizedSha256": "80a71ee7abb58e7c0d74a5f70a99666c4851105990f3319a2119bf957835cebc"
+    },
+    {
+      "version": "89",
+      "script": "V089__workforce_attendance.sql",
+      "checksum": 1634347633,
+      "normalizedSha256": "d4813bc63b2a847c7b0914e7ee3dfd879bfefe8686d3f9064b15da10a875624a"
+    },
+    {
+      "version": "90",
+      "script": "V090__workforce_timekeeping.sql",
+      "checksum": 2144487868,
+      "normalizedSha256": "755f577c48aab947d12cf841ee3ba98e2ee5d85eea8c891df625a9c7144ac15e"
+    },
+    {
+      "version": "91",
+      "script": "V091__workforce_payroll.sql",
+      "checksum": 930264533,
+      "normalizedSha256": "c14892d02dc45939826d395ee9b6b5f7d76f756b9b90883aebb508f149505627"
+    },
+    {
+      "version": "92",
+      "script": "V092__workforce_positions.sql",
+      "checksum": 1877035140,
+      "normalizedSha256": "f72093ab7bd35b93baea8afc42ac9435129fc42efad2bc217c3d24a51027357e"
+    },
+    {
+      "version": "93",
+      "script": "V093__workforce_bulk_schedule.sql",
+      "checksum": 1117074955,
+      "normalizedSha256": "d2d748552064d0bd056b997c0affe9691cc4ae6a035cf869f04a47e8872f1cee"
+    },
+    {
+      "version": "94",
+      "script": "V094__workforce_schedule_soft_delete.sql",
+      "checksum": 466988316,
+      "normalizedSha256": "1514ec77176256aa2ff51d9a0fa135e99d42dd81f2be4da823de86ee66467079"
+    },
+    {
+      "version": "95",
+      "script": "V095__workforce_employee_documents.sql",
+      "checksum": -1081250109,
+      "normalizedSha256": "ba8e3276e1d90fc6b4d49485208af515d2422d490d1381dd5439dd31120af37c"
+    },
+    {
+      "version": "96",
+      "script": "V096__workforce_holiday_years.sql",
+      "checksum": -318024908,
+      "normalizedSha256": "5ed459ce5e35a9e8c989ad5d0905b68ac0586abbc03732f6254028758a271467"
+    },
+    {
+      "version": "97",
+      "script": "V097__workforce_rest_swaps.sql",
+      "checksum": 1078988259,
+      "normalizedSha256": "c20ea43ccabad17ad95032cd6cc6a272182d408b370496a50efd5187b8ed9c4a"
+    },
+    {
+      "version": "98",
+      "script": "V098__workforce_attendance_rules.sql",
+      "checksum": -1396969942,
+      "normalizedSha256": "79c24467fffc4ec0bf85663778af7d43dd6876f39e1bd5024a6f249c9e2e4915"
+    },
+    {
+      "version": "99",
+      "script": "V099__workforce_statutory_policies.sql",
+      "checksum": 67301112,
+      "normalizedSha256": "6b11bce843f1c053a94cc076a71106a2e26b22a617f493a0cc46843f23f1849d"
+    },
+    {
+      "version": "100",
+      "script": "V100__workforce_document_approval_dates.sql",
+      "checksum": -469128690,
+      "normalizedSha256": "aa9dd974305c90aa4f30657539f3749cbd3304d924fd33b821cae2b9f0b480df"
+    },
+    {
+      "version": "101",
+      "script": "V101__workforce_leave_groups.sql",
+      "checksum": 29589317,
+      "normalizedSha256": "a71c15555ddacb4018a3d7f2ff9616de6295ecb8bd8c7853ae8dd26a7974ad40"
+    },
+    {
+      "version": "102",
+      "script": "V102__workforce_payment_bank.sql",
+      "checksum": -986880312,
+      "normalizedSha256": "27f47c952f1d7e04d249913512cff9848d71e2c1e617a97b06386fb48ff55c12"
+    },
+    {
+      "version": "103",
+      "script": "V103__workforce_cdac_bulk_commands.sql",
+      "checksum": -1060405253,
+      "normalizedSha256": "11a9ec5f35663a06b03f36d53ea6427a0afab5096bb56d98eda2783466a6e8e3"
+    },
+    {
+      "version": "104",
+      "script": "V104__workforce_work_modes.sql",
+      "checksum": 1526531890,
+      "normalizedSha256": "28186270239328d9d8d1fbb09bb195df1dae1ca80ad31e43f1a051455a3eb37b"
+    },
+    {
+      "version": "105",
+      "script": "V105__workforce_payroll_computation.sql",
+      "checksum": -1860615739,
+      "normalizedSha256": "399ff4dae69fe29ddee89d0e78199f5621b5feb82bc50b17e06bcd0f876c5881"
+    },
+    {
+      "version": "106",
+      "script": "V106__workforce_review_explanations.sql",
+      "checksum": -1868004677,
+      "normalizedSha256": "07b9ee70e46a6dcb2a45c3f08c3bafc8feb4670b85a9d8940a862419e42999f0"
+    },
+    {
+      "version": "107",
+      "script": "V107__workforce_position_salary_defaults.sql",
+      "checksum": -817010065,
+      "normalizedSha256": "1d2391de2f2737aa2c714d0b7caaac6dfccc82a8f58d15c325add40ca4442d67"
+    },
+    {
+      "version": "108",
+      "script": "V108__workforce_pay_template_publication.sql",
+      "checksum": 526263468,
+      "normalizedSha256": "9f34e448c67f043bd007a28b4bcbd9e845426afa0c94fe4a915ddaf362381500"
+    },
+    {
+      "version": "109",
+      "script": "V109__workforce_pay_change_requests.sql",
+      "checksum": -560694488,
+      "normalizedSha256": "9f78630be6654b336b48e4d9f4c311bb3f9155a270b6e92f8066feb5b134867c"
+    },
+    {
+      "version": "110",
+      "script": "V110__workforce_effective_pay_evidence.sql",
+      "checksum": -118647808,
+      "normalizedSha256": "78883db14a7b25a5c401a9734832764669a1f149190bc57d10e8000aabdb5ecd"
+    },
+    {
+      "version": "111",
+      "script": "V111__workforce_annual_wages.sql",
+      "checksum": 526229105,
+      "normalizedSha256": "8e1ecf907e3c9a7a04aff9e31c012ea221c6ba330ef5e1a8c2d62784bafa8b32"
+    },
+    {
+      "version": "112",
+      "script": "V112__workforce_supplemental_settlement.sql",
+      "checksum": 941761023,
+      "normalizedSha256": "06d21261140636fcccb6a7bfe7ff19ae785ddc169c593813eb4d4c967aa4bcdb"
+    },
+    {
+      "version": "113",
+      "script": "V113__workforce_clock_options.sql",
+      "checksum": -1193121933,
+      "normalizedSha256": "54cd76d1af0bba21b6cbe409daae6ff5cf36c10bedf121b85dce9d5098aebcbc"
+    },
+    {
+      "version": "114",
+      "script": "V114__workforce_position_basis_salary_defaults.sql",
+      "checksum": -429780912,
+      "normalizedSha256": "775d1dcf32004987d475c0c6af50a9aaf219273bc5eeccb4cb4baf11f8a4cdca"
+    },
+    {
+      "version": "115",
+      "script": "V115__workforce_segment_settlements.sql",
+      "checksum": 1274574627,
+      "normalizedSha256": "9ee7f7bda1bedd91f2a01c5aa9f24b0cb20d335029d1a776b0575efd60954fe6"
+    },
+    {
+      "version": "116",
+      "script": "V116__workforce_compliance_policy_contracts.sql",
+      "checksum": 1032197048,
+      "normalizedSha256": "a37933ca12def86796e986ab7a180ddea4e174665b0517018c2f56e2041271ae"
+    },
+    {
+      "version": "117",
+      "script": "V117__workforce_leave_accounts.sql",
+      "checksum": 1618557334,
+      "normalizedSha256": "aaa4f84671d8d4c68535280295489ae5ec7afe24be5c0cd97ebd2ee586fb3f04"
+    },
+    {
+      "version": "118",
+      "script": "V118__workforce_leave_encashment.sql",
+      "checksum": -1546855073,
+      "normalizedSha256": "9171310c0907dd0400abb793fceb8b5deeb7360cd2e14125dcc553ec7b800b77"
+    },
+    {
+      "version": "119",
+      "script": "V119__workforce_segment_wage_events.sql",
+      "checksum": 973636110,
+      "normalizedSha256": "18072540d0545449568d79128280842dc0d4eb891d667d87e30a719663a4cd42"
+    },
+    {
+      "version": "120",
+      "script": "V120__workforce_leave_evidence_guards.sql",
+      "checksum": 699105422,
+      "normalizedSha256": "e9f138e9d0a652a85b3971ee3af7b46b34bdb5bb568a03753624e3fb32dbcb47"
+    }
+  ]
+}

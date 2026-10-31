@@ -39,7 +39,7 @@ class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPost
    boolean allCurrent=true;
    for(int r=0;r<a.sources().size();r++){
     var x=a.sources().get(r);var y=e.sources().get(r);assertThat(x.evidence()).isNotNull();assertThat(x.evidence().actualSeconds()).isEqualTo(y.workSeconds());
-    assertThat(new SourceRef(x.scheduleId(),x.storeId(),x.workDate(),x.approvalVersion(),x.sourceFingerprint(),y.workSeconds(),y.paidLeaveSeconds(),y.unpaidLeaveSeconds(),x.payable())).as("unchanged source identity/order/fingerprint and current actual facts").isEqualTo(y);
+    assertThat(new SourceRef(x.sourceId(),x.storeId(),x.workDate(),x.sourceVersion(),x.sourceFingerprint(),y.workSeconds(),y.paidLeaveSeconds(),y.unpaidLeaveSeconds(),x.payable())).as("unchanged source identity/order/fingerprint and current actual facts").isEqualTo(y);
     if(x.evidence().approvalState().equals("current")){assertThat(x.workSeconds()).isEqualTo(y.workSeconds());assertThat(x.paidLeaveSeconds()).isEqualTo(y.paidLeaveSeconds());assertThat(x.unpaidLeaveSeconds()).isEqualTo(y.unpaidLeaveSeconds());assertThat(x.evidence().approvedSeconds()).isEqualTo(y.workSeconds());}
     else {allCurrent=false;assertThat(x.evidence().approvedSeconds()).isNull();assertThat(x.workSeconds()).isZero();assertThat(x.paidLeaveSeconds()).isZero();assertThat(x.unpaidLeaveSeconds()).isZero();}
    }
@@ -81,8 +81,8 @@ class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPost
   time.at("2026-11-02T01:00:00Z");
   var pending=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(worked.id(),2L,worked.startAt(),worked.endAt().minusSeconds(1800),List.of(),false,"Pending correction"));
   var first=equivalent(null,inputs);assertThat(first.stores()).contains(store,sibling);assertThat(first.lines().getFirst().specialDays()).isTrue();assertThat(first.lines().getFirst().issues()).contains("SOURCE_PENDING","APPROVAL_STALE");
-  assertThat(first.lines().getFirst().sources()).extracting(SourceRef::scheduleId).doesNotContain(cancelled.id());
-  assertThat(first.lines().getFirst().sources()).filteredOn(s->s.scheduleId().equals(leaveDay.id())).singleElement().satisfies(s->{assertThat(s.evidence().approvalState()).isEqualTo("missing");assertThat(s.evidence().approvedSeconds()).isNull();assertThat(s.paidLeaveSeconds()).isZero();assertThat(s.unpaidLeaveSeconds()).isZero();});
+  assertThat(first.lines().getFirst().sources()).extracting(SourceRef::sourceId).doesNotContain(cancelled.id());
+  assertThat(first.lines().getFirst().sources()).filteredOn(s->s.sourceId().equals(leaveDay.id())).singleElement().satisfies(s->{assertThat(s.evidence().approvalState()).isEqualTo("missing");assertThat(s.evidence().approvedSeconds()).isNull();assertThat(s.paidLeaveSeconds()).isZero();assertThat(s.unpaidLeaveSeconds()).isZero();});
   corrections.decide(admin,store,pending.id(),new DecisionWrite(1L,"rejected","Keep original"));equivalent(null,inputs);
   var accepted=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(worked.id(),2L,worked.startAt(),worked.endAt().minusSeconds(1800),List.of(),false,"Accepted correction"));
   corrections.decide(admin,store,accepted.id(),new DecisionWrite(1L,"approved","Corrected"));var corrected=equivalent(null,inputs);assertThat(corrected.fingerprint()).isNotEqualTo(first.fingerprint());
@@ -104,7 +104,7 @@ class WorkforcePayrollSourceEquivalencePostgresTest extends WorkforcePayrollPost
   time.at("2026-11-02T01:00:00Z");
   var cpf=new CpfProfile("foreign",null,null,"GG","");var manual=new Rule("monthly","3000","8","44",true,"1.5",List.of());plan(manual,cpf);
   var inputs=List.of(new LineInput(employee,3,"22","21",true,false,List.of(),"Manual"));
-  var first=equivalent(null,inputs);assertThat(first.lines().getFirst().sources()).extracting(SourceRef::scheduleId).containsExactly(context.id(),payable.id());
+  var first=equivalent(null,inputs);assertThat(first.lines().getFirst().sources()).extracting(SourceRef::sourceId).containsExactly(context.id(),payable.id());
   assertThat(first.lines().getFirst().sources()).extracting(SourceRef::payable).containsExactly(false,true);
   for(var schedule:List.of(context,payable)){UUID shop=schedule.id().equals(context.id())?store:sibling;var row=approvals.detail(admin,shop,schedule.id()).row();approvals.approve(admin,shop,schedule.id(),new ApprovalDtos.ApprovalWrite(0L,row.sourceFingerprint(),"Valid old/new monetary comparison"));}
   var approved=equivalent(null,inputs);assertThat(approved.lines().getFirst().sources()).allSatisfy(r->assertThat(r.evidence().approvalState()).isEqualTo("current"));
