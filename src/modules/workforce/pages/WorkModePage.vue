@@ -35,7 +35,7 @@ function decide(a:HomeAddress,status:'approved'|'rejected'){if(!data.value?.canR
 onMounted(refresh)
 </script>
 <template>
- <section class="wf-panel wf-form-panel wm-page">
+ <section class="wf-panel wm-page">
   <header class="wf-toolbar"><h2>{{w('title')}}<span v-if="data"> · {{data.employeeName}}</span></h2><button :disabled="busy||loading||pointBusy||!!pending" @click="refresh">{{w('refresh')}}</button></header>
   <div class="wf-inline wm-back"><RouterLink v-if="employeeId" :to="base+'/employees'">{{w('backEmployees')}}</RouterLink><RouterLink v-else :to="base+'/clock'">{{w('backClock')}}</RouterLink></div>
   <PhaseStatus :failure="failure" :notice="notice" :loading="loading"/>
