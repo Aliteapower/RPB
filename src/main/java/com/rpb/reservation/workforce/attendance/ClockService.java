@@ -25,7 +25,7 @@ public class ClockService {
         var replay=repository.replay(actor.tenantId(),command,employee.id(),store,c);if(replay.isPresent())return replay.get();
         var schedule=access.read(actor,store,c.scheduleId());if(!schedule.employeeId().equals(employee.id()))throw WorkforceException.forbidden();
         Instant now=clock.instant().truncatedTo(ChronoUnit.MICROS);Session old=repository.bySchedule(actor.tenantId(),schedule.id()).orElse(null),next;
-        var policy=workModes==null?null:workModes.policy(actor.tenantId(),employee.id(),store,schedule.workDate(),old);if(workModes!=null)workModes.verify(policy,c.location());
+        var policy=workModes==null?null:workModes.policy(actor.tenantId(),employee.id(),store,schedule.workDate(),old);var selectedPolicy=com.rpb.reservation.workforce.workmode.WorkModeOptions.select(policy,c.mode());if(workModes!=null)workModes.verify(selectedPolicy,c.location());
         if("IN".equals(c.action())){
             // Reload after the shared employee lock so employment/membership edits cannot race a punch.
             employee=employees.byAccount(actor.tenantId(),actor.actorId()).orElseThrow(WorkforceException::forbidden);
@@ -43,8 +43,8 @@ public class ClockService {
             }
             next=new Session(old.id(),old.scheduleId(),old.employeeId(),store,old.inAt(),out,rest,breaks,old.overrideBreak(),old.version()+1,restRule,policy);
         }
-        repository.save(actor.tenantId(),next);repository.event(actor.tenantId(),command,actor.actorId(),c.action(),now,next,c.breakRuleId());
-        if(workModes!=null)workModes.evidence(actor.tenantId(),command,policy,c.location());
+        repository.save(actor.tenantId(),next);repository.event(actor.tenantId(),command,actor.actorId(),c.action(),now,next,c.breakRuleId(),selectedPolicy==null?"legacy":selectedPolicy.mode(),c.mode());
+        if(workModes!=null)workModes.evidence(actor.tenantId(),command,selectedPolicy,c.location());
         audit.changed(actor,store,"clock."+c.action().toLowerCase(Locale.ROOT),command,old,next);return next;
     }
     private WorkforceException state(){return new WorkforceException("WORKFORCE_CLOCK_STATE",409);}

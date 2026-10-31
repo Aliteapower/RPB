@@ -16,11 +16,14 @@ public class PositionService {
   access.sourceWrite(actor);access.enter(actor,store);access.headOffice(actor);
   if(c==null||c.expectedVersion()==null||c.expectedVersion()<0||c.enabled()==null||c.name()==null||c.name().trim().isEmpty()||c.name().trim().length()>80)throw WorkforceException.invalid();
   repository.lock(actor.tenantId());var old=repository.find(actor.tenantId(),id).orElse(null);String name=c.name().trim();String mode=c.attendanceMode()==null?(old==null?null:old.attendanceMode()):com.rpb.reservation.workforce.workmode.WorkModeRules.mode(c.attendanceMode());
+  var modes=com.rpb.reservation.workforce.workmode.WorkModeOptions.updated(mode,c.attendanceModes(),old==null?null:old.attendanceMode(),old==null?null:old.attendanceModes());
   if(repository.deleted(actor.tenantId(),id).isPresent())throw WorkforceException.missing();
-  if(old!=null&&old.name().equals(name)&&old.enabled()==c.enabled()&&Objects.equals(old.attendanceMode(),mode)&&(c.expectedVersion()==old.version()||c.expectedVersion()==old.version()-1))return old;
+  if(old!=null&&old.name().equals(name)&&old.enabled()==c.enabled()&&Objects.equals(old.attendanceMode(),mode)
+   &&(mode==null?Objects.equals(old.attendanceModes(),modes):com.rpb.reservation.workforce.workmode.WorkModeOptions.modes(mode,old.attendanceModes()).equals(com.rpb.reservation.workforce.workmode.WorkModeOptions.modes(mode,modes)))
+   &&(c.expectedVersion()==old.version()||c.expectedVersion()==old.version()-1))return old;
   if((old==null?0:old.version())!=c.expectedVersion())throw WorkforceException.conflict();
   if(repository.list(actor.tenantId()).stream().anyMatch(p->!p.id().equals(id)&&p.name().equalsIgnoreCase(name)))throw WorkforceException.conflict();
-  var saved=new Position(id,name,c.enabled(),c.expectedVersion()+1,mode);repository.save(actor.tenantId(),saved,old==null);audit.changed(actor,store,"position.save",id,old,saved);return saved;
+  var saved=new Position(id,name,c.enabled(),c.expectedVersion()+1,mode,modes);repository.save(actor.tenantId(),saved,old==null);audit.changed(actor,store,"position.save",id,old,saved);return saved;
  }
  @Transactional public Deleted delete(CurrentActor actor,UUID store,UUID id,DeleteWrite c){
   access.sourceWrite(actor);access.enter(actor,store);access.headOffice(actor);

@@ -1,5 +1,5 @@
 import type {AttendanceRules} from './restPolicy'
-import type {ClockPolicy,WorkMode} from './workMode'
+import type {ClockPolicy,WorkMode,ClockLocation} from './workMode'
 export type {AttendanceRules,BreakRule,AnomalyRule,AttendanceRuleTemplate} from './restPolicy'
 export interface Option {id:string;name:string}
 export interface StoreOption extends Option {companyId:string|null}
@@ -11,7 +11,7 @@ export interface Employee {
 export interface EmployeeWrite extends Omit<Employee,'id'|'version'|'editable'> {expectedVersion:number;username?:string;password?:string}
 export interface Company extends Option {registrationNo:string;payDay:number;enabled:boolean;version:number}
 export interface Administrator {accountId:string;name:string;employeeManage:boolean;payrollCompanyId:string|null;version:number}
-export interface Position extends Option {enabled:boolean;version:number;attendanceMode?:WorkMode|null}
+export interface Position extends Option {enabled:boolean;version:number;attendanceMode?:WorkMode|null;attendanceModes?:WorkMode[]|null}
 export interface Home {headOffice:boolean;employeeManage:boolean;stores:StoreOption[];clockStores?:StoreOption[];companies:Option[];accounts:Option[];administratorAccounts:Option[];myself:Employee|null}
 export interface Shift {id:string;name:string;startTime:string;endTime:string;startNextDay?:boolean|null;nextDay:boolean;breakMode:'none'|'duration'|'window'|'manual';breakMinutes:number;breakAfterMinutes:number;breakStartOffset:number;breakEndOffset:number;breakPaid:boolean;enabled:boolean;version:number;rules?:AttendanceRules|null}
 export interface ShiftWrite extends Omit<Shift,'id'|'version'> {expectedVersion:number}
@@ -24,5 +24,5 @@ export interface Attendance {exempt?:boolean;schedule:Schedule;session:Session|n
 export type ClockAction='IN'|'BREAK_START'|'BREAK_END'|'OUT'
 export interface ClockResult {schedules:Schedule[];active:Session|null;attendance:Attendance|null;actions:ClockAction[];serverTime:string;policy?:ClockPolicy|null;policies?:Record<string,ClockPolicy|null>}
 export interface Correction {id:string;scheduleId:string;employeeId:string;employeeName:string;basedSessionVersion:number;inAt:string;outAt:string;breaks:BreakInterval[];overrideBreak:boolean;reason:string;status:'pending'|'approved'|'rejected'|'withdrawn';applicantId:string;reviewerId:string|null;reviewNote:string|null;version:number;createdAt:string}
-export interface AttendanceDetail {attendance:Attendance;events:{id:string;action:string;occurredAt:string;actorId:string}[];corrections:Correction[]}
+export interface AttendanceDetail {attendance:Attendance;events:{id:string;action:string;occurredAt:string;actorId:string;clockMode?:WorkMode|null;location?:Partial<ClockLocation>|null}[];corrections:Correction[]}
 

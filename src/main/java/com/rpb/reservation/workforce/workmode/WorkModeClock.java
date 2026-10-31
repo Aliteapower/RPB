@@ -9,7 +9,7 @@ public class WorkModeClock {
  public WorkModeClock(WorkModeRepository repository,WorkModeResolver resolver,Clock clock){this.repository=repository;this.resolver=resolver;this.clock=clock;}
  public ClockPolicy policy(UUID tenant,UUID employee,UUID store,LocalDate date,Session session){return session==null?resolver.snapshot(tenant,employee,store,date):session.clockPolicy();}
  /** Without a punch, mutable site/address geometry is not an attendance fact or an approval dependency. */
- public ClockPolicy approvalPolicy(UUID tenant,UUID employee,UUID store,LocalDate date,Session session){var p=policy(tenant,employee,store,date,session);return session!=null||p==null?p:new ClockPolicy(p.mode(),p.assignmentId(),p.assignmentVersion(),null,null,0);}
+ public ClockPolicy approvalPolicy(UUID tenant,UUID employee,UUID store,LocalDate date,Session session){var p=policy(tenant,employee,store,date,session);return session!=null||p==null?p:WorkModeOptions.geometryFree(p);}
  public Map<UUID,ClockPolicy> approvalPolicies(UUID tenant,List<com.rpb.reservation.workforce.scheduling.SchedulingDtos.Schedule> schedules,Map<UUID,Session> sessions){
   var employees=schedules.stream().filter(s->!sessions.containsKey(s.id())).map(s->s.employeeId()).distinct().toList();var assignments=resolver.assignmentsFor(tenant,employees);var result=new HashMap<UUID,ClockPolicy>();
   for(var s:schedules){var session=sessions.get(s.id());result.put(s.id(),session==null?resolver.approvalSnapshot(assignments.getOrDefault(s.employeeId(),List.of()),s.workDate()):session.clockPolicy());}return result;

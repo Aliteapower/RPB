@@ -14,7 +14,8 @@ public class HomeAddressService {
  @Transactional public HomeAddress submit(CurrentActor actor,UUID store,UUID id,HomeWrite c){
   gate.sourceWrite(actor);var e=WorkModeAccess.self(gate,employees,actor,store);if(id==null||c==null||c.effectiveFrom()==null)throw WorkforceException.invalid();var point=WorkModeRules.point(c.point());employees.lock(e.id());e=WorkModeAccess.self(gate,employees,actor,store);var old=repository.address(actor.tenantId(),id).orElse(null);
   if(old!=null){if(old.employeeId().equals(e.id())&&old.applicantId().equals(actor.actorId())&&old.point().equals(point)&&old.effectiveFrom().equals(c.effectiveFrom()))return old;throw WorkforceException.conflict();}
-  if(c.effectiveFrom().isBefore(tomorrow())||c.effectiveFrom().isBefore(e.hireDate())||!e.enabled()||!e.status().equals("active"))throw WorkforceException.invalid();
+  if(c.effectiveFrom().isBefore(tomorrow()))throw new WorkforceException("WORKFORCE_HOME_EFFECTIVE_DATE_INVALID",400);
+  if(c.effectiveFrom().isBefore(e.hireDate())||!e.enabled()||!e.status().equals("active"))throw WorkforceException.invalid();
   var h=new HomeAddress(id,e.id(),point,c.effectiveFrom(),"pending",1,actor.actorId(),null,"",clock.instant());repository.insertHome(actor.tenantId(),h);var saved=repository.address(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"home-address.submit",id,null,saved);return saved;
  }
  @Transactional public HomeAddress decide(CurrentActor actor,UUID store,UUID id,HomeDecision raw){
@@ -23,6 +24,10 @@ public class HomeAddressService {
   if(actor.actorId().equals(old.applicantId())||actor.actorId().equals(e.accountId()))throw WorkforceException.forbidden();
   if(old.version()==c.expectedVersion()+1&&old.status().equals(c.status())&&actor.actorId().equals(old.reviewerId())&&old.reviewNote().equals(c.note()))return old;
   if(old.version()!=c.expectedVersion()||!old.status().equals("pending"))throw WorkforceException.conflict();
-  if(c.status().equals("approved")&&old.effectiveFrom().isBefore(tomorrow()))throw WorkforceException.invalid();repository.decide(actor.tenantId(),id,actor.actorId(),c);var next=repository.address(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"home-address."+c.status(),id,old,next);return next;
+  if(c.status().equals("approved")){
+   if(old.effectiveFrom().isBefore(tomorrow()))throw new WorkforceException("WORKFORCE_HOME_REQUEST_EXPIRED",409);
+   if(repository.addresses(actor.tenantId(),old.employeeId()).stream().anyMatch(h->h.status().equals("approved")&&h.effectiveFrom().equals(old.effectiveFrom())))throw new WorkforceException("WORKFORCE_HOME_EFFECTIVE_DATE_CONFLICT",409);
+  }
+  repository.decide(actor.tenantId(),id,actor.actorId(),c);var next=repository.address(actor.tenantId(),id).orElseThrow();audit.changed(actor,store,"home-address."+c.status(),id,old,next);return next;
  }
 }
