@@ -2,6 +2,7 @@ import {computed,onUnmounted,ref,watch} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useStorageCodeRefresh} from './useStorageCodeRefresh'
 import {useVisiblePageRefresh} from '../../../composables/useVisiblePageRefresh'
+import {customerStoreSessionMissing} from '../../../utils/customerStoreSession'
 import {storageApi,StorageApiError} from '../api'
 import type {Home,Intent} from '../types'
 import {useCustomerStorageText} from './text'
@@ -13,8 +14,16 @@ export function useCustomerStorage(){
  let generation=0,homeRequest=0
  watch(()=>route.query.view,v=>{view.value=parseView(v)})
  function open(target:CustomerStorageView,record?:string){if(busy.value)return;view.value=target;error.value='';if(target!=='records')notice.value='';void router.push({query:{...route.query,view:target,record:record??undefined}})}
- function fail(e:unknown){if(e instanceof StorageApiError&&[403,404].includes(e.status)){home.value=null;activeIntent.value=null;scannedCode.value=''}error.value=e instanceof Error?e.message:String(e);if(e instanceof StorageApiError&&e.status===401){generation++;login.value=true;home.value=null;activeIntent.value=null;scannedCode.value='';notice.value='';loading.value=false;busy.value=false;error.value=t('signIn')}pending.value=!!api.value.pending()}
- async function load(){const g=generation,request=++homeRequest;loading.value=true;try{const data=await api.value.get<Home>('/home');if(g!==generation||request!==homeRequest)return;home.value=data;syncCode(data);error.value='';login.value=false;pending.value=!!api.value.pending();const hash=new URLSearchParams(route.hash.slice(1)).get('storage');if(hash&&/^WS\.[A-Za-z0-9_-]{43}$/.test(hash)){await router.replace({hash:''});if(g===generation)await scan(hash)}}catch(e){if(g===generation&&request===homeRequest)fail(e)}finally{if(g===generation&&request===homeRequest)loading.value=false}}
+ function showLogin(){generation++;login.value=true;home.value=null;activeIntent.value=null;scannedCode.value='';notice.value='';loading.value=false;busy.value=false;error.value=t('signIn')}
+ function fail(e:unknown){if(e instanceof StorageApiError&&[403,404].includes(e.status)){home.value=null;activeIntent.value=null;scannedCode.value=''}error.value=e instanceof Error?e.message:String(e);if(e instanceof StorageApiError&&e.status===401)showLogin();pending.value=!!api.value.pending()}
+ async function load(){const g=generation,request=++homeRequest,id=store.value;loading.value=true;try{const data=await api.value.get<Home>('/home');if(g!==generation||request!==homeRequest)return;home.value=data;syncCode(data);error.value='';login.value=false;pending.value=!!api.value.pending();const hash=new URLSearchParams(route.hash.slice(1)).get('storage');if(hash&&/^WS\.[A-Za-z0-9_-]{43}$/.test(hash)){await router.replace({hash:''});if(g===generation)await scan(hash)}}catch(e){
+  if(g!==generation||request!==homeRequest)return
+  fail(e)
+  if(e instanceof StorageApiError&&[403,404].includes(e.status)){
+   const missingSession=await customerStoreSessionMissing(id)
+   if(g===generation&&request===homeRequest&&missingSession)showLogin()
+  }
+ }finally{if(g===generation&&request===homeRequest)loading.value=false}}
  function clearCode(){activeIntent.value=null;scannedCode.value='';notice.value=''}
  function syncCode(data:Home){if(!activeIntent.value)return;const current=data.intents.find(i=>i.id===activeIntent.value!.id);if(!current){clearCode();return}if(!['authorized','awaiting_authorization'].includes(current.status)){activeIntent.value={...current,code:null};scannedCode.value='';notice.value=current.status==='completed'?t('usedCodeHint'):''}}
  async function refreshCode(){if(loading.value||busy.value||pending.value||login.value)return;const g=generation,request=++homeRequest;try{const data=await api.value.get<Home>('/home');if(g!==generation||request!==homeRequest)return;home.value=data;syncCode(data)}catch(e){if(g===generation&&request===homeRequest&&e instanceof StorageApiError&&e.status===401)fail(e)}}

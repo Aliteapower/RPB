@@ -2,6 +2,7 @@ import {cardCode} from '../cards/qr.mjs'
 import { computed, inject, onUnmounted, provide, ref, watch, type InjectionKey } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { walletApi, WalletApiError } from './api'
+import { customerStoreSessionMissing } from '../../utils/customerStoreSession'
 import { merchantCode } from './scanning/walletQr'
 import { customerWalletPath, legacyWalletTarget } from './navigation'
 import type { CustomerHome } from './types'
@@ -48,7 +49,14 @@ function createWorkspace() {
     }catch(e){
       if(current!==generation || request!==sequence)return
       if(e instanceof WalletApiError && e.status===401){home.value=null;needsLogin.value=true;error.value=''}
-      else{if(e instanceof WalletApiError && [403,404].includes(e.status))home.value=null;error.value=e instanceof Error?e.message:String(e)}
+      else{
+        const scopeDenied=e instanceof WalletApiError && [403,404].includes(e.status)
+        if(scopeDenied)home.value=null
+        const missingSession=scopeDenied && await customerStoreSessionMissing(id)
+        if(current!==generation || request!==sequence)return
+        if(missingSession){needsLogin.value=true;error.value=''}
+        else error.value=e instanceof Error?e.message:String(e)
+      }
     }finally{if(current===generation && request===sequence){loading.value=false;refreshing.value=false}}
   }
   async function authenticated(){needsLogin.value=false;error.value='';await refresh()}
