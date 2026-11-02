@@ -1,46 +1,28 @@
 <script setup lang="ts">
-import StorageItemPhotos from '../StorageItemPhotos.vue'
-import {storageExpiryText} from '../format'
-
 import {computed,ref,watch,onUnmounted} from 'vue'
-import type {Item,Intent,Event} from '../types'
+import type {Item,Intent,Event,Selection} from '../types'
 import type {StorageApi} from '../api'
-import {displayName} from '../../shared-commerce/format'
-import {dateTime,storageLocationText} from '../format'
-import {useCustomerStorageText} from './text'
-import {collectibleItems,withdrawalSelection} from './selection'
-import StorageQuantityStepper from '../StorageQuantityStepper.vue'
+import StoragePickupCart from '../StoragePickupCart.vue'
 import WalletQrDisplay from '../../wallet/components/WalletQrDisplay.vue'
+import {withdrawalSelection} from './selection'
+import {displayName} from '../../shared-commerce/format'
+import {useCustomerStorageText} from './text'
 const props=defineProps<{api:StorageApi;items:Item[];events?:Event[];disabled:boolean;activeIntent?:Intent|null}>(),emit=defineEmits<{created:[Intent];'quick-created':[Intent];cancel:[];error:[unknown];deposit:[];'busy-change':[boolean]}>(),{t,locale}=useCustomerStorageText()
-const saving=ref(false),now=ref(Date.now())
-const quickQuantities=ref<Record<string,number>>({})
-function quickQuantity(id:string){return quickQuantities.value[id]??1}
-function quickSelection(id:string){return withdrawalSelection(props.items,{[id]:quickQuantity(id)},now.value)}
+const saving=ref(false),now=ref(Date.now()),x=(zh:string,en:string)=>locale.value.startsWith('en')?en:zh
 let active=true
 const timer=setInterval(()=>{now.value=Date.now()},1000)
 onUnmounted(()=>{active=false;clearInterval(timer);emit('busy-change',false)})
 watch(saving,value=>emit('busy-change',value),{flush:'sync'})
-const available=computed(()=>collectibleItems(props.items,now.value))
 const liveCode=computed(()=>props.activeIntent?.origin==='customer'&&props.activeIntent.status==='authorized'&&!!props.activeIntent.code&&Date.parse(props.activeIntent.expiresAt)>now.value?props.activeIntent:null)
-function codeFor(id:string){return liveCode.value?.selections.length===1&&liveCode.value.selections[0]?.itemId===id?liveCode.value:null}
-async function quickCreate(id:string){
+async function submit(selected:Selection[]){
  if(props.disabled||saving.value||liveCode.value)return
- const lines=withdrawalSelection(props.items,{[id]:quickQuantity(id)})
+ const lines=withdrawalSelection(props.items,Object.fromEntries(selected.map(l=>[l.itemId,l.quantity])))
  if(!lines){emit('error',new Error(t('selectionChanged')));return}
  saving.value=true
  try{const result=await props.api.command<Intent>('/intents',{selections:lines});if(active)emit('quick-created',result)}catch(e){if(active)emit('error',e)}finally{if(active)saving.value=false}
 }
 </script>
-<template>
- <section class="storage-panel storage-section">
-  <template v-if="!available.length"><h2>{{t('emptyCollectible')}}</h2><p class="cards-muted">{{t('emptyCollectibleHint')}}</p><button @click="emit('deposit')">{{t('deposit')}}</button></template>
-  <template v-else><h2>{{t('chooseBottles')}}</h2>
-   <div class="storage-grid"><article v-for="item in available" :key="item.id" class="storage-panel storage-customer-bottle">
-    <div class="storage-bottle-heading"><div class="storage-bottle-info"><h3>{{displayName(item.snapshot,locale)}}</h3><p class="storage-bottle-remaining">{{t('remaining')}} <strong>{{item.remaining}}</strong> {{t('bottleUnit')}}</p><small>{{t('expiresAt')}} {{storageExpiryText(item.expiresAt,item.snapshot.timezone,t('unlimited'))}}</small><small v-if="item.snapshot.storageLocation||item.location">{{t('location')}} {{storageLocationText(item)}}</small><StorageItemPhotos :item="item" :api="api" :events="events"/></div><aside class="storage-bottle-code">
-     <template v-if="codeFor(item.id)"><WalletQrDisplay :value="codeFor(item.id)!.code!" :expires-at="codeFor(item.id)!.expiresAt"/><strong>{{t('quickScanHint')}}</strong><small>{{t('quickQuantity')}} {{codeFor(item.id)!.selections[0]!.quantity}} {{t('bottleUnit')}}</small><button :disabled="disabled||saving" @click="emit('cancel')">{{t('cancel')}}</button></template>
-     <template v-else><StorageQuantityStepper :model-value="quickQuantity(item.id)" :max="item.opened?1:item.remaining" :disabled="disabled||saving||!!liveCode" :label="t('collectQuantity')" @update:model-value="quickQuantities[item.id]=$event"/><button :disabled="disabled||saving||!!liveCode||!quickSelection(item.id)" @click="quickCreate(item.id)">{{t('quickCode')}}</button><small>{{t('quickScanHint')}}</small></template>
-    </aside></div>
-   </article></div>
-  </template>
- </section>
-</template>
+<template><section class="storage-panel storage-section">
+ <section v-if="liveCode" class="storage-panel"><h2>{{x('整车取酒码','Batch pickup code')}}</h2><p v-for="line in liveCode.selections" :key="line.itemId">{{items.find(i=>i.id===line.itemId)?displayName(items.find(i=>i.id===line.itemId)!.snapshot,locale):'—'}} × {{line.quantity}} {{x('瓶','bottles')}}</p><WalletQrDisplay :value="liveCode.code!" :expires-at="liveCode.expiresAt"/><p>{{x('请交由店员核对并扫码，核销后才扣减存酒。','Staff checks and scans this code before stock is deducted.')}}</p><button type="button" :disabled="disabled||saving" @click="emit('cancel')">{{t('cancel')}}</button></section>
+ <StoragePickupCart v-else :items="items" :events="events" :api="api" :scope="api.base" :disabled="disabled||saving" :submit-label="x('提交取酒，生成取酒码','Submit and get pickup code')" :submit-hint="x('一次生成整车取酒码，由店员核销后扣减存酒。','One code for the entire cart. Stock is deducted after staff handover.')" @submit="submit"/>
+</section></template>
