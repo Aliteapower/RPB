@@ -12,7 +12,7 @@ import '../wallet/wallet.css'
 import './storage.css'
 import './customer/customer.css'
 defineOptions({inheritAttrs:false})
-const {t}=useCustomerStorageText(),{store,api,home,loading,busy,login,pending,error,notice,view,activeIntent,scannedCode,open,load,run,recover,created,quickCreated,applied,fail}=useCustomerStorage()
+const {t}=useCustomerStorageText(),{store,api,home,loading,busy,login,pending,error,notice,view,activeIntent,scannedCode,open,load,run,recover,created,quickCreated,applied,fail,clearCode}=useCustomerStorage()
 const childBusy=ref(false),again=ref<{item:Item;intentId:string;quantity:number}|null>(null)
 watch(store,()=>{childBusy.value=false;again.value=null})
 function deposit(value?:{item:Item;intentId:string;quantity:number}){again.value=value??null;open('deposit')}
@@ -28,6 +28,6 @@ function deposit(value?:{item:Item;intentId:string;quantity:number}){again.value
   <p v-if="home.operationMode==='staff_registration'&&view!=='records'" class="storage-notice">{{t('staffModeHint')}}</p>
   <template v-if="view==='deposit'&&home.operationMode!=='staff_registration'"><p v-if="!home.newBusinessEnabled" class="storage-notice">{{t('closed')}}</p><StorageApplicationForm v-else :key="`${store}:${again?.intentId??'new'}`" :api="api" :disabled="busy||pending" :again="again" @saved="applied" @error="fail" @busy-change="childBusy=$event"/><details class="storage-panel"><summary>{{t('rulesTitle')}}</summary><p>{{t('expiryHint')}}</p><p v-for="rule in home.rules" :key="rule.id">{{rule.name}} · {{rule.months===0?t('unlimited'):`${rule.months} ${t('months')}`}}</p></details></template>
   <template v-if="view==='withdraw'&&home.operationMode!=='staff_registration'"><CustomerStorageWithdrawal :key="store" :api="api" :items="home.items" :active-intent="activeIntent" :disabled="busy||pending" @quick-created="quickCreated" @cancel="run(()=>api.command(`/intents/${activeIntent!.id}/cancel`))" @created="created" @error="fail" @deposit="deposit()" @busy-change="childBusy=$event"/></template>
-  <CustomerStorageRecords v-if="view==='records'" :home="home" :api="api" :disabled="busy||pending" :active-intent="activeIntent" :scanned-code="scannedCode" @command="run" @deposit="deposit()" @again="deposit" @cleared="activeIntent=null"/>
+  <CustomerStorageRecords v-if="view==='records'" :home="home" :api="api" :disabled="busy||pending" :active-intent="activeIntent" :scanned-code="scannedCode" @command="run" @deposit="deposit()" @again="deposit" @cleared="clearCode"/>
  </template>
 </main></template>

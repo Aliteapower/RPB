@@ -84,11 +84,10 @@
   .storage-customer-page .storage-panel { padding: 12px; }
   .storage-customer-page .storage-customer-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .storage-customer-page .storage-customer-fields > label:first-child:nth-last-child(3) { grid-column: 1 / -1; }
-  .storage-customer-page .storage-bottle-code { flex-basis: 138px; padding-left: 10px; }
+  .storage-customer-page .storage-bottle-code { flex-basis: auto; max-width: none; padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--wallet-line); }
   .storage-customer-page .storage-bottle-heading { gap: 10px; }
 }
 @media (max-width: 360px) {
-  .storage-customer-page .storage-bottle-code { flex-basis: 132px; padding-left: 8px; }
   .storage-customer-page .storage-customer-fields { grid-template-columns: 1fr; }
   .storage-customer-page .storage-customer-fields:has(> label:nth-child(2):last-child) { grid-template-columns: 1fr; }
 }

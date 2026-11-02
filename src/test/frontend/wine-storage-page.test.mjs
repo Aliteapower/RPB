@@ -190,7 +190,28 @@ test('quick pickup excludes expired holdings, reports rejected commands and supp
  await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Show pickup QR')[0].props.onClick();await tick()
  assert.equal(nodes(s.root,n=>n.tag==='figure').length,1)
  await nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='Cancel')[0].props.onClick();await tick()
- assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);assert.equal(s.calls.filter(c=>c.url.endsWith('/intents/quick-cancel-code/cancel')).length,1);s.unmount()
+ assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);assert.doesNotMatch(text(s.root),/Your collection code is ready/);assert.equal(s.calls.filter(c=>c.url.endsWith('/intents/quick-cancel-code/cancel')).length,1);s.unmount()
+})
+
+test('cancelling from pickup or records retains the code on failure and clears notice only after success',async()=>{
+ for(const fromRecords of [false,true]){
+  const item={id:'cancel-item',snapshot:{nameZh:'验收酒',timezone:'Asia/Singapore'},remaining:2,opened:false,status:'stored',expiresAt:null},intent={id:'cancel-intent',origin:'customer',status:'authorized',code:'WS.'+'N'.repeat(43),expiresAt:new Date(Date.now()+300000).toISOString(),selections:[{itemId:item.id,quantity:1}]},data={...home,items:[item],intents:[]}
+  let failCancel=true,finishCancel
+  const s=mount(CustomerPage,true,'en',data,(url,options)=>options?.method==='POST'?(url.endsWith('/cancel')?new Promise(resolve=>finishCancel=()=>{data.intents=[{...intent,code:null,status:'cancelled'}];resolve(data.intents[0])}):(data.intents=[{...intent,code:null}],intent)):url.includes('/product-options')?{items:[],categories:[],hasMore:false}:{...data});await tick()
+  button(s.root,'Collect bottles').props.onClick();await tick();await button(s.root,'Show pickup QR').props.onClick();await tick();assert.match(text(s.root),/Your collection code is ready/)
+  if(fromRecords){button(s.root,'My records').props.onClick();await tick();button(s.root,'Collections').props.onClick();await tick()}
+  const okFetch=globalThis.fetch
+  globalThis.fetch=async(url,options)=>url.endsWith('/cancel')&&failCancel?{ok:false,status:409,json:async()=>({code:'STORAGE_CONFLICT',message:'Cancel rejected'})}:okFetch(url,options)
+  await button(s.root,'Cancel').props.onClick();await tick();assert.match(text(s.root),/Cancel rejected/);assert.match(text(s.root),/Your collection code is ready/);assert.equal(nodes(s.root,n=>n.tag==='figure').length,1)
+  failCancel=false;const work=button(s.root,'Cancel').props.onClick();button(s.root,'Cancel').props.onClick();await tick();assert.match(text(s.root),/Your collection code is ready/);assert.equal(s.calls.filter(c=>c.url.endsWith('/cancel')).length,1)
+  finishCancel();await work;await tick();assert.doesNotMatch(text(s.root),/Your collection code is ready|Cancel rejected/);assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);assert.equal(data.items[0].remaining,2);s.unmount()
+ }
+})
+
+test('refresh clears stale pickup notices when a code was cancelled elsewhere',async()=>{
+ const item={id:'refresh-cancel-item',snapshot:{nameZh:'验收酒',timezone:'Asia/Singapore'},remaining:2,opened:false,status:'stored',expiresAt:null},intent={id:'refresh-cancel-intent',origin:'customer',status:'authorized',code:'WS.'+'R'.repeat(43),expiresAt:new Date(Date.now()+300000).toISOString(),selections:[{itemId:item.id,quantity:1}]},data={...home,items:[item],intents:[]}
+ const s=mount(CustomerPage,true,'en',data,(url,options)=>options?.method==='POST'?(data.intents=[{...intent,code:null}],intent):url.includes('/product-options')?{items:[],categories:[],hasMore:false}:{...data});await tick();button(s.root,'Collect bottles').props.onClick();await tick();await button(s.root,'Show pickup QR').props.onClick();await tick()
+ data.intents=[{...intent,code:null,status:'cancelled'}];await Promise.all([...globalThis.document.listeners.get('visibilitychange')].map(fn=>fn()));await tick();assert.doesNotMatch(text(s.root),/Your collection code is ready/);assert.equal(nodes(s.root,n=>n.tag==='figure').length,0);s.unmount()
 })
 
 test('customer selects a catalog wine, adds photos and submits the application as the signed-in customer',async()=>{
