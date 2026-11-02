@@ -38,3 +38,17 @@ test('lost scan redemption response recovers the same one-time code command and 
  globalThis.fetch=async(url,options)=>{calls.push({url,body:options.body});if(calls.length===1)throw new Error('lost scan response');return{ok:true,json:async()=>done}}
  await assert.rejects(api.command('/scan-deliver',{code:'WS.'+'S'.repeat(43)}),/lost scan response/);assert.equal(api.pending().path,'/scan-deliver');assert.deepEqual(await api.recover(),done);assert.equal(calls[0].body,calls[1].body);assert.equal(calls[1].url,'/api/v1/stores/scan-store/wine-storage/scan-deliver');assert.equal(api.pending(),null)
 })
+
+const {collectibleItems,withdrawalSelection}=await load('src/modules/wine-storage/customer/selection.ts')
+const {merchantSelection}=await load('src/modules/wine-storage/merchant/scope.ts')
+const {storageExpiryText}=await load('src/modules/wine-storage/format.ts')
+test('unlimited bottles remain collectible without reviving expired or foreign holdings',()=>{
+ const now=Date.parse('2099-01-01T00:00:00Z'),unlimited={id:'unlimited',customerId:'self',status:'stored',remaining:3,opened:false,expiresAt:null}
+ const expired={...unlimited,id:'expired',expiresAt:'2026-01-01T00:00:00Z'},empty={...unlimited,id:'empty',remaining:0}
+ assert.deepEqual(collectibleItems([unlimited,expired,empty],now),[unlimited])
+ assert.deepEqual(withdrawalSelection([unlimited],{unlimited:2},now),[{itemId:'unlimited',quantity:2}])
+ assert.equal(withdrawalSelection([unlimited],{unlimited:4},now),null)
+ assert.equal(merchantSelection('other',[unlimited],{unlimited:1},now),null)
+ assert.deepEqual(merchantSelection('self',[unlimited],{unlimited:1},now),{customerId:'self',selections:[{itemId:'unlimited',quantity:1}]})
+ assert.equal(storageExpiryText(null,'Asia/Singapore','No time limit'),'No time limit')
+})

@@ -2,3 +2,7 @@ export function dateTime(value:string,zone:string){return new Intl.DateTimeForma
 
 /** Use frozen receipt names; legacy records retain their original free-text location. */
 export function storageLocationText(value:{location:string;storageLocation?:{name:string}|null;snapshot?:{storageLocation?:{name:string}|null}}){return [value.storageLocation?.name??value.snapshot?.storageLocation?.name,value.location].filter(part=>part&&part.trim()).join(' · ')||'—'}
+
+export function storageExpired(expiresAt:string|null,now=Date.now()){return expiresAt!==null&&Date.parse(expiresAt)<=now}
+export function storageAvailable(expiresAt:string|null,now=Date.now()){return expiresAt===null||Date.parse(expiresAt)>now}
+export function storageExpiryText(expiresAt:string|null,zone:string,unlimited:string){return expiresAt===null?unlimited:dateTime(expiresAt,zone)}

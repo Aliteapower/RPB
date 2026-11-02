@@ -11,7 +11,7 @@ public final class StorageDtos {
  public record Settings(String operationMode,int version){}
  public record SettingsWrite(String operationMode,@JsonDeserialize(using=StrictIntegerDeserializer.class) int version,String idempotencyKey){}
  public record Rule(UUID id,UUID categoryId,String name,int months,int version){}
- public record RuleWrite(UUID categoryId,String name,@JsonDeserialize(using=StrictIntegerDeserializer.class) int months,String idempotencyKey){}
+ public record RuleWrite(UUID categoryId,String name,@JsonDeserialize(using=StrictIntegerDeserializer.class) Integer months,String idempotencyKey){}
  public record Line(UUID id,UUID productId,String nameZh,String nameEn,@JsonDeserialize(using=StrictIntegerDeserializer.class) int quantity,boolean opened,String source,List<UUID> photos,String note){}
  public record Apply(List<Line> lines,boolean rulesAccepted,UUID withdrawalId,UUID withdrawalItemId,String idempotencyKey){}
  public record Application(UUID id,UUID customerId,String status,Apply original,List<Line> lines,Receive confirmation,String reason,Instant createdAt){}

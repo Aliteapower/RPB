@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {storageExpiryText} from '../format'
+
 import {computed,ref,watch,onUnmounted} from 'vue'
 import './inventory.css'
 import type {StorageApi} from '../api'
@@ -50,7 +52,7 @@ onUnmounted(()=>{active=false;generation++})
   <div v-else class="storage-inventory-list">
    <article v-for="item in data.items" :key="item.id" class="storage-panel storage-inventory-item">
     <header><div><h2>{{(locale.startsWith('en')?item.nameEn||item.nameZh:item.nameZh||item.nameEn)||t('inventoryUnnamed')}}</h2><span class="cards-badge" :class="{'storage-error':item.status==='expired'}">{{t(item.status==='expired'?'inventoryExpired':'inventoryStored')}}</span><span v-if="item.opened" class="cards-badge">{{t('inventoryOpenedBottle')}}</span></div><div class="storage-inventory-quantity"><strong>{{item.remaining}}</strong><span>{{t('unit')}}</span></div></header>
-    <dl><div><dt>{{t('inventoryCustomer')}}</dt><dd>{{item.customerName||t('inventoryUnknownCustomer')}}<small v-if="item.customerPhone">{{item.customerPhone}}</small></dd></div><div><dt>{{t('inventoryLocation')}}</dt><dd>{{[item.locationName,item.slot].filter(Boolean).join(' · ')||'—'}}</dd></div><div><dt>{{t('inventoryReceived')}}</dt><dd>{{dateTime(item.receivedAt,timezone)}}</dd></div><div><dt>{{t('inventoryExpires')}}</dt><dd :class="{'storage-error':item.status==='expired'}">{{dateTime(item.expiresAt,timezone)}}</dd></div><div><dt>{{t('inventoryCustodian')}}</dt><dd>{{item.custodianName||'—'}}</dd></div><div><dt>{{t('inventoryLabel')}}</dt><dd>{{item.label||'—'}}</dd></div></dl>
+    <dl><div><dt>{{t('inventoryCustomer')}}</dt><dd>{{item.customerName||t('inventoryUnknownCustomer')}}<small v-if="item.customerPhone">{{item.customerPhone}}</small></dd></div><div><dt>{{t('inventoryLocation')}}</dt><dd>{{[item.locationName,item.slot].filter(Boolean).join(' · ')||'—'}}</dd></div><div><dt>{{t('inventoryReceived')}}</dt><dd>{{dateTime(item.receivedAt,timezone)}}</dd></div><div><dt>{{t('inventoryExpires')}}</dt><dd :class="{'storage-error':item.status==='expired'}">{{storageExpiryText(item.expiresAt,timezone,t('unlimited'))}}</dd></div><div><dt>{{t('inventoryCustodian')}}</dt><dd>{{item.custodianName||'—'}}</dd></div><div><dt>{{t('inventoryLabel')}}</dt><dd>{{item.label||'—'}}</dd></div></dl>
    </article>
   </div>
   <nav v-if="page>0||data.hasMore" class="storage-inline" :aria-label="t('inventoryPages')"><button :disabled="loading||exporting||page===0" @click="next(-1)">{{t('inventoryPrevious')}}</button><span>{{t('inventoryPage')}} {{page+1}}</span><button :disabled="loading||exporting||!data.hasMore" @click="next(1)">{{t('inventoryNext')}}</button></nav>

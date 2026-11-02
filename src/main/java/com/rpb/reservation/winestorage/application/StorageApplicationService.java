@@ -22,7 +22,7 @@ public class StorageApplicationService {
 
  @Transactional public Rule rule(StoreScope s,CurrentActor a,RuleWrite c){
   access.staff(s,a,"wine_storage.rules.manage",true);
-  if(c==null||c.categoryId()==null||text(c.name()).isBlank()||c.name().length()>200||c.months()<1||c.months()>120)throw StorageException.invalid();
+  if(c==null||c.categoryId()==null||text(c.name()).isBlank()||c.name().length()>200||c.months()==null||c.months()<0||c.months()>120)throw StorageException.invalid();
   return commands.run(s,a.actorId(),"staff","rule",c.idempotencyKey(),c,Rule.class,()->{
    if(products.categories(s).stream().noneMatch(x->x.id().equals(c.categoryId())&&x.enabled()))throw StorageException.missing();
    r.lock(s,"rule:"+c.categoryId());int version=r.rules(s).stream().filter(x->x.categoryId().equals(c.categoryId())).mapToInt(Rule::version).max().orElse(0)+1;

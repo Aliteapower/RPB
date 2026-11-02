@@ -16,6 +16,11 @@ class StorageJsonTest {
   assertThat(json.readValue("{\"itemId\":\"00000000-0000-0000-0000-000000000001\",\"quantity\":2}",Selection.class).quantity()).isEqualTo(2);
   assertThatThrownBy(()->json.readValue("{\"name\":\"规则\",\"months\":1.5}",RuleWrite.class)).isInstanceOf(JsonProcessingException.class);
  }
+ @Test void unlimitedMonthsRequireAnExplicitWholeNumber()throws Exception{
+  assertThat(json.readValue("{\"months\":0}",RuleWrite.class).months()).isZero();
+  assertThatThrownBy(()->json.readValue("{}",RuleWrite.class)).isInstanceOf(JsonProcessingException.class);
+  for(String value:new String[]{"0.5","\"0\"","null"})assertThatThrownBy(()->json.readValue("{\"months\":"+value+"}",RuleWrite.class)).isInstanceOf(JsonProcessingException.class);
+ }
  @Test void customerApplicationCountUsesTheSameStrictContract()throws Exception{
   assertThat(json.readValue("{\"quantity\":2}",Line.class).quantity()).isEqualTo(2);
   assertThatThrownBy(()->json.readValue("{\"quantity\":1.5}",Line.class)).isInstanceOf(JsonProcessingException.class);

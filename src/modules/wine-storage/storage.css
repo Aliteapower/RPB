@@ -175,3 +175,20 @@
 .storage-merchant-customer-search > button {padding:10px 12px}
 
 .storage-merchant-page .storage-deposit-views{margin:0 0 12px}.storage-deposit-views .cards-badge{margin-left:6px}.storage-direct-registration{min-width:0}
+
+/* Receipt selection reuses the storage form's widths and responsive container. */
+.storage-selected-wine { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px; background:#eaf4ef; border-radius:10px; }
+.storage-selected-wine > div:first-child { display:grid; gap:5px; min-width:0; overflow-wrap:anywhere; }
+.storage-selected-wine strong { font-size:17px; }
+.storage-wine-modes { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.storage-wine-modes button { min-width:0; }
+.storage-wine-result-list { display:grid; gap:8px; margin:12px 0; }
+.storage-wine-result-list > button { display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:left; background:white; min-width:0; }
+.storage-wine-result-list > button > span:first-child { display:grid; gap:4px; min-width:0; overflow-wrap:anywhere; }
+.storage-wine-result-list small { color:var(--wallet-muted); font-weight:normal; }
+.storage-receipt-wine-picker > label { display:flex; flex-direction:column; gap:6px; }
+@media(max-width:560px) {
+ .storage-receipt-wine-picker .storage-receive-search-row { flex-wrap:wrap; }
+ .storage-receipt-wine-picker .storage-receive-search-row > label { flex-basis:100%; }
+ .storage-wine-result-list > button { flex-wrap:wrap; }
+}

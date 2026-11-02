@@ -21,6 +21,13 @@ class StorageInventoryWorkbookTest {
    var details=book.getSheetAt(1);assertThat(details.getLastRowNum()).isEqualTo(1);assertThat(details.getRow(1).getCell(4).getNumericCellValue()).isEqualTo(2);assertThat(details.getRow(1).getCell(2).getCellType()).isEqualTo(CellType.STRING);assertThat(details.getRow(1).getCell(2).getStringCellValue()).startsWith("=HYPERLINK");assertThat(details.getRow(1).getCell(3).getStringCellValue()).isEqualTo("+6591234567");assertThat(details.getRow(1).getCell(8).getStringCellValue()).isEqualTo("2026-10-27 08:00:00");assertThat(details.getRow(1).getCell(12).getStringCellValue()).isEqualTo("0012");assertThat(((org.apache.poi.xssf.usermodel.XSSFSheet)details).getCTWorksheet().isSetAutoFilter()).isTrue();assertThat(details.getPaneInformation().isFreezePane()).isTrue();
   }
  }
+ @Test void unlimitedExpiryExportsAsBusinessTextInBothLanguages()throws Exception{
+  var row=new StorageInventoryDtos.Row(UUID.randomUUID(),UUID.randomUUID(),"Customer","Phone","Wine","Wine",2,2,false,now,null,"stored","Desk","A","L","Staff");
+  for(String locale:List.of("zh-CN","en")){
+   var bytes=new StorageInventoryWorkbook().write(new Page(List.of(row),new Summary(1,2,0,0,1),0,50,false),"Store","Asia/Singapore",now,"","stored",locale);
+   try(var book=WorkbookFactory.create(new ByteArrayInputStream(bytes))){assertThat(book.getSheetAt(1).getRow(1).getCell(9).getStringCellValue()).isEqualTo(locale.equals("en")?"No time limit":"不限时间");}
+  }
+ }
  @Test void emptyEnglishWorkbookStillIncludesZeroSummaryAndDetailHeaders()throws Exception{
   var bytes=new StorageInventoryWorkbook().write(new Page(List.of(),new Summary(0,0,0,0,0),0,50000,false),"Store","Asia/Singapore",now,"","all","en");
   try(var book=WorkbookFactory.create(new ByteArrayInputStream(bytes))){assertThat(book.getSheetName(0)).isEqualTo("Summary");assertThat(book.getSheetAt(0).getRow(8).getCell(1).getNumericCellValue()).isZero();assertThat(book.getSheetAt(1).getLastRowNum()).isZero();assertThat(book.getSheetAt(1).getRow(0).getCell(4).getStringCellValue()).isEqualTo("Remaining bottles");}

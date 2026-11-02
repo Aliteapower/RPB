@@ -43,6 +43,29 @@ class StoragePostgresTest extends CatalogPostgresTest {
  Intent deliver(Intent intent,String key){return tx.execute(s->withdrawals.deliver(scope,actor,intent.id(),new Key(key,"现场交付")));}
  StorageSettingsService settings(){return new StorageSettingsService(access,r,new StorageCommands(r));}
  void directMode(){tx.execute(s->settings().save(scope,actor,new SettingsWrite("staff_registration",r.settings(scope).version(),key())));}
+ @Test void unlimitedRuleRetainsHistoryAndSupportsInventoryAndDelivery()throws Exception{
+  var old=stored(2,false);var oldExpiry=old.expiresAt();
+  var command=new RuleWrite(product.categoryId(),"Unlimited",0,key());
+  rule=tx.execute(s->app.rule(scope,actor,command));
+  Rule replay=tx.execute(s->app.rule(scope,actor,command));assertThat(replay).isEqualTo(rule);
+  var unlimited=stored(3,false);assertThat(unlimited.expiresAt()).isNull();
+  assertThat(unlimited.snapshot().rule().months()).isZero();
+  assertThat(r.item(scope,old.id(),false,clock.instant()).expiresAt()).isEqualTo(oldExpiry);
+  tx.execute(s->app.rule(scope,actor,new RuleWrite(product.categoryId(),"Monthly again",1,key())));
+  clock.now=Instant.parse("2099-01-01T00:00:00Z");
+  assertThat(r.item(scope,unlimited.id(),false,clock.instant()).status()).isEqualTo("stored");
+  assertThat(r.item(scope,old.id(),false,clock.instant()).status()).isEqualTo("expired");
+  var inventory=new StorageInventoryRepository(jdbc);
+  var current=inventory.list(scope,"","stored",0,50,clock.instant());
+  assertThat(current.items()).extracting(StorageInventoryDtos.Row::id).containsExactly(unlimited.id());
+  assertThat(current.items().getFirst().expiresAt()).isNull();
+  assertThat(current.summary().expiredBottleCount()).isZero();
+  assertThat(inventory.list(scope,"","expired",0,50,clock.instant()).items()).extracting(StorageInventoryDtos.Row::id).containsExactly(old.id());
+  assertThat(inventory.list(new StoreScope(new TenantId(UUID.randomUUID()),store),"","stored",0,50,clock.instant()).items()).isEmpty();
+  var pickup=intent(unlimited,1);deliver(pickup,key());
+  assertThat(r.item(scope,unlimited.id(),false,clock.instant()).remaining()).isEqualTo(2);
+  assertThatThrownBy(()->tx.execute(s->app.rule(scope,actor,new RuleWrite(product.categoryId(),"Missing",null,key())))).isInstanceOf(StorageException.class);
+ }
  @Test void directModeDefaultsSettingsIsolationVersionsAndReplay(){
   assertThat(r.settings(scope).operationMode()).isEqualTo("customer_verification");
   var c=new SettingsWrite("staff_registration",0,key());var saved=tx.execute(s->settings().save(scope,actor,c));
@@ -56,21 +79,23 @@ class StoragePostgresTest extends CatalogPostgresTest {
   doThrow(StorageException.forbidden()).when(access).staff(scope,actor,"wine_storage.rules.manage",true);
   assertThatThrownBy(()->tx.execute(s->settings().save(scope,actor,new SettingsWrite("customer_verification",1,key())))).isInstanceOf(StorageException.class);
  }
- @Test void directDeliveryRequiresModeAndReplaysEvenAfterModeSwitch()throws Exception{
+ @Test void quickModeAllowsDirectDeliveryAndRetainsCustomerSelfServiceAndReplay()throws Exception{
   var item=stored(4,false);var c=new IntentWrite(customer,List.of(new Selection(item.id(),2)),key());
-  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,c))).isInstanceOf(StorageException.class);
-  directMode();var result=tx.execute(s->withdrawals.directDeliver(scope,actor,c));
+  var request=apply(1,false);assertThat(request.status()).isEqualTo("pending");
+  var result=tx.execute(s->withdrawals.directDeliver(scope,actor,c));
   assertThat(result.status()).isEqualTo("completed");assertThat(result.code()).isNull();
   assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);
   assertThat(r.events(scope,customer)).anyMatch(e->e.action().equals("staff.delivery_registered")&&e.actorId().equals(actor.actorId())).noneMatch(e->e.action().equals("authorized"));
-  tx.execute(s->settings().save(scope,actor,new SettingsWrite("customer_verification",1,key())));
+  assertThat(r.events(scope,customer)).anyMatch(e->e.action().equals("staff.delivery_registered")&&e.details().get("operationMode").equals("customer_verification"));
+  directMode();
   Intent replay=tx.execute(s->withdrawals.directDeliver(scope,actor,c));assertThat(replay).isEqualTo(result);
   assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(2);
-  assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,c.selections(),key())))).isInstanceOf(StorageException.class);
+  var last=tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,c.selections(),key())));assertThat(last.status()).isEqualTo("completed");
+  assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isZero();
  }
  @Test void directDeliveryRejectsExpiredOverdrawForeignCustomerAndDeniedStaff()throws Exception{
-  var item=stored(2,false);directMode();
-  assertThatThrownBy(()->tx.execute(s->withdrawals.create(scope,principal,new IntentWrite(null,List.of(new Selection(item.id(),1)),key())))).isInstanceOf(StorageException.class);
+  var item=stored(2,false);
+  assertThat(intent(item,1).origin()).isEqualTo("customer");
   assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(UUID.randomUUID(),List.of(new Selection(item.id(),1)),key())))).isInstanceOf(StorageException.class);
   assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),3)),key())))).isInstanceOf(StorageException.class);
   clock.now=item.expiresAt();
@@ -81,7 +106,7 @@ class StoragePostgresTest extends CatalogPostgresTest {
  }
  @Test void directDeliveryBatchRollbackAndConcurrentCommandsNeverOverdraw()throws Exception{
   var item=stored(3,false);var other=stored(2,false);var pending=tx.execute(s->withdrawals.create(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())));directMode();
-  assertThatThrownBy(()->deliver(pending,key())).hasMessageContaining("授权");
+  assertThat(pending.status()).isEqualTo("awaiting_authorization");
   assertThatThrownBy(()->tx.execute(s->withdrawals.directDeliver(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1),new Selection(other.id(),3)),key())))).isInstanceOf(StorageException.class);
   assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(3);
   int before=r.intents(scope,customer).size();
@@ -138,10 +163,11 @@ class StoragePostgresTest extends CatalogPostgresTest {
   clock.now=first.expiresAt();assertThatThrownBy(()->deliver(i,key())).isInstanceOfSatisfying(StorageException.class,e->assertThat(e.problems().contains(new Problem(first.id(),"EXPIRED"))).isTrue());
   assertThat(r.items(scope,customer,clock.instant())).allMatch(item->item.remaining()==3);
  }
- @Test void merchantIntentRequiresCustomerAuthorizationAndExpires()throws Exception{
+ @Test void legacyMerchantIntentCanBeDeliveredWithoutCustomerScanButStillExpires()throws Exception{
   var item=stored(2,false);var i=tx.execute(s->withdrawals.create(scope,actor,new IntentWrite(customer,List.of(new Selection(item.id(),1)),key())));
-  assertThatThrownBy(()->deliver(i,key())).hasMessageContaining("授权");assertThat(withdrawals.scan(scope,principal,i.code()).id()).isEqualTo(i.id());
-  tx.execute(s->withdrawals.authorize(scope,principal,i.id(),new Authorize(i.code(),key())));deliver(i,key());
+  assertThat(deliver(i,key()).status()).isEqualTo("completed");
+  assertThat(r.events(scope,customer)).anyMatch(e->e.action().equals("staff.delivery_registered")).noneMatch(e->e.action().equals("authorized"));
+  assertThatThrownBy(()->deliver(i,key())).isInstanceOf(StorageException.class);
   var expired=intent(item,1);clock.now=clock.now.plusSeconds(300);assertThatThrownBy(()->deliver(expired,key())).hasMessageContaining("超时");
   assertThat(r.item(scope,item.id(),false,clock.instant()).remaining()).isEqualTo(1);
  }
