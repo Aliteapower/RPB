@@ -344,6 +344,15 @@ test('merchant rejection requires an explicit customer-visible reason and never 
  const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/stores/A/wine-storage/applications/reject-inbox/reject');assert.equal(writes[0].body.reason,'尚未收到实物，请核对后重新申请');assert.match(text(s.root),/申请已拒绝/);s.unmount()
 })
 
+test('merchant pickup cards show only selected customer photos and enlargement never registers delivery',async()=>{
+ const item={id:'merchant-photo',applicationId:'application',customerId:'customer',snapshot:{nameZh:'核对啤酒',nameEn:'Check beer',timezone:'Asia/Singapore',receiptPhotos:['receipt-check'],applicationPhotos:[]},quantity:2,remaining:2,opened:false,status:'stored',expiresAt:null,label:'A'},data={...home,items:[item,{...item,id:'without-photo',snapshot:{...item.snapshot,receiptPhotos:[]}},{...item,id:'foreign',customerId:'another-customer',snapshot:{...item.snapshot,receiptPhotos:['foreign-photo']}}],events:[{sourceId:item.id,action:'photos.added',details:{photos:['followup-check']}}]}
+ const s=mount(StaffPage,false,'zh-CN',data,undefined,{query:{task:'withdraw'}});await tick()
+ nodes(s.root,n=>n.tag==='input')[0].props.onInput({target:{value:'张'}});globalThis.fetch=async()=>({ok:true,json:async()=>[{id:'customer',displayName:'张',phone:'80000000'}]});await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('张')&&text(n).includes('80000000'))[0].props.onClick();await tick()
+ const photos=nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='放大查看照片');assert.equal(photos.length,2)
+ assert.deepEqual(nodes(s.root,n=>n.tag==='img').map(n=>n.props.src),['/api/v1/stores/A/wine-storage/photos/receipt-check','/api/v1/stores/A/wine-storage/photos/followup-check'])
+ await photos[0].props.onClick({currentTarget:{focus(){}}});await tick();const dialog=nodes(s.root,n=>n.props?.role==='dialog')[0];assert.ok(dialog);assert.equal(nodes(dialog,n=>n.tag==='img')[0].props.src,'/api/v1/stores/A/wine-storage/photos/receipt-check');button(dialog,'继续放大').props.onClick();await tick();assert.ok(nodes(s.root,n=>String(n.props?.class).includes('is-zoomed')).length);button(dialog,'关闭').props.onClick();await tick()
+ assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0);assert.ok(s.calls.every(c=>c.method==='GET'));assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='确认登记取酒').length,0);s.unmount()
+})
 test('customer pickup shows staff receipt and later photos, enlarges safely and refreshes without commands',async()=>{
  const item={id:'photo-bottle',applicationId:'application',customerId:'customer',snapshot:{nameZh:'青岛啤酒',nameEn:'Beer',timezone:'Asia/Singapore',receiptPhotos:['staff-photo'],applicationPhotos:[]},quantity:2,remaining:2,opened:false,status:'stored',expiresAt:null}
  const data={...home,items:[item],events:[{sourceId:item.id,action:'photos.added',details:{photos:['extra-photo']}},{sourceId:'another-bottle',action:'photos.added',details:{photos:['not-this-bottle']}}]}
