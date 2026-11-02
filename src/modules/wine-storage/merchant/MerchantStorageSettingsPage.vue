@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import StorageGuide from '../guide/StorageGuide.vue'
-import guidePdf from '../guide/guide-zh.pdf'
+import StorageGuideAccess from '../guide/StorageGuideAccess.vue'
 import CustomerAccessLinks from '../../customers/CustomerAccessLinks.vue'
 import {computed,ref,watch} from 'vue'
 import CatalogPage from '../../catalog/CatalogPage.vue'
@@ -19,9 +19,9 @@ const canCatalog=computed(()=>auth.user?.roles.includes('tenant_admin')===true&&
 watch(canCatalog,value=>{if(!value)managingProducts.value=false})
 </script>
 <template><section class="storage-settings-page"><div class="storage-settings-heading"><h2 v-if="readingGuide">{{x('酒水寄存操作指南','Bottle storage quick guide')}}</h2><h2 v-else-if="!managingProducts">{{t('storageSettings')}}</h2><button v-else :disabled="disabled" @click="managingProducts=false">{{t('backStorageSettings')}}</button><button v-if="readingGuide" type="button" :disabled="disabled" @click="readingGuide=false">{{t('backStorageSettings')}}</button><button :disabled="disabled" @click="emit('back')">← {{t('backStorage')}}</button></div><p v-if="!managingProducts&&!readingGuide" class="cards-muted storage-settings-hint">{{t('storageSettingsHint')}}</p>
-<StorageGuide v-if="readingGuide"/>
+<StorageGuide v-if="readingGuide" :store="store" :enabled="home.newBusinessEnabled"/>
 <template v-else-if="managingProducts&&canCatalog"><CatalogPage :key="store" :store-id="store" storage-only embedded :disabled="disabled" @busy-change="emit('busy-change',$event)" @categories-changed="emit('refresh')"/></template>
-<template v-else><div class="storage-settings-grid"><section class="storage-panel storage-guide-entry"><div><h3>{{x('操作指南','Quick guide')}}</h3><p class="cards-muted">{{x('选任务、按步骤，快速了解存酒、取酒与报表。','Step-by-step help for deposits, pickups and reports.')}}</p></div><div class="storage-guide-entry-actions"><button type="button" :disabled="disabled" @click="readingGuide=true">{{x('查看操作指南','Read quick guide')}}</button><a class="storage-guide-download" :href="guidePdf" download="酒水寄存操作指南.pdf">{{x('下载 PDF（中文）','Download PDF (Chinese)')}}</a></div></section><section v-if="canCatalog" class="storage-panel storage-settings-product-entry"><div><h3>{{t('wineProducts')}}</h3><p class="cards-muted">{{t('wineProductsHint')}}</p></div><button :disabled="disabled" @click="managingProducts=true">{{t('manageWineProducts')}}</button></section>
+<template v-else><div class="storage-settings-grid"><section class="storage-panel storage-guide-entry"><div><h3>{{x('操作指南','Quick guide')}}</h3><p class="cards-muted">{{x('选任务、按步骤，快速了解存酒、取酒与报表。','Step-by-step help for deposits, pickups and reports.')}}</p></div><div class="storage-guide-entry-actions"><button type="button" :disabled="disabled" @click="readingGuide=true">{{x('查看操作指南','Read quick guide')}}</button><StorageGuideAccess :key="store" :store="store" :enabled="home.newBusinessEnabled" compact/></div></section><section v-if="canCatalog" class="storage-panel storage-settings-product-entry"><div><h3>{{t('wineProducts')}}</h3><p class="cards-muted">{{t('wineProductsHint')}}</p></div><button :disabled="disabled" @click="managingProducts=true">{{t('manageWineProducts')}}</button></section>
 <MerchantStorageModeSettings v-if="home.newBusinessEnabled&&can('rules.manage')&&auth.user?.roles.includes('tenant_admin')" :home="home" :api="api" :disabled="disabled" @command="emit('command',$event)"/>
 <MerchantStorageLocations v-if="home.newBusinessEnabled&&can('rules.manage')&&auth.user?.roles.includes('tenant_admin')" :api="api" :disabled="disabled" @error="emit('error',$event)" @busy-change="emit('busy-change',$event)"/>
 <MerchantStorageCustodians v-if="home.newBusinessEnabled&&can('custodians.manage')" :api="api" :disabled="disabled" @error="emit('error',$event)" @busy-change="emit('busy-change',$event)"/>

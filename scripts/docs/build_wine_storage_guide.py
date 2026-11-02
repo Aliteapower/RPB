@@ -42,5 +42,17 @@ def build(font):
  manifest={'version':d['version'],'contentSha256':hashlib.sha256(content).hexdigest(),'pdfSha256':hashlib.sha256(out.read_bytes()).hexdigest(),'pages':2,'language':'zh-CN'}
  (BASE/'guide-zh.manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
  print(json.dumps(manifest))
+def build_entry_template(font):
+ from reportlab.pdfgen import canvas
+ rl_config.invariant=1
+ pdfmetrics.registerFont(TTFont('GuideCJK',str(font),subfontIndex=0))
+ c=canvas.Canvas(str(BASE/'entry-template.pdf'),pagesize=A4,invariant=1)
+ c.setTitle('酒水寄存本店入口页模板');c.setFont('GuideCJK',20);c.setFillColor(colors.HexColor('#155F52'));c.drawString(38,797,'本店员工与顾客入口')
+ c.setFont('GuideCJK',9);c.setFillColor(colors.HexColor('#567277'));c.drawString(38,775,'核对门店名称后再分享；网址和二维码均指向当前门店，仍需登录并校验权限。')
+ for top,title,note in [(743,'员工酒存入口','需使用有本店权限的员工账号登录。'),(393,'顾客存酒入口','顾客本人登录后查看及办理自己的存酒。')]:
+  c.setFont('GuideCJK',12);c.setFillColor(colors.HexColor('#155F52'));c.drawString(267,top-34,title)
+  c.setFont('GuideCJK',9);c.setFillColor(colors.HexColor('#567277'));c.drawString(267,top-190,note)
+ c.setFont('GuideCJK',8);c.drawString(38,28,'本页为当前门店专用入口；员工码仅供员工使用。');c.drawRightString(557,28,'3 / 3');c.showPage();c.save()
+
 if __name__=='__main__':
- parser=argparse.ArgumentParser();parser.add_argument('--font',default=os.environ.get('RPB_GUIDE_FONT','C:/Windows/Fonts/msyh.ttc'));args=parser.parse_args();build(args.font)
+ parser=argparse.ArgumentParser();parser.add_argument('--font',default=os.environ.get('RPB_GUIDE_FONT','C:/Windows/Fonts/msyh.ttc'));parser.add_argument('--entry-template-only',action='store_true');args=parser.parse_args();build_entry_template(args.font) if args.entry_template_only else build(args.font)
