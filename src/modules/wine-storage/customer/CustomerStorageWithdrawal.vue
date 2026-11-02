@@ -24,5 +24,5 @@ async function submit(selected:Selection[]){
 </script>
 <template><section class="storage-panel storage-section">
  <section v-if="liveCode" class="storage-panel"><h2>{{x('整车取酒码','Batch pickup code')}}</h2><p v-for="line in liveCode.selections" :key="line.itemId">{{items.find(i=>i.id===line.itemId)?displayName(items.find(i=>i.id===line.itemId)!.snapshot,locale):'—'}} × {{line.quantity}} {{x('瓶','bottles')}}</p><WalletQrDisplay :value="liveCode.code!" :expires-at="liveCode.expiresAt"/><p>{{x('请交由店员核对并扫码，核销后才扣减存酒。','Staff checks and scans this code before stock is deducted.')}}</p><button type="button" :disabled="disabled||saving" @click="emit('cancel')">{{t('cancel')}}</button></section>
- <StoragePickupCart v-else :items="items" :events="events" :api="api" :scope="api.base" :disabled="disabled||saving" :submit-label="x('提交取酒，生成取酒码','Submit and get pickup code')" :submit-hint="x('一次生成整车取酒码，由店员核销后扣减存酒。','One code for the entire cart. Stock is deducted after staff handover.')" @submit="submit"/>
+ <StoragePickupCart v-else :items="items" :events="events" :api="api" :scope="api.base+'|'+(items[0]?.customerId??'')" :disabled="disabled||saving" :submit-label="x('提交取酒，生成取酒码','Submit and get pickup code')" :submit-hint="x('一次生成整车取酒码，由店员核销后扣减存酒。','One code for the entire cart. Stock is deducted after staff handover.')" @submit="submit"/>
 </section></template>

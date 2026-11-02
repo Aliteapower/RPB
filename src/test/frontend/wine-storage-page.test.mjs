@@ -215,6 +215,10 @@ test('cart removal clears quantities and switching stores never carries an old p
  await preparePickupCart(s.root,2);button(s.root,'移出取酒车').props.onClick();await tick();assert.equal(button(s.root,'提交取酒').props.disabled,true);button(s.root,'继续选酒').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.type==='number')[0].props.value,0)
  await preparePickupCart(s.root,2);s.route.params.storeId='B';await tick();assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.type==='number')[0].props.value,0);assert.equal(button(s.root,'查看取酒车').props.disabled,true);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
 })
+test('same-store customer ownership change clears the old pickup cart and cached row snapshots',async()=>{
+ const item={id:'owner-old',customerId:'owner-a',snapshot:{nameZh:'旧顾客存酒',timezone:'Asia/Singapore'},remaining:2,opened:false,status:'stored',expiresAt:null},data={...home,items:[item]},s=mount(CustomerPage,true,'zh-CN',data,url=>url.includes('/product-options')?{items:[],categories:[],hasMore:false}:{...data},{query:{view:'withdraw'}});await tick();await preparePickupCart(s.root,1)
+ data.items=[{...item,id:'owner-new',customerId:'owner-b',snapshot:{...item.snapshot,nameZh:'新顾客存酒'}}];await nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='刷新')[0].props.onClick();await tick();assert.doesNotMatch(text(s.root),/旧顾客存酒/);assert.match(text(s.root),/新顾客存酒/);assert.equal(nodes(s.root,n=>n.tag==='input'&&n.props.type==='number')[0].props.value,0);assert.equal(button(s.root,'查看取酒车').props.disabled,true);s.unmount()
+})
 test('merchant cart directly submits a complete multi-item batch once in either storage mode',async()=>{
  for(const operationMode of ['customer_verification','staff_registration']){
   const item={id:'cart-a',customerId:'customer',snapshot:{nameZh:'酒甲',timezone:'Asia/Singapore'},remaining:3,opened:false,status:'stored',expiresAt:null},other={...item,id:'cart-b'},data={...home,operationMode,items:[item,other,{...item,id:'foreign',customerId:'someone-else'}],intents:[]},person={id:'customer',displayName:'批量顾客',phone:'8000'};let finish
