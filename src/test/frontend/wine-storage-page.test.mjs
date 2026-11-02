@@ -350,7 +350,7 @@ test('customer pickup shows staff receipt and later photos, enlarges safely and 
  const s=mount(CustomerPage,true,'zh-CN',data,url=>url.includes('/product-options')?{items:[],categories:[],hasMore:false}:structuredClone(data));await tick();button(s.root,'我要取酒').props.onClick();await tick()
  const thumbs=()=>nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='放大查看照片')
  assert.equal(thumbs().length,2);assert.deepEqual(nodes(s.root,n=>n.tag==='img').map(n=>n.props.src),['/api/v1/public/stores/A/wine-storage/photos/staff-photo','/api/v1/public/stores/A/wine-storage/photos/extra-photo'])
- await thumbs()[0].props.onClick({currentTarget:{focus(){}}});await tick();let dialog=nodes(s.root,n=>n.props?.role==='dialog')[0];assert.ok(dialog);assert.equal(nodes(dialog,n=>n.tag==='img')[0].props.src,'/api/v1/public/stores/A/wine-storage/photos/staff-photo')
+ await thumbs()[0].props.onClick({currentTarget:{focus(){}}});await tick();let dialog=nodes(s.root,n=>n.props?.role==='dialog')[0];assert.ok(dialog);assert.equal(dialog.props['aria-label'],'照片预览');assert.equal(nodes(dialog,n=>n.tag==='img')[0].props.src,'/api/v1/public/stores/A/wine-storage/photos/staff-photo')
  button(dialog,'继续放大').props.onClick();await tick();assert.ok(nodes(s.root,n=>String(n.props?.class).includes('is-zoomed')).length)
  ;[].concat(dialog.props.onKeydown).forEach(handler=>handler({key:'Escape',preventDefault(){}}));await tick();assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0)
  data.events.push({sourceId:item.id,action:'photos.added',details:{photos:['new-followup']}});await nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='刷新')[0].props.onClick();await tick();assert.equal(thumbs().length,3);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
