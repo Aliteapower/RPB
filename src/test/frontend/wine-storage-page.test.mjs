@@ -30,26 +30,15 @@ test('explicit merchant history suppresses administrator customer creation even 
  const actor={accountId:'history-admin',roles:['tenant_admin'],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A']}
  const s=mount(StaffPage,false,'en-SG',home,undefined,{actor,query:{task:'records',history:'1'}});await tick()
  assert.equal(button(s.root,'＋'),undefined);assert.equal(button(s.root,'Settings'),undefined)
- assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='Records').length,1)
- s.route.query={task:'records'};await tick();assert.ok(button(s.root,'＋'),'business records retain authorized customer creation');assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
-})
-test('entering explicit history clears an open correction draft and rejects a stale submit handler',async()=>{
- const item={id:'history-bottle',applicationId:'application',customerId:'customer',snapshot:{nameEn:'Historic wine',timezone:'Asia/Singapore',applicationPhotos:[],receiptPhotos:[]},quantity:3,remaining:2,opened:false,status:'stored',location:'A1',label:'L1',expiresAt:null}
- const data={...home,permissions:[...home.permissions,'wine_storage.correct'],items:[item]},person={id:'customer',displayName:'History customer',phone:'+6580000000'}
- const s=mount(StaffPage,false,'en-SG',data,url=>url.includes('/customers?')?[person]:data,{query:{task:'records'}});await tick()
- const search=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0];nodes(search,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await search.props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes(person.displayName))[0].props.onClick();await tick()
- button(s.root,'Holdings').props.onClick();await tick();const correctionButton=nodes(s.root,n=>n.tag==='button'&&/correction/i.test(text(n)))[0];assert.ok(correctionButton);correctionButton.props.onClick();await tick()
- const draft=nodes(s.root,n=>n.tag==='form'&&text(n).includes('Append a note only'))[0];assert.ok(draft);nodes(draft,n=>n.tag==='input')[0].props['onUpdate:modelValue']('Checked historic facts');nodes(draft,n=>n.tag==='textarea')[0].props['onUpdate:modelValue']('Draft must not survive read-only navigation');await tick();const staleSubmit=draft.props.onSubmit
- s.route.query={task:'records',history:'1'};await tick();assert.equal(nodes(s.root,n=>n.tag==='form'&&text(n).includes('Append a note only')).length,0);assert.equal(nodes(s.root,n=>n.tag==='button'&&/correction/i.test(text(n))).length,0)
- await staleSubmit({preventDefault(){}});await tick();assert.ok(s.calls.every(c=>c.method==='GET'),'stale handler cannot invoke a storage command')
- s.route.query={task:'records'};await tick();assert.equal(nodes(s.root,n=>n.tag==='form'&&text(n).includes('Append a note only')).length,0,'restoring business view does not restore a cleared draft');s.unmount()
+ assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='Reports').length,1)
+ s.route.query={task:'records'};await tick();assert.equal(button(s.root,'＋'),undefined,'reports never create customers');assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
 })
 test('explicit merchant history cannot be switched to deposit or withdrawal by a scanner handoff',async()=>{
  for(const task of ['deposit','withdraw']){
   const person={id:'handoff-history-customer',displayName:'Should not be selected',phone:'80000000'},actor={accountId:'history-handoff',roles:[],permissions:home.permissions,storeIds:['A']}
   setScanHandoff({store:'A',actor:actor.accountId,target:'storage',code:'WI.'+'A'.repeat(43),customerId:person.id,task})
   const s=mount(StaffPage,false,'en-SG',home,url=>url.endsWith('/customers/'+person.id)?person:home,{actor,query:{task:'records',history:'1'}});await tick()
-  assert.ok(!s.calls.some(c=>c.url.endsWith('/customers/'+person.id)));assert.doesNotMatch(text(s.root),/Should not be selected|Register storage for customer|Scan and redeem customer code/);assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='Records').length,1);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+  assert.ok(!s.calls.some(c=>c.url.endsWith('/customers/'+person.id)));assert.doesNotMatch(text(s.root),/Should not be selected|Register storage for customer|Scan and redeem customer code/);assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='Reports').length,1);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
  }
 })
 test('a pending customer handoff cannot leave records after entering same-store explicit history',async()=>{
@@ -57,7 +46,7 @@ test('a pending customer handoff cannot leave records after entering same-store 
  setScanHandoff({store:'A',actor:actor.accountId,target:'storage',code:'WI.'+'A'.repeat(43),customerId:person.id,task:'deposit'})
  const s=mount(StaffPage,false,'en-SG',home,url=>url.endsWith('/customers/'+person.id)?new Promise(resolve=>finish=resolve):home,{actor,query:{task:'records'}});await tick();assert.equal(typeof finish,'function');assert.equal(s.calls.filter(c=>c.url.endsWith('/customers/'+person.id)).length,1)
  s.route.query={task:'records',history:'1'};await tick();finish(person);await tick()
- assert.equal(s.route.query.history,'1');assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='Records').length,1);assert.doesNotMatch(text(s.root),/Late handoff customer|Register storage for customer|Scan and redeem customer code/);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+ assert.equal(s.route.query.history,'1');assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-pressed']===true&&text(n).trim()==='Reports').length,1);assert.doesNotMatch(text(s.root),/Late handoff customer|Register storage for customer|Scan and redeem customer code/);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
 })
 test('merchant history composable rejects command callbacks while preserving business capability after return',async()=>{
  let workspace;const harness={setup(){workspace=useMerchantStorage();return()=>h('div')}};const s=mount(harness,false,'en-SG',home,undefined,{query:{task:'records',history:'1'}});await tick();let calls=0
@@ -139,7 +128,7 @@ before(async()=>{
 })
 after(()=>{globalThis.window=originalWindow;globalThis.fetch=originalFetch;globalThis.sessionStorage=originalStorage;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 function mount(component,customer,locale='zh-CN',data=home,respond,lists={}){
- const calls=[],navigation=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());return response}
+ const calls=[],navigation=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.includes('/wine-storage/reports')?(lists.reportRespond?lists.reportRespond(url):{items:[],summary:{recordCount:0,completedCount:0,bottleCount:0},page:0,size:20,hasMore:false}):url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());return response}
  const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target);if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,navigation,i18n,route,unmount:()=>{app.unmount();mounted.delete(app)}}
 }
 test('customer storage only links back to a commercially enabled wallet and tracks activation and closure',async()=>{
@@ -165,7 +154,7 @@ test('customer pages never expose merchant receipt or rule editing even if respo
  for(const customer of [true,false]){
   const s=mount(customer?CustomerPage:StaffPage,customer);await tick()
   if(customer){assert.match(text(s.root),/我要存酒/);assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='保存规则').length,0);s.unmount();continue}
-  assert.match(text(s.root),/存酒.*取酒.*记录/)
+  assert.match(text(s.root),/存酒.*取酒.*报表/)
   assert.match(text(s.root),/直接登记.*待审核/);assert.match(text(s.root),/1\. 找到顾客/);assert.doesNotMatch(text(s.root),/请先查找并确认一位顾客/)
   assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n)==='确认实际收存').length,0)
   assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,0);button(s.root,'设置').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)==='保存新版本').length>0).length,1)
@@ -368,9 +357,9 @@ test('customer pickup shows staff receipt and later photos, enlarges safely and 
  ;[].concat(dialog.props.onKeydown).forEach(handler=>handler({key:'Escape',preventDefault(){}}));await tick();assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0)
  data.events.push({sourceId:item.id,action:'photos.added',details:{photos:['new-followup']}});await nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='刷新')[0].props.onClick();await tick();assert.equal(thumbs().length,3);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
 })
-test('customer stored and past records and merchant records reuse scoped photo enlargement',async()=>{
+test('customer stored and past records reuse scoped photo enlargement',async()=>{
  const item={id:'past-photo',applicationId:'application',customerId:'customer',snapshot:{nameZh:'啤酒',nameEn:'Beer',timezone:'Asia/Singapore',receiptPhotos:['receipt-photo'],applicationPhotos:[]},quantity:2,remaining:0,opened:false,status:'collected',expiresAt:null},data={...home,items:[item],events:[]}
- for(const customer of [true,false]){
+ for(const customer of [true]){
   const s=mount(customer?CustomerPage:StaffPage,customer,'zh-CN',data,undefined,{query:customer?{}:{task:'records'}});await tick()
   if(customer)button(s.root,'我的记录').props.onClick();else{nodes(s.root,n=>n.tag==='input')[0].props.onInput({target:{value:'张'}});globalThis.fetch=async()=>({ok:true,json:async()=>[{id:'customer',displayName:'张',phone:'80000000'}]});await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('张')&&text(n).includes('80000000'))[0].props.onClick();await tick()}
   await tick();if(!customer)button(s.root,'酒品明细').props.onClick();await tick()
@@ -782,30 +771,10 @@ test('duplicate phone keeps quick-create details and allows lookup of the existi
 test('settings URL stays on settings after page initialization and supports closed-product rule history',async()=>{
  const s=mount(StaffPage,false,'zh-CN',{...home,newBusinessEnabled:false},undefined,{query:{task:'settings'}});await tick()
  assert.match(text(s.root),/存酒设置/);assert.equal(button(s.root,'查找顾客'),undefined);assert.equal(button(s.root,'保存存取酒模式'),undefined);assert.ok(nodes(s.root,n=>n.tag==='summary'&&text(n)==='保存规则设置').length)
- button(s.root,'← 返回存取酒').props.onClick();await tick();assert.ok(button(s.root,'记录'));assert.equal(button(s.root,'存酒'),undefined);s.unmount()
+ button(s.root,'← 返回存取酒').props.onClick();await tick();assert.ok(button(s.root,'报表'));assert.equal(button(s.root,'存酒'),undefined);s.unmount()
 })
 
-test('deposit records show actual received facts once, label people, and collapse preserved evidence',async()=>{
- const application={id:'receipt-app',customerId:'customer',status:'stored',createdAt:'2026-11-01T01:00:00Z',reason:'原登记说明',lines:[{id:'line',nameZh:'原酒名',nameEn:'Original',quantity:3,photos:[]}],confirmation:{lines:[{lineId:'line',nameZh:'核实酒名',nameEn:'Verified',quantity:2,photos:[],location:'A1',label:'L1'}],reason:'核实原因'}},item={id:'receipt-item',applicationId:application.id,customerId:'customer',quantity:2,remaining:0,status:'collected',location:'A1',label:'L1',expiresAt:null,receivedAt:'2026-11-01T02:00:00Z',snapshot:{nameZh:'核实酒名',timezone:'Asia/Singapore',custodian:{name:'保管乙'},receiptPhotos:[],applicationPhotos:[]}},data={...home,applications:[application],items:[item],events:[{sourceId:application.id,action:'staff.registered',actorName:'经办甲',details:{},createdAt:item.receivedAt},{sourceId:application.id,action:'received',actorName:'经办甲',details:{},createdAt:item.receivedAt}]}
- const s=await merchantRecordFixture(data);const summary=nodes(s.root,n=>n.props?.class==='record-summary-lines')[0];assert.match(text(summary),/核实酒名.*实收.*2/);assert.doesNotMatch(text(summary),/原酒名|剩余|原申请/);assert.match(text(s.root),/已收存/);assert.match(text(s.root),/数量有调整/);assert.match(text(s.root),/经办人.*经办甲/);assert.match(text(s.root),/保管人.*保管乙/);assert.match(text(s.root),/原登记说明|核实原因/)
- const details=nodes(s.root,n=>n.tag==='details'&&n.props?.class==='storage-record-details')[0];assert.notEqual(details.props.open,true);assert.ok(nodes(details,n=>String(n.props?.class).includes('storage-receipt-summary')).length);assert.equal(nodes(s.root,n=>n.tag==='button'&&['存酒记录','取酒记录','酒品明细','操作日志'].includes(text(n).trim())).length,4);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
-})
-test('pickup records distinguish completed handover from pending code and label a missing creation time',async()=>{
- const item={id:'pickup-item',applicationId:'application',customerId:'customer',quantity:2,remaining:1,status:'stored',expiresAt:null,location:'A1',snapshot:{nameZh:'啤酒',timezone:'Asia/Singapore'}},base={customerId:'customer',origin:'customer',selections:[{itemId:item.id,quantity:1}],code:null},data={...home,items:[item],intents:[{...base,id:'done',status:'completed',expiresAt:'2000-01-01T00:00:00Z',completedAt:'2026-11-02T02:00:00Z'},{...base,id:'pending',status:'authorized',expiresAt:'2099-01-01T00:05:00Z',completedAt:null}],events:[]};const s=await merchantRecordFixture(data);button(s.root,'取酒记录').props.onClick();await tick()
- const cards=nodes(s.root,n=>n.tag==='article'&&n.props?.class==='storage-record-card');assert.equal(cards.length,2);assert.match(text(nodes(cards[0],n=>n.tag==='header')[0]),/已取走.*取走/);assert.doesNotMatch(text(nodes(cards[0],n=>n.tag==='header')[0]),/已过期|2000/);assert.match(text(nodes(cards[1],n=>n.tag==='header')[0]),/待领取.*时间未记录/);assert.doesNotMatch(text(nodes(cards[1],n=>n.tag==='header')[0]),/2099/);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
-})
-async function merchantRecordFixture(data){const person={id:'customer',displayName:'记录顾客',phone:'8000'},s=mount(StaffPage,false,'zh-CN',data,url=>url.includes('/customers?')?[person]:data,{query:{task:'records'}});await tick();const form=nodes(s.root,n=>n.tag==='form')[0];nodes(form,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await form.props.onSubmit({preventDefault(){}});await tick();button(s.root,'记录顾客').props.onClick();await tick();return s}
-test('compact holdings retain the authorized append-note command without altering balances',async()=>{
- const item={id:'note-item',applicationId:'application',customerId:'customer',quantity:2,remaining:1,status:'stored',location:'A1',label:'L1',expiresAt:null,snapshot:{nameZh:'酒',timezone:'Asia/Singapore',applicationPhotos:[],receiptPhotos:[]}},data={...home,items:[item],permissions:[...home.permissions,'wine_storage.correct']},s=await merchantRecordFixture(data);button(s.root,'酒品明细').props.onClick();await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('追加纠错说明'))[0].props.onClick();await tick();const form=nodes(s.root,n=>n.tag==='form'&&nodes(n,c=>c.tag==='input').length>0)[0];nodes(form,n=>n.tag==='input')[0].props['onUpdate:modelValue']('核实原因');nodes(form,n=>n.tag==='textarea')[0].props['onUpdate:modelValue']('追加说明');await tick();await form.props.onSubmit({preventDefault(){}});await tick();const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.ok(writes[0].url.endsWith('/items/note-item/corrections'));assert.equal(writes[0].body.note,'追加说明');assert.equal(data.items[0].remaining,1);s.unmount()
-})
-test('storage activity shows operator names and a translated missing-name fallback instead of UUIDs',async()=>{
- const actorId='30000000-0000-0000-0000-000000000902',person={id:'customer',displayName:'顾客',phone:'8000'},data={...home,events:[{id:'e1',sourceId:'application',action:'received',actorId,actorName:'王经理',details:{},createdAt:new Date().toISOString()},{id:'e2',sourceId:'application',action:'received',actorId:'missing-actor-id',actorName:null,details:{},createdAt:new Date().toISOString()}]}
- const s=mount(StaffPage,false,'zh-CN',data,url=>url.includes('/customers?')?[person]:data);await tick()
- const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0];nodes(form,n=>n.tag==='input')[0].props.onInput({target:{value:'8000'}});await form.props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('顾客')&&text(n).includes('8000'))[0].props.onClick();await tick()
- button(s.root,'记录').props.onClick();await tick();button(s.root,'操作日志').props.onClick();await tick()
- assert.match(text(s.root),/操作人.*王经理/);assert.match(text(s.root),/未知操作者/);assert.doesNotMatch(text(s.root),/30000000-0000-0000-0000-000000000902|missing-actor-id/)
- s.i18n.global.locale.value='en-SG';await tick();assert.match(text(s.root),/Unknown operator/);s.unmount()
-})
+
 
 
 test('compact activation workspace searches the shared directory and isolates selected customer by store',async()=>{
@@ -1034,3 +1003,25 @@ async function preparePickupCart(root,quantity){
  const view=button(root,'查看取酒车')??button(root,'View pickup cart');if(view){view.props.onClick();await tick()}
  return button(root,'提交取酒')??button(root,'Submit and get pickup code')??button(root,'Submit pickup')
 }
+
+const reportRow={id:'bill-one',kind:'deposit',customerId:'customer',customerName:'报表顾客',customerPhone:'8000',status:'stored',occurredAt:'2026-11-02T02:00:00Z',quantity:2,winesZh:'青岛黑啤 × 2',winesEn:'Beer × 2',locations:'前台 · A01'}
+const reportPage={items:[reportRow],summary:{recordCount:41,completedCount:39,bottleCount:88},page:0,size:20,hasMore:true}
+function reportMount(options={}){return mount(StaffPage,false,'zh-CN',home,undefined,{actor:{accountId:'report-admin',roles:['tenant_admin'],permissions:[...home.permissions,'tenant.admin.manage'],storeIds:['A','B']},query:{task:'records'},reportRespond:()=>reportPage,...options})}
+function reportForm(s){return nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-report-filters'))[0]}
+function updateModel(n,value){n.props['onUpdate:modelValue'](value)}
+test('merchant report opens all-store results without customer selection or creation and fetches metadata only',async()=>{
+ const s=reportMount();await tick();assert.match(text(s.root),/报表顾客.*青岛黑啤/);assert.equal(nodes(s.root,n=>n.tag==='tbody')[0].children.filter(n=>n.tag==='tr').length,1);assert.doesNotMatch(text(s.root),/找到顾客|新增顾客|确认一位顾客|追加纠错|上传实物/);assert.ok(s.calls.some(c=>c.url.endsWith('/home?includeRecords=false')));assert.equal(s.calls.filter(c=>c.url.includes('/customers')).length,0);assert.match(text(s.root),/41.*39.*88/);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+})
+test('report applies date keyword and status filters to server pages and does not mix draft filters with old totals',async()=>{
+ const s=reportMount();await tick();const form=reportForm(s),inputs=nodes(form,n=>n.tag==='input'),selects=nodes(form,n=>n.tag==='select');updateModel(inputs[0],'  黑啤  ');updateModel(inputs[1],'2026-11-01');updateModel(inputs[2],'2026-11-02');updateModel(selects[1],'stored');await tick();assert.match(text(s.root),/筛选已更改/);assert.equal(button(s.root,'下一页').props.disabled,true);await form.props.onSubmit({preventDefault(){}});await tick();let call=s.calls.filter(c=>c.url.includes('/reports?')).at(-1);let q=new URL('http://qa'+call.url).searchParams;assert.equal(q.get('query'),'黑啤');assert.equal(q.get('from'),'2026-11-01');assert.equal(q.get('to'),'2026-11-02');assert.equal(q.get('status'),'stored');assert.equal(q.get('page'),'0');await button(s.root,'下一页').props.onClick();await tick();assert.equal(new URL('http://qa'+s.calls.at(-1).url).searchParams.get('page'),'1');updateModel(selects[0],'pickup');await selects[0].props.onChange();await tick();q=new URL('http://qa'+s.calls.at(-1).url).searchParams;assert.equal(q.get('kind'),'pickup');assert.equal(q.get('status'),'all');assert.equal(q.get('page'),'0');s.unmount()
+})
+test('report details retain original evidence photos and audit names without any storage mutation controls',async()=>{
+ const item={id:'report-item',applicationId:'bill-one',customerId:'customer',snapshot:{nameZh:'青岛黑啤',timezone:'Asia/Singapore',receiptPhotos:['receipt-photo'],applicationPhotos:[]},quantity:2,remaining:0,status:'collected',expiresAt:null},application={id:'bill-one',customerId:'customer',status:'stored',lines:[{id:'line',nameZh:'青岛黑啤',quantity:3,photos:[],note:'原申请说明'}],confirmation:{lines:[{lineId:'line',nameZh:'青岛黑啤',quantity:2,photos:[]}],reason:'核实实收两瓶'},createdAt:'2026-11-02T02:00:00Z'},detail={application,intent:null,items:[item],events:[{id:'event',sourceId:'bill-one',action:'received',actorName:'王经理',details:{},createdAt:'2026-11-02T02:00:00Z'}]};
+ const s=reportMount({reportRespond:url=>url.includes('/reports/deposit/')?detail:reportPage});await tick();await button(s.root,'详情').props.onClick();await tick();assert.match(text(s.root),/原申请瓶数.*3.*实际收存瓶数.*2/);assert.match(text(s.root),/核实实收两瓶|原申请说明/);assert.match(text(s.root),/王经理/);assert.doesNotMatch(text(s.root),/追加纠错说明|追加现场照片|登记取酒|新增顾客/);const photo=nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='放大查看照片')[0];assert.ok(photo);await photo.props.onClick({currentTarget:{focus(){}}});await tick();assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,1);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+})
+test('report switch store and query invalidates stale list and details while retry handles errors',async()=>{
+ let finishList,finishDetail;let count=0;const s=reportMount({reportRespond:url=>url.includes('/reports/deposit/')?new Promise(r=>finishDetail=r):++count===1?reportPage:new Promise(r=>finishList=r)});await tick();button(s.root,'详情').props.onClick();await tick();assert.equal(typeof finishDetail,'function');await button(s.root,'下一页').props.onClick();await tick();finishDetail({application:null,intent:null,items:[],events:[]});await tick();assert.equal(nodes(s.root,n=>String(n.props?.class).includes('storage-report-detail')).length,0);const old=finishList;s.route.params.storeId='B';await tick();globalThis.fetch=async()=>({ok:false,status:403,json:async()=>({code:'STORAGE_FORBIDDEN',message:'无权限'})});old({...reportPage,items:[{...reportRow,customerName:'旧店顾客'}]});await tick();assert.doesNotMatch(text(s.root),/旧店顾客/);s.unmount()
+})
+test('report validates reversed dates and displays empty error retry and English states',async()=>{
+ let fail=false;const s=reportMount({reportRespond:()=>{if(fail)throw new Error('network failed');return {...reportPage,items:[],summary:{recordCount:0,completedCount:0,bottleCount:0},hasMore:false}}});await tick();assert.match(text(s.root),/没有符合条件/);const inputs=nodes(reportForm(s),n=>n.tag==='input');updateModel(inputs[1],'2026-11-03');updateModel(inputs[2],'2026-11-02');const count=s.calls.length;await reportForm(s).props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.length,count);assert.match(text(s.root),/开始日期不能晚于/);fail=true;updateModel(inputs[1],'');updateModel(inputs[2],'');await reportForm(s).props.onSubmit({preventDefault(){}});await tick();assert.match(text(s.root),/network failed/);fail=false;await button(s.root,'重新查询').props.onClick();await tick();s.i18n.global.locale.value='en-SG';await tick();assert.match(text(s.root),/Report type.*Customer.*Status/);assert.match(text(s.root),/No matching records/);s.unmount()
+})

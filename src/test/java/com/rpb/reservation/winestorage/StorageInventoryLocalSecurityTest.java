@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({StorageInventoryController.class,StorageInventoryExportController.class})
+@WebMvcTest({StorageInventoryController.class,StorageInventoryExportController.class,StorageReportController.class})
 @Import({LocalRuntimeSecurityConfiguration.class,com.rpb.reservation.walkin.auth.LocalRuntimeCurrentActorProvider.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
 @ActiveProfiles("local")
 @TestPropertySource(properties="rpb.local-auth.enabled=true")
@@ -23,6 +23,7 @@ class StorageInventoryLocalSecurityTest {
  @Autowired MockMvc mvc;
  @MockBean StorageIdentity identity;
  @MockBean StorageInventoryQuery query;
+ @MockBean com.rpb.reservation.winestorage.application.StorageReportQuery reports;
  @MockBean com.rpb.reservation.winestorage.application.StorageInventoryExportService exports;
  @MockBean com.rpb.reservation.appgate.application.AppGateService appGate;
  @MockBean com.rpb.reservation.appgate.application.AppGateDenialAuditService audit;
@@ -38,5 +39,10 @@ class StorageInventoryLocalSecurityTest {
   mvc.perform(get(path+"/export/debug")).andExpect(status().isForbidden());
   mvc.perform(get(path.replace("/api/v1/stores/","/api/v1/public/stores/")+"/export")).andExpect(status().isForbidden());
   verifyNoInteractions(query,exports);
+ }
+ @Test void reportsRemainExactReadOnlyStaffRoutes()throws Exception{
+  when(identity.staff()).thenThrow(new StorageException("STORAGE_UNAUTHENTICATED",401,"login"));String path="/api/v1/stores/20000000-0000-0000-0000-000000000983/wine-storage/reports";
+  mvc.perform(get(path)).andExpect(status().isUnauthorized());mvc.perform(get(path+"/deposit/00000000-0000-4000-8000-000000000001")).andExpect(status().isUnauthorized());
+  mvc.perform(post(path).header("X-RPB-Storage","1")).andExpect(status().isForbidden());mvc.perform(get(path+"/debug")).andExpect(status().isForbidden());mvc.perform(get(path.replace("/api/v1/stores/","/api/v1/public/stores/"))).andExpect(status().isForbidden());verifyNoInteractions(reports);
  }
 }
