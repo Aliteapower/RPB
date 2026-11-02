@@ -18,6 +18,10 @@ import static com.rpb.reservation.winestorage.persistence.StorageRepository.at;
 public class StorageWithdrawalService {
  private final StorageAccess access;private final StorageRepository r;private final StorageCommands commands;private final Clock clock;
  public StorageWithdrawalService(StorageAccess access,StorageRepository r,StorageCommands commands,Clock clock){this.access=access;this.r=r;this.commands=commands;this.clock=clock;}
+ public Intent rejectLegacyStaffIntent(StoreScope s,CurrentActor a,IntentWrite c){
+  access.staff(s,a,"wine_storage.deliver",false);if(c==null)throw StorageException.invalid();access.customerId(s,c.customerId());
+  throw new StorageException("STORAGE_CLIENT_UPDATE_REQUIRED",409,"当前页面版本已过期，已停用顾客扫码授权取酒。请先保存或记下未保存内容，再重新载入页面，使用门店直接确认交付。 / This page is out of date. Save or note unsaved work, then reload and use direct handover; customer scan authorization is no longer required.");
+ }
  @Transactional public Intent create(StoreScope s,CustomerAuthPrincipal p,IntentWrite c){access.customer(s,p,false);return create(s,p.customerId(),p.customerId(),"customer",c);}
  @Transactional public Intent create(StoreScope s,CurrentActor a,IntentWrite c){access.staff(s,a,"wine_storage.deliver",false);if(c==null)throw StorageException.invalid();access.customerId(s,c.customerId());return create(s,c.customerId(),a.actorId(),"staff",c);}
  @Transactional public Intent directDeliver(StoreScope s,CurrentActor a,IntentWrite c){

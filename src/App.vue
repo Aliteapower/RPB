@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import FrontendLocaleSwitcher from './components/common/FrontendLocaleSwitcher.vue'
+import FrontendUpdateNotice from './frontend-version/FrontendUpdateNotice.vue'
 import { routeViewKey } from './router/viewKey'
 </script>
 
 <template>
   <FrontendLocaleSwitcher />
+  <FrontendUpdateNotice />
   <RouterView :key="routeViewKey($route)" />
 </template>
 

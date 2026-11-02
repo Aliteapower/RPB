@@ -1,5 +1,11 @@
 # 酒水寄存 API
 
+## 2026-11-02 旧客户端授权流程停用
+
+商户 `POST /intents` 是旧“生成顾客扫码授权码”入口，已被 `/direct-deliver` 取代。仍按原顺序检查身份、门店/租户范围、交付权限和顾客归属；通过后固定返回409，错误码 `STORAGE_CLIENT_UPDATE_REQUIRED`，提示先保存/记下未保存内容、重新载入后使用直接交付。不会保存幂等键、创建意图或扣减库存；重复及恢复旧请求同样返回409。
+
+此限制不作用于顾客 `POST /intents`，顾客仍可主动出码供店员核销。已有历史意图的查询、直接交付与取消保持原规则，不伪造顾客授权，不改写历史记录。
+
 基址：商户 `/api/v1/stores/{storeId}/wine-storage`；顾客 `/api/v1/public/stores/{storeId}/wine-storage`。顾客沿用现有 customer session cookie，商户沿用 CurrentActor。所有返回使用专用 DTO。UTC ISO8601 时间，响应包含门店时区。
 
 | 方法/后缀 | 调用方 | 语义 |
@@ -13,7 +19,7 @@
 | POST /applications/{id}/reject | 商户 receive | 原因必填，仅 pending |
 | POST /applications/{id}/receive | 商户 receive | 全部 lines 逐项确认，产品关联/新建、数量、状态、来源、ruleId、收存照片、位置和标签；修正理由必填 |
 | POST /rules | 商户 rules.manage | categoryId、name、months，追加新版本 |
-| POST /intents | 双方（商户 deliver） | selections: itemId、quantity；商户另传 customerId。返回明确明细及一次性授权码 |
+| POST /intents | 顾客；旧商户入口仅返回升级错误 | 顾客传 selections: itemId、quantity，返回明确明细及一次性取酒码；商户旧请求范围校验后返回409 STORAGE_CLIENT_UPDATE_REQUIRED，不创建意图 |
 | POST /scan | 双方 | code，商户解析顾客码，顾客读取商户意图；不自动授权或扣减 |
 | POST /intents/{id}/authorize | 顾客 | code，顾客明确授权商户意图 |
 | POST /intents/{id}/cancel | 双方 | 未完成可取消，不扣减 |
