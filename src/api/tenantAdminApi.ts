@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 export interface TenantAdminPage {
   limit: number
   offset: number
@@ -483,6 +484,7 @@ async function requestForm<T>(
   form: FormData,
   fetcher?: TenantAdminFetcher
 ): Promise<T> {
+  form = await prepareImageFormData(form)
   let response: TextResponse
 
   try {

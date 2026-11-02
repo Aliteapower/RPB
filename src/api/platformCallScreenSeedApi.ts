@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 import type {
   PlatformCallScreenSeedApiErrorResponse,
   PlatformCallScreenMediaAssetResponse,
@@ -98,6 +99,7 @@ async function requestForm<T>(
   form: FormData,
   fetcher?: PlatformCallScreenSeedFetcher
 ): Promise<T> {
+  form = await prepareImageFormData(form)
   let response: TextResponse
 
   try {

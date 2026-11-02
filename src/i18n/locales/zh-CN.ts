@@ -12,6 +12,7 @@ export const zhCN = {
   wallet: walletZh,
   dailyLedger: { messages: ledgerMessages, entry: '每日营业记录', description: '盘点、交班与历史账目', symbol: '账' },
   common: {
+    imageUploadHint: '图片上传前自动压缩至1MB以内。',
     actions: {
       login: '登录',
       loggingIn: '登录中...',

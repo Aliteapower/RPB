@@ -1,3 +1,4 @@
+import {prepareImageUpload} from '../../utils/imageUpload'
 export interface Pending {path:string;body:Record<string,unknown>}
 export class StorageApiError extends Error {constructor(readonly status:number,readonly code:string,message:string,readonly problems:unknown[]=[]){super(message)}}
 export function storageApi(store:string,customer:boolean){
@@ -16,7 +17,7 @@ export function storageApi(store:string,customer:boolean){
   },
   command:<T>(path:string,body:Record<string,unknown>={})=>{if(pending())throw new Error('请先恢复未确定操作 / Recover pending operation');const p={path,body:{...body,idempotencyKey:crypto.randomUUID()}};sessionStorage.setItem(key,JSON.stringify(p));return execute<T>(p)},
   recover:()=>{const p=pending();return p?execute<unknown>(p):Promise.resolve(null)},
-  async upload(file:File,customerId?:string,phase='receipt'){const form=new FormData();form.set('image',file);if(customerId){form.set('customerId',customerId);form.set('phase',phase)}const response=await fetch(base+'/photos',{method:'POST',credentials:'same-origin',headers:{'X-RPB-Storage':'1'},body:form});const data=await response.json();if(!response.ok)throw new StorageApiError(response.status,data.code,data.message);return data.id as string}
+  async upload(file:File,customerId?:string,phase='receipt'){const form=new FormData();form.set('image',await prepareImageUpload(file));if(customerId){form.set('customerId',customerId);form.set('phase',phase)}const response=await fetch(base+'/photos',{method:'POST',credentials:'same-origin',headers:{'X-RPB-Storage':'1'},body:form});const data=await response.json();if(!response.ok)throw new StorageApiError(response.status,data.code,data.message);return data.id as string}
  }
 }
 export type StorageApi=ReturnType<typeof storageApi>

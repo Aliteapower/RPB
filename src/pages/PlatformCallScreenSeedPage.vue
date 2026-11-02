@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {IMAGE_SOURCE_LIMIT,ImageUploadError} from '../utils/imageUpload'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import {
@@ -45,7 +46,7 @@ const previewLogoUrl = ref('')
 const previewLogoFailed = ref(false)
 let previewCarouselTimer: number | undefined
 
-const MAX_CALL_SCREEN_IMAGE_BYTES = 10 * 1024 * 1024
+const MAX_CALL_SCREEN_IMAGE_SOURCE_BYTES = IMAGE_SOURCE_LIMIT
 const MAX_CALL_SCREEN_VIDEO_BYTES = 80 * 1024 * 1024
 const CALL_SCREEN_MEDIA_UPLOAD_HINT = gt('generated.platform-call-screen-seed.083')
 const CALL_SCREEN_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
@@ -379,7 +380,7 @@ function isMediaSlide(slide: PlatformPreviewSlide | undefined): slide is Platfor
 
 function validateMediaUploadFile(file: File): string {
   if (CALL_SCREEN_IMAGE_TYPES.has(file.type)) {
-    return file.size > MAX_CALL_SCREEN_IMAGE_BYTES ? gt('generated.platform-call-screen-seed.097') : ''
+    return file.size > MAX_CALL_SCREEN_IMAGE_SOURCE_BYTES ? gt('generated.platform-call-screen-seed.097') : ''
   }
   if (CALL_SCREEN_VIDEO_TYPES.has(file.type)) {
     return file.size > MAX_CALL_SCREEN_VIDEO_BYTES ? gt('generated.platform-call-screen-seed.098') : ''
@@ -392,6 +393,7 @@ function statusLabel(status: PlatformCallScreenSeedStatus): string {
 }
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof PlatformCallScreenSeedApiError)) {
     return gt('generated.platform-call-screen-seed.102')
   }

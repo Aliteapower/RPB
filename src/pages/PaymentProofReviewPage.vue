@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {ImageUploadError} from '../utils/imageUpload'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -419,6 +420,7 @@ function createIdempotencyKey(): string {
 
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof PaymentApiError)) {
     return gt('generated.payment-proof-review.020')
   }

@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../../utils/imageUpload'
 export class WalletApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly details: Record<string, unknown> = {}) { super(message); this.name = 'WalletApiError' }
 }
@@ -8,6 +9,7 @@ export function createWalletBill(store: string, accountId: string, amount: strin
 export function walletApi(store: string, customer = false) {
   const base = `/api/v1/${customer ? 'public/' : ''}stores/${encodeURIComponent(store)}/wallet`
   async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+    if(body instanceof FormData)body=await prepareImageFormData(body)
     const response = await fetch(base + path, { method, credentials: 'same-origin',
       headers: { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-RPB-Wallet': '1', 'X-RPB-Wallet-Model': 'components-v2' }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) })
     const result = await response.json().catch(() => ({})) as { code?: string; message?: string } & Record<string, unknown>

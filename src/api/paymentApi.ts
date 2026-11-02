@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 import type {
   PaymentApiErrorResponse,
   PaymentIntentCreateRequest,
@@ -389,6 +390,7 @@ async function requestJson<T>(
 }
 
 async function requestMultipart<T>(endpoint: string, body: FormData, fetcher?: PaymentFetcher): Promise<T> {
+  body = await prepareImageFormData(body)
   let response: TextResponse
 
   try {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {ImageUploadError} from '../utils/imageUpload'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -283,6 +284,7 @@ function statusLabel(status: string): string {
 }
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof TenantAdminApiError)) {
     return gt('generated.tenant-admin-profile.035')
   }

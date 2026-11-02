@@ -1,3 +1,4 @@
+import {prepareImageUpload} from '../../utils/imageUpload'
 export class WorkforceApiError extends Error {
  constructor(readonly status:number,readonly code:string){super(code)}
 }
@@ -11,7 +12,7 @@ export function workforceApi(store:string){
   if(!response.ok)throw new WorkforceApiError(response.status,data.code??'WORKFORCE_PERSISTENCE_ERROR')
   return data
  }
- async function upload<T>(path:string,file:File,expectedVersion:number):Promise<T>{const body=new FormData();body.append('file',file);body.append('expectedVersion',String(expectedVersion));const response=await fetch(base+path,{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{'X-RPB-Workforce':'1',Accept:'application/json'},body});const data=await response.json().catch(()=>({code:'WORKFORCE_PERSISTENCE_ERROR'}));if(!response.ok)throw new WorkforceApiError(response.status,data.code||'WORKFORCE_PERSISTENCE_ERROR');return data}
+ async function upload<T>(path:string,file:File,expectedVersion:number):Promise<T>{const body=new FormData();body.append('file',file.type.startsWith('image/')?await prepareImageUpload(file):file);body.append('expectedVersion',String(expectedVersion));const response=await fetch(base+path,{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{'X-RPB-Workforce':'1',Accept:'application/json'},body});const data=await response.json().catch(()=>({code:'WORKFORCE_PERSISTENCE_ERROR'}));if(!response.ok)throw new WorkforceApiError(response.status,data.code||'WORKFORCE_PERSISTENCE_ERROR');return data}
  async function file(path:string,signal?:AbortSignal):Promise<Blob>{
   const response=await fetch(base+path,{method:'GET',signal,credentials:'same-origin',cache:'no-store',headers:{Accept:'image/jpeg,image/png,image/webp,application/pdf'}})
   if(!response.ok){const error=await response.json().catch(()=>({}));throw new WorkforceApiError(response.status,error.code||'WORKFORCE_PERSISTENCE_ERROR')}

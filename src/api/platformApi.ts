@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 export interface PlatformTenant {
   id: string
   tenantCode: string
@@ -431,6 +432,7 @@ async function requestForm<T>(
     fetcher?: PlatformFetcher
   }
 ): Promise<T> {
+  options = {...options, body: await prepareImageFormData(options.body)}
   let response: TextResponse
 
   try {

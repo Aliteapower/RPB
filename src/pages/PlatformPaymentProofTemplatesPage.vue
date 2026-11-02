@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {ImageUploadError} from '../utils/imageUpload'
 import { computed, onMounted, reactive, ref } from 'vue'
 
 import {
@@ -237,6 +238,7 @@ function isValidJson(value: string): boolean {
 }
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof PaymentApiError)) {
     return gt('generated.platform-payment-proof-templates.018')
   }

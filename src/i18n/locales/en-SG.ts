@@ -12,6 +12,7 @@ export const enSG = {
   wallet: walletEn,
   dailyLedger: { messages: ledgerMessages, entry: 'Daily Ledger', description: 'Cash counts, handover and history', symbol: '$' },
   common: {
+    imageUploadHint: 'Images are automatically compressed to at most 1MB before upload.',
     actions: {
       login: 'Sign in',
       loggingIn: 'Signing in...',
