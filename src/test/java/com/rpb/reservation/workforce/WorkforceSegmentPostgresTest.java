@@ -14,6 +14,18 @@ class WorkforceSegmentPostgresTest extends WorkforcePayrollPostgresTest {
  Write write(LocalDate cutoff){return new Write(0L,company,employee,"2026-10",cutoff,null,null,true,false,"Approved cumulative attendance");}
  Detail calculate(LocalDate cutoff){var id=UUID.randomUUID();var d=segments.save(admin,store,id,write(cutoff));return action(d,"calculate");}
  Detail action(Detail d,String action){return segments.action(admin,store,d.id(),UUID.randomUUID(),new Action(d.version(),action,"Checked settlement"));}
+ @Test void closedProductKeepsManagedAndOwnFrozenSegmentHistoryWithoutOpeningDraftsOrCommands(){
+  completed();time.at("2026-10-30T01:00:00Z");var draft=segments.save(admin,store,UUID.randomUUID(),write(LocalDate.of(2026,10,28)));
+  org.mockito.Mockito.doAnswer(call->{var r=(com.rpb.reservation.appgate.application.AppGateAccessRequest)call.getArgument(0);return com.rpb.reservation.appgate.domain.AppGateDecision.allow(r.appKey(),r.tenantId(),r.storeId(),r.requiredPermission());}).when(gate).evaluateHistory(org.mockito.ArgumentMatchers.any());
+  assertThatThrownBy(()->segments.historyDetail(admin,store,draft.id(),true)).extracting("status").isEqualTo(404);
+  var confirmed=action(action(draft,"calculate"),"confirm");assertThat(segments.historyDetail(admin,store,confirmed.id(),true).status()).isEqualTo("confirmed");assertThatThrownBy(()->segments.historyDetail(worker,store,confirmed.id(),false)).extracting("status").isEqualTo(404);var published=action(confirmed,"publish");
+  org.mockito.Mockito.doReturn(com.rpb.reservation.appgate.domain.AppGateDecision.deny("workforce",tenant,store,"workforce.view",com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_EXPIRED)).when(gate).evaluate(org.mockito.ArgumentMatchers.any());
+  assertThat(segments.history(admin,store,2026,true,company)).extracting(Slip::id).contains(published.id());assertThat(segments.historyDetail(worker,store,published.id(),false).net()).isEqualTo("640.00");
+  var limited=new com.rpb.reservation.walkin.api.CurrentActor(tenant,adminId,"staff",admin.roles(),admin.permissions(),Set.of(store));assertThatThrownBy(()->segments.historyDetail(limited,store,published.id(),true)).extracting("status").isEqualTo(403);
+  assertThatThrownBy(()->segments.historyDetail(worker,store,published.id(),true)).extracting("status").isEqualTo(403);
+  var foreign=new com.rpb.reservation.walkin.api.CurrentActor(UUID.randomUUID(),employeeAccount,"staff",worker.roles(),worker.permissions(),worker.storeIds());assertThatThrownBy(()->segments.historyDetail(foreign,store,published.id(),false)).extracting("status").isEqualTo(404);
+  assertThatThrownBy(()->action(published,"void")).extracting("status").isEqualTo(403);
+ }
  @Test void partialMonthExcludesFutureUnapprovedDaysAndFormalRangeLeavesOrdinaryPayroll(){
   completed();time.at("2026-10-30T01:00:00Z");var d=calculate(LocalDate.of(2026,10,28));assertThat(d.calculation().issues()).isEmpty();assertThat(d.calculation().delta().gross()).isEqualTo("800.00");d=action(d,"confirm");assertThat(sources.capture(tenant,company,YearMonth.of(2026,10),List.of()).lines()).noneMatch(l->l.employee().id().equals(employee));
   assertThat(d.status()).isEqualTo("confirmed");assertThat(d.from()).isEqualTo(LocalDate.of(2026,10,1));assertThat(d.calculation().delta().net()).isEqualTo("640.00");

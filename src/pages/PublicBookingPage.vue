@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onUnmounted, reactive, ref, watch } from 'vue'
+import { useVisiblePageRefresh } from '../composables/useVisiblePageRefresh'
 import { useRoute } from 'vue-router'
 
 import {
@@ -111,7 +112,7 @@ const loginFlow = computed(() => resolvePublicBookingLoginFlow(
 ))
 const canProceedToContact = computed(() => loginFlow.value.canEnterContact && !authBusy.value)
 const canSubmit = computed(() => (
-  currentStep.value === 3 &&
+  !!context.value?.settings.enabled && currentStep.value === 3 &&
   loginFlow.value.canEnterContact &&
   !!selectedSlot.value &&
   hasValidPartySize.value &&
@@ -130,10 +131,22 @@ const whatsappContactUrl = computed(() => {
   return digits ? `https://wa.me/${digits}` : ''
 })
 
-onMounted(() => {
-  void loadCustomer()
+let customerSequence = 0
+let contextSequence = 0
+let disposed = false
+let contextError = false
+watch(routeStoreId, () => {
+  contextSequence++
+  customerSequence++
+  Object.assign(bookingForm, {partySize:2,customerName:'',customerNickname:'',customerEmail:'',phoneLocal:'',note:''})
+  context.value = null
+  resolvedStoreId.value = ''
+  customer.value = null
+  currentStep.value = 1
   void loadContext()
-})
+}, { immediate: true })
+onUnmounted(() => { disposed = true; contextSequence++; customerSequence++ })
+useVisiblePageRefresh(() => loadContext(true), () => !loading.value && !submitting.value && !authBusy.value && currentStep.value !== 'complete')
 
 watch(selectedDate, () => {
   const clampedDate = clampBookingDate(selectedDate.value)
@@ -178,32 +191,37 @@ watch(slotsByPeriod, () => {
 })
 
 async function loadCustomer(): Promise<void> {
+  const sequence=++customerSequence, scope=routeStoreId.value
+  const current=()=>!disposed&&sequence===customerSequence&&routeStoreId.value===scope
   try {
-    if (!(await resolvePublicBookingEntry())) return
+    if (!storeId.value||!current()) return
     const response = await getCustomerMe(undefined, storeId.value)
-    customer.value = response.principal?.passwordChangeRequired ? null : response.principal
+    if(current())customer.value = response.principal?.passwordChangeRequired ? null : response.principal
   } catch {
-    customer.value = null
+    if(current())customer.value = null
   }
 }
 
-async function loadContext(): Promise<void> {
+async function loadContext(background = false): Promise<void> {
+  const sequence = ++contextSequence, scope = routeStoreId.value, date = selectedDate.value
+  const current = () => !disposed && sequence === contextSequence && routeStoreId.value === scope && selectedDate.value === date
   loading.value = true
-  errorText.value = ''
-  statusText.value = ''
+  if (!background) { errorText.value = ''; statusText.value = '' }
   try {
-    if (!(await resolvePublicBookingEntry())) {
-      return
-    }
-    context.value = await getPublicBookingContext(storeId.value, selectedDate.value)
-    if (!context.value.settings.enabled) {
-      errorText.value = gt('generated.public-booking.047')
-    }
+    if (!(await resolvePublicBookingEntry()) || !current()) return
+    if(!background)void loadCustomer()
+    const value = await getPublicBookingContext(storeId.value, date)
+    if (!current()) return
+    context.value = value
+    if (!value.settings.enabled) { errorText.value = gt('generated.public-booking.047'); contextError = true }
+    else if (contextError) { errorText.value = ''; contextError = false }
   } catch (error) {
+    if (!current()) return
     context.value = null
     errorText.value = publicBookingErrorText(error)
+    contextError = true
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 
@@ -211,15 +229,11 @@ async function resolvePublicBookingEntry(): Promise<boolean> {
   if (routeStoreId.value || resolvedStoreId.value) {
     return true
   }
-  try {
-    const response = await resolveTenantPublicBookingEntry()
-    resolvedStoreId.value = response.storeId
-    return true
-  } catch (error) {
-    context.value = null
-    errorText.value = publicBookingErrorText(error)
-    return false
-  }
+  const scope=routeStoreId.value
+  const response = await resolveTenantPublicBookingEntry()
+  if(disposed||routeStoreId.value!==scope)return false
+  resolvedStoreId.value = response.storeId
+  return true
 }
 
 function passwordAuthenticated(principal: CustomerAuthPrincipal): void {
@@ -440,7 +454,7 @@ function clampBookingDate(isoDate: string): string {
         <p v-if="closePageFallbackText" class="quiet-line">{{ closePageFallbackText }}</p>
       </section>
 
-      <section v-else-if="currentStep === 1" class="booking-panel" :aria-label="gt('generated.public-booking.006')">
+      <section v-else-if="currentStep === 1 && context?.settings.enabled" class="booking-panel" :aria-label="gt('generated.public-booking.006')">
         <div class="panel-title">
           <span>1</span>
           <strong>{{ gt('generated.public-booking.007') }}</strong>
@@ -508,7 +522,7 @@ function clampBookingDate(isoDate: string): string {
         <button class="submit-button" type="button" :disabled="!canProceedToAuth" @click="goToAuthStep"> {{ nextStepText }} </button>
       </section>
 
-      <section v-else-if="currentStep === 2" class="booking-panel" :aria-label="gt('generated.public-booking.017')">
+      <section v-else-if="currentStep === 2 && context?.settings.enabled" class="booking-panel" :aria-label="gt('generated.public-booking.017')">
         <div class="panel-title">
           <span>2</span>
           <strong>{{ gt('generated.public-booking.018') }}</strong>
@@ -527,7 +541,7 @@ function clampBookingDate(isoDate: string): string {
         </div>
       </section>
 
-      <form v-else-if="currentStep === 3" class="booking-panel" :aria-label="gt('generated.public-booking.035')" @submit.prevent="submitBooking">
+      <form v-else-if="currentStep === 3 && context?.settings.enabled" class="booking-panel" :aria-label="gt('generated.public-booking.035')" @submit.prevent="submitBooking">
         <div class="panel-title">
           <span>{{ loginFlow.contactStepNumber }}</span>
           <strong>{{ gt('generated.public-booking.036') }}</strong>

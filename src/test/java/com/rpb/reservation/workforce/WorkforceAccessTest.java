@@ -37,4 +37,19 @@ class WorkforceAccessTest {
         when(directory.managerStoreIds(tenant,account)).thenReturn(Set.of(store,other));
         assertThat(access.managedStores(actor(Set.of("store_manager"),Set.of("workforce.view")))).containsExactly(store);
     }
+    @Test void explicitHistoryDoesNotLoosenOperationalGateOrStoreScope() {
+        var actor=actor(Set.of("store_staff"),Set.of("workforce.view"));
+        when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.allow("workforce",tenant,store,"workforce.view"));
+        when(gate.evaluate(any())).thenReturn(AppGateDecision.deny("workforce",tenant,store,"workforce.view",AppGateDenyReason.STORE_APP_EXPIRED));
+        access.history(actor,store);
+        assertThatThrownBy(()->access.enter(actor,store)).extracting("status").isEqualTo(403);
+        assertThatThrownBy(()->access.history(actor,UUID.randomUUID())).extracting("status").isEqualTo(403);
+        verify(gate).evaluateHistory(argThat(r->r.appKey().equals("workforce")&&r.requiredPermission().equals("workforce.view")));
+    }
+    @Test void historicalGateStillRejectsUnprovisionedOrDisabledProduct() {
+        for(var reason:List.of(AppGateDenyReason.TENANT_APP_NOT_ENABLED,AppGateDenyReason.STORE_APP_NOT_ENABLED,AppGateDenyReason.APP_DISABLED)){
+            when(gate.evaluateHistory(any())).thenReturn(AppGateDecision.deny("workforce",tenant,store,"workforce.view",reason));
+            assertThatThrownBy(()->access.history(actor(Set.of("store_staff"),Set.of("workforce.view")),store)).extracting("code").isEqualTo(reason.name());
+        }
+    }
 }

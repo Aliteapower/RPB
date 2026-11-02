@@ -29,6 +29,12 @@ description: Use when adding an RPB product line or investigating stale administ
 - `history=1` 是显式视图标记，不是后端读写授权。日期、分类、分页、详情、返回、底部导航都要保留既有只读上下文；不要把该标记加入原本不接受它的业务API查询。恢复开通后仍查看历史时，提示“当前只读”，不能误报“产品已关闭”。
 - 显式只读视图不因权限齐全而出现新增交易或冲正入口。退款、取消及有效酒水受控领取等原单操作沿用已有独立规则；不自行统一放开或禁用，也不新增商业规则。
 
+## 工作区直达边界
+
+代码产品目录 `product-line-entries.json` 同时声明 `routePrefixes`（完整后台业务范围）、`historyReadRoutes`（严格只读路径，可含必须匹配的query）和 `recoveryRoutes`（原单受控处理）。新增产品须一次性注册这些范围；不能将共享员工首页、租户资料、账号或开通管理误归到某一产品。历史路径须明确列出，不得通配全部GET或整个模块。
+
+`/api/me/apps?includeAccess=true` 的 `productAccess` 由AppGate和真实角色/门店计算，与entry_visible分离。App层ProductRouteBoundary在状态确认前不挂载业务组件，失效后卸载缓存展示，失败后不保留旧资格，恢复后按共享刷新重试。显式history=1仍须业务模块禁用/清理命令、草稿及扫码handoff，不能只依赖隐藏菜单。顾客继续使用本人context/home，不使用员工摘要。
+
 ## 复用刷新机制
 
 - 员工/管理员优先使用 `useStoreVisibleApps`；顾客/产品摘要复用 `useVisiblePageRefresh`，由模块自己的只读查询提供状态，不将权限判断塞进刷新helper。

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductRouteBoundary from './modules/tenant-products/ProductRouteBoundary.vue'
 import FrontendLocaleSwitcher from './components/common/FrontendLocaleSwitcher.vue'
 import FrontendUpdateNotice from './frontend-version/FrontendUpdateNotice.vue'
 import { routeViewKey } from './router/viewKey'
@@ -7,7 +8,7 @@ import { routeViewKey } from './router/viewKey'
 <template>
   <FrontendLocaleSwitcher />
   <FrontendUpdateNotice />
-  <RouterView :key="routeViewKey($route)" />
+  <ProductRouteBoundary><RouterView :key="routeViewKey($route)" /></ProductRouteBoundary>
 </template>
 
 <style>

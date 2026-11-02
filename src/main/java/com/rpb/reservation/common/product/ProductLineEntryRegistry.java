@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 /** Code-owned manifest shared with Vue. Database config cannot register permissions or executable routes. */
 public final class ProductLineEntryRegistry {
     public record DistributionEntry(String key, String audience, String path) {}
-    public record Entry(String appKey, String value, String labelKey, String descriptionKey, Set<String> permissions, String historyRoute, Set<String> historyPermissions, List<DistributionEntry> distributionEntries) {}
+    public record Entry(String appKey, String value, String labelKey, String descriptionKey, Set<String> permissions, String historyRoute, Set<String> historyPermissions, List<DistributionEntry> distributionEntries, List<String> routePrefixes, List<String> historyReadRoutes, List<String> recoveryRoutes) {}
 
     private static final List<Entry> ENTRIES = load();
     private static final Set<String> ROUTES = ENTRIES.stream().map(Entry::value).collect(Collectors.toUnmodifiableSet());
@@ -29,13 +29,15 @@ public final class ProductLineEntryRegistry {
     public static List<String> managedProducts() { return ENTRIES.stream().map(Entry::appKey).filter(key -> !key.isBlank()).toList(); }
     public static Set<String> historyPermissions(String key) { return ENTRIES.stream().filter(e -> e.appKey().equals(key)).findFirst().map(Entry::historyPermissions).orElse(Set.of()); }
 
+    private static List<String> immutable(List<String> values) { return values == null ? List.of() : List.copyOf(values); }
+
     private static List<Entry> load() {
         try (var input = ProductLineEntryRegistry.class.getResourceAsStream("/product-line-entries.json")) {
             if (input == null) throw new IllegalStateException("Product entry manifest missing");
             List<Entry> entries = new ObjectMapper().readValue(input, new TypeReference<>() {});
             return entries.stream().map(entry -> new Entry(entry.appKey(), entry.value(), entry.labelKey(),
                 entry.descriptionKey(), Set.copyOf(entry.permissions()), entry.historyRoute(), Set.copyOf(entry.historyPermissions()),
-                entry.distributionEntries() == null ? List.of() : List.copyOf(entry.distributionEntries()))).toList();
+                entry.distributionEntries() == null ? List.of() : List.copyOf(entry.distributionEntries()), immutable(entry.routePrefixes()), immutable(entry.historyReadRoutes()), immutable(entry.recoveryRoutes()))).toList();
         } catch (IOException error) {
             throw new IllegalStateException("Invalid product entry manifest", error);
         }

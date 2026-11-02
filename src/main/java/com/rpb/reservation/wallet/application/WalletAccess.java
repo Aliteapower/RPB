@@ -31,6 +31,13 @@ public class WalletAccess {
         if(commercial(scope).allowed() || gate.isStoreProductProvisioned("wallet",scope.tenantId().value(),scope.storeId().value())) return;
         throw new WalletException("WALLET_PRODUCT_UNAVAILABLE",403,"本门店未开通储值钱包");
     }
+    /** Workspace entry only; record reads and existing controlled operations keep their rules. */
+    public void requireStaffEntry(StoreScope scope,CurrentActor actor) {
+        var request=new AppGateAccessRequest("wallet",actor.tenantId(),scope.storeId().value(),"wallet.view",actor);
+        if(gate.evaluate(request).allowed())return;
+        var history=gate.evaluateHistory(request);
+        if(history==null||!history.allowed())throw new WalletException("WALLET_PRODUCT_UNAVAILABLE",403,"本门店未开通储值钱包或无历史查看权限");
+    }
     /** Historical read keeps customer identity validation without requiring an active source store. */
     public void historicalCustomer(StoreScope scope,CustomerAuthPrincipal principal) {
         if(principal==null)throw new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录顾客账号");

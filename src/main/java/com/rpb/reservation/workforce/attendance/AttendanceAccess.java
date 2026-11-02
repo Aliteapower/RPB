@@ -14,6 +14,7 @@ public class AttendanceAccess {
     public AttendanceAccess(WorkforceAccess access,WorkforceEmployeeRepository employees,SchedulingRepository schedules){this.access=access;this.employees=employees;this.schedules=schedules;}
     public void sourceWrite(CurrentActor actor){access.sourceWrite(actor);}
     public Employee self(CurrentActor actor,UUID store){access.enter(actor,store);return employees.byAccount(actor.tenantId(),actor.actorId()).orElseThrow(WorkforceException::forbidden);}
+    public Employee historySelf(CurrentActor actor,UUID store){access.history(actor,store);return employees.byAccount(actor.tenantId(),actor.actorId()).orElseThrow(WorkforceException::forbidden);}
     public Schedule read(CurrentActor actor,UUID store,UUID id){
         access.enter(actor,store);var s=schedules.find(actor.tenantId(),id).orElseThrow(WorkforceException::missing);
         if(!store.equals(schedules.store(actor.tenantId(),id)))throw WorkforceException.missing();

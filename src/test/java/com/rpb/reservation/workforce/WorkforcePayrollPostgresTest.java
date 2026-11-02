@@ -47,6 +47,28 @@ class WorkforcePayrollPostgresTest extends WorkforcePostgresTest {
   completed();var b=create();assertThat(payslips.mine(worker,store,2026)).isEmpty();b=action(b,"calculate");assertThat(b.calculation().issues()).isEmpty();assertThat(b.calculation().totalGross()).isEqualTo("800.00");assertThat(b.calculation().totalEmployeeCpf()).isEqualTo("160.00");assertThat(b.calculation().totalEmployerCpf()).isEqualTo("136.00");assertThat(b.calculation().totalNet()).isEqualTo("640.00");
   var current=b;assertThatThrownBy(()->action(current,"confirm")).isInstanceOf(WorkforceException.class);time.at("2026-11-02T01:00:00Z");b=action(b,"confirm");assertThat(payslips.mine(worker,store,2026)).isEmpty();b=action(b,"publish");assertThat(payslips.mine(worker,store,2026)).hasSize(1);assertThat(payslips.mineDetail(worker,store,b.batch().id()).line().netPay()).isEqualTo("640.00");
  }
+ @Test void closedProductKeepsOwnAndAuthorizedCompanySnapshotHistoryButRejectsOperationalReadsAndWrites(){
+  var b=published();var id=b.batch().id();
+  doAnswer(call->{var r=(com.rpb.reservation.appgate.application.AppGateAccessRequest)call.getArgument(0);return com.rpb.reservation.appgate.domain.AppGateDecision.allow(r.appKey(),r.tenantId(),r.storeId(),r.requiredPermission());}).when(gate).evaluateHistory(any());
+  for(var reason:List.of(com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_EXPIRED,com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_NOT_ENABLED)){
+   doReturn(com.rpb.reservation.appgate.domain.AppGateDecision.deny("workforce",tenant,store,"workforce.view",reason)).when(gate).evaluate(any());
+   assertThat(payslips.history(worker,store,2026,false,null)).hasSize(1);
+   var own=payslips.historyDetail(worker,store,id,false,null);assertThat(own.line().employeeId()).isEqualTo(employee);assertThat(own.line().input().note()).isEmpty();
+   assertThat(payslips.historyBatches(admin,store,2026,company)).extracting(PayslipService.HistoryBatch::id).contains(id);
+   assertThat(payslips.historyDetail(admin,store,id,true,employee).line().netPay()).isEqualTo(own.line().netPay());
+   assertThatThrownBy(()->payslips.mine(worker,store,2026)).extracting("status").isEqualTo(403);
+   assertThatThrownBy(()->batches.create(admin,store,UUID.randomUUID(),new BatchWrite(company,"2026-09"))).extracting("status").isEqualTo(403);
+  }
+ }
+ @Test void historicalPayslipCannotLeakToAnotherEmployeeOrEmployeeManager(){
+  var b=published();doAnswer(call->{var r=(com.rpb.reservation.appgate.application.AppGateAccessRequest)call.getArgument(0);return com.rpb.reservation.appgate.domain.AppGateDecision.allow(r.appKey(),r.tenantId(),r.storeId(),r.requiredPermission());}).when(gate).evaluateHistory(any());
+  var stranger=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),Set.of("workforce.view"),Set.of(store,sibling));
+  assertThatThrownBy(()->payslips.historyDetail(stranger,store,b.batch().id(),false,employee)).extracting("status").isEqualTo(403);
+  var managerId=account("store_manager",Set.of(store,sibling),Set.of("workforce.view"));var manager=new CurrentActor(tenant,managerId,"staff",Set.of("store_manager"),Set.of("workforce.view"),Set.of(store,sibling));
+  assertThatThrownBy(()->payslips.historyDetail(manager,store,b.batch().id(),true,employee)).extracting("status").isEqualTo(403);
+  var foreign=new CurrentActor(UUID.randomUUID(),employeeAccount,"staff",Set.of("store_staff"),Set.of("workforce.view"),Set.of(store));
+  assertThatThrownBy(()->payslips.historyDetail(foreign,store,b.batch().id(),false,null)).extracting("status").isEqualTo(404);
+ }
  @Test void changedAttendanceBlocksConfirmationButDoesNotRewriteConfirmedMoney(){
   var s=completed();time.at("2026-11-02T01:00:00Z");var b=action(create(),"calculate");var c=corrections.submit(worker,store,UUID.randomUUID(),new CorrectionWrite(s.id(),2L,s.startAt(),s.endAt().minusSeconds(3600),List.of(),false,"Correction"));var old=b;
   assertThatThrownBy(()->action(old,"confirm")).isInstanceOf(WorkforceException.class);corrections.decide(admin,store,c.id(),new DecisionWrite(1L,"rejected","Keep"));var refreshed=approvals.detail(admin,store,s.id()).row();approvals.approve(admin,store,s.id(),new com.rpb.reservation.workforce.approval.ApprovalDtos.ApprovalWrite(refreshed.approval().version(),refreshed.sourceFingerprint(),"Rechecked sources"));b=action(b,"calculate");b=action(b,"confirm");

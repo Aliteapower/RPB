@@ -26,6 +26,17 @@ public class AttendanceQueryService {
         return new AttendancePage(schedules.list(actor.tenantId(),store,from,to,employee,limit,offset).stream().map(s->{var a=attendance(actor.tenantId(),s);return privacy==null?a:privacy.attendance(actor,a);}).toList(),limit,offset);
     }
     public Detail detail(CurrentActor actor,UUID store,UUID id){var s=access.read(actor,store,id);var d=new Detail(attendance(actor.tenantId(),s),repository.events(actor.tenantId(),id),repository.corrections(actor.tenantId(),id));return privacy==null?d:privacy.detail(actor,d);}
+    public AttendancePage historyList(CurrentActor actor,UUID store,LocalDate from,LocalDate to,UUID employee,int limit,int offset){
+        gate.history(actor,store);ScheduleService.range(from,to);if(limit<1||limit>100||offset<0)throw WorkforceException.invalid();
+        if(!access.manager(actor,store))employee=access.historySelf(actor,store).id();
+        return new AttendancePage(schedules.list(actor.tenantId(),store,from,to,employee,limit,offset).stream().map(s->{var a=attendance(actor.tenantId(),s);return privacy==null?a:privacy.attendance(actor,a);}).toList(),limit,offset);
+    }
+    public Detail historyDetail(CurrentActor actor,UUID store,UUID id){
+        gate.history(actor,store);var s=schedules.find(actor.tenantId(),id).orElseThrow(WorkforceException::missing);
+        if(!store.equals(schedules.store(actor.tenantId(),id)))throw WorkforceException.missing();
+        if(!access.manager(actor,store)&&!s.employeeId().equals(access.historySelf(actor,store).id()))throw WorkforceException.forbidden();
+        var d=new Detail(attendance(actor.tenantId(),s),repository.events(actor.tenantId(),id),repository.corrections(actor.tenantId(),id));return privacy==null?d:privacy.detail(actor,d);
+    }
     public ClockHome home(CurrentActor actor,UUID store){
         var employee=access.self(actor,store);var zone=ZoneId.of(schedules.timezone(actor.tenantId(),store));var today=LocalDate.now(clock.withZone(zone));var now=clock.instant();
         var available=schedules.list(actor.tenantId(),store,today.minusDays(2),today.plusDays(1),employee.id(),100,0).stream().filter(s->s.status().equals("scheduled")&&employee.storeIds().contains(store)&&employee.companyId().equals(s.companyId())&&schedules.assigned(actor.tenantId(),employee.id(),store,s.workDate())&&!now.isBefore(s.startAt().minusSeconds(12*3600))&&now.isBefore(s.endAt())&&repository.bySchedule(actor.tenantId(),s.id()).isEmpty()).toList();

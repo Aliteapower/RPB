@@ -19,6 +19,12 @@ public class WorkforceAccess {
         var decision=gate.evaluate(new AppGateAccessRequest("workforce",actor.tenantId(),store,"workforce.view",actor));
         if(!decision.allowed())throw new WorkforceException(decision.denyReason().name(),403);
     }
+    /** Explicit read-only entry; operational and command paths must keep using enter. */
+    public void history(CurrentActor actor,UUID store){
+        if(actor==null||actor.actorId()==null||actor.tenantId()==null||actor.roles().contains("platform_admin")||!actor.canAccessStore(store))throw WorkforceException.forbidden();
+        var decision=gate.evaluateHistory(new AppGateAccessRequest("workforce",actor.tenantId(),store,"workforce.view",actor));
+        if(!decision.allowed())throw new WorkforceException(decision.denyReason().name(),403);
+    }
     public boolean isHeadOffice(CurrentActor actor){
         return actor!=null&&actor.roles().contains("tenant_admin")&&!actor.roles().contains("store_manager")
             &&!actor.roles().contains("platform_admin")&&actor.hasPermission("tenant.admin.manage")&&actor.hasPermission("workforce.admin.manage");

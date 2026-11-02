@@ -72,5 +72,30 @@ public class SupplementalService {
  private BigDecimal paid(List<PayrollDtos.Payment> payments){return payments.stream().map(p->number(p.amount()).multiply(BigDecimal.valueOf(p.reversesId()==null?1:-1))).reduce(BigDecimal.ZERO,BigDecimal::add);}
  public List<Payslip> mine(CurrentActor a,UUID store){gate.enter(a,store);var employee=jdbc.query("select id from workforce_employees where tenant_id=? and account_id=?",(r,n)->r.getObject(1,UUID.class),a.tenantId(),a.actorId());if(employee.isEmpty())return List.of();return jdbc.query("select snapshot from workforce_supplemental_batches where tenant_id=? and employee_id=? and status='published' order by settlement_month desc,id",(r,n)->slip(a.tenantId(),json.read(r.getString(1),Batch.class)),a.tenantId(),employee.getFirst());}
  public Payslip mine(CurrentActor a,UUID store,UUID id){return mine(a,store).stream().filter(p->p.batchId().equals(id)).findFirst().orElseThrow(WorkforceException::missing);}
+ public List<Payslip> historyMine(CurrentActor a,UUID store,int year){gate.history(a,store);if(year<2000||year>2100)throw WorkforceException.invalid();var employee=jdbc.query("select id from workforce_employees where tenant_id=? and account_id=?",(r,n)->r.getObject(1,UUID.class),a.tenantId(),a.actorId());if(employee.isEmpty())return List.of();return jdbc.query("select snapshot from workforce_supplemental_batches where tenant_id=? and employee_id=? and status='published' and settlement_month between ? and ? order by settlement_month desc,id",(r,n)->slip(a.tenantId(),json.read(r.getString(1),Batch.class)),a.tenantId(),employee.getFirst(),LocalDate.of(year,1,1),LocalDate.of(year,12,31));}
+ public List<Payslip> history(CurrentActor a,UUID store,int year,boolean managed,UUID company){
+  if(!managed)return historyMine(a,store,year);gate.history(a,store);if(year<2000||year>2100)throw WorkforceException.invalid();access.history(a,store,company,List.of());
+  return repository.historyYear(a.tenantId(),company,year).stream().map(b->{historyManaged(a,store,b);return slip(a.tenantId(),b);}).toList();
+ }
+ public Payslip historyDetail(CurrentActor a,UUID store,UUID id,boolean managed){
+  gate.history(a,store);var b=repository.find(a.tenantId(),id).orElseThrow(WorkforceException::missing);
+  if(managed)historyManaged(a,store,b);else{var self=employees.byAccount(a.tenantId(),a.actorId()).orElseThrow(WorkforceException::forbidden);if(!b.employeeId().equals(self.id())||!b.status().equals("published")||b.calculation()==null)throw WorkforceException.missing();}
+  return slip(a.tenantId(),b);
+ }
+ private void historyManaged(CurrentActor a,UUID store,Batch b){
+  if(!Set.of("confirmed","published").contains(b.status())||b.calculation()==null)throw WorkforceException.missing();access.history(a,store,b.companyId(),List.of());access.employee(a,b.companyId(),b.employeeId());
+  var source=b.proposal().source();if(source==null)throw WorkforceException.missing();
+  if(source.batchId()==null){if(!("opening".equals(source.kind())&&source.openingVersion()!=null)&&!"employment-zero".equals(source.kind()))throw WorkforceException.missing();return;}
+  if("segment".equals(source.kind())){
+   var segments=new com.rpb.reservation.workforce.payroll.segment.SegmentRepository(jdbc,json);var seen=new HashSet<UUID>();UUID next=source.batchId();
+   while(next!=null){if(!seen.add(next))throw WorkforceException.missing();var original=segments.find(a.tenantId(),next).orElseThrow(WorkforceException::missing);
+    if(!original.company().equals(b.companyId())||!original.employee().equals(b.employeeId())||original.calculation()==null||!com.rpb.reservation.workforce.payroll.segment.SegmentRepository.formal(original.status()))throw WorkforceException.missing();
+    access.history(a,store,b.companyId(),original.calculation().cumulative().lines().stream().flatMap(l->l.sources().stream()).map(PayrollDtos.SourceRef::storeId).toList());next=original.calculation().previousId();}
+  }else if("normal".equals(source.kind())){
+   var original=new PayrollRepository(jdbc,json).find(a.tenantId(),source.batchId()).orElseThrow(WorkforceException::missing);
+   if(!original.company().equals(b.companyId())||original.calculation()==null||!Set.of("confirmed","published").contains(original.status())||original.calculation().lines().stream().noneMatch(l->l.employeeId().equals(b.employeeId())))throw WorkforceException.missing();
+   access.history(a,store,b.companyId(),original.calculation().lines().stream().flatMap(l->l.sources().stream()).map(PayrollDtos.SourceRef::storeId).toList());
+  }else throw WorkforceException.missing();
+ }
  private Payslip slip(UUID tenant,Batch b){String company=jdbc.queryForObject("select display_name from operating_entities where tenant_id=? and id=?",String.class,tenant,b.companyId());var s=b.calculation();String paid=money(paid(repository.payments(tenant,b.id())));return new Payslip(b.id(),company,b.employeeName(),b.originMonth(),b.settlementMonth(),b.status(),s.grossDelta(),s.employeeCpfDeduction(),s.cdacDeduction(),s.employeeCashPayable(),paid,difference(s.employeeCashPayable(),paid),b.proposal().source().batchId(),b.proposal().items().stream().map(i->new PayslipItem(i.label(),i.amount(),i.eventEvidence().businessType(),i.eventEvidence().classification(),b.originMonth(),b.settlementMonth())).toList());}
 }

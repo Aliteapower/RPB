@@ -180,7 +180,7 @@ public class AppGateService {
             }).toList();
     }
 
-    private static String historyRoute(ProductLineEntryRegistry.Entry entry, Set<String> permissions) {
+    public static String historyRoute(ProductLineEntryRegistry.Entry entry, Set<String> permissions) {
         if ("reservation_queue".equals(entry.appKey()) && !permissions.contains("reservation.today_view")) {
             return "/stores/:storeId/queue-tickets?history=1";
         }

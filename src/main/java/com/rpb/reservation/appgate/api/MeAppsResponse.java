@@ -1,14 +1,24 @@
 package com.rpb.reservation.appgate.api;
 
 import com.rpb.reservation.appgate.application.AppGateAppEntry;
+import com.rpb.reservation.appgate.application.ProductRouteAccessQuery.ProductAccess;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.util.Set;
 
 public record MeAppsResponse(
     boolean success,
     List<AppEntryResponse> apps,
-    List<AppEntryResponse> historyApps
+    List<AppEntryResponse> historyApps,
+    @JsonInclude(JsonInclude.Include.NON_NULL) List<ProductAccess> productAccess
 ) {
+    public MeAppsResponse(boolean success,List<AppEntryResponse> apps,List<AppEntryResponse> historyApps) {
+        this(success,apps,historyApps,null);
+    }
+
+    public MeAppsResponse withProductAccess(List<ProductAccess> access) {
+        return new MeAppsResponse(success,apps,historyApps,List.copyOf(access));
+    }
     public static MeAppsResponse of(List<AppGateAppEntry> apps) {
         return of(apps,List.of());
     }

@@ -61,6 +61,14 @@ public class AttendanceOvertimeProjection {
     }
 
     public EmployeeMonth project(CurrentActor actor, UUID store, UUID company, EmployeeMonth row, YearMonth month, List<EffectiveDay> context) {
+        return projectRead(actor,store,company,row,month,context,false);
+    }
+
+    public EmployeeMonth historyProject(CurrentActor actor, UUID store, UUID company, EmployeeMonth row, YearMonth month, List<EffectiveDay> context) {
+        return projectRead(actor,store,company,row,month,context,true);
+    }
+
+    private EmployeeMonth projectRead(CurrentActor actor, UUID store, UUID company, EmployeeMonth row, YearMonth month, List<EffectiveDay> context, boolean history) {
         var shops = new HashSet<UUID>();
         for (var day : context) {
             if (day.storeId() != null) shops.add(day.storeId());
@@ -69,7 +77,7 @@ public class AttendanceOvertimeProjection {
         boolean manager = access.managedStores(actor).contains(store);
         if (shops.stream().anyMatch(s -> !actor.canAccessStore(s) || manager && !access.managedStores(actor).contains(s)))
             return summarize(row, row.days().stream().map(d -> withOvertime(d, null, "scope_restricted")).toList());
-        for (var shop : shops) access.enter(actor, shop);
+        for (var shop : shops) {if(history)access.history(actor,shop);else access.enter(actor,shop);}
         var proof = profiles.effective().context(actor.tenantId(), company, month);
         var candidates = profiles.profiles(actor.tenantId(), company).stream().filter(p -> p.employeeId().equals(row.employeeId())
             && !p.effectiveFrom().isAfter(month.atEndOfMonth()) && proof.profile(p) != null).sorted(Comparator.comparing(PayrollDtos.PayProfile::effectiveFrom)).toList();

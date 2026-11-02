@@ -42,6 +42,18 @@ public class LocalRuntimeSecurityConfiguration {
         return http
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/stores/*/workforce/history/context",
+                    "/api/v1/stores/*/workforce/history/attendance",
+                    "/api/v1/stores/*/workforce/history/attendance/*",
+                    "/api/v1/stores/*/workforce/history/attendance-month",
+                    "/api/v1/stores/*/workforce/history/payslips",
+                    "/api/v1/stores/*/workforce/history/payslips/*",
+                    "/api/v1/stores/*/workforce/history/batches",
+                    "/api/v1/stores/*/workforce/history/segments",
+                    "/api/v1/stores/*/workforce/history/segments/*",
+                    "/api/v1/stores/*/workforce/history/supplements",
+                    "/api/v1/stores/*/workforce/history/supplements/*").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/schedule/*/deletion").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/schedule-adjustments/preview","/api/v1/stores/*/workforce/schedule-adjustments/*").permitAll()
                 .requestMatchers(HttpMethod.PUT,"/api/v1/stores/*/workforce/schedule-copy-bulk/preview","/api/v1/stores/*/workforce/schedule-copy-bulk/*").permitAll()

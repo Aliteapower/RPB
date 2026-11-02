@@ -37,6 +37,25 @@ public class PayrollAccess {
         }
         return List.copyOf(result);
     }
+    /** Same salary ownership as enter, with an explicit historical commercial check. */
+    public void history(CurrentActor actor,UUID store,UUID company,Collection<UUID> sourceStores){
+        access.history(actor,store);
+        if(company==null||sourceStores==null||sourceStores.stream().anyMatch(Objects::isNull))throw WorkforceException.invalid();
+        if(directory.companies(actor.tenantId()).stream().noneMatch(c->c.id().equals(company)))throw WorkforceException.forbidden();
+        if(access.isHeadOffice(actor)){access.company(actor,company);}else if(!granted(actor,store,company))throw WorkforceException.forbidden();
+        var stores=directory.stores(actor.tenantId()).stream().filter(s->company.equals(s.companyId())).toList();
+        if(stores.isEmpty()||stores.stream().anyMatch(s->!actor.canAccessStore(s.id())))throw WorkforceException.forbidden();
+        var required=new TreeSet<UUID>();stores.forEach(s->required.add(s.id()));required.addAll(sourceStores);
+        for(var shop:required)access.history(actor,shop);
+    }
+    public List<Option> historyCompanies(CurrentActor actor,UUID store){
+        access.history(actor,store);var result=new ArrayList<Option>();
+        for(var company:directory.companies(actor.tenantId())){
+            if(!access.isHeadOffice(actor)&&!granted(actor,store,company.id()))continue;
+            try{history(actor,store,company.id(),List.of());result.add(company);}catch(WorkforceException e){if(e.status()!=403)throw e;}
+        }
+        return List.copyOf(result);
+    }
     private boolean granted(CurrentActor actor,UUID store,UUID company){
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_administrators where tenant_id=? and store_id=? and account_id=? and payroll_company_id=?)",Boolean.class,actor.tenantId(),store,actor.actorId(),company));
     }

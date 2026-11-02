@@ -14,6 +14,18 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class WorkforceSupplementalPostgresTest extends WorkforceAnnualWagesPostgresTest {
+ @Test void closedProductKeepsManagedAndOwnFrozenSupplementalHistoryWithOriginalCompanyScope(){
+  normal("1004");evidence("200","0.50");var draft=draft("101");var service=supplements();
+  org.mockito.Mockito.doAnswer(call->{var r=(com.rpb.reservation.appgate.application.AppGateAccessRequest)call.getArgument(0);return com.rpb.reservation.appgate.domain.AppGateDecision.allow(r.appKey(),r.tenantId(),r.storeId(),r.requiredPermission());}).when(gate).evaluateHistory(org.mockito.ArgumentMatchers.any());
+  assertThatThrownBy(()->service.historyDetail(admin,store,draft.batch().id(),true)).extracting("status").isEqualTo(404);
+  var confirmed=action(action(draft,"calculate"),"confirm");assertThat(service.historyDetail(admin,store,confirmed.batch().id(),true).status()).isEqualTo("confirmed");
+  var ownerId=account("store_staff",Set.of(store,sibling),Set.of("workforce.view"));jdbc.update("update workforce_employees set account_id=? where tenant_id=? and id=?",ownerId,tenant,employee);var owner=new CurrentActor(tenant,ownerId,"staff",Set.of("store_staff"),Set.of("workforce.view"),Set.of(store,sibling));
+  assertThatThrownBy(()->service.historyDetail(owner,store,confirmed.batch().id(),false)).extracting("status").isEqualTo(404);var published=action(confirmed,"publish");
+  org.mockito.Mockito.doReturn(com.rpb.reservation.appgate.domain.AppGateDecision.deny("workforce",tenant,store,"workforce.view",com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_NOT_ENABLED)).when(gate).evaluate(org.mockito.ArgumentMatchers.any());
+  assertThat(service.history(admin,store,2026,true,company)).extracting(SupplementalDtos.Payslip::batchId).contains(published.batch().id());assertThat(service.historyDetail(owner,store,published.batch().id(),false).employeeCashPayable()).isEqualTo(published.batch().calculation().employeeCashPayable());
+  assertThatThrownBy(()->service.historyDetail(owner,store,published.batch().id(),true)).extracting("status").isEqualTo(403);var limited=new CurrentActor(tenant,adminId,"staff",admin.roles(),admin.permissions(),Set.of(store));assertThatThrownBy(()->service.historyDetail(limited,store,published.batch().id(),true)).extracting("status").isEqualTo(403);
+  var foreign=new CurrentActor(UUID.randomUUID(),ownerId,"staff",owner.roles(),owner.permissions(),owner.storeIds());assertThatThrownBy(()->service.historyDetail(foreign,store,published.batch().id(),false)).extracting("status").isEqualTo(404);assertThatThrownBy(()->action(published,"void")).extracting("status").isEqualTo(403);
+ }
  @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"none","rule","input","both","manual"})
  void legacyFrozenCdacPreservesResponsibilityWithoutRepeatingCash(String mode){
   var original=legacyCdacNormal(mode);String amount=mode.equals("none")?"0.00":mode.equals("both")?"6.00":"3.00";

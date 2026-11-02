@@ -41,6 +41,10 @@ public class StorageRepository {
  public Rule rule(StoreScope s,UUID id){return rules(s).stream().filter(r->r.id().equals(id)).findFirst().orElseThrow(StorageException::missing);}
  public void addRule(StoreScope s,Rule r,UUID actor){update(s,"insert into wine_storage_rules(tenant_id,store_id,id,category_id,name,months,version,created_by) values(?,?,?,?,?,?,?,?)",r.id(),r.categoryId(),r.name(),r.months(),r.version(),actor);}
  public List<Application> applications(StoreScope s,UUID customer){return jdbc.query("select * from wine_storage_applications where tenant_id=? and store_id=?"+(customer==null?"":" and customer_id=?")+" order by created_at desc",(r,n)->application(s,r),scopeArgs(s,customer==null?new Object[]{}:new Object[]{customer}));}
+ public boolean hasCustomerHistory(StoreScope s,UUID customer){
+  var tenant=s.tenantId().value();var store=s.storeId().value();
+  return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from wine_storage_applications where tenant_id=? and store_id=? and customer_id=?) or exists(select 1 from wine_storage_items where tenant_id=? and store_id=? and customer_id=?) or exists(select 1 from wine_storage_intents where tenant_id=? and store_id=? and customer_id=?) or exists(select 1 from wine_storage_events where tenant_id=? and store_id=? and customer_id=?)",Boolean.class,tenant,store,customer,tenant,store,customer,tenant,store,customer,tenant,store,customer));
+ }
  private Application application(StoreScope s,ResultSet r)throws SQLException {
   UUID app=id(r,"id");var lines=jdbc.query("select original::text from wine_storage_application_lines where tenant_id=? and store_id=? and application_id=? order by id",(row,n)->read(row.getString(1),Line.class),scopeArgs(s,new Object[]{app}));
   return new Application(app,id(r,"customer_id"),r.getString("status"),read(r.getString("original"),Apply.class),lines,read(r.getString("confirmation"),Receive.class),r.getString("reason"),time(r,"created_at"));

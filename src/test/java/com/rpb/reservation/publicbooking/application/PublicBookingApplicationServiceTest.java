@@ -50,7 +50,8 @@ class PublicBookingApplicationServiceTest {
             null,
             null,
             new FakeMealPeriodRepository(),
-            Clock.fixed(Instant.parse("2026-06-30T00:00:00Z"), ZoneOffset.UTC)
+            Clock.fixed(Instant.parse("2026-06-30T00:00:00Z"), ZoneOffset.UTC),
+            allowedGate()
         );
 
         PublicBookingContext context = service.getContext(SCOPE.storeId().value(), WEDNESDAY.toString()).orElseThrow();
@@ -68,7 +69,7 @@ class PublicBookingApplicationServiceTest {
     @Test
     void tenantPublicBookingEntryResolvesOnlyWhenExactlyOneEnabledStoreExists() {
         FakeStoreRepository storeRepository = new FakeStoreRepository();
-        PublicBookingEntryApplicationService service = new PublicBookingEntryApplicationService(storeRepository);
+        PublicBookingEntryApplicationService service = new PublicBookingEntryApplicationService(storeRepository, allowedGate());
 
         PublicBookingEntryResult result = service.resolveTenantEntry("20000000");
 
@@ -81,7 +82,7 @@ class PublicBookingApplicationServiceTest {
     void tenantPublicBookingEntryRejectsMultipleEnabledStoresWithoutGuessing() {
         FakeStoreRepository storeRepository = new FakeStoreRepository();
         storeRepository.tenantEntryProfiles = List.of(storeRepository.profile, storeRepository.secondProfile);
-        PublicBookingEntryApplicationService service = new PublicBookingEntryApplicationService(storeRepository);
+        PublicBookingEntryApplicationService service = new PublicBookingEntryApplicationService(storeRepository, allowedGate());
 
         PublicBookingEntryResult result = service.resolveTenantEntry("20000000");
 
@@ -113,7 +114,8 @@ class PublicBookingApplicationServiceTest {
             null,
             reservationService,
             new FakeMealPeriodRepository(),
-            Clock.fixed(Instant.parse("2026-06-30T00:00:00Z"), ZoneOffset.UTC)
+            Clock.fixed(Instant.parse("2026-06-30T00:00:00Z"), ZoneOffset.UTC),
+            allowedGate()
         );
 
         PublicBookingCreateResult result = service.createBooking(new PublicBookingCreateCommand(
@@ -138,6 +140,13 @@ class PublicBookingApplicationServiceTest {
         assertThat(command.customerNickname()).isEqualTo("先生");
         assertThat(command.customerEmail()).isEqualTo("public-guest@example.test");
         assertThat(command.phoneE164()).isEqualTo("+6591234567");
+    }
+
+    private static com.rpb.reservation.appgate.application.AppGateService allowedGate() {
+        var gate = Mockito.mock(com.rpb.reservation.appgate.application.AppGateService.class);
+        when(gate.evaluateCommercial(Mockito.eq("reservation_queue"), any(), any())).thenAnswer(invocation ->
+            com.rpb.reservation.appgate.domain.AppGateDecision.allow("reservation_queue", invocation.getArgument(1), invocation.getArgument(2), null));
+        return gate;
     }
 
     private static PublicBookingAvailabilityRule weeklyRule(String periodKey, String quotaMode) {

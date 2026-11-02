@@ -18,14 +18,14 @@ import '../wallet/wallet.css'
 import './storage.css'
 import './merchant/storage-management.css'
 defineOptions({inheritAttrs:false})
-const {store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scanResult,scoped,can,choose,clearCustomer,search,open,load,run,scan,recover,fail,t}=useMerchantStorage()
+const {historyOnly,store,api,home,customer,results,query,task,busy,loading,searching,searched,pending,error,notice,activeIntent,scanResult,scoped,can,choose,clearCustomer,search,open,load,run,scan,recover,fail,t}=useMerchantStorage()
 const inventoryRefresh=ref(0)
 const depositTask=computed(()=>task.value==='deposit'||task.value==='inbox'),customerTask=computed(()=>task.value==='withdraw'||task.value==='records')
 const pendingCount=computed(()=>home.value?.applications.filter(a=>a.status==='pending').length??0)
 const addingCustomer=ref(false),previousTask=ref('deposit')
 const auth=useAuthSessionStore(),router=useRouter(),operationBusy=ref(false),showScan=ref(false)
 watch(store,()=>{addingCustomer.value=false;operationBusy.value=false;showScan.value=false})
-const canCreate=computed(()=>!!home.value?.newBusinessEnabled&&auth.isTenantAdmin&&auth.user?.storeIds.includes(store.value)===true)
+const canCreate=computed(()=>!historyOnly.value&&!!home.value?.newBusinessEnabled&&auth.isTenantAdmin&&auth.user?.storeIds.includes(store.value)===true)
 watch(canCreate,allowed=>{if(!allowed)addingCustomer.value=false})
 watch(task,()=>{addingCustomer.value=false})
 function showSettings(){previousTask.value=task.value==='settings'?'deposit':task.value;showScan.value=false;open('settings')}
@@ -35,16 +35,16 @@ function lookupCustomer(phone:string){addingCustomer.value=false;query.value=pho
 function identify(code:string){showScan.value=false;void run(()=>scan(code))}
 </script>
 <template><main class="cards-page storage-page storage-merchant-page" data-storage-role="merchant">
- <ProductPageHeader :title="t('manage')" :caption="home?.storeName" :back-to="`/stores/${store}/wallet`" :back-label="t('back')" :refresh-label="t('refresh')" :refresh-disabled="loading||busy||operationBusy" @refresh="load();inventoryRefresh++">
+ <ProductPageHeader :title="t('manage')" :caption="home?.storeName" :back-to="`/stores/${store}/${home?.walletEnabled===true?'wallet':'staff'}`" :back-label="t(home?.walletEnabled===true?'back':'backStaff')" :refresh-label="t('refresh')" :refresh-disabled="loading||busy||operationBusy" @refresh="load();inventoryRefresh++">
   <template #navigation><select v-if="home&&home.stores.length>1" class="storage-header-switch" :value="store" :disabled="busy||operationBusy" :aria-label="t('switchStore')" :title="home.storeName" @change="router.push(`/stores/${encodeURIComponent(($event.target as HTMLSelectElement).value)}/wine-storage`)"><option v-for="option in home.stores" :key="option.id" :value="option.id">{{option.id===store?t('switchStore'):option.name}}</option></select></template>
-  <template #actions><button v-if="home&&task!=='settings'" :disabled="busy||operationBusy||pending" @click="showSettings">{{t('settingsEntry')}}</button></template>
+  <template #actions><button v-if="!historyOnly&&home&&task!=='settings'" :disabled="busy||operationBusy||pending" @click="showSettings">{{t('settingsEntry')}}</button></template>
  </ProductPageHeader>
  <p v-if="loading&&!home" role="status">{{t('loading')}}</p><p v-if="error" class="storage-error" role="alert">{{error}}</p><p v-if="notice" class="storage-notice" role="status">{{notice}}</p>
- <section v-if="pending" class="storage-panel"><p>{{t('pendingResult')}}</p><button :disabled="busy||operationBusy" @click="recover">{{t('recover')}}</button></section>
+ <section v-if="pending&&!historyOnly" class="storage-panel"><p>{{t('pendingResult')}}</p><button :disabled="busy||operationBusy" @click="recover">{{t('recover')}}</button></section>
  <template v-if="home">
   <MerchantStorageSettingsPage v-if="task==='settings'" :key="store" :store="store" :home="home" :api="api" :disabled="busy||pending||operationBusy" @back="backSettings" @refresh="load" @command="run" @error="fail" @busy-change="operationBusy=$event"/>
   <template v-else>
-  <nav class="storage-customer-tasks" :aria-label="t('sections')"><button v-for="view in (home?.newBusinessEnabled?['deposit','withdraw','inventory','records']:['withdraw','inventory','records'])" :key="view" :aria-label="t(view)" :aria-pressed="task===view||(view==='deposit'&&depositTask)" :class="{primary:task===view||(view==='deposit'&&depositTask)}" :disabled="busy||operationBusy" @click="open(view)">{{t(view+'Tab')}}</button></nav><p v-if="task!=='inbox'" class="storage-customer-hint">{{t(task==='inventory'?'inventoryHint':task==='withdraw'?(home.operationMode==='staff_registration'?'directWithdrawHint':'withdrawHint'):task==='records'?'recordsHint':'depositHint')}}</p>
+  <nav class="storage-customer-tasks" :aria-label="t('sections')"><button v-for="view in (historyOnly?['records']:home?.newBusinessEnabled?['deposit','withdraw','inventory','records']:['withdraw','inventory','records'])" :key="view" :aria-label="t(view)" :aria-pressed="task===view||(view==='deposit'&&depositTask)" :class="{primary:task===view||(view==='deposit'&&depositTask)}" :disabled="busy||operationBusy" @click="open(view)">{{t(view+'Tab')}}</button></nav><p v-if="task!=='inbox'" class="storage-customer-hint">{{t(task==='inventory'?'inventoryHint':task==='withdraw'?(home.operationMode==='staff_registration'?'directWithdrawHint':'withdrawHint'):task==='records'?'recordsHint':'depositHint')}}</p>
   <nav v-if="depositTask&&home.newBusinessEnabled&&can('receive')" class="storage-deposit-views" :aria-label="t('depositSections')"><button :aria-label="t('directRegister')" :title="t('directRegister')" :class="{primary:task==='deposit'}" :aria-current="task==='deposit'?'page':undefined" :disabled="busy||operationBusy||pending" @click="open('deposit')">{{t('directRegisterTab')}}</button><button :aria-label="`${t('inbox')} (${pendingCount})`" :title="t('inbox')" :class="{primary:task==='inbox'}" :aria-current="task==='inbox'?'page':undefined" :disabled="busy||operationBusy||pending" @click="open('inbox')">{{t('inboxTab')}} <span class="cards-badge">{{pendingCount}}</span></button></nav>
   <MerchantStorageInventory v-if="task==='inventory'" :key="store" :api="api" :timezone="home.timezone" :refresh-key="inventoryRefresh"/>
   <template v-else>

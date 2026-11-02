@@ -7,10 +7,19 @@ export interface MeAppEntry {
   permissions: string[]
 }
 
+export interface ProductRouteAccess {
+  appKey: string
+  businessAllowed: boolean
+  historyAllowed: boolean
+  historyRoute: string | null
+  denialReason?: string | null
+}
+
 export interface MeAppsResponse {
   success: true
   apps: MeAppEntry[]
   historyApps?: MeAppEntry[]
+  productAccess?: ProductRouteAccess[]
 }
 
 export interface MeAppsApiErrorBody {

@@ -6,7 +6,10 @@
     "descriptionKey": "platform.productLines.entryRoutes.none.description",
     "permissions": [],
     "historyRoute": "",
-    "historyPermissions": []
+    "historyPermissions": [],
+    "routePrefixes": [],
+    "historyReadRoutes": [],
+    "recoveryRoutes": []
   },
   {
     "appKey": "reservation_queue",
@@ -48,7 +51,26 @@
         "audience": "customer",
         "path": "/book/:storeId"
       }
-    ]
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/reservations",
+      "/stores/:storeId/queue-tickets",
+      "/stores/:storeId/queue-display",
+      "/stores/:storeId/tables",
+      "/stores/:storeId/walk-ins",
+      "/stores/:storeId/cleaning",
+      "/stores/:storeId/admin/tables",
+      "/stores/:storeId/admin/settings",
+      "/stores/:storeId/admin/reservation-queue",
+      "/stores/:storeId/admin/share-template",
+      "/stores/:storeId/admin/public-booking",
+      "/stores/:storeId/admin/call-screen"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/reservations/today",
+      "/stores/:storeId/queue-tickets"
+    ],
+    "recoveryRoutes": []
   },
   {
     "appKey": "payment",
@@ -72,6 +94,17 @@
         "audience": "staff",
         "path": "/stores/:storeId/payments"
       }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/payments",
+      "/stores/:storeId/admin/payment"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/payments/records",
+      "/stores/:storeId/admin/payment/records"
+    ],
+    "recoveryRoutes": [
+      "/stores/:storeId/payments/display/:sessionNo"
     ]
   },
   {
@@ -101,6 +134,24 @@
         "audience": "staff",
         "path": "/stores/:storeId/wallet"
       }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/wallet"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/wallet/transactions",
+      "/stores/:storeId/wallet/transactions/:sourceType/:transactionId",
+      "/stores/:storeId/wallet/bills/:billId",
+      "/stores/:storeId/wallet/topups/:topupId",
+      "/stores/:storeId/wallet/refunds/:refundId",
+      "/stores/:storeId/wallet/business-report",
+      "/stores/:storeId/wallet/report",
+      "/stores/:storeId/wallet/exceptions"
+    ],
+    "recoveryRoutes": [
+      "/stores/:storeId/wallet/refund-create",
+      "/stores/:storeId/wallet/points/:entryId/reverse",
+      "/stores/:storeId/wallet/cards"
     ]
   },
   {
@@ -128,6 +179,15 @@
         "audience": "staff",
         "path": "/stores/:storeId/wine-storage"
       }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/wine-storage"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/wine-storage?task=records"
+    ],
+    "recoveryRoutes": [
+      "/stores/:storeId/wine-storage?task=withdraw"
     ]
   },
   {
@@ -138,8 +198,10 @@
     "permissions": [
       "workforce.view"
     ],
-    "historyRoute": "",
-    "historyPermissions": [],
+    "historyRoute": "/stores/:storeId/workforce-history?history=1",
+    "historyPermissions": [
+      "workforce.view"
+    ],
     "distributionEntries": [
       {
         "key": "workforce",
@@ -156,7 +218,15 @@
         "audience": "admin",
         "path": "/stores/:storeId/workforce/management"
       }
-    ]
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/workforce",
+      "/stores/:storeId/workforce-history"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/workforce-history"
+    ],
+    "recoveryRoutes": []
   },
   {
     "appKey": "daily_ledger",
@@ -177,6 +247,13 @@
         "audience": "staff",
         "path": "/stores/:storeId/daily-ledger"
       }
-    ]
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/daily-ledger"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/daily-ledger"
+    ],
+    "recoveryRoutes": []
   }
 ]

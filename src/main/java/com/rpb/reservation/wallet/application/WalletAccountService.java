@@ -20,7 +20,7 @@ public class WalletAccountService {
     public WalletAccountService(WalletAccountRepository accounts,WalletLedgerRepository ledger,WalletCommandRepository commands,WalletAccess access,WalletDirectory directory,WalletCollectionPort collection) {
         this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.access=access;this.directory=directory;this.collection=collection;
     }
-    public Context context(StoreScope scope,CurrentActor actor) {access.staff(scope,actor,"wallet.view",false);return context(scope);}
+    public Context context(StoreScope scope,CurrentActor actor) {access.staff(scope,actor,"wallet.view",false);access.requireStaffEntry(scope,actor);return context(scope);}
     public Context customerContext(StoreScope scope,CustomerAuthPrincipal principal) {
         access.customer(scope,principal,false);
         // Preserve the customer's existing historical account even if old entitlement metadata is absent.

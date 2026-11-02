@@ -38,6 +38,18 @@ class WorkforceAttendancePostgresTest extends WorkforcePostgresTest {
     Shift shift(UUID shop,String mode){return shifts.save(admin,shop,UUID.randomUUID(),new ShiftWrite(0L,"Day","09:00","17:00",false,mode,30,360,120,180,false,true));}
     Schedule schedule(UUID shop,Shift shift,LocalDate day){return roster.save(admin,shop,UUID.randomUUID(),new ScheduleWrite(0L,employee,shift.id(),day,"scheduled"));}
     Session punch(Schedule s,String action){return punches.punch(worker,store,UUID.randomUUID(),new ClockWrite(s.id(),action));}
+    @Test void closedProductAllowsHistoricalAttendanceButKeepsSelfStoreAndWriteBoundaries(){
+        var s=schedule(store,shift(store,"none"),DATE);punch(s,"IN");
+        doAnswer(call->{var r=(com.rpb.reservation.appgate.application.AppGateAccessRequest)call.getArgument(0);return com.rpb.reservation.appgate.domain.AppGateDecision.allow(r.appKey(),r.tenantId(),r.storeId(),r.requiredPermission());}).when(gate).evaluateHistory(any());
+        doReturn(com.rpb.reservation.appgate.domain.AppGateDecision.deny("workforce",tenant,store,"workforce.view",com.rpb.reservation.appgate.domain.AppGateDenyReason.STORE_APP_EXPIRED)).when(gate).evaluate(any());
+        assertThat(query.historyList(worker,store,DATE,DATE,UUID.randomUUID(),50,0).items()).extracting(a->a.schedule().employeeId()).containsExactly(employee);
+        assertThat(query.historyDetail(worker,store,s.id()).attendance().schedule().id()).isEqualTo(s.id());
+        assertThat(query.historyDetail(admin,store,s.id()).attendance().schedule().id()).isEqualTo(s.id());
+        assertThatThrownBy(()->query.historyDetail(worker,sibling,s.id())).extracting("status").isEqualTo(404);
+        var stranger=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of("store_staff"),Set.of("workforce.view"),Set.of(store));
+        assertThatThrownBy(()->query.historyDetail(stranger,store,s.id())).extracting("status").isEqualTo(403);
+        var before=attendance.events(tenant,s.id()).size();assertThatThrownBy(()->punch(s,"OUT")).extracting("status").isEqualTo(403);assertThat(attendance.events(tenant,s.id())).hasSize(before);
+    }
     @Test void scheduleOptionsRespectEmploymentAndStoreDatesWithoutHidingHistory(){
         var template=shift(store,"none");var existing=schedule(store,template,DATE);
         jdbc.update("update workforce_employees set leave_date=? where tenant_id=? and id=?",DATE.minusDays(1),tenant,employee);

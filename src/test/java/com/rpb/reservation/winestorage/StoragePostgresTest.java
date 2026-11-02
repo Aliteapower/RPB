@@ -43,6 +43,17 @@ class StoragePostgresTest extends CatalogPostgresTest {
  Intent deliver(Intent intent,String key){return tx.execute(s->withdrawals.deliver(scope,actor,intent.id(),new Key(key,"现场交付")));}
  StorageSettingsService settings(){return new StorageSettingsService(access,r,new StorageCommands(r));}
  void directMode(){tx.execute(s->settings().save(scope,actor,new SettingsWrite("staff_registration",r.settings(scope).version(),key())));}
+ @Test void customerHistoryEntryExistsOnlyForTheOriginalTenantStoreAndCustomer()throws Exception{
+  assertThat(r.hasCustomerHistory(scope,customer)).isFalse();
+  var item=stored(2,false);
+  assertThat(r.hasCustomerHistory(scope,customer)).isTrue();
+  assertThat(r.hasCustomerHistory(scope,UUID.randomUUID())).isFalse();
+  assertThat(r.hasCustomerHistory(new StoreScope(scope.tenantId(),UUID.randomUUID()),customer)).isFalse();
+  assertThat(r.hasCustomerHistory(new StoreScope(new TenantId(UUID.randomUUID()),scope.storeId().value()),customer)).isFalse();
+  clock.now=Instant.parse("2099-01-01T00:00:00Z");
+  assertThat(r.item(scope,item.id(),false,clock.instant()).status()).isEqualTo("expired");
+  assertThat(r.hasCustomerHistory(scope,customer)).isTrue();
+ }
  @Test void unlimitedRuleRetainsHistoryAndSupportsInventoryAndDelivery()throws Exception{
   var old=stored(2,false);var oldExpiry=old.expiresAt();
   var command=new RuleWrite(product.categoryId(),"Unlimited",0,key());

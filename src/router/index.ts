@@ -57,6 +57,7 @@ const defaultStoreId = import.meta.env.VITE_DEFAULT_STORE_ID || localValidationS
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/stores/:storeId/workforce-history',name:'workforce-history',component:()=>import('../modules/workforce/pages/WorkforceHistoryPage.vue')},
     ...workforceRoutes,
     {path:'/stores/:storeId/admin/customer-activation',name:'customer-activation',component:()=>import('../pages/TenantAdminCustomerActivationPage.vue'),meta:{requiresTenantAdmin:true}},
     {path:'/stores/:storeId/admin/customer-email',name:'customer-email-settings',component:()=>import('../pages/TenantAdminCustomerEmailPage.vue'),meta:{requiresTenantAdmin:true}},
