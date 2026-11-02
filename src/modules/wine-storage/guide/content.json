@@ -1,0 +1,337 @@
+{
+  "version": "2026-11-03",
+  "title": {
+    "zh": "酒水寄存操作指南",
+    "en": "Bottle storage quick guide"
+  },
+  "intro": {
+    "zh": "商户与员工 · 选一个任务，按步骤办理。",
+    "en": "For merchants and staff. Choose a task and follow its steps."
+  },
+  "keyRule": {
+    "zh": "先核对实物，再完成办理。门店提交取酒、扫码核销都会扣库存；顾客生成取酒码不会扣库存。",
+    "en": "Verify the physical bottles first. Staff pickup submission and code redemption deduct stock; generating a customer code does not."
+  },
+  "sections": [
+    {
+      "id": "deposit",
+      "title": {
+        "zh": "帮顾客存酒",
+        "en": "Store bottles"
+      },
+      "hint": {
+        "zh": "门店已收到实物时使用。",
+        "en": "Use when the store has physically received the bottles."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh": "确认顾客",
+            "en": "Identify the customer"
+          },
+          "text": {
+            "zh": "进入“存酒 → 直接登记”，查找并选定顾客；没有档案时，由有权限的管理员新增。",
+            "en": "Open Deposit → Register. Find and select the customer. An authorized administrator can create a missing customer."
+          }
+        },
+        {
+          "title": {
+            "zh": "填写实收",
+            "en": "Record actual receipt"
+          },
+          "text": {
+            "zh": "选择已有酒品；找不到时按权限新增酒品。填写实际瓶数、整瓶/已开瓶、来源及保存规则，可再加多款酒。",
+            "en": "Select or register the wine as permitted. Enter the actual quantity, whole/opened state, source and storage rule. Add more wines if needed."
+          }
+        },
+        {
+          "title": {
+            "zh": "补充核对资料",
+            "en": "Add useful evidence"
+          },
+          "text": {
+            "zh": "照片、位置、仓位、标签和保管人按需填写；有照片可供顾客及员工放大核对。",
+            "en": "Photos, location, slot, label and custodian are optional. Customers and staff can enlarge stored photos."
+          }
+        },
+        {
+          "title": {
+            "zh": "确认已收存",
+            "en": "Confirm physical receipt"
+          },
+          "text": {
+            "zh": "核对本次款数与瓶数，填写核实说明，勾选已告知规则并收到实物，再点“确认实物已收存”。",
+            "en": "Check wines and bottle totals, enter a verification note and confirm consent and physical receipt. Then select Confirm bottles received."
+          }
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "title": {
+        "zh": "审核顾客存酒申请",
+        "en": "Review a customer request"
+      },
+      "hint": {
+        "zh": "顾客已提交申请时使用，避免重复登记。",
+        "en": "Use for a request already submitted by the customer; do not register it again."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh": "打开待审核",
+            "en": "Open Pending"
+          },
+          "text": {
+            "zh": "进入“存酒 → 待审核”，选择申请，无需先查找顾客。",
+            "en": "Go to Deposit → Pending and choose the request. No customer search is needed."
+          }
+        },
+        {
+          "title": {
+            "zh": "按实物核实",
+            "en": "Check the actual bottles"
+          },
+          "text": {
+            "zh": "对照原申请核对酒品、实际瓶数和瓶身状态；有差异按实填写，并说明原因。",
+            "en": "Compare the original request with the actual wines, quantities and bottle condition. Record differences and explain why."
+          }
+        },
+        {
+          "title": {
+            "zh": "确认收存或拒绝",
+            "en": "Receive or reject"
+          },
+          "text": {
+            "zh": "实物已收到再确认收存；不能接收时填写原因后拒绝申请。",
+            "en": "Confirm receipt only after receiving the bottles. If the request cannot be accepted, reject it with a reason."
+          }
+        }
+      ]
+    },
+    {
+      "id": "pickup",
+      "title": {
+        "zh": "门店批量取酒",
+        "en": "Staff batch pickup"
+      },
+      "hint": {
+        "zh": "商户、员工确认交付；提交会立即扣减存酒。",
+        "en": "For staff-confirmed handover. Submitting immediately deducts stored bottles."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh": "确认顾客与酒品",
+            "en": "Identify the customer and bottles"
+          },
+          "text": {
+            "zh": "进入“取酒”，查找并选定顾客。核对酒名、位置、标签和余量；点击照片可放大。",
+            "en": "Open Collect and select the customer. Check wine, location, label and balance; enlarge photos when available."
+          }
+        },
+        {
+          "title": {
+            "zh": "加入取酒车",
+            "en": "Build the pickup cart"
+          },
+          "text": {
+            "zh": "用减号、数量、加号设置本次取酒瓶数，可选多款；数量为0表示不取。",
+            "en": "Set quantities using minus, quantity or plus. Select multiple holdings; zero means not selected."
+          }
+        },
+        {
+          "title": {
+            "zh": "核对整车",
+            "en": "Review the cart"
+          },
+          "text": {
+            "zh": "点击“查看取酒车”，核对整车酒品与总瓶数；可移除酒品或返回继续选择。",
+            "en": "Open View pickup cart. Check every holding and the total bottles. Remove a holding or return to select more."
+          }
+        },
+        {
+          "title": {
+            "zh": "交付后提交",
+            "en": "Submit after handover"
+          },
+          "text": {
+            "zh": "确认整车实物已交付，再点“提交取酒”。成功后一次扣减整车库存，不需要顾客再次扫码。",
+            "en": "After physically handing over the entire cart, select Submit pickup. The full cart is deducted once; no further customer scan is required."
+          }
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "title": {
+        "zh": "核销顾客取酒码",
+        "en": "Redeem a customer code"
+      },
+      "hint": {
+        "zh": "适用于“快捷存取”模式下的顾客取酒码。",
+        "en": "For customer pickup codes in Quick storage / collection mode."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh": "顾客整车出码",
+            "en": "Customer creates one cart code"
+          },
+          "text": {
+            "zh": "顾客进入“取酒”，选择酒品与数量，在取酒车提交后生成一个整车取酒码；此时尚未扣库存。",
+            "en": "The customer selects wines and quantities and submits the pickup cart to generate one code. Stock is not deducted yet."
+          }
+        },
+        {
+          "title": {
+            "zh": "门店核对整车",
+            "en": "Check the entire handover"
+          },
+          "text": {
+            "zh": "当面核对顾客、酒品、瓶数及位置，确认交付对象与整车明细一致。",
+            "en": "Verify the customer, bottles, quantities and locations in person against the full cart."
+          }
+        },
+        {
+          "title": {
+            "zh": "扫码即核销",
+            "en": "Scan to redeem"
+          },
+          "text": {
+            "zh": "门店进入“取酒 → 扫描顾客取酒码并核销”。扫描成功即完成整车核销并扣库存，按码内数量交付。",
+            "en": "Open Collect → Scan and redeem customer code. A successful scan completes redemption and deducts the entire cart; hand over the quantities in the code."
+          }
+        },
+        {
+          "title": {
+            "zh": "过期码重新生成",
+            "en": "Replace unusable codes"
+          },
+          "text": {
+            "zh": "过期、已取消或已使用的码不能再领；未完成的取酒码不会扣库存，需要时请顾客重新生成。",
+            "en": "Expired, cancelled or already-used codes cannot be redeemed. Uncompleted codes do not deduct stock; ask the customer to create a new code if needed."
+          }
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "title": {
+        "zh": "查询库存与历史报表",
+        "en": "Check stock and reports"
+      },
+      "hint": {
+        "zh": "看现余用“当前寄存”；查已办理业务用“报表”。",
+        "en": "Use Stock for current balances and Reports for historical business records."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh": "查看当前寄存",
+            "en": "Check current stock"
+          },
+          "text": {
+            "zh": "进入“当前寄存”，按顾客、酒品或位置查询余量与到期情况；需要时导出Excel。",
+            "en": "Open Stock to find balances and expiry by customer, wine or location. Export Excel when needed."
+          }
+        },
+        {
+          "title": {
+            "zh": "设置报表条件",
+            "en": "Set report filters"
+          },
+          "text": {
+            "zh": "进入“报表”，选择存酒或取酒，按关键词、状态、起止日期筛选，再点“查询”。无需新增或选择顾客。",
+            "en": "Open Reports. Choose Deposits or Pickups, set keyword, status and date filters, then Search. No customer creation or selection is needed."
+          }
+        },
+        {
+          "title": {
+            "zh": "读懂汇总与明细",
+            "en": "Read totals and details"
+          },
+          "text": {
+            "zh": "一笔业务一行，每页20笔；汇总覆盖全部筛选结果。实收/实取只统计完成单，不代表当前库存。点“详情”查看原申请、照片及日志。",
+            "en": "One bill per row, 20 per page; totals cover all matches. Received/collected bottles count completed bills, not current stock. Details retain requests, photos and audit evidence."
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "title": {
+        "zh": "管理员开店准备",
+        "en": "Administrator setup"
+      },
+      "hint": {
+        "zh": "入口和可修改项目以开通情况及岗位权限为准。",
+        "en": "Available entries and editable settings depend on product access and role permissions."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh": "维护基础资料",
+            "en": "Prepare reference data"
+          },
+          "text": {
+            "zh": "进入“设置”，按权限维护寄存酒商品、常用位置、保管人与保存规则；员工看不到可修改项时请联系管理员。",
+            "en": "In Settings, maintain wines, locations, custodians and storage rules as permitted. Staff without edit access should contact an administrator."
+          }
+        },
+        {
+          "title": {
+            "zh": "选择存取酒模式",
+            "en": "Choose the operating mode"
+          },
+          "text": {
+            "zh": "“快捷存取”支持顾客申请与出码，也支持门店直接办理；“租户直接登记”由门店办理，顾客查看记录。",
+            "en": "Quick mode supports customer requests/codes and direct staff handling. Staff registration mode is handled by the store; customers view records."
+          }
+        },
+        {
+          "title": {
+            "zh": "分享顾客入口",
+            "en": "Share the customer entry"
+          },
+          "text": {
+            "zh": "从设置里的顾客入口，或后台“常用入口与二维码”获取顾客存酒链接/二维码，先核对门店再分享。",
+            "en": "Get the customer storage link/code from Settings or Common entries and QR codes. Verify the store before sharing."
+          }
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "title": {
+        "zh": "操作结果不确定",
+        "en": "Uncertain result"
+      },
+      "text": {
+        "zh": "看到“上次操作结果不确定”时，先检查/恢复上次操作，不要反复提交。",
+        "en": "If a previous result is uncertain, check or recover it before submitting again."
+      }
+    },
+    {
+      "title": {
+        "zh": "看不到入口或不能提交",
+        "en": "Missing entry or blocked submission"
+      },
+      "text": {
+        "zh": "先刷新并检查当前门店、产品开通及员工权限。业务关闭后历史保留；历史页只供查询，存取以页面允许的操作为准。",
+        "en": "Refresh and check the store, product access and staff permissions. History remains after closure; historical pages are read-only. Follow the operations currently allowed on screen."
+      }
+    },
+    {
+      "title": {
+        "zh": "规则变更不改旧记录",
+        "en": "Rules preserve history"
+      },
+      "text": {
+        "zh": "新规则用于之后收存；已有酒品保留原快照。取酒数量或状态变化时，重新核对取酒车后提交。",
+        "en": "New rules apply to later receipts; existing holdings keep their snapshots. If balances or eligibility change, review the cart again."
+      }
+    }
+  ]
+}
