@@ -40,7 +40,7 @@ public final class StorageDtos {
  public record Product(UUID id,UUID categoryId,String code,String nameZh,String nameEn){}
  public record Category(UUID id,String nameZh,String nameEn){}
  public record StoreOption(UUID id,String name){}
- public record Home(String operationMode,int settingsVersion,String timezone,String storeName,List<StoreOption> stores,boolean newBusinessEnabled,Set<String> permissions,List<Rule> rules,List<Category> categories,List<Application> applications,List<Item> items,List<Intent> intents,List<Event> events){}
+ public record Home(String operationMode,int settingsVersion,String timezone,String storeName,List<StoreOption> stores,boolean newBusinessEnabled,Set<String> permissions,List<Rule> rules,List<Category> categories,List<Application> applications,List<Item> items,List<Intent> intents,List<Event> events,boolean walletEnabled){}
  public record StorageLocation(UUID id,String name,boolean defaultLocation,int version){}
  public record LocationWrite(String name,Integer version,String idempotencyKey){}
  public record LocationRef(UUID id,String name){}

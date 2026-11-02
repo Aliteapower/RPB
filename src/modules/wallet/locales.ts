@@ -12,6 +12,7 @@ import { personalZh,personalEn } from './personalLocales'
 import {settingsZh,settingsEn} from './settingsLocales'
 import {operationZh,operationEn} from './operationLocales'
 export const walletZh = {
+  entryUnavailable: '储值钱包不可用', entryUnavailableHint: '本门店尚未开通储值钱包，或已关闭、到期。请联系门店了解详情。', customerHistoryOnly: '查看钱包历史记录',
   navigationFailed: '暂时无法打开收银功能，请重试或选择上方功能。', navigationRetry: '重试',
   businessReport:businessReportZh,
   accountUi: walletAccountZh,
@@ -66,6 +67,7 @@ export const walletZh = {
 }
 export const walletEn = {
   ...walletZh,
+  entryUnavailable: 'Stored-value wallet unavailable', entryUnavailableHint: 'The wallet is not activated at this store, or it is closed or expired. Contact the store for details.', customerHistoryOnly: 'View wallet history',
   navigationFailed: 'Unable to open the cashier. Retry or select a function above.', navigationRetry: 'Retry',
   businessReport:businessReportEn,
   accountUi: walletAccountEn,

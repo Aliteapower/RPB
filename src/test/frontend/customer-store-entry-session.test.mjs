@@ -23,6 +23,11 @@ function mount(kind){
  app.use(createI18n({legacy:false,locale:'en',messages:{en:{}},missingWarn:false,fallbackWarn:false}));app.mount({children:[]});mounted.add(app)
  return {state,route,app,login:()=>kind==='wallet'?state.needsLogin.value:state.login.value}
 }
+test('unopened wallet state is explicit and activation clears it without reloading the customer page',async()=>{
+ globalThis.fetch=async url=>url.includes('/customer-auth/me')?response(200,{success:true}):response(403,{code:'WALLET_PRODUCT_UNAVAILABLE',message:'Wallet not activated'})
+ const s=mount('wallet');await tick();assert.equal(s.state.unavailable.value,true);assert.equal(s.login(),false);assert.equal(s.state.home.value,null)
+ globalThis.fetch=async()=>response(200,{accounts:[],context:{denialReason:null}});await s.state.refresh();await tick();assert.equal(s.state.unavailable.value,false);assert.ok(s.state.home.value)
+})
 for(const kind of ['wallet','storage']){
  test(`${kind}: another tenant's customer session opens target-store login without logging out or replaying commands`,async()=>{
   for(const status of [403,404]){

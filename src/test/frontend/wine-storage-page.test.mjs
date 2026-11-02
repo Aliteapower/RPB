@@ -96,9 +96,17 @@ function mount(component,customer,locale='zh-CN',data=home,respond,lists={}){
  const calls=[],navigation=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());return response}
  const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target);if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,navigation,i18n,route,unmount:()=>{app.unmount();mounted.delete(app)}}
 }
+test('customer storage only links back to a commercially enabled wallet and tracks activation and closure',async()=>{
+ const s=mount(CustomerPage,true,'zh-CN',{...home,walletEnabled:false});await tick()
+ const walletBack=()=>nodes(s.root,n=>n.tag==='a'&&n.props.href==='/wallet/A')
+ assert.equal(walletBack().length,0)
+ globalThis.fetch=async()=>({ok:true,json:async()=>({...home,walletEnabled:true})});await nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='刷新')[0].props.onClick();await tick();assert.equal(walletBack().length,1)
+ globalThis.fetch=async()=>({ok:true,json:async()=>({...home,walletEnabled:false})});await nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='刷新')[0].props.onClick();await tick();assert.equal(walletBack().length,0)
+})
+
 test('storage customer and merchant entry titles and API scopes are distinct',async()=>{
  for(const customer of [true,false]){
-  const s=mount(customer?CustomerPage:StaffPage,customer);await tick();assert.match(text(s.root),customer?/我的存酒卡/:/酒水寄存管理/)
+  const s=mount(customer?CustomerPage:StaffPage,customer,'zh-CN',{...home,walletEnabled:true});await tick();assert.match(text(s.root),customer?/我的存酒卡/:/酒水寄存管理/)
   assert.equal(s.calls[0].url,`/api/v1/${customer?'public/':''}stores/A/wine-storage/home`)
   assert.equal(nodes(s.root,n=>n.tag==='a')[0].props.href,customer?'/wallet/A':'/stores/A/wallet')
   assert.ok(nodes(s.root,n=>n.props?.class?.includes('cards-page')).length)

@@ -18,9 +18,9 @@ watch(store,()=>{childBusy.value=false;again.value=null})
 function deposit(value?:{item:Item;intentId:string;quantity:number}){again.value=value??null;open('deposit')}
 </script>
 <template><main class="cards-page storage-page storage-customer-page" data-storage-role="customer">
- <ProductPageHeader :title="t('title')" :caption="home?.storeName" :back-to="`/wallet/${store}`" :back-label="t('back')" :refresh-label="t('refresh')" :refresh-disabled="loading||busy||childBusy" @refresh="load"/>
+ <ProductPageHeader :title="t('title')" :caption="home?.storeName" :back-to="home?.walletEnabled===true ? `/wallet/${store}` : undefined" :back-label="t('back')" :refresh-label="t('refresh')" :refresh-disabled="loading||busy||childBusy" @refresh="load"/>
  <p v-if="loading&&!home" role="status">{{t('loading')}}</p><p v-if="error" role="alert" class="storage-error">{{error}}</p><p v-if="notice" role="status" class="storage-notice">{{notice}}</p>
- <WalletCustomerLogin v-if="login" :store="store" @authenticated="load"/>
+ <WalletCustomerLogin v-if="login" :store="store" :return-to="`/wallet/${store}/wine-storage`" @authenticated="load"/>
  <section v-if="pending" class="storage-panel"><p>{{t('pendingHint')}}</p><button :disabled="busy||childBusy" @click="recover">{{t('recover')}}</button></section>
  <template v-if="home">
   <nav class="storage-customer-tasks" :aria-label="t('sections')"><button v-for="task in ['deposit','withdraw','records'] as const" :key="task" :aria-pressed="view===task" :class="{primary:view===task}" :disabled="busy||childBusy" @click="open(task)">{{t(task==='withdraw'?'withdrawTask':task)}}</button></nav>

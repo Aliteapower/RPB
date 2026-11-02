@@ -14,6 +14,7 @@ function createWorkspace() {
   const route=useRoute(),router=useRouter(),store=computed(()=>String(route.params.storeId))
   const home=ref<CustomerHome|null>(null),needsLogin=ref(false),error=ref(''),linkError=ref(''),loading=ref(false)
   const loggingOut=ref(false),refreshing=ref(false),{t}=useI18n()
+  const unavailable=ref(false)
   const account=computed(()=>home.value?.accounts[0]??null)
   let generation=0,sequence=0,legacyRunning=false,lastLegacyAttempt=''
   async function scan(value:string,replace=false) {
@@ -45,16 +46,17 @@ function createWorkspace() {
     try {
       const result=await walletApi(id,true).get<CustomerHome>('/me')
       if(current!==generation || request!==sequence)return
-      home.value=result;needsLogin.value=false;error.value='';await legacy()
+      home.value=result;unavailable.value=false;needsLogin.value=false;error.value='';await legacy()
     }catch(e){
       if(current!==generation || request!==sequence)return
+      unavailable.value=e instanceof WalletApiError && e.code==='WALLET_PRODUCT_UNAVAILABLE'
       if(e instanceof WalletApiError && e.status===401){home.value=null;needsLogin.value=true;error.value=''}
       else{
         const scopeDenied=e instanceof WalletApiError && [403,404].includes(e.status)
         if(scopeDenied)home.value=null
         const missingSession=scopeDenied && await customerStoreSessionMissing(id)
         if(current!==generation || request!==sequence)return
-        if(missingSession){needsLogin.value=true;error.value=''}
+        if(missingSession){unavailable.value=false;needsLogin.value=true;error.value=''}
         else error.value=e instanceof Error?e.message:String(e)
       }
     }finally{if(current===generation && request===sequence){loading.value=false;refreshing.value=false}}
@@ -65,16 +67,16 @@ function createWorkspace() {
     loggingOut.value=true;generation++;sequence++;refreshing.value=false;error.value='';linkError.value=''
     try{
       await logoutCustomer()
-      generation++;sequence++;home.value=null;needsLogin.value=true;loading.value=false;lastLegacyAttempt=''
+      generation++;sequence++;home.value=null;unavailable.value=false;needsLogin.value=true;loading.value=false;lastLegacyAttempt=''
       await router.replace(customerWalletPath(store.value))
     }catch{error.value=t('wallet.operation.logoutFailed')}
     finally{loggingOut.value=false}
   }
-  watch(store,()=>{generation++;home.value=null;needsLogin.value=false;error.value='';linkError.value='';lastLegacyAttempt='';void refresh()},{immediate:true})
+  watch(store,()=>{generation++;home.value=null;unavailable.value=false;needsLogin.value=false;error.value='';linkError.value='';lastLegacyAttempt='';void refresh()},{immediate:true})
   watch(()=>route.hash,()=>{lastLegacyAttempt='';linkError.value='';void legacy()})
   useVisiblePageRefresh(refresh,()=>!needsLogin.value&&!loggingOut.value&&!refreshing.value,5000)
   onUnmounted(()=>{generation++;sequence++})
-  return{store,home,account,needsLogin,error:computed(()=>linkError.value||error.value),loading,refresh,scan,authenticated,logout,loggingOut}
+  return{store,home,account,needsLogin,unavailable,error:computed(()=>linkError.value||error.value),loading,refresh,scan,authenticated,logout,loggingOut}
 }
 type Workspace=ReturnType<typeof createWorkspace>
 const key:InjectionKey<Workspace>=Symbol('customer-wallet')

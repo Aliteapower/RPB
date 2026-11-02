@@ -10,7 +10,7 @@ export interface Intent {id:string;customerId:string;origin:string;status:string
 export interface Event {id:string;sourceId:string;action:string;actorId:string;actorName?:string|null;details:Record<string,unknown>;createdAt:string}
 export interface InventoryRow {id:string;customerId:string;customerName:string|null;customerPhone:string|null;nameZh:string|null;nameEn:string|null;quantity:number;remaining:number;opened:boolean;receivedAt:string;expiresAt:string|null;status:'stored'|'expired';locationName:string|null;slot:string|null;label:string|null;custodianName:string|null}
 export interface InventoryPage {items:InventoryRow[];summary:{customerCount:number;bottleCount:number;openedBottleCount:number;expiredBottleCount:number;itemCount:number};page:number;size:number;hasMore:boolean}
-export interface Home {operationMode?:'customer_verification'|'staff_registration';settingsVersion?:number;timezone:string;storeName:string;stores:{id:string;name:string}[];newBusinessEnabled:boolean;permissions:string[];rules:Rule[];categories:Category[];applications:Application[];items:Item[];intents:Intent[];events:Event[]}
+export interface Home {operationMode?:'customer_verification'|'staff_registration';settingsVersion?:number;walletEnabled?:boolean;timezone:string;storeName:string;stores:{id:string;name:string}[];newBusinessEnabled:boolean;permissions:string[];rules:Rule[];categories:Category[];applications:Application[];items:Item[];intents:Intent[];events:Event[]}
 
 export interface CustodianRef {id:string;name:string;kind:string}
 export interface Custodian extends CustodianRef {enabled:boolean;version:number}

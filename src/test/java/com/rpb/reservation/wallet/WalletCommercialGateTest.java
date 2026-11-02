@@ -43,4 +43,11 @@ class WalletCommercialGateTest {
         assertThat(gate.evaluate(new AppGateAccessRequest("wallet",tenant,store,"wallet.view",actor)).allowed()).isFalse();
         assertThat(gate.visibleApps(actor,store)).isEmpty();
     }
+    @Test void storageBackLinkUsesTheSameWalletExpiryAndSiblingStoreScope() {
+        when(subscriptions.findByTenantAndStore(tenant,store)).thenReturn(Map.of("wallet",new StoreAppSubscription("active","active",now)));
+        when(subscriptions.findByTenantAndStore(tenant,sibling)).thenReturn(Map.of("wallet",new StoreAppSubscription("active","active",now.plusDays(2))));
+        var access=new com.rpb.reservation.winestorage.application.StorageAccess(gate,null,null);
+        assertThat(access.walletEnabled(new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(tenant),store))).isFalse();
+        assertThat(access.walletEnabled(new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(tenant),sibling))).isTrue();
+    }
 }

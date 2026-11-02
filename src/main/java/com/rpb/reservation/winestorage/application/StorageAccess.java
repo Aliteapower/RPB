@@ -17,6 +17,7 @@ public class StorageAccess {
  public String timezone(StoreScope s){return stores.active(s.tenantId().value(),s.storeId().value()).orElseThrow(StorageException::missing).timezone();}
  public void customerId(StoreScope s,UUID id){if(id==null||customers.active(s.tenantScope(),id).isEmpty())throw StorageException.missing();}
  public boolean enabled(StoreScope s){return gate.evaluateCommercial("wine_storage",s.tenantId().value(),s.storeId().value()).allowed();}
+ public boolean walletEnabled(StoreScope s){return gate.evaluateCommercial("wallet",s.tenantId().value(),s.storeId().value()).allowed();}
  public void customer(StoreScope s,CustomerAuthPrincipal p,boolean fresh){if(p==null||!s.tenantId().value().equals(p.tenantId()))throw StorageException.forbidden();timezone(s);customerId(s,p.customerId());if(fresh&&!enabled(s))throw StorageException.forbidden();}
  public void staff(StoreScope s,CurrentActor a,String permission,boolean fresh){
   if(a==null||!s.tenantId().value().equals(a.tenantId())||!a.canAccessStore(s.storeId().value())||!a.hasPermission(permission)||"platform_admin".equals(a.actorType()))throw StorageException.forbidden();

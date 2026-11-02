@@ -21,7 +21,12 @@ public class WalletAccountService {
         this.accounts=accounts;this.ledger=ledger;this.commands=commands;this.access=access;this.directory=directory;this.collection=collection;
     }
     public Context context(StoreScope scope,CurrentActor actor) {access.staff(scope,actor,"wallet.view",false);return context(scope);}
-    public Context customerContext(StoreScope scope,CustomerAuthPrincipal principal) {access.customer(scope,principal,false);return context(scope);}
+    public Context customerContext(StoreScope scope,CustomerAuthPrincipal principal) {
+        access.customer(scope,principal,false);
+        // Preserve the customer's existing historical account even if old entitlement metadata is absent.
+        if(accounts.customerAccounts(scope,principal.customerId()).isEmpty()) access.requireCustomerEntry(scope);
+        return context(scope);
+    }
     private Context context(StoreScope scope) {
         var d=access.commercial(scope);var program=accounts.program(scope).orElse(null);var identity=directory.store(scope);
         return new Context(identity,program,d.allowed() && program!=null && "active".equals(program.status()),d.allowed()?null:d.denyReason().name(),collection.paynowConfigured(scope));

@@ -26,6 +26,11 @@ public class WalletAccess {
         if(newTransaction) require(commercial(scope));
     }
     public AppGateDecision commercial(StoreScope scope) {return gate.evaluateCommercial("wallet",scope.tenantId().value(),scope.storeId().value());}
+    /** An unopened product must not expose an empty operational home; prior provisioning keeps history. */
+    public void requireCustomerEntry(StoreScope scope) {
+        if(commercial(scope).allowed() || gate.isStoreProductProvisioned("wallet",scope.tenantId().value(),scope.storeId().value())) return;
+        throw new WalletException("WALLET_PRODUCT_UNAVAILABLE",403,"本门店未开通储值钱包");
+    }
     /** Historical read keeps customer identity validation without requiring an active source store. */
     public void historicalCustomer(StoreScope scope,CustomerAuthPrincipal principal) {
         if(principal==null)throw new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录顾客账号");
