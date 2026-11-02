@@ -40,6 +40,7 @@ import { publicBookingUrlForTenant } from '../utils/hostContext'
 const props=defineProps<{emailOnly?:boolean}>()
 const {t:accessText}=useCustomerAccessText()
 const emailLoaded=ref(false)
+const emailScope=ref<string>('unconfigured')
 const { gt } = useGeneratedText()
 
 const route = useRoute()
@@ -142,7 +143,7 @@ const facebookSettingsComplete = computed(() => (
 const emailLoginReady = computed(() => emailForm.enabled && emailSettingsComplete.value)
 const googleLoginReady = computed(() => googleForm.enabled && googleSettingsComplete.value)
 const facebookLoginReady = computed(() => facebookForm.enabled && facebookSettingsComplete.value)
-const canSaveEmail = computed(() => !savingEmail.value && (!props.emailOnly||emailLoaded.value) && (!emailForm.enabled || emailSettingsComplete.value))
+const canSaveEmail = computed(() => !savingEmail.value && emailLoaded.value && (!emailForm.enabled || emailSettingsComplete.value))
 const canSaveGoogle = computed(() => !savingGoogle.value && (!googleForm.enabled || googleSettingsComplete.value))
 const canSaveFacebook = computed(() => !savingFacebook.value && (!facebookForm.enabled || facebookSettingsComplete.value))
 
@@ -218,6 +219,7 @@ function applyEmailSettings(email:TenantAdminCustomerEmailSettingsResponse){
       smtpPassword: '',
       smtpStartTls: email.smtpStartTls
     })
+    emailScope.value=email.configurationScope||'tenant'
     emailSecretConfigured.value = email.secretConfigured
     emailLoaded.value=true
 }
@@ -231,8 +233,7 @@ async function saveEmailSettings(): Promise<void> {
   savedText.value = ''
   try {
     const response = await updateTenantAdminCustomerEmailSettings(storeId.value, normalizedEmailSettings())
-    emailSecretConfigured.value = response.secretConfigured
-    emailForm.smtpPassword = ''
+    applyEmailSettings(response)
     savedText.value = gt('generated.tenant-admin-public-booking.121')
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -753,13 +754,14 @@ function apiErrorText(error: unknown): string {
 
         <form v-else-if="activePanel === 'email'" class="form-panel" @submit.prevent="saveEmailSettings">
           <div class="form-panel__wide panel-heading-row">
-            <h2>{{ emailOnly?accessText('emailPanel'):gt('generated.tenant-admin-public-booking.049') }}</h2>
+            <h2>{{ accessText('emailPanel') }}</h2>
             <strong class="status-chip" :class="{ 'status-chip--ready': emailLoginReady }">
               {{ emailLoginReady ? gt('generated.tenant-admin-public-booking.050') : gt('generated.tenant-admin-public-booking.051') }}
             </strong>
           </div>
-          <p class="form-panel__wide panel-note">{{ emailOnly?accessText('emailDescription'):gt('generated.tenant-admin-public-booking.052') }}</p>
+          <p class="form-panel__wide panel-note">{{ accessText('emailDescription') }}</p>
 
+          <p class="form-panel__wide panel-note" role="status">{{accessText(emailScope==='legacy_store'?'emailLegacy':emailScope==='unconfigured'?'emailFirst':'emailShared')}}</p>
           <section class="form-panel__wide switch-row">
             <label>
               <input v-model="emailForm.enabled" type="checkbox" />

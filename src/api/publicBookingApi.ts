@@ -184,7 +184,7 @@ export async function getTenantAdminCustomerEmailSettings(
   storeId: string,
   fetcher?: PublicBookingFetcher
 ): Promise<TenantAdminCustomerEmailSettingsResponse> {
-  return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/customer-auth/email-settings'), {
+  return requestJson(`/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/customer-auth/email-settings`, {
     method: 'GET',
     fetcher
   })
@@ -195,7 +195,7 @@ export async function updateTenantAdminCustomerEmailSettings(
   request: TenantAdminCustomerEmailSettingsMutation,
   fetcher?: PublicBookingFetcher
 ): Promise<TenantAdminCustomerEmailSettingsResponse> {
-  return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/customer-auth/email-settings'), {
+  return requestJson(`/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/customer-auth/email-settings`, {
     method: 'PUT',
     body: request,
     fetcher

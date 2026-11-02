@@ -427,7 +427,7 @@ const catalogActor={roles:['tenant_admin'],permissions:['catalog.view','catalog.
 const emailSettingsFixture={success:true,enabled:true,fromEmail:'qa@example.test',fromName:'QA',smtpHost:'smtp.example.test',smtpPort:587,smtpUsername:'qa-user',smtpStartTls:true,secretConfigured:true}
 test('standalone email settings loads only shared SMTP configuration and keeps existing passwords on save',async()=>{
  const actor={...catalogActor,permissions:['tenant.admin.manage']},s=mount(EmailSettings,false,'zh-CN',home,()=>emailSettingsFixture,{actor});await tick()
- assert.equal(s.calls.length,1);assert.ok(s.calls[0].url.endsWith('/customer-auth/email-settings'));assert.equal(nodes(s.root,n=>n.tag==='form').length,1);assert.ok(nodes(s.root,n=>n.tag==='input'&&n.value==='smtp.example.test').length)
+ assert.equal(s.calls.length,1);assert.equal(s.calls[0].url,'/api/v1/stores/A/tenant-admin/customer-auth/email-settings');assert.equal(nodes(s.root,n=>n.tag==='form').length,1);assert.ok(nodes(s.root,n=>n.tag==='input'&&n.value==='smtp.example.test').length)
  const password=nodes(s.root,n=>n.tag==='input'&&n.props.type==='password')[0];assert.equal(password.value,'');const form=nodes(s.root,n=>n.tag==='form')[0];form.props.onSubmit({preventDefault(){}});form.props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.filter(c=>c.method==='PUT').length,1);const body=s.calls.find(c=>c.method==='PUT').body;assert.equal(body.smtpPassword,null);assert.equal(body.smtpHost,'smtp.example.test');assert.equal(password.value,'');s.unmount()
 })
 test('standalone email page ignores old store responses and hides forms without administrator access',async()=>{
@@ -1054,4 +1054,15 @@ test('guide PDF output is suppressed after store switch during async composition
 
 test('guide PDF download revalidates entries and completes a named current-store download',async()=>{
  const s=guideMount();await tick();await tick();const downloads=[],oldCreate=document.createElement;document.createElement=()=>({click(){downloads.push({name:this.download,href:this.href})}});const reads=s.calls.filter(c=>c.url==='/api/v1/me/stores').length;await button(s.root,'下载本店指南 PDF').props.onClick();await tick();assert.equal(downloads.length,1);assert.ok(nodes(s.root,n=>n.tag==='a'&&String(n.props.href).startsWith('blob:')).length);assert.match(downloads[0].name,/核对门店-A/);assert.match(downloads[0].href,/^blob:/);assert.equal(s.calls.filter(c=>c.url==='/api/v1/me/stores').length,reads+1);assert.ok(s.calls.every(c=>c.method==='GET'));document.createElement=oldCreate;s.unmount()
+})
+
+
+test('email settings distinguishes first setup, tenant sharing and legacy conflict in both languages',async()=>{
+ for(const locale of ['zh-CN','en-SG'])for(const scope of ['unconfigured','tenant','legacy_store']){
+  const actor={...catalogActor,permissions:['tenant.admin.manage']};const s=mount(EmailSettings,false,locale,home,()=>({...emailSettingsFixture,configurationScope:scope}),{actor});await tick()
+  const copy=text(s.root);assert.match(copy,locale==='zh-CN'?/整个租户|所有门店|其他门店/:/entire tenant|all stores|Other stores/)
+  if(scope==='legacy_store')assert.match(copy,locale==='zh-CN'?/旧门店配置/:/legacy store settings/)
+  if(scope==='unconfigured')assert.match(copy,locale==='zh-CN'?/尚未配置/:/Not configured/)
+  assert.equal(s.calls.length,1);assert.ok(!s.calls[0].url.includes('public-booking'));s.unmount()
+ }
 })

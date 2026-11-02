@@ -435,4 +435,27 @@ class SharedCustomerPasswordPostgresTest {
             assertThat(jdbc.queryForObject("select consumed_at is null from customer_activation_codes where tenant_id=?",Boolean.class,tenant)).isTrue();
         }finally{jdbc.execute("drop trigger deny_activation_audit on audit_logs");jdbc.execute("drop function "+SCHEMA+".deny_activation_audit()");}
     }
+    @Autowired TenantCustomerEmailAdminService tenantEmail;
+    @Test void tenantEmailSaveSharesRecoveryChannelAndWritesSecretFreeAudit() throws Exception {
+        UUID second=UUID.randomUUID();
+        jdbc.update("insert into stores(id,tenant_id,store_code,display_name,status,timezone,locale,date_format,time_format,currency) values(?,?,'email-second','Second','active','Asia/Singapore','zh-CN','DD-MM-YYYY','HH:mm','SGD')",second,tenant);
+        tenantEmail.saveEmailSettings(storeScope(),new CustomerEmailSettingsCommand(true,"from@example.test","Tenant","smtp.example.test",587,"user","private-secret",true),staff);
+        var other=new StoreScope(new TenantId(tenant),second);
+        assertThat(tenantEmail.getEmailSettings(other).smtpPassword()).isNull();
+        assertThat(tenantEmail.getEmailSettings(other).enabled()).isTrue();
+        assertThat(tenantEmail.emailSettingsScope(other)).isEqualTo("tenant");
+        String metadata=jdbc.queryForObject("select metadata::text from audit_logs where tenant_id=? and operation_code='customer.email_settings.saved'",String.class,tenant);
+        assertThat(metadata).contains("enabled").doesNotContain("private-secret","smtp.example.test","user");
+        var principal=readyCustomer();securityEmail.requestBinding(other,principal,"verified@example.com","tenant-email-test");
+        org.mockito.Mockito.verify(mail,org.mockito.Mockito.atLeastOnce()).sendLoginCode(org.mockito.ArgumentMatchers.argThat(m->m.storeId().equals(second)),org.mockito.ArgumentMatchers.argThat(c->c.smtpPassword().equals("private-secret")));
+    }
+    @Test void tenantEmailAuditFailureRollsBackTheSharedConfiguration() {
+        jdbc.execute("create function "+SCHEMA+".deny_email_audit() returns trigger language plpgsql as $$ begin if new.operation_code='customer.email_settings.saved' then raise exception 'test audit failure'; end if; return new; end $$");
+        jdbc.execute("create trigger deny_email_audit before insert on audit_logs for each row execute function "+SCHEMA+".deny_email_audit()");
+        try {
+            assertThatThrownBy(()->tenantEmail.saveEmailSettings(storeScope(),new CustomerEmailSettingsCommand(true,"from@example.test","Tenant","smtp.example.test",587,"user","private-secret",true),staff)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThat(jdbc.queryForObject("select count(*) from tenant_customer_email_settings where tenant_id=?",Integer.class,tenant)).isZero();
+        } finally {jdbc.execute("drop trigger deny_email_audit on audit_logs");jdbc.execute("drop function "+SCHEMA+".deny_email_audit()");}
+    }
+
 }

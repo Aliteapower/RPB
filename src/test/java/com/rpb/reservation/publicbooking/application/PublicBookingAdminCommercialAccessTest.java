@@ -38,7 +38,6 @@ class PublicBookingAdminCommercialAccessTest {
         when(gate.evaluateCommercial("reservation_queue",tenant,store)).thenReturn(AppGateDecision.deny("reservation_queue",tenant,store,null,reason));
         assertThatThrownBy(()->controller.getSettings(store)).isInstanceOf(TenantAdminApiException.class);
         assertThatThrownBy(()->controller.saveSettings(store,null)).isInstanceOf(TenantAdminApiException.class);
-        assertThatThrownBy(()->controller.getEmailSettings(store)).isInstanceOf(TenantAdminApiException.class);
         verifyNoInteractions(service,auth);
     }
     @Test void crossTenantPhysicalStoreIsRejectedBeforeCommercialCheck() {

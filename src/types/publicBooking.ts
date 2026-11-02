@@ -122,6 +122,7 @@ export interface TenantAdminPublicBookingSettingsMutation {
 }
 
 export interface TenantAdminCustomerEmailSettingsResponse {
+  configurationScope?: 'tenant' | 'legacy_store' | 'unconfigured'
   success: true
   enabled: boolean
   provider: 'smtp'

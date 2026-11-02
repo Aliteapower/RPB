@@ -4,8 +4,6 @@ import com.rpb.reservation.publicbooking.application.PublicBookingManagementAcce
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.customerauth.application.CustomerAuthIntegrationAdminService;
-import com.rpb.reservation.customerauth.application.CustomerEmailSettings;
-import com.rpb.reservation.customerauth.application.CustomerEmailSettingsCommand;
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettings;
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettingsCommand;
 import com.rpb.reservation.publicbooking.application.PublicBookingAdminService;
@@ -127,22 +125,6 @@ public class TenantAdminPublicBookingController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/customer-auth/email-settings")
-    public ResponseEntity<EmailSettingsResponse> getEmailSettings(@PathVariable UUID storeId) {
-        StoreScope scope = requireBookingScope(storeId);
-        return ResponseEntity.ok(EmailSettingsResponse.from(authIntegrationService.getEmailSettings(scope)));
-    }
-
-    @PutMapping("/customer-auth/email-settings")
-    public ResponseEntity<EmailSettingsResponse> saveEmailSettings(
-        @PathVariable UUID storeId,
-        @RequestBody(required = false) EmailSettingsRequest request
-    ) {
-        StoreScope scope = requireBookingScope(storeId);
-        CustomerEmailSettingsCommand command = request == null ? null : request.toCommand();
-        return ResponseEntity.ok(EmailSettingsResponse.from(authIntegrationService.saveEmailSettings(scope, command)));
-    }
-
     @GetMapping("/customer-auth/oauth-providers/{provider}")
     public ResponseEntity<OAuthProviderSettingsResponse> getOAuthProviderSettings(
         @PathVariable UUID storeId,
@@ -256,30 +238,6 @@ public class TenantAdminPublicBookingController {
         }
     }
 
-    public record EmailSettingsRequest(
-        Boolean enabled,
-        String fromEmail,
-        String fromName,
-        String smtpHost,
-        Integer smtpPort,
-        String smtpUsername,
-        String smtpPassword,
-        Boolean smtpStartTls
-    ) {
-        CustomerEmailSettingsCommand toCommand() {
-            return new CustomerEmailSettingsCommand(
-                enabled,
-                fromEmail,
-                fromName,
-                smtpHost,
-                smtpPort,
-                smtpUsername,
-                smtpPassword,
-                smtpStartTls
-            );
-        }
-    }
-
     public record OAuthProviderSettingsRequest(
         Boolean enabled,
         String clientId,
@@ -372,34 +330,6 @@ public class TenantAdminPublicBookingController {
                 rule.quotaPercent(),
                 rule.tableCount(),
                 rule.guestCount()
-            );
-        }
-    }
-
-    public record EmailSettingsResponse(
-        boolean success,
-        boolean enabled,
-        String provider,
-        String fromEmail,
-        String fromName,
-        String smtpHost,
-        int smtpPort,
-        String smtpUsername,
-        boolean smtpStartTls,
-        boolean secretConfigured
-    ) {
-        static EmailSettingsResponse from(CustomerEmailSettings settings) {
-            return new EmailSettingsResponse(
-                true,
-                settings.enabled(),
-                settings.provider(),
-                settings.fromEmail(),
-                settings.fromName(),
-                settings.smtpHost(),
-                settings.smtpPort(),
-                settings.smtpUsername(),
-                settings.smtpStartTls(),
-                settings.secretConfigured()
             );
         }
     }
