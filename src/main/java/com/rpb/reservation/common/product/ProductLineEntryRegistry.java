@@ -9,7 +9,8 @@ import java.util.stream.Collectors;
 
 /** Code-owned manifest shared with Vue. Database config cannot register permissions or executable routes. */
 public final class ProductLineEntryRegistry {
-    public record Entry(String appKey, String value, String labelKey, String descriptionKey, Set<String> permissions, String historyRoute, Set<String> historyPermissions) {}
+    public record DistributionEntry(String key, String audience, String path) {}
+    public record Entry(String appKey, String value, String labelKey, String descriptionKey, Set<String> permissions, String historyRoute, Set<String> historyPermissions, List<DistributionEntry> distributionEntries) {}
 
     private static final List<Entry> ENTRIES = load();
     private static final Set<String> ROUTES = ENTRIES.stream().map(Entry::value).collect(Collectors.toUnmodifiableSet());
@@ -33,7 +34,8 @@ public final class ProductLineEntryRegistry {
             if (input == null) throw new IllegalStateException("Product entry manifest missing");
             List<Entry> entries = new ObjectMapper().readValue(input, new TypeReference<>() {});
             return entries.stream().map(entry -> new Entry(entry.appKey(), entry.value(), entry.labelKey(),
-                entry.descriptionKey(), Set.copyOf(entry.permissions()), entry.historyRoute(), Set.copyOf(entry.historyPermissions()))).toList();
+                entry.descriptionKey(), Set.copyOf(entry.permissions()), entry.historyRoute(), Set.copyOf(entry.historyPermissions()),
+                entry.distributionEntries() == null ? List.of() : List.copyOf(entry.distributionEntries()))).toList();
         } catch (IOException error) {
             throw new IllegalStateException("Invalid product entry manifest", error);
         }

@@ -9,6 +9,8 @@ let vite
 before(async () => {
   globalThis.window = { __RPB_HOST_PREFIX_BASE_HOST__: 'booking.yumstone.sg' }
   vite = await createServer({
+    configFile: false,
+    cacheDir: 'target/host-context-test-cache',
     appType: 'custom',
     logLevel: 'silent',
     server: { middlewareMode: true }
@@ -31,7 +33,7 @@ test('public booking admin links always identify the selected store', () => {
       port: '',
       origin: 'https://lsc106.booking.yumstone.sg'
     }),
-    `https://lsc106.booking.yumstone.sg/book/${storeId}`
+    `https://booking.yumstone.sg/book/${storeId}`
   )
 
   assert.equal(
@@ -41,6 +43,6 @@ test('public booking admin links always identify the selected store', () => {
       port: '',
       origin: 'https://booking.yumstone.sg'
     }),
-    `https://lsc106.booking.yumstone.sg/book/${storeId}`
+    `https://booking.yumstone.sg/book/${storeId}`
   )
 })

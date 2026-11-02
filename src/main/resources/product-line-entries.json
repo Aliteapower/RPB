@@ -41,6 +41,13 @@
     "historyPermissions": [
       "reservation.today_view",
       "queue.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "booking",
+        "audience": "customer",
+        "path": "/book/:storeId"
+      }
     ]
   },
   {
@@ -58,6 +65,13 @@
     "historyRoute": "/stores/:storeId/payments/records?history=1",
     "historyPermissions": [
       "payment.intent.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "payment",
+        "audience": "staff",
+        "path": "/stores/:storeId/payments"
+      }
     ]
   },
   {
@@ -75,6 +89,18 @@
     "historyPermissions": [
       "wallet.view",
       "wallet.points.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "walletCustomer",
+        "audience": "customer",
+        "path": "/wallet/:storeId"
+      },
+      {
+        "key": "walletStaff",
+        "audience": "staff",
+        "path": "/stores/:storeId/wallet"
+      }
     ]
   },
   {
@@ -90,6 +116,18 @@
     "historyRoute": "/stores/:storeId/wine-storage?task=records&history=1",
     "historyPermissions": [
       "wine_storage.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "wineCustomer",
+        "audience": "customer",
+        "path": "/wallet/:storeId/wine-storage"
+      },
+      {
+        "key": "wineStaff",
+        "audience": "staff",
+        "path": "/stores/:storeId/wine-storage"
+      }
     ]
   },
   {
@@ -97,9 +135,28 @@
     "value": "/stores/:storeId/workforce",
     "labelKey": "workforce.entry",
     "descriptionKey": "workforce.description",
-    "permissions": ["workforce.view"],
+    "permissions": [
+      "workforce.view"
+    ],
     "historyRoute": "",
-    "historyPermissions": []
+    "historyPermissions": [],
+    "distributionEntries": [
+      {
+        "key": "workforce",
+        "audience": "staff",
+        "path": "/stores/:storeId/workforce"
+      },
+      {
+        "key": "workforceClock",
+        "audience": "staff",
+        "path": "/stores/:storeId/workforce/clock"
+      },
+      {
+        "key": "workforceAdmin",
+        "audience": "admin",
+        "path": "/stores/:storeId/workforce/management"
+      }
+    ]
   },
   {
     "appKey": "daily_ledger",
@@ -113,6 +170,13 @@
     "historyRoute": "/stores/:storeId/daily-ledger?history=1",
     "historyPermissions": [
       "daily_ledger.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "ledger",
+        "audience": "staff",
+        "path": "/stores/:storeId/daily-ledger"
+      }
     ]
   }
 ]

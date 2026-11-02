@@ -11,10 +11,20 @@ after(()=>{delete globalThis.window})
 test('every generated URL identifies the correct tenant and selected store and contains no credentials',()=>{
  for(const host of ['booking.yumstone.sg','platform.booking.yumstone.sg','other.booking.yumstone.sg','tenant-a.booking.yumstone.sg']){
   const entries=buildTenantEntries(context,loc(host));assert.equal(entries.length,7)
-  for(const e of entries){const url=new URL(e.url);assert.equal(url.origin,'https://tenant-a.booking.yumstone.sg');assert.ok(e.available);assert.equal(url.username,'');assert.equal(url.password,'');assert.equal(url.hash,'')}
-  assert.equal(entries[0].url,'https://tenant-a.booking.yumstone.sg/wallet/store-a')
-  assert.equal(entries[1].url,'https://tenant-a.booking.yumstone.sg/book/store-a')
+  for(const e of entries){const url=new URL(e.url);assert.equal(url.origin,'https://booking.yumstone.sg');assert.ok(e.available);assert.equal(url.username,'');assert.equal(url.password,'');assert.equal(url.hash,'')}
+  assert.equal(entries.find(e=>e.key==='walletCustomer').url,'https://booking.yumstone.sg/wallet/store-a')
+  assert.equal(entries.find(e=>e.key==='booking').url,'https://booking.yumstone.sg/book/store-a')
   const staff=new URL(entries.find(e=>e.key==='staff').url);assert.equal(staff.searchParams.get('entry'),'staff');assert.equal(staff.searchParams.get('redirect'),'/stores/store-a/staff')
+ }
+})
+test('new tenant codes never require new certificate coverage to distribute customer or staff links',()=>{
+ for(const code of ['mw','new-company','900000001']){
+  const entries=buildTenantEntries({...context,identity:{...context.identity,tenantCode:code}},loc())
+  for(const e of entries)assert.equal(new URL(e.url).hostname,'booking.yumstone.sg')
+  for(const e of entries.filter(e=>e.audience!=='customer')){
+   const url=new URL(e.url);assert.equal(url.searchParams.get('tenantCode'),code)
+   assert.ok(url.searchParams.get('redirect').startsWith('/stores/store-a/'))
+  }
  }
 })
 test('local development keeps its actual origin and port and supplies only a tenant hint for login',()=>{
@@ -38,7 +48,7 @@ test('unavailable products, closed booking and inactive stores never become dist
 })
 test('switching a store changes public paths and protected redirects and unsafe tenant domains are rejected',()=>{
  const second=buildTenantEntries({...context,identity:{...context.identity,storeId:'store-b'}},loc())
- assert.ok(second.every(e=>!e.url.includes('store-a')));assert.ok(second[0].url.endsWith('/wallet/store-b'))
+ assert.ok(second.every(e=>!e.url.includes('store-a')));assert.ok(second.find(e=>e.key==='walletCustomer').url.endsWith('/wallet/store-b'))
  for(const tenantCode of ['evil.com','platform','x@evil.com','../other','javascript:'])assert.throws(()=>buildTenantEntries({...context,identity:{...context.identity,tenantCode}},loc()))
 })
 test('staff and admin links preselect a permitted login tab without changing platform or tenant identity',()=>{

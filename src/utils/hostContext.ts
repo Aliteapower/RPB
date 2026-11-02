@@ -38,25 +38,30 @@ export function resolveLoginHostContext(
 }
 
 export function publicBookingUrlForTenant(
-  tenantCode: string,
+  _tenantCode: string,
   storeId: string,
   locationLike: Pick<Location, 'protocol' | 'hostname' | 'port' | 'origin'> = window.location
 ): string {
-  const normalizedTenantCode = tenantCode.trim()
-  const hostContext = resolveLoginHostContext(locationLike.hostname)
-  if (!normalizedTenantCode) {
-    return `${locationLike.origin}/book/${encodeURIComponent(storeId)}`
+  return `${publicEntryOrigin(locationLike)}/book/${encodeURIComponent(storeId)}`
+}
+
+/** Stable sharing host: new tenants must not require new DNS or TLS certificates. */
+export function publicEntryOrigin(
+  locationLike: Pick<Location, 'protocol' | 'hostname' | 'port' | 'origin'> = window.location
+): string {
+  if (!/^https?:$/.test(locationLike.protocol)) throw new Error('Invalid public entry protocol')
+  if (isLocalHostname(locationLike.hostname) || isIpHostname(locationLike.hostname)) return locationLike.origin
+  const baseHost = configuredBaseHost()
+  if (!baseHost) return locationLike.origin
+  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(baseHost) || baseHost.includes('..')) {
+    throw new Error('Invalid public entry base host')
   }
-  if (hostContext.kind === 'tenant' && hostContext.tenantCode === normalizedTenantCode) {
-    return `${locationLike.origin}/book/${encodeURIComponent(storeId)}`
+  const host = normalizedHostname(locationLike.hostname)
+  if (host !== baseHost && resolveLoginHostContext(host, baseHost).kind === 'legacy') {
+    throw new Error('Untrusted public entry host')
   }
-  if (isLocalHostname(locationLike.hostname) || isIpHostname(locationLike.hostname)) {
-    return `${locationLike.origin}/book/${encodeURIComponent(storeId)}`
-  }
-  const labels = normalizedHostname(locationLike.hostname).split('.')
-  const rootHost = hostContext.kind === 'legacy' ? labels.join('.') : labels.slice(1).join('.')
-  const port = locationLike.port ? `:${locationLike.port}` : ''
-  return `${locationLike.protocol}//${normalizedTenantCode}.${rootHost}${port}/book/${encodeURIComponent(storeId)}`
+  const port = locationLike.port && !['80', '443'].includes(locationLike.port) ? `:${locationLike.port}` : ''
+  return `https://${baseHost}${port}`
 }
 
 function normalizedHostname(hostname: string): string {

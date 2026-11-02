@@ -3,10 +3,21 @@ package com.rpb.reservation.appgate.domain;
 import com.rpb.reservation.common.product.ProductLineEntryRegistry;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ProductLineEntryRegistryTest {
+    @Test void distributionMetadataLoadsWithoutChangingAuthorizationRoutes() {
+        var wallet = ProductLineEntryRegistry.entries().stream().filter(e -> e.appKey().equals("wallet")).findFirst().orElseThrow();
+        assertThat(wallet.value()).isEqualTo("/stores/:storeId/wallet");
+        assertThat(wallet.distributionEntries()).extracting(ProductLineEntryRegistry.DistributionEntry::path)
+            .containsExactly("/wallet/:storeId", "/stores/:storeId/wallet");
+        assertThat(ProductLineEntryRegistry.entries().getFirst().distributionEntries()).isEmpty();
+        var entries = ProductLineEntryRegistry.entries().stream().flatMap(e -> e.distributionEntries().stream()).toList();
+        assertThat(entries).extracting(ProductLineEntryRegistry.DistributionEntry::key).doesNotHaveDuplicates();
+        assertThat(entries).allMatch(e -> Set.of("customer", "staff", "admin").contains(e.audience()));
+    }
     @Test void registeredPermissionsMatchRoleDefinitionsAndUnknownProductFailsClosed() {
         assertThat(ProductLineEntryRegistry.permissions("reservation_queue")).isEqualTo(AppGateRequiredPermission.RESERVATION_QUEUE_ENTRY_PERMISSIONS);
         assertThat(ProductLineEntryRegistry.permissions("payment")).isEqualTo(AppGateRequiredPermission.PAYMENT_ENTRY_PERMISSIONS);

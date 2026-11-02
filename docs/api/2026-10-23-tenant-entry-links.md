@@ -19,10 +19,13 @@ GET `/api/v1/stores/{storeId}/tenant-admin/entry-links`
 ## URL 与兼容
 
 - 顾客钱包 `/wallet/{storeId}`，预约 `/book/{storeId}`；多门店绝不生成猜测的 `/book`。
-- 员工登录 `/login?entry=staff&redirect=<内部门店路由>`；租户后台登录 entry=tenant_admin。租户子域固定本租户；本地/旧主域补充合法 tenantCode 仅用于登录填充，服务端身份和权限仍须验证。
+- 员工登录 `/login?entry=staff&tenantCode=<租户代码>&redirect=<内部门店路由>`；租户后台登录 entry=tenant_admin。分享链接统一使用受信主域，门店 ID 保留在公开路径与受保护 redirect，不依赖新租户子域的 DNS 或证书。tenantCode 仅用于登录填充，服务端身份和权限仍须验证；既有子域登录固定本租户的规则不变。
 - 新登录类别 query 仅选择已允许的选项；平台域不因 query 切换租户入口。旧 URL 缺省语义不变。
 - 租户域名按现有 hostContext 构造方式和受信基域生成；不接收任意域名、脚本协议或外部重定向。页面只生成固定路径目录，不接受数据库任意链接。
 - 产品不可用时显示未开通/停用/到期原因，不启用打开、复制或二维码分发；原有资料、订阅和原单善后入口行为不变。
+- 产品分享路径统一声明在 `product-line-entries.json` 的可选 `distributionEntries` 中，包含 key、audience（customer/staff/admin）、path。未声明时复用产品 value 作为员工入口；顾客及额外管理入口须明确注册，并验证目标路由存在、门店范围与公开边界。不得将数据库文本作为可执行入口。
+- 常用入口复用可见页面刷新机制，每30秒及 focus/pageshow/恢复可见时读取现有只读接口，禁止缓存、同店请求重叠；切店立即清空，丢弃旧请求，失败清除可分发入口，卸载移除监听。
+- 新链接与二维码采用统一主域。已下载的旧二维码内容不会自动变化，原子域证书需要独立维护。
 
 ## 测试清单
 
