@@ -39,7 +39,7 @@ public class CatalogPostgresTest {
   scope=new StoreScope(new TenantId(tenant),store);actor=new CurrentActor(tenant,UUID.randomUUID(),"tenant_admin",Set.of("tenant_admin"),Set.of("catalog.view","catalog.manage","catalog.publish"),Set.of(store));
   var repo=new CatalogRepository(jdbc);products=new ProductCatalogQuery(repo);var access=mock(CatalogAccess.class);
   catalog=new CatalogService(access,repo,new CatalogCommands(jdbc,json),products);
-  var cat=tx.execute(s->catalog.category(scope,actor,null,new CategoryWrite("C","饮品","Drinks",true,0,null,key())));
+  var cat=tx.execute(s->catalog.category(scope,actor,null,new CategoryWrite("C","饮品","Drinks",true,0,null,key(),List.of("wallet","wine_storage"))));
   product=tx.execute(s->catalog.save(scope,actor,null,write(cat.id(),null)));
   product=tx.execute(s->catalog.status(scope,actor,product.id(),new Status("active",0,key())));
  }

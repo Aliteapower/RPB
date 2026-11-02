@@ -3,8 +3,12 @@ import java.math.BigDecimal;
 import java.util.*;
 public final class CatalogDtos {
  private CatalogDtos(){}
- public record Category(UUID id,String code,String nameZh,String nameEn,boolean enabled,int sortOrder,int version){}
- public record CategoryWrite(String code,String nameZh,String nameEn,boolean enabled,int sortOrder,Integer expectedVersion,String idempotencyKey){}
+ public record Category(UUID id,String code,String nameZh,String nameEn,boolean enabled,int sortOrder,int version,List<String> productLines){
+  public Category(UUID id,String code,String zh,String en,boolean enabled,int sort,int version){this(id,code,zh,en,enabled,sort,version,List.of("wallet","wine_storage"));}
+ }
+ public record CategoryWrite(String code,String nameZh,String nameEn,boolean enabled,int sortOrder,Integer expectedVersion,String idempotencyKey,List<String> productLines){
+
+ }
  public record ProductWrite(String code,UUID categoryId,String nameZh,String nameEn,String descriptionZh,String descriptionEn,String kind,String unit,String imageUrl,Long priceCents,String taxMode,String taxCategory,BigDecimal taxRate,List<String> channels,Integer expectedVersion,String idempotencyKey){
   public ProductWrite(String code,UUID categoryId,String nameZh,String nameEn,String descriptionZh,String descriptionEn,String kind,String unit,String imageUrl,int priceCents,String taxMode,String taxCategory,BigDecimal taxRate,List<String> channels,Integer expectedVersion,String idempotencyKey){this(code,categoryId,nameZh,nameEn,descriptionZh,descriptionEn,kind,unit,imageUrl,Long.valueOf(priceCents),taxMode,taxCategory,taxRate,channels,expectedVersion,idempotencyKey);}
  }

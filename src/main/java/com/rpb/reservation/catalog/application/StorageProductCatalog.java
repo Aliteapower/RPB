@@ -13,10 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly=true)
 public class StorageProductCatalog {
- private static final String STORAGE_FILTER=" and p.kind='physical' and p.status='active' and c.enabled and l.enabled and 'storage'=any(l.channels)";
+ private static final String STORAGE_FILTER=" and p.kind='physical' and p.status='active' and c.enabled and 'wine_storage'=any(c.product_lines) and l.enabled and 'storage'=any(l.channels)";
  private final CatalogRepository r;private final ProductCatalogQuery query;private final JdbcTemplate jdbc;
  public StorageProductCatalog(CatalogRepository r,ProductCatalogQuery query,JdbcTemplate jdbc){this.r=r;this.query=query;this.jdbc=jdbc;}
- public List<CatalogDtos.Category> categories(StoreScope s){return r.categories(s.tenantId().value());}
+ public List<CatalogDtos.Category> categories(StoreScope s){return r.categories(s.tenantId().value()).stream().filter(c->c.productLines().contains("wine_storage")).toList();}
  public List<Product> search(StoreScope s,String value,boolean legacyReview){
   String q=value==null?"":value.trim().toLowerCase(Locale.ROOT);if(q.length()>120)throw CatalogException.invalid();
   // Legacy review mode must not bypass eligibility. SQL filters before the bound; existing catalog list's global 500-row cap must not hide matches.
@@ -41,6 +41,7 @@ public class StorageProductCatalog {
  public Product associate(StoreScope s,UUID id,UUID category,String zh,String en,UUID actor){
   if(id!=null){r.lock(s,id);return selectable(s,id);}
   if(category==null||categories(s).stream().noneMatch(c->c.id().equals(category)&&c.enabled())||(zh==null||zh.isBlank())&&(en==null||en.isBlank()))throw CatalogException.invalid();
+  r.requireCategory(s,category,List.of("storage"));
   UUID product=UUID.randomUUID();String code=new com.rpb.reservation.catalog.persistence.CatalogProductCodes(jdbc).next(s);
   jdbc.update("insert into catalog_products(id,tenant_id,category_id,code,name_zh,name_en,kind,unit,status,base_price_cents,tax_mode,tax_category,tax_rate) values(?,?,?,?,?,?,'physical','瓶','active',null,null,null,null)",product,s.tenantId().value(),category,code,text(zh),text(en));
   jdbc.update("insert into catalog_product_stores(tenant_id,store_id,product_id,price_cents,channels) values(?,?,?,null,array['storage'])",s.tenantId().value(),s.storeId().value(),product);
