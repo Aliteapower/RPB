@@ -344,6 +344,32 @@ test('merchant rejection requires an explicit customer-visible reason and never 
  const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/stores/A/wine-storage/applications/reject-inbox/reject');assert.equal(writes[0].body.reason,'尚未收到实物，请核对后重新申请');assert.match(text(s.root),/申请已拒绝/);s.unmount()
 })
 
+test('customer pickup shows staff receipt and later photos, enlarges safely and refreshes without commands',async()=>{
+ const item={id:'photo-bottle',applicationId:'application',customerId:'customer',snapshot:{nameZh:'青岛啤酒',nameEn:'Beer',timezone:'Asia/Singapore',receiptPhotos:['staff-photo'],applicationPhotos:[]},quantity:2,remaining:2,opened:false,status:'stored',expiresAt:null}
+ const data={...home,items:[item],events:[{sourceId:item.id,action:'photos.added',details:{photos:['extra-photo']}},{sourceId:'another-bottle',action:'photos.added',details:{photos:['not-this-bottle']}}]}
+ const s=mount(CustomerPage,true,'zh-CN',data,url=>url.includes('/product-options')?{items:[],categories:[],hasMore:false}:structuredClone(data));await tick();button(s.root,'我要取酒').props.onClick();await tick()
+ const thumbs=()=>nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='放大查看照片')
+ assert.equal(thumbs().length,2);assert.deepEqual(nodes(s.root,n=>n.tag==='img').map(n=>n.props.src),['/api/v1/public/stores/A/wine-storage/photos/staff-photo','/api/v1/public/stores/A/wine-storage/photos/extra-photo'])
+ await thumbs()[0].props.onClick({currentTarget:{focus(){}}});await tick();let dialog=nodes(s.root,n=>n.props?.role==='dialog')[0];assert.ok(dialog);assert.equal(nodes(dialog,n=>n.tag==='img')[0].props.src,'/api/v1/public/stores/A/wine-storage/photos/staff-photo')
+ button(dialog,'继续放大').props.onClick();await tick();assert.ok(nodes(s.root,n=>String(n.props?.class).includes('is-zoomed')).length)
+ ;[].concat(dialog.props.onKeydown).forEach(handler=>handler({key:'Escape',preventDefault(){}}));await tick();assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0)
+ data.events.push({sourceId:item.id,action:'photos.added',details:{photos:['new-followup']}});await nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='刷新')[0].props.onClick();await tick();assert.equal(thumbs().length,3);assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+})
+test('customer stored and past records and merchant records reuse scoped photo enlargement',async()=>{
+ const item={id:'past-photo',applicationId:'application',customerId:'customer',snapshot:{nameZh:'啤酒',nameEn:'Beer',timezone:'Asia/Singapore',receiptPhotos:['receipt-photo'],applicationPhotos:[]},quantity:2,remaining:0,opened:false,status:'collected',expiresAt:null},data={...home,items:[item],events:[]}
+ for(const customer of [true,false]){
+  const s=mount(customer?CustomerPage:StaffPage,customer,'zh-CN',data,undefined,{query:customer?{}:{task:'records'}});await tick()
+  if(customer)button(s.root,'我的记录').props.onClick();else{nodes(s.root,n=>n.tag==='input')[0].props.onInput({target:{value:'张'}});globalThis.fetch=async()=>({ok:true,json:async()=>[{id:'customer',displayName:'张',phone:'80000000'}]});await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();nodes(s.root,n=>n.tag==='button'&&text(n).includes('张')&&text(n).includes('80000000'))[0].props.onClick();await tick()}
+  await tick();if(!customer)button(s.root,'寄存酒品明细').props.onClick();await tick()
+  const thumbnails=nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='放大查看照片');assert.ok(thumbnails.length)
+  await thumbnails[0].props.onClick({currentTarget:{focus(){}}});await tick();const dialog=nodes(s.root,n=>n.props?.role==='dialog')[0];assert.equal(nodes(dialog,n=>n.tag==='img')[0].props.src,`/api/v1/${customer?'public/':''}stores/A/wine-storage/photos/receipt-photo`);button(dialog,'关闭').props.onClick();await tick()
+  if(customer){button(s.root,'已结束的寄存').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']==='放大查看照片').length,1)}
+  assert.ok(s.calls.every(c=>c.method==='GET'));s.unmount()
+ }
+})
+test('customer pickup without photos renders no empty gallery or preview button',async()=>{
+ const item={id:'plain',snapshot:{nameZh:'啤酒',timezone:'Asia/Singapore'},remaining:1,opened:false,status:'stored',expiresAt:null},s=mount(CustomerPage,true,'zh-CN',{...home,items:[item]});await tick();button(s.root,'我要取酒').props.onClick();await tick();assert.equal(nodes(s.root,n=>String(n.props?.class).includes('storage-photos')).length,0);assert.equal(nodes(s.root,n=>n.props?.role==='dialog').length,0);s.unmount()
+})
 test('customer sees original and received counts separately and can enlarge original photos without writing',async()=>{
  const line={id:'line',productId:'wine',nameZh:'啤酒',nameEn:'Beer',quantity:12,opened:false,source:'customer',photos:['original-photo'],note:'原申请说明'},application={id:'application',customerId:'customer',status:'stored',lines:[line],reason:'实物核对10瓶',createdAt:new Date().toISOString(),confirmation:{lines:[{...line,lineId:'line',quantity:10,photos:['receipt-photo']}],reason:'实物核对10瓶'}},data={...home,applications:[application]}
  const s=mount(CustomerPage,true,'zh-CN',data);await tick();nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='我的记录')[0].props.onClick();await tick()

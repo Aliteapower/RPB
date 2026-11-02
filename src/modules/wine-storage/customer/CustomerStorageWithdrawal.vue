@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import StorageItemPhotos from '../StorageItemPhotos.vue'
 import {storageExpiryText} from '../format'
 
 import {computed,ref,watch,onUnmounted} from 'vue'
-import type {Item,Intent} from '../types'
+import type {Item,Intent,Event} from '../types'
 import type {StorageApi} from '../api'
 import {displayName} from '../../shared-commerce/format'
 import {dateTime,storageLocationText} from '../format'
@@ -10,7 +11,7 @@ import {useCustomerStorageText} from './text'
 import {collectibleItems,withdrawalSelection} from './selection'
 import StorageQuantityStepper from '../StorageQuantityStepper.vue'
 import WalletQrDisplay from '../../wallet/components/WalletQrDisplay.vue'
-const props=defineProps<{api:StorageApi;items:Item[];disabled:boolean;activeIntent?:Intent|null}>(),emit=defineEmits<{created:[Intent];'quick-created':[Intent];cancel:[];error:[unknown];deposit:[];'busy-change':[boolean]}>(),{t,locale}=useCustomerStorageText()
+const props=defineProps<{api:StorageApi;items:Item[];events?:Event[];disabled:boolean;activeIntent?:Intent|null}>(),emit=defineEmits<{created:[Intent];'quick-created':[Intent];cancel:[];error:[unknown];deposit:[];'busy-change':[boolean]}>(),{t,locale}=useCustomerStorageText()
 const saving=ref(false),now=ref(Date.now())
 const quickQuantities=ref<Record<string,number>>({})
 function quickQuantity(id:string){return quickQuantities.value[id]??1}
@@ -35,7 +36,7 @@ async function quickCreate(id:string){
   <template v-if="!available.length"><h2>{{t('emptyCollectible')}}</h2><p class="cards-muted">{{t('emptyCollectibleHint')}}</p><button @click="emit('deposit')">{{t('deposit')}}</button></template>
   <template v-else><h2>{{t('chooseBottles')}}</h2>
    <div class="storage-grid"><article v-for="item in available" :key="item.id" class="storage-panel storage-customer-bottle">
-    <div class="storage-bottle-heading"><div class="storage-bottle-info"><h3>{{displayName(item.snapshot,locale)}}</h3><p class="storage-bottle-remaining">{{t('remaining')}} <strong>{{item.remaining}}</strong> {{t('bottleUnit')}}</p><small>{{t('expiresAt')}} {{storageExpiryText(item.expiresAt,item.snapshot.timezone,t('unlimited'))}}</small><small v-if="item.snapshot.storageLocation||item.location">{{t('location')}} {{storageLocationText(item)}}</small></div><aside class="storage-bottle-code">
+    <div class="storage-bottle-heading"><div class="storage-bottle-info"><h3>{{displayName(item.snapshot,locale)}}</h3><p class="storage-bottle-remaining">{{t('remaining')}} <strong>{{item.remaining}}</strong> {{t('bottleUnit')}}</p><small>{{t('expiresAt')}} {{storageExpiryText(item.expiresAt,item.snapshot.timezone,t('unlimited'))}}</small><small v-if="item.snapshot.storageLocation||item.location">{{t('location')}} {{storageLocationText(item)}}</small><StorageItemPhotos :item="item" :api="api" :events="events"/></div><aside class="storage-bottle-code">
      <template v-if="codeFor(item.id)"><WalletQrDisplay :value="codeFor(item.id)!.code!" :expires-at="codeFor(item.id)!.expiresAt"/><strong>{{t('quickScanHint')}}</strong><small>{{t('quickQuantity')}} {{codeFor(item.id)!.selections[0]!.quantity}} {{t('bottleUnit')}}</small><button :disabled="disabled||saving" @click="emit('cancel')">{{t('cancel')}}</button></template>
      <template v-else><StorageQuantityStepper :model-value="quickQuantity(item.id)" :max="item.opened?1:item.remaining" :disabled="disabled||saving||!!liveCode" :label="t('collectQuantity')" @update:model-value="quickQuantities[item.id]=$event"/><button :disabled="disabled||saving||!!liveCode||!quickSelection(item.id)" @click="quickCreate(item.id)">{{t('quickCode')}}</button><small>{{t('quickScanHint')}}</small></template>
     </aside></div>
