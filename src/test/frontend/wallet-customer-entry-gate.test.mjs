@@ -50,3 +50,9 @@ test('shared registration returns to the originating storage page without introd
  assert.equal(nodes(s.root,n=>n.tag==='a'&&n.props.href==='/wallet/A/wine-storage').length,1)
  assert.equal(nodes(s.root,n=>n.tag==='a'&&n.props.href==='/wallet/A').length,0)
 })
+test('closing the wallet root preserves existing card and original-order subpages under their own controls',async()=>{
+ for(const name of ['wallet-customer-cards','wallet-customer-order']){
+  const s=await mount({closed:true,name});assert.equal(nodes(s.root,n=>n.props?.['data-business']).length,1)
+ }
+ const s=await mount({unavailable:true,name:'wallet-customer-cards'});assert.equal(nodes(s.root,n=>n.props?.['data-business']).length,0)
+})
