@@ -1,0 +1,13 @@
+[Unit]
+Description=Record RPB artifact retention failure locally
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 -B /usr/local/sbin/rpb-retention-alert.py
+StateDirectory=rpb-backup-retention
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

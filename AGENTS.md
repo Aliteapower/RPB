@@ -25,7 +25,11 @@ Before adding or changing an RPB page layout, read `docs/frontend/PAGE_LAYOUT_CO
 
 When a task is explicitly documentation-only, keep edits inside the requested documentation paths and do not change business code, database schema, migrations, API behavior, dependency files, or runtime configuration.
 
-## Local Validation Database
+## Production Artifact Lifecycle
+
+For future production releases, follow `docs/development/ARTIFACT_RETENTION_OPERATIONS.md` and use `ops/rpb_release_artifacts.py`: create managed staging, check the space budget, prepare immutable version artifacts, make a version-specific rollback snapshot, then register success only after verifying the live frontend/backend. Keep the publication switch and registration under the shared release lock (use the Python functions inside a deployer already holding the lock; do not recursively acquire it through the CLI). Uploads must use `/opt/rpb/staging`, not arbitrary `/home/ubuntu` files. Do not register failed, unfinished, unknown or manually reconstructed material as successful merely to make it eligible for deletion. Retain independent backend/frontend versions, at least two valid full recovery points, and explicit rollback references. Capacity alerts never authorize deleting production data, logs, unregistered originals or required recovery points.
+
+## Local Validation Database Runtime
 
 For local backend, browser, or migration validation, Codex must use the PostgreSQL runtime pointed to by `target/local-postgres-current.txt`.
 

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """RPB backup retention. Default is a read-only plan; production roots cannot be overridden."""
-import argparse
 from dataclasses import dataclass, field
 import datetime as dt
-import json
 import hashlib
 import math
 import os
@@ -67,6 +65,7 @@ class Plan:
  warnings:list
  cutoff:float
  estimated_bytes:int
+ trusted:dict=field(default_factory=dict)
  def report(self):
   return {'mode':'dry-run','retention_days':self.policy.retention_days,
    'cutoff_utc':dt.datetime.fromtimestamp(self.cutoff,dt.timezone.utc).isoformat(),
@@ -115,7 +114,7 @@ def signature_node(path,base):
  s=path.lstat()
  return (str(path.relative_to(base)),s.st_mode,s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,s.st_nlink)
 
-def scan(path,base):
+def scan(path,base,trusted=None):
  if path.parent!=base:raise SafetyError('Backup is not an immediate child')
  if path.is_symlink():return Entry(path,(),0,0,unsafe='symlink')
  try:
@@ -139,8 +138,11 @@ def scan(path,base):
    elif not stat.S_ISDIR(s.st_mode):unsafe='special_file'
   e=Entry(path,sig,max(p.lstat().st_mtime for p in nodes),sum(s.st_size for p,s in files),files,unsafe=unsafe)
   if unsafe:return e
+  if trusted is not None:
+   from rpb_artifact_registry import inventory
+   if inventory(path)!=trusted['files']:e.unsafe='registered_manifest_changed';return e
   if any(p.name in ('.git','.rpb-keep') for p in nodes):e.pin=True
-  if any(p.suffix.lower() in ('.pdf','.docx','.xlsx','.ttf','.otf') for p,s in files):e.unsafe='unknown_originals';return e
+  if trusted is None and any(p.suffix.lower() in ('.pdf','.docx','.xlsx','.ttf','.otf') for p,s in files):e.unsafe='unknown_originals';return e
   if path.is_file():
    if path.suffix=='.jar' and rpb_jar(path):e.backend=True
    else:e.unsafe='unknown_standalone_file'
@@ -150,7 +152,7 @@ def scan(path,base):
    'reservation-platform.jar','reservation-platform.jar.sha256','backend.jar','RELEASE_SHA','FRONTEND_RELEASE_SHA','BACKEND_RELEASE_SHA','rpb-backend.env','.rpb-keep','source-export.json','preflight.jsonl','import.log'}
   def allowed_top(n):
    return n in allowed or bool(re.fullmatch(r'(business|other-tenants|wallet(?:-[a-z0-9]+)*)-(before|after|final)\.jsonl',n)) or n.endswith('.dump') or n in ('database.sql','queue_groups-before.sql','stores-without-queue-groups-before.txt')
-  if not all(allowed_top(n) for n in tops):e.unsafe='unknown_content';return e
+  if trusted is None and not all(allowed_top(n) for n in tops):e.unsafe='unknown_content';return e
   jars=[path/n for n in ('reservation-platform.jar','backend.jar') if (path/n).is_file()]
   e.backend=bool(jars) and all(rpb_jar(p) for p in jars)
   if jars and not e.backend:e.unsafe='unknown_jar';return e
@@ -176,12 +178,12 @@ def validate_dump(path):
  try:return subprocess.run(['/usr/bin/pg_restore','-l',str(path)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30).returncode==0
  except (OSError,subprocess.TimeoutExpired):return False
 
-def plan_retention(base,app,releases,policy,now=None,db_validator=None):
+def plan_retention(base,app,releases,policy,now=None,db_validator=None,trusted_backups=None):
  base=Path(base);app=Path(app);releases=Path(releases);policy.validate();inode=safe_base(base);versions=identity(app)
  now=time.time() if now is None else now;cutoff=math.floor(now)-policy.retention_days*86400
  entries={}
  for p in sorted(base.iterdir()):
-  entry=scan(p,base)
+  entry=scan(p,base,(trusted_backups or {}).get(p.name))
   # Recent/protected trees need only live-artifact identities; avoid holding every asset's stat in memory.
   if entry.unsafe or entry.newest>=cutoff:
    entry.files=[(f,s) for f,s in entry.files if f==p or f.relative_to(p).as_posix() in ('reservation-platform.jar','backend.jar','frontend/index.html','frontend.previous/index.html','index.html')]
@@ -230,7 +232,7 @@ def plan_retention(base,app,releases,policy,now=None,db_validator=None):
   for p,s in entries[name].files:
    key=(s.st_dev,s.st_ino);v=inodes.setdefault(key,{'links':s.st_nlink,'removed':0,'bytes':getattr(s,'st_blocks',0)*512});v['removed']+=1
  estimate=sum(v['bytes'] for v in inodes.values() if v['links']==v['removed'])
- return Plan(base,app,inode,versions,policy,entries,delete,keep,blocked,warnings,cutoff,estimate)
+ return Plan(base,app,inode,versions,policy,entries,delete,keep,blocked,warnings,cutoff,estimate,trusted_backups or {})
 
 def apply_plan(plan):
  if plan.blocked:raise SafetyError('; '.join(plan.blocked))
@@ -238,7 +240,7 @@ def apply_plan(plan):
  # Validate every candidate before the first unlink. Hardlink counts/ctime can then change due to our own removals.
  for name in plan.delete:
   if not name or Path(name).name!=name or name in ('.','..'):raise SafetyError('Unsafe backup name')
-  p=plan.base/name;fresh=scan(p,plan.base)
+  p=plan.base/name;fresh=scan(p,plan.base,plan.trusted.get(name))
   if fresh.unsafe or fresh.signature!=plan.entries[name].signature:raise SafetyError('Candidate changed: '+name)
  before=shutil.disk_usage(plan.base);deleted=[]
  for name in plan.delete:
@@ -253,21 +255,10 @@ def apply_plan(plan):
  return out
 
 def main():
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--apply',action='store_true');parser.add_argument('--config',type=Path,default=Path('/etc/rpb/backup-retention.json'));args=parser.parse_args()
- import fcntl
- fd=os.open(LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
- try:
-  try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-  except BlockingIOError:print(json.dumps({'status':'skipped_deployment_in_progress','retry_after_seconds':900}));return 75
-  config=json.loads(args.config.read_text());policy=Policy(**config)
-  if args.apply and not shutil.rmtree.avoids_symlink_attacks:raise SafetyError('Safe descriptor-based recursive deletion is unavailable')
-  plan=plan_retention(BACKUPS,APP,RELEASES,policy)
-  out=apply_plan(plan) if args.apply else plan.report()
-  if args.apply:
-   STATE.parent.mkdir(mode=0o700,parents=True,exist_ok=True);temp=STATE.with_suffix('.tmp');temp.write_text(json.dumps(out,indent=2));os.replace(temp,STATE)
-  print(json.dumps(out));return 1 if plan.blocked else 2 if out.get('space_warning') else 0
- except (SafetyError,OSError,ValueError,TypeError) as error:
-  print(json.dumps({'status':'failed_closed','error':str(error)}));return 1
- finally:os.close(fd)
+ # Keep the tested legacy planner/API; the operational runner adds the managed registry.
+ import sys
+ sys.path.insert(0,str(Path(__file__).resolve().parent))
+ from rpb_retention_job import main as run_job
+ return run_job(sys.modules[__name__])
 
 if __name__=='__main__':raise SystemExit(main())
