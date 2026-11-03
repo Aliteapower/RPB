@@ -33,7 +33,7 @@ function createWorkspace() {
   }
   async function search(query: string) {
     const request=++lookup;customers.value=[]
-    return await task.run(async () => { const current = generation; const result = await walletApi(store.value).get<Customer[]>(`/customers?query=${encodeURIComponent(query)}`); if (current === generation&&request===lookup){customers.value = result;return result} })
+    return await task.run(async () => { const current = generation;try {const result = await walletApi(store.value).get<Customer[]>(`/customers?query=${encodeURIComponent(query)}`); if (current === generation&&request===lookup){customers.value = result;return result}}catch(e){if(current===generation&&request===lookup)throw e} })
   }
   async function choose(value: Customer, openAccount = true, createIfMissing = true) {
     await task.run(async () => {
