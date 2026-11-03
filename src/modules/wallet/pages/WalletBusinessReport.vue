@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {computed,ref,watch,onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {useStaffWallet} from '../useStaffWallet'
@@ -39,7 +40,7 @@ watch([period,selected],()=>void load())
  <section v-else class="wallet-business-report">
   <form class="wallet-card report-filters" @submit.prevent="load">
    <nav :aria-label="t('wallet.businessReport.title')"><button v-for="kind in (['day','month','year'] as const)" :key="kind" type="button" :aria-pressed="period===kind" @click="selectPeriod(kind)">{{t(`wallet.businessReport.${kind}`)}}</button></nav>
-   <label>{{t(`wallet.businessReport.${period}`)}}<input v-model="selected" :type="period==='year'?'number':period==='month'?'month':'date'" :min="period==='year'?'1900':period==='month'?'1900-01':'1900-01-01'" :max="period==='year'?'9999':period==='month'?'9999-12':'9999-12-31'" required :aria-label="t(`wallet.businessReport.${period}`)"></label>
+   <label>{{t(`wallet.businessReport.${period}`)}}<DateInput v-if="period!=='year'" v-model="selected" :type="period==='month'?'month':'date'" :min="period==='month'?'1900-01':'1900-01-01'" :max="period==='month'?'9999-12':'9999-12-31'" required :aria-label="t(`wallet.businessReport.${period}`)" /><input v-else v-model="selected" type="number" :min="period==='year'?'1900':period==='month'?'1900-01':'1900-01-01'" :max="period==='year'?'9999':period==='month'?'9999-12':'9999-12-31'" required :aria-label="t(`wallet.businessReport.${period}`)" /></label>
    <button class="wallet-primary" :disabled="busy">{{t('wallet.businessReport.query')}}</button><button type="button" :disabled="busy||!report?.rows.length" @click="exportCsv">{{t('wallet.businessReport.export')}}</button>
   </form>
   <p class="report-note">{{t('wallet.businessReport.note')}}</p><p class="report-note">{{t('wallet.businessReport.receiptNote')}}</p>

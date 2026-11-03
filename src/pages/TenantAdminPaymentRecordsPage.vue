@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import ProductHistoryNotice from '../modules/tenant-products/ProductHistoryNotice.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import {useI18n} from 'vue-i18n'
@@ -202,7 +203,7 @@ function isAppGateError(code: string, messageKey: string): boolean {
       <form class="filter-panel" role="search" @submit.prevent="loadRecords">
         <label>
           <span>{{ gt('generated.tenant-admin-payment-records.009') }}</span>
-          <input v-model="filters.businessDate" type="date" />
+          <DateInput v-model="filters.businessDate" type="date" />
         </label>
         <label>
           <span>{{ gt('generated.tenant-admin-payment-records.010') }}</span>

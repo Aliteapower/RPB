@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue'
 import {usePhasePage} from '../phasePage'
 import {shiftRuleSummary} from '../restPolicy'
@@ -94,7 +95,7 @@ function remove(){
    <label>{{p('employee')}}<select v-model="draft.employeeId" required :disabled="optionsLoading||!!optionsFailure"><option value="" disabled>{{t('select')}}</option><option v-for="employee in employeeOptions" :key="employee.id" :value="employee.id" :disabled="employeeUnavailable&&employee.id===draft.employeeId">{{employee.name}}</option></select></label>
    <p v-if="optionsLoading" class="wf-hint" role="status">{{t('loading')}}</p><p v-else-if="optionsFailure" role="alert">{{optionsFailure}} <button type="button" @click="refreshEmployees">{{p('reload')}}</button></p><p v-else-if="employeeUnavailable||prefillUnavailable" class="wf-hint" role="status">{{employeeUnavailableText}}</p><p v-else-if="!employees.length" class="wf-hint" role="status">{{scheduleNoEligibleEmployees(english())}}</p>
    <label>{{p('shift')}}<select v-model="draft.shiftId" required><option value="" disabled>{{t('select')}}</option><option v-for="shift in shifts.filter(shift=>shift.enabled||shift.id===snapshot?.shiftId)" :key="shift.id" :value="shift.id" :disabled="!shift.enabled">{{shift.name}} · {{restaurantShiftRange(shift,english())}}{{shift.rules?' · '+shiftRuleSummary(shift,'',english()):''}} {{!shift.enabled?t('disabled'):''}}</option></select></label>
-   <label>{{p('workDate')}}<input v-model="draft.workDate" type="date" required :min="storeToday(zone)" :max="addDays(storeToday(zone),90)"></label>
+   <label>{{p('workDate')}}<DateInput v-model="draft.workDate" type="date" required :min="storeToday(zone)" :max="addDays(storeToday(zone),90)" /></label>
    <p class="wf-hint">{{restaurantText(english()).business}}</p><p v-if="selectedShift" class="wf-hint" role="status">{{restaurantText(english()).actual}}: {{restaurantSchedulePreview(draft.workDate,selectedShift)}}</p><p class="wf-hint">{{p('timezone')}}: {{zone}}</p><p v-if="snapshot" class="wf-hint">{{p('snapshot')}}: {{snapshot.shift.name}} {{restaurantShiftRange(snapshot.shift,english())}} · {{shiftRuleSummary(snapshot.shift,p(snapshot.shift.breakMode),english())}} · {{p(snapshot.status)}}</p>
   </fieldset>
   <p v-if="snapshot?.status==='cancelled'" class="wf-hint">{{s('restoreHint')}}</p>

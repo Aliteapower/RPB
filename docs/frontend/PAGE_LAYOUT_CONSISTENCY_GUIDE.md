@@ -121,3 +121,8 @@
 - [本次登录后验收与修复记录](../development/WORKFORCE_UI_BROWSER_ACCEPTANCE_20261031.md)：问题、16 个真实页面状态、桌面和手机实际尺寸及生产边界。
 
 本指南的通用规则用于后续工作；历史记录中的发布版本、测试数量和验收截图只说明当时状态，不能替代下一次修改后的实际验证。
+
+
+## 公共日期输入
+
+新建或调整日期、月份及本地日期时间字段，使用 [DateInput 公共规范](DATE_INPUT_STANDARD.md) 中的 `src/components/common/DateInput.vue`，沿用模块自己的 label、面板和页面布局。不要新增裸 `input type=date/month/datetime-local`，避免浏览器语言造成混杂占位符。构建时会检查此项。业务模型、门店时区、必填/只读/范围/步长规则不因外观统一而更改；年份数字和普通时刻字段继续用原控件。

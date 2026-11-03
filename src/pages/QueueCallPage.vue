@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -202,7 +203,7 @@ function queryValue(value: unknown): string {
 
       <label class="called-at-field">
         <span>{{ gt('generated.queue-call.006') }}</span>
-        <input v-model="form.calledAt" name="calledAt" type="datetime-local" />
+        <DateInput v-model="form.calledAt" name="calledAt" type="datetime-local" />
       </label>
 
       <details class="field-group">

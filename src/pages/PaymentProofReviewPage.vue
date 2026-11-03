@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import {ImageUploadError} from '../utils/imageUpload'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -479,7 +480,7 @@ function apiErrorText(error: unknown): string {
       <form class="filter-strip" @submit.prevent="loadCandidates">
         <label>
           <span>{{ gt('generated.payment-proof-review.008') }}</span>
-          <input v-model="businessDate" type="date" />
+          <DateInput v-model="businessDate" type="date" />
         </label>
         <label>
           <span>{{ gt('generated.payment-proof-review.009') }}</span>

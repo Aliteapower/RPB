@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../common/DateInput.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -923,7 +924,7 @@ function reservationShareUrl(info: ReservationShareInfo): string {
 
         <label>
           <span>{{ $t('reservationWorkbench.createDialog.date') }}</span>
-          <input v-model="form.businessDate" :min="minDate" name="businessDate" type="date" />
+          <DateInput v-model="form.businessDate" :min="minDate" name="businessDate" type="date" />
         </label>
 
         <div class="reservation-create-dialog__field">

@@ -7,6 +7,7 @@ const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:80
 export default defineConfig(({command}) => {
  const version = command === 'build' ? (process.env.RPB_FRONTEND_VERSION || execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()) : 'development'
  if(command === 'build' && !/^[a-f0-9]{40}$/.test(version)) throw new Error('RPB_FRONTEND_VERSION must be a 40-character Git commit SHA')
+ if(command==='build')execFileSync(process.execPath,['scripts/check-date-inputs.mjs'],{stdio:'inherit'})
  return {
   define: {'import.meta.env.VITE_FRONTEND_VERSION': JSON.stringify(version)},
   plugins: [vue(), {name:'rpb-frontend-version',generateBundle(){this.emitFile({type:'asset',fileName:'frontend-version.json',source:JSON.stringify({version})+'\n'})}}],

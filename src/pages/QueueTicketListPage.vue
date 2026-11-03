@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import {useI18n} from 'vue-i18n'
 import ProductHistoryNotice from '../modules/tenant-products/ProductHistoryNotice.vue'
 import { computed, ref, watch } from 'vue'
@@ -1092,7 +1093,7 @@ function createRejoinLocalError(code: string, messageKey: string): QueueRejoinAp
 <template>
   <main class="staff-workbench-shell queue-workbench">
     <ProductHistoryNotice v-if="historyOnly" />
-    <label v-if="historyOnly">{{historyDateLabel}}<input v-model="historyDate" type="date" @change="loadQueueTickets" /></label>
+    <label v-if="historyOnly">{{historyDateLabel}}<DateInput v-model="historyDate" type="date" @change="loadQueueTickets" /></label>
     <StaffHomeTopBar
       :app-status-label="appStatusLabel"
       :business-date="currentBusinessDate"

@@ -5,6 +5,7 @@ import {parse,compileScript} from '@vue/compiler-sfc'
 import {readFile,writeFile,mkdir} from 'node:fs/promises'
 import {pathToFileURL} from 'node:url'
 import {createRenderer,h,reactive,nextTick} from 'vue'
+import {createI18n} from 'vue-i18n'
 import {routeLocationKey} from 'vue-router'
 
 let Page,PublicBookingApiError
@@ -24,7 +25,7 @@ before(async()=>{
    export const createPublicBooking=(...args)=>globalThis.__bookingTest.call('POST',...args)`,loader:'js'}))
   b.onLoad({filter:/generatedText\.ts$/},()=>({contents:"export const useGeneratedText=()=>({gt:(key)=>key})",loader:'js'}))
   b.onLoad({filter:/\.vue$/},async({path})=>{
-   if(!path.endsWith('PublicBookingPage.vue')){
+   if(!path.endsWith('PublicBookingPage.vue')&&!path.endsWith('DateInput.vue')){
     const kind=path.endsWith('CustomerPasswordLogin.vue')?'login':path.endsWith('CustomerPasswordChange.vue')?'password-change':'phone'
     return {contents:`import {h} from 'vue';export default {props:['store','modelValue','disabled'],emits:['authenticated','update:modelValue'],setup(p,{emit}){return()=>h('div',{'data-stub':'${kind}',value:p.modelValue,store:p.store,onAuthenticated:value=>emit('authenticated',value),'onUpdate:modelValue':value=>emit('update:modelValue',value)})}}`,loader:'js'}
    }
@@ -37,7 +38,7 @@ before(async()=>{
 afterEach(()=>{mounted.splice(0).forEach(a=>a.unmount());assert.ok(!(globalThis.__bookingTest?.calls||[]).some(c=>c.kind==='POST'),'read-only availability refresh must never create a booking');globalThis.window=originalWindow;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot;delete globalThis.__bookingTest})
 function browser(t){globalThis.Document=class extends EventTarget{};globalThis.ShadowRoot=class{};const win=new EventTarget(),doc=new globalThis.Document();doc.visibilityState='visible';doc.activeElement=null;globalThis.window=win;globalThis.document=doc;t.mock.timers.enable({apis:['setInterval']});return{win,doc}}
 function api(handler){const calls=[];globalThis.__bookingTest={calls,call(kind,...args){calls.push({kind,args});if(kind==='POST')throw Error('Unexpected POST');if(kind==='me')return handler?.(kind,...args)??Promise.resolve({principal:null});return handler(kind,...args)}};return calls}
-async function mount(store='A'){const route=reactive({params:{storeId:store}}),root=element('root'),app=renderer.createApp({render:()=>h(Page)});app.provide(routeLocationKey,route);app.mount(root);mounted.push(app);await settle();return{root,route,app}}
+async function mount(store='A'){const route=reactive({params:{storeId:store}}),root=element('root'),app=renderer.createApp({render:()=>h(Page)});app.use(createI18n({legacy:false,locale:'zh-CN',messages:{}}));app.provide(routeLocationKey,route);app.mount(root);mounted.push(app);await settle();return{root,route,app}}
 function context(store='A',enabled=true,login=false,date=new Date().toISOString().slice(0,10)){return{success:true,store:{storeId:store,storeName:'STORE '+store},settings:{enabled,requireCustomerLogin:login,maxAdvanceDays:30,minLeadMinutes:0},businessDate:date,timeSlots:[{periodKey:'lunch',displayName:'Lunch '+date,localTime:'12:00:00',startAt:date+'T12:00:00Z',selectable:true,nextDay:false}]}}
 const dateField=s=>nodes(s.root,n=>n.tag==='input'&&n.props.type==='date')[0]
 const form=s=>nodes(s.root,n=>n.tag==='form')[0]

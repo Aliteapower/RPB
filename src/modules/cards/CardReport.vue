@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../components/common/DateInput.vue'
 import {ref,watch} from 'vue'
 import {cardApi} from './api'
 import {useCardText} from './text'
@@ -12,7 +13,7 @@ watch(()=>props.store,()=>{report.value=null;void load()},{immediate:true})
 <template>
   <section class="cards-panel cards-report">
     <header class="cards-section-heading"><h2>{{t('report')}}</h2></header>
-    <form class="cards-report-filters" @submit.prevent="load"><label>{{t('dateFrom')}}<input v-model="from" type="date" required></label><label>{{t('dateTo')}}<input v-model="to" type="date" required></label><button class="primary" :disabled="busy">{{t('refresh')}}</button></form>
+    <form class="cards-report-filters" @submit.prevent="load"><label>{{t('dateFrom')}}<DateInput v-model="from" type="date" required /></label><label>{{t('dateTo')}}<DateInput v-model="to" type="date" required /></label><button class="primary" :disabled="busy">{{t('refresh')}}</button></form>
     <p v-if="busy" class="cards-caption" role="status">{{t('loading')}}</p><p v-if="error" class="cards-error" role="alert">{{error}}</p>
     <template v-if="report">
       <dl class="cards-report-totals"><div><dt>{{t('received')}}</dt><dd>{{money(report.money.receivedCents)}}</dd></div><div><dt>{{t('refundAmount')}}</dt><dd>{{money(report.money.refundedCents)}}</dd></div></dl>

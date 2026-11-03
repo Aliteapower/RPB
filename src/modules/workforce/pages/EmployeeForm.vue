@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {useI18n} from 'vue-i18n'
 const {locale}=useI18n()
 import {usePayrollReturn} from '../payrollReturn'
@@ -40,7 +41,7 @@ async function save(){if(!draft.value||busy.value)return;busy.value=true;failure
        <label>{{t('employeeNo')}}<input v-model="draft.employeeNo" data-field="employeeNo" required maxlength="40"></label>
        <label>{{t('name')}}<input v-model="draft.name" data-field="name" required maxlength="100"></label>
        <label>{{d('englishName')}}<input v-model="draft.englishName" maxlength="100"></label>
-       <label>{{d('birthDate')}}<input v-model="draft.birthDate" type="date" :max="draft.hireDate||undefined"></label>
+       <label>{{d('birthDate')}}<DateInput v-model="draft.birthDate" type="date" :max="draft.hireDate||undefined" /></label>
        <label>{{t('phone')}}<input v-model="draft.phone" maxlength="40" type="tel" autocomplete="tel"></label>
        <label>{{t('email')}}<input v-model="draft.email" maxlength="160" type="email" autocomplete="email"></label>
       </div>
@@ -48,9 +49,9 @@ async function save(){if(!draft.value||busy.value)return;busy.value=true;failure
      <EmployeeTaskSection :title="ee('employment')" :description="ee('employmentHint')" :summary="employmentSummary" :default-open="!existing" data-employee-task="employment">
       <div class="wf-grid">
        <label>{{t('jobTitle')}}<select v-model="draft.positionId" data-field="positionId" @change="draft.jobTitle=''" :aria-label="t('jobTitle')"><option :value="null">{{j('choose')}}</option><option v-for="p in positions.filter(p=>p.enabled||p.id===originalPosition)" :key="p.id" :value="p.id">{{p.name}}{{p.enabled?'':' · '+j('retained')}}</option></select><RouterLink v-if="home?.headOffice" :to="`/stores/${store}/workforce/positions`">{{j('manage')}}</RouterLink><small v-else>{{j('contact')}}</small></label>
-       <label>{{t('hireDate')}}<input v-model="draft.hireDate" data-field="hireDate" required type="date" :disabled="!!existing&&!home?.headOffice"></label>
+       <label>{{t('hireDate')}}<DateInput v-model="draft.hireDate" data-field="hireDate" required type="date" :disabled="!!existing&&!home?.headOffice" /></label>
        <label>{{t('status')}}<select v-model="draft.status" data-field="status"><option value="active">{{t('active')}}</option><option value="left">{{t('left')}}</option></select></label>
-       <label v-if="draft.status==='left'">{{t('leaveDate')}}<input v-model="draft.leaveDate" data-field="leaveDate" required type="date" :min="draft.hireDate||undefined"></label>
+       <label v-if="draft.status==='left'">{{t('leaveDate')}}<DateInput v-model="draft.leaveDate" data-field="leaveDate" required type="date" :min="draft.hireDate||undefined" /></label>
        <label>{{d('availability')}}<select v-model="draft.enabled" data-field="enabled"><option :value="true">{{d('enabled')}}</option><option :value="false">{{d('disabled')}}</option></select><small>{{d('employmentHint')}}</small></label>
       </div>
       <template v-if="!existing"><div class="wf-grid"><label>{{t('company')}}<select v-model="draft.companyId" data-field="companyId" required><option :value="null" disabled>{{t('select')}}</option><option v-for="c in home?.companies" :key="c.id" :value="c.id">{{c.name}}</option></select></label><label>{{t('mainStore')}}<select v-model="draft.mainStoreId" data-field="mainStoreId" required @change="draft.storeIds=[store,draft.mainStoreId!].filter((v,i,a)=>a.indexOf(v)===i)"><option v-for="s in home?.stores" :key="s.id" :value="s.id">{{s.name}}</option></select></label></div><p class="wf-hint">{{t('newEmployeeHint')}}</p></template>

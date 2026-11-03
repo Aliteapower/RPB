@@ -54,7 +54,7 @@ test('switching a company back restores its original effective date',async()=>{
  const select=nodes(root,n=>n.tag==='select')[0]
  select.props['onUpdate:modelValue']('D');select.props.onChange();await settle()
  select.props['onUpdate:modelValue']('C');select.props.onChange();await settle()
- assert.equal(nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0].props.value,'2026-10-01')
+ assert.equal(nodes(root,n=>n.tag==='input'&&n.props.type==='date')[0].value,'2026-10-01')
 })
 test('request uses same-origin credentials and protected PUT without persisting passwords',async()=>{
  const {workforceApi}=await import(pathToFileURL(process.cwd()+'/target/workforce-api-test.mjs'));let call
@@ -300,7 +300,7 @@ test('editing a schedule moves it between cells and preserves the selected week 
  const writes=[];globalThis.fetch=editingFetch(writes,body=>response({...scheduledRow,...body,version:2}));const {root,router}=await mount(ScheduleList,'/stores/A/workforce/schedule')
  nodes(root,n=>n.tag==='button'&&n.props['data-schedule-id']==='S')[0].props.onClick();await settle();const modal=nodes(root,n=>n.tag==='dialog')[0];assert.match(text(modal),/调整排班/)
  nodes(modal,n=>n.tag==='input'&&n.props.type==='date')[0].props['onUpdate:modelValue']('2026-10-30');await settle();await nodes(modal,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
- assert.equal(writes[0].expectedVersion,1);assert.equal(nodes(root,n=>n.tag==='button'&&n.props['data-schedule-id']==='S').length,1);assert.ok(nodes(root,n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('新增排班 · Alice · 2026-10-29')).length);assert.ok(nodes(root,n=>n.tag==='button'&&String(n.props['aria-label']).includes('调整排班 · Alice · 2026-10-30')).length);assert.equal(router.currentRoute.value.path,'/stores/A/workforce/schedule');assert.equal(nodes(root,n=>n.tag==='form'&&n.props.class==='wf-schedule-query')[0].children[0].children.find(n=>n.tag==='input').value,'2026-10-26')
+ assert.equal(writes[0].expectedVersion,1);assert.equal(nodes(root,n=>n.tag==='button'&&n.props['data-schedule-id']==='S').length,1);assert.ok(nodes(root,n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('新增排班 · Alice · 2026-10-29')).length);assert.ok(nodes(root,n=>n.tag==='button'&&String(n.props['aria-label']).includes('调整排班 · Alice · 2026-10-30')).length);assert.equal(router.currentRoute.value.path,'/stores/A/workforce/schedule');assert.equal(nodes(nodes(root,n=>n.tag==='form'&&n.props.class==='wf-schedule-query')[0].children[0],n=>n.tag==='input'&&n.props.type==='text')[0].value,'2026-10-26')
 })
 test('cancellation submits original snapshot and updates the cell without removing history',async()=>{
  const writes=[];globalThis.fetch=editingFetch(writes,body=>response({...scheduledRow,...body,version:2}));const {root}=await mount(ScheduleList,'/stores/A/workforce/schedule');nodes(root,n=>n.tag==='button'&&n.props['data-schedule-id']==='S')[0].props.onClick();await settle();const modal=nodes(root,n=>n.tag==='dialog')[0]

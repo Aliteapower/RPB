@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {computed,onMounted,ref,watch} from 'vue'
 import {usePayrollPage} from '../payrollPage'
 import {useReportText} from '../reportText'
@@ -26,7 +27,7 @@ function download(kind:'companies'|'employees'|'payments'|'items'){
  <header class="wf-toolbar"><h2>{{q('reports')}}</h2><RouterLink class="wf-button" :to="base+'/payroll-reconciliation'">{{q('reconciliation')}}</RouterLink></header>
  <PhaseStatus :failure="failure" :notice="notice ? r('saved') : ''" :loading="loading"/>
  <template v-if="home?.companies.length"><p class="wf-hint">{{q('scope')}}</p>
- <form class="wf-report-filter" @submit.prevent="reload"><label>{{r('month')}}<input v-model="month" :disabled="busy" type="month" min="2000-01" max="2100-12" required></label><fieldset :disabled="busy"><legend>{{q('selected')}} · {{selected.length}} / {{home.companies.length}}</legend><label v-for="c in home.companies" :key="c.id" class="wf-check"><input v-model="selected" type="checkbox" :value="c.id">{{c.name}}</label></fieldset><button :disabled="loading||busy||!selected.length">{{q('load')}}</button></form>
+ <form class="wf-report-filter" @submit.prevent="reload"><label>{{r('month')}}<DateInput v-model="month" :disabled="busy" type="month" min="2000-01" max="2100-12" required /></label><fieldset :disabled="busy"><legend>{{q('selected')}} · {{selected.length}} / {{home.companies.length}}</legend><label v-for="c in home.companies" :key="c.id" class="wf-check"><input v-model="selected" type="checkbox" :value="c.id">{{c.name}}</label></fieldset><button :disabled="loading||busy||!selected.length">{{q('load')}}</button></form>
  </template><p v-else-if="home" class="wf-empty">{{r('unavailable')}}</p>
  <template v-if="data&&!loading"><p class="wf-hint">{{data.month}} · {{data.currency}} · {{q('selected')}} {{data.companies.length}}</p><p class="wf-hint">{{q('frozenHint')}}</p>
  <div class="wf-report-totals"><section v-for="entry in [{name:'frozen' as const,value:data.frozen},{name:'forecast' as const,value:data.forecast}]" :key="entry.name"><h3>{{q(entry.name)}}</h3><p class="wf-hint">{{q('companyCount')}} {{entry.value.companyCount}} · {{q('employeeCount')}} {{entry.value.employeeCount}} · {{q('payrollRows')}} {{entry.value.payrollRows}}</p><dl class="wf-details"><template v-for="field in reportFields" :key="field"><dt>{{q(field)}}</dt><dd>{{entry.value.totals[field]}}</dd></template></dl><details v-if="entry.value.breakdown"><summary>{{r('breakdownTitle')}}</summary><PayBreakdownSummary :value="entry.value.breakdown" details aggregated/></details></section></div>

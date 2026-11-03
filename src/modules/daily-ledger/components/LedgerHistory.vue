@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import { useLedgerI18n } from '../i18n'
 import { computed, onMounted, ref } from 'vue'
 import { ledgerApi } from '../api'
@@ -33,7 +34,7 @@ onMounted(async () => { try { years.value = await ledgerApi(props.storeId).years
     <div class="page-heading"><div><div class="eyebrow">BUSINESS HISTORY</div><h1>{{ text('历史账目') }}<span class="heading-dot">.</span></h1><p>{{ text('每一天的盘点，都有迹可循。') }}</p></div></div>
     <div class="panel history-panel">
     <form @submit.prevent="selectedQuick = ''; load()"><div class="history-shortcuts" role="group" :aria-label="text('日期快速查询')"><span>{{ text('快速查询') }}</span><button v-for="(name, key) in { today: '本日', month: '本月', yesterday: '上日', 'last-month': '上月', 'last-year': '上年' }" :key="key" type="button" class="button secondary" :aria-pressed="selectedQuick === key" :disabled="loading" @click="quick(key)">{{ text(name) }}</button><label class="history-year-label">{{ text('年度') }}<select :aria-label="text('按年度查询')" @change="selectedQuick = ''; start = `${($event.target as HTMLSelectElement).value}-01-01`; end = `${($event.target as HTMLSelectElement).value}-12-31`; load()"><option disabled selected>{{ text('选择年度') }}</option><option v-for="year in years" :key="year" :value="year">{{ year }}</option></select></label></div>
-    <div class="history-date-range"><label>{{ text('开始日期') }}<span class="history-date-control"><span class="history-date-display"><span>{{ format.date(start) }}</span><span>▦</span></span><input v-model="start" type="date" required /></span></label><span class="history-date-separator">{{ text('至') }}</span><label>{{ text('结束日期') }}<span class="history-date-control"><span class="history-date-display"><span>{{ format.date(end) }}</span><span>▦</span></span><input v-model="end" type="date" required /></span></label></div><button class="button primary" :disabled="loading">{{ text('查询') }}</button><button class="button secondary" type="button" :disabled="loading || !!error || !days.length" @click="exportCsv">{{ text('导出 CSV') }}</button></form>
+    <div class="history-date-range"><label>{{ text('开始日期') }}<DateInput v-model="start" type="date" required /></label><span class="history-date-separator">{{ text('至') }}</span><label>{{ text('结束日期') }}<DateInput v-model="end" type="date" required /></label></div><button class="button primary" :disabled="loading">{{ text('查询') }}</button><button class="button secondary" type="button" :disabled="loading || !!error || !days.length" @click="exportCsv">{{ text('导出 CSV') }}</button></form>
     <p class="small muted">{{ text('日报只取指定班次已提交的累计数，其他班次和草稿不计入；新口径营业额＝盘点现金＋已抽大钞＋非现金＋已付现金开支－底钱；现金总交款＝盘点现金＋已抽大钞－底钱。旧记录按原提交口径显示。') }}</p>
     <p v-if="error" role="alert" class="ledger-error">{{ errorText(error) }}</p><p v-if="loading" class="history-empty">{{ text('正在读取…') }}</p>
     <template v-else-if="!error">

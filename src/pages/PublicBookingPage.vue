@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { useVisiblePageRefresh } from '../composables/useVisiblePageRefresh'
 import { useRoute } from 'vue-router'
@@ -462,12 +463,11 @@ function clampBookingDate(isoDate: string): string {
 
         <label>
           <span>{{ gt('generated.public-booking.008') }}</span>
-          <input
+          <DateInput
             v-model="selectedDate"
             :min="minBookingDate"
             :max="maxBookingDate"
-            type="date"
-          />
+            type="date" />
           <small class="date-window-hint">{{ bookingDateWindowText }}</small>
           <small v-if="dateInputErrorText" class="field-error">{{ dateInputErrorText }}</small>
         </label>

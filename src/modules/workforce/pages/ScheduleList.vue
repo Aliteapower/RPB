@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import RestSwapLabels from '../components/RestSwapLabels.vue'
 import CalendarDateLabels from '../components/CalendarDateLabels.vue'
 import {nextTick,onBeforeUnmount,onMounted,ref} from 'vue'
@@ -100,10 +101,10 @@ onBeforeUnmount(()=>{++boardRevision;stopSync?.()})
 <template><section v-if="home?.employeeManage" ref="panel" class="wf-panel wf-schedule-page">
  <header class="wf-toolbar wf-schedule-header"><h2>{{displayedPeriod==='month'?s('monthlySchedule'):p('schedule')}}</h2><small>{{p('timezone')}}: {{data.timezone}} · {{displayedFrom}} – {{displayedTo}}</small><RouterLink class="wf-button" :to="base+'/shifts'">{{p('shifts')}}</RouterLink></header><p class="wf-hint">{{restaurantText(english()).business}}</p>
  <div class="wf-schedule-controls">
-  <form class="wf-schedule-query" @submit.prevent="filter"><label>{{period==='month'?s('month'):p('week')}}<input v-if="period==='month'" v-model="month" type="month" required :disabled="!!copyDraft||busy"><input v-else v-model="week" type="date" required :disabled="!!copyDraft||busy"></label><div class="wf-schedule-buttons"><button type="button" :disabled="loading||busy||!!copyDraft" @click="move(-7)">{{t('previous')}}</button><button type="button" :disabled="loading||busy||!!copyDraft" @click="move(7)">{{t('next')}}</button><button :disabled="loading||busy||!!copyDraft">{{p('filter')}}</button></div></form>
+  <form class="wf-schedule-query" @submit.prevent="filter"><label>{{period==='month'?s('month'):p('week')}}<DateInput v-if="period==='month'" v-model="month" type="month" required :disabled="!!copyDraft||busy" /><DateInput v-else v-model="week" type="date" required :disabled="!!copyDraft||busy" /></label><div class="wf-schedule-buttons"><button type="button" :disabled="loading||busy||!!copyDraft" @click="move(-7)">{{t('previous')}}</button><button type="button" :disabled="loading||busy||!!copyDraft" @click="move(7)">{{t('next')}}</button><button :disabled="loading||busy||!!copyDraft">{{p('filter')}}</button></div></form>
   <button type="button" class="primary" :disabled="loading||busy||!!copyDraft" @click="openBulk">{{s('bulk')}}</button>
   <button type="button" :disabled="busy||!!copyDraft" @click="create()">{{p('newSchedule')}}</button>
-  <form v-if="period==='week'" class="wf-schedule-copy" @submit.prevent="copy"><label>{{p('targetWeek')}}<input v-model="target" type="date" required :disabled="busy||!!copyDraft"></label><button :disabled="busy||loading||data.weekScheduleCount===0">{{busy?t('saving'):target===addDays(displayedWeek,7)?s('copyToNextWeek'):p('copyWeek')}}</button></form>
+  <form v-if="period==='week'" class="wf-schedule-copy" @submit.prevent="copy"><label>{{p('targetWeek')}}<DateInput v-model="target" type="date" required :disabled="busy||!!copyDraft" /></label><button :disabled="busy||loading||data.weekScheduleCount===0">{{busy?t('saving'):target===addDays(displayedWeek,7)?s('copyToNextWeek'):p('copyWeek')}}</button></form>
  </div>
  <p v-if="period==='week'" class="wf-hint wf-schedule-copy-hint">{{s('copySource')}}: {{displayedWeek}} → {{target}} · {{p('copyHint')}}</p>
  <p v-if="period==='month'" class="wf-hint wf-schedule-copy-hint">{{s('copyWeekView')}}</p>

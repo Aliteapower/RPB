@@ -12,6 +12,7 @@ import './report.css'
 const props=defineProps<{api:StorageApi;timezone:string;refreshKey:number}>()
 const {locale}=useMerchantStorageText(),x=(zh:string,en:string)=>locale.value.startsWith('en')?en:zh
 const kind=ref('deposit'),query=ref(''),status=ref('all'),from=ref(''),to=ref(''),page=ref(0),data=ref<ReportPage|null>(null),loading=ref(false),error=ref(''),selected=ref<ReportRow|null>(null),detail=ref<ReportDetail|null>(null),detailLoading=ref(false),detailError=ref('')
+const fromValid=ref(true),toValid=ref(true),dateReset=ref(0)
 const selectedPanel=ref<HTMLElement|null>(null)
 const applied=ref({kind:'deposit',query:'',status:'all',from:'',to:''})
 const dirty=computed(()=>JSON.stringify(filters())!==JSON.stringify(applied.value))
@@ -27,8 +28,8 @@ async function load(){
  catch(e){if(active&&request===generation)error.value=e instanceof Error?e.message:String(e)}
  finally{if(active&&request===generation)loading.value=false}
 }
-function search(){if(!validReportDate(from.value)||!validReportDate(to.value)){error.value=x('请输入有效日期，格式：年-月-日','Enter a valid date (YYYY-MM-DD)');return}if(from.value&&to.value&&from.value>to.value){error.value=x('开始日期不能晚于结束日期','Start date must be before end date');return}applied.value=filters();page.value=0;void load()}
-function reset(){query.value='';status.value='all';from.value='';to.value='';search()}
+function search(){if(!fromValid.value||!toValid.value||!validReportDate(from.value)||!validReportDate(to.value)){error.value=x('请输入有效日期，格式：年-月-日','Enter a valid date (YYYY-MM-DD)');return}if(from.value&&to.value&&from.value>to.value){error.value=x('开始日期不能晚于结束日期','Start date must be before end date');return}applied.value=filters();page.value=0;void load()}
+function reset(){dateReset.value++;fromValid.value=true;toValid.value=true;query.value='';status.value='all';from.value='';to.value='';search()}
 function changeKind(){status.value='all';search()}
 function move(offset:number){if(loading.value||dirty.value||!data.value||offset<0&&page.value===0||offset>0&&!data.value.hasMore)return;page.value+=offset;void load()}
 async function show(row:ReportRow){
@@ -46,7 +47,7 @@ onUnmounted(()=>{active=false;generation++;detailGeneration++})
   <label>{{x('报表类型','Report type')}}<select v-model="kind" :disabled="loading" @change="changeKind"><option value="deposit">{{x('存酒记录','Deposits')}}</option><option value="pickup">{{x('取酒记录','Pickups')}}</option></select></label>
   <label class="storage-report-keyword">{{x('顾客 / 酒品 / 位置','Customer / wine / location')}}<input v-model="query" maxlength="120" :placeholder="x('姓名、手机号、酒名或标签','Name, phone, wine or label')"></label>
   <label>{{x('状态','Status')}}<select v-model="status"><option value="all">{{label('all')}}</option><option v-for="value in statuses" :key="value" :value="value">{{label(value)}}</option></select></label>
-  <div class="storage-report-dates"><StorageReportDateField v-model="from" :label="x('开始日期','From')" :placeholder="x('年-月-日','YYYY-MM-DD')" :calendar-label="x('选择开始日期','Choose start date')" :max="validReportDate(to)?to||undefined:undefined"/><StorageReportDateField v-model="to" :label="x('结束日期','To')" :placeholder="x('年-月-日','YYYY-MM-DD')" :calendar-label="x('选择结束日期','Choose end date')" :min="validReportDate(from)?from||undefined:undefined"/></div>
+  <div class="storage-report-dates"><StorageReportDateField :reset-key="dateReset" v-model="from" @validity-change="fromValid=$event" :label="x('开始日期','From')" :placeholder="x('年-月-日','YYYY-MM-DD')" :calendar-label="x('选择开始日期','Choose start date')" :max="validReportDate(to)?to||undefined:undefined"/><StorageReportDateField :reset-key="dateReset" v-model="to" @validity-change="toValid=$event" :label="x('结束日期','To')" :placeholder="x('年-月-日','YYYY-MM-DD')" :calendar-label="x('选择结束日期','Choose end date')" :min="validReportDate(from)?from||undefined:undefined"/></div>
   <div class="storage-report-filter-actions"><button class="primary" :disabled="loading">{{x('查询','Search')}}</button><button type="button" :disabled="loading" @click="reset">{{x('重置','Reset')}}</button></div>
  </form>
  <p class="storage-report-help">{{dirty?x('筛选已更改，点击查询更新结果。','Filters changed. Search to update results.'):x('按办理时间查询，每笔存酒或取酒单只列一行；汇总覆盖全部查询结果。','Search by processing date. One row per bill; totals cover all matching results.')}}</p>

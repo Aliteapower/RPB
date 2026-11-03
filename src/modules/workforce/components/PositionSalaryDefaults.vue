@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {computed,ref,watch} from 'vue'
 import {useWorkforce} from '../context'
 import {useWorkforceText} from '../text'
@@ -33,7 +34,7 @@ async function save(){if(busy.value||!company.value||!template.value||!date.valu
    <form @submit.prevent="save">
     <fieldset :disabled="busy">
      <legend>{{editing?x('修改岗位标准','Edit position default'):x('2. 设置岗位默认模板','2. Set the position template')}}</legend>
-     <div class="wf-grid"><label>{{pc('from')}}<input v-model="date" type="date" required :disabled="!!editing"></label><label>{{pc('template')}}<select v-model="template" required :aria-label="pc('template')"><option value="">{{x('请选择匹配计薪方式的模板','Choose a matching template')}}</option><option v-for="t in eligibleTemplates" :key="t.id" :value="t.id">{{t.name}}</option></select></label></div>
+     <div class="wf-grid"><label>{{pc('from')}}<DateInput v-model="date" type="date" required :disabled="!!editing" /></label><label>{{pc('template')}}<select v-model="template" required :aria-label="pc('template')"><option value="">{{x('请选择匹配计薪方式的模板','Choose a matching template')}}</option><option v-for="t in eligibleTemplates" :key="t.id" :value="t.id">{{t.name}}</option></select></label></div>
      <p v-if="!eligibleTemplates.length" class="wf-hint">{{x('暂无匹配的启用模板。请先到工资模板查看可用规则；总部发布后，门店预览并启用。','No enabled template matches this basis. Check salary templates first; publish and enable a matching version.')}} <RouterLink target="_blank" rel="noopener" :to="{path:`/stores/${store}/workforce/salary-templates`,query:{companyId:company}}">{{x('在新页查看工资模板','Open salary templates in a new tab')}}</RouterLink></p>
      <details v-if="selectedTemplate" class="wf-task-section"><summary>{{x('查看所选模板金额、津贴与加班依据','Review selected pay, allowances and overtime rules')}} · {{selectedTemplate.name}}</summary><PayRuleSummary :rule="selectedTemplate.rule"/></details>
      <label class="wf-check"><input v-model="enabled" type="checkbox">{{pc('enable')}}</label>

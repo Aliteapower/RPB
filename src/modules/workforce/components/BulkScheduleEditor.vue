@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {restaurantShiftRange} from '../restaurantShifts'
 import {computed,onMounted,ref,watch} from 'vue'
 import {usePhasePage} from '../phasePage'
@@ -50,7 +51,7 @@ onMounted(()=>{if(home.value?.employeeManage)refresh()})
   <p class="wf-hint">{{s('filterClears')}}</p>
   <div class="wf-bulk-employees"><label v-for="employee in options.items" :key="employee.id" class="wf-check"><input v-model="selected" type="checkbox" :value="employee.id" :disabled="selected.length>=500&&!selected.includes(employee.id)"><span>{{employee.name}} <small>{{employee.employeeNo}}</small></span></label><p v-if="!options.items.length">{{t('empty')}}</p></div>
   <footer class="wf-pagination"><span>{{options.total?offset+1:0}}–{{Math.min(offset+50,options.total)}} / {{options.total}}</span><button type="button" :disabled="offset===0" @click="page(-50)">{{t('previous')}}</button><button type="button" :disabled="offset+50>=options.total" @click="page(50)">{{t('next')}}</button></footer>
-  <div class="wf-filters wf-section"><label>{{p('from')}}<input v-model="from" type="date" :min="storeToday(options.timezone)"></label><label>{{p('to')}}<input v-model="to" type="date" :min="from"></label><label>{{p('shift')}}<select v-model="shift"><option value="">—</option><option v-for="item in options.shifts.filter(v=>v.enabled)" :key="item.id" :value="item.id">{{item.name}} · {{restaurantShiftRange(item,english())}}</option></select></label></div>
+  <div class="wf-filters wf-section"><label>{{p('from')}}<DateInput v-model="from" type="date" :min="storeToday(options.timezone)" /></label><label>{{p('to')}}<DateInput v-model="to" type="date" :min="from" /></label><label>{{p('shift')}}<select v-model="shift"><option value="">—</option><option v-for="item in options.shifts.filter(v=>v.enabled)" :key="item.id" :value="item.id">{{item.name}} · {{restaurantShiftRange(item,english())}}</option></select></label></div>
   <fieldset class="wf-weekdays"><legend>{{s('weekdays')}}</legend><label v-for="(name,i) in days()" :key="i" class="wf-check"><input v-model="weekdays" type="checkbox" :value="i+1">{{name}}</label></fieldset>
   <button type="button" :disabled="!selected.length||!shift||!from||!to||!weekdays.length" @click="check">{{s('preview')}}</button>
  </fieldset>

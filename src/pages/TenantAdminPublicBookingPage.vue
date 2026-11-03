@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import {useCustomerAccessText} from '../modules/customers/accessText'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -905,7 +906,7 @@ function apiErrorText(error: unknown): string {
 
           <label v-if="ruleForm.ruleType === 'date_exception'">
             <span>{{ gt('generated.tenant-admin-public-booking.086') }}</span>
-            <input v-model="ruleForm.businessDate" type="date" />
+            <DateInput v-model="ruleForm.businessDate" type="date" />
           </label>
 
           <label>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../../../components/common/DateInput.vue'
 import {computed,onBeforeUnmount,onMounted,reactive,ref,watch} from 'vue'
 import {usePayrollPage} from '../payrollPage'
 import {useCdacText} from '../cdac'
@@ -32,7 +33,7 @@ onMounted(()=>dialog.value?.showModal?.());onBeforeUnmount(()=>dialog.value?.clo
 <template><dialog ref="dialog" class="wf-schedule-dialog wf-bulk-dialog" aria-modal="true" aria-labelledby="wf-cdac-bulk-title" @cancel.prevent="close"><section>
  <header class="wf-toolbar"><h2 id="wf-cdac-bulk-title">{{b('title')}}</h2><button type="button" :disabled="frozen" @click="close">{{t('cancel')}}</button></header>
  <PhaseStatus :loading="loading" :failure="failure"/><p class="wf-hint">{{b('hint')}}</p>
- <fieldset :disabled="frozen||!!result"><div class="wf-grid"><label>{{b('month')}}<input v-model="draft.month" type="month" min="2000-01" max="2099-12" required></label><label>{{d('status')}}<select v-model="draft.status"><option value="applicable">{{d('applicable')}}</option><option value="exempt">{{d('exempt')}}</option><option value="manual">{{d('manual')}}</option></select></label></div>
+ <fieldset :disabled="frozen||!!result"><div class="wf-grid"><label>{{b('month')}}<DateInput v-model="draft.month" type="month" min="2000-01" max="2099-12" required /></label><label>{{d('status')}}<select v-model="draft.status"><option value="applicable">{{d('applicable')}}</option><option value="exempt">{{d('exempt')}}</option><option value="manual">{{d('manual')}}</option></select></label></div>
  <label>{{d('reference')}}<textarea v-model="draft.reference" :required="draft.status!=='applicable'" maxlength="500" rows="2"></textarea></label><p v-if="draft.status==='manual'" class="wf-hint">{{b('manualHint')}}</p>
  <label>{{b('reason')}}<textarea v-model="draft.reason" required maxlength="1000" rows="2"></textarea></label><label>{{b('search')}}<input v-model="search" type="search"></label><div class="wf-toolbar"><button type="button" :disabled="!filtered.length||filtered.length>500" @click="selected=filtered.map(e=>e.id)">{{b('all')}}</button><button type="button" @click="selected=[]">{{b('clear')}}</button><span>{{b('selected')}} {{selected.length}} / 500</span></div>
  <div class="wf-cdac-people"><label v-for="e in filtered" :key="e.id" class="wf-inline"><input type="checkbox" :checked="selected.includes(e.id)" :aria-label="e.name" @change="toggle(e.id,($event.target as HTMLInputElement).checked)">{{e.name}}</label><p v-if="!filtered.length">{{t('empty')}}</p></div>
