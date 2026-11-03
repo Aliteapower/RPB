@@ -28,4 +28,8 @@
 
 生产基线前端e11afaae、后端c06b4b5e、Flyway128|128|0。只发布干净提交归档构建的前端，校验源文件blob与产物哈希。持有发布锁，检查旧版本/index/后端JAR/环境/数据库版本，保留旧静态资源，备份并替换index.html、frontend-version.json和FRONTEND_RELEASE_SHA，不重启后端。失败恢复这三个文件，无数据库回滚。原钱包组件、EmployeeStores及未跟踪资料保持不变。
 
-发布结果待补充；证据目录 `target/customer-query-release-20261103/`。
+已提交、推送并发布最终前端 `92e2bcfeec3b51aaf4c559a9fbadd88de8fb293c`。干净归档4216个blob全部匹配，独立npm ci、415/415相关回归、类型检查和完整构建通过。复核额外覆盖取消查询后迟到的错误，不仅忽略旧顾客结果，也不让旧错误覆盖新查询状态。
+
+最终线上452项静态资源哈希、115项入口页面、5域名版本/TLS、14项匿名401（含钱包/酒存顾客查询及卡券持卡接口）、10项指南PDF校验通过。后端c06b4b5e、JAR/环境哈希、服务运行身份及Flyway128|128|0与发布前一致，本地dist同步最终构建。8个既有钱包组件原始字节指纹未变，EmployeeStores和未跟踪资料未纳入提交。
+
+初次统一发布5d520915后补充旧错误防护；最终验收证据目录 `target/customer-query-final-release-20261103/`，初次证据保留于 `target/customer-query-release-20261103/`。最终备份 `/opt/rpb/backups/20261103-customer-query-final-92e2bcfe-before` 可退回5d520915；如需完整退回本轮优化前e11afaae，使用 `/opt/rpb/backups/20261103-customer-query-5d520915-before` 中的三个索引/版本标记文件。均不恢复数据库或重启后端。
