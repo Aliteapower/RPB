@@ -25,7 +25,15 @@
 .cards-page.cards-staff-page input:not([type=checkbox]),.cards-page.cards-staff-page select,.cards-page.cards-staff-page textarea{min-width:0;min-height:38px;padding:8px 10px;border-radius:7px;border-color:#dce3ed;color:#243650;background:#fff;font-size:13px;line-height:1.5}
 .cards-page.cards-staff-page input::placeholder{color:#8793a5}
 .cards-page.cards-staff-page .cards-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px}
-.cards-page.cards-staff-page .cards-customer-fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cards-page.cards-staff-page .cards-customer-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cards-page.cards-staff-page .cards-selected-customer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin-bottom:12px;border:1px solid #dce3ed;border-radius:8px;background:#f4f7fb}
+.cards-page.cards-staff-page .cards-selected-customer>div:first-child{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-selected-customer span{color:#607189;font-size:12px}
+.cards-page.cards-staff-page .cards-selected-customer .cards-actions{margin:0;flex-shrink:0}
+.cards-page.cards-staff-page .cards-customer-results{margin-bottom:12px;display:grid;gap:6px}
+.cards-page.cards-staff-page .cards-customer-results p{margin:0 0 4px;color:#607189;font-size:12px}
+.cards-page.cards-staff-page .cards-customer-result{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;overflow-wrap:anywhere}
+.cards-page.cards-staff-page .cards-customer-result span{color:#607189}
 .cards-page.cards-staff-page .cards-actions{gap:8px;margin:10px 0}
 .cards-page.cards-staff-page .cards-customer-search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;margin:0 0 14px}
 .cards-page.cards-staff-page .cards-redemption-fields{grid-template-columns:minmax(0,2fr) minmax(90px,1fr);max-width:380px;padding-top:12px;margin-top:12px;border-top:1px solid #edf0f5}
@@ -34,6 +42,7 @@
 .wallet-shell:has(.cards-page.cards-staff-page) .wallet-header{margin-bottom:16px}
 .wallet-shell:has(.cards-page.cards-staff-page) .wallet-utility-bar{margin-bottom:14px}
 @media(max-width:560px){
+ .cards-page.cards-staff-page .cards-selected-customer{flex-wrap:wrap;gap:8px}
  .cards-page.cards-staff-page .cards-workspace-heading{display:block}
  .cards-page.cards-staff-page .cards-workspace-heading h1{font-size:20px;margin-bottom:10px}
  .cards-page.cards-staff-page .cards-heading-actions{justify-content:flex-start;gap:8px 12px}
