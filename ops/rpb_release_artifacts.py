@@ -108,14 +108,18 @@ def snapshot(catalog,ident,release,database=False):
  budget(2*size+estimate)
  dest=catalog.paths.backups/name(ident)
  if dest.exists():raise SafetyError('Backup already exists')
- dest.mkdir(mode=0o700)
- for rel in ['reservation-platform.jar','RELEASE_SHA','FRONTEND_RELEASE_SHA']+[f for f in r['files'] if f.startswith('frontend/')]:
-  target=dest/rel;target.parent.mkdir(parents=True,exist_ok=True);clone(catalog.location(r)/rel,target,catalog)
- if database:
-  with (dest/'database.dump').open('xb') as f:subprocess.run(['sudo','-n','-u','postgres','pg_dump','-Fc','--no-owner','--no-acl','-d','rpb_acceptance'],stdout=f,check=True)
-  from rpb_backup_retention import validate_dump
-  if not validate_dump(dest/'database.dump'):raise SafetyError('Backup dump invalid')
- return catalog.register('backup',ident,r['backend_sha'],r['frontend_sha'])
+ dest.mkdir(mode=0o700);pin=dest/'.rpb-keep';pin.write_text('Unfinished snapshot; inspect before release\n')
+ try:
+  for rel in ['reservation-platform.jar','RELEASE_SHA','FRONTEND_RELEASE_SHA']+[f for f in r['files'] if f.startswith('frontend/')]:
+   target=dest/rel;target.parent.mkdir(parents=True,exist_ok=True);clone(catalog.location(r)/rel,target,catalog)
+  if database:
+   with (dest/'database.dump').open('xb') as f:subprocess.run(['sudo','-n','-u','postgres','pg_dump','-Fc','--no-owner','--no-acl','-d','rpb_acceptance'],stdout=f,check=True)
+   from rpb_backup_retention import validate_dump
+   if not validate_dump(dest/'database.dump'):raise SafetyError('Backup dump invalid')
+  pin.unlink()
+  return catalog.register('backup',ident,r['backend_sha'],r['frontend_sha'])
+ except BaseException:
+  pin.write_text('Incomplete or failed snapshot; inspect before release\n');raise
 
 def main():
  import fcntl

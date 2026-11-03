@@ -71,5 +71,17 @@ class ReleaseArtifactTest(unittest.TestCase):
   p=managed.plan_managed(self.c,{'RELEASE_SHA':'c'*40,'FRONTEND_RELEASE_SHA':'d'*40},active_paths=[str(self.paths.releases/'old')]);self.assertNotIn('release:old',p['delete'])
  def test_success_registration_requires_explicit_rollback(self):
   with self.assertRaises(SafetyError):tools.register_release(self.c,'not-yet-live')
+ def test_failed_database_snapshot_keeps_manual_pin_and_is_not_registered(self):
+  self.release()
+  def dump(*args,**kwargs):kwargs['stdout'].write(b'PGDMPpartial')
+  with patch.object(tools,'APP',self.app),patch.object(tools,'budget',return_value={}),patch.object(tools.subprocess,'check_output',return_value='1024'),patch.object(tools.subprocess,'run',side_effect=dump),patch.object(legacy,'validate_dump',return_value=False),self.assertRaises(SafetyError):tools.snapshot(self.c,'failed','current',database=True)
+  path=self.paths.backups/'failed';self.assertTrue((path/'.rpb-keep').exists());self.assertNotIn('backup:failed',self.c.records());self.assertTrue(legacy.scan(path,self.paths.backups).pin)
+ def test_snapshot_registration_failure_restores_pending_pin(self):
+  self.release();original=self.c.register
+  def register(kind,*args,**kwargs):
+   if kind=='backup':raise SafetyError('Registry unavailable')
+   return original(kind,*args,**kwargs)
+  with patch.object(tools,'APP',self.app),patch.object(tools,'budget',return_value={}),patch.object(self.c,'register',side_effect=register),self.assertRaises(SafetyError):tools.snapshot(self.c,'failed','current')
+  self.assertTrue((self.paths.backups/'failed/.rpb-keep').exists())
 
 if __name__=='__main__':unittest.main()
