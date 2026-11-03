@@ -32,6 +32,21 @@ const response=body=>({ok:true,status:200,json:async()=>body,text:async()=>JSON.
 const storageHome={timezone:'Asia/Singapore',storeName:'QA Store',stores:[],newBusinessEnabled:true,permissions:[],rules:[],categories:[],items:[],applications:[],intents:[],events:[]}
 const allText=root=>[root.text||'',...(root.children||[]).map(allText)].join(' ')
 
+test('general points customer search selects a unique match without opening a wallet and supports clear/change',async()=>{
+ const calls=[];globalThis.fetch=async(url,o)=>{calls.push({url,method:o?.method});return response(url.includes('/customers?')?[{id:'unique-points',displayName:'唯一顾客',phone:'+6581234567'}]:url.endsWith('/points/context')?{...staffContext,program:null}:{balance:5})}
+ const scope=mount(StaffPoints,'staff',reactive({name:'wallet-points',params:{storeId:'A'},query:{},hash:''}),{},['wallet.points.view','wallet.points.grant']);await tick();const input=nodes(scope.root,n=>n.tag==='input'&&n.props.maxlength==='160')[0];input.props['onUpdate:modelValue']('81234567');await tick();await nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-search')[0].props.onSubmit(submitEvent());await tick();assert.equal(scope.workspace.customer.value?.id,'unique-points');assert.ok(!calls.some(c=>c.method==='POST'));const change=nodes(scope.root,n=>n.tag==='button'&&allText(n)==='更换')[0];change.props.onClick();await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.maxlength==='160')[0].value,'81234567');scope.unmount()
+})
+test('unique wallet query reads existing accounts but account creation requires the explicit open button',async()=>{
+ const calls=[];globalThis.fetch=async(url,o)=>{calls.push({url,method:o.method});return response(url.includes('/customers?')?[{id:'new-wallet',displayName:'无钱包顾客',phone:'+6581234567'}]:url.endsWith('/customers/new-wallet/accounts')?[]:url.endsWith('/accounts')?funded:url.endsWith('/topup-offers')?offers:staffContext)}
+ const scope=mount(StaffTopup,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{},hash:''}));await tick();nodes(scope.root,n=>n.tag==='input'&&n.props.maxlength==='160')[0].props['onUpdate:modelValue']('81234567');await tick();await nodes(scope.root,n=>n.tag==='form'&&n.props.class==='wallet-search')[0].props.onSubmit(submitEvent());await tick();assert.equal(scope.workspace.customer.value.id,'new-wallet');assert.equal(scope.workspace.account.value,null);assert.ok(calls.every(c=>c.method==='GET'));await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='开通本店钱包')[0].props.onClick();await tick();assert.equal(calls.filter(c=>c.method==='POST').length,1);assert.ok(calls.find(c=>c.method==='POST').url.endsWith('/accounts'));assert.ok(scope.workspace.account.value);scope.unmount()
+})
+test('phone query leaves multiple matches for a single click and both change and clear reset identity',async()=>{
+ globalThis.fetch=async url=>response(url.includes('/customers?')?[{id:'one',displayName:'顾客甲',phone:'+6581234567'},{id:'two',displayName:'顾客乙',phone:'+6081234567'}]:staffContext);const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}));await tick();const submit=async()=>{nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0].props['onUpdate:modelValue']('81234567');await tick();await nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick()};await submit();assert.equal(scope.workspace.customer.value,null);assert.equal(nodes(scope.root,n=>n.props?.['data-phone-candidate']).length,2);await nodes(scope.root,n=>n.props?.['data-phone-candidate']==='two')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'two');assert.equal(scope.workspace.phoneConfirmedCustomerId.value,'two');assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客').length,0);nodes(scope.root,n=>n.tag==='button'&&allText(n)==='更换')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(scope.workspace.phoneConfirmedCustomerId.value,null);assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0].value,'81234567');await submit();await nodes(scope.root,n=>n.props?.['data-phone-candidate']==='one')[0].props.onClick();await tick();nodes(scope.root,n=>n.tag==='button'&&allText(n)==='清空')[0].props.onClick();await tick();assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0].value,'');assert.equal(scope.workspace.customer.value,null);scope.unmount()
+})
+test('editing a pending phone query invalidates old results and cannot select a late customer',async()=>{
+ let finish;globalThis.fetch=async url=>url.includes('/customers?')?new Promise(r=>finish=r):response(staffContext);const scope=mount(RechargePage,'staff',reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}));await tick();const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0];input.props['onUpdate:modelValue']('81234567');await tick();const lookup=nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick();input.props['onUpdate:modelValue']('91234567');await tick();finish(response([{id:'old',phone:'+6581234567',displayName:'旧结果'}]));await lookup;await tick();assert.equal(scope.workspace.customer.value,null);assert.deepEqual(scope.workspace.customers.value,[]);assert.doesNotMatch(allText(scope.root),/旧结果/);scope.unmount()
+})
+
 before(async()=>{
  globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',documentElement:{},addEventListener(){},removeEventListener(){}})
  globalThis.window={setInterval:()=>1,clearInterval:()=>{},addEventListener(){},removeEventListener(){}}
@@ -64,13 +79,13 @@ test('failed wallet logout shows an error and can be retried without claiming su
  let attempts=0;const home={context:staffContext,accounts:[],pendingBills:[]};globalThis.fetch=async url=>{if(url.endsWith('/wine-storage/home'))return response(storageHome);if(url.endsWith('/customer-auth/logout')){if(++attempts===1)throw new Error('offline');return response({success:true,principal:null})}return response(url.endsWith('/wallet/me')?home:{balance:0})}
  const scope=mount(CustomerHome,'customer',reactive({params:{storeId:'A'},query:{},hash:''}));await tick();await scope.workspace.logout();assert.ok(scope.workspace.home.value);assert.equal(scope.workspace.needsLogin.value,false);assert.equal(scope.workspace.loggingOut.value,false);assert.match(scope.workspace.error.value,/退出失败/);await scope.workspace.logout();assert.equal(attempts,2);assert.equal(scope.workspace.needsLogin.value,true);assert.equal(scope.workspace.home.value,null);scope.unmount()
 })
-test('phone entry requires candidate confirmation before operations and never opens a funding account while searching',async()=>{
+test('phone entry directly selects a unique customer before operations and never opens a funding account while searching',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.includes('/customers?')?[{id:'phone-customer',displayName:'手机号顾客',phone:'+6581234567'}]:staffContext)}
  const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}),scope=mount(RechargePage,'staff',route);await tick()
  assert.equal(nodes(scope.root,n=>n.props?.['data-scan']).length,0);const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0];assert.ok(input)
  input.props['onUpdate:modelValue']('81234567');await tick();await nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick()
- nodes(scope.root,n=>n.props?.['data-phone-candidate']==='phone-customer')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length,0)
- await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value.id,'phone-customer');assert.equal(scope.workspace.identifiedCustomerId.value,null)
+ assert.ok(scope.workspace.customer.value);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length,1)
+ assert.equal(scope.workspace.customer.value.id,'phone-customer');assert.equal(scope.workspace.identifiedCustomerId.value,null)
  assert.ok(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='钱包充值').length);assert.ok(!calls.some(u=>u.endsWith('/accounts')||u.endsWith('/topup-offers')));scope.unmount()
 })
 test('cashier landing directly enters consumption without a second entry click',async()=>{
@@ -80,13 +95,13 @@ test('cashier landing directly enters consumption without a second entry click',
  assert.equal(nodes(scope.root,n=>n.tag==='a'&&String(n.props.href).endsWith('/collect')).length,0);scope.unmount()
 })
 
-test('phone points-only entry confirms explicitly, cannot use short searches, and clears on a new store',async()=>{
+test('phone points-only entry selects a unique customer, cannot use short searches, and clears on a new store',async()=>{
  const calls=[];globalThis.fetch=async url=>{calls.push(url);return response(url.includes('/customers?')?[{id:'phone-points',displayName:'积分顾客',phone:'+6581234567'}]:url.endsWith('/points/context')?{...staffContext,program:null}:{balance:10,version:1})}
  const route=reactive({name:'wallet-topup',params:{storeId:'A'},query:{entry:'phone'},hash:''}),scope=mount(RechargePage,'staff',route,{},['wallet.points.view','wallet.points.grant']);await tick()
  const input=nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0],lookup=()=>nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0]
  input.props['onUpdate:modelValue']('123');await tick();await lookup().props.onSubmit(submitEvent());await tick();assert.ok(!calls.some(u=>u.includes('/customers?')))
- input.props['onUpdate:modelValue']('81234567');await tick();await lookup().props.onSubmit(submitEvent());await tick();assert.equal(scope.workspace.customer.value,null)
- nodes(scope.root,n=>n.props?.['data-phone-candidate']==='phone-points')[0].props.onClick();await tick();await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick()
+ input.props['onUpdate:modelValue']('81234567');await tick();await lookup().props.onSubmit(submitEvent());await tick();assert.equal(scope.workspace.customer.value.id,'phone-points')
+
  await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='积分增减 / 兑换')[0].props.onClick();await tick();assert.match(allText(scope.root),/积分余额: 10/);assert.equal(scope.workspace.phoneConfirmedCustomerId.value,'phone-points');assert.equal(scope.workspace.identifiedCustomerId.value,null)
  assert.ok(!calls.some(u=>u.endsWith('/wallet/context')||u.endsWith('/accounts')||u.endsWith('/topup-offers')))
  route.params.storeId='B';await tick();assert.equal(scope.workspace.customer.value,null);assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)==='积分增减 / 兑换').length,0);scope.unmount()
@@ -702,8 +717,8 @@ for(const mode of ['phone','scan'])for(const kind of ['grants','deductions','red
  if(mode==='phone'){
   nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0].props['onUpdate:modelValue']('81234567');await tick()
   await nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick()
-  nodes(scope.root,n=>n.props?.['data-phone-candidate']==='completed-c')[0].props.onClick();await tick()
-  await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick()
+
+
  }else{await scope.workspace.choose({id:'completed-c',displayName:'上一位',phone:'+6581234567'},false);scope.workspace.identifiedCustomerId.value='completed-c';await tick()}
  nodes(scope.root,n=>n.tag==='select')[0].props['onUpdate:modelValue'](kind);await tick()
  nodes(scope.root,n=>n.tag==='input'&&n.props.type==='number')[0].props['onUpdate:modelValue']('3')
@@ -720,8 +735,8 @@ for(const mode of ['phone','scan'])for(const kind of ['grants','deductions','red
  if(mode==='phone'){
   nodes(scope.root,n=>n.tag==='input'&&n.props.type==='tel')[0].props['onUpdate:modelValue']('81234567');await tick()
   await nodes(scope.root,n=>n.tag==='form'&&String(n.props.class).includes('wallet-phone-search'))[0].props.onSubmit(submitEvent());await tick()
-  nodes(scope.root,n=>n.props?.['data-phone-candidate']==='completed-c')[0].props.onClick();await tick();assert.equal(scope.workspace.customer.value,null)
-  await nodes(scope.root,n=>n.tag==='button'&&allText(n)==='确认选中顾客')[0].props.onClick();await tick()
+  assert.ok(scope.workspace.customer.value)
+
  }else{await scope.workspace.choose({id:'completed-c',displayName:'上一位',phone:'+6581234567'},false);scope.workspace.identifiedCustomerId.value='completed-c';await tick()}
  assert.equal(scope.workspace.customer.value.id,'completed-c');assert.equal(nodes(scope.root,n=>n.tag==='input'&&n.props.type==='number')[0].value,'');assert.equal(nodes(scope.root,n=>n.tag==='button'&&allText(n)===label).length,0);assert.equal(writes,2);scope.unmount()
 })

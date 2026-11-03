@@ -30,7 +30,7 @@ async function change(kind: 'money' | 'points') {
   await router.replace({ query: { ...route.query, kind, scan: undefined } })
   if(kind==='money'&&!previous&&customer.value)await choose(customer.value)
 }
-async function prepareMoney(){if(route.query.kind==='money'&&customer.value&&!busy.value)await choose(customer.value)}
+async function prepareMoney(){if(route.query.kind==='money'&&customer.value&&!busy.value)await choose(customer.value,true,!phoneMode.value)}
 function confirmPhone(id:string){confirmedPhoneId.value=id;void prepareMoney()}
 function resetOperation(){confirmedPhoneId.value=null;void router.replace({query:{...route.query,kind:route.query.kind==='money'||route.query.kind==='points'?route.query.kind:undefined,scan:phoneMode.value?undefined:'1'}})}
 const identified=computed(()=>!!customer.value&&customer.value.id===(phoneMode.value?confirmedPhoneId.value:identifiedCustomerId.value))
