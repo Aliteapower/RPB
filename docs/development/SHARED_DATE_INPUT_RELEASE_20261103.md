@@ -26,4 +26,10 @@ APPROVE。公共控件独立于产品业务，迁移保持原字段事件和数�
 
 ## 发布结果
 
-待干净构建及生产验收完成后补充；证据目录 `target/shared-date-release-20261103/`。
+已提交、推送并发布前端 `6e0187996c6bb65fceb38650dd7f6cc2d8e18a81`。干净归档4213个blob全部匹配，独立npm ci及类型检查/完整构建通过；最终广泛回归1085项，1059通过，26项失败与基线集合一致，日期/酒存专项146项全部通过。
+
+生产452个静态文件哈希、90个入口页面、5域名版本/TLS、11个匿名401接口、10次指南PDF校验通过。后端版本c06b4b5e、JAR/环境哈希、服务运行身份及Flyway128|128|0逐项保持不变。备份 `/opt/rpb/backups/20261103-shared-date-6e018799-before`；发布后可用磁盘219172864字节，未删除任何历史备份。生产验收只读，未创建账号、修改订阅或业务记录。
+
+最终干净构建的酒存报表桌面核验非法日期表单拦截、重置清空且恢复有效，两个日期框均约353.48px，client/scroll均1198。`target/shared-date-preview/report-desktop-final.png` 为最终报表截图；公共组件320px中英文验收见同目录mobile-en.png及其他截图。尝试再次调整报表标签页视口未生效，因此不将名为report-mobile-final的重复桌面截图计入最终移动端证据；移动端结论仅来自公共组件320px及先前报表391/321px实际验证，未声称全部页面逐一视觉验收。
+
+本地dist已同步同一验收构建。证据目录 `target/shared-date-release-20261103/`，含 source-verification、test-result、artifacts、deploy/public-result、生产前后快照；已有钱包文件和EmployeeStores原用户差异保留。
