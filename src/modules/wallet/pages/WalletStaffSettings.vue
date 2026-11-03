@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ScanDeviceSettings from '../../shared-commerce/scanning/ScanDeviceSettings.vue'
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStaffWallet } from '../useStaffWallet'
@@ -13,6 +14,7 @@ watch(() => props.section, () => { saved.value = false })
 async function changed() { await run(async () => { await refresh(); saved.value = true }) }
 </script>
 <template><template v-if="context">
+  <section v-if="section==='overview'" class="wallet-card"><ScanDeviceSettings :store="store"/></section>
   <WalletSettingsPanel v-if="section==='overview'" :store="store" :context="context" :allowed="can('wallet.settings.manage')" />
   <template v-else-if="can('wallet.settings.manage')">
     <section class="wallet-page-heading"><h2>{{ t(`wallet.settingsUi.${section}`) }}</h2><p>{{ t(section==='channels'?'wallet.settingsUi.issuerScope':'wallet.settingsUi.storeScope') }}</p></section>

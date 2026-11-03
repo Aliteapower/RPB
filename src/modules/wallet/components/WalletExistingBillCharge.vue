@@ -8,7 +8,7 @@ import { useWalletTask } from '../useWalletTask'
 import type { Account, Bill, Customer } from '../types'
 import { useChargeComponents } from '../useChargeComponents'
 import WalletAmountSplit from './WalletAmountSplit.vue'
-import WalletQrScanner from './WalletQrScanner.vue'
+import WalletQrScanner from '../../shared-commerce/scanning/StaffQrScanner.vue'
 import WalletChargePreview from './WalletChargePreview.vue'
 const props=defineProps<{store:string;bill:Bill}>(),emit=defineEmits<{paid:[bill:Bill]}>(),{t}=useI18n()
 const {busy,error,run}=useWalletTask(),selected=ref<{account:Account;customer:Customer;code:string}|null>(null)

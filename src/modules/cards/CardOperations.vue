@@ -6,7 +6,7 @@ import {cardApi} from './api'
 import {useCardText} from './text'
 import {displayName,businessDay,cardCode,dateTime} from './format'
 import type {Plan,Holding,Customer,CardRequest,QrCode} from './types'
-import WalletQrScanner from '../wallet/components/WalletQrScanner.vue'
+import WalletQrScanner from '../shared-commerce/scanning/StaffQrScanner.vue'
 import WalletQrDisplay from '../wallet/components/WalletQrDisplay.vue'
 const props=defineProps<{store:string;plans:Plan[];holdings:Holding[];disabled:boolean;can:(permission:string)=>boolean}>(),emit=defineEmits<{changed:[];error:[message:string]}>(),{t,locale}=useCardText()
 const origin=window.location.origin

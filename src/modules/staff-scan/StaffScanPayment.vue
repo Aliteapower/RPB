@@ -8,7 +8,7 @@ import {createPersonalChargeAttempt} from '../wallet/personalCharge'
 import type {Context} from '../wallet/types'
 import WalletAmountKeypad from '../wallet/components/WalletAmountKeypad.vue'
 import {useStaffScanText} from './text'
-const props=defineProps<{store:string;code:string}>(),emit=defineEmits<{'busy-change':[boolean]}>()
+const props=defineProps<{store:string;code:string;continuous?:boolean}>(),emit=defineEmits<{'busy-change':[boolean];completed:[{amount:string;billId:string}]}>()
 const auth=useAuthSessionStore(),router=useRouter(),{t}=useStaffScanText(),actor=auth.user?.accountId??'',context=ref<Context|null>(null),amount=ref(''),description=ref(''),busy=ref(false),pending=ref(false),error=ref('')
 const personal=createPersonalChargeAttempt(props.store,actor,()=>auth.user?.accountId??'')
 let active=true
@@ -24,6 +24,7 @@ async function submit(){
   const result=pending.value?await personal.retry():await personal.scan(props.code,amount.value,description.value)
   pending.value=personal.pending
   if(active&&result.status==='not_submitted')error.value=t('notSubmitted')
+  if(active&&owner.value&&props.continuous&&result.status==='paid'){emit('completed',{amount:amount.value,billId:result.bill.id});return}
   if(active&&owner.value&&result.status!=='not_submitted')await router.push(`/stores/${props.store}/wallet/bills/${result.bill.id}`)
  }catch(e){if(active){error.value=e instanceof Error?e.message:String(e);pending.value=personal.pending}}
  finally{if(active)busy.value=false}

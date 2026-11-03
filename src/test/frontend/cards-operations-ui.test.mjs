@@ -14,10 +14,10 @@ const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))]
 const text=n=>(n.text||'')+(n.children||[]).map(text).join('')
 const tick=async()=>{for(let i=0;i<12;i++)await nextTick()}
 before(async()=>{
- globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.window={location:{origin:'https://test.local'},setInterval:()=>1,clearInterval(){}}
+ globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.window={location:{origin:'https://test.local'},setInterval:()=>1,clearInterval(){},addEventListener(){},removeEventListener(){}}
  globalThis.sessionStorage={getItem:()=>null,removeItem(){}}
  const result=await build({entryPoints:['src/modules/cards/CardOperations.vue'],bundle:true,write:false,format:'esm',platform:'node',external:['vue','pinia','vue-i18n'],plugins:[{name:'vue',setup(b){
- b.onLoad({filter:/WalletQr(Scanner|Display)\.vue$/},()=>({contents:"import {h} from 'vue';export default {props:['purpose'],setup:p=>()=>h('div',{'data-scanner-purpose':p.purpose})}",loader:'js'}))
+ b.onLoad({filter:/(?:WalletQr(?:Scanner|Display)|StaffQrScanner)\.vue$/},()=>({contents:"import {h} from 'vue';export default {props:['purpose'],setup:p=>()=>h('div',{'data-scanner-purpose':p.purpose})}",loader:'js'}))
  b.onLoad({filter:/\.vue$/},async({path})=>{const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return {contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}})
  }}]});await mkdir('target',{recursive:true});await writeFile('target/card-operations-ui-test.mjs',result.outputFiles[0].contents);Page=(await import(pathToFileURL(process.cwd()+'/target/card-operations-ui-test.mjs'))).default
 })

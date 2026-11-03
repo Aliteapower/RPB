@@ -6,7 +6,7 @@ import { useStaffWallet } from '../useStaffWallet'
 import { staffWalletPath } from '../navigation'
 import { createPersonalChargeAttempt,type PersonalChargeResult } from '../personalCharge'
 import { chargePreview } from '../scanCharge'
-import WalletQrScanner from '../components/WalletQrScanner.vue'
+import WalletQrScanner from '../../shared-commerce/scanning/StaffQrScanner.vue'
 import WalletAmountKeypad from '../components/WalletAmountKeypad.vue'
 const emit=defineEmits<{'busy-change':[busy:boolean]}>()
 const {t}=useI18n(),router=useRouter(),workspace=useStaffWallet(),{store,actorId,context,can}=workspace

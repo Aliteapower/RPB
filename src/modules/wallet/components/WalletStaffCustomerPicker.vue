@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { useStaffWallet } from '../useStaffWallet'
 import { money } from '../format'
 import WalletAmountSplit from './WalletAmountSplit.vue'
-import WalletQrScanner from './WalletQrScanner.vue'
+import WalletQrScanner from '../../shared-commerce/scanning/StaffQrScanner.vue'
 import WalletIcon from './WalletIcon.vue'
 const props = withDefaults(defineProps<{ allowScan?: boolean; disabled?: boolean; scanPurpose?: 'topup'; openAccount?: boolean }>(), { allowScan: true, disabled: false, openAccount: true })
 const { t } = useI18n(), route = useRoute(), workspace = useStaffWallet()

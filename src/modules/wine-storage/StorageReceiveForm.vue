@@ -3,16 +3,19 @@ import {computed,ref,onMounted,watch,onUnmounted} from 'vue'
 import {useMerchantStorageText} from './merchant/text'
 import {StorageApiError,type StorageApi} from './api'
 import type {Application,Home,ReceiptLine,Product,StorageLocation} from './types'
+import MerchantBottleScanner from './merchant/MerchantBottleScanner.vue'
+import {addScannedBottle} from './merchant/receiptBarcode'
 import StoragePhotos from './StoragePhotos.vue'
 import StorageReceiptWinePicker from './merchant/StorageReceiptWinePicker.vue'
 import StorageLocationSelect from './merchant/StorageLocationSelect.vue'
 import StorageCustodianSelect from './merchant/StorageCustodianSelect.vue'
-const props=defineProps<{api:StorageApi;application:Application;home:Home;disabled:boolean;direct?:boolean}>(),emit=defineEmits<{saved:[];error:[string];'busy-change':[boolean]}>(),{t}=useMerchantStorageText()
+const props=defineProps<{api:StorageApi;application:Application;home:Home;disabled:boolean;direct?:boolean}>(),emit=defineEmits<{saved:[];error:[string];'busy-change':[boolean]}>(),{t,locale}=useMerchantStorageText()
 const lines=ref<ReceiptLine[]>(props.application.lines.map(l=>({lineId:l.id,productId:l.productId,categoryId:'',nameZh:l.nameZh,nameEn:l.nameEn,quantity:l.quantity,opened:l.opened,source:l.source,ruleId:'',photos:[],note:l.note,location:'',label:''}))),reason=ref(props.direct?t('registrationReason'):''),rulesConfirmed=ref(false),custodianId=ref(''),uploading=ref(0),saving=ref(false)
 const matchesOriginal=computed(()=>lines.value.length===props.application.lines.length&&lines.value.every(line=>props.application.lines.some(original=>original.id===line.lineId&&original.productId===line.productId&&original.quantity===line.quantity&&original.opened===line.opened&&original.source===line.source)))
 const selectedProducts=ref<Product[]>([]),searching=ref(false),searchFailed=ref(false),wineBusy=ref<Record<string,boolean>>({}),wineEditing=ref<Record<string,boolean>>({})
 const lineKeys=new WeakMap<ReceiptLine,string>()
 function lineKey(line:ReceiptLine){let key=lineKeys.get(line);if(!key){key=crypto.randomUUID();lineKeys.set(line,key)}return key}
+const barcodeSearching=ref(false),barcodeError=ref('')
 const wineSearching=computed(()=>Object.values(wineBusy.value).some(Boolean))
 let generation=0,locationGeneration=0
 const locations=ref<StorageLocation[]>([]),locationsLoading=ref(true),locationsFailed=ref(false)
@@ -26,16 +29,21 @@ async function loadProducts(){const own=++generation;searching.value=true;search
  }catch(e){if(own===generation){searchFailed.value=true;selectedProducts.value=[];emit('error',String(e))}}finally{if(own===generation)searching.value=false}}
 onMounted(()=>{void loadProducts();void loadLocations()})
 function choose(line:ReceiptLine,product:Product){if(line.productId!==product.id)line.photos=[];selectedProducts.value=[...selectedProducts.value.filter(p=>p.id!==product.id),product];Object.assign(line,{productId:product.id,categoryId:product.categoryId,nameZh:product.nameZh,nameEn:product.nameEn,ruleId:props.home.rules.find(r=>r.categoryId===product.categoryId)?.id??''});rulesConfirmed.value=false}
+function scannedBottle(product:Product){
+ const rule=props.home.rules.find(r=>r.categoryId===product.categoryId)?.id??''
+ if(!addScannedBottle(lines.value,product,rule,locations.value.find(p=>p.defaultLocation)?.id??null)){barcodeError.value=locale.value.startsWith('en')?'Check the draft: up to 50 lines and 1–10000 bottles per whole-bottle line.':'无法加入，请核对清单：最多 50 行，每行未开瓶酒为 1–10000 瓶。';return}
+ barcodeError.value='';selectedProducts.value=[...selectedProducts.value.filter(p=>p.id!==product.id),product];rulesConfirmed.value=false
+}
 function clearWine(line:ReceiptLine){Object.assign(line,{productId:null,categoryId:'',nameZh:'',nameEn:'',ruleId:'',quantity:1,opened:false,source:'customer',photos:[],note:'',location:'',label:'',storageLocationId:locations.value.find(p=>p.defaultLocation)?.id??null});rulesConfirmed.value=false}
 function patchWine(line:ReceiptLine,patch:Partial<ReceiptLine>){Object.assign(line,patch);if('categoryId'in patch)line.ruleId=props.home.rules.find(r=>r.categoryId===line.categoryId)?.id??'';rulesConfirmed.value=false}
-watch([saving,uploading,searching,locationsLoading,wineSearching],()=>emit('busy-change',saving.value||uploading.value>0||searching.value||locationsLoading.value||wineSearching.value),{flush:'sync'})
+watch([saving,uploading,searching,locationsLoading,wineSearching,barcodeSearching],()=>emit('busy-change',saving.value||uploading.value>0||searching.value||locationsLoading.value||wineSearching.value||barcodeSearching.value),{flush:'sync'})
 onUnmounted(()=>{generation++;locationGeneration++;emit('busy-change',false)})
 function addLine(line:ReceiptLine){const added={...line,lineId:props.direct?crypto.randomUUID():line.lineId,quantity:1,opened:props.direct?false:true,photos:[],label:''};if(props.direct)clearWine(added);lines.value.push(added)}
 function validLine(line:ReceiptLine){return !searching.value&&!wineSearching.value&&!wineEditing.value[lineKey(line)]&&(!line.productId||available.value.some(p=>p.id===line.productId))&&!!line.ruleId&&Number.isInteger(line.quantity)&&line.quantity>=1&&line.quantity<=(line.opened?1:10000)&&!!(line.productId||(line.categoryId&&(line.nameZh.trim()||line.nameEn.trim())))}
 const chosenLines=computed(()=>lines.value.filter(line=>line.productId||((line.nameZh.trim()||line.nameEn.trim())&&line.categoryId)))
 const remainingSteps=computed(()=>{
  const missing:string[]=[]
- if(searching.value||wineSearching.value)missing.push(t('loadingWine'))
+ if(searching.value||wineSearching.value||barcodeSearching.value)missing.push(t('loadingWine'))
  if(locationsLoading.value)missing.push(t('loadingLocations'))
  if(locationsFailed.value)missing.push(t('retryLocations'))
  for(const [i,line] of lines.value.entries()){
@@ -48,15 +56,17 @@ const remainingSteps=computed(()=>{
  if(props.direct&&!rulesConfirmed.value)missing.push(t('confirmReceiptConsent'))
  return missing
 })
-async function submit(){if(props.disabled||saving.value||uploading.value||locationsLoading.value||locationsFailed.value||!reason.value.trim()||(props.direct&&!rulesConfirmed.value)||!lines.value.length||lines.value.some(l=>!validLine(l)))return;saving.value=true;try{await props.api.command(props.direct?'/registrations':`/applications/${props.application.id}/receive`,{lines:lines.value.map(line=>({...line,storageLocationId:line.storageLocationId||null})),reason:reason.value,custodianId:custodianId.value||null,...(props.direct?{customerId:props.application.customerId,rulesConfirmed:rulesConfirmed.value}:{})});emit('saved')}catch(e){emit('error',String(e))}finally{saving.value=false}}
+async function submit(){if(props.disabled||barcodeSearching.value||saving.value||uploading.value||locationsLoading.value||locationsFailed.value||!reason.value.trim()||(props.direct&&!rulesConfirmed.value)||!lines.value.length||lines.value.some(l=>!validLine(l)))return;saving.value=true;try{await props.api.command(props.direct?'/registrations':`/applications/${props.application.id}/receive`,{lines:lines.value.map(line=>({...line,storageLocationId:line.storageLocationId||null})),reason:reason.value,custodianId:custodianId.value||null,...(props.direct?{customerId:props.application.customerId,rulesConfirmed:rulesConfirmed.value}:{})});emit('saved')}catch(e){emit('error',String(e))}finally{saving.value=false}}
 </script>
 <template>
 <form class="storage-panel storage-receive-form" @submit.prevent="submit"><fieldset :disabled="disabled||saving||uploading>0||searching||locationsLoading">
  <header class="storage-receive-header"><h2>{{t(direct?'directRegister':'receive')}}</h2><p>{{t('receiveSimpleHint')}}</p></header>
+ <MerchantBottleScanner v-if="direct" :api="api" :disabled="disabled||saving||uploading>0||searching||locationsLoading||wineSearching" @choose="scannedBottle" @busy="barcodeSearching=$event"/>
+ <p v-if="barcodeError" class="storage-error" role="alert">{{barcodeError}}</p>
  <article v-for="(l,index) in lines" :key="lineKey(l)" class="storage-receive-line">
   <div class="storage-inline"><h3>{{t('wineItem')}} {{index+1}}<template v-if="l.nameZh||l.nameEn"> · {{l.nameZh||l.nameEn}}</template></h3><button v-if="direct?lines.length>1:lines.filter(x=>x.lineId===l.lineId).length>1" type="button" @click="lines.splice(index,1)">{{t('remove')}}</button></div>
   <h3><span class="storage-step">1</span>{{t('chooseWineStep')}}</h3>
-  <StorageReceiptWinePicker :api="api" :line="l" :categories="home.categories" :disabled="disabled||saving||uploading>0" :code="available.find(p=>p.id===l.productId)?.code" @choose="choose(l,$event)" @clear="clearWine(l)" @manual="clearWine(l)" @patch="patchWine(l,$event)" @error="emit('error',String($event))" @busy="wineBusy[lineKey(l)]=$event" @editing="wineEditing[lineKey(l)]=$event"/>
+  <StorageReceiptWinePicker :api="api" :line="l" :categories="home.categories" :disabled="disabled||saving||uploading>0||barcodeSearching" :code="available.find(p=>p.id===l.productId)?.code" @choose="choose(l,$event)" @clear="clearWine(l)" @manual="clearWine(l)" @patch="patchWine(l,$event)" @error="emit('error',String($event))" @busy="wineBusy[lineKey(l)]=$event" @editing="wineEditing[lineKey(l)]=$event"/>
   <p v-if="l.productId&&!searching&&!searchFailed&&!available.some(p=>p.id===l.productId)" class="storage-notice" role="status">{{t('productUnavailable')}}</p>
   <template v-if="l.productId||((l.nameZh.trim()||l.nameEn.trim())&&l.categoryId)">
   <h3><span class="storage-step">2</span>{{t('storageDetailsStep')}}</h3>
@@ -73,5 +83,5 @@ async function submit(){if(props.disabled||saving.value||uploading.value||locati
  <label v-if="direct" class="storage-receive-consent"><input v-model="rulesConfirmed" type="checkbox" required>{{t('registrationConsent')}}</label>
  <p class="cards-muted">{{t('expiryHint')}}</p>
  <p v-if="remainingSteps.length" class="storage-form-guidance" role="status">{{t('stillNeeded')}}{{remainingSteps.join('；')}}</p><p v-else-if="uploading" class="storage-form-guidance" role="status">{{t('uploadingPhotos')}}</p>
- <button class="primary storage-receive-submit" type="submit" :disabled="disabled||saving||uploading>0||locationsLoading||locationsFailed||!lines.length||remainingSteps.length>0">{{t(saving?'saving':direct?'registerSubmit':'receive')}}</button></section>
+ <button class="primary storage-receive-submit" type="submit" :disabled="disabled||barcodeSearching||saving||uploading>0||locationsLoading||locationsFailed||!lines.length||remainingSteps.length>0">{{t(saving?'saving':direct?'registerSubmit':'receive')}}</button></section>
 </fieldset></form></template>

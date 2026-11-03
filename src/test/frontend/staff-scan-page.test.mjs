@@ -9,7 +9,7 @@ import {createPinia} from 'pinia'
 import {createI18n} from 'vue-i18n'
 import {routeLocationKey,routerKey} from 'vue-router'
 let Page,Entry,Recharge,CardOperations,provideStaffWallet,useAuthSessionStore,takeScanHandoff,setScanHandoff
-const original={fetch:globalThis.fetch,window:globalThis.window,sessionStorage:globalThis.sessionStorage,document:globalThis.document,Document:globalThis.Document,ShadowRoot:globalThis.ShadowRoot},mounted=new Set()
+const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage,sessionStorage:globalThis.sessionStorage,document:globalThis.document,Document:globalThis.Document,ShadowRoot:globalThis.ShadowRoot},mounted=new Set()
 const store='20000000-0000-0000-0000-000000000983',code=p=>p+'.'+'B'.repeat(43),permissions=['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create','wallet.cards.view','wallet.cards.redeem','wine_storage.view','wine_storage.receive','wine_storage.deliver']
 const renderer=createRenderer({createElement:tag=>({tag,tagName:tag.toUpperCase(),children:[],props:{},value:'',get options(){return this.children.filter(c=>c.tag==='option')},listeners:{},addEventListener(name,fn){this.listeners[name]=fn},removeEventListener(){},getRootNode(){return globalThis.document}}),createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>n.text=t,patchProp:(n,k,o,v)=>{n.props[k]=v;if(k==='value'){n._value=v;n.value=v}},insert:(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:n=>{const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null}})
 const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))],text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
@@ -17,20 +17,20 @@ const tick=async()=>{for(let i=0;i<24;i++){await Promise.resolve();await nextTic
 const button=(s,label)=>nodes(s.root,n=>n.tag==='button'&&text(n).trim()===label)[0]
 before(async()=>{
  const result=await build({stdin:{contents:"export {default as Recharge} from './src/modules/wallet/pages/WalletStaffRecharge.vue';export {default as CardOperations} from './src/modules/cards/CardOperations.vue';export {provideStaffWallet} from './src/modules/wallet/useStaffWallet';export {setScanHandoff} from './src/modules/staff-scan/handoff';export {default as Page} from './src/modules/staff-scan/StaffScanPage.vue';export {default as Entry} from './src/modules/staff-scan/StaffScanEntry.vue';export {useAuthSessionStore} from './src/stores/authSession';export {takeScanHandoff} from './src/modules/staff-scan/handoff'",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',external:['vue','pinia','vue-i18n','vue-router'],plugins:[{name:'scan-page',setup(b){b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));b.onLoad({filter:/\.vue$/},async({path})=>{
-  if(path.endsWith('WalletQrScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['purpose','disabled'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scanner':p.purpose,disabled:p.disabled,onClick:()=>emit('code',globalThis.staffScanTestCode)},'scan-test')}",loader:'js'}
+  if(path.endsWith('WalletQrScanner.vue')||path.endsWith('StaffQrScanner.vue'))return{contents:"import {h} from 'vue';export default {props:['purpose','disabled'],emits:['code'],setup:(p,{emit})=>()=>h('button',{'data-scanner':p.purpose,disabled:p.disabled,onClick:()=>emit('code',globalThis.staffScanTestCode)},'scan-test')}",loader:'js'}
   if(path.endsWith('WalletAmountKeypad.vue'))return{contents:"import {h} from 'vue';export default {props:['modelValue','disabled'],emits:['update:modelValue'],setup:(p,{emit})=>()=>h('input',{'data-amount':true,disabled:p.disabled,onInput:e=>emit('update:modelValue',e.target.value)})}",loader:'js'}
   if(path.endsWith('WalletLocaleControl.vue')||path.endsWith('WalletIcon.vue')||path.endsWith('WalletQrDisplay.vue'))return{contents:'export default {render(){return null}}',loader:'js'}
   const{descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}
  })}}]});await mkdir('target/staff-scan-page-test',{recursive:true});await writeFile('target/staff-scan-page-test/entry.mjs',result.outputFiles[0].contents)
  ;({Page,Entry,Recharge,CardOperations,provideStaffWallet,useAuthSessionStore,takeScanHandoff,setScanHandoff}=await import(pathToFileURL(process.cwd()+'/target/staff-scan-page-test/entry.mjs').href+'?'+Date.now()))
 })
-beforeEach(()=>{const memory=new Map();globalThis.sessionStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};globalThis.window={location:{origin:'https://booking.test'},setInterval:()=>0,clearInterval(){}};globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',addEventListener(){},removeEventListener(){}})})
+beforeEach(()=>{const memory=new Map();globalThis.localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};globalThis.sessionStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};globalThis.window={location:{origin:'https://booking.test'},setInterval:()=>0,clearInterval(){},addEventListener(){},removeEventListener(){}};globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',addEventListener(){},removeEventListener(){}})})
 afterEach(()=>{for(const app of mounted)app.unmount();mounted.clear();delete globalThis.staffScanTestCode})
 after(()=>{Object.assign(globalThis,original)})
 function mount(respond,perms=permissions,locale='zh-CN',component=Page,props={}){
  const root={children:[]},calls=[],navigation=[],route=reactive({name:component===Recharge?'wallet-topup':'staff-scan',params:{storeId:store},query:{},hash:''})
  globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:options?.body?JSON.parse(options.body):undefined});const data=await respond(url,options);return{ok:data?.httpStatus?false:true,status:data?.httpStatus??200,json:async()=>data}}
- const pinia=createPinia(),auth=useAuthSessionStore(pinia);auth.user={accountId:'cashier',roles:[],storeIds:[store],permissions:perms}
+ const pinia=createPinia(),auth=useAuthSessionStore(pinia);auth.user={tenantId:'tenant',accountId:'cashier',roles:[],storeIds:[store],permissions:perms}
  let workspace;const app=renderer.createApp({setup(){if(component===Recharge)workspace=provideStaffWallet();return()=>h(component,{store,...props})}});app.use(pinia);app.use(createI18n({legacy:false,locale,messages:{}}));app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>navigation.push(target)});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app)
  return{root,calls,navigation,route,auth,get workspace(){return workspace},async scan(value){globalThis.staffScanTestCode=value;nodes(root,n=>n.props?.['data-scanner'])[0].props.onClick();await tick()},unmount(){app.unmount();mounted.delete(app)}}
 }
@@ -100,3 +100,24 @@ test('uncertain pickup blocks another scan and only the original cashier can rec
  assert.equal(s.calls.filter(c=>c.url.endsWith('/identity')).length,1);assert.ok(s.calls.some(c=>c.url.includes('/holdings?customerId=card-owner')));assert.match(text(s.root),/卡顾客/)
  assert.ok(s.calls.every(c=>c.url.endsWith('/identity')||c.url.includes('/holdings?customerId=card-owner')))
  })
+
+const hardware=()=>localStorage.setItem('rpb.scan-device.v1:tenant:'+store,'hardware')
+test('hardware redeems consecutive distinct codes, suppresses completed repeats and retains recent results',async()=>{
+ hardware();const s=mount(()=>({status:'completed',quantity:2}));await s.scan(code('CA'));assert.equal(nodes(s.root,n=>n.props?.['data-scanner']).length,1);await s.scan(code('CA'));assert.equal(s.calls.length,1);await s.scan('CA.'+'C'.repeat(43));assert.equal(s.calls.length,2);assert.match(text(s.root),/最近扫码/);assert.equal(nodes(s.root,n=>n.props?.['data-recent-scan']!==undefined).length,2)
+})
+test('hardware replaces an idle identity but stops receiving when payment editing starts',async()=>{
+ hardware();const s=mount(url=>url.endsWith('/context')?{transactionsEnabled:true,program:{id:'p'}}:{id:'c'+Math.random(),displayName:'Customer'});await s.scan(code('WI'));await s.scan('WI.'+'C'.repeat(43));assert.equal(s.calls.length,2);button(s,'消费收款').props.onClick();await tick();assert.equal(nodes(s.root,n=>n.props?.['data-scanner']).length,0)
+})
+test('hardware errors can retry but pending and non-completed results stop automatic scans',async()=>{
+ hardware();const s=mount(()=>({httpStatus:409,code:'USED',message:'expired'}));await s.scan(code('CA'));assert.equal(nodes(s.root,n=>n.props?.['data-scanner']).length,1);s.unmount()
+ const pending=mount(()=>{throw Error('lost')});await pending.scan(code('WS'));assert.equal(nodes(pending.root,n=>n.props?.['data-scanner']).length,0);pending.unmount();sessionStorage.removeItem('rpb.storage.pending:false:'+store)
+ const incomplete=mount(()=>({status:'pending',quantity:1}));await incomplete.scan(code('CA'));assert.equal(nodes(incomplete.root,n=>n.props?.['data-scanner']).length,0)
+})
+
+test('hardware paid consumption clears customer and amount and receives the next customer without navigation',async()=>{
+ hardware();const s=mount(url=>url.endsWith('/context')?{transactionsEnabled:true,program:{id:'program'}}:url.endsWith('/personal-scan-charges')?{status:'paid',bill:{id:'paid-bill'}}:{id:'customer',displayName:'Previous customer'});await s.scan(code('WI'));button(s,'消费收款').props.onClick();await tick();nodes(s.root,n=>n.props?.['data-amount'])[0].props.onInput({target:{value:'8.50'}});await tick();await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();assert.equal(s.navigation.length,0);assert.equal(nodes(s.root,n=>n.props?.['data-scanner']).length,1);assert.equal(nodes(s.root,n=>n.props?.['data-amount']).length,0);assert.doesNotMatch(text(s.root),/Previous customer/);assert.match(text(s.root),/消费已付款.*8.50/)
+})
+
+test('hardware confirmation-required payment keeps the original customer confirmation route',async()=>{
+ hardware();const s=mount(url=>url.endsWith('/context')?{transactionsEnabled:true,program:{id:'program'}}:url.endsWith('/personal-scan-charges')?{status:'confirmation_required',bill:{id:'confirm-bill'}}:{id:'customer'});await s.scan(code('WI'));button(s,'消费收款').props.onClick();await tick();nodes(s.root,n=>n.props?.['data-amount'])[0].props.onInput({target:{value:'8.50'}});await tick();await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();assert.equal(s.navigation.at(-1),`/stores/${store}/wallet/bills/confirm-bill`)
+})

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref,watch} from 'vue'
-import ProductBarcodeScanner from '../../shared-commerce/barcode/ProductBarcodeScanner.vue'
+import ProductBarcodeScanner from '../../shared-commerce/scanning/StaffBarcodeScanner.vue'
 import {useCatalogText} from '../text'
 const props=defineProps<{modelValue:string[];disabled:boolean;readOnly:boolean}>(),emit=defineEmits<{'update:modelValue':[string[]]}>(),{t}=useCatalogText(),scanning=ref(false)
 function update(value:string){emit('update:modelValue',value?[value]:[])}
