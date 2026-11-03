@@ -129,7 +129,7 @@ before(async()=>{
 after(()=>{globalThis.window=originalWindow;globalThis.fetch=originalFetch;globalThis.sessionStorage=originalStorage;globalThis.document=originalDocument;globalThis.Document=originalDocumentClass;globalThis.ShadowRoot=originalShadowRoot})
 function mount(component,customer,locale='zh-CN',data=home,respond,lists={}){
  const calls=[],navigation=[],root={children:[]};globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:typeof options?.body==='string'?JSON.parse(options.body):undefined});const response={ok:true,status:200,json:async()=>url.includes('/wine-storage/reports')?(lists.reportRespond?lists.reportRespond(url):{items:[],summary:{recordCount:0,completedCount:0,bottleCount:0},page:0,size:20,hasMore:false}):url.endsWith('/locations')&&(!options?.method||options.method==='GET')?(lists.locations??[{id:'front-desk',name:'前台寄存处',defaultLocation:true,version:0}]):url.endsWith('/pending-applications')?[...(lists.pending??[])]:url.includes('/custodians')&&(!options?.method||options.method==='GET')?[...(lists.people??[])]:respond?respond(url,options):url.includes('/products')?[]:data};response.text=async()=>JSON.stringify(await response.json());response.arrayBuffer=async()=>new Uint8Array([1]).buffer;return response}
- const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target);if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,navigation,i18n,route,unmount:()=>{app.unmount();mounted.delete(app)}}
+ const route=reactive({params:{storeId:'A'},hash:'',query:lists.query??{}});const app=renderer.createApp({render:()=>h(component,{customer,store:'A',...lists.props})});const pinia=createPinia();app.use(pinia);if(lists.actor)useAuthSessionStore(pinia).user=lists.actor;const i18n=createI18n({legacy:false,locale,messages:{}});app.use(i18n);app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>{navigation.push(target);if(target?.query)route.query=target.query},replace:async target=>{if(target?.hash!==undefined)route.hash=target.hash}});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app);return{root,calls,navigation,i18n,route,auth:useAuthSessionStore(pinia),unmount:()=>{app.unmount();mounted.delete(app)}}
 }
 test('customer storage only links back to a commercially enabled wallet and tracks activation and closure',async()=>{
  const s=mount(CustomerPage,true,'zh-CN',{...home,walletEnabled:false});await tick()
@@ -1065,4 +1065,24 @@ test('email settings distinguishes first setup, tenant sharing and legacy confli
   if(scope==='unconfigured')assert.match(copy,locale==='zh-CN'?/尚未配置/:/Not configured/)
   assert.equal(s.calls.length,1);assert.ok(!s.calls[0].url.includes('public-booking'));s.unmount()
  }
+})
+
+
+test('merchant and employee can sign out directly from storage settings without business mutations',async()=>{
+ for(const [locale,roles] of [['zh-CN',['tenant_admin']],['en-SG',['staff']]]){
+  const actor={accountId:'staff-session',roles,permissions:home.permissions,storeIds:['A']};let finish
+  const s=mount(StaffPage,false,locale,home,(url)=>url==='/api/v1/auth/logout'?new Promise(resolve=>finish=resolve):url.includes('/products')?[]:home,{actor});await tick()
+  button(s.root,locale==='zh-CN'?'设置':'Settings').props.onClick();await tick()
+  const exit=button(s.root,locale==='zh-CN'?'退出登录':'Sign out');assert.ok(exit);const action=exit.props.onClick
+  const first=action();await tick();assert.equal(exit.props.disabled,true);await action();assert.equal(s.calls.filter(c=>c.url==='/api/v1/auth/logout').length,1)
+  finish({success:true});await first;await tick();assert.equal(s.auth.user,null);assert.deepEqual(s.navigation.at(-1),{name:'login'});assert.ok(s.calls.filter(c=>c.method!=='GET').every(c=>c.url==='/api/v1/auth/logout'));s.unmount()
+ }
+})
+
+
+test('storage settings handles logout failure without a false login navigation or repeated submission',async()=>{
+ let fail=true
+ const s=mount(StaffPage,false,'zh-CN',home,url=>{if(url==='/api/v1/auth/logout'){if(fail)throw new Error('offline');return {success:true}}return url.includes('/products')?[]:home},{actor:{accountId:'employee',roles:['staff'],permissions:home.permissions,storeIds:['A']},query:{task:'settings'}});await tick()
+ await button(s.root,'退出登录').props.onClick();await tick();assert.equal(s.navigation.length,0);assert.equal(s.auth.user,null);assert.ok(nodes(s.root,n=>n.props?.role==='alert').length);assert.equal(button(s.root,'退出登录').props.disabled,false)
+ fail=false;await button(s.root,'退出登录').props.onClick();await tick();assert.deepEqual(s.navigation.at(-1),{name:'login'});assert.equal(s.calls.filter(c=>c.url==='/api/v1/auth/logout').length,2);s.unmount()
 })

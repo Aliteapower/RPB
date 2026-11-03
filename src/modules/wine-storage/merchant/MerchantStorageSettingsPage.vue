@@ -3,6 +3,7 @@ import StorageGuide from '../guide/StorageGuide.vue'
 import StorageGuideAccess from '../guide/StorageGuideAccess.vue'
 import CustomerAccessLinks from '../../customers/CustomerAccessLinks.vue'
 import {computed,ref,watch} from 'vue'
+import {useRouter} from 'vue-router'
 import CatalogPage from '../../catalog/CatalogPage.vue'
 import type {Home} from '../types'
 import type {StorageApi} from '../api'
@@ -14,7 +15,15 @@ import MerchantStorageSettings from './MerchantStorageSettings.vue'
 import {useMerchantStorageText} from './text'
 const props=defineProps<{store:string;home:Home;api:StorageApi;disabled:boolean}>(),emit=defineEmits<{back:[];refresh:[];command:[()=>Promise<unknown>];error:[unknown];'busy-change':[boolean]}>()
 const auth=useAuthSessionStore(),{t,locale}=useMerchantStorageText(),x=(zh:string,en:string)=>locale.value.startsWith('en')?en:zh,can=(key:string)=>props.home.permissions.includes('wine_storage.'+key)
-const managingProducts=ref(false),readingGuide=ref(false)
+const managingProducts=ref(false),readingGuide=ref(false),loggingOut=ref(false)
+const router=useRouter()
+async function signOut(){
+ if(props.disabled||loggingOut.value)return
+ loggingOut.value=true;emit('busy-change',true)
+ try{await auth.logoutCurrentUser();await router.push({name:'login'})}
+ catch(error){emit('error',error)}
+ finally{loggingOut.value=false;emit('busy-change',false)}
+}
 const canCatalog=computed(()=>auth.user?.roles.includes('tenant_admin')===true&&auth.user?.permissions.includes('catalog.view')===true&&auth.user?.storeIds.includes(props.store)===true)
 watch(canCatalog,value=>{if(!value)managingProducts.value=false})
 </script>
@@ -26,4 +35,4 @@ watch(canCatalog,value=>{if(!value)managingProducts.value=false})
 <MerchantStorageLocations v-if="home.newBusinessEnabled&&can('rules.manage')&&auth.user?.roles.includes('tenant_admin')" :api="api" :disabled="disabled" @error="emit('error',$event)" @busy-change="emit('busy-change',$event)"/>
 <MerchantStorageCustodians v-if="home.newBusinessEnabled&&can('custodians.manage')" :api="api" :disabled="disabled" @error="emit('error',$event)" @busy-change="emit('busy-change',$event)"/>
 <MerchantStorageSettings class="storage-rule-settings" :home="home" :api="api" :disabled="disabled" :can-manage="home.newBusinessEnabled&&can('rules.manage')" @command="emit('command',$event)"/>
-<CustomerAccessLinks :store="store" source="storage" :disabled="disabled"/></div></template></section></template>
+<CustomerAccessLinks :store="store" source="storage" :disabled="disabled"/><section class="storage-panel storage-settings-product-entry"><div><h3>{{x('账号','Account')}}</h3><p class="cards-muted">{{x('退出当前账号，返回登录页。','Sign out of this account and return to sign in.')}}</p></div><button type="button" :disabled="disabled||loggingOut" @click="signOut">{{loggingOut?x('正在退出…','Signing out…'):x('退出登录','Sign out')}}</button></section></div></template></section></template>
