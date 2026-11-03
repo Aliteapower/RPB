@@ -2,7 +2,7 @@
 
 GET `/api/v1/stores/{storeId}/wallet/cards/reports`
 
-Staff `wallet.cards.view` through existing CardAccess/App Gate and tenant/store scope. Historic access remains available when new transactions are disabled. No new permission or migration. Existing `/entries` and `/summary` remain compatible.
+Staff `wallet.cards.view` through existing CardAccess and tenant/store scope. As with existing record APIs, authorized historical reads do not require an active subscription; workspace entry and new transactions retain their separate App Gate checks. No new permission or migration. Existing `/entries` and `/summary` remain compatible.
 
 Parameters: required ISO `from`, `to`; optional `section=business|expiry` (default business), `query` (literal customer name/phone, max120), `planId` UUID, `groupBy=plan|customer` (default plan), `kind=all|redeem|stamp|grant|refund|reversal` (default all), `page` zero-based (0..100000), `size` (1..100, default25). Inclusive date range max366 days. Invalid input: existing CARD_INVALID/400. Authentication/denial: existing 401/403. Expiry section accepts kind=all only.
 

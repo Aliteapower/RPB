@@ -16,4 +16,4 @@
 
 失败时成对恢复本次备份中的旧JAR、index.html、frontend-version.json和版本标记，再启动原后端；不恢复数据库覆盖新业务。没有schema回退步骤。生产验收只调用必要查询和权限保护接口，不发卡、不消费、不冲正、不改真实订阅。
 
-本地实现与测试证据见docs/development/CARD_BUSINESS_REPORT_IMPLEMENTATION_20261103.md；生产发布结果另行记录。
+本地实现与测试证据见docs/development/CARD_BUSINESS_REPORT_IMPLEMENTATION_20261103.md。已配对发布功能版本3abca5b1，13项生产QA认证检查及453项静态制品核验通过；完整发布结果见docs/development/CARD_BUSINESS_REPORT_PRODUCTION_RELEASE_20261103.md。
