@@ -15,3 +15,11 @@
 ## 审查与发布
 
 Code review APPROVE，前端发布 GO。从干净提交重新核对源码和构建；发布持有互斥锁、旧前端/后端版本及文件哈希检查，保留旧静态资源，备份索引、版本和前端标记。失败回退上述三项即可，后端、数据库及其他服务不变。证据 target/storage-settings-receipt-release-20261103/。
+
+## 生产结果
+
+前端功能提交 `510afd318421f7a13823d5c24714cf1ae943f7e3` 已推送并上线，包含 c6d607ab 的设置退出按钮。干净 Git 归档核对 4,204 个文件对象；干净前端重跑 146 项测试、类型检查及完整构建通过，1 项后端照片策略测试通过。450 个发布文件哈希一致；5 域名 90 项页面、5 项版本与 TLS 检查、11 项匿名拒绝、10 项指南 PDF 检查通过。没有代真实用户执行退出、存酒、上传或其他业务写入。
+
+后端保持 `c06b4b5e423a7c815b95a2e0ff42e6d0da15ff9e`，JAR 哈希 `e73db53fb6d59f60c5cb658e44a9e155ca15bc14d23dbe8a1db7b59d4d1da27a`；未重启后端，MainPID=528159，NRestarts=0，active，InvocationID=`36ef6e73ef994fef885fec9e619d2947`。无数据库、依赖、权限或运行环境修改；44 个相邻钱包组件与 EmployeeStores 文件字节指纹不变，其他未跟踪资料原样保留。
+
+备份 `/opt/rpb/backups/20261103-storage-settings-receipt-510afd31-before`，发布目录 `/opt/rpb/releases/20261103-storage-settings-receipt-510afd31`，仅新增静态资源并替换入口/版本/前端标记，旧资源保留。发布后可用空间 237,162,496 字节，无既有备份或资料清理。发布 GO，未触发回退；真实手机及认证页面视觉验收仍未完成。
