@@ -20,4 +20,6 @@ Code review：APPROVE；操作状态仍归卡业务组件所有，复用已有AP
 
 以前端6e018799为生产基线，仅从干净提交归档构建前端；核对后端c06b4b5e、JAR/环境哈希、Flyway128|128|0及服务身份不变。增量资源发布保留旧文件，备份index.html、frontend-version.json及FRONTEND_RELEASE_SHA，失败恢复三个文件，不重启后端、不回滚数据库。生产验收仅读取版本、页面、资源及匿名权限，不创建或修改真实业务数据。
 
-发布结果待补充，证据目录 `target/cards-customer-release-20261103/`。
+已提交、推送并发布前端 `e11afaae950a4e4b87d5243b4160ef6f81a7e5ae`。干净归档4214个blob逐项匹配；独立npm ci、38/38卡业务测试、类型检查和完整构建通过。生产452项资源哈希、100项入口页面（含员工及顾客卡入口）、5域名版本/TLS、11项匿名401和10项PDF校验通过。
+
+生产后端c06b4b5e、JAR/环境哈希、所有服务运行身份及Flyway128|128|0与发布前完全一致。回退目录 `/opt/rpb/backups/20261103-cards-customer-e11afaae-before`。本地dist已同步相同发布构建，原有未提交资料和代码保留。最终UI证据包括selected-desktop.png、empty-mobile.png、selected-narrow-en.png；证据目录 `target/cards-customer-release-20261103/`。
