@@ -6,4 +6,4 @@ root登记的精确清单支持新版备份JSON和版本指南PDF，不扩大历
 
 无业务代码、API、数据库迁移、依赖或业务权限变化。自动服务仅新增releases/staging写权限，ProtectHome维持只读，生产app/frontend/media、数据库、日志和未知资料不进入新清理范围。手动及systemd dry-run核验后才启用。脚本/单元回退独立于应用，保留登记库及证据；不恢复数据库或删除未知文件。
 
-最终Linux隔离文件夹55项测试全部通过，包括旧备份回归、真实临时文件删选、相同后端不同前端版本、回退引用、重复上传原件保护、路径/权限/符号链接、变更中止、锁、dry-run开关和重复执行。测试未操作生产业务数据。生产结果另记。操作规范见docs/development/ARTIFACT_RETENTION_OPERATIONS.md。
+最终Linux隔离文件夹57项测试全部通过，包括旧备份回归、真实临时文件删选、相同后端不同前端版本、回退引用、重复上传原件保护、路径/权限/符号链接、变更中止、锁、dry-run开关、重复执行及失败快照保留。测试未操作生产业务数据。生产已启用功能版本9634f036，每天03:30新加坡时间执行；两次dry-run及首次实际执行均为0删除，当前版本、回退点及未知内容完整保留。生产结果见docs/development/ARTIFACT_RETENTION_PRODUCTION_20261103.md，操作规范见docs/development/ARTIFACT_RETENTION_OPERATIONS.md。
