@@ -1086,3 +1086,19 @@ test('storage settings handles logout failure without a false login navigation o
  await button(s.root,'退出登录').props.onClick();await tick();assert.equal(s.navigation.length,0);assert.equal(s.auth.user,null);assert.ok(nodes(s.root,n=>n.props?.role==='alert').length);assert.equal(button(s.root,'退出登录').props.disabled,false)
  fail=false;await button(s.root,'退出登录').props.onClick();await tick();assert.deepEqual(s.navigation.at(-1),{name:'login'});assert.equal(s.calls.filter(c=>c.url==='/api/v1/auth/logout').length,2);s.unmount()
 })
+
+
+test('receipt empty search keeps exactly one new wine action in the top toolbar',async()=>{
+ const s=receiptMount('zh-CN',url=>url.includes('/product-options?')?{items:[],hasMore:false}:receiptHome);await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='＋ 新增酒品').length,1)
+ button(s.root,'＋ 新增酒品').props.onClick();await tick();assert.match(text(s.root),/中文酒名/);s.unmount()
+})
+
+test('receipt submits existing and newly entered wines without any uploaded photos',async()=>{
+ for(const manual of [false,true]){
+  const s=receiptMount();await tick()
+  if(manual){button(s.root,'＋ 新增酒品').props.onClick();await tick();const label=nodes(s.root,n=>n.tag==='label'&&text(n).includes('中文酒名'))[0];nodes(label,n=>n.tag==='input')[0].props.onInput({target:{value:'无图寄存白酒'}});const category=nodes(s.root,n=>n.tag==='select'&&n.props.required!==undefined)[0];category.props.onChange({target:{value:'category'}})}else chooseReceiptWine(s.root)
+  await tick();setReceiptConsent(s.root);await tick();assert.equal(button(s.root,'确认实物已收存').props.disabled,false)
+  await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.deepEqual(writes[0].body.lines[0].photos,[]);assert.equal(writes[0].body.rulesConfirmed,true);assert.equal(s.calls.some(c=>c.url.endsWith('/photos')),false);s.unmount()
+ }
+})
