@@ -14,6 +14,10 @@ public final class BulkScheduleDtos {
     public record Item(UUID employeeId,String employeeNo,String employeeName,LocalDate date,String status,String reason) {}
     public record Preview(String fingerprint,int employeeCount,int total,int ready,int existing,int conflicts,List<Item> items,String timezone) {}
     public record Result(UUID commandId,int created,int existing,int conflicts,List<UUID> scheduleIds) {}
+    public record DailyRoster(LocalDate date,long people,List<RosterStore> stores) {}
+    public record RosterStore(UUID id,String name,List<RosterEmployee> employees) {}
+    public record RosterEmployee(UUID id,String name,String employeeNo,String position,List<RosterSegment> segments) {}
+    public record RosterSegment(UUID id,String shiftName,Instant startAt,Instant endAt,String timezone) {}
     public record ShiftCount(UUID shiftId,String name,long people,long personDays) {}
     public record ShiftDayCount(UUID shiftId,LocalDate date,long people) {}
     public record DailyTotal(LocalDate date,long people) {}

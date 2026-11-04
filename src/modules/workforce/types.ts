@@ -22,7 +22,7 @@ export interface BreakSummary {ruleId:string;name:string;mode:'window'|'actual'|
 export interface Session {id:string;scheduleId:string;employeeId:string;storeId:string;inAt:string;outAt:string|null;breakStartedAt:string|null;breakStartedRuleId?:string|null;breaks:BreakInterval[];overrideBreak:boolean;version:number;clockPolicy?:ClockPolicy|null}
 export interface Attendance {exempt?:boolean;schedule:Schedule;session:Session|null;grossSeconds:number|null;breakSeconds:number|null;workSeconds:number|null;anomalies:string[];breakSummary?:BreakSummary[]}
 export type ClockAction='IN'|'BREAK_START'|'BREAK_END'|'OUT'
-export interface ClockResult {schedules:Schedule[];active:Session|null;attendance:Attendance|null;actions:ClockAction[];serverTime:string;policy?:ClockPolicy|null;policies?:Record<string,ClockPolicy|null>}
+export interface ClockResult {schedules:Schedule[];active:Session|null;attendance:Attendance|null;actions:ClockAction[];serverTime:string;policy?:ClockPolicy|null;policies?:Record<string,ClockPolicy|null>;transferStores?:Record<string,Option>}
 export interface Correction {id:string;scheduleId:string;employeeId:string;employeeName:string;basedSessionVersion:number;inAt:string;outAt:string;breaks:BreakInterval[];overrideBreak:boolean;reason:string;status:'pending'|'approved'|'rejected'|'withdrawn';applicantId:string;reviewerId:string|null;reviewNote:string|null;version:number;createdAt:string}
-export interface AttendanceDetail {attendance:Attendance;events:{id:string;action:string;occurredAt:string;actorId:string;clockMode?:WorkMode|null;location?:Partial<ClockLocation>|null}[];corrections:Correction[]}
+export interface AttendanceDetail {attendance:Attendance;transferStore?:Option;events:{id:string;action:string;occurredAt:string;actorId:string;clockMode?:WorkMode|null;location?:Partial<ClockLocation>|null}[];corrections:Correction[]}
 

@@ -59,6 +59,95 @@ public class SchedulingRepository {
         where workforce_schedules.tenant_id=excluded.tenant_id and workforce_schedules.store_id=excluded.store_id and workforce_schedules.employee_id=excluded.employee_id
         """,s.id(),tenant,store,s.employeeId(),s.companyId(),s.shiftId(),s.workDate(),Timestamp.from(s.startAt()),Timestamp.from(s.endAt()),s.timezone(),json.write(s.shift()),s.status(),s.version());if(changed!=1)throw com.rpb.reservation.workforce.domain.WorkforceException.conflict();}
     public List<Schedule> copySource(UUID tenant,UUID store,LocalDate from){return jdbc.query("select s.*,e.name,e.employee_no from workforce_schedules s join workforce_employees e on e.id=s.employee_id and e.tenant_id=s.tenant_id where s.tenant_id=? and s.store_id=? and s.work_date between ? and ? and s.status='scheduled' and s.deleted_at is null order by s.start_at,s.id limit 101",this::schedule,tenant,store,from,from.plusDays(6));}
+    public String storeName(UUID tenant,UUID store){
+        return jdbc.queryForObject("select display_name from stores where tenant_id=? and id=?",String.class,tenant,store);
+    }
+    public List<Schedule> ownAttendance(UUID tenant,UUID anchor,LocalDate from,LocalDate to,UUID employee,int limit,int offset){
+        return jdbc.query("""
+            select s.*,e.name,e.employee_no from workforce_schedules s
+            join workforce_employees e on e.id=s.employee_id and e.tenant_id=s.tenant_id
+            left join workforce_schedule_transfers t on t.tenant_id=s.tenant_id and t.target_schedule_id=s.id
+            where s.tenant_id=? and (s.store_id=? or t.anchor_store_id=?) and s.employee_id=?
+                and s.deleted_at is null and s.work_date between ? and ?
+            order by s.work_date,s.start_at,s.id limit ? offset ?
+            """,this::schedule,tenant,anchor,anchor,employee,from,to,limit,offset);
+    }
+    public UUID companyOn(UUID tenant,UUID employee,LocalDate date){
+        return jdbc.query("select company_id from workforce_company_history where tenant_id=? and employee_id=? and effective_date<=? order by effective_date desc,version desc limit 1",
+            (r,n)->r.getObject(1,UUID.class),tenant,employee,date).stream().findFirst().orElse(null);
+    }
+    public UUID storeCompany(UUID tenant,UUID store){
+        return jdbc.query("select operating_entity_id from stores where tenant_id=? and id=? and status='active' and deleted_at is null",
+            (r,n)->r.getObject(1,UUID.class),tenant,store).stream().findFirst().orElse(null);
+    }
+    public Optional<UUID> transferAnchor(UUID tenant,UUID schedule){
+        return jdbc.queryForList("select anchor_store_id from workforce_schedule_transfers where tenant_id=? and target_schedule_id=?",
+            UUID.class,tenant,schedule).stream().findFirst();
+    }
+    public boolean transferLocked(UUID tenant,UUID schedule){
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from workforce_schedule_transfers
+                where tenant_id=? and (source_schedule_id=? or target_schedule_id=?))
+            """,Boolean.class,tenant,schedule,schedule));
+    }
+    public boolean transferredOut(UUID tenant,UUID schedule){
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_schedule_transfers where tenant_id=? and source_schedule_id=?)",
+            Boolean.class,tenant,schedule));
+    }
+    public record TransferDay(UUID employee,UUID company,LocalDate date){}
+    public List<TransferDay> transferDays(UUID tenant,UUID store,LocalDate from,LocalDate to){
+        return jdbc.query("""
+            select distinct s.employee_id,s.company_id,s.work_date
+            from workforce_schedule_transfers t
+            join workforce_schedules s on s.tenant_id=t.tenant_id and s.id=t.source_schedule_id
+            join workforce_schedules n on n.tenant_id=t.tenant_id and n.id=t.target_schedule_id
+            where t.tenant_id=? and (s.store_id=? or n.store_id=?) and s.work_date between ? and ?
+            """,(r,n)->new TransferDay(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,LocalDate.class)),
+            tenant,store,store,from,to);
+    }
+    public Optional<Instant> transferClockNotBefore(UUID tenant,UUID schedule){
+        return jdbc.query("""
+            select clock_not_before from workforce_schedule_transfers
+            where tenant_id=? and target_schedule_id=? and clock_not_before is not null
+            """,(r,n)->r.getTimestamp(1).toInstant(),tenant,schedule).stream().findFirst();
+    }
+    public void linkTransfer(UUID tenant,UUID source,UUID target,UUID anchor,Instant notBefore){
+        jdbc.update("insert into workforce_schedule_transfers(tenant_id,source_schedule_id,target_schedule_id,anchor_store_id,clock_not_before) values(?,?,?,?,?)",
+            tenant,source,target,anchor,notBefore==null?null:Timestamp.from(notBefore));
+    }
+    public List<ScopedSchedule> incomingTransfers(UUID tenant,UUID anchor,UUID employee,Instant now){
+        return jdbc.query("""
+            select s.*,e.name,e.employee_no
+            from workforce_schedule_transfers t join workforce_schedules s on s.tenant_id=t.tenant_id and s.id=t.target_schedule_id
+            join workforce_employees e on e.tenant_id=s.tenant_id and e.id=s.employee_id
+            where t.tenant_id=? and t.anchor_store_id=? and s.employee_id=?
+                and s.deleted_at is null and s.status='scheduled' and s.end_at>? and s.start_at<=?::timestamptz+interval '12 hours'
+            order by s.start_at,s.id
+            """,(r,n)->new ScopedSchedule(r.getObject("store_id",UUID.class),schedule(r,n)),tenant,anchor,employee,Timestamp.from(now),Timestamp.from(now));
+    }
+    public boolean transferProtected(UUID tenant,Schedule source,ShiftTiming.Interval target){
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from workforce_corrections where tenant_id=? and schedule_id=? and status in ('pending','approved'))
+                or exists(select 1 from workforce_leaves where tenant_id=? and employee_id=? and status in ('pending','approved','cancel_requested')
+                    and (schedule_id=? or (start_at<? and end_at>?) or (start_at<? and end_at>?)))
+                or exists(select 1 from workforce_approvals where tenant_id=? and schedule_id=?)
+                or exists(select 1 from workforce_attendance_exceptions where tenant_id=? and employee_id=?
+                    and status in ('pending','approved','cancel_requested')
+                    and ((start_at<? and end_at>?) or (start_at<? and end_at>?)))
+                or exists(select 1 from workforce_attendance_days d
+                    join workforce_attendance_day_versions v on v.tenant_id=d.tenant_id and v.day_id=d.id
+                    where d.tenant_id=? and d.company_id=? and d.employee_id=? and d.work_date=?
+                        and v.state in ('human_valid','system_valid'))
+                or exists(select 1 from workforce_pay_batches where tenant_id=? and company_id=?
+                    and period_month=? and status in ('confirmed','published'))
+                or exists(select 1 from workforce_pay_segment_days where tenant_id=? and company_id=? and employee_id=? and covered_date=?)
+            """,Boolean.class,tenant,source.id(),tenant,source.employeeId(),source.id(),
+            Timestamp.from(target.end()),Timestamp.from(target.start()),Timestamp.from(source.endAt()),Timestamp.from(source.startAt()),tenant,source.id(),
+            tenant,source.employeeId(),Timestamp.from(source.endAt()),Timestamp.from(source.startAt()),
+            Timestamp.from(target.end()),Timestamp.from(target.start()),
+            tenant,source.companyId(),source.employeeId(),source.workDate(),tenant,source.companyId(),source.workDate().withDayOfMonth(1),
+            tenant,source.companyId(),source.employeeId(),source.workDate()));
+    }
     public boolean assigned(UUID tenant,UUID employee,UUID store,LocalDate date){return Boolean.TRUE.equals(jdbc.queryForObject("""
         select exists(select 1 from workforce_employees e join workforce_work_stores w on w.employee_id=e.id and w.tenant_id=e.tenant_id
         where e.tenant_id=? and e.id=? and e.status='active' and e.enabled=true and e.hire_date<=? and (e.leave_date is null or e.leave_date>=?)

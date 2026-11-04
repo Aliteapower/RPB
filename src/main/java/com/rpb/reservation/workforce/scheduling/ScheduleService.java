@@ -29,6 +29,8 @@ public class ScheduleService {
         if(old!=null&&(!store.equals(repository.store(actor.tenantId(),id))||!old.employeeId().equals(c.employeeId())))throw WorkforceException.forbidden();
         if(old!=null&&c.expectedVersion()==0&&old.shiftId().equals(c.shiftId())&&old.workDate().equals(c.workDate())&&old.status().equals(c.status()))return old;
         if((old==null?0:old.version())!=c.expectedVersion())throw WorkforceException.conflict();
+        if(old!=null&&"scheduled".equals(c.status())&&repository.transferLocked(actor.tenantId(),id))
+            throw error("WORKFORCE_ACTIVE_ATTENDANCE");
         if(repository.used(actor.tenantId(),id))throw error("WORKFORCE_ACTIVE_ATTENDANCE");
         if("cancelled".equals(c.status())){
             if(old==null||!old.shiftId().equals(c.shiftId())||!old.workDate().equals(c.workDate()))throw WorkforceException.invalid();

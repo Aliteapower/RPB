@@ -15,6 +15,30 @@ class WorkforceBulkSchedulePostgresTest extends WorkforcePostgresTest {
  BulkScheduleRepository bulk;BulkSchedulePlanService plans;BulkScheduleService service;SchedulingRepository scheduling;ScheduleService schedules;UUID employee,shift;
  @BeforeEach void bulkSetup(TestInfo info){if(info.getTestMethod().orElseThrow().getDeclaringClass()!=WorkforceBulkSchedulePostgresTest.class)return;var mapper=new ObjectMapper().findAndRegisterModules();var json=new WorkforceJson(mapper);var audit=new WorkforceAudit(logs,mapper);scheduling=new SchedulingRepository(jdbc,json);bulk=new BulkScheduleRepository(jdbc,json);schedules=proxy(new ScheduleService(access,scheduling,repository,audit,clock));plans=proxy(new BulkSchedulePlanService(access,bulk,scheduling,json,clock));service=proxy(new BulkScheduleService(access,bulk,scheduling,repository,plans,schedules,audit,json));employee=UUID.randomUUID();employees.save(admin,store,employee,command(0,List.of(store,sibling),company,null,null));shift=UUID.randomUUID();proxy(new ShiftService(access,scheduling,audit)).save(admin,store,shift,new ShiftWrite(0L,"Early","09:00","17:00",false,"none",0,0,0,0,false,true));}
  Request request(){return new Request(List.of(employee),shift,LocalDate.of(2026,10,29),LocalDate.of(2026,10,30),List.of(1,2,3,4,5,6,7));}
+ @Test void dailyRosterCountsPeopleAcrossStoresAndIncludesEmptyAuthorizedStores(){
+  var date=request().from();
+  var late=UUID.randomUUID();
+  var evening=UUID.randomUUID();
+  var shifts=proxy(new ShiftService(access,scheduling,new WorkforceAudit(logs,new ObjectMapper().findAndRegisterModules())));
+  shifts.save(admin,sibling,late,new ShiftWrite(0L,"Late","17:00","19:00",false,"none",0,0,0,0,false,true));
+  shifts.save(admin,sibling,evening,new ShiftWrite(0L,"Evening","19:00","21:00",false,"none",0,0,0,0,false,true));
+  schedules.save(admin,store,UUID.randomUUID(),new ScheduleWrite(0L,employee,shift,date,"scheduled"));
+  schedules.save(admin,sibling,UUID.randomUUID(),new ScheduleWrite(0L,employee,late,date,"scheduled"));
+  var cancelled=schedules.save(admin,sibling,UUID.randomUUID(),new ScheduleWrite(0L,employee,evening,date,"scheduled"));
+  schedules.save(admin,sibling,cancelled.id(),new ScheduleWrite(cancelled.version(),employee,evening,date,"cancelled"));
+  var roster=plans.dailyRoster(admin,store,date);
+  assertThat(roster.people()).isEqualTo(1);
+  assertThat(roster.stores()).extracting(RosterStore::id).containsExactlyInAnyOrder(store,sibling,otherStore);
+  var siblingRoster=roster.stores().stream().filter(x->x.id().equals(sibling)).findFirst().orElseThrow();
+  assertThat(siblingRoster.employees()).singleElement().satisfies(person->{
+   assertThat(person.id()).isEqualTo(employee);
+   assertThat(person.segments()).extracting(RosterSegment::shiftName).containsExactly("Late");
+  });
+  assertThat(roster.stores().stream().filter(x->x.id().equals(otherStore)).findFirst().orElseThrow().employees()).isEmpty();
+  var limited=new com.rpb.reservation.walkin.api.CurrentActor(tenant,adminId,"staff",admin.roles(),admin.permissions(),Set.of(store));
+  assertThat(plans.dailyRoster(limited,store,date).stores()).extracting(RosterStore::id).containsExactly(store);
+  assertThatThrownBy(()->plans.dailyRoster(limited,sibling,date)).isInstanceOf(WorkforceException.class);
+ }
  @Test void previewIsReadonlyCommitSkipsExistingAndReplayCannotDuplicate(){
   schedules.save(admin,store,UUID.randomUUID(),new ScheduleWrite(0L,employee,shift,request().from(),"scheduled"));
   long before=jdbc.queryForObject("select count(*) from workforce_schedules",Long.class);var p=plans.preview(admin,store,request());assertThat(p.ready()).isEqualTo(1);assertThat(p.existing()).isEqualTo(1);assertThat(jdbc.queryForObject("select count(*) from workforce_schedules",Long.class)).isEqualTo(before);

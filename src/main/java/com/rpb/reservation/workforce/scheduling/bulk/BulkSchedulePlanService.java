@@ -36,6 +36,20 @@ public class BulkSchedulePlanService {
   return new Board(page.items(),page.total(),limit,offset,schedules.forEmployees(actor.tenantId(),store,from,to,page.items().stream().map(Employee::id).toList()),schedules.timezone(actor.tenantId(),store),weekCount,repository.positions(actor.tenantId()),to.equals(monday.plusDays(6))&&from.equals(monday)?weekCount:repository.periodCount(actor.tenantId(),store,from,to),repository.staffing(actor.tenantId(),store,from,to,position,search==null?"":search.trim()),repository.calendar(actor.tenantId(),store,from,to),repository.restSwaps(actor.tenantId(),store,from,to,page.items().stream().map(Employee::id).toList()));
  }
  @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+ public DailyRoster dailyRoster(CurrentActor actor,UUID store,LocalDate date){
+  manage(actor,store);
+  if(date==null)throw WorkforceException.invalid();
+  var permitted=new HashSet<UUID>();
+  permitted.add(store);
+  for(var candidate:access.managedStores(actor)){
+   if(candidate.equals(store))continue;
+   try{access.enter(actor,candidate);permitted.add(candidate);}
+   catch(WorkforceException e){if(e.status()!=403)throw e;}
+  }
+  var groups=repository.dailyRoster(actor.tenantId(),permitted,date);
+  long people=groups.stream().flatMap(group->group.employees().stream()).map(RosterEmployee::id).distinct().count();
+  return new DailyRoster(date,people,groups);
+ }
  public StaffingEmployees staffingEmployees(CurrentActor actor,UUID store,LocalDate from,LocalDate to,UUID shift,UUID position,String search,int limit,int offset){
   manage(actor,store);ScheduleService.range(from,to);if(shift==null)throw WorkforceException.invalid();return repository.staffingEmployees(actor.tenantId(),store,from,to,shift,position,search(search,limit,offset),limit,offset);
  }

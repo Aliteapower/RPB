@@ -22,15 +22,17 @@ public class ClockService {
         access.sourceWrite(actor);
         if(c==null||c.scheduleId()==null||!Set.of("IN","OUT","BREAK_START","BREAK_END").contains(c.action()==null?"":c.action()))throw WorkforceException.invalid();
         var employee=access.self(actor,store);employees.lock(employee.id());
+        var scope=access.clockScope(actor,store,c.scheduleId(),employee);
+        store=scope.store();
         var replay=repository.replay(actor.tenantId(),command,employee.id(),store,c);if(replay.isPresent())return replay.get();
-        var schedule=access.read(actor,store,c.scheduleId());if(!schedule.employeeId().equals(employee.id()))throw WorkforceException.forbidden();
+        var schedule=scope.schedule();
         Instant now=clock.instant().truncatedTo(ChronoUnit.MICROS);Session old=repository.bySchedule(actor.tenantId(),schedule.id()).orElse(null),next;
         if(workModes!=null&&workModes.exempt(actor.tenantId(),employee.id(),store,schedule.workDate(),old))throw new WorkforceException("WORKFORCE_CLOCK_EXEMPT",409);
         var policy=workModes==null?null:workModes.policy(actor.tenantId(),employee.id(),store,schedule.workDate(),old);var selectedPolicy=com.rpb.reservation.workforce.workmode.WorkModeOptions.select(policy,c.mode());if(workModes!=null)workModes.verify(selectedPolicy,c.location());
         if("IN".equals(c.action())){
             // Reload after the shared employee lock so employment/membership edits cannot race a punch.
             employee=employees.byAccount(actor.tenantId(),actor.actorId()).orElseThrow(WorkforceException::forbidden);
-            if(old!=null||!schedule.status().equals("scheduled")||!employee.status().equals("active")||!employee.storeIds().contains(store)||!employee.companyId().equals(schedule.companyId())||!schedules.assigned(actor.tenantId(),employee.id(),store,schedule.workDate())||now.isBefore(schedule.startAt().minusSeconds(12*3600))||!now.isBefore(schedule.endAt()))throw state();
+            if(old!=null||!access.canStart(actor.tenantId(),store,employee,schedule)||!access.canStartAt(actor.tenantId(),schedule,now))throw state();
             if(repository.active(actor.tenantId(),employee.id()).isPresent()||repository.overlaps(actor.tenantId(),employee.id(),schedule.id(),now,null))throw new WorkforceException("WORKFORCE_ATTENDANCE_OVERLAP",409);
             next=new Session(UUID.randomUUID(),schedule.id(),employee.id(),store,now,null,null,List.of(),false,1,null,policy);
         }else{

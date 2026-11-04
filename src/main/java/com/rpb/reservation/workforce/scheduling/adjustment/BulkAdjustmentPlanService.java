@@ -22,7 +22,7 @@ public class BulkAdjustmentPlanService {
   for(var inspection:source){var row=inspection.schedule();String status="ready",reason="";
    if(inspection.deleted()||!row.status().equals("scheduled")||row.version()!=expected.get(row.id())||!row.workDate().equals(request.date())||!row.shiftId().equals(request.sourceShiftId()))reason="SOURCE_CHANGED";
    else if(request.sourceShiftId().equals(request.targetShiftId())){status="unchanged";reason="UNCHANGED";}
-   else if(inspection.used())reason="IN_USE";
+   else if(inspection.used()||schedules.transferLocked(actor.tenantId(),row.id()))reason="IN_USE";
    else if(inspection.segments()!=1)reason="MULTIPLE_SEGMENTS";
    else if(request.date().isBefore(today)||request.date().isAfter(today.plusDays(90)))reason="OUTSIDE_WINDOW";
    else if(!target.enabled())reason="SHIFT_UNAVAILABLE";

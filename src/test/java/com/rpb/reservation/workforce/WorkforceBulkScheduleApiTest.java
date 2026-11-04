@@ -23,4 +23,9 @@ class WorkforceBulkScheduleApiTest {
   String path=base+"/schedule-staffing/employees?from=2026-10-29&to=2026-10-29&shiftId="+UUID.randomUUID();when(actors.currentActor()).thenReturn(Optional.empty());mvc.perform(get(path)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
   when(actors.currentActor()).thenReturn(Optional.of(new CurrentActor(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of())));when(plans.staffingEmployees(any(),any(),any(),any(),any(),isNull(),eq(""),eq(50),eq(0))).thenReturn(new BulkScheduleDtos.StaffingEmployees(List.of(),0,0,50,0));mvc.perform(get(path)).andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0)).andExpect(header().string("Cache-Control","private, no-store"));mvc.perform(get(path.replace("2026-10-29","invalid"))).andExpect(status().isBadRequest());mvc.perform(get(base+"/schedule-staffing/employees?from=2026-10-29")).andExpect(status().isBadRequest());
  }
+ @Test void dailyRosterRequiresAuthentication()throws Exception {
+  when(actors.currentActor()).thenReturn(Optional.empty());
+  mvc.perform(get(base+"/schedule-daily?date=2026-11-04"))
+   .andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control","private, no-store"));
+ }
 }

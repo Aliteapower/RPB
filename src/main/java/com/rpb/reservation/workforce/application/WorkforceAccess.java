@@ -25,6 +25,11 @@ public class WorkforceAccess {
         var decision=gate.evaluateHistory(new AppGateAccessRequest("workforce",actor.tenantId(),store,"workforce.view",actor));
         if(!decision.allowed())throw new WorkforceException(decision.denyReason().name(),403);
     }
+    /** The caller must first prove ownership of a specific transferred schedule from an accessible anchor. */
+    public boolean transferClockAllowed(CurrentActor actor,UUID store){
+        if(!actor.hasPermission("workforce.view"))return false;
+        return gate.evaluateCommercial("workforce",actor.tenantId(),store).allowed();
+    }
     public boolean isHeadOffice(CurrentActor actor){
         return actor!=null&&actor.roles().contains("tenant_admin")&&!actor.roles().contains("store_manager")
             &&!actor.roles().contains("platform_admin")&&actor.hasPermission("tenant.admin.manage")&&actor.hasPermission("workforce.admin.manage");

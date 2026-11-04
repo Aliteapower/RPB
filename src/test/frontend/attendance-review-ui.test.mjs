@@ -112,3 +112,23 @@ test('disabled absence rule blocks missing approval and removes absence option',
  const root=await mount(ui.ApprovalDetail,'/stores/A/workforce/approvals/schedule')
  const select=nodes(root,n=>n.tag==='select')[0];assert.equal(select.props.disabled,true);assert.deepEqual(nodes(select,n=>n.tag==='option').map(n=>n.props.value),['']);assert.match(text(root),/未启用旷工判定，缺卡只能先补卡或请假/)
 })
+
+test('a transferred active shift can clock out from the original store workbench',async()=>{
+ const writes=[]
+ const active={id:'session',scheduleId:'schedule',storeId:'B',breakStartedAt:null}
+ const data={schedules:[],active,actions:['OUT'],serverTime:'2026-10-01T05:00:00Z',
+  attendance:{schedule,session:active},transferStores:{schedule:{id:'B',name:'Destination Store'}}}
+ globalThis.sessionStorage={getItem:()=>null,setItem(){},removeItem(){}}
+ globalThis.fetch=async(url,opt)=>{
+  if(opt.method==='PUT'){writes.push({url:String(url),body:JSON.parse(opt.body)});return response({})}
+  return response(data)
+ }
+ const root=await mount(ui.ClockPage,'/stores/A/workforce/clock',{...admin,myself:{id:'worker',accountId:'account'}})
+ assert.match(text(root),/Destination Store/)
+ const button=nodes(root,n=>n.tag==='button'&&text(n)==='下班')[0]
+ assert.ok(button)
+ button.props.onClick()
+ await settle()
+ assert.match(writes[0].url,/\/stores\/A\/workforce\/clock\//)
+ assert.deepEqual(writes[0].body,{scheduleId:'schedule',action:'OUT'})
+})

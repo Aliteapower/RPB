@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DailyStoreRoster from '../components/DailyStoreRoster.vue'
 import DateInput from '../../../components/common/DateInput.vue'
 import RestSwapLabels from '../components/RestSwapLabels.vue'
 import CalendarDateLabels from '../components/CalendarDateLabels.vue'
@@ -19,6 +20,7 @@ import {addDays,storeToday,weekMonday} from '../time'
 import {restaurantText} from '../restaurantShifts'
 import PhaseStatus from '../components/PhaseStatus.vue'
 const {api,home,store,current,t,p,base,loading,busy,failure,notice,load,format,english}=usePhasePage(),{s}=useScheduleText()
+const dailyDate=ref<string|null>(null)
 const week=ref(weekMonday(storeToday())),month=ref(storeToday().slice(0,7)),target=ref(addDays(week.value,7))
 const view=ref<'weekly'|'monthly'|'list'>('weekly'),period=ref<'week'|'month'>('week'),displayedPeriod=ref<'week'|'month'>('week')
 const displayedWeek=ref(week.value),displayedFrom=ref(week.value),displayedTo=ref(addDays(week.value,6)),position=ref(''),search=ref(''),offset=ref(0)
@@ -31,6 +33,9 @@ const staffingSelection=ref<{shiftId:string;shiftName:string;from:string;to:stri
 function monthEnd(first:string){const d=new Date(first+'T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+1,0);return Number.isFinite(d.getTime())?d.toISOString().slice(0,10):''}
 function create(employeeId?:string,workDate?:string){if(!busy.value&&!copyDraft.value)editor.value={employeeId,workDate}}
 function edit(schedule:Schedule){if(!busy.value&&!copyDraft.value)editor.value={id:schedule.id}}
+function openDaily(date=storeToday(data.value.timezone)){
+ if(!busy.value&&!copyDraft.value)dailyDate.value=date
+}
 function openStaffing(shiftId:string,shiftName:string,date?:string){
  if(loading.value||busy.value||!lastQuery||staffingSelection.value)return
  staffingSelection.value={shiftId,shiftName,from:date||lastQuery.from,to:date||lastQuery.to,positionId:lastQuery.position,search:lastQuery.search}
@@ -100,6 +105,9 @@ onBeforeUnmount(()=>{++boardRevision;stopSync?.()})
 </script>
 <template><section v-if="home?.employeeManage" ref="panel" class="wf-panel wf-schedule-page">
  <header class="wf-toolbar wf-schedule-header"><h2>{{displayedPeriod==='month'?s('monthlySchedule'):p('schedule')}}</h2><small>{{p('timezone')}}: {{data.timezone}} · {{displayedFrom}} – {{displayedTo}}</small><RouterLink class="wf-button" :to="base+'/shifts'">{{p('shifts')}}</RouterLink></header><p class="wf-hint">{{restaurantText(english()).business}}</p>
+ <button type="button" :aria-expanded="dailyDate!==null" :disabled="busy||!!copyDraft" @click="dailyDate?dailyDate=null:openDaily()">{{english()?'Daily roster by store':'当日各店名单'}}</button>
+ <DailyStoreRoster v-if="dailyDate" :key="dailyDate" :initial-date="dailyDate"/>
+ <div v-show="!dailyDate">
  <div class="wf-schedule-controls">
   <form class="wf-schedule-query" @submit.prevent="filter"><label>{{period==='month'?s('month'):p('week')}}<DateInput v-if="period==='month'" v-model="month" type="month" required :disabled="!!copyDraft||busy" /><DateInput v-else v-model="week" type="date" required :disabled="!!copyDraft||busy" /></label><div class="wf-schedule-buttons"><button type="button" :disabled="loading||busy||!!copyDraft" @click="move(-7)">{{t('previous')}}</button><button type="button" :disabled="loading||busy||!!copyDraft" @click="move(7)">{{t('next')}}</button><button :disabled="loading||busy||!!copyDraft">{{p('filter')}}</button></div></form>
   <button type="button" class="primary" :disabled="loading||busy||!!copyDraft" @click="openBulk">{{s('bulk')}}</button>
@@ -113,9 +121,10 @@ onBeforeUnmount(()=>{++boardRevision;stopSync?.()})
  <form class="wf-filters" @submit.prevent="filter"><label>{{s('position')}}<select v-model="position" :disabled="loading||busy||!!copyDraft"><option value="">{{s('allPositions')}}</option><option v-for="item in data.positions" :key="item.id" :value="item.id">{{item.name}}</option></select></label><label>{{s('search')}}<input v-model="search" type="search" maxlength="100" :disabled="loading||busy||!!copyDraft"></label><button :disabled="loading||busy||!!copyDraft">{{p('filter')}}</button><div class="wf-view-switch" role="group"><button type="button" :aria-pressed="view==='weekly'" :disabled="loading||busy||!!copyDraft" @click="switchView('weekly')">{{s('weekly')}}</button><button type="button" :aria-pressed="view==='monthly'" :disabled="loading||busy||!!copyDraft" @click="switchView('monthly')">{{s('monthly')}}</button><button type="button" :aria-pressed="view==='list'" :disabled="loading||busy||!!copyDraft" @click="switchView('list')">{{s('list')}}</button></div></form>
  <ScheduleStaffing :value="data.staffing" @staffing="openStaffing"/>
  <p class="wf-hint wf-sync-hint">{{s('syncHint')}}</p>
- <WeekScheduleTable v-if="!loading&&view!=='list'" :data="data" :week="displayedFrom" :to="displayedTo" :base="base" @create="create" @edit="edit" @staffing="openStaffing"/>
+ <WeekScheduleTable v-if="!loading&&view!=='list'" :data="data" :week="displayedFrom" :to="displayedTo" :base="base" @create="create" @edit="edit" @staffing="openStaffing" @daily="openDaily"/>
  <div v-if="!loading&&view==='list'" class="wf-table-wrap"><table><thead><tr><th>{{p('workDate')}}</th><th>{{p('employee')}}</th><th>{{p('shift')}}</th><th>{{p('plan')}}</th><th>{{p('status')}}</th><th></th></tr></thead><tbody><tr v-for="row in data.items" :key="row.id"><td>{{row.workDate}}<RestSwapLabels :items="data.restSwaps" :date="row.workDate" :employee-id="row.employeeId"/><CalendarDateLabels :events="data.calendar" :date="row.workDate"/></td><td>{{row.employeeName}} <small>{{row.employeeNo}}</small></td><td>{{row.shift.name}}</td><td>{{format(row.startAt,row.timezone)}} – {{format(row.endAt,row.timezone)}}</td><td>{{p(row.status)}}</td><td><button type="button" :data-schedule-id="row.id" @click="edit(row)">{{t('manage')}}</button></td></tr><tr v-if="!data.items.length"><td colspan="6" class="wf-empty">{{t('empty')}}</td></tr></tbody></table></div>
  <footer class="wf-pagination"><span>{{data.total?offset+1:0}}–{{Math.min(offset+50,data.total)}} / {{data.total}} {{s('count')}}</span><button :disabled="loading||busy||!!copyDraft||offset===0" @click="page(-50)">{{t('previous')}}</button><button :disabled="loading||busy||!!copyDraft||offset+50>=data.total" @click="page(50)">{{t('next')}}</button></footer>
+ </div>
  <StaffingEmployeesDialog v-if="staffingSelection" v-bind="staffingSelection" @close="staffingSelection=null" @changed="staffingChanged"/>
  <WeekCopyDialog v-if="copyDraft" v-bind="copyDraft" @close="copyDraft=null" @saved="copied"/>
  <ScheduleDialog v-if="editor" v-bind="editor" @close="editor=null" @saved="saved" @deleted="deleted"/>

@@ -68,6 +68,46 @@ public class BulkScheduleRepository {
         var items=named.query("select e.id,e.employee_no,e.name,s.work_date,(array_agg(s.shift_snapshot->>'name' order by s.start_at desc,s.id desc))[1],jsonb_agg(jsonb_build_object('id',s.id,'startAt',s.start_at,'endAt',s.end_at,'timezone',s.timezone,'version',s.version) order by s.start_at,s.id)::text "+scope+" group by e.id,e.employee_no,e.name,s.work_date order by s.work_date,e.employee_no,e.id limit :limit offset :offset",p,(r,n)->new StaffingEmployee(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),List.of(json.read(r.getString(6),StaffingSchedule[].class))));
         return new StaffingEmployees(items,((Number)counts.get("total")).longValue(),((Number)counts.get("people")).longValue(),limit,offset);
     }
+    public List<RosterStore> dailyRoster(UUID tenant,Set<UUID> stores,LocalDate date){
+        if(stores.isEmpty())return List.of();
+        var params=new MapSqlParameterSource("tenant",tenant).addValue("stores",stores).addValue("date",date);
+        return named.query("""
+            select st.id,st.display_name,e.id employee_id,e.name,e.employee_no,p.name position,
+                   s.id schedule_id,s.shift_snapshot->>'name' shift_name,s.start_at,s.end_at,s.timezone
+            from stores st
+            left join workforce_schedules s on s.tenant_id=st.tenant_id and s.store_id=st.id
+                and s.work_date=:date and s.status='scheduled' and s.deleted_at is null
+            left join workforce_employees e on e.tenant_id=s.tenant_id and e.id=s.employee_id
+            left join workforce_positions p on p.tenant_id=e.tenant_id and p.id=e.position_id and p.deleted_at is null
+            where st.tenant_id=:tenant and st.id in (:stores) and st.deleted_at is null and st.status='active'
+            order by st.display_name,st.id,e.employee_no,e.id,s.start_at,s.id
+            """,params,rs->{
+                var result=new LinkedHashMap<UUID,RosterStore>();
+                var people=new HashMap<UUID,Map<UUID,RosterEmployee>>();
+                while(rs.next()){
+                    UUID store=rs.getObject("id",UUID.class);
+                    var group=result.get(store);
+                    if(group==null){
+                        group=new RosterStore(store,rs.getString("display_name"),new ArrayList<>());
+                        result.put(store,group);
+                        people.put(store,new HashMap<>());
+                    }
+                    UUID employee=rs.getObject("employee_id",UUID.class);
+                    if(employee==null)continue;
+                    var person=people.get(store).get(employee);
+                    if(person==null){
+                        person=new RosterEmployee(employee,rs.getString("name"),rs.getString("employee_no"),
+                            rs.getString("position"),new ArrayList<>());
+                        people.get(store).put(employee,person);
+                        group.employees().add(person);
+                    }
+                    person.segments().add(new RosterSegment(rs.getObject("schedule_id",UUID.class),
+                        rs.getString("shift_name"),rs.getTimestamp("start_at").toInstant(),
+                        rs.getTimestamp("end_at").toInstant(),rs.getString("timezone")));
+                }
+                return List.copyOf(result.values());
+            });
+    }
     public long periodCount(UUID tenant,UUID store,LocalDate from,LocalDate to){return jdbc.queryForObject("select count(*) from workforce_schedules where tenant_id=? and store_id=? and work_date between ? and ? and status='scheduled'",Long.class,tenant,store,from,to);}
     public long weekCount(UUID tenant,UUID store,LocalDate from){return jdbc.queryForObject("select count(*) from workforce_schedules where tenant_id=? and store_id=? and work_date between ? and ? and status='scheduled'",Long.class,tenant,store,from,from.plusDays(6));}
     public Optional<Result> replay(UUID tenant,UUID store,UUID actor,UUID id,String hash){return replayAs(tenant,store,actor,id,hash,Result.class);}

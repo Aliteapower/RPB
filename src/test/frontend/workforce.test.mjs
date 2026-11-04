@@ -489,3 +489,60 @@ test('bulk selection disables multiple segments and other dates while preserving
 
 
 test('payroll home defaults to the authorized current-store company',async()=>{const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return response(String(url).includes('/payroll-home')?payrollDirectory:{companyId:'D',month:'2026-09',rows:[],issues:[],totals:null})};await mount(PayrollHome,'/stores/A/workforce/payroll',{...home,stores:[{id:'A',companyId:'D'}]});assert.ok(requests.some(u=>u.includes('/employee-payroll-board?companyId=D')));assert.ok(!requests.some(u=>u.includes('/employee-payroll-board?companyId=C')))});
+
+test('date header opens the selected day roster across authorized stores',async()=>{
+ const requests=[]
+ globalThis.fetch=async(url)=>{
+  requests.push(String(url))
+  const date=new URL(String(url),'http://localhost').searchParams.get('date')
+  if(date)return response({date,people:1,stores:[
+   {id:'A',name:'East',employees:[{id:'employee',name:'Alice',employeeNo:'E001',position:'Service',
+    segments:[{id:'S',shiftName:'Early',startAt:date+'T01:00:00Z',endAt:date+'T09:00:00Z',timezone:'Asia/Singapore'}]}]},
+   {id:'B',name:'West',employees:[]}
+  ]})
+  return response({items:[],employees:[],timezone:'Asia/Singapore',total:0,limit:50,offset:0,weekScheduleCount:0,positions:[]})
+ }
+ const {root}=await mount(ScheduleList,'/stores/A/workforce/schedule')
+ const header=nodes(root,n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('当日各店名单 · '))[0]
+ const date=header.props['aria-label'].split(' · ')[1]
+ header.props.onClick()
+ await settle()
+ assert.ok(requests.some(url=>url.endsWith('/schedule-daily?date='+date)))
+ assert.match(text(root),/员工总人数（去重） · 1/)
+ assert.match(text(root),/East · 1 人.*Alice.*Service.*Early/)
+ assert.match(text(root),/West · 0 人/)
+})
+
+test('administrator previews and confirms a transfer from the original shift editor',async()=>{
+ const writes=[]
+ const source={...scheduledRow,companyId:'C',version:1,shiftId:'source-shift',shift:{...scheduledRow.shift,id:'source-shift',enabled:true,startTime:'09:00',endTime:'18:00'}}
+ const targetShift={...source.shift,id:'target-shift',name:'Support',version:2}
+ globalThis.fetch=async(url,opt)=>{
+  const path=String(url)
+  if(path.includes('/schedule-transfer/')){
+   writes.push({path,body:JSON.parse(opt.body)})
+   return response({source:{...source,status:'cancelled'},target:{...source,id:'target',shift:targetShift},sourcePlannedSeconds:0,targetPlannedSeconds:28800})
+  }
+  if(path.endsWith('/stores/B/workforce/shifts'))return response([targetShift])
+  if(path.endsWith('/shifts'))return response([source.shift])
+  return response({items:[source],employees:[{id:'employee',name:'Alice'}],timezone:'Asia/Singapore'})
+ }
+ const {root}=await mount(ScheduleForm,'/stores/A/workforce/schedule/S',{
+  ...home,stores:[home.stores[0],{id:'B',name:'B店',companyId:source.companyId}]})
+ button(root,'调店').props.onClick()
+ await settle()
+ nodes(root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('B')
+ await settle()
+ nodes(root,n=>n.tag==='select')[1].props['onUpdate:modelValue']('target-shift')
+ await settle()
+ nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}})
+ await settle()
+ assert.match(text(root),/原店班次将取消/)
+ assert.equal(writes.length,1)
+ button(root,'确认调店').props.onClick()
+ await settle()
+ assert.equal(writes.length,2)
+ assert.deepEqual(writes[1].body,writes[0].body)
+ assert.equal(writes[1].body.targetStoreId,'B')
+ assert.equal(writes[1].body.targetShiftVersion,2)
+})

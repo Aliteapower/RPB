@@ -11,6 +11,7 @@ import {scheduleEmployeeUnavailable,scheduleNoEligibleEmployees} from '../schedu
 import {storeToday,addDays} from '../time'
 import {restaurantShiftRange,restaurantSchedulePreview,restaurantText} from '../restaurantShifts'
 import type {Schedule,ScheduleResult,Shift,Option} from '../types'
+import ScheduleTransferEditor from './ScheduleTransferEditor.vue'
 import PhaseStatus from './PhaseStatus.vue'
 const props=defineProps<{id?:string;employeeId?:unknown;workDate?:unknown}>()
 const emit=defineEmits<{saved:[schedule:Schedule];deleted:[id:string];close:[];blocked:[value:boolean]}>()
@@ -37,7 +38,8 @@ async function refreshEmployees(){
  finally{if(revision===optionsRevision&&current())optionsLoading.value=false}
 }
 // Keep the UUID and exact body until a potentially committed request is resolved.
-const pending=ref<typeof draft.value|null>(null),deletion=ref<{expectedVersion:number}|null>(null),blocked=computed(()=>busy.value||!!pending.value||!!deletion.value)
+const transferOpen=ref(false),transferBlocked=ref(false)
+const pending=ref<typeof draft.value|null>(null),deletion=ref<{expectedVersion:number}|null>(null),blocked=computed(()=>busy.value||!!pending.value||!!deletion.value||transferBlocked.value)
 const eligibilityBlocked=computed(()=>!pending.value&&(optionsLoading.value||optionsDate.value!==draft.value.workDate||!!optionsFailure.value||employeeUnavailable.value))
 const selectedShift=computed(()=>draft.value.status==='cancelled'?snapshot.value?.shift:shifts.value.find(s=>s.id===draft.value.shiftId))
 watch(blocked,value=>emit('blocked',value),{immediate:true,flush:'sync'})
@@ -90,6 +92,8 @@ function remove(){
  <header class="wf-toolbar"><h2 id="wf-schedule-editor-title">{{p(existing?'editSchedule':'newSchedule')}}</h2><button type="button" class="wf-dialog-close" :aria-label="s('closeDialog')" :disabled="blocked" @click="close">×</button></header>
  <PhaseStatus :failure="failure===p('activeConflict')?s('scheduleProtected'):failure" :loading="loading"/>
  <p v-if="!home?.employeeManage" role="alert">{{t('noAccess')}}</p>
+ <ScheduleTransferEditor v-else-if="transferOpen&&snapshot" :source="snapshot" @close="transferOpen=false"
+  @blocked="transferBlocked=$event" @saved="emit('saved',$event)"/>
  <form v-else-if="ready&&!loading" @submit.prevent="save()">
   <fieldset :disabled="blocked||draft.status==='cancelled'">
    <label>{{p('employee')}}<select v-model="draft.employeeId" required :disabled="optionsLoading||!!optionsFailure"><option value="" disabled>{{t('select')}}</option><option v-for="employee in employeeOptions" :key="employee.id" :value="employee.id" :disabled="employeeUnavailable&&employee.id===draft.employeeId">{{employee.name}}</option></select></label>
@@ -102,7 +106,7 @@ function remove(){
   <p v-if="snapshot" class="wf-hint">{{s('deleteScheduleHint')}}</p>
   <p v-if="deletion&&!busy" role="status" class="wf-hint">{{s('retryDelete')}}</p>
   <p v-if="pending&&!busy" role="status" class="wf-hint">{{s('retrySchedule')}}</p>
-  <footer class="wf-form-actions"><button type="button" :disabled="blocked" @click="close">{{t('cancel')}}</button><button v-if="snapshot" type="button" class="danger" :disabled="busy||!!pending" @click="remove">{{busy?t('saving'):deletion?s('retryDeleteAction'):s('deleteSchedule')}}</button><button v-if="snapshot?.status==='scheduled'" type="button" :disabled="blocked" @click="save(true)">{{p('cancelSchedule')}}</button><button v-if="snapshot?.status==='cancelled'" type="button" class="primary" :disabled="busy||!!deletion||eligibilityBlocked" @click="save(false,true)">{{busy?t('saving'):pending?s('retryScheduleAction'):s('restoreSchedule')}}</button><button v-if="draft.status!=='cancelled'" class="primary" :disabled="busy||!!deletion||eligibilityBlocked">{{busy?t('saving'):pending?s('retryScheduleAction'):t('save')}}</button></footer>
+  <footer class="wf-form-actions"><button v-if="snapshot?.status==='scheduled'&&home?.stores.some(item=>item.id!==store&&item.companyId===snapshot?.companyId)" type="button" :disabled="blocked" @click="transferOpen=true">{{english()?'Transfer store':'调店'}}</button><button type="button" :disabled="blocked" @click="close">{{t('cancel')}}</button><button v-if="snapshot" type="button" class="danger" :disabled="busy||!!pending" @click="remove">{{busy?t('saving'):deletion?s('retryDeleteAction'):s('deleteSchedule')}}</button><button v-if="snapshot?.status==='scheduled'" type="button" :disabled="blocked" @click="save(true)">{{p('cancelSchedule')}}</button><button v-if="snapshot?.status==='cancelled'" type="button" class="primary" :disabled="busy||!!deletion||eligibilityBlocked" @click="save(false,true)">{{busy?t('saving'):pending?s('retryScheduleAction'):s('restoreSchedule')}}</button><button v-if="draft.status!=='cancelled'" class="primary" :disabled="busy||!!deletion||eligibilityBlocked">{{busy?t('saving'):pending?s('retryScheduleAction'):t('save')}}</button></footer>
  </form>
 </section></template>
 

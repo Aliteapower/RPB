@@ -15,6 +15,14 @@ public class AttendanceRepository {
     public List<Correction> correctionsFor(UUID tenant,List<UUID> ids){if(ids.isEmpty())return List.of();var args=new ArrayList<Object>();args.add(tenant);args.addAll(ids);return jdbc.query("select c.*,e.name from workforce_corrections c join workforce_employees e on e.id=c.employee_id and e.tenant_id=c.tenant_id where c.tenant_id=? and c.schedule_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by c.created_at,c.id",this::correction,args.toArray());}
     public Optional<Session> active(UUID tenant,UUID employee){return jdbc.query("select * from workforce_attendance_sessions where tenant_id=? and employee_id=? and out_at is null",this::session,tenant,employee).stream().findFirst();}
     public Optional<Session> latest(UUID tenant,UUID store,UUID employee){return jdbc.query("select * from workforce_attendance_sessions where tenant_id=? and store_id=? and employee_id=? order by in_at desc,id limit 1",this::session,tenant,store,employee).stream().findFirst();}
+    public Optional<Session> latestTransferred(UUID tenant,UUID anchor,UUID employee){
+        return jdbc.query("""
+            select a.* from workforce_attendance_sessions a
+            join workforce_schedule_transfers t on t.tenant_id=a.tenant_id and t.target_schedule_id=a.schedule_id
+            where a.tenant_id=? and t.anchor_store_id=? and a.employee_id=?
+            order by a.in_at desc,a.id limit 1
+            """,this::session,tenant,anchor,employee).stream().findFirst();
+    }
     private Session session(ResultSet r,int n)throws SQLException{return new Session(r.getObject("id",UUID.class),r.getObject("schedule_id",UUID.class),r.getObject("employee_id",UUID.class),r.getObject("store_id",UUID.class),time(r,"in_at"),time(r,"out_at"),time(r,"break_started_at"),List.of(json.read(r.getString("breaks"),Interval[].class)),r.getBoolean("override_break"),r.getLong("version"),r.getString("break_started_rule_id"),r.getString("clock_policy")==null?null:json.read(r.getString("clock_policy"),com.rpb.reservation.workforce.workmode.WorkModeDtos.ClockPolicy.class));}
     private Instant time(ResultSet r,String field)throws SQLException{var t=r.getTimestamp(field);return t==null?null:t.toInstant();}
     public void save(UUID tenant,Session s){jdbc.update("""
