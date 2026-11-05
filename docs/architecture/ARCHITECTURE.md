@@ -103,6 +103,8 @@ RBAC
 - Tenant is the main data isolation boundary.
 - Store is the operational boundary for Reservation, QueueTicket, Seating, Cleaning, Area, and Table.
 - Cross-store Customer is allowed only inside the same Tenant.
+- Customer profiles are shared across all product lines in one Tenant. New product lines use `customer.application.CustomerDirectoryQuery` for reads and the Customer application services for profile resolution/maintenance, referencing only `customer_id` rather than copying identity fields.
+- Formal customer maintenance requires a tenant-unique E.164 phone. Existing temporary/no-phone operational records remain supported for compatibility; they must receive a phone before opening a new wallet. Phone/password authentication belongs to `customerauth`, not to individual products. See `docs/api/2026-10-23-shared-customer-phone-auth.md`.
 - Cross-Tenant references are forbidden.
 - Store operational resources cannot be shared across Stores unless a later confirmed rule explicitly allows a controlled cross-store scenario.
 - Audit must preserve the scope where the action occurred.

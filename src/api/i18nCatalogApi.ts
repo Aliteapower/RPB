@@ -1,6 +1,7 @@
 import type {
   I18nCatalogApiErrorResponse,
   I18nCatalogResponse,
+  I18nCatalogProductLineScope,
   PlatformI18nCatalogMutation,
   TenantAdminI18nCatalogMutation
 } from '../types/i18nCatalog'
@@ -32,17 +33,19 @@ export async function updatePlatformI18nCatalog(
 
 export async function getTenantAdminI18nCatalog(
   storeId: string,
+  productLine?: I18nCatalogProductLineScope,
   fetcher?: I18nCatalogFetcher
 ): Promise<I18nCatalogResponse> {
-  return requestJson(tenantEndpoint(storeId), { method: 'GET', fetcher })
+  return requestJson(tenantEndpoint(storeId, productLine), { method: 'GET', fetcher })
 }
 
 export async function updateTenantAdminI18nCatalog(
   storeId: string,
   request: TenantAdminI18nCatalogMutation,
+  productLine?: I18nCatalogProductLineScope,
   fetcher?: I18nCatalogFetcher
 ): Promise<I18nCatalogResponse> {
-  return requestJson(tenantEndpoint(storeId), { method: 'PATCH', body: request, fetcher })
+  return requestJson(tenantEndpoint(storeId, productLine), { method: 'PATCH', body: request, fetcher })
 }
 
 async function requestJson<T>(
@@ -80,8 +83,12 @@ async function requestJson<T>(
   return payload as T
 }
 
-function tenantEndpoint(storeId: string): string {
-  return `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/i18n/catalog`
+function tenantEndpoint(storeId: string, productLine?: I18nCatalogProductLineScope): string {
+  const endpoint = `/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/i18n/catalog`
+  if (!productLine) {
+    return endpoint
+  }
+  return `${endpoint}?productLine=${encodeURIComponent(productLine)}`
 }
 
 async function readJson(response: Response): Promise<unknown> {

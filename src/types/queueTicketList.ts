@@ -9,6 +9,7 @@ export type QueueTicketListStatusFilter =
   | (string & {})
 
 export interface QueueTicketListQuery {
+  businessDate?: string
   status?: QueueTicketListStatusFilter
   tableArea?: string
   partySize?: number

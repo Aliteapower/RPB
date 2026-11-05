@@ -1,0 +1,42 @@
+/* Ported from the original daily ledger UI; scoped to this product. */
+.daily-ledger dialog{border:1px solid #e3e9da;border-radius:16px;padding:25px 28px;width:510px;max-width:calc(100% - 28px);color:var(--ink);box-shadow:0 25px 100px #16332125;max-height:88dvh;overflow-y:auto}
+.daily-ledger dialog.wide{width:810px}
+.daily-ledger dialog::backdrop{background:#18302566;backdrop-filter:blur(3px)}
+.daily-ledger .modal-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:19px}
+.daily-ledger .modal-head h2{font-size:19px}
+.daily-ledger .modal-head+p{font-size:12px;line-height:1.9}
+.daily-ledger .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:25px;padding-top:18px;border-top:1px solid var(--line)}
+.daily-ledger .settings-columns{display:grid;grid-template-columns:1.1fr 1fr .8fr;gap:18px}
+.daily-ledger .settings-columns.two{grid-template-columns:1fr 1fr;gap:30px}
+.daily-ledger .period-settings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.daily-ledger .period-settings .switch-label{margin-top:13px}
+.daily-ledger .switch-label{display:flex;align-items:flex-start;gap:7px;white-space:normal;font-size:11px;color:#8a9a80;cursor:pointer;min-width:0}
+.daily-ledger .switch-label input{flex-shrink:0}
+.daily-ledger .period-settings>div{min-width:0}
+.daily-ledger .notice>a{margin-inline-start:4px}
+.daily-ledger .setting-item{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.daily-ledger .setting-item>input{padding:9px 11px;font-size:12px}
+.daily-ledger .subheading{display:flex;align-items:center;justify-content:space-between}
+@media (max-width:760px){.daily-ledger dialog{padding:19px 18px;border-radius:13px;max-height:85dvh}
+}
+@media (max-width:760px){.daily-ledger .modal-head{margin-bottom:15px}
+}
+@media (max-width:760px){.daily-ledger .modal-head h2{font-size:17px}
+}
+@media (max-width:760px){.daily-ledger .settings-columns{grid-template-columns:1fr 1fr;gap:0 13px}
+}
+@media (max-width:760px){.daily-ledger .settings-columns.two{grid-template-columns:1fr;gap:10px}
+}
+@media (max-width:760px){.daily-ledger .settings-columns>div:first-child{grid-column:1 / -1}
+}
+@media (max-width:760px){.daily-ledger .period-settings{gap:9px}
+}
+@media (max-width:760px){.daily-ledger .period-settings input{font-size:12px;padding:10px}
+}
+@media (max-width:760px){.daily-ledger .switch-label{font-size:10px;gap:5px}
+}
+@media (max-width:760px){.daily-ledger .modal-actions .button{font-size:11px;padding:11px 13px}
+}
+@media (max-width:760px){.daily-ledger .modal-head .icon-button{height:30px}
+}
+

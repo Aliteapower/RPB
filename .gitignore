@@ -1,6 +1,8 @@
 target/
 dist/
 node_modules/
+.worktrees/
+.superpowers/
 
 .idea/
 .vscode/

@@ -1,19 +1,32 @@
 package com.rpb.reservation.appgate.api;
 
 import com.rpb.reservation.appgate.application.AppGateAppEntry;
+import com.rpb.reservation.appgate.application.ProductRouteAccessQuery.ProductAccess;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.util.Set;
 
 public record MeAppsResponse(
     boolean success,
-    List<AppEntryResponse> apps
+    List<AppEntryResponse> apps,
+    List<AppEntryResponse> historyApps,
+    @JsonInclude(JsonInclude.Include.NON_NULL) List<ProductAccess> productAccess
 ) {
-    public static MeAppsResponse of(List<AppGateAppEntry> apps) {
-        return new MeAppsResponse(true, apps.stream().map(AppEntryResponse::from).toList());
+    public MeAppsResponse(boolean success,List<AppEntryResponse> apps,List<AppEntryResponse> historyApps) {
+        this(success,apps,historyApps,null);
     }
 
+    public MeAppsResponse withProductAccess(List<ProductAccess> access) {
+        return new MeAppsResponse(success,apps,historyApps,List.copyOf(access));
+    }
+    public static MeAppsResponse of(List<AppGateAppEntry> apps) {
+        return of(apps,List.of());
+    }
+
+    public static MeAppsResponse of(List<AppGateAppEntry> apps,List<AppGateAppEntry> historyApps) { return new MeAppsResponse(true,apps.stream().map(AppEntryResponse::from).toList(),historyApps.stream().map(AppEntryResponse::from).toList()); }
+
     public static MeAppsResponse empty() {
-        return new MeAppsResponse(true, List.of());
+        return new MeAppsResponse(true, List.of(), List.of());
     }
 
     public record AppEntryResponse(

@@ -1,0 +1,15 @@
+{
+  "retention_days": 15,
+  "keep_full": 2,
+  "keep_frontend": 2,
+  "pinned_backups": [
+    "20261102-wine-storage-26947810-before",
+    "20261031-workforce-exception-49839ab8-before"
+  ],
+  "managed_enabled": true,
+  "release_retention_days": 15,
+  "keep_releases": 2,
+  "upload_retention_hours": 24,
+  "warning_free_bytes": 5368709120,
+  "critical_free_bytes": 2147483648
+}

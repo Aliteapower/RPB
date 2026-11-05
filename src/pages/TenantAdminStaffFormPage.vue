@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import {ImageUploadError} from '../utils/imageUpload'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -22,12 +23,13 @@ import {
 import CountryPhoneField from '../components/common/CountryPhoneField.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import TenantAdminNav from '../components/tenant-admin/TenantAdminNav.vue'
+import StaffPermissionsPanel from '../modules/staff-permissions/StaffPermissionsPanel.vue'
 import { useAuthSessionStore } from '../stores/authSession'
 import type { AuthStoreAccess } from '../types/auth'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 interface TenantProfileForm {
   tenantCode: string
@@ -138,6 +140,14 @@ const form = reactive({
 })
 const selectedStoreIds = ref<string[]>([])
 const defaultStoreId = ref('')
+const existingDefaultStoreId = ref('')
+const persistedStoreIds = ref<string[]>([])
+const hasUnmanagedStoreAccess = computed(() => persistedStoreIds.value.some(id => !currentStoreAllowed(id)))
+const staffLoaded = ref(false)
+let staffLoadGeneration = 0
+const permissionStores = computed(() => storeChoices.value
+  .filter(store => persistedStoreIds.value.includes(store.storeId) && assignableStores.value.some(allowed => allowed.storeId === store.storeId))
+  .map(store => ({storeId: store.storeId, label: storeDisplayName(store)})))
 
 onMounted(() => {
   void loadAssignableStores()
@@ -149,10 +159,19 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  staffLoadGeneration++
   revokeLocalLogoPreview()
 })
 
+watch(() => [staffId.value, storeId.value, mode.value], () => {
+  if (mode.value !== 'create') void loadStaff()
+})
+
 async function loadStaff(): Promise<void> {
+  const generation = ++staffLoadGeneration
+  staffLoaded.value = false
+  persistedStoreIds.value = []
+  existingDefaultStoreId.value = ''
   loading.value = true
   errorText.value = ''
   savedText.value = ''
@@ -162,17 +181,19 @@ async function loadStaff(): Promise<void> {
         getTenantProfile(storeId.value),
         getCurrentTenantAdminStaff(storeId.value)
       ])
+      if (generation !== staffLoadGeneration) return
       applyTenantProfile(profileResponse.profile)
       applyAdminAccount(staffResponse.staff)
       return
     }
 
     const response = await getStaff(storeId.value, staffId.value)
+    if (generation !== staffLoadGeneration) return
     applyAdminAccount(response.staff)
   } catch (error) {
-    errorText.value = apiErrorText(error)
+    if (generation === staffLoadGeneration) errorText.value = apiErrorText(error)
   } finally {
-    loading.value = false
+    if (generation === staffLoadGeneration) loading.value = false
   }
 }
 
@@ -204,7 +225,10 @@ async function submitStaff(): Promise<void> {
   savedText.value = ''
   try {
     if (mode.value === 'create') {
-      await createStaff(storeId.value, toPayload())
+      const created = await createStaff(storeId.value, toPayload())
+      const nextStoreId = created.staff.storeIds.includes(storeId.value) ? storeId.value : created.staff.defaultStoreId || created.staff.storeIds[0]
+      await router.push({name: 'tenant-admin-staff-edit', params: {storeId: nextStoreId, staffId: created.staff.id}})
+      return
     } else if (mode.value === 'self') {
       const [profileResponse, staffResponse] = await Promise.all([
         updateTenantProfile(storeId.value, tenantProfilePayload()),
@@ -316,6 +340,9 @@ function applyTenantProfile(profile: TenantAdminProfile): void {
 }
 
 function applyAdminAccount(staff: TenantAdminStaff): void {
+  staffLoaded.value = true
+  persistedStoreIds.value = [...staff.storeIds]
+  existingDefaultStoreId.value = staff.defaultStoreId || ''
   Object.assign(form, {
     employeeNo: staff.employeeNo,
     name: staff.name,
@@ -373,6 +400,10 @@ function validateStoreAccessForm(): boolean {
     errorText.value = t('tenant.staffForm.errors.defaultStoreRequired')
     return false
   }
+  if (!currentStoreAllowed(defaultStoreId.value) && defaultStoreId.value !== existingDefaultStoreId.value) {
+    errorText.value = t('tenant.staffForm.errors.defaultStoreRequired')
+    return false
+  }
   return true
 }
 
@@ -390,6 +421,7 @@ function toPayload(): TenantAdminStaffMutation {
 }
 
 function toggleStore(storeId: string, checked: boolean): void {
+  if (!currentStoreAllowed(storeId)) return
   const current = new Set(selectedStoreIds.value)
   if (checked) {
     current.add(storeId)
@@ -398,7 +430,9 @@ function toggleStore(storeId: string, checked: boolean): void {
   }
   selectedStoreIds.value = normalizeSelectedStoreIds(Array.from(current))
   if (!defaultStoreId.value || !selectedStoreIds.value.includes(defaultStoreId.value)) {
-    defaultStoreId.value = selectedStoreIds.value[0] || ''
+    defaultStoreId.value = selectedStoreIds.value.includes(existingDefaultStoreId.value)
+      ? existingDefaultStoreId.value
+      : selectedStoreIds.value.find(currentStoreAllowed) || ''
   }
 }
 
@@ -458,6 +492,7 @@ function statusLabel(status: string): string {
 }
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof TenantAdminApiError)) {
     return gt('generated.tenant-admin-staff-form.051')
   }
@@ -665,6 +700,7 @@ function apiErrorText(error: unknown): string {
                 <input
                   type="checkbox"
                   :checked="selectedStoreIds.includes(store.storeId)"
+                  :disabled="storeAccessLoading || !currentStoreAllowed(store.storeId)"
                   @change="toggleStoreFromEvent(store.storeId, $event)"
                 />
                 <span>
@@ -673,10 +709,11 @@ function apiErrorText(error: unknown): string {
                 </span>
               </label>
             </div>
+            <p v-if="hasUnmanagedStoreAccess" class="loading-line">{{ locale.startsWith('zh') ? '其他门店的已有访问权保留，由对应管理员管理。' : 'Existing access to other stores is retained and managed by their administrators.' }}</p>
             <label class="wide-field">
               <span>{{ t('tenant.staffForm.storeAccess.defaultStore') }}</span>
               <select v-model="defaultStoreId" :disabled="selectedStoreOptions.length === 0" required>
-                <option v-for="store in selectedStoreOptions" :key="store.storeId" :value="store.storeId">
+                <option v-for="store in selectedStoreOptions" :key="store.storeId" :value="store.storeId" :disabled="!currentStoreAllowed(store.storeId) && store.storeId !== existingDefaultStoreId">
                   {{ storeDisplayName(store) }}
                 </option>
               </select>
@@ -690,6 +727,7 @@ function apiErrorText(error: unknown): string {
           </button>
         </div>
       </form>
+      <StaffPermissionsPanel v-if="mode === 'edit' && staffLoaded && !loading" :staff-id="staffId" :initial-store-id="storeId" :stores="permissionStores" />
     </section>
   </main>
 </template>

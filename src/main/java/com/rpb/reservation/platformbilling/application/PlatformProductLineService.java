@@ -2,6 +2,7 @@ package com.rpb.reservation.platformbilling.application;
 
 import com.rpb.reservation.platformbilling.persistence.PlatformProductLineRepository;
 import com.rpb.reservation.platformbilling.persistence.PlatformProductLinePriceRepository;
+import com.rpb.reservation.common.product.ProductLineEntryRegistry;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,6 @@ public class PlatformProductLineService {
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
     private static final Pattern APP_KEY_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{1,63}$");
-    private static final Set<String> CONTROLLED_ENTRY_ROUTES = Set.of("", "/stores/:storeId/staff");
 
     private final PlatformProductLineRepository repository;
     private final PlatformProductLinePriceRepository prices;
@@ -160,7 +160,7 @@ public class PlatformProductLineService {
 
     private static String normalizedEntryRoute(String defaultEntryRoute, String fallback) {
         String entryRoute = defaultEntryRoute == null ? fallback : defaultEntryRoute.trim();
-        if (!CONTROLLED_ENTRY_ROUTES.contains(entryRoute)) {
+        if (!ProductLineEntryRegistry.isControlledRoute(entryRoute)) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
         return entryRoute;
@@ -184,7 +184,7 @@ public class PlatformProductLineService {
         if (command.sortOrder() != null && command.sortOrder() < 0) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
-        if (command.defaultEntryRoute() != null && !CONTROLLED_ENTRY_ROUTES.contains(command.defaultEntryRoute().trim())) {
+        if (command.defaultEntryRoute() != null && !ProductLineEntryRegistry.isControlledRoute(command.defaultEntryRoute().trim())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
     }

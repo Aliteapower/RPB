@@ -1,0 +1,9 @@
+import type {PayRule} from './payrollTypes'
+import type {TemplateRelease,TemplateAdoption} from './payTemplatePublication'
+export interface UpgradeDifference {path:string;label:string;oldBase:string|null;local:string|null;target:string|null;localChanged:boolean;targetChanged:boolean;conflict:boolean}
+export interface UpgradeResolution {path:string;choice:'local'|'target'|'custom'}
+export interface UpgradeContext {oldRelease:TemplateRelease;targetRelease:TemplateRelease;expectedLatestStoreVersion:number;effectiveDate:string;previewHash:string;resolutions:UpgradeResolution[]}
+export interface UpgradePreview extends Omit<UpgradeContext,'resolutions'> {baseAdoption:TemplateAdoption;differences:UpgradeDifference[];hasLocalChanges:boolean}
+export interface UpgradeWrite {expectedRevision:number;companyId:string;adoptionId:string;targetReleaseVersion:number;effectiveDate:string;expectedLatestStoreVersion:number;previewHash:string;derivedRule:PayRule;resolutions:UpgradeResolution[];reason:string}
+// Paths use immutable item IDs, never array positions. Preserve all untouched rule fields.
+export function applyUpgradeValue(rule:PayRule,path:string,value:string|null){let parsed:unknown=value;if(value!==null&&(value.startsWith('{')||value.startsWith('[')||value==='true'||value==='false'))try{parsed=JSON.parse(value)}catch{};const parts=path.split('.');let node:any=rule;for(let i=0;i<parts.length-1;i++){const part=parts[i]!;if(Array.isArray(node)){let item=node.find(v=>v.itemId===part);if(!item){item={itemId:part};node.push(item)}node=item}else{node[part]??={};node=node[part]}}const key=parts.at(-1)!;if(Array.isArray(node)){const i=node.findIndex(v=>v.itemId===key);if(parsed==null){if(i>=0)node.splice(i,1)}else if(i>=0)node[i]=parsed;else node.push(parsed)}else if(value===null)delete node[key];else node[key]=parsed}

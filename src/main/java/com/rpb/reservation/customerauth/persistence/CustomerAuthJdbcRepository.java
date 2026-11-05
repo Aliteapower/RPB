@@ -26,9 +26,20 @@ public class CustomerAuthJdbcRepository implements
     CustomerOAuthSettingsRepositoryPort,
     CustomerAuthIntegrationManagementPort {
     private final JdbcTemplate jdbc;
+    private final TenantCustomerEmailSettingsJdbc email;
 
     public CustomerAuthJdbcRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        this.email = new TenantCustomerEmailSettingsJdbc(jdbc);
+    }
+
+    @Override
+    public java.util.Set<UUID> activeCustomerIds(UUID tenantId, java.util.List<UUID> customerIds) {
+        if (customerIds.isEmpty()) return java.util.Set.of();
+        var args = new java.util.ArrayList<Object>(); args.add(tenantId); args.addAll(customerIds);
+        String placeholders = String.join(",",java.util.Collections.nCopies(customerIds.size(),"?"));
+        return new java.util.HashSet<>(jdbc.query("select distinct customer_id from customer_auth_accounts where tenant_id=? and status='active' and deleted_at is null and customer_id in ("+placeholders+")",
+            (rs,n)->rs.getObject("customer_id",UUID.class),args.toArray()));
     }
 
     @Override
@@ -129,6 +140,15 @@ public class CustomerAuthJdbcRepository implements
     }
 
     @Override
+    public Optional<CustomerAuthAccountRecord> findAccountByCustomerId(UUID tenantId, UUID customerId) {
+        return jdbc.query("""
+            select id, tenant_id, customer_id, email, display_name, status from customer_auth_accounts
+            where tenant_id = ? and customer_id = ? and deleted_at is null
+            order by created_at, id limit 1
+            """, (rs,n) -> account(rs), tenantId, customerId).stream().findFirst();
+    }
+
+    @Override
     public Optional<CustomerAuthAccountRecord> findAccountByEmail(UUID tenantId, String email) {
         return jdbc.query(
             """
@@ -172,13 +192,14 @@ public class CustomerAuthJdbcRepository implements
             insert into customer_auth_accounts (
                 id, tenant_id, customer_id, email, display_name, status, email_verified_at
             )
-            values (?, ?, ?, ?, ?, 'active', now())
+            values (?, ?, ?, ?, ?, 'active', case when cast(? as text) is null then null else now() end)
             """,
             accountId,
             tenantId,
             customerId,
             email,
-            displayName
+            displayName,
+            email
         );
         return new CustomerAuthAccountRecord(accountId, tenantId, customerId, email, displayName, "active");
     }
@@ -260,6 +281,7 @@ public class CustomerAuthJdbcRepository implements
             select
                 session.id as session_id,
                 session.expires_at,
+                session.password_change_required,
                 account.id,
                 account.tenant_id,
                 account.customer_id,
@@ -278,7 +300,8 @@ public class CustomerAuthJdbcRepository implements
             (rs, rowNum) -> new CustomerAuthSessionRecord(
                 rs.getObject("session_id", UUID.class),
                 account(rs),
-                rs.getTimestamp("expires_at").toInstant()
+                rs.getTimestamp("expires_at").toInstant(),
+                rs.getBoolean("password_change_required")
             ),
             sessionHash
         ).stream().findFirst();
@@ -299,6 +322,10 @@ public class CustomerAuthJdbcRepository implements
         );
     }
 
+    @Override public void requirePasswordChange(UUID sessionId) {
+        jdbc.update("update customer_auth_sessions set password_change_required=true where id=?", sessionId);
+    }
+
     @Override
     public void revokeSession(String sessionHash) {
         jdbc.update(
@@ -317,19 +344,12 @@ public class CustomerAuthJdbcRepository implements
 
     @Override
     public Optional<CustomerEmailSettings> findEmailSettings(UUID tenantId, UUID storeId) {
-        return jdbc.query(
-            """
-            select enabled, provider, from_email, from_name, smtp_host, smtp_port,
-                   smtp_username, smtp_password_secret, smtp_start_tls
-            from store_customer_email_settings
-            where tenant_id = ?
-              and store_id = ?
-              and deleted_at is null
-            """,
-            (rs, rowNum) -> emailSettings(rs),
-            tenantId,
-            storeId
-        ).stream().findFirst();
+        return email.find(tenantId,storeId);
+    }
+
+    @Override
+    public String emailSettingsScope(UUID tenantId, UUID storeId) {
+        return email.scope(tenantId,storeId);
     }
 
     @Override
@@ -352,59 +372,7 @@ public class CustomerAuthJdbcRepository implements
 
     @Override
     public CustomerEmailSettings saveEmailSettings(StoreScope scope, CustomerEmailSettings settings) {
-        int updated = jdbc.update(
-            """
-            update store_customer_email_settings
-            set enabled = ?,
-                provider = ?,
-                from_email = ?,
-                from_name = ?,
-                smtp_host = ?,
-                smtp_port = ?,
-                smtp_username = ?,
-                smtp_password_secret = ?,
-                smtp_start_tls = ?,
-                updated_at = now(),
-                version = version + 1
-            where tenant_id = ?
-              and store_id = ?
-              and deleted_at is null
-            """,
-            settings.enabled(),
-            settings.provider(),
-            settings.fromEmail(),
-            settings.fromName(),
-            settings.smtpHost(),
-            settings.smtpPort(),
-            settings.smtpUsername(),
-            settings.smtpPassword(),
-            settings.smtpStartTls(),
-            scope.tenantId().value(),
-            scope.storeId().value()
-        );
-        if (updated == 0) {
-            jdbc.update(
-                """
-                insert into store_customer_email_settings (
-                    tenant_id, store_id, enabled, provider, from_email, from_name,
-                    smtp_host, smtp_port, smtp_username, smtp_password_secret, smtp_start_tls
-                )
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                scope.tenantId().value(),
-                scope.storeId().value(),
-                settings.enabled(),
-                settings.provider(),
-                settings.fromEmail(),
-                settings.fromName(),
-                settings.smtpHost(),
-                settings.smtpPort(),
-                settings.smtpUsername(),
-                settings.smtpPassword(),
-                settings.smtpStartTls()
-            );
-        }
-        return findEmailSettings(scope.tenantId().value(), scope.storeId().value()).orElse(settings);
+        return email.save(scope,settings);
     }
 
     @Override
@@ -474,22 +442,6 @@ public class CustomerAuthJdbcRepository implements
             rs.getString("email"),
             rs.getString("display_name"),
             rs.getString("status")
-        );
-    }
-
-    private static CustomerEmailSettings emailSettings(ResultSet rs) throws SQLException {
-        String password = rs.getString("smtp_password_secret");
-        return new CustomerEmailSettings(
-            rs.getBoolean("enabled"),
-            rs.getString("provider"),
-            rs.getString("from_email"),
-            rs.getString("from_name"),
-            rs.getString("smtp_host"),
-            rs.getInt("smtp_port"),
-            rs.getString("smtp_username"),
-            password,
-            rs.getBoolean("smtp_start_tls"),
-            password != null && !password.isBlank()
         );
     }
 

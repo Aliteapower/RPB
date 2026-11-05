@@ -36,6 +36,11 @@ public class CustomerAuthIntegrationAdminService {
             .orElse(CustomerEmailSettings.disabled()));
     }
 
+    @Transactional(readOnly = true)
+    public String emailSettingsScope(StoreScope scope) {
+        return emailSettingsRepository.emailSettingsScope(scope.tenantId().value(),scope.storeId().value());
+    }
+
     @Transactional
     public CustomerEmailSettings saveEmailSettings(StoreScope scope, CustomerEmailSettingsCommand command) {
         CustomerEmailSettings current = emailSettingsRepository
@@ -53,6 +58,7 @@ public class CustomerAuthIntegrationAdminService {
             optional(command == null ? null : command.smtpStartTls(), current.smtpStartTls()),
             hasText(command == null ? null : command.smtpPassword()) || current.secretConfigured()
         );
+        if(next.enabled()&&!next.usableForLoginCode())throw new IllegalArgumentException("Incomplete email configuration");
         return scrubEmailSecret(managementPort.saveEmailSettings(scope, next));
     }
 

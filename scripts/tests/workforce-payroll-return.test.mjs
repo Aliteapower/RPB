@@ -1,0 +1,4 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {payrollReturnLocation} from '../../src/modules/workforce/payrollReturn.ts'
+test('structured return preserves authorized store company month and filters without accepting an arbitrary URL',()=>{const q={fromPayroll:'1',companyId:'C',month:'2026-09',returnStoreId:'A',paySearch:'张三',payIssues:'1',payEmployee:'E',payScroll:'120',returnTo:'https://outside.invalid'};assert.deepEqual(payrollReturnLocation(q,'B',[{id:'A'}]),{path:'/stores/A/workforce/payroll',query:{companyId:'C',month:'2026-09',paySearch:'张三',payIssues:'1',payEmployee:'E',payScroll:'120'}});assert.equal(payrollReturnLocation(q,'B',[]),null);assert.equal(payrollReturnLocation({...q,month:'2026-13'},'A',[]),null);assert.equal(payrollReturnLocation({...q,fromPayroll:undefined},'A',[]),null)})

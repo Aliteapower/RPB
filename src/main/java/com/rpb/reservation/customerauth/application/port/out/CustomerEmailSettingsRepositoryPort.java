@@ -6,4 +6,5 @@ import java.util.UUID;
 
 public interface CustomerEmailSettingsRepositoryPort {
     Optional<CustomerEmailSettings> findEmailSettings(UUID tenantId, UUID storeId);
+    default String emailSettingsScope(UUID tenantId, UUID storeId) { return "tenant"; }
 }

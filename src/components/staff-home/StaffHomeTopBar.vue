@@ -50,7 +50,7 @@ const displayAppStatus = computed(() => {
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  margin: 0 -14px;
+  margin: 0;
   min-height: 58px;
   padding: max(10px, env(safe-area-inset-top)) 14px 10px;
   position: sticky;
@@ -157,11 +157,23 @@ h1 {
 
 @media (max-width: 420px) {
   .staff-topbar {
+    align-items: stretch;
+    flex-direction: column;
     gap: 8px;
   }
 
   .topbar-row {
+    flex-wrap: wrap;
     gap: 5px;
+    justify-content: space-between;
+  }
+
+  .topbar-meta {
+    align-items: stretch;
+  }
+
+  h1 {
+    white-space: normal;
   }
 
   .app-pill {

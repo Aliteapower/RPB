@@ -1,0 +1,12 @@
+<script setup lang="ts">
+import type {TemplatePreview} from '../payTemplatePublication'
+import type {Option,StoreOption} from '../types'
+import {usePhaseText} from '../phaseText'
+import ScheduledPayAdoptions from './ScheduledPayAdoptions.vue'
+import PayRuleSummary from './PayRuleSummary.vue'
+const props=defineProps<{preview:TemplatePreview;companies:Option[];stores:StoreOption[];busy:boolean}>()
+defineEmits<{enable:[];close:[];upgrade:[]}>()
+const {english}=usePhaseText(),x=(zh:string,en:string)=>english()?en:zh
+function names(ids:string[],options:Option[]){return ids.map(id=>options.find(o=>o.id===id)?.name||id).join('、')}
+</script>
+<template><section class="wf-section" aria-label="release-preview"><header class="wf-toolbar"><h3>{{preview.release.name}} · {{x('发布版本','Release version')}} {{preview.release.version}}</h3><button type="button" :disabled="busy" @click="$emit('close')">{{x('关闭','Close')}}</button></header><p>{{x('母版','Master')}}: {{preview.release.masterId}} · {{x('来源草稿版本','Source draft')}} {{preview.release.draftVersion}}</p><p>{{x('适用公司','Companies')}}: {{names(preview.release.companyIds,companies)}} · {{x('现有门店','Existing stores')}}: {{names(preview.release.storeIds,stores)||'—'}}</p><p>{{x('未来新增门店','Future stores')}}: {{preview.release.includeFutureStores?x('匹配公司时可见，未自动启用','Visible when company matches, not enabled automatically'):x('不包含','Excluded')}}</p><p>{{x('当前采用','Current adoption')}}: {{preview.adoption?`${preview.adoption.releaseVersion} / ${preview.adoption.storeVersion}`:x('尚未启用','Not enabled')}}</p><ScheduledPayAdoptions :items="preview.scheduledAdoptions"/><p v-if="preview.scheduledAdoptions?.length" class="wf-hint">{{x('已有批准待生效计划；请通过申请明确修改，不能直接启用覆盖。','An approved future plan exists. Use a change request to modify it.')}}</p><p>{{x('标准金额','Standard rate')}}: {{preview.release.rule.rate}}</p><PayRuleSummary :rule="props.preview.release.rule"/><p class="wf-hint">{{x('启用仅增加本店候选，不会改写员工方案、岗位映射或工资批次。升级需显式接受固定版本。','Enable adds a store candidate. It does not change employee plans, position mappings or payroll batches. Upgrades require explicit acceptance.')}}</p><button type="button" class="primary" :disabled="busy||!!preview.scheduledAdoptions?.length" @click="$emit('enable')">{{x('启用此固定版本','Enable this fixed version')}}</button><button v-if="preview.adoption||preview.scheduledAdoptions?.length" type="button" :disabled="busy" @click="$emit('upgrade')">{{x('升级差异与申请','Upgrade differences and request')}}</button></section></template>

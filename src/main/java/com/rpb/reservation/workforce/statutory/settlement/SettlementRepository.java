@@ -1,0 +1,27 @@
+package com.rpb.reservation.workforce.statutory.settlement;
+
+import static com.rpb.reservation.workforce.statutory.settlement.SettlementDtos.*;
+import com.rpb.reservation.workforce.application.WorkforceJson;
+import com.rpb.reservation.workforce.statutory.annual.AnnualWageDtos;
+import com.rpb.reservation.workforce.payroll.supplemental.SupplementalMoney;
+import java.math.*;import java.time.*;import java.util.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+@Repository public class SettlementRepository {
+ private final JdbcTemplate jdbc;private final WorkforceJson json;
+ public SettlementRepository(JdbcTemplate jdbc,WorkforceJson json){this.jdbc=jdbc;this.json=json;}
+ public record Saved(long version,Evidence evidence){}
+ public Saved evidence(UUID tenant,UUID company,UUID employee,YearMonth month){return jdbc.query("select version,snapshot from workforce_statutory_evidence where tenant_id=? and company_id=? and employee_id=? and period_month=? order by version desc limit 1",(r,n)->new Saved(r.getLong(1),json.read(r.getString(2),Evidence.class)),tenant,company,employee,month.atDay(1)).stream().findFirst().orElse(new Saved(0,null));}
+ public void evidence(UUID tenant,UUID company,UUID employee,YearMonth month,Evidence e,UUID actor){jdbc.update("insert into workforce_statutory_evidence(tenant_id,company_id,employee_id,period_month,version,snapshot,created_by) values(?,?,?,?,?,?::jsonb,?)",tenant,company,employee,month.atDay(1),e.expectedVersion()+1,json.write(e),actor);}
+ public BigDecimal liability(UUID tenant,UUID company,UUID employee,YearMonth month,String component){return jdbc.queryForObject("select coalesce(sum(amount),0) from workforce_statutory_liability_entries where tenant_id=? and company_id=? and employee_id is not distinct from ? and origin_month=? and component=?",BigDecimal.class,tenant,company,employee,month.atDay(1),component);}
+ public BigDecimal remitted(UUID tenant,UUID company,UUID employee,YearMonth month,String component){return jdbc.queryForObject("select coalesce(sum(a.amount*case when r.reverses_id is null then 1 else -1 end),0) from workforce_statutory_remittance_allocations a join workforce_statutory_remittances r on r.id=a.remittance_id and r.tenant_id=a.tenant_id and r.company_id=a.company_id where a.tenant_id=? and a.company_id=? and a.employee_id is not distinct from ? and a.period_month=? and a.component=?",BigDecimal.class,tenant,company,employee,month.atDay(1),component);}
+ public void liability(UUID tenant,UUID company,UUID employee,YearMonth month,YearMonth settlement,String component,String amount,UUID supplemental,UUID assessment,String key,Object snapshot){if(amount==null)throw new IllegalArgumentException("unknown liability");jdbc.update("insert into workforce_statutory_liability_entries(id,tenant_id,company_id,employee_id,origin_month,settlement_month,component,amount,supplemental_id,assessment_id,settlement_id,source_key,snapshot) values(?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb)",UUID.randomUUID(),tenant,company,employee,month.atDay(1),settlement.atDay(1),component,SupplementalMoney.number(amount),supplemental,assessment,key.startsWith("month:")?UUID.fromString(key.substring(6)):null,key,json.write(snapshot));}
+ public List<Remittance> remittances(UUID tenant,UUID company){return jdbc.query("select snapshot from workforce_statutory_remittances where tenant_id=? and company_id=? order by created_at,id",(r,n)->json.read(r.getString(1),Remittance.class),tenant,company);}
+ public Optional<Remittance> remittance(UUID tenant,UUID id){return jdbc.query("select snapshot from workforce_statutory_remittances where tenant_id=? and id=?",(r,n)->json.read(r.getString(1),Remittance.class),tenant,id).stream().findFirst();}
+ public void remittance(UUID tenant,Remittance r){jdbc.update("insert into workforce_statutory_remittances(id,tenant_id,company_id,snapshot,reverses_id,created_by) values(?,?,?,?::jsonb,?,?)",r.id(),tenant,r.companyId(),json.write(r),r.reversesId(),r.recordedBy());for(var a:r.allocations())jdbc.update("insert into workforce_statutory_remittance_allocations(remittance_id,tenant_id,company_id,employee_id,period_month,component,amount) values(?,?,?,?,?,?,?)",r.id(),tenant,r.companyId(),a.employeeId(),YearMonth.parse(a.month()).atDay(1),a.component(),SupplementalMoney.number(a.amount()));}
+ public Optional<AnnualWageDtos.Reconciliation> reconciliation(UUID tenant,UUID id){return jdbc.query("select snapshot from workforce_aw_reconciliations where tenant_id=? and id=?",(r,n)->json.read(r.getString(1),AnnualWageDtos.Reconciliation.class),tenant,id).stream().findFirst();}
+ public boolean settled(UUID tenant,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_statutory_settlements where tenant_id=? and assessment_id=?)",Boolean.class,tenant,id));}
+ public void settlement(UUID tenant,Settlement s){jdbc.update("insert into workforce_statutory_settlements(id,tenant_id,company_id,employee_id,assessment_id,snapshot) values(?,?,?,?,?,?::jsonb)",s.id(),tenant,s.companyId(),s.employeeId(),s.reconciliationId(),json.write(s));}
+ public Object tokens(UUID tenant,UUID company,UUID employee,int year){return jdbc.queryForList("select snapshot::text from workforce_statutory_evidence where tenant_id=? and company_id=? and employee_id=? and extract(year from period_month)=? order by period_month,version",String.class,tenant,company,employee,year);}
+}

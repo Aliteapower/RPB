@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {ImageUploadError} from '../utils/imageUpload'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -281,6 +282,7 @@ function optionalValue(value: string): string | null {
 }
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof PlatformProfileApiError)) {
     return t('platform.profile.errors.operationFailed')
   }

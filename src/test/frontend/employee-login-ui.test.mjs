@@ -1,0 +1,90 @@
+import {afterEach,test} from 'node:test'
+import assert from 'node:assert/strict'
+import {createRenderer,h,nextTick,ref} from 'vue'
+import {createI18n} from 'vue-i18n'
+import {createRouter,createMemoryHistory} from 'vue-router'
+import {workforceKey} from '../../modules/workforce/context.ts'
+import {WorkforceApiError} from '../../modules/workforce/api.ts'
+import EmployeeLoginSettings from '../../modules/workforce/components/EmployeeLoginSettings.vue'
+import EmployeeAccountFields from '../../modules/workforce/components/EmployeeAccountFields.vue'
+import EmployeePasswordInput from '../../modules/workforce/components/EmployeePasswordInput.vue'
+const apps=[],calls=[]
+const element=tag=>({tag,props:{},children:[],style:{},addEventListener(){},removeEventListener(){},getRootNode(){return {}},get options(){return nodes(this,n=>n.tag==='option')}})
+const renderer=createRenderer({createElement:element,createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[]},patchProp:(n,k,o,v)=>{n.props[k]=v;if(k==='value')n.value=v},insert:(n,p,a)=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1);n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:n=>{const a=n.parent?.children||[];return a[a.indexOf(n)+1]||null}})
+const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))]
+const text=n=>(n.text||'')+(n.children||[]).map(text).join('')
+const settle=async()=>{for(let i=0;i<20;i++){await Promise.resolve();await nextTick()}}
+const button=(root,label)=>nodes(root,n=>n.tag==='button'&&text(n)===label)[0]
+const checkbox=(root,label)=>nodes(root,n=>n.tag==='label'&&text(n)===label).flatMap(n=>nodes(n,c=>c.tag==='input'))[0]
+const home={headOffice:true,employeeManage:true,stores:[],companies:[],accounts:[],administratorAccounts:[],myself:null}
+let handler=async()=>({items:[],headOffice:true})
+async function mount(Page,{path='/stores/A/workforce/shifts/new',manager=false,props={}}={}){
+ globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document={}
+ const router=createRouter({history:createMemoryHistory(),routes:[{path:'/stores/:storeId/workforce/management',component:{render:()=>null}},{path:'/stores/:storeId/workforce/shifts/new',component:Page},{path:'/stores/:storeId/workforce/shifts/:id',component:Page},{path:'/stores/:storeId/workforce/shifts',component:{render:()=>null}}]});await router.push(path)
+ const root=element('root'),app=renderer.createApp({render:()=>h(Page,props)})
+ app.use(router);app.use(createI18n({legacy:false,locale:'zh-CN',messages:{}}));app.provide(workforceKey,{store:ref('A'),home:ref({...home,headOffice:!manager}),api:()=>({get:async path=>{calls.push({path,method:'GET'});return handler(path)},put:async(path,body)=>{calls.push({path,method:'PUT',body:JSON.parse(JSON.stringify(body))});return handler(path,body)}}),refresh:async()=>{}});app.mount(root);apps.push(app);await settle();return root
+}
+afterEach(()=>{apps.splice(0).forEach(a=>a.unmount());calls.length=0;handler=async()=>({items:[],headOffice:true})})
+
+
+const info={accountId:'account',username:'clock-alice',status:'active',version:0,workforceAccess:true,canReset:true}
+test('dedicated disabled account can be explicitly enabled independently from employee availability',async()=>{
+ handler=async(path,body)=>({...info,status:body?'active':'disabled',version:body?1:0,canChangeStatus:true});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.ok(button(root,'启用登录账号'));await button(root,'启用登录账号').props.onClick();await settle()
+ assert.deepEqual(calls.find(c=>c.method==='PUT'),{path:'/employees/E/login-account/status',method:'PUT',body:{expectedVersion:0,status:'active'}})
+ assert.match(text(root),/登录账号已启用/);assert.ok(button(root,'停用登录账号'))
+})
+test('shared account cannot toggle login status from employee settings',async()=>{
+ handler=async()=>({...info,status:'disabled',canChangeStatus:false});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.equal(button(root,'启用登录账号'),undefined);assert.match(text(root),/账号管理/)
+})
+test('status conflict retains employee draft and refresh retries with current version then disables',async()=>{
+ const draft=ref({name:'尚未保存的员工草稿'});let version=0,status='disabled',fail=true
+ handler=async(path,body)=>{if(body){if(fail){fail=false;version=2;throw new WorkforceApiError(409,'WORKFORCE_CONFLICT')}assert.equal(body.expectedVersion,version);status=body.status;version++}return {...info,status,version,canChangeStatus:true}}
+ const root=await mount({setup:()=>()=>h('div',[h('input',{value:draft.value.name,onInput:e=>draft.value.name=e.target.value}),h(EmployeeLoginSettings,{employeeId:'E'})])})
+ await button(root,'启用登录账号').props.onClick();await settle();assert.match(text(root),/已被其他人修改/);assert.equal(draft.value.name,'尚未保存的员工草稿')
+ await button(root,'刷新账号').props.onClick();await settle();await button(root,'启用登录账号').props.onClick();await settle();await button(root,'停用登录账号').props.onClick();await settle()
+ assert.equal(status,'disabled');assert.equal(draft.value.name,'尚未保存的员工草稿');assert.ok(calls.filter(c=>c.method==='PUT').every(c=>c.path==='/employees/E/login-account/status'))
+})
+test('employee account shows username and status without any existing password; blank causes no write',async()=>{
+ handler=async()=>({...info});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.match(text(root),/clock-alice/);assert.match(text(root),/可登录/);assert.match(text(root),/已授权/)
+ assert.equal(nodes(root,n=>n.tag==='input')[0].props.type,'password');assert.equal(nodes(root,n=>n.tag==='input')[0].props.value,'')
+ assert.equal(button(root,'保存新密码').props.disabled,true)
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});assert.equal(calls.filter(c=>c.method==='PUT').length,0)
+})
+test('new password can be revealed and hidden and is saved separately then cleared',async()=>{
+ handler=async(path,body)=>({...info,version:body?1:0});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ let input=nodes(root,n=>n.tag==='input')[0];input.props.onInput({target:{value:'Abc987'}});await settle()
+ button(root,'显示密码').props.onClick();await settle();assert.equal(nodes(root,n=>n.tag==='input')[0].props.type,'text')
+ button(root,'隐藏密码').props.onClick();await settle();assert.equal(nodes(root,n=>n.tag==='input')[0].props.type,'password')
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle()
+ assert.deepEqual(calls.find(c=>c.method==='PUT'),{path:'/employees/E/login-account',method:'PUT',body:{expectedVersion:0,password:'Abc987'}})
+ assert.equal(nodes(root,n=>n.tag==='input')[0].props.value,'');assert.match(text(root),/密码已更新/)
+})
+test('credential conflict retains new input for explicit retry without exposing stored credentials',async()=>{
+ handler=async(path,body)=>{if(body)throw new WorkforceApiError(409,'WORKFORCE_CONFLICT');return {...info}}
+ const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}});nodes(root,n=>n.tag==='input')[0].props.onInput({target:{value:'Abc987'}});await settle()
+ await nodes(root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await settle();assert.match(text(root),/已被其他人修改/);assert.equal(nodes(root,n=>n.tag==='input')[0].props.value,'Abc987')
+})
+test('disabled or privileged account has metadata but no password form',async()=>{
+ handler=async()=>({...info,status:'disabled',canReset:false});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.match(text(root),/已停用/);assert.equal(nodes(root,n=>n.tag==='form').length,0);assert.equal(nodes(root,n=>n.tag==='input').length,0)
+})
+test('failed account load offers retry and no editable password form',async()=>{
+ handler=async()=>{throw new Error('offline')};const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.equal(nodes(root,n=>n.props?.role==='alert').length,1);assert.equal(nodes(root,n=>n.tag==='form').length,0);assert.ok(button(root,'刷新账号'))
+})
+
+test('new attendance account follows employee number and has no separate editable username',async()=>{
+ const draft={employeeNo:'1005',accountId:null};const root=await mount(EmployeeAccountFields,{props:{draft,accounts:[]}})
+ nodes(root,n=>n.tag==='select')[0].props['onUpdate:modelValue']('create');await settle();assert.equal(draft.username,'1005');assert.equal(nodes(root,n=>n.tag==='input'&&n.props.readonly!==undefined)[0].props.value,'1005')
+})
+test('disabled employee can reset password while page clearly explains it stays disabled',async()=>{
+ handler=async()=>({...info,status:'disabled',canReset:true});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ assert.match(text(root),/改密不会自动启用账号/);assert.equal(nodes(root,n=>n.tag==='form').length,1)
+})
+test('dedicated account offers explicit employee-number sync and updates displayed login without password',async()=>{
+ handler=async(path,body)=>({...info,employeeNo:'1005',canUseEmployeeNumber:true,username:body?'1005':'legacy-clock',version:body?1:0});const root=await mount(EmployeeLoginSettings,{props:{employeeId:'E'}})
+ await button(root,'改为员工编号').props.onClick();await settle();assert.deepEqual(calls.find(c=>c.method==='PUT'),{path:'/employees/E/login-account/employee-number',method:'PUT',body:{expectedVersion:0}});assert.match(text(root),/登录账号已改为员工编号/);assert.equal(button(root,'改为员工编号'),undefined)
+})

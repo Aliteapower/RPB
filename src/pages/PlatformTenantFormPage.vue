@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {ImageUploadError} from '../utils/imageUpload'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -358,6 +359,7 @@ function normalizeCreateOnboardingMode(value: unknown): PlatformTenantOnboarding
 }
 
 function apiErrorText(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message
   if (!(error instanceof PlatformApiError)) {
     return t('platform.tenants.errors.operationFailed')
   }

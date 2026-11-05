@@ -1,0 +1,36 @@
+package com.rpb.reservation.workforce.payroll.governance;
+
+import static com.rpb.reservation.workforce.payroll.governance.PayChangeDtos.*;
+import com.rpb.reservation.workforce.payroll.PayrollDtos.LineInput;
+import com.rpb.reservation.workforce.payroll.PayrollSources;
+import com.rpb.reservation.workforce.application.WorkforceJson;
+import com.rpb.reservation.workforce.domain.WorkforceException;
+import com.rpb.reservation.walkin.api.CurrentActor;
+import java.time.*;
+import java.util.*;
+import java.security.*;
+import java.nio.charset.StandardCharsets;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+@Repository public class PayChangeRepository {
+ private final JdbcTemplate jdbc;private final WorkforceJson json;
+ public PayChangeRepository(JdbcTemplate jdbc,WorkforceJson json){this.jdbc=jdbc;this.json=json;}
+ public void lock(String key){jdbc.queryForObject("select pg_advisory_xact_lock(hashtextextended(?,0))",Object.class,"workforce.pay.change:"+key);}
+ public String hash(Object value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.write(value).getBytes(StandardCharsets.UTF_8)));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
+ public Optional<Request> find(UUID tenant,UUID id){return jdbc.query("select snapshot from workforce_pay_change_requests where tenant_id=? and id=?",(r,n)->json.read(r.getString(1),Request.class),tenant,id).stream().findFirst();}
+ public List<Request> list(UUID tenant,UUID store,UUID company){return jdbc.query("select snapshot from workforce_pay_change_requests where tenant_id=? and store_id=? and company_id=? order by created_at desc,id",(r,n)->json.read(r.getString(1),Request.class),tenant,store,company);}
+ public List<Request> open(UUID tenant,UUID company,UUID employee,UUID adoption){return jdbc.query("select snapshot from workforce_pay_change_requests where tenant_id=? and company_id=? and (employee_id=? or adoption_id=?) and status in ('draft','submitted','withdrawn') order by id",(r,n)->json.read(r.getString(1),Request.class),tenant,company,employee,adoption);}
+ public void save(UUID tenant,Request r,boolean revision){jdbc.update("insert into workforce_pay_change_requests(id,tenant_id,company_id,store_id,employee_id,adoption_id,effective_date,revision,hash,status,snapshot,created_by) values(?,?,?,?,?,?,?,?,?,?,?::jsonb,?) on conflict(id) do update set revision=excluded.revision,hash=excluded.hash,status=excluded.status,snapshot=excluded.snapshot,updated_at=now() where workforce_pay_change_requests.tenant_id=excluded.tenant_id",r.id(),tenant,r.companyId(),r.storeId(),r.employeeId(),r.adoptionId(),r.effectiveDate(),r.revision(),r.hash(),r.status(),json.write(r),r.createdBy());if(revision)jdbc.update("insert into workforce_pay_change_revisions(request_id,tenant_id,company_id,revision,hash,content) values(?,?,?,?,?,?::jsonb)",r.id(),tenant,r.companyId(),r.revision(),r.hash(),json.write(r.content()));}
+ public void event(UUID tenant,Request r,Event e){jdbc.update("insert into workforce_pay_change_events(request_id,tenant_id,company_id,revision,action,actor_id,snapshot) values(?,?,?,?,?,?,?::jsonb)",r.id(),tenant,r.companyId(),e.revision(),e.action(),e.actorId(),json.write(e));}
+ public Optional<Request> replay(CurrentActor actor,UUID store,UUID id,Action c){return jdbc.query("select tenant_id,store_id,actor_id,request_id,payload,response from workforce_pay_change_commands where id=?",(r,n)->{if(!actor.tenantId().equals(r.getObject(1,UUID.class))||!store.equals(r.getObject(2,UUID.class))||!actor.actorId().equals(r.getObject(3,UUID.class))||!id.equals(r.getObject(4,UUID.class))||!json.read(r.getString(5),Action.class).equals(c))throw WorkforceException.conflict();return json.read(r.getString(6),Request.class);},c.commandId()).stream().findFirst();}
+ public void command(CurrentActor actor,UUID store,Request r,Action c){jdbc.update("insert into workforce_pay_change_commands(id,tenant_id,store_id,actor_id,request_id,company_id,payload,response) values(?,?,?,?,?,?,?::jsonb,?::jsonb)",c.commandId(),actor.tenantId(),store,actor.actorId(),r.id(),r.companyId(),json.write(c),json.write(r));}
+ public void proof(UUID tenant,UUID company,Proof p,Object result){jdbc.update("insert into workforce_pay_change_proofs(request_id,tenant_id,company_id,revision,kind,subject_id,period_month,version,hash,result,snapshot) values(?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb)",p.requestId(),tenant,company,p.revision(),p.kind(),p.subjectId(),p.month()==null?"":p.month(),p.version(),p.hash(),json.write(result),json.write(p));}
+ public List<Proof> proofs(UUID tenant,UUID request){return jdbc.query("select snapshot from workforce_pay_change_proofs where tenant_id=? and request_id=? order by kind,subject_id,period_month",(r,n)->json.read(r.getString(1),Proof.class),tenant,request);}
+ public Optional<ApprovedMonth> approvedMonthly(UUID tenant,UUID company,UUID employee,YearMonth month){return jdbc.query("select snapshot from workforce_pay_approved_months where tenant_id=? and company_id=? and employee_id=? and period_month=? order by version desc limit 1",(r,n)->json.read(r.getString(1),ApprovedMonth.class),tenant,company,employee,month.atDay(1)).stream().findFirst();}
+ public void approveMonth(UUID tenant,ApprovedMonth m){jdbc.update("insert into workforce_pay_approved_months(tenant_id,company_id,employee_id,period_month,version,request_id,revision,snapshot) values(?,?,?,?,?,?,?,?::jsonb)",tenant,m.companyId(),m.employeeId(),YearMonth.parse(m.month()).atDay(1),m.version(),m.proof().requestId(),m.proof().revision(),json.write(m));}
+ public LineInput monthlyBaseline(UUID tenant,UUID company,UUID employee,YearMonth month){var result=new EffectivePayGovernance(jdbc,json).monthly(tenant,company,employee,month);if(result.issue()!=null)throw new WorkforceException(result.issue(),409);return result.input();}
+ public Object supplementalSources(UUID tenant,UUID company,UUID employee,java.util.List<com.rpb.reservation.workforce.payroll.supplemental.SupplementalDtos.Proposal> proposals){var resolver=new com.rpb.reservation.workforce.payroll.supplemental.SupplementalSourceResolver(jdbc,json,java.time.Clock.systemUTC());return proposals.stream().map(p->resolver.validate(tenant,company,employee,p).source()).toList();}
+ public boolean frozen(UUID tenant,UUID company,UUID employee,LocalDate from,LocalDate to){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from workforce_pay_batches b cross join lateral jsonb_array_elements(coalesce(b.calculation->'lines','[]'::jsonb)) l where b.tenant_id=? and b.company_id=? and b.status in ('confirmed','published') and b.period_month between ? and ? and l->>'employeeId'=?) or exists(select 1 from workforce_pay_segments s where s.tenant_id=? and s.company_id=? and s.employee_id=? and s.status in ('confirmed','published') and s.period_month between ? and ?)",Boolean.class,tenant,company,from.withDayOfMonth(1),to.withDayOfMonth(1),employee.toString(),tenant,company,employee,from.withDayOfMonth(1),to.withDayOfMonth(1)));}
+ public String companyHistory(UUID tenant,UUID employee){return jdbc.queryForObject("select coalesce(jsonb_agg(to_jsonb(h) order by h.version)::text,'[]') from workforce_company_history h where tenant_id=? and employee_id=?",String.class,tenant,employee);}
+}

@@ -181,6 +181,32 @@ class CustomerAuthApplicationServiceTest {
                 .isEqualTo(CustomerAuthError.PROVIDER_NOT_CONFIGURED));
     }
 
+    @Test
+    void archivedMissingOrWrongTenantCustomersCannotLoginOrUseExistingSessions() {
+        for (String state : List.of("archived", "inactive", "deleted", "other_tenant")) {
+            var auth = new FakeCustomerAuthRepository();var customers = new FakeCustomerRepository();
+            var service = service(auth, customers, new FakeEmailDelivery(), new FakeOAuthVerifier());
+            var first = service.requestEmailCode(tenantId, storeId, "guest@example.com", "", "test");
+            var login = service.loginWithEmail(tenantId, storeId, "guest@example.com", first.devCode(), "Guest", "", "test");
+            Customer original = customers.savedCustomer;
+            assertThat(service.authenticateSession(login.sessionToken())).isPresent();
+            var next = service.requestEmailCode(tenantId, storeId, "guest@example.com", "", "test");
+            customers.savedCustomer = "deleted".equals(state) ? null : new Customer(original.id(),
+                "other_tenant".equals(state) ? new TenantScope(new com.rpb.reservation.tenant.value.TenantId(UUID.randomUUID())) : original.scope(),
+                original.customerCode(), original.customerType(), original.phone(), "other_tenant".equals(state) ? "active" : state, "Guest", null);
+            assertThat(service.authenticateSession(login.sessionToken())).isEmpty();
+            for(int retry=0;retry<2;retry++) assertThatThrownBy(()->service.loginWithEmail(tenantId,storeId,"guest@example.com",next.devCode(),"Guest","","test"))
+                .isInstanceOfSatisfying(CustomerAuthServiceException.class,e->assertThat(e.error()).isEqualTo(CustomerAuthError.ACCOUNT_DISABLED));
+            assertThatThrownBy(()->service.loginWithProvider(tenantId,storeId,"google","official-token","","test"))
+                .isInstanceOfSatisfying(CustomerAuthServiceException.class,e->assertThat(e.error()).isEqualTo(CustomerAuthError.ACCOUNT_DISABLED));
+            auth.identityAccount = auth.account;
+            assertThatThrownBy(()->service.loginWithProvider(tenantId,storeId,"google","official-token","","test"))
+                .isInstanceOfSatisfying(CustomerAuthServiceException.class,e->assertThat(e.error()).isEqualTo(CustomerAuthError.ACCOUNT_DISABLED));
+            assertThat(auth.sessionCount).isEqualTo(1);assertThat(auth.codeStatus).isEqualTo("created");
+            assertThat(customers.saveCount).isEqualTo(1); // no replacement Customer or email-only merge
+        }
+    }
+
     private CustomerAuthApplicationService service(
         FakeCustomerAuthRepository authRepository,
         FakeCustomerRepository customerRepository,
@@ -201,9 +227,11 @@ class CustomerAuthApplicationServiceTest {
         private EmailCodeRecord code;
         private String codeStatus = "created";
         private CustomerAuthAccountRecord account;
+        private CustomerAuthAccountRecord identityAccount;
         private String linkedProvider;
         private String linkedSubject;
         private int sessionCount;
+        private CustomerAuthSessionRecord session;
 
         @Override
         public void createEmailCode(
@@ -250,7 +278,7 @@ class CustomerAuthApplicationServiceTest {
 
         @Override
         public Optional<CustomerAuthAccountRecord> findAccountByIdentity(UUID tenantId, String provider, String providerSubject) {
-            return Optional.empty();
+            return Optional.ofNullable(identityAccount);
         }
 
         @Override
@@ -292,11 +320,12 @@ class CustomerAuthApplicationServiceTest {
             String userAgent
         ) {
             sessionCount++;
+            session = new CustomerAuthSessionRecord(sessionId, account, expiresAt);
         }
 
         @Override
         public Optional<CustomerAuthSessionRecord> findActiveSessionByHash(String sessionHash) {
-            return Optional.empty();
+            return Optional.ofNullable(session);
         }
 
         @Override
@@ -366,10 +395,11 @@ class CustomerAuthApplicationServiceTest {
 
     private static final class FakeCustomerRepository implements CustomerRepositoryPort {
         private Customer savedCustomer;
+        private int saveCount;
 
         @Override
         public Optional<Customer> findById(TenantScope scope, CustomerId customerId) {
-            return Optional.empty();
+            return Optional.ofNullable(savedCustomer).filter(c -> c.id().equals(customerId) && c.scope().equals(scope));
         }
 
         @Override
@@ -390,6 +420,7 @@ class CustomerAuthApplicationServiceTest {
         @Override
         public Customer save(TenantScope scope, Customer customer) {
             savedCustomer = customer;
+            saveCount++;
             return customer;
         }
     }

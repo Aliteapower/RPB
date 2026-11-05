@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
@@ -19,6 +19,7 @@ import type {
   I18nCatalogLocaleEntry,
   I18nCatalogMessage,
   I18nCatalogMessageMutation,
+  I18nCatalogProductLineScope,
   I18nCatalogResponse,
   I18nCatalogScopeLevel
 } from '../types/i18nCatalog'
@@ -50,6 +51,19 @@ const catalog = ref<I18nCatalogResponse | null>(null)
 const rows = ref<DraftEntry[]>([])
 
 const storeId = computed(() => String(route.params.storeId || ''))
+const productLineScope = computed<I18nCatalogProductLineScope | undefined>(() => {
+  const routeName = String(route.name || '')
+  if (routeName === 'tenant-admin-payment-i18n-catalog') {
+    return 'payment'
+  }
+  if (
+    routeName === 'tenant-admin-reservation-queue-i18n-catalog' ||
+    routeName === 'tenant-admin-i18n-catalog-legacy'
+  ) {
+    return 'reservation_queue'
+  }
+  return undefined
+})
 const namespaceOptions = computed(() => {
   const options = new Set((catalog.value?.entries ?? []).map(entry => entry.key.namespace))
   return Array.from(options).sort((left, right) => left.localeCompare(right))
@@ -61,18 +75,18 @@ const filteredRows = computed(() => {
   return rows.value.filter(row => row.source.key.namespace === namespaceFilter.value)
 })
 
-onMounted(() => {
-  void loadCatalog()
-})
-
 watch(scopeLevel, () => rebuildRows())
+watch([storeId, productLineScope], () => {
+  namespaceFilter.value = ''
+  void loadCatalog()
+}, { immediate: true })
 
 async function loadCatalog(): Promise<void> {
   loading.value = true
   errorText.value = ''
   savedText.value = ''
   try {
-    catalog.value = await getTenantAdminI18nCatalog(storeId.value)
+    catalog.value = await getTenantAdminI18nCatalog(storeId.value, productLineScope.value)
     rebuildRows()
   } catch (error) {
     errorText.value = apiErrorText(error)
@@ -124,7 +138,7 @@ async function saveCatalog(): Promise<void> {
     catalog.value = await updateTenantAdminI18nCatalog(storeId.value, {
       scopeLevel: scopeLevel.value,
       messages
-    })
+    }, productLineScope.value)
     rebuildRows()
     savedText.value = t('tenant.i18nCatalog.messages.saved')
   } catch (error) {

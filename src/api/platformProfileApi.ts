@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 export interface PlatformSocialLink {
   id: string
   displayName: string
@@ -169,7 +170,7 @@ async function requestForm<T>(
   return request(endpoint, {
     method: options.method,
     headers: { Accept: 'application/json' },
-    body: options.body,
+    body: await prepareImageFormData(options.body),
     fetcher: options.fetcher
   })
 }

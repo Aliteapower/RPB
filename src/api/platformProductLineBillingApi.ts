@@ -1,3 +1,4 @@
+import { selectedStoreBillingRetry } from './selectedStoreBillingRetry'
 import type {
   PlatformBillingApiErrorResponse,
   PlatformProductLineCreateMutation,
@@ -92,6 +93,7 @@ export async function purchaseProductSubscription(
   request: ProductSubscriptionMutation,
   fetcher?: PlatformBillingFetcher
 ): Promise<TenantProductSubscriptionResponse> {
+  if(request.appKey === 'wallet' || request.storeIds !== undefined) { const path = `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/purchase`; return selectedStoreBillingRetry(path,request,body=>requestJson(path,{method:'POST',body,fetcher})) }
   return requestJson(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/purchase`, {
     method: 'POST',
     body: request,
@@ -105,6 +107,7 @@ export async function renewProductSubscription(
   request: ProductSubscriptionMutation,
   fetcher?: PlatformBillingFetcher
 ): Promise<TenantProductSubscriptionResponse> {
+  if(request.appKey === 'wallet' || request.storeIds !== undefined) { const path = `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/${encodeURIComponent(subscriptionId)}/renew`; return selectedStoreBillingRetry(path,request,body=>requestJson(path,{method:'POST',body,fetcher})) }
   return requestJson(
     `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/${encodeURIComponent(subscriptionId)}/renew`,
     {
@@ -115,6 +118,11 @@ export async function renewProductSubscription(
   )
 }
 
+export async function addSubscriptionStores(tenantId: string, subscriptionId: string, request: ProductSubscriptionMutation): Promise<TenantProductSubscriptionResponse> {
+  const path = `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/${encodeURIComponent(subscriptionId)}/add-stores`
+  return selectedStoreBillingRetry(path,request,body=>requestJson(path,{method:'POST',body}))
+}
+
 export async function renewProductSubscriptionItem(
   tenantId: string,
   subscriptionId: string,
@@ -122,6 +130,7 @@ export async function renewProductSubscriptionItem(
   request: ProductSubscriptionMutation,
   fetcher?: PlatformBillingFetcher
 ): Promise<TenantProductSubscriptionResponse> {
+  if(request.appKey === 'wallet' || request.storeIds !== undefined) { const path = `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/${encodeURIComponent(subscriptionId)}/items/${encodeURIComponent(itemId)}/renew`; return selectedStoreBillingRetry(path,request,body=>requestJson(path,{method:'POST',body,fetcher})) }
   return requestJson(
     `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/product-subscriptions/${encodeURIComponent(subscriptionId)}/items/${encodeURIComponent(itemId)}/renew`,
     {

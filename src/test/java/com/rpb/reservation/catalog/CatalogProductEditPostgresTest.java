@@ -1,0 +1,38 @@
+package com.rpb.reservation.catalog;
+import com.rpb.reservation.catalog.access.CatalogAccess;
+import com.rpb.reservation.catalog.application.*;
+import com.rpb.reservation.catalog.application.CatalogDtos.*;
+import com.rpb.reservation.catalog.persistence.*;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+public class CatalogProductEditPostgresTest extends CatalogPostgresTest {
+ CatalogBarcodeService barcodes;CatalogProductEditService editor;
+ void setup(){var access=mock(CatalogAccess.class);var repo=new CatalogRepository(jdbc);var commands=new CatalogCommands(jdbc,json);barcodes=new CatalogBarcodeService(access,repo,commands,jdbc);editor=new CatalogProductEditService(access,repo,commands,catalog,barcodes);}
+ CatalogProductEditService.Write edit(List<String> desired,List<String> expected,String name){var old=write(product.categoryId(),product.version());var c=new ProductWrite(old.code(),old.categoryId(),name,old.nameEn(),old.descriptionZh(),old.descriptionEn(),old.kind(),old.unit(),old.imageUrl(),old.priceCents(),old.taxMode(),old.taxCategory(),old.taxRate(),old.channels(),old.expectedVersion(),key());return new CatalogProductEditService.Write(c,desired,expected,product.listingVersion(),key());}
+ @Test void saveProductAndExactRawBarcodeTogetherAndReplay(){setup();var command=edit(List.of("6956367311355"),List.of(),"修改商品");var result=tx.execute(t->editor.save(scope,actor,product.id(),command));assertThat(result.product().nameZh()).isEqualTo("修改商品");assertThat(result.barcodes()).containsExactly("6956367311355");assertThat(jdbc.queryForObject("select barcode from catalog_product_barcodes where product_id=?",String.class,product.id())).isEqualTo("06956367311355");
+  CatalogProductEditService.Detail replay=tx.execute(t->editor.save(scope,actor,product.id(),command));assertThat(replay).isEqualTo(result);
+ }
+ @Test void sameGtinDifferentLengthChangesOnlyRawRepresentation(){setup();tx.execute(t->barcodes.save(scope,actor,product.id(),new CatalogBarcodeService.Write("06956367311355",false,key())));var result=tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of("6956367311355"),List.of("06956367311355"),"名称")));assertThat(result.barcodes()).containsExactly("6956367311355");assertThat(jdbc.queryForObject("select count(*) from catalog_product_barcodes where product_id=?",Integer.class,product.id())).isEqualTo(1);}
+ @Test void conflictOrStaleBarcodeRollsBackProductAndCommand(){setup();UUID other=tx.execute(t->new StorageProductCatalog(new CatalogRepository(jdbc),products,jdbc).associate(scope,null,product.categoryId(),"另一商品","Other",actor.actorId())).id();tx.execute(t->barcodes.save(scope,actor,other,new CatalogBarcodeService.Write("6956367311355",false,key())));
+  assertThatThrownBy(()->tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of("6956367311355"),List.of(),"不应保存")))).hasMessageContaining("其他商品");assertThat(products.get(scope,product.id()).nameZh()).isEqualTo(product.nameZh());
+  assertThatThrownBy(()->tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of(),List.of("036000291452"),"不应保存")))).hasMessageContaining("变化");assertThat(products.get(scope,product.id()).version()).isEqualTo(product.version());assertThat(jdbc.queryForObject("select count(*) from catalog_commands where tenant_id=? and operation='product.edit'",Integer.class,tenant)).isZero();
+ }
+ @Test void createWithBarcodeAndListingConflict(){setup();var c=new CatalogProductEditService.Write(write(product.categoryId(),null),List.of("036000291452"),List.of(),0,key());var old=c.product();var fresh=new ProductWrite("NEW",old.categoryId(),"新酒","New","","","physical","瓶","",old.priceCents(),old.taxMode(),old.taxCategory(),old.taxRate(),old.channels(),null,key());var result=tx.execute(t->editor.save(scope,actor,null,new CatalogProductEditService.Write(fresh,c.barcodes(),List.of(),0,key())));assertThat(result.barcodes()).containsExactly("036000291452");
+  var command=edit(List.of(),List.of(),"不应保存");tx.execute(t->catalog.listing(scope,actor,product.id(),new Listing(600,List.of("cards"),true,product.listingVersion(),key())));assertThatThrownBy(()->tx.execute(t->editor.save(scope,actor,product.id(),command))).hasMessageContaining("变化");
+ }
+ @Test void preservesEverySupportedLengthWithoutPadding(){setup();List<String> expected=List.of();for(String raw:List.of("96385074","036000291452","6956367311355","06956367311355")){var result=tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of(raw),editor.get(scope,actor,product.id()).barcodes(),"名称")));assertThat(result.barcodes()).containsExactly(raw);product=result.product();}}
+ @Test void tenantIsolationAndPermissionRejection(){setup();var other=new com.rpb.reservation.common.scope.StoreScope(new com.rpb.reservation.tenant.value.TenantId(UUID.randomUUID()),store);assertThatThrownBy(()->editor.get(other,actor,product.id())).hasMessageContaining("不存在");assertThatThrownBy(()->tx.execute(t->editor.save(other,actor,product.id(),edit(List.of(),List.of(),"不可保存")))).hasMessageContaining("不存在");var access=mock(CatalogAccess.class);doThrow(new IllegalStateException("denied")).when(access).requireGlobal(scope,actor,"catalog.manage");var blocked=new CatalogProductEditService(access,new CatalogRepository(jdbc),new CatalogCommands(jdbc,json),catalog,barcodes);assertThatThrownBy(()->tx.execute(t->blocked.save(scope,actor,product.id(),edit(List.of(),List.of(),"不可保存")))).hasMessage("denied");}
+ @Test void saveRequiresManageWithoutAddingAnUndocumentedViewPermission(){setup();var access=mock(CatalogAccess.class);doThrow(new IllegalStateException("view denied")).when(access).require(scope,actor,"catalog.view");var service=new CatalogProductEditService(access,new CatalogRepository(jdbc),new CatalogCommands(jdbc,json),catalog,barcodes);var result=tx.execute(t->service.save(scope,actor,product.id(),edit(List.of(),List.of(),"可保存")));assertThat(result.product().nameZh()).isEqualTo("可保存");verify(access).requireGlobal(scope,actor,"catalog.manage");verify(access,never()).require(scope,actor,"catalog.view");}
+ @Test void multipleBarcodesAreRejectedAndProductChangesRollBack(){setup();
+  assertThatThrownBy(()->tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of("036000291452","6956367311355"),List.of(),"不可保存")))).hasMessageContaining("一个条码");
+  assertThat(products.get(scope,product.id()).nameZh()).isEqualTo(product.nameZh());assertThat(barcodes.values(scope,product.id())).isEmpty();
+ }
+ @Test void legacyMultipleBarcodesRequireAnExplicitCompleteSnapshot(){setup();
+  for(String raw:List.of("036000291452","6956367311355"))jdbc.update("insert into catalog_product_barcodes(tenant_id,barcode,product_id,created_by,raw_barcode) values(?,?,?,?,?)",tenant,ProductBarcode.normalize(raw),product.id(),actor.actorId(),raw);
+  assertThatThrownBy(()->tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of("6956367311355"),List.of("6956367311355"),"不可保存")))).hasMessageContaining("变化");
+  assertThat(barcodes.values(scope,product.id())).hasSize(2);
+  var result=tx.execute(t->editor.save(scope,actor,product.id(),edit(List.of("6956367311355"),List.of("036000291452","6956367311355"),"保留一条")));assertThat(result.barcodes()).containsExactly("6956367311355");
+ }
+}

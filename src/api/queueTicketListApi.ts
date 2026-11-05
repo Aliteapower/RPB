@@ -57,6 +57,7 @@ export async function listQueueTickets(
 
 function buildEndpoint(storeId: string, query: QueueTicketListQuery): string {
   const params = new URLSearchParams()
+  if(query.businessDate?.trim())params.set('businessDate',query.businessDate.trim())
   const status = query.status?.trim()
 
   if (status) {

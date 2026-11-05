@@ -1,10 +1,9 @@
 package com.rpb.reservation.publicbooking.api;
 
+import com.rpb.reservation.publicbooking.application.PublicBookingManagementAccess;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.customerauth.application.CustomerAuthIntegrationAdminService;
-import com.rpb.reservation.customerauth.application.CustomerEmailSettings;
-import com.rpb.reservation.customerauth.application.CustomerEmailSettingsCommand;
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettings;
 import com.rpb.reservation.customerauth.application.CustomerOAuthProviderSettingsCommand;
 import com.rpb.reservation.publicbooking.application.PublicBookingAdminService;
@@ -41,20 +40,29 @@ public class TenantAdminPublicBookingController {
     private final PublicBookingAdminService service;
     private final CustomerAuthIntegrationAdminService authIntegrationService;
     private final TenantAdminScopeResolver scopeResolver;
+    private final PublicBookingManagementAccess access;
 
     public TenantAdminPublicBookingController(
         PublicBookingAdminService service,
         CustomerAuthIntegrationAdminService authIntegrationService,
-        TenantAdminScopeResolver scopeResolver
+        TenantAdminScopeResolver scopeResolver,
+        PublicBookingManagementAccess access
     ) {
         this.service = service;
         this.authIntegrationService = authIntegrationService;
         this.scopeResolver = scopeResolver;
+        this.access = access;
+    }
+
+    private StoreScope requireBookingScope(UUID storeId) {
+        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        access.require(scope);
+        return scope;
     }
 
     @GetMapping("/settings")
     public ResponseEntity<SettingsResponse> getSettings(@PathVariable UUID storeId) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         return ResponseEntity.ok(SettingsResponse.from(service.getSettings(scope)));
     }
 
@@ -63,7 +71,7 @@ public class TenantAdminPublicBookingController {
         @PathVariable UUID storeId,
         @RequestBody(required = false) PublicBookingSettingsRequest request
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         PublicBookingSettingsCommand command = request == null ? null : request.toCommand();
         return ResponseEntity.ok(SettingsResponse.from(service.saveSettings(scope, command)));
     }
@@ -73,7 +81,7 @@ public class TenantAdminPublicBookingController {
         @PathVariable UUID storeId,
         @RequestBody PublicBookingQuotaOverrideRequest request
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         PublicBookingQuotaOverride override = service.saveQuotaOverride(scope, request.toCommand());
         return ResponseEntity.ok(QuotaOverrideResponse.from(override));
     }
@@ -84,7 +92,7 @@ public class TenantAdminPublicBookingController {
         @RequestParam("businessDate") LocalDate businessDate,
         @RequestParam(value = "periodKey", required = false) String periodKey
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         Optional<PublicBookingQuotaOverride> override = service.findQuotaOverride(scope, new BusinessDate(businessDate), periodKey);
         return override
             .map(value -> ResponseEntity.ok(QuotaOverrideResponse.from(value)))
@@ -93,7 +101,7 @@ public class TenantAdminPublicBookingController {
 
     @GetMapping("/availability-rules")
     public ResponseEntity<AvailabilityRulesResponse> getAvailabilityRules(@PathVariable UUID storeId) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         return ResponseEntity.ok(AvailabilityRulesResponse.from(service.listAvailabilityRules(scope)));
     }
 
@@ -102,7 +110,7 @@ public class TenantAdminPublicBookingController {
         @PathVariable UUID storeId,
         @RequestBody AvailabilityRuleRequest request
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         PublicBookingAvailabilityRule rule = service.saveAvailabilityRule(scope, request.toCommand());
         return ResponseEntity.ok(AvailabilityRuleResponse.from(rule));
     }
@@ -112,25 +120,9 @@ public class TenantAdminPublicBookingController {
         @PathVariable UUID storeId,
         @PathVariable UUID ruleId
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         service.deleteAvailabilityRule(scope, ruleId);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/customer-auth/email-settings")
-    public ResponseEntity<EmailSettingsResponse> getEmailSettings(@PathVariable UUID storeId) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(EmailSettingsResponse.from(authIntegrationService.getEmailSettings(scope)));
-    }
-
-    @PutMapping("/customer-auth/email-settings")
-    public ResponseEntity<EmailSettingsResponse> saveEmailSettings(
-        @PathVariable UUID storeId,
-        @RequestBody(required = false) EmailSettingsRequest request
-    ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
-        CustomerEmailSettingsCommand command = request == null ? null : request.toCommand();
-        return ResponseEntity.ok(EmailSettingsResponse.from(authIntegrationService.saveEmailSettings(scope, command)));
     }
 
     @GetMapping("/customer-auth/oauth-providers/{provider}")
@@ -138,7 +130,7 @@ public class TenantAdminPublicBookingController {
         @PathVariable UUID storeId,
         @PathVariable String provider
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         return ResponseEntity.ok(OAuthProviderSettingsResponse.from(
             authIntegrationService.getOAuthProviderSettings(scope, provider)
         ));
@@ -150,7 +142,7 @@ public class TenantAdminPublicBookingController {
         @PathVariable String provider,
         @RequestBody(required = false) OAuthProviderSettingsRequest request
     ) {
-        StoreScope scope = scopeResolver.requireTenantAdminScope(storeId);
+        StoreScope scope = requireBookingScope(storeId);
         CustomerOAuthProviderSettingsCommand command = request == null
             ? new CustomerOAuthProviderSettingsCommand(provider, null, null, null)
             : request.toCommand(provider);
@@ -242,30 +234,6 @@ public class TenantAdminPublicBookingController {
                 quotaPercent,
                 tableCount,
                 guestCount
-            );
-        }
-    }
-
-    public record EmailSettingsRequest(
-        Boolean enabled,
-        String fromEmail,
-        String fromName,
-        String smtpHost,
-        Integer smtpPort,
-        String smtpUsername,
-        String smtpPassword,
-        Boolean smtpStartTls
-    ) {
-        CustomerEmailSettingsCommand toCommand() {
-            return new CustomerEmailSettingsCommand(
-                enabled,
-                fromEmail,
-                fromName,
-                smtpHost,
-                smtpPort,
-                smtpUsername,
-                smtpPassword,
-                smtpStartTls
             );
         }
     }
@@ -362,34 +330,6 @@ public class TenantAdminPublicBookingController {
                 rule.quotaPercent(),
                 rule.tableCount(),
                 rule.guestCount()
-            );
-        }
-    }
-
-    public record EmailSettingsResponse(
-        boolean success,
-        boolean enabled,
-        String provider,
-        String fromEmail,
-        String fromName,
-        String smtpHost,
-        int smtpPort,
-        String smtpUsername,
-        boolean smtpStartTls,
-        boolean secretConfigured
-    ) {
-        static EmailSettingsResponse from(CustomerEmailSettings settings) {
-            return new EmailSettingsResponse(
-                true,
-                settings.enabled(),
-                settings.provider(),
-                settings.fromEmail(),
-                settings.fromName(),
-                settings.smtpHost(),
-                settings.smtpPort(),
-                settings.smtpUsername(),
-                settings.smtpStartTls(),
-                settings.secretConfigured()
             );
         }
     }

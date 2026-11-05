@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 export interface TenantAdminPage {
   limit: number
   offset: number
@@ -32,7 +33,9 @@ export interface TenantAdminStaffMutation {
   defaultStoreId?: string | null
 }
 
+export type CustomerActivationState = 'required'|'verified_pending'|'activated'|'email_verified'|'unavailable'|'unknown'
 export interface TenantAdminCustomer {
+  activationState?: CustomerActivationState
   id: string
   customerCode: string
   displayName: string | null
@@ -45,11 +48,17 @@ export interface TenantAdminCustomer {
 }
 
 export interface TenantAdminCustomerMutation {
+  privacyConsent?: {accepted:boolean;noticeVersion:string;entrySource:'wallet'|'tenant_admin'}
   displayName?: string | null
   nickname?: string | null
   phoneE164?: string | null
   email?: string | null
 }
+
+export interface CustomerPrivacyNotice {version:string;textZh:string;textEn:string;labelZh:string;labelEn:string}
+export interface CustomerPrivacyRecord {id:string;customerId:string;storeId:string;accepted:boolean;recordedBy:string|null;recordedByCustomerId:string|null;recordedByName:string;recordedAt:string;entrySource:'wallet'|'tenant_admin'|'customer_registration';confirmationMethod:'merchant_attestation'|'customer_registration_submission';noticeVersion:string;noticeTextZh:string;noticeTextEn:string}
+export function getCustomerPrivacyNotice(storeId:string):Promise<CustomerPrivacyNotice>{return requestJson(`${baseEndpoint(storeId)}/customer-privacy-notice`,{method:'GET'})}
+export function listCustomerPrivacyConsents(storeId:string,customerId:string):Promise<{records:CustomerPrivacyRecord[]}>{return requestJson(`${baseEndpoint(storeId)}/customers/${encodeURIComponent(customerId)}/privacy-consents`,{method:'GET'})}
 
 export interface TenantAdminTable {
   id: string
@@ -475,6 +484,7 @@ async function requestForm<T>(
   form: FormData,
   fetcher?: TenantAdminFetcher
 ): Promise<T> {
+  form = await prepareImageFormData(form)
   let response: TextResponse
 
   try {

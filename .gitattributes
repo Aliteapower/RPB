@@ -1,1 +1,2 @@
 ops/*.sh text eol=lf
+src/main/resources/db/migration/V113__workforce_clock_options.sql text eol=lf

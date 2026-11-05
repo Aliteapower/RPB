@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import ProductRouteBoundary from './modules/tenant-products/ProductRouteBoundary.vue'
 import FrontendLocaleSwitcher from './components/common/FrontendLocaleSwitcher.vue'
+import FrontendUpdateNotice from './frontend-version/FrontendUpdateNotice.vue'
+import { routeViewKey } from './router/viewKey'
 </script>
 
 <template>
   <FrontendLocaleSwitcher />
-  <RouterView :key="$route.path" />
+  <FrontendUpdateNotice />
+  <ProductRouteBoundary><RouterView :key="routeViewKey($route)" /></ProductRouteBoundary>
 </template>
 
 <style>
@@ -32,7 +36,8 @@ body,
 }
 
 body {
-  min-width: 320px;
+  /* Classic vertical scrollbars can leave less than 320px of layout width. */
+  min-width: min(320px, 100%);
 }
 
 button,

@@ -3,6 +3,11 @@ package com.rpb.reservation.appgate.domain;
 import java.util.Set;
 
 public final class AppGateRequiredPermission {
+    public static final Set<String> WINE_STORAGE_ADMIN_PERMISSIONS=Set.of("wine_storage.view","wine_storage.receive","wine_storage.deliver","wine_storage.rules.manage","wine_storage.correct","wine_storage.custodians.manage");
+    public static final Set<String> WALLET_ENTRY_PERMISSIONS=Set.of("wallet.view","wallet.topup.create","wallet.charge.create");
+    public static final Set<String> WALLET_ADMIN_PERMISSIONS=Set.of("wallet.view","wallet.topup.create","wallet.charge.create","wallet.collection.confirm","wallet.refund.manage","wallet.reconcile.view","wallet.settings.manage","wallet.marketing.view","wallet.marketing.manage","wallet.points.view","wallet.points.grant","wallet.points.redeem","wallet.points.adjust","wallet.points.reverse","wallet.cards.view","wallet.cards.manage","wallet.cards.sell","wallet.cards.stamp","wallet.cards.redeem","wallet.cards.reverse","wallet.cards.refund","catalog.view","catalog.manage","catalog.publish");
+    public static final Set<String> DAILY_LEDGER_ENTRY_PERMISSIONS = Set.of("daily_ledger.view", "daily_ledger.write");
+    public static final Set<String> DAILY_LEDGER_ADMIN_PERMISSIONS = Set.of("daily_ledger.view", "daily_ledger.write", "daily_ledger.settings.manage");
     public static final String RESERVATION_CREATE = "reservation.create";
     public static final String RESERVATION_CHECK_IN = "reservation.check_in";
     public static final String RESERVATION_SEAT = "reservation.seat";
@@ -25,6 +30,13 @@ public final class AppGateRequiredPermission {
     public static final String WALKIN_QUEUE_CREATE = "walkin.queue.create";
     public static final String CLEANING_START = "cleaning.start";
     public static final String CLEANING_COMPLETE = "cleaning.complete";
+    public static final String PAYMENT_SETTINGS_MANAGE = "payment.settings.manage";
+    public static final String PAYMENT_INTENT_VIEW = "payment.intent.view";
+    public static final String PAYMENT_INTENT_CREATE = "payment.intent.create";
+    public static final String PAYMENT_VERIFICATION_REVIEW = "payment.verification.review";
+    public static final String PAYMENT_PROOF_REVIEW = "payment.proof.review";
+    public static final String PAYMENT_PROOF_TEMPLATE_MANAGE = "payment.proof_template.manage";
+    public static final String PLATFORM_PAYMENT_PROOF_TEMPLATE_MANAGE = "platform.payment_proof_template.manage";
 
     public static final Set<String> RESERVATION_QUEUE_ENTRY_PERMISSIONS = Set.of(
         RESERVATION_CREATE,
@@ -49,6 +61,28 @@ public final class AppGateRequiredPermission {
         WALKIN_QUEUE_CREATE,
         CLEANING_START,
         CLEANING_COMPLETE
+    );
+
+    public static final Set<String> PAYMENT_ENTRY_PERMISSIONS = Set.of(
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_VERIFICATION_REVIEW,
+        PAYMENT_PROOF_REVIEW,
+        PAYMENT_PROOF_TEMPLATE_MANAGE
+    );
+
+    public static final Set<String> PAYMENT_TENANT_ADMIN_PERMISSIONS = Set.of(
+        PAYMENT_SETTINGS_MANAGE,
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_VERIFICATION_REVIEW,
+        PAYMENT_PROOF_REVIEW
+    );
+
+    public static final Set<String> PAYMENT_STAFF_OPERATION_PERMISSIONS = Set.of(
+        PAYMENT_INTENT_VIEW,
+        PAYMENT_INTENT_CREATE,
+        PAYMENT_PROOF_REVIEW
     );
 
     private AppGateRequiredPermission() {

@@ -98,8 +98,8 @@ export async function loginCustomerWithOAuth(
   })
 }
 
-export async function getCustomerMe(fetcher?: PublicBookingFetcher): Promise<CustomerAuthMeResponse> {
-  return requestJson('/api/v1/public/customer-auth/me', { method: 'GET', fetcher })
+export async function getCustomerMe(fetcher?: PublicBookingFetcher, storeId?: string): Promise<CustomerAuthMeResponse> {
+  return requestJson('/api/v1/public/customer-auth/me' + (storeId ? `?storeId=${encodeURIComponent(storeId)}` : ''), { method: 'GET', fetcher })
 }
 
 export async function createPublicBooking(
@@ -184,7 +184,7 @@ export async function getTenantAdminCustomerEmailSettings(
   storeId: string,
   fetcher?: PublicBookingFetcher
 ): Promise<TenantAdminCustomerEmailSettingsResponse> {
-  return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/customer-auth/email-settings'), {
+  return requestJson(`/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/customer-auth/email-settings`, {
     method: 'GET',
     fetcher
   })
@@ -195,7 +195,7 @@ export async function updateTenantAdminCustomerEmailSettings(
   request: TenantAdminCustomerEmailSettingsMutation,
   fetcher?: PublicBookingFetcher
 ): Promise<TenantAdminCustomerEmailSettingsResponse> {
-  return requestJson(tenantAdminPublicBookingEndpoint(storeId, '/customer-auth/email-settings'), {
+  return requestJson(`/api/v1/stores/${encodeURIComponent(storeId)}/tenant-admin/customer-auth/email-settings`, {
     method: 'PUT',
     body: request,
     fetcher

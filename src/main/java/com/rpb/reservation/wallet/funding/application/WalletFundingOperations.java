@@ -1,0 +1,35 @@
+package com.rpb.reservation.wallet.funding.application;
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.walkin.api.CurrentActor;
+import com.rpb.reservation.wallet.application.*;
+import com.rpb.reservation.wallet.domain.*;
+import com.rpb.reservation.wallet.persistence.*;
+import com.rpb.reservation.wallet.funding.persistence.WalletFundingRepository.Lot;
+import java.util.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Access-checked previews and controlled bonus-only exits; no controller accesses funding repositories. */
+@Service
+@Transactional
+public class WalletFundingOperations {
+ private final WalletAccess access;private final WalletAccountRepository accounts;private final WalletTopupRepository topups;private final WalletBillRepository bills;private final WalletRefundRepository refunds;private final WalletFundingService funding;private final WalletCommandRepository commands;
+ public WalletFundingOperations(WalletAccess access,WalletAccountRepository accounts,WalletTopupRepository topups,WalletBillRepository bills,WalletRefundRepository refunds,WalletFundingService funding,WalletCommandRepository commands){this.access=access;this.accounts=accounts;this.topups=topups;this.bills=bills;this.refunds=refunds;this.funding=funding;this.commands=commands;}
+ public record ChargePreview(UUID accountId,String amount,UUID billId){}
+ public record RefundPreviewRequest(String sourceType,UUID sourceId,String amount,String mode){}
+ public record LotView(UUID id,UUID accountId,long initialP,long initialG,long principal,long bonus,long reservedP,long reservedG,long spentP,long spentG,String policy,boolean legacy,int version){}
+ public record AllocationView(UUID lotId,long principal,long bonus,UUID original){}
+ public record ChargeSplit(UUID accountId,int accountVersion,long principalCents,long bonusCents,List<AllocationView> allocations){}
+ public record BonusExit(UUID accountId,Integer expectedVersion,String reason,String idempotencyKey){}
+ public record RefundPreview(long amountCents,long walletCents,long cashPrincipalRefundCents,long principalReturnCents,long bonusReturnCents,long bonusRevokeCents,long externalRefundCents,UUID accountId,int accountVersion,String mode,List<LotView> fundingLots){}
+ public List<LotView> lots(StoreScope s,CurrentActor actor,UUID account){access.staff(s,actor,"wallet.view",false);return views(funding.lots(s,accounts.account(s,account,false)));}
+ public ChargeSplit chargePreview(StoreScope s,CurrentActor actor,ChargePreview c){access.staff(s,actor,"wallet.charge.create",true);if(c==null||c.accountId()==null)throw WalletException.invalid();accounts.requireProgram(s,true);var a=accounts.account(s,c.accountId(),true);accounts.requireActive(a);long total=WalletMoney.cents(c.amount());if(c.billId()!=null){var b=bills.get(s,c.billId(),false);if(!b.accountId().equals(a.id())||b.remainingCents()!=total||b.closed()||b.walletApplied())throw WalletException.conflict("账单已变化，请重新核对");}var split=funding.preview(s,a,Math.min(a.availableCents(),total));return new ChargeSplit(a.id(),a.version(),split.principalCents(),split.bonusCents(),split.allocations().stream().map(x->new AllocationView(x.lotId(),x.principal(),x.bonus(),x.original())).toList());}
+ public RefundPreview refundPreview(StoreScope s,CurrentActor actor,RefundPreviewRequest c){
+  access.staff(s,actor,"wallet.refund.manage",false);if(c==null||c.sourceId()==null||!Set.of("top_up","bill","collection_exception").contains(Objects.toString(c.sourceType(),""))||(c.mode()!=null&&!"remaining_lot_exit".equals(c.mode())))throw WalletException.invalid();
+  if("collection_exception".equals(c.sourceType())){var collection=refunds.collection(s,c.sourceId());if(!collection.exception())throw WalletException.invalid();var account=collection.topupId()!=null?topups.get(s,collection.topupId(),false).accountId():bills.get(s,collection.billId(),false).accountId();var a=accounts.lockForExternalRecovery(s,account);long amount=WalletMoney.cents(c.amount());if(amount>collection.amountCents()-refunds.collectionAllocated(s.tenantId().value(),collection.id()))throw WalletException.conflict("超出原收款可退额");return new RefundPreview(amount,0,amount,0,0,0,amount,a.id(),a.version(),"collection_exception",List.of());}
+  if("top_up".equals(c.sourceType())){var t=topups.get(s,c.sourceId(),false);var a=accounts.account(s,t.accountId(),true);accounts.requireActive(a);if(!"credited".equals(t.status()))throw WalletException.conflict("充值尚未入账");if(t.bonusCents()>0&&!"remaining_lot_exit".equals(c.mode()))throw new WalletException("WALLET_FUNDING_REFUND_NOT_ALLOWED",409,"活动充值需整批退出剩余权益");long p="remaining_lot_exit".equals(c.mode())?funding.topupRemainingPrincipal(s,a,t.id()):WalletMoney.cents(c.amount());if(p<=0)throw WalletException.conflict("无本金可退，剩余赠送请使用赠送退出");long remaining=refunds.collections(s,t.id(),null).stream().filter(x->!x.exception()).mapToLong(x->x.amountCents()-refunds.collectionAllocated(s.tenantId().value(),x.id())).sum();if(p>remaining)throw WalletException.conflict("超过原实收未退本金");var split=funding.topupRefundPreview(s,a,t.id(),p);return new RefundPreview(p,split.totalCents(),p,0,0,split.bonusCents(),p,a.id(),a.version(),c.mode(),views(funding.lots(s,a)));}
+  var b=bills.get(s,c.sourceId(),false);var a=accounts.account(s,b.accountId(),true);accounts.requireActive(a);long amount=WalletMoney.cents(c.amount());UUID walletTender=new UUID(0,0);Map<UUID,Long> available=new LinkedHashMap<>();available.put(walletTender,b.walletPaidCents()-refunds.walletAllocated(s,b.id()));for(var collection:refunds.collections(s,null,b.id()))if(!collection.exception())available.put(collection.id(),collection.amountCents()-refunds.collectionAllocated(s.tenantId().value(),collection.id()));long wallet=WalletMoney.allocate(amount,available).getOrDefault(walletTender,0L);var split=funding.previewBillRefund(s,a,b.id(),wallet);return new RefundPreview(amount,wallet,0,split.principalCents(),split.bonusCents(),0,amount-wallet,a.id(),a.version(),c.mode(),views(funding.lots(s,a)));
+ }
+ private List<LotView> views(List<Lot> lots){return lots.stream().map(x->new LotView(x.id(),x.accountId(),x.initialP(),x.initialG(),x.principal(),x.bonus(),x.reservedP(),x.reservedG(),x.spentP(),x.spentG(),x.policy(),x.legacy(),x.version())).toList();}
+ public WalletViews.Account exit(StoreScope s,CurrentActor actor,UUID lot,BonusExit c){access.staff(s,actor,"wallet.refund.manage",false);if(c==null||c.accountId()==null||c.expectedVersion()==null)throw WalletException.invalid();return commands.run(s,actor.actorId(),"bonus.exit",c.idempotencyKey(),Map.of("lot",lot,"command",c),WalletViews.Account.class,()->{var a=accounts.account(s,c.accountId(),true);accounts.requireActive(a);if(a.version()!=c.expectedVersion())throw new WalletException("WALLET_ALLOCATION_STALE",409,"余额已变化，请重新核对");var result=funding.exitBonus(s,a,lot,c.reason(),actor.actorId());commands.audit(s,actor.actorId(),"bonus.exit",lot,Map.of("reason",c.reason()));return result;});}
+}

@@ -174,19 +174,25 @@ public class CustomerAuthApplicationService {
                 repository.linkIdentity(tenantId, resolved.id(), normalizedProvider, subject, normalizedEmail, trimToNull(displayName));
                 return resolved;
             });
-        requireActiveAccount(account);
+        requireActiveCustomer(account);
         repository.markEmailVerified(account.id(), trimToNull(displayName));
         return createSession(account, remoteAddr, userAgent);
     }
 
     @Transactional
     public Optional<CustomerAuthPrincipal> authenticateSession(String sessionToken) {
+        return authenticatePasswordManagementSession(sessionToken).filter(p -> !p.passwordChangeRequired());
+    }
+
+    @Transactional
+    public Optional<CustomerAuthPrincipal> authenticatePasswordManagementSession(String sessionToken) {
         if (sessionToken == null || sessionToken.isBlank()) {
             return Optional.empty();
         }
-        Optional<CustomerAuthSessionRecord> session = repository.findActiveSessionByHash(hash(sessionToken));
+        Optional<CustomerAuthSessionRecord> session = repository.findActiveSessionByHash(hash(sessionToken))
+            .filter(record -> activeCustomer(record.account()));
         session.ifPresent(record -> repository.touchSession(record.sessionId()));
-        return session.map(record -> principal(record.account()));
+        return session.map(record -> principal(record.account(), record.passwordChangeRequired()));
     }
 
     @Transactional
@@ -198,7 +204,7 @@ public class CustomerAuthApplicationService {
 
     private CustomerAuthAccountRecord accountForEmail(UUID tenantId, String email, String displayName) {
         return repository.findAccountByEmail(tenantId, email)
-            .map(CustomerAuthApplicationService::requireActiveAccount)
+            .map(this::requireActiveCustomer)
             .orElseGet(() -> {
                 TenantScope scope = new TenantScope(new TenantId(tenantId));
                 Customer customer = customerRepository.save(
@@ -225,27 +231,64 @@ public class CustomerAuthApplicationService {
         return account;
     }
 
+    private boolean activeCustomer(CustomerAuthAccountRecord account) {
+        if (!ACCOUNT_STATUS_ACTIVE.equals(account.status())) return false;
+        TenantScope scope = new TenantScope(new TenantId(account.tenantId()));
+        return customerRepository.findById(scope, new CustomerId(account.customerId()))
+            .filter(customer -> customer.scope().equals(scope) && customer.id().value().equals(account.customerId()))
+            .filter(customer -> ACCOUNT_STATUS_ACTIVE.equals(customer.status())).isPresent();
+    }
+
+    private CustomerAuthAccountRecord requireActiveCustomer(CustomerAuthAccountRecord account) {
+        requireActiveAccount(account);
+        if (!activeCustomer(account)) throw new CustomerAuthServiceException(CustomerAuthError.ACCOUNT_DISABLED);
+        return account;
+    }
+
+    @Transactional
+    public CustomerAuthLoginResult loginAccount(CustomerAuthAccountRecord account, String remoteAddr, String userAgent) {
+        return createSession(requireActiveCustomer(account), remoteAddr, userAgent);
+    }
+
+    @Transactional
+    public CustomerAuthLoginResult loginAccount(CustomerAuthAccountRecord account, String remoteAddr, String userAgent, boolean passwordChangeRequired) {
+        return createSession(requireActiveCustomer(account), remoteAddr, userAgent, passwordChangeRequired);
+    }
+
     private CustomerAuthLoginResult createSession(CustomerAuthAccountRecord account, String remoteAddr, String userAgent) {
+        return createSession(account, remoteAddr, userAgent, false);
+    }
+
+    private CustomerAuthLoginResult createSession(CustomerAuthAccountRecord account, String remoteAddr, String userAgent, boolean passwordChangeRequired) {
         String sessionToken = newSessionToken();
-        Instant expiresAt = Instant.now().plus(SESSION_TTL);
+        Instant expiresAt = Instant.now().plus(passwordChangeRequired ? Duration.ofMinutes(15) : SESSION_TTL);
+        UUID sessionId = UUID.randomUUID();
         repository.createSession(
-            UUID.randomUUID(),
+            sessionId,
             account,
             hash(sessionToken),
             expiresAt,
             remoteAddr,
             userAgent
         );
-        return new CustomerAuthLoginResult(principal(account), sessionToken, expiresAt);
+        if (passwordChangeRequired) repository.requirePasswordChange(sessionId);
+        return new CustomerAuthLoginResult(principal(account, passwordChangeRequired), sessionToken, expiresAt);
     }
 
-    private static CustomerAuthPrincipal principal(CustomerAuthAccountRecord account) {
+    private CustomerAuthPrincipal principal(CustomerAuthAccountRecord account) {
+        return principal(account, false);
+    }
+
+    private CustomerAuthPrincipal principal(CustomerAuthAccountRecord account, boolean passwordChangeRequired) {
+        var customer = customerRepository.findById(new TenantScope(new TenantId(account.tenantId())),new CustomerId(account.customerId()));
         return new CustomerAuthPrincipal(
             account.tenantId(),
             account.id(),
             account.customerId(),
             account.email(),
-            account.displayName()
+            customer.map(Customer::displayName).orElse(account.displayName()),
+            customer.map(c -> c.phone().value()).orElse(null),
+            passwordChangeRequired
         );
     }
 

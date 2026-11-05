@@ -1,3 +1,4 @@
+import {prepareImageFormData} from '../utils/imageUpload'
 import type {
   CallScreenAdminApiErrorResponse,
   CallScreenAdSetListResponse,
@@ -133,6 +134,7 @@ async function requestForm<T>(
   form: FormData,
   fetcher?: CallScreenAdminFetcher
 ): Promise<T> {
+  form = await prepareImageFormData(form)
   let response: TextResponse
   try {
     const activeFetcher = fetcher ?? resolveFetch()

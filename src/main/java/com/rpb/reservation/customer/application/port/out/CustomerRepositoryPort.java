@@ -32,6 +32,10 @@ public interface CustomerRepositoryPort {
         throw new UnsupportedOperationException("customer_management_find_not_supported");
     }
 
+    default List<CustomerManagementItem> findActiveByIds(TenantScope scope, java.util.Set<java.util.UUID> ids) {
+        throw new UnsupportedOperationException("customer_directory_batch_not_supported");
+    }
+
     default void archive(TenantScope scope, CustomerId customerId) {
         throw new UnsupportedOperationException("customer_management_archive_not_supported");
     }
