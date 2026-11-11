@@ -3,7 +3,8 @@ import DateInput from '../../components/common/DateInput.vue'
 import {useI18n} from 'vue-i18n'
 import { useLedgerI18n } from './i18n'
 import { computed, provide, ref, watch } from 'vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import { logout } from '../../api/authApi'
 import LedgerShell from './components/LedgerShell.vue'
 import LedgerOverview from './components/LedgerOverview.vue'
 import LedgerSubmittedPayments from './components/LedgerSubmittedPayments.vue'
@@ -17,12 +18,13 @@ import LedgerSettings from './components/LedgerSettings.vue'
 import './ledger.css'
 import { defaultDisplay, displayKey } from './format'
 const { text, locale, errorText, itemName } = useLedgerI18n()
-const route = useRoute(), auth = useAuthSessionStore(), {t}=useI18n()
+const route = useRoute(), router = useRouter(), auth = useAuthSessionStore(), {t}=useI18n()
 const historyOnly=computed(()=>route.query.history==='1')
 const storeId = computed(() => String(route.params.storeId))
 const settings = ref<Settings>(), day = ref<LedgerDay>(), date = ref(businessDate()), period = ref<Period>('dinner')
 const tab = ref<'record' | 'history' | 'settings'>('record'), loading = ref(false), error = ref('')
 const editor = ref<InstanceType<typeof LedgerRecordEditor>>()
+const signingOut = ref(false), signOutFailed = ref(false)
 const admin = computed(() => !historyOnly.value && auth.user?.permissions.includes('daily_ledger.settings.manage') === true)
 const writable = computed(() => !historyOnly.value && auth.user?.permissions.includes('daily_ledger.write') === true)
 const timezone = ref('Asia/Singapore')
@@ -30,6 +32,21 @@ provide(displayKey, computed(() => settings.value?.display ?? defaultDisplay))
 let selectedDate = false
 let generation = 0
 async function flush() { return await editor.value?.flush() ?? true }
+async function signOut() {
+  if (signingOut.value) return
+  signingOut.value = true
+  signOutFailed.value = false
+  try {
+    if (!await flush()) return
+    await logout()
+    auth.clear()
+    await router.replace({ name: 'login' })
+  } catch {
+    signOutFailed.value = true
+  } finally {
+    signingOut.value = false
+  }
+}
 async function load() {
   const current = ++generation, targetStore = storeId.value, targetDate = date.value
   loading.value = true; error.value = ''; day.value = undefined
@@ -53,8 +70,9 @@ watch(storeId, () => { selectedDate = false; settings.value = undefined; tab.val
 </script>
 <template>
   <div class="daily-ledger">
-    <LedgerShell :branding="settings?.branding" :store-id="storeId" :tab="tab" :admin="admin" :history-only="historyOnly" :currency="settings?.config.currency" @navigate="changeTab">
+    <LedgerShell :branding="settings?.branding" :store-id="storeId" :tab="tab" :admin="admin" :history-only="historyOnly" :currency="settings?.config.currency" :signing-out="signingOut" @navigate="changeTab" @sign-out="signOut">
       <p v-if="historyOnly" role="status">{{t('tenantProducts.closedHistory')}}</p>
+      <p v-if="signOutFailed" role="alert" class="ledger-error">{{ text('退出登录失败，请重试。') }}</p>
       <div v-if="error" role="alert" class="ledger-error">{{ errorText(error) }} <button class="button secondary" @click="load">{{ text('重新载入') }}</button></div>
       <p v-if="loading" class="loading">{{ text('正在读取门店账本…') }}</p>
       <template v-if="!loading && day && settings">

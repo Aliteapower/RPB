@@ -1,6 +1,7 @@
 export const ledgerMessages = {
   "daily_ledger": "Daily Ledger",
   "unable_to_load_the_ledger": "Unable to load the ledger",
+  "sign_out_failed": "Could not sign out. Please try again.",
   "reload": "Reload",
   "loading_store_ledger": "Loading store ledger…",
   "keep_a_clear_record_of_every_transaction": "Keep a clear record of every transaction.",

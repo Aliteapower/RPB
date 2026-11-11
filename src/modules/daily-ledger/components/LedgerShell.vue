@@ -5,13 +5,13 @@ import LedgerPageHeader from './LedgerPageHeader.vue'
 import type { Branding } from '../types'
 import LedgerIcon from './LedgerIcon.vue'
 const { text } = useLedgerI18n()
-defineProps<{ branding?: Branding; storeId: string; tab: string; admin: boolean; currency?: string; historyOnly?:boolean }>()
-defineEmits<{ navigate: [tab: 'record' | 'history' | 'settings'] }>()
+defineProps<{ branding?: Branding; storeId: string; tab: string; admin: boolean; currency?: string; historyOnly?:boolean; signingOut: boolean }>()
+defineEmits<{ navigate: [tab: 'record' | 'history' | 'settings']; signOut: [] }>()
 const auth = useAuthSessionStore()
 </script>
 <template>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" :inert="signingOut">
 
       <span class="nav-label">{{ text('工作台') }}</span>
       <nav :aria-label="text('账本工作台')">
@@ -23,8 +23,8 @@ const auth = useAuthSessionStore()
       <div class="sidebar-bottom"><div class="ledger-mode"><span class="status-dot saved"></span>{{ text('当日累计盘点模式') }}</div></div>
     </aside>
     <div class="workspace">
-      <LedgerPageHeader :branding="branding" :store-id="storeId" :tab="tab" :currency="currency"/>
-      <main><slot /></main><footer class="page-footer"><span class="footer-brand">{{ branding?.store_name_en }}</span><span>{{ text('清楚记录每一天') }}</span></footer>
+      <LedgerPageHeader :branding="branding" :store-id="storeId" :tab="tab" :currency="currency" :signing-out="signingOut" @sign-out="$emit('signOut')"/>
+      <main :inert="signingOut"><slot /></main><footer class="page-footer"><span class="footer-brand">{{ branding?.store_name_en }}</span><span>{{ text('清楚记录每一天') }}</span></footer>
     </div>
   </div>
 </template>

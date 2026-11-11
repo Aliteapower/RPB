@@ -1,6 +1,7 @@
 export const ledgerMessages = {
   "daily_ledger": "每日营业记录",
   "unable_to_load_the_ledger": "读取失败",
+  "sign_out_failed": "退出登录失败，请重试。",
   "reload": "重新载入",
   "loading_store_ledger": "正在读取门店账本…",
   "keep_a_clear_record_of_every_transaction": "把今天的每一笔，记清楚。",

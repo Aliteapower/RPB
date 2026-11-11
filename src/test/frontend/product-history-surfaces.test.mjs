@@ -38,9 +38,23 @@ test('wallet history navigation preserves its read-only marker across store chan
  const customer=mount(Bottom,{store:'B',customer:true})
  assert.deepEqual(nodes(customer,n=>n.tag==='a').map(n=>n.props.href),['/wallet/B','/wallet/B/transactions?category=all'])
 })
-test('ledger historical shell removes record and settings navigation',()=>{
- const history=mount(Shell,{storeId:'A',tab:'history',admin:false,historyOnly:true});assert.equal(nodes(history,n=>n.tag==='button').length,1);assert.match(text(history),/dailyLedger.messages.history/)
- assert.equal(nodes(mount(Shell,{storeId:'A',tab:'record',admin:true}),n=>n.tag==='button').length,3)
+test('ledger history limits navigation and keeps sign-out available across roles',async()=>{
+ let signOuts=0
+ const props=reactive({storeId:'A',tab:'history',admin:false,historyOnly:true,signingOut:false,onSignOut:()=>signOuts++})
+ const history=mount(Shell,props)
+ const navButtons=root=>nodes(nodes(root,n=>n.tag==='nav')[0],n=>n.tag==='button')
+ const signOutButton=root=>nodes(root,n=>n.tag==='button'&&n.props.class?.includes('ledger-sign-out'))[0]
+ assert.equal(navButtons(history).length,1)
+ assert.match(text(navButtons(history)[0]),/dailyLedger.messages.history/)
+ assert.equal(signOutButton(history).props.disabled,false)
+ signOutButton(history).props.onClick()
+ assert.equal(signOuts,1)
+ props.signingOut=true
+ await tick()
+ assert.equal(signOutButton(history).props.disabled,true)
+ const active=mount(Shell,{storeId:'B',tab:'record',admin:true,signingOut:false})
+ assert.equal(navButtons(active).length,3)
+ assert.equal(signOutButton(active).props.disabled,false)
 })
 test('card history starts on records and removes operation, settings and recovery controls even for full permission actors',async()=>{
  const root=mount(Cards,{}, {history:'1'});await tick();assert.doesNotMatch(text(root),/启用卡功能/)
