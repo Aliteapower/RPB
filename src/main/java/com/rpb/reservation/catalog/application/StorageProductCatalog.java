@@ -37,13 +37,16 @@ public class StorageProductCatalog {
   return new Options(ids.stream().limit(size).map(id->r.get(s,id)).toList(),ids.size()>size,page,cats);
  }
  public Product selectable(StoreScope s,UUID id){var product=query.requireUsable(s,id,"storage");if(!product.kind().equals("physical"))throw new CatalogException("CATALOG_UNAVAILABLE",409,"商品未开启寄存酒或不可用于本门店存酒");return product;}
+ public boolean isUncategorized(StoreScope s,UUID category){return r.uncategorizedWine(s).filter(category::equals).isPresent();}
  @Transactional
  public Product associate(StoreScope s,UUID id,UUID category,String zh,String en,UUID actor){
   if(id!=null){r.lock(s,id);return selectable(s,id);}
-  if(category==null||categories(s).stream().noneMatch(c->c.id().equals(category)&&c.enabled())||(zh==null||zh.isBlank())&&(en==null||en.isBlank()))throw CatalogException.invalid();
-  r.requireCategory(s,category,List.of("storage"));
+  if((zh==null||zh.isBlank())&&(en==null||en.isBlank()))throw CatalogException.invalid();
+  UUID resolvedCategory=category==null?r.ensureUncategorizedWine(s):category;
+  if(categories(s).stream().noneMatch(c->c.id().equals(resolvedCategory)&&c.enabled()))throw CatalogException.invalid();
+  r.requireCategory(s,resolvedCategory,List.of("storage"));
   UUID product=UUID.randomUUID();String code=new com.rpb.reservation.catalog.persistence.CatalogProductCodes(jdbc).next(s);
-  jdbc.update("insert into catalog_products(id,tenant_id,category_id,code,name_zh,name_en,kind,unit,status,base_price_cents,tax_mode,tax_category,tax_rate) values(?,?,?,?,?,?,'physical','瓶','active',null,null,null,null)",product,s.tenantId().value(),category,code,text(zh),text(en));
+  jdbc.update("insert into catalog_products(id,tenant_id,category_id,code,name_zh,name_en,kind,unit,status,base_price_cents,tax_mode,tax_category,tax_rate) values(?,?,?,?,?,?,'physical','瓶','active',null,null,null,null)",product,s.tenantId().value(),resolvedCategory,code,text(zh),text(en));
   jdbc.update("insert into catalog_product_stores(tenant_id,store_id,product_id,price_cents,channels) values(?,?,?,null,array['storage'])",s.tenantId().value(),s.storeId().value(),product);
   jdbc.update("insert into catalog_audit(tenant_id,store_id,actor_id,action,source_id) values(?,?,?,'storage.product.create',?)",s.tenantId().value(),s.storeId().value(),actor,product);
   return r.get(s,product);

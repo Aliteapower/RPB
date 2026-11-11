@@ -1,6 +1,6 @@
 export interface Rule {id:string;categoryId:string;name:string;months:number;version:number}
 export interface Product {id:string;categoryId:string;code:string;nameZh:string;nameEn:string}
-export interface Category {id:string;nameZh:string;nameEn:string}
+export interface Category {id:string;nameZh:string;nameEn:string;uncategorized?:boolean}
 export interface Line {id:string;productId:string|null;nameZh:string;nameEn:string;quantity:number;opened:boolean;source:string;photos:string[];note:string}
 export interface Application {id:string;customerId:string;status:string;lines:Line[];confirmation:{lines:ReceiptLine[];reason:string}|null;reason:string;createdAt:string}
 export interface ReceiptLine {lineId:string;productId:string|null;categoryId:string;nameZh:string;nameEn:string;quantity:number;opened:boolean;source:string;ruleId:string;photos:string[];note:string;location:string;label:string;storageLocationId?:string|null;storageLocation?:StorageLocationRef|null}

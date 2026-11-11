@@ -462,11 +462,11 @@ test('embedded wine workspace keeps one title and groups search and actions with
  const generic=mount(CatalogPage,false,'zh-CN',home,catalogResponse,{actor:catalogActor});await tick();assert.ok(button(generic.root,'分类管理'));assert.equal(nodes(generic.root,n=>n.tag==='h2'&&text(n).trim()==='商品列表').length,1);generic.unmount()
 })
 
-test('new storage wine defaults to enabled wine category and lets the server allocate a short code',async()=>{
+test('new storage wine can leave category blank and lets the server allocate a short code',async()=>{
  const category={productLines:['wine_storage'],id:'wine-default',code:'WINE',nameZh:'酒水',nameEn:'Wine',enabled:true,version:0,sortOrder:0,productLines:['wallet','wine_storage']}
  const s=mount(CatalogPage,false,'zh-CN',home,(url,options)=>url.includes('/storage-products?')?{items:[],total:0,page:0,size:12,hasMore:false}:url.endsWith('/categories')?[{...category,id:'disabled',enabled:false},category]:catalogResponse(url,options),{actor:catalogActor,props:{storageOnly:true,embedded:true}});await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
  const code=nodes(s.root,n=>n.tag==='input'&&n.props.maxlength==='80')[0];assert.equal(code.props.required,false);assert.equal(code.value,'');assert.match(text(s.root),/留空自动生成/);assert.ok(nodes(s.root,n=>n.tag==='option'&&n.props.value==='wine-default').length)
- const name=nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()==='中文名称')[0],n=>n.tag==='input')[0];name.props['onUpdate:modelValue']('自动编号酒');nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.find(c=>c.method==='POST').body.product.code,'');assert.equal(s.calls.find(c=>c.method==='POST').body.product.categoryId,'wine-default');s.unmount()
+ const name=nodes(nodes(s.root,n=>n.tag==='label'&&text(n).trim()==='中文名称')[0],n=>n.tag==='input')[0];name.props['onUpdate:modelValue']('自动编号酒');nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();assert.equal(s.calls.find(c=>c.method==='POST').body.product.code,'');assert.equal(s.calls.find(c=>c.method==='POST').body.product.categoryId,null);s.unmount()
 })
 
 test('storage editor defaults to bottles and preserves advanced values through collapse and save',async()=>{
@@ -1097,6 +1097,37 @@ test('storage settings handles logout failure without a false login navigation o
 })
 
 
+test('receipt category shortcut returns to the same draft and selects the new wine-only category',async()=>{
+ const created={id:'new-category',code:'QA-WINE',nameZh:'测试新分类',nameEn:'',enabled:true,productLines:['wine_storage']}
+ const s=mount(ReceiveForm,false,'zh-CN',receiptHome,(url,options)=>options?.method==='POST'?created:{items:[],hasMore:false},{actor:catalogActor,props:{home:receiptHome,api:storageApi('A',false),application:emptyReceipt(),direct:true,disabled:false}})
+ await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
+ const wineName=nodes(s.root,n=>n.tag==='label'&&text(n).includes('中文酒名'))[0]
+ nodes(wineName,n=>n.tag==='input')[0].props.onInput({target:{value:'草稿啤酒'}});await tick()
+ const receipt=nodes(s.root,n=>n.tag==='form')[0]
+ const quantity=nodes(receipt,n=>n.tag==='input'&&n.props.type==='number')[0]
+ quantity.value='3';quantity.listeners.input({target:quantity});await tick()
+ button(s.root,'＋ 新增分类').props.onClick();await tick()
+ assert.equal(receipt.props.style.display,'none')
+ button(s.root,'返回收存').props.onClick();await tick()
+ assert.equal(receipt.props.style,undefined);assert.equal(s.calls.filter(c=>c.method==='POST').length,0)
+ button(s.root,'＋ 新增分类').props.onClick();await tick()
+ const editor=nodes(s.root,n=>n.tag==='form').find(form=>form!==receipt)
+ const inputs=nodes(editor,n=>n.tag==='input')
+ updateModel(inputs[0],created.code);updateModel(inputs[1],created.nameZh);await tick()
+ await editor.props.onSubmit({preventDefault(){}});await tick()
+ const writes=s.calls.filter(c=>c.method==='POST')
+ assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/v1/stores/A/catalog/categories')
+ assert.deepEqual(writes[0].body.productLines,['wine_storage'])
+ assert.equal(receipt.props.style,undefined)
+ assert.equal(nodes(wineName,n=>n.tag==='input')[0].value,'草稿啤酒')
+ assert.equal(Number(quantity.value),3)
+ const category=nodes(receipt,n=>n.tag==='select'&&n.props.id?.startsWith('receipt-category-'))[0]
+ assert.equal(category.value,created.id);assert.match(text(category),/测试新分类/)
+ s.auth.user={...catalogActor,permissions:['catalog.view']};await tick()
+ assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).includes('新增分类')).length,0)
+ s.unmount()
+})
+
 test('receipt empty search keeps exactly one new wine action in the top toolbar',async()=>{
  const s=receiptMount('zh-CN',url=>url.includes('/product-options?')?{items:[],hasMore:false}:receiptHome);await tick()
  assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).trim()==='＋ 新增酒品').length,1)
@@ -1104,11 +1135,12 @@ test('receipt empty search keeps exactly one new wine action in the top toolbar'
 })
 
 test('receipt submits existing and newly entered wines without any uploaded photos',async()=>{
- for(const manual of [false,true]){
-  const s=receiptMount();await tick()
-  if(manual){button(s.root,'＋ 新增酒品').props.onClick();await tick();const label=nodes(s.root,n=>n.tag==='label'&&text(n).includes('中文酒名'))[0];nodes(label,n=>n.tag==='input')[0].props.onInput({target:{value:'无图寄存白酒'}});const category=nodes(s.root,n=>n.tag==='select'&&n.props.required!==undefined)[0];category.props.onChange({target:{value:'category'}})}else chooseReceiptWine(s.root)
-  await tick();setReceiptConsent(s.root);await tick();assert.equal(button(s.root,'确认实物已收存').props.disabled,false)
-  await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.deepEqual(writes[0].body.lines[0].photos,[]);assert.equal(writes[0].body.rulesConfirmed,true);assert.equal(s.calls.some(c=>c.url.endsWith('/photos')),false);s.unmount()
+ for(const mode of ['existing','categorized','uncategorized','configured']){
+  const data=mode==='uncategorized'?{...home,categories:[],rules:[]}:mode==='configured'?{...home,categories:[{id:'uncategorized',nameZh:'未分类酒品',uncategorized:true}],rules:[{id:'store-rule',categoryId:'uncategorized',name:'本店默认规则',months:0,version:2}]}:null
+  const s=data?mount(ReceiveForm,false,'zh-CN',data,url=>url.endsWith('/locations')||url.endsWith('/custodians')?[]:url.includes('/product-options?')?{items:[],categories:data.categories}:{status:'stored'},{props:{home:data,api:storageApi('A',false),application:emptyReceipt(),direct:true,disabled:false}}):receiptMount();await tick()
+  if(mode!=='existing'){button(s.root,'＋ 新增酒品').props.onClick();await tick();const label=nodes(s.root,n=>n.tag==='label'&&text(n).includes('中文酒名'))[0];nodes(label,n=>n.tag==='input')[0].props.onInput({target:{value:'无图寄存白酒'}});const category=nodes(s.root,n=>n.tag==='select'&&text(n).includes('不指定分类'))[0];assert.equal(category.props.required,undefined);if(mode==='categorized')category.props.onChange({target:{value:'category'}})}else chooseReceiptWine(s.root)
+  await tick();if(mode==='uncategorized')assert.match(text(s.root),/未分类酒品 · 3 个自然月/);if(mode==='configured')assert.match(text(s.root),/本店默认规则 · 不限时间/);setReceiptConsent(s.root);await tick();assert.equal(button(s.root,'确认实物已收存').props.disabled,false)
+  await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.deepEqual(writes[0].body.lines[0].photos,[]);assert.equal(writes[0].body.lines[0].categoryId,data?null:'category');assert.equal(writes[0].body.lines[0].ruleId,mode==='uncategorized'?null:mode==='configured'?'store-rule':'rule');assert.equal(writes[0].body.rulesConfirmed,true);assert.equal(s.calls.some(c=>c.url.endsWith('/photos')),false);s.unmount()
  }
 })
 

@@ -6,7 +6,11 @@ POST `/api/v1/stores/{storeId}/wine-storage/registrations`
 
 权限：wine_storage.receive + 原 StorageAccess staff / App Gate 新业务检查；同租户有效顾客、本店产品和当前分类规则。沿用原收存校验、期限和照片权限。
 
-响应：沿用 Application，status=stored。记录原始登记行（无虚构顾客申请照片，rulesAccepted=false）、收存快照、staff.registered 审计（actor=当前商户操作人，rulesConfirmed=true），received 审计。登记、关联照片及收存同事务，任何失败全部回滚。原顾客申请和商户收存 API 不变。
+响应：沿用 Application，status=stored。记录原始登记行（无虚构顾客申请照片，rulesAccepted=false）、收存快照、staff.registered 审计（actor=当前商户操作人，rulesConfirmed=true），received 审计。登记、关联照片及收存同事务，任何失败全部回滚。
+
+直接登记及申请审核收存中，手输酒品至少填写一个酒名，`categoryId` 可为空。后端在当前租户内归入酒水寄存专用的「未分类酒品」。该分类的 `ruleId` 留空表示采用页面展示的初始规则（3 个自然月），首次收存时写入当前门店的规则版本。门店设有新版规则时，必须提交当前 `ruleId` 并重新确认。历史收存仍以各自的规则快照为准。已指定分类的收存仍校验分类及当前规则。
+
+酒品目录编辑接口也允许专用于 `storage` 的实物商品省略 `categoryId`，并归入同一租户分类。
 
 幂等：按租户/门店/操作人/staff/register/idempotencyKey 和完整请求重放；同键同请求返回原记录，不增加库存；同键异请求沿用 STORAGE_CONFLICT。失败不残留待收存申请。错误沿用 StorageException：参数400、无权限403、不存在404、状态/照片/幂等冲突409。
 

@@ -9,6 +9,7 @@ import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
 import com.rpb.reservation.tenant.value.TenantId;
 import com.rpb.reservation.winestorage.application.*;
 import com.rpb.reservation.winestorage.domain.StorageException;
+import com.rpb.reservation.winestorage.domain.StorageRules;
 import com.rpb.reservation.winestorage.persistence.*;
 import java.time.*;
 import java.util.*;
@@ -254,6 +255,28 @@ class StoragePostgresTest extends CatalogPostgresTest {
 
  Registration registration(UUID photo,String key){return new Registration(customer,List.of(new ReceiptLine(null,product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(photo),"代登记","A1","STAFF")),"已核对实物并向顾客说明规则",true,key);}
  StorageRegistrationService registrations(){return new StorageRegistrationService(access,r,new StorageCommands(r),app,clock);}
+ @Test void staffCanStoreAnUncategorizedWineWithoutAnyConfiguredRule(){
+  var line=new ReceiptLine(null,null,null,"QA 无分类酒品","",2,false,"customer",null,List.of(),"","","");
+  var command=new Registration(customer,List.of(line),"确认实物",true,key());
+  var accepted=tx.execute(t->registrations().register(scope,actor,command));
+  var replay=tx.execute(t->registrations().register(scope,actor,command));
+  assertThat(replay).isEqualTo(accepted);
+  var items=r.items(scope,customer,clock.instant());
+  assertThat(items).hasSize(1);
+  var item=items.getFirst();
+  var savedRule=item.snapshot().rule();
+  assertThat(savedRule.months()).isEqualTo(3);
+  assertThat(item.expiresAt()).isEqualTo(StorageRules.expires(clock.instant(),"Asia/Singapore",3));
+  assertThat(item.snapshot().categoryId()).isEqualTo(savedRule.categoryId());
+  assertThat(jdbc.queryForObject("select product_lines=array['wine_storage'] from catalog_categories where tenant_id=? and id=?",
+    Boolean.class,tenant,savedRule.categoryId())).isTrue();
+  var changed=tx.execute(t->app.rule(scope,actor,new RuleWrite(savedRule.categoryId(),"长期保存",0,key())));
+  assertThatThrownBy(()->tx.execute(t->registrations().register(scope,actor,new Registration(customer,List.of(line),"确认实物",true,key()))))
+    .isInstanceOfSatisfying(StorageException.class,error->assertThat(error.status()).isEqualTo(409));
+  var withRule=new ReceiptLine(null,null,null,"QA 新规则","",1,false,"customer",changed.id(),List.of(),"","","");
+  tx.execute(t->registrations().register(scope,actor,new Registration(customer,List.of(withRule),"确认实物",true,key())));
+  assertThat(r.items(scope,customer,clock.instant())).extracting(i->i.snapshot().rule().months()).containsExactlyInAnyOrder(0,3);
+ }
  @Test void staffRegistrationStoresAtomicallyAndReplaysWithoutImpersonatingCustomer()throws Exception{
   var c=registration(photo(true),key());var service=registrations();var result=tx.execute(s->service.register(scope,actor,c));
   assertThat(result.status()).isEqualTo("stored");assertThat(result.original().rulesAccepted()).isFalse();assertThat(result.lines().getFirst().photos()).isEmpty();

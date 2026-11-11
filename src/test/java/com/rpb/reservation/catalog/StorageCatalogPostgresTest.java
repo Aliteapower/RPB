@@ -1,6 +1,8 @@
 package com.rpb.reservation.catalog;
 
 import com.rpb.reservation.catalog.persistence.CatalogRepository;
+import com.rpb.reservation.catalog.application.CatalogDtos.ProductWrite;
+import com.rpb.reservation.catalog.domain.CatalogException;
 import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.tenant.value.TenantId;
 import java.util.*;
@@ -8,6 +10,21 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class StorageCatalogPostgresTest extends CatalogPostgresTest {
+ @Test void storageOnlyProductsCanBeSavedWithoutChoosingACategory(){
+  var first=new ProductWrite("",null,"QA 酒品","",null,null,"physical","瓶",null,null,null,null,null,List.of("storage"),null,UUID.randomUUID().toString());
+  var second=new ProductWrite("",null,"QA 酒品二","",null,null,"physical","瓶",null,null,null,null,null,List.of("storage"),null,UUID.randomUUID().toString());
+  var saved=tx.execute(t->catalog.save(scope,actor,null,first));
+  var replay=tx.execute(t->catalog.save(scope,actor,null,first));
+  assertThat(replay).isEqualTo(saved);
+  var other=tx.execute(t->catalog.save(scope,actor,null,second));
+  assertThat(other.categoryId()).isEqualTo(saved.categoryId());
+  assertThat(new CatalogRepository(jdbc).categories(tenant)).anySatisfy(category->{
+   assertThat(category.id()).isEqualTo(saved.categoryId());
+   assertThat(category.productLines()).containsExactly("wine_storage");
+  });
+  var wallet=new ProductWrite("QA-WALLET",null,"QA 钱包商品","",null,null,"physical","件",null,null,null,null,null,List.of("shopping"),null,UUID.randomUUID().toString());
+  assertThatThrownBy(()->tx.execute(t->catalog.save(scope,actor,null,wallet))).isInstanceOf(CatalogException.class);
+ }
  @Test void allStorageMatchesAreReachableAcrossStablePages(){
   jdbc.update("insert into catalog_products(id,tenant_id,category_id,code,name_zh,name_en,kind,unit,status) select gen_random_uuid(),?,?,'WINE'||n,'寄存酒'||n,'Wine','physical','瓶','active' from generate_series(1,17) n",tenant,product.categoryId());
   jdbc.update("insert into catalog_product_stores(tenant_id,product_id,store_id,price_cents,channels,enabled) select tenant_id,id,?,100,array['storage'],false from catalog_products where tenant_id=? and code like 'WINE%'",store,tenant);

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import {computed,ref,onMounted,watch,onUnmounted} from 'vue'
+import {computed,ref,onMounted,watch,onUnmounted,nextTick} from 'vue'
+import {useAuthSessionStore} from '../../stores/authSession'
+import CatalogCategories from '../catalog/CatalogCategories.vue'
+import type {Category as CatalogCategory} from '../catalog/types'
 import {useMerchantStorageText} from './merchant/text'
 import {StorageApiError,type StorageApi} from './api'
-import type {Application,Home,ReceiptLine,Product,StorageLocation} from './types'
+import type {Application,Category,Home,ReceiptLine,Product,StorageLocation} from './types'
 import MerchantBottleScanner from './merchant/MerchantBottleScanner.vue'
 import {addScannedBottle} from './merchant/receiptBarcode'
 import StoragePhotos from './StoragePhotos.vue'
@@ -15,6 +18,37 @@ const matchesOriginal=computed(()=>lines.value.length===props.application.lines.
 const selectedProducts=ref<Product[]>([]),searching=ref(false),searchFailed=ref(false),wineBusy=ref<Record<string,boolean>>({}),wineEditing=ref<Record<string,boolean>>({})
 const lineKeys=new WeakMap<ReceiptLine,string>()
 function lineKey(line:ReceiptLine){let key=lineKeys.get(line);if(!key){key=crypto.randomUUID();lineKeys.set(line,key)}return key}
+const auth=useAuthSessionStore()
+const storeId=computed(()=>props.api.base.match(/^\/api\/v1\/stores\/([^/]+)\/wine-storage$/)?.[1])
+const catalogBase=computed(()=>'/api/v1/stores/'+storeId.value+'/catalog')
+const canCreateCategory=computed(()=>!!storeId.value&&auth.user?.roles.includes('tenant_admin')&&auth.user.permissions.includes('catalog.view')&&auth.user.permissions.includes('catalog.manage')&&auth.user.storeIds.includes(decodeURIComponent(storeId.value)))
+const categoryLine=ref<ReceiptLine|null>(null),createdCategories=ref<Category[]>([])
+const categories=computed(()=>[...props.home.categories,...createdCategories.value.filter(c=>!props.home.categories.some(current=>current.id===c.id))])
+const categoryPanel=ref<HTMLElement|null>(null)
+let returnFocus:HTMLElement|null=null
+async function openCategory(line:ReceiptLine){
+ if(!canCreateCategory.value||props.disabled||saving.value||uploading.value||wineSearching.value||barcodeSearching.value)return
+ returnFocus=typeof document==='undefined'?null:document.activeElement as HTMLElement|null
+ categoryLine.value=line
+ await nextTick()
+ categoryPanel.value?.focus?.()
+}
+async function closeCategory(){
+ categoryLine.value=null
+ await nextTick()
+ returnFocus?.focus?.()
+ returnFocus=null
+}
+function categoryCreated(category:CatalogCategory){
+ if(!categoryLine.value)return
+ createdCategories.value.push(category)
+ patchWine(categoryLine.value,{categoryId:category.id})
+ void closeCategory()
+}
+watch([()=>props.api.base,canCreateCategory],([base,allowed],[previous])=>{
+ if(base!==previous)createdCategories.value=[]
+ if(base!==previous||!allowed)void closeCategory()
+})
 const barcodeSearching=ref(false),barcodeError=ref('')
 const wineSearching=computed(()=>Object.values(wineBusy.value).some(Boolean))
 let generation=0,locationGeneration=0
@@ -27,7 +61,12 @@ async function loadProducts(){const own=++generation;searching.value=true;search
  if(own!==generation)return;selectedProducts.value=found.filter((p):p is Product=>!!p)
  for(const line of lines.value){const product=available.value.find(p=>p.id===line.productId);if(product)choose(line,product);else if(line.productId){line.ruleId='';line.categoryId=''}}
  }catch(e){if(own===generation){searchFailed.value=true;selectedProducts.value=[];emit('error',String(e))}}finally{if(own===generation)searching.value=false}}
-onMounted(()=>{void loadProducts();void loadLocations()})
+onMounted(()=>{for(const line of lines.value){if(!line.productId)line.ruleId=rulesFor(line)[0]?.id??''}void loadProducts();void loadLocations()})
+const uncategorizedId=computed(()=>categories.value.find(category=>category.uncategorized)?.id)
+function ruleCategory(line:ReceiptLine){return line.categoryId||uncategorizedId.value}
+function rulesFor(line:ReceiptLine){return props.home.rules.filter(rule=>rule.categoryId===ruleCategory(line))}
+function usesDefaultRule(line:ReceiptLine){return (!line.categoryId||line.categoryId===uncategorizedId.value)&&!rulesFor(line).length}
+function hasWine(line:ReceiptLine){return !!(line.productId||line.nameZh.trim()||line.nameEn.trim())}
 function choose(line:ReceiptLine,product:Product){if(line.productId!==product.id)line.photos=[];selectedProducts.value=[...selectedProducts.value.filter(p=>p.id!==product.id),product];Object.assign(line,{productId:product.id,categoryId:product.categoryId,nameZh:product.nameZh,nameEn:product.nameEn,ruleId:props.home.rules.find(r=>r.categoryId===product.categoryId)?.id??''});rulesConfirmed.value=false}
 function scannedBottle(product:Product){
  const rule=props.home.rules.find(r=>r.categoryId===product.categoryId)?.id??''
@@ -35,12 +74,12 @@ function scannedBottle(product:Product){
  barcodeError.value='';selectedProducts.value=[...selectedProducts.value.filter(p=>p.id!==product.id),product];rulesConfirmed.value=false
 }
 function clearWine(line:ReceiptLine){Object.assign(line,{productId:null,categoryId:'',nameZh:'',nameEn:'',ruleId:'',quantity:1,opened:false,source:'customer',photos:[],note:'',location:'',label:'',storageLocationId:locations.value.find(p=>p.defaultLocation)?.id??null});rulesConfirmed.value=false}
-function patchWine(line:ReceiptLine,patch:Partial<ReceiptLine>){Object.assign(line,patch);if('categoryId'in patch)line.ruleId=props.home.rules.find(r=>r.categoryId===line.categoryId)?.id??'';rulesConfirmed.value=false}
-watch([saving,uploading,searching,locationsLoading,wineSearching,barcodeSearching],()=>emit('busy-change',saving.value||uploading.value>0||searching.value||locationsLoading.value||wineSearching.value||barcodeSearching.value),{flush:'sync'})
+function patchWine(line:ReceiptLine,patch:Partial<ReceiptLine>){Object.assign(line,patch);if('categoryId'in patch||!line.productId&&!line.categoryId&&!line.ruleId)line.ruleId=rulesFor(line)[0]?.id??'';rulesConfirmed.value=false}
+watch([saving,uploading,searching,locationsLoading,wineSearching,barcodeSearching,categoryLine],()=>emit('busy-change',saving.value||uploading.value>0||searching.value||locationsLoading.value||wineSearching.value||barcodeSearching.value||!!categoryLine.value),{flush:'sync'})
 onUnmounted(()=>{generation++;locationGeneration++;emit('busy-change',false)})
 function addLine(line:ReceiptLine){const added={...line,lineId:props.direct?crypto.randomUUID():line.lineId,quantity:1,opened:props.direct?false:true,photos:[],label:''};if(props.direct)clearWine(added);lines.value.push(added)}
-function validLine(line:ReceiptLine){return !searching.value&&!wineSearching.value&&!wineEditing.value[lineKey(line)]&&(!line.productId||available.value.some(p=>p.id===line.productId))&&!!line.ruleId&&Number.isInteger(line.quantity)&&line.quantity>=1&&line.quantity<=(line.opened?1:10000)&&!!(line.productId||(line.categoryId&&(line.nameZh.trim()||line.nameEn.trim())))}
-const chosenLines=computed(()=>lines.value.filter(line=>line.productId||((line.nameZh.trim()||line.nameEn.trim())&&line.categoryId)))
+function validLine(line:ReceiptLine){return !searching.value&&!wineSearching.value&&!wineEditing.value[lineKey(line)]&&(!line.productId||available.value.some(p=>p.id===line.productId))&&(!!line.ruleId||usesDefaultRule(line))&&Number.isInteger(line.quantity)&&line.quantity>=1&&line.quantity<=(line.opened?1:10000)&&hasWine(line)}
+const chosenLines=computed(()=>lines.value.filter(hasWine))
 const remainingSteps=computed(()=>{
  const missing:string[]=[]
  if(searching.value||wineSearching.value||barcodeSearching.value)missing.push(t('loadingWine'))
@@ -48,30 +87,30 @@ const remainingSteps=computed(()=>{
  if(locationsFailed.value)missing.push(t('retryLocations'))
  for(const [i,line] of lines.value.entries()){
   const prefix=t('wineItem')+' '+(i+1)+'：'
-  if(wineEditing.value[lineKey(line)]||!line.productId&&!((line.nameZh.trim()||line.nameEn.trim())&&line.categoryId)||line.productId&&!available.value.some(p=>p.id===line.productId))missing.push(prefix+t('completeWine'))
-  if(!line.ruleId)missing.push(prefix+t('chooseRule'))
+  if(wineEditing.value[lineKey(line)]||!hasWine(line)||line.productId&&!available.value.some(p=>p.id===line.productId))missing.push(prefix+t('completeWine'))
+  if(hasWine(line)&&!line.ruleId&&!usesDefaultRule(line))missing.push(prefix+t('chooseRule'))
   if(!Number.isInteger(line.quantity)||line.quantity<1||line.quantity>(line.opened?1:10000))missing.push(prefix+t('validQuantity'))
  }
  if(!reason.value.trim())missing.push(t('completeReason'))
  if(props.direct&&!rulesConfirmed.value)missing.push(t('confirmReceiptConsent'))
  return missing
 })
-async function submit(){if(props.disabled||barcodeSearching.value||saving.value||uploading.value||locationsLoading.value||locationsFailed.value||!reason.value.trim()||(props.direct&&!rulesConfirmed.value)||!lines.value.length||lines.value.some(l=>!validLine(l)))return;saving.value=true;try{await props.api.command(props.direct?'/registrations':`/applications/${props.application.id}/receive`,{lines:lines.value.map(line=>({...line,storageLocationId:line.storageLocationId||null})),reason:reason.value,custodianId:custodianId.value||null,...(props.direct?{customerId:props.application.customerId,rulesConfirmed:rulesConfirmed.value}:{})});emit('saved')}catch(e){emit('error',String(e))}finally{saving.value=false}}
+async function submit(){if(categoryLine.value||props.disabled||barcodeSearching.value||saving.value||uploading.value||locationsLoading.value||locationsFailed.value||!reason.value.trim()||(props.direct&&!rulesConfirmed.value)||!lines.value.length||lines.value.some(l=>!validLine(l)))return;saving.value=true;try{await props.api.command(props.direct?'/registrations':`/applications/${props.application.id}/receive`,{lines:lines.value.map(line=>({...line,categoryId:line.categoryId||null,ruleId:line.ruleId||null,storageLocationId:line.storageLocationId||null})),reason:reason.value,custodianId:custodianId.value||null,...(props.direct?{customerId:props.application.customerId,rulesConfirmed:rulesConfirmed.value}:{})});emit('saved')}catch(e){emit('error',String(e))}finally{saving.value=false}}
 </script>
 <template>
-<form class="storage-panel storage-receive-form" @submit.prevent="submit"><fieldset :disabled="disabled||saving||uploading>0||searching||locationsLoading">
+<form :style="categoryLine?{display:'none'}:undefined" class="storage-panel storage-receive-form" @submit.prevent="submit"><fieldset :disabled="disabled||saving||uploading>0||searching||locationsLoading">
  <header class="storage-receive-header"><h2>{{t(direct?'directRegister':'receive')}}</h2><p>{{t('receiveSimpleHint')}}</p></header>
  <MerchantBottleScanner v-if="direct" :api="api" :disabled="disabled||saving||uploading>0||searching||locationsLoading||wineSearching" @choose="scannedBottle" @busy="barcodeSearching=$event"/>
  <p v-if="barcodeError" class="storage-error" role="alert">{{barcodeError}}</p>
  <article v-for="(l,index) in lines" :key="lineKey(l)" class="storage-receive-line">
   <div class="storage-inline"><h3>{{t('wineItem')}} {{index+1}}<template v-if="l.nameZh||l.nameEn"> · {{l.nameZh||l.nameEn}}</template></h3><button v-if="direct?lines.length>1:lines.filter(x=>x.lineId===l.lineId).length>1" type="button" @click="lines.splice(index,1)">{{t('remove')}}</button></div>
   <h3><span class="storage-step">1</span>{{t('chooseWineStep')}}</h3>
-  <StorageReceiptWinePicker :api="api" :line="l" :categories="home.categories" :disabled="disabled||saving||uploading>0||barcodeSearching" :code="available.find(p=>p.id===l.productId)?.code" @choose="choose(l,$event)" @clear="clearWine(l)" @manual="clearWine(l)" @patch="patchWine(l,$event)" @error="emit('error',String($event))" @busy="wineBusy[lineKey(l)]=$event" @editing="wineEditing[lineKey(l)]=$event"/>
+  <StorageReceiptWinePicker :api="api" :line="l" :categories="categories" :can-create-category="!!canCreateCategory" :disabled="disabled||saving||uploading>0||barcodeSearching" @create-category="openCategory(l)" :code="available.find(p=>p.id===l.productId)?.code" @choose="choose(l,$event)" @clear="clearWine(l)" @manual="clearWine(l)" @patch="patchWine(l,$event)" @error="emit('error',String($event))" @busy="wineBusy[lineKey(l)]=$event" @editing="wineEditing[lineKey(l)]=$event"/>
   <p v-if="l.productId&&!searching&&!searchFailed&&!available.some(p=>p.id===l.productId)" class="storage-notice" role="status">{{t('productUnavailable')}}</p>
-  <template v-if="l.productId||((l.nameZh.trim()||l.nameEn.trim())&&l.categoryId)">
+  <template v-if="hasWine(l)">
   <h3><span class="storage-step">2</span>{{t('storageDetailsStep')}}</h3>
   <div class="storage-receive-grid"><label>{{t('actualQuantity')}}<small v-if="!direct">{{t('originalQuantity')}} {{application.lines.find(original=>original.id===l.lineId)?.quantity}}</small><input v-model.number="l.quantity" type="number" required min="1" :max="l.opened?1:10000"></label><label>{{t('bottleState')}}<select v-model="l.opened" @change="l.opened&&(l.quantity=1)"><option :value="false">{{t('whole')}}</option><option :value="true">{{t('opened')}}</option></select></label><label>{{t('source')}}<select v-model="l.source"><option value="store">{{t('store')}}</option><option value="customer">{{t('customer')}}</option></select></label></div>
-  <label>{{t('rules')}}<select v-model="l.ruleId" required><option value="">{{t('chooseRule')}}</option><option v-for="r in home.rules.filter(r=>!l.categoryId||r.categoryId===l.categoryId)" :key="r.id" :value="r.id">{{r.name}} · {{r.months===0?t('unlimited'):`${r.months} ${t('months')}`}}</option></select></label><p v-if="!home.rules.some(r=>!l.categoryId||r.categoryId===l.categoryId)" class="storage-notice">{{t('missingRuleHint')}}</p>
+  <p v-if="usesDefaultRule(l)">{{t('defaultUncategorizedRule')}}</p><label v-else>{{t('rules')}}<select v-model="l.ruleId" required @change="rulesConfirmed=false"><option value="">{{t('chooseRule')}}</option><option v-for="r in rulesFor(l)" :key="r.id" :value="r.id">{{r.name}} · {{r.months===0?t('unlimited'):`${r.months} ${t('months')}`}}</option></select></label><p v-if="!usesDefaultRule(l)&&!rulesFor(l).length" class="storage-notice">{{t('missingRuleHint')}}</p>
   <StoragePhotos optional v-model="l.photos" :api="api" :customer-id="application.customerId" :disabled="disabled||saving" @busy="uploading=Math.max(0,uploading+($event?1:-1))" @error="emit('error',$event)"/>
   <details class="storage-receive-extras"><summary>{{t('extraStorageDetails')}}</summary><p class="cards-muted">{{t('optionalDetailsHint')}}</p><StorageLocationSelect :model-value="l.storageLocationId" :locations="locations" :disabled="disabled||saving||locationsLoading" @update:model-value="l.storageLocationId=$event"/><button type="button" :disabled="disabled||saving||locationsLoading" @click="loadLocations">{{t('refreshLocations')}}</button><label>{{t('slotOptional')}}<input v-model="l.location" maxlength="200" :placeholder="t('slotHint')"></label><label>{{t('labelOptional')}}<input v-model="l.label" maxlength="200"></label><label>{{t('noteOptional')}}<textarea v-model="l.note" maxlength="2000"/></label></details>
   </template>
@@ -84,4 +123,7 @@ async function submit(){if(props.disabled||barcodeSearching.value||saving.value|
  <p class="cards-muted">{{t('expiryHint')}}</p>
  <p v-if="remainingSteps.length" class="storage-form-guidance" role="status">{{t('stillNeeded')}}{{remainingSteps.join('；')}}</p><p v-else-if="uploading" class="storage-form-guidance" role="status">{{t('uploadingPhotos')}}</p>
  <button class="primary storage-receive-submit" type="submit" :disabled="disabled||barcodeSearching||saving||uploading>0||locationsLoading||locationsFailed||!lines.length||remainingSteps.length>0">{{t(saving?'saving':direct?'registerSubmit':'receive')}}</button></section>
-</fieldset></form></template>
+</fieldset></form>
+<section v-if="categoryLine&&canCreateCategory" ref="categoryPanel" class="storage-panel" tabindex="-1" :aria-label="locale.startsWith('en')?'Add category':'新增分类'">
+ <CatalogCategories :base="catalogBase" :categories="[]" :default-product-lines="['wine_storage']" can-edit create-only @created="categoryCreated" @cancel="closeCategory"/>
+</section></template>

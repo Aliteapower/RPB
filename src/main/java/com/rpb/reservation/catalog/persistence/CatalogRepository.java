@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 @Repository
 public class CatalogRepository {
+ public static final String UNCATEGORIZED_WINE_CODE="system:wine-uncategorized";
  public ProductPage storageProducts(StoreScope scope,String query,int page,int size){
   String where=" where p.tenant_id=? and 'storage'=any(s.channels) and strpos(lower(concat_ws(' ',p.code,p.name_zh,p.name_en)),lower(?))>0";
   Object[] args={scope.storeId().value(),scope.tenantId().value(),query};
@@ -17,12 +18,24 @@ public class CatalogRepository {
  }
  private final JdbcTemplate jdbc;
  public CatalogRepository(JdbcTemplate jdbc){this.jdbc=jdbc;}
+ public Optional<UUID> uncategorizedWine(StoreScope s){
+  return jdbc.queryForList("select id from catalog_categories where tenant_id=? and code=?",UUID.class,s.tenantId().value(),UNCATEGORIZED_WINE_CODE).stream().findFirst();
+ }
+ public UUID ensureUncategorizedWine(StoreScope s){
+  var current=uncategorizedWine(s);
+  if(current.isPresent())return current.get();
+  jdbc.update("insert into catalog_categories(tenant_id,code,name_zh,name_en,product_lines) values(?,?,?,'Uncategorized wine',array['wine_storage']) on conflict(tenant_id,code) do nothing",
+    s.tenantId().value(),UNCATEGORIZED_WINE_CODE,"未分类酒品");
+  return uncategorizedWine(s).orElseThrow();
+ }
  public List<Category> categories(UUID tenant){return jdbc.query("select * from catalog_categories where tenant_id=? order by sort_order,code",(r,n)->new Category(r.getObject("id",UUID.class),r.getString("code"),r.getString("name_zh"),r.getString("name_en"),r.getBoolean("enabled"),r.getInt("sort_order"),r.getInt("version"),List.of((String[])r.getArray("product_lines").getArray())),tenant);}
  public UUID category(StoreScope s,CategoryWrite c){
+  if(UNCATEGORIZED_WINE_CODE.equals(c.code()))throw CatalogException.invalid();
   UUID id=UUID.randomUUID();jdbc.update("insert into catalog_categories(id,tenant_id,code,name_zh,name_en,enabled,sort_order,product_lines) values(?,?,?,?,?,?,?,?::text[])",id,s.tenantId().value(),c.code(),text(c.nameZh()),text(c.nameEn()),c.enabled(),c.sortOrder(),array(c.productLines()));return id;
  }
  public void categoryUpdate(StoreScope s,UUID id,CategoryWrite c){
   lockCategory(s,id);
+  if(uncategorizedWine(s).filter(id::equals).isPresent())throw CatalogException.invalid();
   if(c.productLines()!=null){var used=jdbc.queryForList("select distinct unnest(l.channels) from catalog_products p join catalog_product_stores l on l.tenant_id=p.tenant_id and l.product_id=p.id where p.tenant_id=? and p.category_id=?",String.class,s.tenantId().value(),id);
    if(!com.rpb.reservation.catalog.application.CatalogProductLines.covers(c.productLines(),used))throw new CatalogException("CATALOG_CATEGORY_IN_USE",409,"该分类仍有商品使用此产品线，请先调整商品渠道 / Category product line is still in use");}
   if(jdbc.update("update catalog_categories set name_zh=?,name_en=?,enabled=?,sort_order=?,product_lines=coalesce(?::text[],product_lines),version=version+1,updated_at=now() where tenant_id=? and id=? and version=?",text(c.nameZh()),text(c.nameEn()),c.enabled(),c.sortOrder(),c.productLines()==null?null:array(c.productLines()),s.tenantId().value(),id,c.expectedVersion())!=1)throw CatalogException.stale();}
