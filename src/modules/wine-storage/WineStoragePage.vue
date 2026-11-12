@@ -16,6 +16,9 @@ import './storage.css'
 const props=defineProps<{customer:boolean}>(),route=useRoute(),router=useRouter(),{t,locale}=useStorageText(),store=computed(()=>String(route.params.storeId)),api=computed(()=>storageApi(store.value,!!props.customer))
 const home=ref<Home|null>(null),error=ref(''),problems=ref<unknown[]>([]),loading=ref(false),busy=ref(false),login=ref(false),pending=ref(false),showForm=ref(false),showScan=ref(false),tab=ref('items'),filter=ref('all'),query=ref(''),receive=ref<Application|null>(null),reason=ref(''),selection=ref<Record<string,number>>({}),intent=ref<Intent|null>(null),code=ref(''),again=ref<{item:Item;intentId:string;quantity:number}|null>(null),storeInput=ref(''),correction=ref({itemId:'',reason:'',note:''})
 const rule=ref({categoryId:'',name:'',months:3}),unlimited=ref(false),can=(p:string)=>home.value?.permissions.includes('wine_storage.'+p)??false
+watch(()=>rule.value.categoryId,categoryId=>{
+ unlimited.value=home.value?.categories.some(category=>category.id===categoryId&&category.uncategorized)??false
+})
 let generation=0
 function fail(e:unknown){error.value=e instanceof Error?e.message:String(e);problems.value=e instanceof StorageApiError?e.problems:[];if(e instanceof StorageApiError&&e.status===401)login.value=true;pending.value=!!api.value.pending()}
 async function load(){const g=generation;loading.value=true;try{const data=await api.value.get<Home>('/home');if(g!==generation)return;home.value=data;login.value=false;pending.value=!!api.value.pending();const hash=new URLSearchParams(route.hash.slice(1)).get('storage');if(hash&&/^WS\.[A-Za-z0-9_-]{43}$/.test(hash)){await router.replace({hash:''});await scan(hash)}}catch(e){if(g===generation)fail(e)}finally{if(g===generation)loading.value=false}}

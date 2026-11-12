@@ -870,11 +870,13 @@ test('storage shortcut clears during store and identity changes and rejects late
 
 test('rule editor saves unlimited explicitly and restores monthly draft in both languages',async()=>{
  for(const locale of ['zh-CN','en']){
-  const data={...home,categories:[{id:'cat',nameZh:'酒水',nameEn:'Wine'}],rules:[{id:'rule',categoryId:'cat',name:'Rule',months:0,version:2}]}
+  const data={...home,categories:[{id:'cat',nameZh:'酒水',nameEn:'Wine'},{id:'uncat',nameZh:'未分类酒品',uncategorized:true}],rules:[{id:'rule',categoryId:'cat',name:'Rule',months:0,version:2}]}
   const s=mount(StaffPage,false,locale,data);await tick();button(s.root,locale==='en'?'Settings':'设置').props.onClick();await tick()
   assert.match(text(s.root),locale==='en'?/No time limit/:/不限时间/)
   const form=nodes(s.root,n=>n.tag==='form'&&nodes(n,k=>k.tag==='button'&&text(k)===(locale==='en'?'Save new version':'保存新版本')).length)[0]
   const selectValue=async(select,value)=>{select.options.forEach(o=>o.selected=o.props.value===value);select.listeners.change({target:select});await tick()}
+  await selectValue(nodes(form,n=>n.tag==='select')[0],'uncat')
+  assert.equal(nodes(form,n=>n.tag==='input'&&n.props.type==='number').length,0)
   await selectValue(nodes(form,n=>n.tag==='select')[0],'cat')
   const name=nodes(form,n=>n.tag==='input'&&String(n.props.maxlength)==='200')[0];name.value='Rule';name.listeners.input({target:name});await tick()
   const months=nodes(form,n=>n.tag==='input'&&n.props.type==='number')[0];months.value='6';months.listeners.input({target:months});await tick()
@@ -1139,7 +1141,7 @@ test('receipt submits existing and newly entered wines without any uploaded phot
   const data=mode==='uncategorized'?{...home,categories:[],rules:[]}:mode==='configured'?{...home,categories:[{id:'uncategorized',nameZh:'未分类酒品',uncategorized:true}],rules:[{id:'store-rule',categoryId:'uncategorized',name:'本店默认规则',months:0,version:2}]}:null
   const s=data?mount(ReceiveForm,false,'zh-CN',data,url=>url.endsWith('/locations')||url.endsWith('/custodians')?[]:url.includes('/product-options?')?{items:[],categories:data.categories}:{status:'stored'},{props:{home:data,api:storageApi('A',false),application:emptyReceipt(),direct:true,disabled:false}}):receiptMount();await tick()
   if(mode!=='existing'){button(s.root,'＋ 新增酒品').props.onClick();await tick();const label=nodes(s.root,n=>n.tag==='label'&&text(n).includes('中文酒名'))[0];nodes(label,n=>n.tag==='input')[0].props.onInput({target:{value:'无图寄存白酒'}});const category=nodes(s.root,n=>n.tag==='select'&&text(n).includes('不指定分类'))[0];assert.equal(category.props.required,undefined);if(mode==='categorized')category.props.onChange({target:{value:'category'}})}else chooseReceiptWine(s.root)
-  await tick();if(mode==='uncategorized')assert.match(text(s.root),/未分类酒品 · 3 个自然月/);if(mode==='configured')assert.match(text(s.root),/本店默认规则 · 不限时间/);setReceiptConsent(s.root);await tick();assert.equal(button(s.root,'确认实物已收存').props.disabled,false)
+  await tick();if(mode==='uncategorized')assert.match(text(s.root),/未分类酒品 · 不限期限/);if(mode==='configured')assert.match(text(s.root),/本店默认规则 · 不限时间/);setReceiptConsent(s.root);await tick();assert.equal(button(s.root,'确认实物已收存').props.disabled,false)
   await nodes(s.root,n=>n.tag==='form')[0].props.onSubmit({preventDefault(){}});await tick();const writes=s.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.deepEqual(writes[0].body.lines[0].photos,[]);assert.equal(writes[0].body.lines[0].categoryId,data?null:'category');assert.equal(writes[0].body.lines[0].ruleId,mode==='uncategorized'?null:mode==='configured'?'store-rule':'rule');assert.equal(writes[0].body.rulesConfirmed,true);assert.equal(s.calls.some(c=>c.url.endsWith('/photos')),false);s.unmount()
  }
 })

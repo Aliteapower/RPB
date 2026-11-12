@@ -17,7 +17,10 @@ import static com.rpb.reservation.winestorage.persistence.StorageRepository.at;
 @Transactional(readOnly=true)
 public class StorageApplicationService {
  private static final String UNCATEGORIZED_RULE_NAME="未分类酒品 / Uncategorized wine";
- private static final int UNCATEGORIZED_RULE_MONTHS=3;
+ private static final int UNCATEGORIZED_RULE_MONTHS=0;
+ static boolean isLegacyUncategorizedDefault(Rule rule){
+  return rule.version()==1&&rule.months()==3&&UNCATEGORIZED_RULE_NAME.equals(rule.name());
+ }
  private final StorageAccess access;private final StorageRepository r;private final StorageCommands commands;
  private final StorageProductCatalog products;private final StoragePhotoService photos;private final Clock clock;private final StorageCustodianService custodians;private final StorageLocationService locations;
  public StorageApplicationService(StorageAccess access,StorageRepository r,StorageCommands commands,StorageProductCatalog products,StoragePhotoService photos,Clock clock,StorageCustodianService custodians,StorageLocationService locations){this.locations=locations;this.custodians=custodians;this.access=access;this.r=r;this.commands=commands;this.products=products;this.photos=photos;this.clock=clock;}
@@ -113,19 +116,24 @@ public class StorageApplicationService {
   });
  }
  private Rule receiptRule(StoreScope s,UUID category,UUID ruleId,UUID actor){
-  if(ruleId!=null)return r.rule(s,ruleId);
-  if(!products.isUncategorized(s,category))throw StorageException.invalid();
-  r.lock(s,"rule:"+category);
-  var latest=r.rules(s).stream().filter(rule->rule.categoryId().equals(category)).findFirst();
-  if(latest.isPresent()){
-   var rule=latest.get();
-   if(rule.version()!=1||rule.months()!=UNCATEGORIZED_RULE_MONTHS||!UNCATEGORIZED_RULE_NAME.equals(rule.name()))
+  if(ruleId!=null){
+   var rule=r.rule(s,ruleId);
+   if(isLegacyUncategorizedDefault(rule)&&products.isUncategorized(s,category))
     throw StorageException.conflict("保存规则已有新版本，请刷新后重新确认");
    return rule;
   }
-  var rule=new Rule(UUID.randomUUID(),category,UNCATEGORIZED_RULE_NAME,UNCATEGORIZED_RULE_MONTHS,1);
-   r.addRule(s,rule,actor);
+  if(!products.isUncategorized(s,category))throw StorageException.invalid();
+  r.lock(s,"rule:"+category);
+  var latest=r.rules(s).stream().filter(rule->rule.categoryId().equals(category)).findFirst();
+  if(latest.isPresent()&&!isLegacyUncategorizedDefault(latest.get())){
+   var rule=latest.get();
+   if(rule.months()!=UNCATEGORIZED_RULE_MONTHS||!UNCATEGORIZED_RULE_NAME.equals(rule.name()))
+    throw StorageException.conflict("保存规则已有新版本，请刷新后重新确认");
    return rule;
+  }
+  var rule=new Rule(UUID.randomUUID(),category,UNCATEGORIZED_RULE_NAME,UNCATEGORIZED_RULE_MONTHS,latest.map(previous->previous.version()+1).orElse(1));
+  r.addRule(s,rule,actor);
+  return rule;
  }
  @Transactional public Event correct(StoreScope s,CurrentActor a,UUID id,Correction c){
   access.staff(s,a,"wine_storage.correct",false);if(c==null||text(c.reason()).isBlank()||text(c.note()).isBlank()||c.note().length()>2000)throw StorageException.invalid();
