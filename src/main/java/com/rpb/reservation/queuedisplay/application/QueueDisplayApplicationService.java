@@ -86,7 +86,7 @@ public class QueueDisplayApplicationService {
                 tenantLogoUrl
             );
         } catch (RuntimeException exception) {
-            LOGGER.warn("queue_display_state_read_failed: {}", exception.toString());
+            LOGGER.warn("queue_display_state_read_failed: {}", exception.getClass().getSimpleName());
             return QueueDisplayResult.failure(QueueDisplayError.PERSISTENCE_ERROR);
         }
     }

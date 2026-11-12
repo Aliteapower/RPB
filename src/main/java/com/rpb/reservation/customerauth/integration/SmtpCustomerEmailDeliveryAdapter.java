@@ -36,9 +36,14 @@ public class SmtpCustomerEmailDeliveryAdapter implements CustomerEmailDeliveryPo
         SimpleMailMessage mail = new SimpleMailMessage();
         mail.setFrom(settings.fromEmail());
         mail.setTo(message.toEmail());
-        mail.setSubject("Your reservation login code");
+        String action=switch(message.purpose()){
+            case "reset_password" -> "password reset";
+            case "bind_email" -> "recovery email verification";
+            default -> "reservation login";
+        };
+        mail.setSubject("Your " + action + " code");
         long minutes = Math.max(1, Duration.between(java.time.Instant.now(), message.expiresAt()).toMinutes());
-        mail.setText("Your reservation login code is %s. It expires in %d minutes.".formatted(message.code(), minutes));
+        mail.setText("Your %s code is %s. It expires in %d minutes. Do not share this code. If you did not request this, ignore this message.".formatted(action,message.code(), minutes));
 
         try {
             sender.send(mail);

@@ -1,0 +1,15 @@
+<script setup lang="ts">
+import {onMounted,ref} from 'vue'
+import {useRoute,useRouter} from 'vue-router'
+import {usePayrollPage} from '../payrollPage'
+import {chooseCompany} from '../payrollUi'
+import type {PayrollHomeData} from '../payrollTypes'
+import type {Option} from '../types'
+import PositionSalaryDefaults from '../components/PositionSalaryDefaults.vue'
+import PhaseStatus from '../components/PhaseStatus.vue'
+const route=useRoute(),router=useRouter(),{api,base,home,load,loading,failure,english}=usePayrollPage(),companies=ref<Option[]>([]),company=ref(String(route.query.companyId||'')),positions=ref<Option[]>([]),position=ref(''),x=(z:string,e:string)=>english()?e:z
+function refresh(){position.value='';positions.value=[];if(!company.value)return;const scope=company.value;void load(()=>api().get<Option[]>('/payroll-positions?'+new URLSearchParams({companyId:scope})),v=>{if(scope===company.value)positions.value=v})}
+function changeCompany(){void router.replace({query:{...route.query,companyId:company.value}});refresh()}
+onMounted(async()=>{await load(()=>api().get<PayrollHomeData>('/payroll-home'),h=>{companies.value=h.companies;if(h.companies.length)company.value=chooseCompany(h,company.value)});if(!failure.value&&companies.value.some(c=>c.id===company.value))refresh()})
+</script>
+<template><section class="wf-panel"><header class="wf-toolbar"><h2>{{x('岗位薪资标准','Position salary standards')}}</h2><RouterLink :to="{path:base+'/payroll',query:{companyId:company||undefined}}">{{x('返回工资总表','Back to payroll')}}</RouterLink></header><p class="wf-hint">{{x('先选岗位，再分别维护月薪或时薪标准。标准只用于员工采用，不自动覆盖个人议定工资；年龄和身份在员工方案中按现有法定规则适配。','Choose a position, then maintain monthly or hourly standards separately. Standards are adopted by employees and do not overwrite agreed pay; statutory rules use employee age and identity.')}}</p><div class="wf-grid"><label>{{x('发薪公司','Paying company')}}<select v-model="company" :disabled="loading" @change="changeCompany"><option v-for="c in companies" :key="c.id" :value="c.id">{{c.name}}</option></select></label><label>{{x('岗位','Position')}}<select v-model="position" :disabled="loading" :aria-label="x('薪资岗位','Salary position')"><option value="">{{x('请选择岗位','Choose a position')}}</option><option v-for="p in positions" :key="p.id" :value="p.id">{{p.name}}</option></select></label></div><PhaseStatus :failure="failure" :loading="loading"/><PositionSalaryDefaults v-if="company&&position&&!loading" :key="company+':'+position" :position-id="position" :company-id="company"/><p v-if="company&&!loading&&!positions.length" class="wf-hint">{{x('暂无有效岗位，请由岗位管理员维护。','No active positions. Ask a position administrator to maintain them.')}}</p><nav class="wf-form-actions"><RouterLink v-if="home?.headOffice&&home?.employeeManage" :to="base+'/positions'">{{x('维护岗位资料','Manage positions')}}</RouterLink><RouterLink v-if="company" :to="{path:base+'/salary-templates',query:{companyId:company}}">{{x('查看可用薪资规则','Available pay rules')}}</RouterLink></nav></section></template>

@@ -175,6 +175,20 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort, Custo
     }
 
     @Override
+    public List<CustomerManagementItem> findActiveByIds(TenantScope scope, java.util.Set<java.util.UUID> ids) {
+        if (ids.isEmpty()) return List.of();
+        var args = new java.util.ArrayList<Object>();
+        args.add(scope.tenantId().value());
+        args.addAll(ids);
+        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+        return jdbc.query("""
+            select id, customer_code, display_name, nickname, phone_e164, email, status, created_at, updated_at
+            from customers
+            where tenant_id = ? and id in (%s) and status = 'active' and deleted_at is null
+            """.formatted(placeholders), CustomerPersistenceAdapter::managementItem, args.toArray());
+    }
+
+    @Override
     public void archive(TenantScope scope, CustomerId customerId) {
         jdbc.update(
             """

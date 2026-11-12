@@ -77,6 +77,15 @@ class CustomerAuthIntegrationAdminServiceTest {
         assertThat(saved.clientId()).isEqualTo("new-client");
     }
 
+    @Test
+    void incompleteEmailActivationCannotReplaceExistingConfiguration() {
+        FakeIntegrationRepository repository = new FakeIntegrationRepository();
+        CustomerAuthIntegrationAdminService service = new CustomerAuthIntegrationAdminService(repository, repository, repository);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.saveEmailSettings(scope,new CustomerEmailSettingsCommand(true,null,null,null,587,null,null,true)))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(repository.savedEmailSettings).isNull();
+    }
+
     private static final class FakeIntegrationRepository implements
         CustomerEmailSettingsRepositoryPort,
         CustomerOAuthSettingsRepositoryPort,

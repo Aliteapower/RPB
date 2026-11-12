@@ -1,0 +1,1 @@
+export interface MerchantOrder {id:string;kind:'money'|'points';amountCents:number|null;quantity:number|null;description:string;status:'pending'|'completed'|'cancelled'|'expired';expiresAt:string;customerId:string|null;sourceType:'bill'|'points'|null;sourceId:string|null;balance:number|null;expectedVersion:number|null}

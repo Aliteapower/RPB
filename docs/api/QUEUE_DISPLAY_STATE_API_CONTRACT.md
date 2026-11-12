@@ -37,7 +37,7 @@ The authenticated actor must be tenant/store scoped to `{storeId}`. Phase 1 does
   "currentCall": {
     "queueTicketId": "91000000-0000-0000-0000-000000000002",
     "displayNumber": "A002",
-    "customerDisplayName": "孙女士",
+    "customerDisplayName": "孙***",
     "partySize": 2,
     "partySizeGroup": "1-2",
     "calledAt": "2026-06-26T03:01:00Z",
@@ -48,7 +48,7 @@ The authenticated actor must be tenant/store scoped to `{storeId}`. Phase 1 does
     "preview": [
       {
         "displayNumber": "A001",
-        "customerDisplayName": "赵先生",
+        "customerDisplayName": "赵***",
         "partySize": 3,
         "partySizeGroup": "3-4"
       }
@@ -71,6 +71,8 @@ The authenticated actor must be tenant/store scoped to `{storeId}`. Phase 1 does
 ```
 
 `currentCall` is nullable. When it is null, the terminal enters advertising state and uses the returned text slides.
+
+Customer display names in both current call and waiting preview are masked by the backend before serialization. Only the first Unicode code point is retained, followed by `***`; single-character names and names containing digits or `@` are fully suppressed as `***`. Missing names display `顾客`. Original customer data remains unchanged. See [privacy output contract](2026-10-26-queue-display-privacy.md).
 
 Text slide `title`, `subtitle`, and `tagline` values are resolved at runtime from `i18n_message_catalog` when the slide is linked to an authorized i18n key. Resolution follows store override, tenant override, platform default, then `zh-CN` fallback. Legacy slide table text remains the final fallback for rows that are not linked to a catalog key.
 

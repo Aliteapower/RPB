@@ -1,15 +1,8 @@
-export const defaultEntryRouteOptions = [
-  {
-    value: '',
-    labelKey: 'platform.productLines.entryRoutes.none.label',
-    descriptionKey: 'platform.productLines.entryRoutes.none.description'
-  },
-  {
-    value: '/stores/:storeId/staff',
-    labelKey: 'platform.productLines.entryRoutes.staffHome.label',
-    descriptionKey: 'platform.productLines.entryRoutes.staffHome.description'
-  }
-] as const
+import productLineEntries from '../../../main/resources/product-line-entries.json'
+
+export const defaultEntryRouteOptions = productLineEntries.map(({ value, labelKey, descriptionKey }) => ({
+  value, labelKey, descriptionKey
+}))
 
 export type ProductLineEntryRouteOption = (typeof defaultEntryRouteOptions)[number]
 

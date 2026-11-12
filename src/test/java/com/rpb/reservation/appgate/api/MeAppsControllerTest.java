@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.rpb.reservation.appgate.application.AppGateAppEntry;
 import com.rpb.reservation.appgate.application.AppGateService;
+import com.rpb.reservation.appgate.application.ProductRouteAccessQuery;
 import com.rpb.reservation.walkin.api.CurrentActor;
 import com.rpb.reservation.walkin.api.CurrentActorProvider;
 import java.util.List;
@@ -26,15 +27,17 @@ class MeAppsControllerTest {
     private static final UUID ACTOR_ID = UUID.fromString("30000000-0000-0000-0000-000000008301");
 
     private AppGateService appGateService;
+    private ProductRouteAccessQuery routeAccess;
     private MutableCurrentActorProvider actorProvider;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         appGateService = mock(AppGateService.class);
+        routeAccess = mock(ProductRouteAccessQuery.class);
         actorProvider = new MutableCurrentActorProvider(actor());
         mockMvc = MockMvcBuilders
-            .standaloneSetup(new MeAppsController(appGateService, actorProvider))
+            .standaloneSetup(new MeAppsController(appGateService, actorProvider,routeAccess))
             .build();
     }
 
@@ -82,6 +85,33 @@ class MeAppsControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.apps").isEmpty());
+    }
+
+    @Test void closedHistoryIsSeparateFromNormalApps() throws Exception {
+        when(appGateService.visibleApps(actorProvider.actor,STORE_ID)).thenReturn(List.of());
+        when(appGateService.historyApps(actorProvider.actor,STORE_ID)).thenReturn(List.of(new AppGateAppEntry("reservation_queue","Reservations","history","/stores/"+STORE_ID+"/reservations/today?history=1",true,Set.of("reservation.today_view"))));
+        mockMvc.perform(get("/api/me/apps").param("storeId",STORE_ID.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.apps").isEmpty()).andExpect(jsonPath("$.historyApps[0].status").value("history"));
+    }
+
+    @Test void routeAccessIsOptInAndDoesNotAlterTheLegacyEnvelope() throws Exception {
+        mockMvc.perform(get("/api/me/apps").param("storeId",STORE_ID.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.productAccess").doesNotExist());
+        verifyNoInteractions(routeAccess);
+        when(routeAccess.find(actorProvider.actor,STORE_ID)).thenReturn(List.of(new ProductRouteAccessQuery.ProductAccess(
+            "payment",false,true,"/stores/"+STORE_ID+"/payments/records?history=1","STORE_APP_EXPIRED")));
+        mockMvc.perform(get("/api/me/apps").param("storeId",STORE_ID.toString()).param("includeAccess","true"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.apps").isArray()).andExpect(jsonPath("$.historyApps").isArray())
+            .andExpect(jsonPath("$.productAccess[0].appKey").value("payment"))
+            .andExpect(jsonPath("$.productAccess[0].businessAllowed").value(false))
+            .andExpect(jsonPath("$.productAccess[0].historyAllowed").value(true))
+            .andExpect(jsonPath("$.productAccess[0].denialReason").value("STORE_APP_EXPIRED"));
+    }
+
+    @Test void optInWithoutAnEmployeeSessionReturnsEmptyAccessWithoutQuerying() throws Exception {
+        actorProvider.actor=null;
+        mockMvc.perform(get("/api/me/apps").param("storeId",STORE_ID.toString()).param("includeAccess","true"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.productAccess").isEmpty());
+        verifyNoInteractions(routeAccess,appGateService);
     }
 
     private static CurrentActor actor() {

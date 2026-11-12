@@ -7,6 +7,14 @@ public record CustomerAuthPrincipal(
     UUID authAccountId,
     UUID customerId,
     String email,
-    String displayName
+    String displayName,
+    String phoneE164,
+    boolean passwordChangeRequired
 ) {
+    public CustomerAuthPrincipal(UUID tenantId, UUID authAccountId, UUID customerId, String email, String displayName, String phoneE164) {
+        this(tenantId, authAccountId, customerId, email, displayName, phoneE164, false);
+    }
+    public CustomerAuthPrincipal(UUID tenantId, UUID authAccountId, UUID customerId, String email, String displayName) {
+        this(tenantId, authAccountId, customerId, email, displayName, null, false);
+    }
 }

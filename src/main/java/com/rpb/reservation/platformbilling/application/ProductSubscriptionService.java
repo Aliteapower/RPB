@@ -64,6 +64,7 @@ public class ProductSubscriptionService {
         ProductSubscriptionCommand command,
         PlatformBillingOperator operator
     ) {
+        subscriptions.lockTenantBilling(tenantId);
         ensureTenant(tenantId);
         ProductSubscriptionCommand normalized = validateMutation(command, PURCHASE_CYCLES, false);
         ensureProductLine(normalized.appKey());
@@ -112,6 +113,7 @@ public class ProductSubscriptionService {
         ProductSubscriptionCommand command,
         PlatformBillingOperator operator
     ) {
+        subscriptions.lockTenantBilling(tenantId);
         ProductSubscription current = currentSubscription(tenantId, subscriptionId);
         ProductSubscriptionCommand normalized = validateMutation(command, PURCHASE_CYCLES, false);
         if (!current.appKey().equals(normalized.appKey())) {
@@ -156,6 +158,7 @@ public class ProductSubscriptionService {
         ProductSubscriptionCommand command,
         PlatformBillingOperator operator
     ) {
+        subscriptions.lockTenantBilling(tenantId);
         ProductSubscription current = currentSubscription(tenantId, subscriptionId);
         if (itemId == null) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
@@ -178,6 +181,9 @@ public class ProductSubscriptionService {
         }
         ProductSubscriptionItem item = items.findByTenantSubscriptionAndId(tenantId, subscriptionId, itemId)
             .orElseThrow(() -> new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_ITEM_NOT_FOUND));
+        if (items.listActiveStores(tenantId).stream().noneMatch(store -> store.storeId().equals(item.storeId()))) {
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_ITEM_NOT_FOUND);
+        }
         checkItemVersion(item, normalized.version());
 
         BillingDuration duration = new BillingDuration(normalized.billingCycle(), normalized.durationCount());
@@ -242,6 +248,7 @@ public class ProductSubscriptionService {
         ProductSubscriptionCommand command,
         PlatformBillingOperator operator
     ) {
+        subscriptions.lockTenantBilling(tenantId);
         ProductSubscription current = currentSubscription(tenantId, subscriptionId);
         if (!LEGACY_GRANT.equals(current.billingCycle())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.SUBSCRIPTION_CONFLICT);
@@ -288,6 +295,7 @@ public class ProductSubscriptionService {
         String nextStatus,
         String eventType
     ) {
+        subscriptions.lockTenantBilling(tenantId);
         ProductSubscription current = currentSubscription(tenantId, subscriptionId);
         ProductSubscriptionStatusCommand normalized = validateStatus(command);
         Optional<ProductSubscriptionMutationResult> replay = replay(tenantId, current.appKey(), eventType, normalized.idempotencyKey());
@@ -361,6 +369,9 @@ public class ProductSubscriptionService {
         if (command == null || blank(command.idempotencyKey()) || blank(command.appKey()) || blank(command.billingCycle())) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         }
+        // Wallet selected-store commands have their own platform-billing use case and replay contract.
+        if("wallet".equals(command.appKey().trim()) || command.storeIds()!=null)
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         String cycle = command.billingCycle().trim();
         if (!allowedCycles.contains(cycle) && !(allowLegacyGrant && LEGACY_GRANT.equals(cycle))) {
             throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
@@ -440,9 +451,11 @@ public class ProductSubscriptionService {
         String paymentNote,
         UUID operatorUserId
     ) {
+        Set<UUID> activeStoreIds = items.listActiveStores(current.tenantId()).stream()
+            .map(BillableStore::storeId).collect(Collectors.toSet());
         List<ProductSubscriptionItem> activeItems = items.listByTenantId(current.tenantId()).stream()
             .filter(item -> item.subscriptionId().equals(current.id()))
-            .filter(item -> ACTIVE.equals(item.status()))
+            .filter(item -> ACTIVE.equals(item.status()) && activeStoreIds.contains(item.storeId()))
             .toList();
         BigDecimal amount = activeItems.stream()
             .map(ProductSubscriptionItem::amount)

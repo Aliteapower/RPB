@@ -1,0 +1,12 @@
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useI18n} from 'vue-i18n'
+import PaymentProofUpload from '../../../components/payment/PaymentProofUpload.vue'
+import WalletQrDisplay from '../components/WalletQrDisplay.vue'
+import {useCustomerPayNowProof} from './useCustomerPayNowProof'
+const props=defineProps<{store:string;sourceType:'topup'|'bill';sourceId:string;channel:string;amount:string;showPaynow?:boolean}>()
+const emit=defineEmits<{submitted:[]}>(),{t}=useI18n()
+const input=computed(()=>({store:props.store,sourceType:props.sourceType,sourceId:props.sourceId,channel:props.channel,amount:props.amount}))
+const {context,file,records,busy,loading,error,qr,select,refresh,submit,showQr}=useCustomerPayNowProof(input,()=>emit('submitted'))
+</script>
+<template><section class="wallet-card"><h3>{{t('wallet.proof.customerTitle')}}</h3><p class="wallet-warning">{{t('wallet.proof.customerHint')}}</p><p v-if="loading" role="status">{{t('wallet.loading')}}</p><dl v-if="context" class="wallet-detail-fields"><dt>{{t('wallet.proof.systemReference')}}</dt><dd><code>{{context.systemReference}}</code></dd><dt>{{t('wallet.proof.expectedAccount')}}</dt><dd>{{context.merchantName}} · {{context.expectedAccount}}</dd></dl><button v-if="showPaynow&&context" type="button" :disabled="busy||loading" @click="showQr">{{t('wallet.showPaynow')}}</button><WalletQrDisplay v-if="qr" :value="qr" /><PaymentProofUpload accept="image/png,image/jpeg" :model-value="file" :disabled="busy||loading||!context" :max-bytes="5*1024*1024" :capture-label="t('wallet.proof.capture')" :album-label="t('wallet.proof.album')" :empty-label="t('wallet.proof.noFile')" :remove-label="t('wallet.proof.remove')" :invalid-label="t('wallet.proof.invalidImage')" @update:model-value="select" /><button type="button" class="wallet-primary" :disabled="!file||!context||busy||loading" @click="submit">{{t(busy?'wallet.loading':'wallet.proof.customerSubmit')}}</button><p v-if="error" class="wallet-error" role="alert">{{error}}</p><button type="button" :disabled="busy||loading" @click="refresh">{{t('wallet.refresh')}}</button><article v-for="record in records" :key="record.id"><p role="status">{{t('wallet.proof.'+record.status)}}</p><p v-if="record.bankReference">{{t('wallet.proof.bankReference')}}: {{record.bankReference}}</p><p v-if="Object.values(record.checks).includes('mismatch')" class="wallet-warning">{{t('wallet.proof.customerMismatch')}}</p><a :href="record.imageUrl" target="_blank" rel="noopener">{{t('wallet.proof.view')}}</a></article></section></template>

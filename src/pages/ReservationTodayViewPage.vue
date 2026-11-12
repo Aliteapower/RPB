@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {useI18n} from 'vue-i18n'
+import ProductHistoryNotice from '../modules/tenant-products/ProductHistoryNotice.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -35,9 +37,12 @@ import type { CreateReservationResponse } from '../types/reservation'
 import { useGeneratedText } from '../i18n/generatedText'
 
 const { gt } = useGeneratedText()
+const {t}=useI18n()
 
 const route = useRoute()
 const router = useRouter()
+const queueHistoryLabel=computed(()=>t('tenantProducts.queueHistory'))
+const historyOnly=computed(()=>route.query.history==='1')
 const storeContext = useStoreContextStore()
 const { currentTimeText } = useCurrentClock()
 
@@ -61,6 +66,7 @@ const response = ref<ReservationTodayViewResponse | null>(null)
 const apiError = ref<ReservationTodayViewApiErrorResponse | null>(null)
 const checkInApiError = ref<ReservationCheckInApiErrorResponse | null>(null)
 const apps = ref<MeAppEntry[]>([])
+const historyApps=ref<MeAppEntry[]>([])
 const showCreateReservationDialog = ref(false)
 const showSeatDialog = ref(false)
 const selectedSeatReservation = ref<ReservationTodayViewItem | null>(null)
@@ -75,13 +81,13 @@ let calendarSummaryLoadSequence = 0
 
 const storeId = computed(() => storeContext.resolveStoreId(route.params.storeId))
 const storeLabel = computed(() => formatStoreLabel(storeId.value))
-const appStatusLabel = computed(() => (isLoading.value ? gt('generated.reservation-today-view.016') : gt('generated.reservation-today-view.017')))
+const appStatusLabel = computed(() => (historyOnly.value?t('tenantProducts.historyOnly'):isLoading.value ? gt('generated.reservation-today-view.016') : gt('generated.reservation-today-view.017')))
 const items = computed(() => response.value?.items ?? [])
 const displayedBusinessDate = computed(() => response.value?.businessDate || businessDate.value || gt('generated.reservation-today-view.018'))
 const storeTimezone = computed(() => response.value?.storeTimezone || 'Asia/Singapore')
 const storeTodayDate = computed(() => todayDateInput(storeTimezone.value))
-const canCreateReservationForSelectedDate = computed(() => businessDate.value >= storeTodayDate.value)
-const canRunCurrentDayActions = computed(() => businessDate.value === storeTodayDate.value)
+const canCreateReservationForSelectedDate = computed(() => !historyOnly.value && businessDate.value >= storeTodayDate.value)
+const canRunCurrentDayActions = computed(() => !historyOnly.value && businessDate.value === storeTodayDate.value)
 const showEmptyState = computed(
   () => !isLoading.value && !apiError.value && !!response.value && items.value.length === 0
 )
@@ -89,14 +95,14 @@ const reservationQueueEntry = computed(() =>
   apps.value.find(app => app.appKey === 'reservation_queue' && app.entryVisible)
 )
 const canCancelReservation = computed(
-  () => reservationQueueEntry.value?.permissions.includes('reservation.cancel') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('reservation.cancel') ?? false)
 )
 const canNoShowReservation = computed(
-  () => reservationQueueEntry.value?.permissions.includes('reservation.no_show') ?? false
+  () => !historyOnly.value && (reservationQueueEntry.value?.permissions.includes('reservation.no_show') ?? false)
 )
 const canAssignReservationTable = computed(() => {
   const permissions = reservationQueueEntry.value?.permissions ?? []
-  return permissions.includes('table.view') && permissions.includes('reservation.create')
+  return !historyOnly.value && permissions.includes('table.view') && permissions.includes('reservation.create')
 })
 
 watch(
@@ -165,7 +171,7 @@ watch(
   storeId,
   async nextStoreId => {
     const sequence = ++appsLoadSequence
-    apps.value = []
+    apps.value = [];historyApps.value=[]
 
     if (!nextStoreId) {
       return
@@ -175,11 +181,11 @@ watch(
       const result = await fetchMeApps(nextStoreId)
 
       if (sequence === appsLoadSequence) {
-        apps.value = result.apps
+        apps.value = result.apps;historyApps.value=result.historyApps??[]
       }
     } catch {
       if (sequence === appsLoadSequence) {
-        apps.value = []
+        apps.value = [];historyApps.value=[]
       }
     }
   },
@@ -499,6 +505,8 @@ function isOpenCreateQuery(value: unknown): boolean {
     </StaffHomeTopBar>
 
     <div class="reservation-workbench-body">
+      <ProductHistoryNotice v-if="historyOnly" />
+      <RouterLink v-if="historyOnly&&historyApps.some(e=>e.appKey==='reservation_queue'&&e.permissions.includes('queue.view'))" :to="`/stores/${storeId}/queue-tickets?history=1`">{{queueHistoryLabel}}</RouterLink>
       <StaffBusinessDateSwitcher
         v-model:selected-date="businessDate"
         :today-date="storeTodayDate"
@@ -507,7 +515,7 @@ function isOpenCreateQuery(value: unknown): boolean {
         @visible-month-changed="handleVisibleMonthChanged"
       />
 
-      <ReservationQuickActionPanel
+      <ReservationQuickActionPanel v-if="!historyOnly"
         :store-id="storeId"
         :can-create-reservation-for-selected-date="canCreateReservationForSelectedDate"
         :selected-date="businessDate"

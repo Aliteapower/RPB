@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DateInput from '../components/common/DateInput.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -219,7 +220,7 @@ function queryValue(value: unknown): string {
 
       <label>
         <span>{{ gt('generated.reservation-check-in.010') }}</span>
-        <input v-model="form.arrivedAt" name="arrivedAt" type="datetime-local" />
+        <DateInput v-model="form.arrivedAt" name="arrivedAt" type="datetime-local" />
       </label>
 
       <label>

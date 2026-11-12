@@ -8,6 +8,10 @@ public record CustomerEmailDeliveryMessage(
     UUID storeId,
     String toEmail,
     String code,
-    Instant expiresAt
+    Instant expiresAt,
+    String purpose
 ) {
+    public CustomerEmailDeliveryMessage(UUID tenantId,UUID storeId,String toEmail,String code,Instant expiresAt){
+        this(tenantId,storeId,toEmail,code,expiresAt,"login");
+    }
 }

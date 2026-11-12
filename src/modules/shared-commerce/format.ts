@@ -1,0 +1,6 @@
+export function displayName(value:{nameZh:string;nameEn:string},locale:string){return locale.startsWith('en')?(value.nameEn||value.nameZh):(value.nameZh||value.nameEn)}
+export function cents(value:string):number {if(!/^\d{1,8}(\.\d{1,2})?$/.test(value.trim()))throw new Error('金额格式 / Invalid amount');const [whole,part='']=value.trim().split('.');return Number(BigInt(whole!)*100n+BigInt(part.padEnd(2,'0')))}
+export function money(value:number){return new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(value/100)}
+export function businessDay(zone:string,now=new Date()){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);const get=(key:string)=>parts.find(p=>p.type===key)?.value;return `${get('year')}-${get('month')}-${get('day')}`}
+
+export function dateTime(value:string,zone='Asia/Singapore'){const parts=new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(value));const get=(key:string)=>parts.find(p=>p.type===key)?.value;return `${get('day')}-${get('month')}-${get('year')} ${get('hour')}:${get('minute')}`}

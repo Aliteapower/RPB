@@ -16,6 +16,10 @@ import org.springframework.stereotype.Repository;
 public class PlatformTenantStructureRepository {
     private final JdbcTemplate jdbc;
 
+    public void lockTenantBilling(UUID tenantId) {
+        jdbc.queryForList("select id from tenants where id = ? and deleted_at is null for no key update", tenantId);
+    }
+
     public PlatformTenantStructureRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }

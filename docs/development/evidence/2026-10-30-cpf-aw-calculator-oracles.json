@@ -1,0 +1,2171 @@
+{
+  "purpose": "Synthetic public read-only calculator oracle; no real person, authentication, CPF filing or funds movement",
+  "checkedDateSingapore": "2026-10-30",
+  "publicPage": "https://www.cpf.gov.sg/employer/tools-and-services/calculators/additional-wage-ceiling-calculator/",
+  "publicEndpoint": "https://www.cpf.gov.sg/bin/web/forms/calculator/additionalWageCeiling",
+  "method": "POST",
+  "reproductionHeaders": {
+    "Content-Type": "application/json",
+    "Referer": "https://www.cpf.gov.sg/employer/tools-and-services/calculators/additional-wage-ceiling-calculator/",
+    "Action-ID": "generate a fresh random UUID; no account credential"
+  },
+  "discoveryScript": "https://www.cpf.gov.sg/etc.clientlibs/web-forms/clientlibs/clientlib-base.min.8ea2bb4b1a0f746f17b60d4fcaee93d6.js",
+  "publicServiceVersion": "1.1.0",
+  "calculatorScope": "Singapore citizens / SPR third year onwards, private or non-pensionable employment, every monthly TW above SGD750; no tested extrapolation to SPR first/second year or low-wage annual reconciliation",
+  "cases": [
+    {
+      "caseId": "same_month_rounding",
+      "startedAtUtc": "2026-10-30T13:28:15.450Z",
+      "completedAtUtc": "2026-10-30T13:28:15.659Z",
+      "httpStatus": 200,
+      "serverDate": "Fri, 30 Oct 2026 13:28:15 GMT",
+      "request": {
+        "dateOfBirth": "1990-01-01",
+        "computeCpfExcessContribution": "N",
+        "wagesDetails": [
+          {
+            "month": "2026-01",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 101
+          },
+          {
+            "month": "2026-03",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-09",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "ordinaryWagesAmount": 1004,
+            "additionalWagesAmount": 0
+          }
+        ],
+        "contributionDetails": [
+          {
+            "month": "2026-01",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-03",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-09",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          }
+        ]
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContribution",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "totalOrdinaryWagePaid": "12,048.00",
+              "totalOrdinaryWageSubjectToCpf": "12,048.00",
+              "totalCpfPayableOnOrdinaryWage": "4,452.00",
+              "totalAdditionalWagePaid": "101.00",
+              "totalAdditionalWageSubjectToCpf": "101.00",
+              "totalCpfPayableOnAdditionalWage": "38.00",
+              "sumOfTotalContributionsPayable": "4,490.00",
+              "totalCpfPayableOnOrdinaryWageEmployer": "2,052.00",
+              "totalCpfPayableOnOrdinaryWageEmployee": "2,400.00",
+              "totalCpfPayableOnAdditionalWageEmployer": "17.00",
+              "totalCpfPayableOnAdditionalWageEmployee": "21.00",
+              "sumOfTotalContributionsPayableDetailed": "4,490.00",
+              "totalCpfPaidEmployer": "0.00",
+              "totalCpfPaidEmployee": "0.00",
+              "totalCpfPaid": "0.00",
+              "totalCpfExcessPaidEmployer": "0.00",
+              "totalCpfExcessPaidEmployee": "0.00",
+              "totalCpfExcessPaid": "0.00",
+              "wageContributionResults": [
+                {
+                  "month": "2026-01",
+                  "monthName": "January",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-02",
+                  "monthName": "February",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "101.00",
+                  "additionalWageSubjectToCpf": "101.00",
+                  "cpfPayableOnAdditionalWage": "38.00",
+                  "totalContributionsPayable": "409.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "17.00",
+                  "cpfPayableOnAdditionalWageEmployee": "21.00",
+                  "totalContributionsPayableDetailed": "409.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-03",
+                  "monthName": "March",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-04",
+                  "monthName": "April",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-05",
+                  "monthName": "May",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-06",
+                  "monthName": "June",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-07",
+                  "monthName": "July",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-08",
+                  "monthName": "August",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-09",
+                  "monthName": "September",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-10",
+                  "monthName": "October",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-11",
+                  "monthName": "November",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-12",
+                  "monthName": "December",
+                  "ordinaryWagePaid": "1,004.00",
+                  "ordinaryWageSubjectToCpf": "1,004.00",
+                  "cpfPayableOnOrdinaryWage": "371.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "371.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "171.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "200.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "371.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "cross_age_final_liability",
+      "startedAtUtc": "2026-10-30T13:28:15.660Z",
+      "completedAtUtc": "2026-10-30T13:28:15.832Z",
+      "httpStatus": 200,
+      "serverDate": "Fri, 30 Oct 2026 13:28:16 GMT",
+      "request": {
+        "dateOfBirth": "1971-06-01",
+        "computeCpfExcessContribution": "N",
+        "wagesDetails": [
+          {
+            "month": "2026-01",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 20000.49
+          },
+          {
+            "month": "2026-03",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 4000.49
+          },
+          {
+            "month": "2026-09",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          }
+        ],
+        "contributionDetails": [
+          {
+            "month": "2026-01",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-03",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-09",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "employerContributionAmount": 0,
+            "employeeContributionAmount": 0
+          }
+        ]
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContribution",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "totalOrdinaryWagePaid": "78,000.00",
+              "totalOrdinaryWageSubjectToCpf": "78,000.00",
+              "totalCpfPayableOnOrdinaryWage": "27,960.00",
+              "totalAdditionalWagePaid": "24,000.98",
+              "totalAdditionalWageSubjectToCpf": "24,000.00",
+              "totalCpfPayableOnAdditionalWage": "8,760.00",
+              "sumOfTotalContributionsPayable": "36,720.00",
+              "totalCpfPayableOnOrdinaryWageEmployer": "12,960.00",
+              "totalCpfPayableOnOrdinaryWageEmployee": "15,000.00",
+              "totalCpfPayableOnAdditionalWageEmployer": "4,041.00",
+              "totalCpfPayableOnAdditionalWageEmployee": "4,719.00",
+              "sumOfTotalContributionsPayableDetailed": "36,720.00",
+              "totalCpfPaidEmployer": "0.00",
+              "totalCpfPaidEmployee": "0.00",
+              "totalCpfPaid": "0.00",
+              "totalCpfExcessPaidEmployer": "0.00",
+              "totalCpfExcessPaidEmployee": "0.00",
+              "totalCpfExcessPaid": "0.00",
+              "wageContributionResults": [
+                {
+                  "month": "2026-01",
+                  "monthName": "January",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-02",
+                  "monthName": "February",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "20,000.49",
+                  "additionalWageSubjectToCpf": "20,000.49",
+                  "cpfPayableOnAdditionalWage": "7,400.00",
+                  "totalContributionsPayable": "10,360.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "3,400.00",
+                  "cpfPayableOnAdditionalWageEmployee": "4,000.00",
+                  "totalContributionsPayableDetailed": "10,360.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-03",
+                  "monthName": "March",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-04",
+                  "monthName": "April",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-05",
+                  "monthName": "May",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-06",
+                  "monthName": "June",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-07",
+                  "monthName": "July",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-08",
+                  "monthName": "August",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "4,000.49",
+                  "additionalWageSubjectToCpf": "3,999.51",
+                  "cpfPayableOnAdditionalWage": "1,360.00",
+                  "totalContributionsPayable": "3,060.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "641.00",
+                  "cpfPayableOnAdditionalWageEmployee": "719.00",
+                  "totalContributionsPayableDetailed": "3,060.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-09",
+                  "monthName": "September",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-10",
+                  "monthName": "October",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-11",
+                  "monthName": "November",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-12",
+                  "monthName": "December",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "0.00",
+                  "cpfPaidEmployee": "0.00",
+                  "totalMonthlyCpfPaid": "0.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "cross_age_shortfall",
+      "startedAtUtc": "2026-10-30T13:28:15.832Z",
+      "completedAtUtc": "2026-10-30T13:28:15.983Z",
+      "httpStatus": 200,
+      "serverDate": "Fri, 30 Oct 2026 13:28:16 GMT",
+      "request": {
+        "dateOfBirth": "1971-06-01",
+        "computeCpfExcessContribution": "Y",
+        "wagesDetails": [
+          {
+            "month": "2026-01",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 20000.49
+          },
+          {
+            "month": "2026-03",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 4000.49
+          },
+          {
+            "month": "2026-09",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          }
+        ],
+        "contributionDetails": [
+          {
+            "month": "2026-01",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-02",
+            "employerContributionAmount": 2380,
+            "employeeContributionAmount": 2800
+          },
+          {
+            "month": "2026-03",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-04",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-05",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-06",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-07",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-08",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-09",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-10",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-11",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-12",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          }
+        ]
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContribution",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "totalOrdinaryWagePaid": "78,000.00",
+              "totalOrdinaryWageSubjectToCpf": "78,000.00",
+              "totalCpfPayableOnOrdinaryWage": "27,960.00",
+              "totalAdditionalWagePaid": "24,000.98",
+              "totalAdditionalWageSubjectToCpf": "24,000.00",
+              "totalCpfPayableOnAdditionalWage": "8,760.00",
+              "sumOfTotalContributionsPayable": "36,720.00",
+              "totalCpfPayableOnOrdinaryWageEmployer": "12,960.00",
+              "totalCpfPayableOnOrdinaryWageEmployee": "15,000.00",
+              "totalCpfPayableOnAdditionalWageEmployer": "4,041.00",
+              "totalCpfPayableOnAdditionalWageEmployee": "4,719.00",
+              "sumOfTotalContributionsPayableDetailed": "36,720.00",
+              "totalCpfPaidEmployer": "13,980.00",
+              "totalCpfPaidEmployee": "16,200.00",
+              "totalCpfPaid": "30,180.00",
+              "totalCpfExcessPaidEmployer": "-3,021.00",
+              "totalCpfExcessPaidEmployee": "-3,519.00",
+              "totalCpfExcessPaid": "-6,540.00",
+              "wageContributionResults": [
+                {
+                  "month": "2026-01",
+                  "monthName": "January",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-02",
+                  "monthName": "February",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "20,000.49",
+                  "additionalWageSubjectToCpf": "20,000.49",
+                  "cpfPayableOnAdditionalWage": "7,400.00",
+                  "totalContributionsPayable": "10,360.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "3,400.00",
+                  "cpfPayableOnAdditionalWageEmployee": "4,000.00",
+                  "totalContributionsPayableDetailed": "10,360.00",
+                  "cpfPaidEmployer": "2,380.00",
+                  "cpfPaidEmployee": "2,800.00",
+                  "totalMonthlyCpfPaid": "5,180.00",
+                  "cpfExcessPaidEmployer": "-2,380.00",
+                  "cpfExcessPaidEmployee": "-2,800.00",
+                  "totalMonthlyCpfExcessPaid": "-5,180.00"
+                },
+                {
+                  "month": "2026-03",
+                  "monthName": "March",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-04",
+                  "monthName": "April",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-05",
+                  "monthName": "May",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-06",
+                  "monthName": "June",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-07",
+                  "monthName": "July",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-08",
+                  "monthName": "August",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "4,000.49",
+                  "additionalWageSubjectToCpf": "3,999.51",
+                  "cpfPayableOnAdditionalWage": "1,360.00",
+                  "totalContributionsPayable": "3,060.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "641.00",
+                  "cpfPayableOnAdditionalWageEmployee": "719.00",
+                  "totalContributionsPayableDetailed": "3,060.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "-641.00",
+                  "cpfExcessPaidEmployee": "-719.00",
+                  "totalMonthlyCpfExcessPaid": "-1,360.00"
+                },
+                {
+                  "month": "2026-09",
+                  "monthName": "September",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-10",
+                  "monthName": "October",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-11",
+                  "monthName": "November",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-12",
+                  "monthName": "December",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "aw_excess_below_annual_limit",
+      "startedAtUtc": "2026-10-30T13:28:15.983Z",
+      "completedAtUtc": "2026-10-30T13:28:16.167Z",
+      "httpStatus": 200,
+      "serverDate": "Fri, 30 Oct 2026 13:28:16 GMT",
+      "request": {
+        "dateOfBirth": "1971-06-01",
+        "computeCpfExcessContribution": "Y",
+        "wagesDetails": [
+          {
+            "month": "2026-01",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 20000.49
+          },
+          {
+            "month": "2026-03",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 4000.49
+          },
+          {
+            "month": "2026-09",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          }
+        ],
+        "contributionDetails": [
+          {
+            "month": "2026-01",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-02",
+            "employerContributionAmount": 4760,
+            "employeeContributionAmount": 5600
+          },
+          {
+            "month": "2026-03",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-04",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-05",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-06",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-07",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-08",
+            "employerContributionAmount": 1442,
+            "employeeContributionAmount": 1620
+          },
+          {
+            "month": "2026-09",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-10",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-11",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-12",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          }
+        ]
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContribution",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "totalOrdinaryWagePaid": "78,000.00",
+              "totalOrdinaryWageSubjectToCpf": "78,000.00",
+              "totalCpfPayableOnOrdinaryWage": "27,960.00",
+              "totalAdditionalWagePaid": "24,000.98",
+              "totalAdditionalWageSubjectToCpf": "24,000.00",
+              "totalCpfPayableOnAdditionalWage": "8,760.00",
+              "sumOfTotalContributionsPayable": "36,720.00",
+              "totalCpfPayableOnOrdinaryWageEmployer": "12,960.00",
+              "totalCpfPayableOnOrdinaryWageEmployee": "15,000.00",
+              "totalCpfPayableOnAdditionalWageEmployer": "4,041.00",
+              "totalCpfPayableOnAdditionalWageEmployee": "4,719.00",
+              "sumOfTotalContributionsPayableDetailed": "36,720.00",
+              "totalCpfPaidEmployer": "17,002.00",
+              "totalCpfPaidEmployee": "19,720.00",
+              "totalCpfPaid": "36,722.00",
+              "totalCpfExcessPaidEmployer": "1.00",
+              "totalCpfExcessPaidEmployee": "1.00",
+              "totalCpfExcessPaid": "2.00",
+              "wageContributionResults": [
+                {
+                  "month": "2026-01",
+                  "monthName": "January",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-02",
+                  "monthName": "February",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "20,000.49",
+                  "additionalWageSubjectToCpf": "20,000.49",
+                  "cpfPayableOnAdditionalWage": "7,400.00",
+                  "totalContributionsPayable": "10,360.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "3,400.00",
+                  "cpfPayableOnAdditionalWageEmployee": "4,000.00",
+                  "totalContributionsPayableDetailed": "10,360.00",
+                  "cpfPaidEmployer": "4,760.00",
+                  "cpfPaidEmployee": "5,600.00",
+                  "totalMonthlyCpfPaid": "10,360.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-03",
+                  "monthName": "March",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-04",
+                  "monthName": "April",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-05",
+                  "monthName": "May",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-06",
+                  "monthName": "June",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-07",
+                  "monthName": "July",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-08",
+                  "monthName": "August",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "4,000.49",
+                  "additionalWageSubjectToCpf": "3,999.51",
+                  "cpfPayableOnAdditionalWage": "1,360.00",
+                  "totalContributionsPayable": "3,060.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "641.00",
+                  "cpfPayableOnAdditionalWageEmployee": "719.00",
+                  "totalContributionsPayableDetailed": "3,060.00",
+                  "cpfPaidEmployer": "1,442.00",
+                  "cpfPaidEmployee": "1,620.00",
+                  "totalMonthlyCpfPaid": "3,062.00",
+                  "cpfExcessPaidEmployer": "1.00",
+                  "cpfExcessPaidEmployee": "1.00",
+                  "totalMonthlyCpfExcessPaid": "2.00"
+                },
+                {
+                  "month": "2026-09",
+                  "monthName": "September",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-10",
+                  "monthName": "October",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-11",
+                  "monthName": "November",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-12",
+                  "monthName": "December",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "zero_total_opposite_share_differences",
+      "startedAtUtc": "2026-10-30T13:28:35.999Z",
+      "completedAtUtc": "2026-10-30T13:28:36.235Z",
+      "httpStatus": 200,
+      "request": {
+        "dateOfBirth": "1971-06-01",
+        "computeCpfExcessContribution": "Y",
+        "wagesDetails": [
+          {
+            "month": "2026-01",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-02",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 20000.49
+          },
+          {
+            "month": "2026-03",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-04",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-05",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-06",
+            "ordinaryWagesAmount": 8000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-07",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-08",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 4000.49
+          },
+          {
+            "month": "2026-09",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-10",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-11",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          },
+          {
+            "month": "2026-12",
+            "ordinaryWagesAmount": 5000,
+            "additionalWagesAmount": 0
+          }
+        ],
+        "contributionDetails": [
+          {
+            "month": "2026-01",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-02",
+            "employerContributionAmount": 4760,
+            "employeeContributionAmount": 5600
+          },
+          {
+            "month": "2026-03",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-04",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-05",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-06",
+            "employerContributionAmount": 1360,
+            "employeeContributionAmount": 1600
+          },
+          {
+            "month": "2026-07",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-08",
+            "employerContributionAmount": 1440,
+            "employeeContributionAmount": 1620
+          },
+          {
+            "month": "2026-09",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-10",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-11",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          },
+          {
+            "month": "2026-12",
+            "employerContributionAmount": 800,
+            "employeeContributionAmount": 900
+          }
+        ]
+      },
+      "response": {
+        "success": true,
+        "result": [
+          {
+            "serviceName": "GetContribution",
+            "returnCode": "00",
+            "errors": [],
+            "payload": {
+              "totalOrdinaryWagePaid": "78,000.00",
+              "totalOrdinaryWageSubjectToCpf": "78,000.00",
+              "totalCpfPayableOnOrdinaryWage": "27,960.00",
+              "totalAdditionalWagePaid": "24,000.98",
+              "totalAdditionalWageSubjectToCpf": "24,000.00",
+              "totalCpfPayableOnAdditionalWage": "8,760.00",
+              "sumOfTotalContributionsPayable": "36,720.00",
+              "totalCpfPayableOnOrdinaryWageEmployer": "12,960.00",
+              "totalCpfPayableOnOrdinaryWageEmployee": "15,000.00",
+              "totalCpfPayableOnAdditionalWageEmployer": "4,041.00",
+              "totalCpfPayableOnAdditionalWageEmployee": "4,719.00",
+              "sumOfTotalContributionsPayableDetailed": "36,720.00",
+              "totalCpfPaidEmployer": "17,000.00",
+              "totalCpfPaidEmployee": "19,720.00",
+              "totalCpfPaid": "36,720.00",
+              "totalCpfExcessPaidEmployer": "-1.00",
+              "totalCpfExcessPaidEmployee": "1.00",
+              "totalCpfExcessPaid": "0.00",
+              "wageContributionResults": [
+                {
+                  "month": "2026-01",
+                  "monthName": "January",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-02",
+                  "monthName": "February",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "20,000.49",
+                  "additionalWageSubjectToCpf": "20,000.49",
+                  "cpfPayableOnAdditionalWage": "7,400.00",
+                  "totalContributionsPayable": "10,360.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "3,400.00",
+                  "cpfPayableOnAdditionalWageEmployee": "4,000.00",
+                  "totalContributionsPayableDetailed": "10,360.00",
+                  "cpfPaidEmployer": "4,760.00",
+                  "cpfPaidEmployee": "5,600.00",
+                  "totalMonthlyCpfPaid": "10,360.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-03",
+                  "monthName": "March",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-04",
+                  "monthName": "April",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-05",
+                  "monthName": "May",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-06",
+                  "monthName": "June",
+                  "ordinaryWagePaid": "8,000.00",
+                  "ordinaryWageSubjectToCpf": "8,000.00",
+                  "cpfPayableOnOrdinaryWage": "2,960.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "2,960.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "1,360.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "1,600.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "2,960.00",
+                  "cpfPaidEmployer": "1,360.00",
+                  "cpfPaidEmployee": "1,600.00",
+                  "totalMonthlyCpfPaid": "2,960.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-07",
+                  "monthName": "July",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-08",
+                  "monthName": "August",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "4,000.49",
+                  "additionalWageSubjectToCpf": "3,999.51",
+                  "cpfPayableOnAdditionalWage": "1,360.00",
+                  "totalContributionsPayable": "3,060.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "641.00",
+                  "cpfPayableOnAdditionalWageEmployee": "719.00",
+                  "totalContributionsPayableDetailed": "3,060.00",
+                  "cpfPaidEmployer": "1,440.00",
+                  "cpfPaidEmployee": "1,620.00",
+                  "totalMonthlyCpfPaid": "3,060.00",
+                  "cpfExcessPaidEmployer": "-1.00",
+                  "cpfExcessPaidEmployee": "1.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-09",
+                  "monthName": "September",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-10",
+                  "monthName": "October",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-11",
+                  "monthName": "November",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                },
+                {
+                  "month": "2026-12",
+                  "monthName": "December",
+                  "ordinaryWagePaid": "5,000.00",
+                  "ordinaryWageSubjectToCpf": "5,000.00",
+                  "cpfPayableOnOrdinaryWage": "1,700.00",
+                  "additionalWagePaid": "0.00",
+                  "additionalWageSubjectToCpf": "0.00",
+                  "cpfPayableOnAdditionalWage": "0.00",
+                  "totalContributionsPayable": "1,700.00",
+                  "cpfPayableOnOrdinaryWageEmployer": "800.00",
+                  "cpfPayableOnOrdinaryWageEmployee": "900.00",
+                  "cpfPayableOnAdditionalWageEmployer": "0.00",
+                  "cpfPayableOnAdditionalWageEmployee": "0.00",
+                  "totalContributionsPayableDetailed": "1,700.00",
+                  "cpfPaidEmployer": "800.00",
+                  "cpfPaidEmployee": "900.00",
+                  "totalMonthlyCpfPaid": "1,700.00",
+                  "cpfExcessPaidEmployer": "0.00",
+                  "cpfExcessPaidEmployee": "0.00",
+                  "totalMonthlyCpfExcessPaid": "0.00"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

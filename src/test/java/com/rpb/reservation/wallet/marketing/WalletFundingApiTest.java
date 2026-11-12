@@ -1,0 +1,31 @@
+package com.rpb.reservation.wallet.marketing;
+import com.rpb.reservation.common.scope.StoreScope;
+import com.rpb.reservation.tenant.value.TenantId;
+import com.rpb.reservation.wallet.api.*;
+import com.rpb.reservation.wallet.domain.WalletException;
+import com.rpb.reservation.wallet.funding.application.WalletFundingOperations;
+import com.rpb.reservation.wallet.funding.application.WalletFundingOperations.AllocationView;
+import com.rpb.reservation.walkin.api.CurrentActor;
+import java.util.*;
+import org.junit.jupiter.api.*;
+import org.springframework.test.web.servlet.*;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+/** Funding controller contract; operations own permission/ledger checks and never trust tenant headers. */
+class WalletFundingApiTest {
+ final UUID tenant=UUID.randomUUID(),store=UUID.randomUUID(),account=UUID.randomUUID(),lot=UUID.randomUUID(),bill=UUID.randomUUID();
+ final StoreScope scope=new StoreScope(new TenantId(tenant),store);
+ final CurrentActor actor=new CurrentActor(tenant,UUID.randomUUID(),"staff",Set.of(),Set.of("wallet.charge.create","wallet.refund.manage"),Set.of(store));
+ WalletApiIdentity identity;WalletFundingOperations operations;MockMvc mvc;
+ String path(String suffix){return "/api/v1/stores/"+store+"/wallet"+suffix;}
+ @BeforeEach void setup(){identity=mock(WalletApiIdentity.class);operations=mock(WalletFundingOperations.class);when(identity.staff()).thenReturn(actor);when(identity.scope(tenant,store)).thenReturn(scope);mvc=MockMvcBuilders.standaloneSetup(new WalletFundingController(identity,operations)).setControllerAdvice(new WalletErrorAdvice()).addFilters(new WalletRequestSecurityFilter()).build();}
+ @Test void chargePreviewReturnsFrozenAccountVersionComponentsAndUsesSessionTenant()throws Exception{var request=new WalletFundingOperations.ChargePreview(account,"55.00",bill);when(operations.chargePreview(scope,actor,request)).thenReturn(new WalletFundingOperations.ChargeSplit(account,7,5000,500,List.of(new AllocationView(lot,5000,500,null))));mvc.perform(post(path("/charge-previews")).header("X-RPB-Wallet","1").header("X-Test-Tenant-Id",UUID.randomUUID()).contentType("application/json").content("{\"accountId\":\""+account+"\",\"amount\":\"55.00\",\"billId\":\""+bill+"\"}")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","private, no-store")).andExpect(jsonPath("$.accountId").value(account.toString())).andExpect(jsonPath("$.accountVersion").value(7)).andExpect(jsonPath("$.principalCents").value(5000)).andExpect(jsonPath("$.bonusCents").value(500)).andExpect(jsonPath("$.allocations[0].lotId").value(lot.toString()));verify(operations).chargePreview(scope,actor,request);verify(identity,never()).scope(argThat(t->!tenant.equals(t)),any());}
+ @Test void refundPreviewMapsOriginalSourceModeAndAllResponseComponents()throws Exception{var request=new WalletFundingOperations.RefundPreviewRequest("bill",bill,"55.00",null);when(operations.refundPreview(scope,actor,request)).thenReturn(new WalletFundingOperations.RefundPreview(5500,2750,0,2500,250,0,2750,account,8,null,List.of()));mvc.perform(post(path("/refund-previews")).header("X-RPB-Wallet","1").contentType("application/json").content("{\"sourceType\":\"bill\",\"sourceId\":\""+bill+"\",\"amount\":\"55.00\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.walletCents").value(2750)).andExpect(jsonPath("$.principalReturnCents").value(2500)).andExpect(jsonPath("$.bonusReturnCents").value(250)).andExpect(jsonPath("$.externalRefundCents").value(2750)).andExpect(jsonPath("$.accountVersion").value(8));verify(operations).refundPreview(scope,actor,request);}
+ @Test void bonusExitRequiresModelHeaderThenPreservesAccountVersionReasonAndKey()throws Exception{String body="{\"accountId\":\""+account+"\",\"expectedVersion\":9,\"reason\":\"退出赠送\",\"idempotencyKey\":\"exit-key\"}";for(String model:List.of("","legacy"))mvc.perform(post(path("/funding-lots/"+lot+"/exit-bonus")).header("X-RPB-Wallet","1").header("X-RPB-Wallet-Model",model).contentType("application/json").content(body)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WALLET_CLIENT_UPGRADE_REQUIRED"));verifyNoInteractions(operations);mvc.perform(post(path("/funding-lots/"+lot+"/exit-bonus")).header("X-RPB-Wallet","1").header("X-RPB-Wallet-Model","components-v2").contentType("application/json").content(body)).andExpect(status().isOk());verify(operations).exit(scope,actor,lot,new WalletFundingOperations.BonusExit(account,9,"退出赠送","exit-key"));}
+ @Test void identityPrecedesModelAndOperationsForEveryFundingRoute()throws Exception{when(identity.staff()).thenThrow(new WalletException("WALLET_UNAUTHENTICATED",401,"请先登录"));for(String suffix:List.of("/charge-previews","/refund-previews","/funding-lots/"+lot+"/exit-bonus"))mvc.perform(post(path(suffix)).header("X-RPB-Wallet","1").contentType("application/json").content("{}")).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("WALLET_UNAUTHENTICATED"));mvc.perform(get(path("/accounts/"+account+"/funding-lots"))).andExpect(status().isUnauthorized());verifyNoInteractions(operations);}
+ @Test void permissionErrorsRemainForbiddenEvenWithComponentsHeader()throws Exception{when(operations.exit(any(),any(),any(),any())).thenThrow(WalletException.forbidden());mvc.perform(post(path("/funding-lots/"+lot+"/exit-bonus")).header("X-RPB-Wallet","1").header("X-RPB-Wallet-Model","components-v2").contentType("application/json").content("{\"accountId\":\""+account+"\",\"expectedVersion\":1,\"reason\":\"reason\",\"idempotencyKey\":\"key\"}")).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("WALLET_FORBIDDEN"));}
+ @Test void fundingLotsReadUsesSessionScopeAndRemainsUncached()throws Exception{when(operations.lots(scope,actor,account)).thenReturn(List.of());mvc.perform(get(path("/accounts/"+account+"/funding-lots")).header("X-Test-Tenant-Id",UUID.randomUUID())).andExpect(status().isOk()).andExpect(header().string("Cache-Control","private, no-store")).andExpect(content().json("[]"));verify(operations).lots(scope,actor,account);}
+}

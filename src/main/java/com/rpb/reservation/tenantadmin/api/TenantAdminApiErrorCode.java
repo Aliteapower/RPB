@@ -7,6 +7,8 @@ public enum TenantAdminApiErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "tenant.admin.forbidden"),
     STORE_SCOPE_MISMATCH(HttpStatus.FORBIDDEN, "tenant.admin.store_scope_mismatch"),
     REQUEST_INVALID(HttpStatus.BAD_REQUEST, "tenant.admin.request_invalid"),
+    PRODUCT_LINE_UNAVAILABLE(HttpStatus.CONFLICT, "tenant.admin.product_line_unavailable"),
+    PERMISSION_VERSION_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.permission_version_conflict"),
     TENANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.tenant_profile_not_found"),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.staff_not_found"),
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "tenant.admin.customer_not_found"),
@@ -15,6 +17,7 @@ public enum TenantAdminApiErrorCode {
     TEMPLATE_UNKNOWN_VARIABLE(HttpStatus.BAD_REQUEST, "tenant.admin.template_unknown_variable"),
     STAFF_CODE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.staff_code_conflict"),
     CUSTOMER_PHONE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.customer_phone_conflict"),
+    CUSTOMER_HAS_RETAINED_ASSETS(HttpStatus.CONFLICT, "tenant.admin.customer_has_retained_assets"),
     TABLE_CODE_CONFLICT(HttpStatus.CONFLICT, "tenant.admin.table_code_conflict"),
     TABLE_IN_USE(HttpStatus.CONFLICT, "tenant.admin.table_in_use"),
     PERSISTENCE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "tenant.admin.persistence_error");

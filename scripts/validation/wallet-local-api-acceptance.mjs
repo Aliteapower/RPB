@@ -1,0 +1,70 @@
+// Repeatable only against the fresh fixture created by wallet-local-fixture.mjs. No production targets.
+import assert from 'node:assert/strict'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+const f=JSON.parse(readFileSync('target/wallet-validation/fixture.json','utf8'))
+const pointer=Object.fromEntries(readFileSync('target/local-postgres-current.txt','utf8').split(/\r?\n/).filter(l=>l.includes('=')).map(l=>l.split(/=(.*)/s).slice(0,2)))
+assert.match(f.schema,/^wallet_browser_[a-f0-9]{32}$/);assert.equal(f.pgPort,pointer.port);assert.equal(f.backendPort,8083)
+const [a,b,c]=f.stores, checks=[]
+async function api(method,path,body,role='staff',expected=200) {
+  const headers={'X-RPB-Wallet':'1',Cookie:role==='customer'?`RPB_CUSTOMER_SESSION=${f.customerToken}`:role==='platform'?`RPB_SESSION=${f.platformToken}`:role==='none'?'':`RPB_SESSION=${f.staffToken}`}
+  if(body && !(body instanceof FormData))headers['Content-Type']='application/json'
+  const r=await fetch('http://127.0.0.1:8083'+path,{method,headers,body:body?body instanceof FormData?body:JSON.stringify(body):undefined})
+  const value=await r.json().catch(()=>({}))
+  assert.equal(r.status,expected,`${method} ${path}: ${JSON.stringify(value)}`);return value
+}
+const w=store=>`/api/v1/stores/${store}/wallet`, pub=store=>`/api/v1/public/stores/${store}/wallet`, profile=`/api/v1/stores/${a}/tenant-admin`
+const key=()=>randomUUID()
+function sql(text) {return execFileSync(process.env.RPB_PSQL||'C:/Program Files/PostgreSQL/17/bin/psql.exe',['-h','127.0.0.1','-p',f.pgPort,'-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-Atq'],{input:text,encoding:'utf8',env:{...process.env,PGCLIENTENCODING:'UTF8',PGOPTIONS:`-c search_path=${f.schema},public`}}).trim()}
+const context=await api('GET',w(a)+'/context');assert.equal(context.store.tenantId,f.tenant)
+const account=(await api('GET',w(a)+`/customers/${f.customer}/accounts`))[0];assert.ok(account)
+for(const store of [b,c])await api('PUT',w(store)+'/program',{channels:['cash','paynow','credit_card'],idempotencyKey:key()})
+checks.push('same issuer attaches sibling stores to the existing program and customer account')
+const pending=await api('POST',w(c)+'/topups',{accountId:account.id,amount:'10',channel:'cash',idempotencyKey:key()})
+const unpaid=await api('POST',w(c)+'/bills',{accountId:account.id,amount:'2',idempotencyKey:key()})
+sql(`update tenant_product_subscription_items set current_period_start=now()-interval '2 months',current_period_end=now()-interval '1 minute' where tenant_id='${f.tenant}' and store_id='${c}' and app_key='wallet';`)
+assert.equal((await api('GET',w(c)+'/context')).transactionsEnabled,false);assert.equal((await api('GET',w(b)+'/context')).transactionsEnabled,true)
+await api('POST',w(c)+'/topups',{accountId:account.id,amount:'1',channel:'cash',idempotencyKey:key()},'staff',403)
+await api('POST',pub(c)+'/payment-codes',{accountId:account.id},'customer',403)
+await api('GET',w(c)+`/bills/${unpaid.id}/paynow`,undefined,'staff',403)
+await api('POST',w(c)+`/bills/${unpaid.id}/collections`,{channel:'cash',amount:'2',terminalCode:'LOCAL',receiptReference:key(),verified:true,idempotencyKey:key()},'staff',403)
+const confirmation=(channel,amount,ref,extra={})=>({channel,amount,terminalCode:'LOCAL',receiptReference:ref,collectionAccount:channel==='paynow'?'TESTONLY01':'',note:'本地虚构验收',verified:true,idempotencyKey:key(),...extra})
+await api('POST',w(c)+`/topups/${pending.id}/confirm`,confirmation('cash','10',key()))
+const bill=await api('POST',w(b)+'/bills',{accountId:account.id,amount:'3',idempotencyKey:key()})
+const quote=await api('POST',pub(b)+`/bills/${bill.id}/quote`,undefined,'customer')
+await api('POST',pub(b)+`/bills/${bill.id}/pay`,{quoteId:quote.id,idempotencyKey:key()},'customer')
+assert.equal((await api('GET',pub(c)+'/me',undefined,'customer')).accounts[0].balanceCents,700)
+checks.push('expired store blocks all new trading and codes, allows original receipt recovery and own balance; sibling remains active with the same login')
+await api('PUT',w(a)+'/collection-profile',{version:null,status:'active',paynowType:'uen',paynowUen:'TESTONLY01',merchantName:'LOCAL TEST ONLY',issuerVerified:true,idempotencyKey:key()})
+const paynow=await api('POST',w(a)+'/topups',{accountId:account.id,amount:'1',channel:'paynow',idempotencyKey:key()})
+assert.match((await api('GET',w(a)+`/topups/${paynow.id}/paynow`)).payload,/^000201/)
+assert.equal((await api('GET',w(a)+`/accounts/${account.id}`)).balanceCents,700)
+await api('POST',w(a)+`/topups/${paynow.id}/confirm`,confirmation('paynow','1',key(),{collectionAccount:'wrong-account'}),'staff',409)
+await api('POST',w(a)+`/topups/${paynow.id}/confirm`,confirmation('paynow','1',key()))
+const card=await api('POST',w(a)+'/topups',{accountId:account.id,amount:'2',channel:'credit_card',idempotencyKey:key()})
+await api('POST',w(a)+`/topups/${card.id}/confirm`,confirmation('credit_card','2',key(),{collectionAccount:'LOCAL-CARD-MERCHANT'}))
+assert.equal((await api('GET',w(a)+`/accounts/${account.id}`)).balanceCents,1000)
+checks.push('real offline PayNow adapter previews without credit; rejects wrong account; manual PayNow and external card confirmation credit exact amounts')
+await api('PATCH',profile+'/profile',{displayName:'统一资料更新后的钱包A店',defaultLocale:'zh-CN',contactPhone:'+6580000000',address:'Local validation address',principalName:'LOCAL TEST'})
+assert.equal((await api('GET',pub(a)+'/me',undefined,'customer')).context.store.storeName,'统一资料更新后的钱包A店')
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=','base64')
+const form=new FormData();form.append('file',new Blob([png],{type:'image/png'}),'wallet-test.png')
+await api('POST',profile+'/profile/logo',form)
+const asset=(await api('GET',pub(c)+'/me',undefined,'customer')).context.store.logoMediaAssetId;assert.ok(asset)
+const logo=await fetch('http://127.0.0.1:8083'+pub(c)+`/logo/${asset}`,{headers:{Cookie:`RPB_CUSTOMER_SESSION=${f.customerToken}`}});assert.equal(logo.status,200)
+await api('DELETE',profile+'/profile/logo')
+assert.equal((await api('GET',pub(a)+'/me',undefined,'customer')).context.store.logoMediaAssetId,null)
+await api('GET',pub(c)+`/logo/${asset}`,undefined,'customer',404)
+await api('PATCH',profile+`/customers/${f.customer}`,{displayName:'统一顾客更新姓名',email:'wallet.test@example.com'})
+assert.equal((await api('GET',w(b)+`/customers/${f.customer}`)).displayName,'统一顾客更新姓名')
+const archived=await api('POST',profile+`/customers/${f.customer}/archive`,undefined,'staff',409);assert.equal(archived.error.code,'CUSTOMER_HAS_RETAINED_ASSETS')
+checks.push('shared profile/customer updates are reflected; current tenant logo is shared and clearing revokes old wallet URL even after expiry; archive is explicitly rejected')
+await api('GET',pub(a)+'/me',undefined,'none',401)
+await api('GET','/api/v1/public/stores/20000000-0000-0000-0000-000000000983/wallet/me',undefined,'customer',404)
+assert.equal(sql(`select count(*) from tenant_app_entitlements where tenant_id='${f.tenant}' and app_key='payment';`),'0')
+const date=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Singapore'}), report=await api('GET',w(a)+`/reconciliation?start=${date}&end=${date}&group=issuer`)
+assert.equal(report.programBalanceCents,1000);assert.equal(report.creditedTopupCents,6300);assert.equal(report.walletSpentCents,5300);assert.equal(report.externalBillCents,3000);assert.equal(report.ledgerMismatchAccounts,0)
+checks.push('issuer totals count shared balance once; software subscription never grants payment product or credits a customer; expired and anonymous sessions remain separated')
+writeFileSync('target/wallet-validation/api-acceptance.json',JSON.stringify({schema:f.schema,checks,report,accountId:account.id,expiredStore:c,activeSibling:b},null,2))
+console.log(JSON.stringify({schema:f.schema,passed:checks.length,balanceCents:report.programBalanceCents,ledgerMismatchAccounts:report.ledgerMismatchAccounts}))

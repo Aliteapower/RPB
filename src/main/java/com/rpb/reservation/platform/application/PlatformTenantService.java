@@ -1,10 +1,13 @@
 package com.rpb.reservation.platform.application;
 
+import com.rpb.reservation.common.scope.StoreScope;
 import com.rpb.reservation.platform.persistence.PlatformTenantAdminAccountRepository;
 import com.rpb.reservation.platform.persistence.PlatformTenantRepository;
+import com.rpb.reservation.queue.application.DefaultQueueGroupProvisioningService;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaAsset;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaContent;
 import com.rpb.reservation.queuedisplay.application.CallScreenMediaService;
+import com.rpb.reservation.tenant.value.TenantId;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +35,7 @@ public class PlatformTenantService {
     private final PlatformTenantAuditService auditService;
     private final CallScreenMediaService mediaService;
     private final PublicHostBindingService publicHostBindingService;
+    private final DefaultQueueGroupProvisioningService queueGroupProvisioningService;
 
     public PlatformTenantService(
         PlatformTenantRepository repository,
@@ -39,7 +43,8 @@ public class PlatformTenantService {
         PasswordEncoder passwordEncoder,
         PlatformTenantAuditService auditService,
         CallScreenMediaService mediaService,
-        PublicHostBindingService publicHostBindingService
+        PublicHostBindingService publicHostBindingService,
+        DefaultQueueGroupProvisioningService queueGroupProvisioningService
     ) {
         this.repository = repository;
         this.accountRepository = accountRepository;
@@ -47,6 +52,7 @@ public class PlatformTenantService {
         this.auditService = auditService;
         this.mediaService = mediaService;
         this.publicHostBindingService = publicHostBindingService;
+        this.queueGroupProvisioningService = queueGroupProvisioningService;
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +121,10 @@ public class PlatformTenantService {
                         tenant.defaultLocale(),
                         defaultOperatingEntityId
                     );
+                    queueGroupProvisioningService.provisionDefaults(new StoreScope(
+                        new TenantId(tenant.id()),
+                        defaultStoreId
+                    ));
                 }
             }
             accountRepository.upsertTenantAdminAccount(

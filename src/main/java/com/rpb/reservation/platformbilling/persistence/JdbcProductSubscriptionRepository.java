@@ -23,6 +23,11 @@ public class JdbcProductSubscriptionRepository implements ProductSubscriptionRep
     }
 
     @Override
+    public void lockTenantBilling(UUID tenantId) {
+        jdbc.queryForList("select id from tenants where id = ? and deleted_at is null for no key update", tenantId);
+    }
+
+    @Override
     public boolean existsActiveTenant(UUID tenantId) {
         Integer count = jdbc.queryForObject(
             "select count(*) from tenants where id = ? and deleted_at is null",

@@ -23,6 +23,8 @@ public class SubscriptionQuoteService {
     ) {
         PlatformProductLinePrice price = prices.findActivePrice(appKey, duration.billingCycle())
             .orElseThrow(() -> new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID));
+        if("wallet".equals(appKey) && (!"SGD".equals(price.currency()) || (requestedCurrency!=null && !"SGD".equals(requestedCurrency))))
+            throw new PlatformBillingServiceException(PlatformBillingServiceErrorCode.REQUEST_INVALID);
         int safeStoreCount = Math.max(0, storeCount);
         BigDecimal storeUnitAmount = price.amount().multiply(BigDecimal.valueOf(duration.durationCount()));
         BigDecimal defaultAmount = storeUnitAmount.multiply(BigDecimal.valueOf(safeStoreCount));

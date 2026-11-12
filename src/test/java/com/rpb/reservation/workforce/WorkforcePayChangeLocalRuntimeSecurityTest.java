@@ -1,0 +1,14 @@
+package com.rpb.reservation.workforce;
+import com.rpb.reservation.workforce.api.WorkforcePayChangeController;
+import com.rpb.reservation.workforce.payroll.governance.*;import com.rpb.reservation.walkin.api.*;import com.rpb.reservation.walkin.auth.LocalRuntimeSecurityConfiguration;
+import java.util.*;import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;import org.springframework.boot.test.mock.mockito.MockBean;import org.springframework.context.annotation.Import;import org.springframework.test.context.ActiveProfiles;import org.springframework.test.context.TestPropertySource;import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.Mockito.*;import static org.mockito.ArgumentMatchers.*;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@WebMvcTest(WorkforcePayChangeController.class)
+@Import({LocalRuntimeSecurityConfiguration.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
+@ActiveProfiles("local") @TestPropertySource(properties="rpb.local-auth.enabled=true")
+class WorkforcePayChangeLocalRuntimeSecurityTest {
+ @Autowired MockMvc mvc;@MockBean CurrentActorProvider actors;@MockBean PayChangeService requests;@MockBean PayChangeImpactService impacts;
+ @MockBean com.rpb.reservation.appgate.application.AppGateService gate;@MockBean com.rpb.reservation.appgate.application.AppGateDenialAuditService denialAudit;
+ @Test void preciseReadWriteRoutesReachServiceWhileUnknownMethodsStayClosed()throws Exception{when(actors.currentActor()).thenReturn(Optional.of(new CurrentActor(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of())));String base="/api/v1/stores/"+UUID.randomUUID()+"/workforce";UUID id=UUID.randomUUID(),company=UUID.randomUUID(),employee=UUID.randomUUID();for(var path:List.of("/pay-change-requests?companyId="+company,"/pay-change-requests/"+id,"/pay-change-requests/"+id+"/impact?month=2026-11","/pay-change-monthly-baseline?companyId="+company+"&employeeId="+employee+"&month=2026-11"))mvc.perform(get(base+path)).andExpect(status().isOk());for(var path:List.of("/pay-change-requests/"+id,"/pay-change-requests/"+id+"/actions"))mvc.perform(put(base+path).header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isOk());verify(requests).monthlyBaseline(any(),any(),eq(company),eq(employee),eq("2026-11"));for(var path:List.of("/pay-change-requests/"+id+"/private","/pay-change-monthly-baseline/private","/pay-change-requests/"+id+"/actions/private"))mvc.perform(get(base+path)).andExpect(status().isForbidden());mvc.perform(post(base+"/pay-change-requests/"+id)).andExpect(status().isForbidden());mvc.perform(delete(base+"/pay-change-requests/"+id)).andExpect(status().isForbidden());}
+}

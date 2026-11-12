@@ -11,4 +11,6 @@ public @interface RequireAppGate {
     String appKey();
 
     String permission();
+
+    boolean allowClosedHistory() default false;
 }

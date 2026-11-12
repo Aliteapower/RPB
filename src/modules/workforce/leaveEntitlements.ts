@@ -1,0 +1,3 @@
+export interface LeaveGrant {id:string;companyId:string;employeeId:string;typeId:string;year:number;grant:number;carryIn:number;adjustment:number;unit:'HOURS'|'DAYS';dayMinutes:number|null;reason:string;version:number}
+export interface LeaveBalance {typeId:string;typeName:string;sourceStoreId:string;companyId:string;policy:LeaveGrant|null;accountUnit?:'HOURS'|'DAYS'|null;state:'KNOWN'|'UNKNOWN';usedSeconds:number|null;reservedSeconds:number|null;used:number|null;reserved:number|null;remaining:number|null;unknownReasons:string[]}
+export interface LeaveBalancePage {employeeId:string;year:number;canManage:boolean;balances:LeaveBalance[]}

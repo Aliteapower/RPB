@@ -1,0 +1,259 @@
+[
+  {
+    "appKey": "",
+    "value": "",
+    "labelKey": "platform.productLines.entryRoutes.none.label",
+    "descriptionKey": "platform.productLines.entryRoutes.none.description",
+    "permissions": [],
+    "historyRoute": "",
+    "historyPermissions": [],
+    "routePrefixes": [],
+    "historyReadRoutes": [],
+    "recoveryRoutes": []
+  },
+  {
+    "appKey": "reservation_queue",
+    "value": "/stores/:storeId/staff",
+    "labelKey": "platform.productLines.entryRoutes.staffHome.label",
+    "descriptionKey": "platform.productLines.entryRoutes.staffHome.description",
+    "permissions": [
+      "reservation.create",
+      "reservation.check_in",
+      "reservation.seat",
+      "reservation.today_view",
+      "reservation.queue",
+      "reservation.cancel",
+      "reservation.no_show",
+      "reservation.complete",
+      "queue.view",
+      "queue.call",
+      "queue.seat",
+      "queue.skip",
+      "queue.rejoin",
+      "queue.cancel",
+      "queue.display.view",
+      "table.view",
+      "table.switch",
+      "customer.lookup",
+      "walkin.direct_seating.create",
+      "walkin.queue.create",
+      "cleaning.start",
+      "cleaning.complete"
+    ],
+    "historyRoute": "/stores/:storeId/reservations/today?history=1",
+    "historyPermissions": [
+      "reservation.today_view",
+      "queue.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "booking",
+        "audience": "customer",
+        "path": "/book/:storeId"
+      }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/reservations",
+      "/stores/:storeId/queue-tickets",
+      "/stores/:storeId/queue-display",
+      "/stores/:storeId/tables",
+      "/stores/:storeId/walk-ins",
+      "/stores/:storeId/cleaning",
+      "/stores/:storeId/admin/tables",
+      "/stores/:storeId/admin/settings",
+      "/stores/:storeId/admin/reservation-queue",
+      "/stores/:storeId/admin/share-template",
+      "/stores/:storeId/admin/public-booking",
+      "/stores/:storeId/admin/call-screen"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/reservations/today",
+      "/stores/:storeId/queue-tickets"
+    ],
+    "recoveryRoutes": []
+  },
+  {
+    "appKey": "payment",
+    "value": "/stores/:storeId/payments",
+    "labelKey": "platform.productLines.entryRoutes.payment.label",
+    "descriptionKey": "platform.productLines.entryRoutes.payment.description",
+    "permissions": [
+      "payment.intent.view",
+      "payment.intent.create",
+      "payment.verification.review",
+      "payment.proof.review",
+      "payment.proof_template.manage"
+    ],
+    "historyRoute": "/stores/:storeId/payments/records?history=1",
+    "historyPermissions": [
+      "payment.intent.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "payment",
+        "audience": "staff",
+        "path": "/stores/:storeId/payments"
+      }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/payments",
+      "/stores/:storeId/admin/payment"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/payments/records",
+      "/stores/:storeId/admin/payment/records"
+    ],
+    "recoveryRoutes": [
+      "/stores/:storeId/payments/display/:sessionNo"
+    ]
+  },
+  {
+    "appKey": "wallet",
+    "value": "/stores/:storeId/wallet",
+    "labelKey": "wallet.entry",
+    "descriptionKey": "wallet.description",
+    "permissions": [
+      "wallet.view",
+      "wallet.topup.create",
+      "wallet.charge.create",
+      "wallet.points.view"
+    ],
+    "historyRoute": "/stores/:storeId/wallet/transactions?history=1",
+    "historyPermissions": [
+      "wallet.view",
+      "wallet.points.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "walletCustomer",
+        "audience": "customer",
+        "path": "/wallet/:storeId"
+      },
+      {
+        "key": "walletStaff",
+        "audience": "staff",
+        "path": "/stores/:storeId/wallet"
+      }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/wallet"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/wallet/transactions",
+      "/stores/:storeId/wallet/transactions/:sourceType/:transactionId",
+      "/stores/:storeId/wallet/bills/:billId",
+      "/stores/:storeId/wallet/topups/:topupId",
+      "/stores/:storeId/wallet/refunds/:refundId",
+      "/stores/:storeId/wallet/business-report",
+      "/stores/:storeId/wallet/report",
+      "/stores/:storeId/wallet/exceptions"
+    ],
+    "recoveryRoutes": [
+      "/stores/:storeId/wallet/refund-create",
+      "/stores/:storeId/wallet/points/:entryId/reverse",
+      "/stores/:storeId/wallet/cards"
+    ]
+  },
+  {
+    "appKey": "wine_storage",
+    "value": "/stores/:storeId/wine-storage",
+    "labelKey": "wineStorage.entry",
+    "descriptionKey": "wineStorage.description",
+    "permissions": [
+      "wine_storage.view",
+      "wine_storage.receive",
+      "wine_storage.deliver"
+    ],
+    "historyRoute": "/stores/:storeId/wine-storage?task=records&history=1",
+    "historyPermissions": [
+      "wine_storage.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "wineCustomer",
+        "audience": "customer",
+        "path": "/wallet/:storeId/wine-storage"
+      },
+      {
+        "key": "wineStaff",
+        "audience": "staff",
+        "path": "/stores/:storeId/wine-storage"
+      }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/wine-storage"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/wine-storage?task=records"
+    ],
+    "recoveryRoutes": [
+      "/stores/:storeId/wine-storage?task=withdraw"
+    ]
+  },
+  {
+    "appKey": "workforce",
+    "value": "/stores/:storeId/workforce",
+    "labelKey": "workforce.entry",
+    "descriptionKey": "workforce.description",
+    "permissions": [
+      "workforce.view"
+    ],
+    "historyRoute": "/stores/:storeId/workforce-history?history=1",
+    "historyPermissions": [
+      "workforce.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "workforce",
+        "audience": "staff",
+        "path": "/stores/:storeId/workforce"
+      },
+      {
+        "key": "workforceClock",
+        "audience": "staff",
+        "path": "/stores/:storeId/workforce/clock"
+      },
+      {
+        "key": "workforceAdmin",
+        "audience": "admin",
+        "path": "/stores/:storeId/workforce/management"
+      }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/workforce",
+      "/stores/:storeId/workforce-history"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/workforce-history"
+    ],
+    "recoveryRoutes": []
+  },
+  {
+    "appKey": "daily_ledger",
+    "value": "/stores/:storeId/daily-ledger",
+    "labelKey": "platform.productLines.entryRoutes.dailyLedger.label",
+    "descriptionKey": "platform.productLines.entryRoutes.dailyLedger.description",
+    "permissions": [
+      "daily_ledger.view",
+      "daily_ledger.write"
+    ],
+    "historyRoute": "/stores/:storeId/daily-ledger?history=1",
+    "historyPermissions": [
+      "daily_ledger.view"
+    ],
+    "distributionEntries": [
+      {
+        "key": "ledger",
+        "audience": "staff",
+        "path": "/stores/:storeId/daily-ledger"
+      }
+    ],
+    "routePrefixes": [
+      "/stores/:storeId/daily-ledger"
+    ],
+    "historyReadRoutes": [
+      "/stores/:storeId/daily-ledger"
+    ],
+    "recoveryRoutes": []
+  }
+]

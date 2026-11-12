@@ -1,5 +1,6 @@
 package com.rpb.reservation.publicbooking.application;
 
+import com.rpb.reservation.appgate.application.AppGateService;
 import com.rpb.reservation.common.time.BusinessDate;
 import com.rpb.reservation.common.value.OperationSource;
 import com.rpb.reservation.customerauth.application.CustomerAuthApplicationService;
@@ -40,6 +41,7 @@ public class PublicBookingApplicationService {
     private final ReservationCreateApplicationService reservationCreateService;
     private final ReservationMealPeriodScheduleService mealPeriodScheduleService;
     private final Clock clock;
+    private final AppGateService appGate;
 
     @Autowired
     public PublicBookingApplicationService(
@@ -49,7 +51,8 @@ public class PublicBookingApplicationService {
         CustomerEmailSettingsRepositoryPort emailSettingsRepository,
         CustomerAuthApplicationService customerAuthService,
         ReservationCreateApplicationService reservationCreateService,
-        ReservationMealPeriodRepositoryPort mealPeriodRepository
+        ReservationMealPeriodRepositoryPort mealPeriodRepository,
+        AppGateService appGate
     ) {
         this(
             storeRepository,
@@ -59,7 +62,8 @@ public class PublicBookingApplicationService {
             customerAuthService,
             reservationCreateService,
             mealPeriodRepository,
-            Clock.systemUTC()
+            Clock.systemUTC(),
+            appGate
         );
     }
 
@@ -71,7 +75,8 @@ public class PublicBookingApplicationService {
         CustomerAuthApplicationService customerAuthService,
         ReservationCreateApplicationService reservationCreateService,
         ReservationMealPeriodRepositoryPort mealPeriodRepository,
-        Clock clock
+        Clock clock,
+        AppGateService appGate
     ) {
         this.storeRepository = storeRepository;
         this.settingsRepository = settingsRepository;
@@ -81,12 +86,13 @@ public class PublicBookingApplicationService {
         this.reservationCreateService = reservationCreateService;
         this.mealPeriodScheduleService = new ReservationMealPeriodScheduleService(mealPeriodRepository);
         this.clock = clock;
+        this.appGate = appGate;
     }
 
     @Transactional(readOnly = true)
     public Optional<PublicBookingContext> getContext(UUID storeId, String rawBusinessDate) {
         PublicBookingStoreProfile store = storeRepository.findActiveStoreProfileByStoreId(storeId).orElse(null);
-        if (store == null) {
+        if (store == null || !commercialAccess(store)) {
             return Optional.empty();
         }
         ZoneId zoneId = zoneId(store.timezone());
@@ -179,14 +185,22 @@ public class PublicBookingApplicationService {
         if (store == null) {
             return PublicBookingCreateResult.failure(PublicBookingError.STORE_NOT_FOUND);
         }
+        if (!commercialAccess(store)) {
+            return PublicBookingCreateResult.failure(PublicBookingError.BOOKING_DISABLED);
+        }
         PublicBookingSettings settings = settingsRepository.findSettings(store.scope()).orElse(PublicBookingSettings.disabled());
         if (!settings.enabled()) {
             return PublicBookingCreateResult.failure(PublicBookingError.BOOKING_DISABLED);
         }
 
         CustomerAuthPrincipal principal = null;
-        if (settings.requireCustomerLogin()) {
+        if (hasText(command.customerSessionToken())) {
             principal = customerAuthService.authenticateSession(command.customerSessionToken()).orElse(null);
+            if (principal != null && !store.scope().tenantId().value().equals(principal.tenantId())) {
+                return PublicBookingCreateResult.failure(PublicBookingError.INVALID_SESSION);
+            }
+        }
+        if (settings.requireCustomerLogin()) {
             if (principal == null) {
                 return PublicBookingCreateResult.failure(PublicBookingError.LOGIN_REQUIRED);
             }
@@ -229,6 +243,10 @@ public class PublicBookingApplicationService {
             return PublicBookingCreateResult.failure(PublicBookingError.RESERVATION_REJECTED);
         }
         return PublicBookingCreateResult.success(result);
+    }
+
+    private boolean commercialAccess(PublicBookingStoreProfile store) {
+        return appGate.evaluateCommercial("reservation_queue", store.scope().tenantId().value(), store.scope().storeId().value()).allowed();
     }
 
     private boolean isInsideBookingWindow(

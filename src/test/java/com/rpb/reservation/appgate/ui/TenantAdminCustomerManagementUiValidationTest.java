@@ -16,7 +16,10 @@ class TenantAdminCustomerManagementUiValidationTest {
         String zhGenerated = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "generated-zh-CN.ts"));
         String enGenerated = FrontendSourceSupport.readString(Path.of("src", "i18n", "locales", "generated-en-SG.ts"));
 
-        assertThat(page)
+        String shared = FrontendSourceSupport.readString(Path.of("src", "modules", "customers", "useCustomerManagement.ts"));
+        String fields = FrontendSourceSupport.readString(Path.of("src", "modules", "customers", "CustomerProfileFields.vue"));
+        assertThat(page).contains("useCustomerManagement").contains("CustomerProfileFields");
+        assertThat(page + shared + fields)
             .contains("listCustomers")
             .contains("createCustomer")
             .contains("updateCustomer")

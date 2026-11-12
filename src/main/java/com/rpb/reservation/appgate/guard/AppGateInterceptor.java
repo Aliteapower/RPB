@@ -67,13 +67,15 @@ public class AppGateInterceptor implements HandlerInterceptor {
         }
 
         CurrentActor actor = currentActor.get();
-        AppGateDecision decision = appGateService.evaluate(new AppGateAccessRequest(
+        AppGateAccessRequest accessRequest = new AppGateAccessRequest(
             annotation.appKey(),
             actor.tenantId(),
             storeId,
             annotation.permission(),
             actor
-        ));
+        );
+        AppGateDecision decision=annotation.allowClosedHistory() && ("GET".equals(request.getMethod())||"HEAD".equals(request.getMethod()))
+            ? appGateService.evaluateHistory(accessRequest) : appGateService.evaluate(accessRequest);
         if (!decision.allowed()) {
             denialAuditService.recordDenial(decision, actor);
             writeDenied(response, decision);

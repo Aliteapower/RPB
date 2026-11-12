@@ -1,0 +1,21 @@
+package com.rpb.reservation.workforce;
+import com.rpb.reservation.workforce.api.WorkforcePayrollBoardController;
+import com.rpb.reservation.workforce.payroll.*;import com.rpb.reservation.walkin.api.*;import com.rpb.reservation.walkin.auth.LocalRuntimeSecurityConfiguration;
+import java.util.*;import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;import org.springframework.boot.test.mock.mockito.MockBean;import org.springframework.context.annotation.Import;import org.springframework.test.context.ActiveProfiles;import org.springframework.test.context.TestPropertySource;import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.Mockito.*;import static org.mockito.ArgumentMatchers.*;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@WebMvcTest({com.rpb.reservation.workforce.api.WorkforcePayPlanEstimateController.class,WorkforcePayrollBoardController.class,com.rpb.reservation.workforce.api.WorkforceSegmentController.class})
+@Import({LocalRuntimeSecurityConfiguration.class,com.rpb.reservation.appgate.api.AppGateApiErrorMapper.class})
+@ActiveProfiles("local") @TestPropertySource(properties="rpb.local-auth.enabled=true")
+class WorkforcePayrollBoardLocalRuntimeSecurityTest {
+ @Autowired MockMvc mvc;@MockBean CurrentActorProvider actors;@MockBean PayrollBoardService workbench;@MockBean com.rpb.reservation.workforce.payroll.segment.SegmentService segments;
+ @MockBean PayPlanEstimateService estimator;
+ @MockBean com.rpb.reservation.appgate.application.AppGateService gate;@MockBean com.rpb.reservation.appgate.application.AppGateDenialAuditService denialAudit;
+ @Test void estimatePostIsExactAndStillNeedsWorkforceGuard()throws Exception{when(actors.currentActor()).thenReturn(Optional.of(new CurrentActor(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of())));String path="/api/v1/stores/"+UUID.randomUUID()+"/workforce/pay-plan-estimate";mvc.perform(post(path).contentType("application/json").content("{}")).andExpect(status().isForbidden());mvc.perform(post(path).header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","private, no-store"));verify(estimator).estimate(any(),any(),any());mvc.perform(post(path+"/private").header("X-RPB-Workforce","1").contentType("application/json").content("{}")).andExpect(status().isForbidden());mvc.perform(put(path).header("X-RPB-Workforce","1")).andExpect(status().isForbidden());}
+ @Test void onlyExactGetReachesPayrollAuthorization()throws Exception{
+  when(actors.currentActor()).thenReturn(Optional.of(new CurrentActor(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of())));String base="/api/v1/stores/"+UUID.randomUUID()+"/workforce/employee-payroll-board";
+  mvc.perform(get(base).param("companyId",UUID.randomUUID().toString()).param("month","2026-10")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","private, no-store"));verify(workbench).read(any(),any(),any(),eq("2026-10"));
+  mvc.perform(get(base+"/private")).andExpect(status().isForbidden());for(var method:List.of("POST","PUT","DELETE"))mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method),base)).andExpect(status().isForbidden());
+ }
+ @Test void segmentRoutesRemainNarrowAndUseWorkforceWriteGuard()throws Exception{when(actors.currentActor()).thenReturn(Optional.of(new CurrentActor(UUID.randomUUID(),UUID.randomUUID(),"staff",Set.of(),Set.of(),Set.of())));String base="/api/v1/stores/"+UUID.randomUUID()+"/workforce";mvc.perform(get(base+"/my-payroll-segments").param("year","2026")).andExpect(status().isOk());verify(segments).mine(any(),any(),eq(2026));mvc.perform(get(base+"/payroll-segments/"+UUID.randomUUID()+"/private")).andExpect(status().isForbidden());mvc.perform(post(base+"/payroll-segments/"+UUID.randomUUID()+"/commands/"+UUID.randomUUID()).contentType("application/json").content("{}")).andExpect(status().isForbidden());mvc.perform(delete(base+"/payroll-segments/"+UUID.randomUUID())).andExpect(status().isForbidden());}
+}

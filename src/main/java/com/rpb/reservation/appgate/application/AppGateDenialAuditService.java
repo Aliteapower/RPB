@@ -25,10 +25,14 @@ public class AppGateDenialAuditService {
             return;
         }
 
+        // A requested foreign/nonexistent store is not a valid FK in the actor's tenant.
+        // Keep the attempted ID in the snapshot and record this as a tenant-level denial.
+        UUID auditStoreId = actor != null && decision.tenantId().equals(actor.tenantId())
+            && actor.canAccessStore(decision.storeId()) ? decision.storeId() : null;
         auditLogs.save(AppGateAuditLogEntity.of(
             UUID.randomUUID(),
             decision.tenantId(),
-            decision.storeId(),
+            auditStoreId,
             decision.appKey(),
             ACTION,
             actor == null ? null : actor.actorId(),
@@ -41,11 +45,12 @@ public class AppGateDenialAuditService {
 
     private static String denialSnapshot(AppGateDecision decision) {
         return """
-            {"decision":"denied","denyReason":"%s","messageKey":"%s","requiredPermission":"%s"}
+            {"decision":"denied","denyReason":"%s","messageKey":"%s","requiredPermission":"%s","requestedStoreId":"%s"}
             """.formatted(
                 decision.denyReason() == null ? "PERMISSION_DENIED" : decision.denyReason().name(),
                 escape(decision.messageKey() == null ? "appgate.permission_denied" : decision.messageKey()),
-                escape(decision.requiredPermission())
+                escape(decision.requiredPermission()),
+                decision.storeId()
             ).trim();
     }
 

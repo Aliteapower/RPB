@@ -35,6 +35,11 @@ public class QueueTicketListApiMapper {
         );
     }
 
+    public QueueTicketListQuery toQuery(UUID storeId,String status,String limit,String offset,String tableArea,String partySize,String phone,String businessDate,CurrentActor actor) {
+        var q=toQuery(storeId,status,limit,offset,tableArea,partySize,phone,actor);
+        return new QueueTicketListQuery(q.tenantId(),q.storeId(),q.actorId(),q.actorType(),q.status(),q.limit(),q.offset(),q.tableArea(),q.partySize(),q.phone(),trimToNull(businessDate));
+    }
+
     public QueueTicketListResponse toResponse(QueueTicketListResult result) {
         return new QueueTicketListResponse(
             true,

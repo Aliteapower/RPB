@@ -1,0 +1,14 @@
+<script setup lang="ts">
+import {onMounted,ref} from 'vue'
+import {usePhasePage} from '../phasePage'
+import {useDocumentText} from '../documentText'
+import {WorkforceApiError} from '../api'
+import type {DocumentType} from '../documentTypes'
+import PhaseStatus from '../components/PhaseStatus.vue'
+const {api,home,current,t,p,load,loading,busy,failure,notice}=usePhasePage(),{d}=useDocumentText(),items=ref<DocumentType[]>([]),editing=ref(false),draft=ref({id:'',name:'',enabled:true,expectedVersion:0})
+function reload(){void load(()=>api().get<DocumentType[]>('/document-types'),rows=>items.value=rows)}
+function edit(row?:DocumentType){draft.value=row?{id:row.id,name:row.name,enabled:row.enabled,expectedVersion:row.version}:{id:crypto.randomUUID(),name:'',enabled:true,expectedVersion:0};editing.value=true}
+async function save(deleted=false){if(busy.value)return;busy.value=true;failure.value='';try{await api().put('/document-types/'+draft.value.id,{...draft.value,deleted});if(current()){editing.value=false;notice.value=p('applied');reload()}}catch(e){if(current())failure.value=e instanceof WorkforceApiError&&e.code==='WORKFORCE_DOCUMENT_TYPE_IN_USE'?d('inUse'):e instanceof WorkforceApiError&&e.status===409?d('stale'):p('invalid')}finally{if(current())busy.value=false}}
+onMounted(()=>{if(home.value?.headOffice)reload()})
+</script>
+<template><section v-if="home?.headOffice" class="wf-panel"><header class="wf-toolbar"><h2>{{d('types')}}</h2><button type="button" class="primary" :disabled="busy" @click="edit()">{{d('addType')}}</button></header><p class="wf-hint">{{d('seedHint')}}</p><PhaseStatus :loading="loading" :failure="failure" :notice="notice"/><form v-if="editing" @submit.prevent="save()"><fieldset :disabled="busy"><div class="wf-filters"><label>{{d('type')}}<input v-model="draft.name" required maxlength="80"></label><label>{{t('status')}}<select v-model="draft.enabled"><option :value="true">{{d('enabled')}}</option><option :value="false">{{d('disabled')}}</option></select></label></div></fieldset><footer class="wf-form-actions"><button type="button" :disabled="busy" @click="editing=false">{{t('cancel')}}</button><button v-if="draft.expectedVersion" type="button" :disabled="busy" @click="save(true)">{{d('deleteType')}}</button><button type="submit" class="primary" :disabled="busy">{{t('save')}}</button></footer></form><div class="wf-table-wrap"><table><thead><tr><th>{{d('type')}}</th><th>{{t('status')}}</th><th>{{t('manage')}}</th></tr></thead><tbody><tr v-for="row in items" :key="row.id"><td>{{row.name}}</td><td>{{d(row.enabled?'enabled':'disabled')}}</td><td><button type="button" :disabled="busy" @click="edit(row)">{{d('edit')}}</button></td></tr></tbody></table></div><button v-if="failure" type="button" :disabled="busy||loading" @click="reload">{{p('reload')}}</button></section><p v-else role="alert">{{p('noAccess')}}</p></template>

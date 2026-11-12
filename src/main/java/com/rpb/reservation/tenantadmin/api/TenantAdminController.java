@@ -57,7 +57,9 @@ public class TenantAdminController {
     private final TenantAdminProfileService profileService;
     private final ReservationMealPeriodManagementService mealPeriodService;
     private final CustomerManagementApplicationService customerManagementService;
+    private final com.rpb.reservation.customer.application.CustomerRegistrationService registrationService;
     private final TenantAdminScopeResolver scopeResolver;
+    private final com.rpb.reservation.customerauth.application.CustomerActivationStatusQuery activationStatuses;
 
     public TenantAdminController(
         TenantAdminStaffService staffService,
@@ -66,7 +68,9 @@ public class TenantAdminController {
         TenantAdminProfileService profileService,
         ReservationMealPeriodManagementService mealPeriodService,
         CustomerManagementApplicationService customerManagementService,
-        TenantAdminScopeResolver scopeResolver
+        com.rpb.reservation.customer.application.CustomerRegistrationService registrationService,
+        TenantAdminScopeResolver scopeResolver,
+        com.rpb.reservation.customerauth.application.CustomerActivationStatusQuery activationStatuses
     ) {
         this.staffService = staffService;
         this.tableService = tableService;
@@ -74,7 +78,9 @@ public class TenantAdminController {
         this.profileService = profileService;
         this.mealPeriodService = mealPeriodService;
         this.customerManagementService = customerManagementService;
+        this.registrationService = registrationService;
         this.scopeResolver = scopeResolver;
+        this.activationStatuses = activationStatuses;
     }
 
     @GetMapping("/profile")
@@ -153,9 +159,9 @@ public class TenantAdminController {
         @PathVariable UUID storeId,
         @RequestBody(required = false) TenantAdminStaffMutationRequest request
     ) {
-        StoreScope scope = requireTenantAdminScope(storeId);
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
         return ResponseEntity.status(201).body(TenantAdminStaffResponse.from(
-            staffService.createStaff(scope, toCommand(request))
+            staffService.createStaff(actorScope.scope(), actorScope.actor(), toCommand(request))
         ));
     }
 
@@ -174,9 +180,9 @@ public class TenantAdminController {
         @PathVariable UUID staffId,
         @RequestBody(required = false) TenantAdminStaffMutationRequest request
     ) {
-        StoreScope scope = requireTenantAdminScope(storeId);
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
         return ResponseEntity.ok(TenantAdminStaffResponse.from(
-            staffService.updateStaff(scope, staffId, toCommand(request))
+            staffService.updateStaff(actorScope.scope(), actorScope.actor(), staffId, toCommand(request))
         ));
     }
 
@@ -188,14 +194,9 @@ public class TenantAdminController {
         @RequestParam(value = "offset", required = false) String offset
     ) {
         StoreScope scope = requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminCustomerListResponse.from(
-            customerManagementService.list(
-                scope.tenantScope(),
-                keyword,
-                optionalInteger(limit),
-                optionalInteger(offset)
-            )
-        ));
+        var result=customerManagementService.list(scope.tenantScope(),keyword,optionalInteger(limit),optionalInteger(offset));
+        var states=activationStatuses.states(scope,result.customers().stream().map(c->c.id()).toList());
+        return ResponseEntity.ok(TenantAdminCustomerListResponse.from(result,states));
     }
 
     @PostMapping("/customers")
@@ -203,10 +204,21 @@ public class TenantAdminController {
         @PathVariable UUID storeId,
         @RequestBody(required = false) TenantAdminCustomerMutationRequest request
     ) {
-        StoreScope scope = requireTenantAdminScope(storeId);
+        TenantAdminActorScope actorScope = scopeResolver.requireTenantAdminActorScope(storeId);
         return ResponseEntity.status(201).body(TenantAdminCustomerResponse.from(
-            customerManagementService.create(scope.tenantScope(), toCommand(request))
+            registrationService.create(actorScope.scope(),actorScope.actor().actorId(),toCommand(request),request==null||request.privacyConsent()==null?null:request.privacyConsent().toCommand())
         ));
+    }
+
+    @GetMapping("/customer-privacy-notice")
+    public ResponseEntity<TenantAdminCustomerPrivacyResponses.Notice> privacyNotice(@PathVariable UUID storeId) {
+        requireTenantAdminScope(storeId);
+        return ResponseEntity.ok(TenantAdminCustomerPrivacyResponses.Notice.from(registrationService.notice()));
+    }
+
+    @GetMapping("/customers/{customerId}/privacy-consents")
+    public ResponseEntity<TenantAdminCustomerPrivacyResponses.History> customerPrivacyRecords(@PathVariable UUID storeId,@PathVariable UUID customerId) {
+        return ResponseEntity.ok(TenantAdminCustomerPrivacyResponses.History.from(registrationService.records(requireTenantAdminScope(storeId),customerId)));
     }
 
     @GetMapping("/customers/{customerId}")
@@ -215,9 +227,9 @@ public class TenantAdminController {
         @PathVariable UUID customerId
     ) {
         StoreScope scope = requireTenantAdminScope(storeId);
-        return ResponseEntity.ok(TenantAdminCustomerResponse.from(
-            customerManagementService.get(scope.tenantScope(), customerId)
-        ));
+        var customer=customerManagementService.get(scope.tenantScope(),customerId);
+        var state=activationStatuses.states(scope,java.util.List.of(customerId)).getOrDefault(customerId,com.rpb.reservation.customerauth.application.CustomerActivationState.unknown);
+        return ResponseEntity.ok(new TenantAdminCustomerResponse(true,TenantAdminCustomerItemResponse.from(customer,state.name())));
     }
 
     @PatchMapping("/customers/{customerId}")
@@ -436,6 +448,7 @@ public class TenantAdminController {
             case REQUEST_INVALID -> TenantAdminApiErrorCode.REQUEST_INVALID;
             case CUSTOMER_NOT_FOUND -> TenantAdminApiErrorCode.CUSTOMER_NOT_FOUND;
             case CUSTOMER_PHONE_CONFLICT -> TenantAdminApiErrorCode.CUSTOMER_PHONE_CONFLICT;
+            case CUSTOMER_HAS_RETAINED_ASSETS -> TenantAdminApiErrorCode.CUSTOMER_HAS_RETAINED_ASSETS;
             case PERSISTENCE_ERROR -> TenantAdminApiErrorCode.PERSISTENCE_ERROR;
         };
     }

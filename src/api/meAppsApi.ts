@@ -14,15 +14,17 @@ export class MeAppsApiError extends Error {
 
 export async function fetchMeApps(
   storeId: string,
-  fetcher: typeof fetch = fetch
+  fetcher: typeof fetch = fetch,
+  includeAccess = false
 ): Promise<MeAppsResponse> {
-  const endpoint = `/api/me/apps?storeId=${encodeURIComponent(storeId)}`
+  const endpoint = `/api/me/apps?storeId=${encodeURIComponent(storeId)}${includeAccess ? '&includeAccess=true' : ''}`
 
   let response: Response
 
   try {
     response = await fetcher(endpoint, {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         Accept: 'application/json'
       }
@@ -103,7 +105,9 @@ function isMeAppsResponse(payload: unknown): payload is MeAppsResponse {
   return (
     candidate.success === true &&
     Array.isArray(candidate.apps) &&
-    candidate.apps.every(isMeAppEntry)
+    candidate.apps.every(isMeAppEntry) &&
+    (candidate.productAccess === undefined || Array.isArray(candidate.productAccess) && candidate.productAccess.every(item => !!item && typeof item.appKey === 'string' && typeof item.businessAllowed === 'boolean' && typeof item.historyAllowed === 'boolean' && (item.historyRoute === null || typeof item.historyRoute === 'string'))) &&
+    (candidate.historyApps === undefined || Array.isArray(candidate.historyApps) && candidate.historyApps.every(isMeAppEntry))
   )
 }
 

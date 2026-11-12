@@ -9,6 +9,7 @@ import type { AuthStoreAccess } from '../../types/auth'
 const props = defineProps<{
   fallbackLabel?: string
   surface?: 'tenant-admin' | 'staff'
+  compact?: boolean
 }>()
 
 const route = useRoute()
@@ -90,12 +91,12 @@ function fallbackStoreLabel(storeId: string): string {
 </script>
 
 <template>
-  <div class="store-switcher" :class="`store-switcher--${surface || 'staff'}`">
+  <div v-if="!compact || canSwitch" class="store-switcher" :class="`store-switcher--${surface || 'staff'}`">
     <label v-if="canSwitch" class="switcher-label">
       <span class="sr-only">{{ t('storeSwitcher.label') }}</span>
-      <select :value="selectValue" :aria-label="t('storeSwitcher.label')" @change="switchStore">
+      <select :value="selectValue" :aria-label="t('storeSwitcher.label')" :title="displayLabel" @change="switchStore">
         <option v-for="store in stores" :key="store.storeId" :value="store.storeId">
-          {{ storeLabel(store) }}
+          {{ compact && store.storeId === selectValue ? t('storeSwitcher.label') : storeLabel(store) }}
         </option>
       </select>
     </label>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "RPB 产品线入口同步"
+  short_description: "新增产品线或排查管理员、员工及顾客入口同步，保留权限隔离与只读历史"
+  default_prompt: "使用 $rpb-product-entry-sync 核对本轮产品线的全端入口与自动同步，复用现有模块和合成数据，不改真实订阅，并按当前授权完成验证。"

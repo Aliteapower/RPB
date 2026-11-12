@@ -32,7 +32,7 @@ public class AuthSessionFilter extends OncePerRequestFilter {
             cookieService.readSessionToken(request)
                 .flatMap(authService::authenticateSession)
                 .map(AuthSessionAuthentication::principal)
-                .map(principal -> authentication(principal.toCurrentActor()))
+                .map(principal -> authentication(principal.toCurrentActor(RequestStoreScope.resolve(request))))
                 .ifPresent(authentication -> SecurityContextHolder.getContext().setAuthentication(authentication));
         }
         filterChain.doFilter(request, response);
