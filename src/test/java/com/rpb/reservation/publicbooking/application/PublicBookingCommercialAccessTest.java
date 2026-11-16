@@ -9,14 +9,20 @@ import com.rpb.reservation.customerauth.application.CustomerAuthPrincipal;
 import com.rpb.reservation.customerauth.api.CustomerAuthCookieService;
 import com.rpb.reservation.publicbooking.api.PublicBookingController;
 import com.rpb.reservation.publicbooking.application.port.out.*;
+import com.rpb.reservation.reservation.application.ReservationCreateResult;
+import com.rpb.reservation.reservation.application.command.CreateReservationCommand;
 import com.rpb.reservation.reservation.application.port.out.ReservationMealPeriodRepositoryPort;
 import com.rpb.reservation.reservation.application.service.ReservationCreateApplicationService;
 import com.rpb.reservation.tenant.value.TenantId;
+import jakarta.servlet.http.Cookie;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockHttpServletRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
@@ -71,18 +77,68 @@ class PublicBookingCommercialAccessTest {
         when(periods.findStorePeriods(scope)).thenReturn(List.of());
         assertThat(service.getContext(store,"2026-07-01")).isPresent();
         assertThat(new PublicBookingEntryApplicationService(stores,gate).resolveTenantEntry("tenant").success()).isTrue();
-        when(reservations.createReservation(any())).thenReturn(com.rpb.reservation.reservation.application.ReservationCreateResult.success(
-            UUID.randomUUID(),null,"R-1",2,LocalDate.of(2026,7,1),Instant.parse("2026-07-01T11:00:00Z"),
-            Instant.parse("2026-07-01T12:00:00Z"),Instant.parse("2026-07-01T11:15:00Z"),"confirmed","completed",List.of(),List.of(),UUID.randomUUID()));
+        when(reservations.createReservation(any())).thenReturn(bookingSuccess());
         assertThat(service.createBooking(command(null)).success()).isTrue();
         verify(reservations).createReservation(any());
     }
-    @Test void optionalLoginCannotCarryAnotherTenantsIdentity() {
+    @Test void optionalLoginCreatesGuestBookingWithSubmittedPhoneDespiteForeignSession() {
         var service=service();
         when(gate.evaluateCommercial("reservation_queue",tenant,store)).thenReturn(AppGateDecision.allow("reservation_queue",tenant,store,null));
+        UUID foreignCustomer = UUID.randomUUID();
+        when(customers.authenticateSession("foreign")).thenReturn(Optional.of(
+            new CustomerAuthPrincipal(UUID.randomUUID(),UUID.randomUUID(),foreignCustomer,"foreign@example.test","Foreign customer")));
+        when(reservations.createReservation(any())).thenReturn(bookingSuccess());
+
+        var controller = new PublicBookingController(service, new CustomerAuthCookieService(false));
+        var http = new MockHttpServletRequest();
+        http.setCookies(new Cookie(CustomerAuthCookieService.COOKIE_NAME, "foreign"));
+        var bookingRequest = command("foreign");
+        var request = new PublicBookingController.PublicBookingCreateRequest(
+            bookingRequest.partySize(), bookingRequest.reservedStartAt(), bookingRequest.businessDate(),
+            bookingRequest.phoneE164(), bookingRequest.note());
+        assertThat(controller.createReservation(store, bookingRequest.idempotencyKey(), request, http).getStatusCode().value())
+            .isEqualTo(201);
+
+        var captured = ArgumentCaptor.forClass(CreateReservationCommand.class);
+        verify(reservations).createReservation(captured.capture());
+        var booking = captured.getValue();
+        assertThat(booking.tenantId()).isEqualTo(tenant);
+        assertThat(booking.storeId()).isEqualTo(store);
+        assertThat(booking.customerId()).isNull();
+        assertThat(booking.customerName()).isNull();
+        assertThat(booking.customerEmail()).isNull();
+        assertThat(booking.phoneE164()).isEqualTo("+6591234567");
+    }
+
+    @Test void requiredLoginRejectsAnotherTenantsSession() {
+        var service=service();
+        when(gate.evaluateCommercial("reservation_queue",tenant,store)).thenReturn(AppGateDecision.allow("reservation_queue",tenant,store,null));
+        when(settings.findSettings(scope)).thenReturn(Optional.of(new PublicBookingSettings(true,true,"percentage",100,null,null,0,30)));
         when(customers.authenticateSession("foreign")).thenReturn(Optional.of(new CustomerAuthPrincipal(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"x@example.test","Guest")));
         assertThat(service.createBooking(command("foreign")).error()).isEqualTo(PublicBookingError.INVALID_SESSION);
         verifyNoInteractions(reservations);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void sameTenantSessionStillIdentifiesCustomer(boolean requireLogin) {
+        var service = service();
+        when(gate.evaluateCommercial("reservation_queue",tenant,store)).thenReturn(AppGateDecision.allow("reservation_queue",tenant,store,null));
+        when(settings.findSettings(scope)).thenReturn(Optional.of(new PublicBookingSettings(true,requireLogin,"percentage",100,null,null,0,30)));
+        UUID customer = UUID.randomUUID();
+        when(customers.authenticateSession("local")).thenReturn(Optional.of(
+            new CustomerAuthPrincipal(tenant,UUID.randomUUID(),customer,"local@example.test","Local customer")));
+        when(reservations.createReservation(any())).thenReturn(bookingSuccess());
+
+        assertThat(service.createBooking(command("local")).success()).isTrue();
+        verify(reservations).createReservation(argThat(booking ->
+            customer.equals(booking.customerId()) && "local@example.test".equals(booking.customerEmail())));
+    }
+
+    private static ReservationCreateResult bookingSuccess() {
+        return ReservationCreateResult.success(
+            UUID.randomUUID(),null,"R-1",2,LocalDate.of(2026,7,1),Instant.parse("2026-07-01T11:00:00Z"),
+            Instant.parse("2026-07-01T12:00:00Z"),Instant.parse("2026-07-01T11:15:00Z"),"confirmed","completed",List.of(),List.of(),UUID.randomUUID());
     }
     @Test void missingStoreCannotUseTheCommercialGateAsDiscovery() {
         var service=service();

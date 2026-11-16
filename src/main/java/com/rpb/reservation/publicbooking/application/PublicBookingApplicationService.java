@@ -197,16 +197,14 @@ public class PublicBookingApplicationService {
         if (hasText(command.customerSessionToken())) {
             principal = customerAuthService.authenticateSession(command.customerSessionToken()).orElse(null);
             if (principal != null && !store.scope().tenantId().value().equals(principal.tenantId())) {
-                return PublicBookingCreateResult.failure(PublicBookingError.INVALID_SESSION);
+                if (settings.requireCustomerLogin()) {
+                    return PublicBookingCreateResult.failure(PublicBookingError.INVALID_SESSION);
+                }
+                principal = null;
             }
         }
-        if (settings.requireCustomerLogin()) {
-            if (principal == null) {
-                return PublicBookingCreateResult.failure(PublicBookingError.LOGIN_REQUIRED);
-            }
-            if (!store.scope().tenantId().value().equals(principal.tenantId())) {
-                return PublicBookingCreateResult.failure(PublicBookingError.INVALID_SESSION);
-            }
+        if (settings.requireCustomerLogin() && principal == null) {
+            return PublicBookingCreateResult.failure(PublicBookingError.LOGIN_REQUIRED);
         }
 
         ZoneId zoneId = zoneId(store.timezone());

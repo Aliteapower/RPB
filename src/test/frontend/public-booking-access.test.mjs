@@ -27,7 +27,7 @@ before(async()=>{
   b.onLoad({filter:/\.vue$/},async({path})=>{
    if(!path.endsWith('PublicBookingPage.vue')&&!path.endsWith('DateInput.vue')){
     const kind=path.endsWith('CustomerPasswordLogin.vue')?'login':path.endsWith('CustomerPasswordChange.vue')?'password-change':'phone'
-    return {contents:`import {h} from 'vue';export default {props:['store','modelValue','disabled'],emits:['authenticated','update:modelValue'],setup(p,{emit}){return()=>h('div',{'data-stub':'${kind}',value:p.modelValue,store:p.store,onAuthenticated:value=>emit('authenticated',value),'onUpdate:modelValue':value=>emit('update:modelValue',value)})}}`,loader:'js'}
+    return {contents:`import {h} from 'vue';export default {props:['store','modelValue','disabled'],emits:['authenticated','update:modelValue'],setup(p,{emit}){return()=>h('div',{'data-stub':'${kind}',value:p.modelValue,disabled:p.disabled,store:p.store,onAuthenticated:value=>emit('authenticated',value),'onUpdate:modelValue':value=>emit('update:modelValue',value)})}}`,loader:'js'}
    }
    const {descriptor}=parse(await readFile(path,'utf8'),{filename:path});return{contents:compileScript(descriptor,{id:path,inlineTemplate:true}).content,loader:'ts'}
   })
@@ -69,6 +69,22 @@ test('background context refresh preserves contact fields and selected date with
  t.mock.timers.tick(30000);await settle();win.dispatchEvent(new Event('focus'));await settle()
  assert.equal(nodes(s.root,n=>n.props?.name==='customerName')[0].value,'Typed guest');assert.equal(nodes(s.root,n=>n.props?.name==='customerEmail')[0].value,'guest@example.test');assert.equal(nodes(s.root,n=>n.tag==='textarea')[0].value,'Window seat');assert.equal(nodes(s.root,n=>n.props?.['data-stub']==='phone')[0].props.value,'91234567');assert.equal(submit(s).props.disabled,false)
  assert.ok(calls.filter(c=>c.kind==='context').length>=3);assert.equal(new Set(calls.filter(c=>c.kind==='context').map(c=>c.args[1])).size,1);assert.ok(calls.every(c=>c.kind!=='POST'))
+})
+
+test('a store-scoped session rejection leaves the guest phone editable', async t => {
+  browser(t)
+  const calls = api(async (kind, store, date) => {
+    if (kind === 'me') throw new PublicBookingApiError(401, { error: 'unauthenticated' })
+    return context(store, true, false, date)
+  })
+  const page = await mount()
+  await chooseAndNext(page)
+  assert.ok(calls.some(call => call.kind === 'me' && call.args[0] === 'A'))
+  const phone = nodes(page.root, node => node.props?.['data-stub'] === 'phone')[0]
+  assert.equal(phone.props.disabled, false)
+  phone.props['onUpdate:modelValue']('91234567')
+  await settle()
+  assert.equal(submit(page).props.disabled, false)
 })
 
 test('late context responses from an old store or old date cannot restore stale booking availability',async t=>{
