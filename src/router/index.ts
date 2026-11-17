@@ -59,6 +59,7 @@ export const router = createRouter({
   routes: [
     { path: '/stores/:storeId/workforce-history',name:'workforce-history',component:()=>import('../modules/workforce/pages/WorkforceHistoryPage.vue')},
     ...workforceRoutes,
+    {path:'/voucher-campaigns/:id',name:'public-voucher-campaign',component:()=>import('../modules/cards/vouchers/PublicVoucherPage.vue'),meta:{public:true}},
     {path:'/stores/:storeId/admin/customer-activation',name:'customer-activation',component:()=>import('../pages/TenantAdminCustomerActivationPage.vue'),meta:{requiresTenantAdmin:true}},
     {path:'/stores/:storeId/admin/customer-email',name:'customer-email-settings',component:()=>import('../pages/TenantAdminCustomerEmailPage.vue'),meta:{requiresTenantAdmin:true}},
     {path:'/stores/:storeId/scan',name:'staff-scan',component:()=>import('../modules/staff-scan/StaffScanPage.vue')},

@@ -15,5 +15,6 @@ public class CardAccess {
  public CardDtos.StoreInfo store(StoreScope s){return context.store(s);}
  public CardDtos.Settings settings(StoreScope s,CurrentActor a){context.staff(s,a,"wallet.cards.view",false);return new CardDtos.Settings(settings.enabled(s));}
  @Transactional public CardDtos.Settings settings(StoreScope s,CurrentActor a,boolean enabled){context.staff(s,a,"wallet.cards.manage",false);settings.set(s,enabled);return new CardDtos.Settings(enabled);}
+ public boolean settingsEnabled(StoreScope s){return settings.enabled(s);}
  private void enabled(StoreScope s){if(!settings.enabled(s))throw new CardException("CARD_DISABLED",409,"卡功能未启用");}
 }

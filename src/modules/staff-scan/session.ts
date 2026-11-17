@@ -1,3 +1,4 @@
+import {voucherStaff, type ScanResult} from '../cards/vouchers/api'
 import {cardApi} from '../cards/api'
 import {storageApi} from '../wine-storage/api'
 import {walletApi} from '../wallet/api'
@@ -17,6 +18,12 @@ export function createStaffScanSession(store:string,actor:string,currentActor:()
   assertOwner();if(running)throw Error('操作处理中 / Processing');if(pending().card||pending().storage)throw Error('请先恢复上次操作 / Recover pending operation')
   running=true
   try{
+   if(value.kind==='voucher'){
+    if(!can('wallet.cards.redeem'))throw Error('无券核销权限 / Voucher redemption permission required')
+    const result=await voucherStaff<ScanResult>(store,'/vouchers/redeem','POST',{code:value.code})
+    assertOwner()
+    return {kind:'voucher' as const,result}
+   }
    if(value.kind==='card'){
     if(!can('wallet.cards.view')||!(can('wallet.cards.redeem')||can('wallet.cards.stamp')))throw Error('无卡核销权限 / Card redemption permission required')
     remember('card');const result=await cards.command('/authorized-redeem',{authorization:value.code},'request.authorized');assertOwner();return{kind:'card' as const,result}
