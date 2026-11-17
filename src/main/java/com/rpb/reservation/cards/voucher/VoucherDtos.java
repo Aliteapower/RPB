@@ -19,7 +19,10 @@ public final class VoucherDtos {
                            int redeemed, Instant startsAt, Instant endsAt, Face face) {}
     public record Summary(UUID id, String activityCode, String state, int version, int total, int issued,
                           int redeemed, Instant startsAt, Instant endsAt, String name, String kind) {}
-    public record PublicView(String status, Face face, String code) {}
+    public record ReportRow(UUID id, String activityCode, String name, String kind, int total,
+                            int issued, int redeemed, int expired) {}
+    public record ReportPage(List<ReportRow> items, boolean hasNext) {}
+    public record PublicView(String status, Face face, String code, String batchCode) {}
     public record ScanResult(String status, Face face, String batchCode, Instant redeemedAt,
                              Integer issueTotal, Integer redemptionNumber) {}
     public record State(String status, int version) {}

@@ -2,8 +2,9 @@
 import {computed, onMounted, ref} from 'vue'
 import {publicEntryOrigin} from '../../../utils/hostContext'
 import VoucherDialog from './VoucherDialog.vue'
+import {voucherShareImage} from './images'
 
-const props = defineProps<{id: string; name: string}>()
+const props = defineProps<{id: string; name: string; batchCode: string}>()
 const emit = defineEmits<{close: []}>()
 const origin = import.meta.env.VITE_VOUCHER_PUBLIC_ORIGIN || publicEntryOrigin()
 const url = computed(() => new URL('/voucher-campaigns/' + encodeURIComponent(props.id), origin).href)
@@ -14,8 +15,7 @@ const canShare = typeof navigator.share === 'function'
 
 onMounted(async () => {
   try {
-    const {default:QRCode} = await import('qrcode')
-    image.value = await QRCode.toDataURL(url.value, {width:320, margin:4})
+    image.value = await voucherShareImage(url.value, props.batchCode)
   } catch {
     feedback.value = '二维码生成失败，仍可复制活动链接'
   }
@@ -47,7 +47,7 @@ async function copy() {
 
 async function share() {
   try {
-    await navigator.share({title:props.name, url:url.value})
+    await navigator.share({title:props.name, text:'活动批号 ' + props.batchCode, url:url.value})
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'AbortError')) await copy()
   }
@@ -56,19 +56,22 @@ async function share() {
 
 <template>
   <VoucherDialog title="分享抢券活动" @close="emit('close')">
-    <p>{{name}}</p>
+    <p class="share-campaign">{{name}} <span>活动批号 <strong>{{batchCode}}</strong></span></p>
     <img v-if="image" :src="image" alt="抢券活动二维码" class="share-qr">
     <label class="share-link">抢券链接 <input ref="linkField" :value="url" readonly></label>
     <div class="share-actions">
       <button type="button" @click="copy">复制链接</button>
       <button v-if="canShare" type="button" @click="share">转发链接</button>
-      <a v-if="image" :href="image" download="抢券活动二维码.png">下载二维码</a>
+      <a v-if="image" :href="image" :download="'抢券活动-' + batchCode + '.png'">下载二维码</a>
     </div>
     <p v-if="feedback" role="status">{{ feedback }}</p>
   </VoucherDialog>
 </template>
 
 <style scoped>
+.share-campaign{margin:0;overflow-wrap:anywhere}
+.share-campaign span{display:block;margin-top:4px;color:#506575;font-size:14px}
+.share-campaign strong{font-variant-numeric:tabular-nums}
 .share-qr{display:block;width:min(240px,100%);height:auto;margin:auto}
 .share-link{display:grid;gap:4px}
 .share-link input{box-sizing:border-box;width:100%;min-width:0}

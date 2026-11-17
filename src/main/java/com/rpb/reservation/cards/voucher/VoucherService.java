@@ -39,6 +39,14 @@ public class VoucherService {
         return repository.list(scope);
     }
 
+    public ReportPage report(StoreScope scope, CurrentActor actor, String query, String kind, int page) {
+        manage(scope, actor, false);
+        if (query.length() > 120 || !Set.of("", "cash", "product").contains(kind) || page < 0) {
+            throw invalid("活动券报表筛选条件无效");
+        }
+        return repository.report(scope, query.strip(), kind, page, clock.instant());
+    }
+
     public Campaign detail(StoreScope scope, CurrentActor actor, UUID id) {
         manage(scope, actor, false);
         return owned(scope, id, false).campaign();
@@ -96,7 +104,8 @@ public class VoucherService {
     public PublicView view(UUID id, String ip, String receipt) {
         var row = repository.find(id, false);
         var prior = restore(id, receipt);
-        return prior.orElseGet(() -> new PublicView(claimAvailability(row, ip, clock.instant()), row.campaign().face(), null));
+        return prior.orElseGet(() -> new PublicView(claimAvailability(row, ip, clock.instant()),
+            row.campaign().face(), null, row.campaign().activityCode()));
     }
 
     @Transactional
@@ -108,10 +117,11 @@ public class VoucherService {
         var now = clock.instant();
         var status = claimAvailability(row, ip, now);
         var face = row.campaign().face();
-        if (!"open".equals(status)) return new PublicView(status, face, null);
+        var batchCode = row.campaign().activityCode();
+        if (!"open".equals(status)) return new PublicView(status, face, null, batchCode);
         String code = code(id, receipt);
         repository.claim(row, ip, hash("receipt:" + receipt), hash(code), now);
-        return new PublicView("claimed", face, code);
+        return new PublicView("claimed", face, code, batchCode);
     }
 
     @Transactional
@@ -140,7 +150,7 @@ public class VoucherService {
         if (!validReceipt(receipt)) return Optional.empty();
         return repository.receipt(id, hash("receipt:" + receipt)).map(claim ->
             new PublicView(claim.redeemedAt() == null ? "claimed" : "used", claim.face(),
-                claim.redeemedAt() == null ? code(id, receipt) : null));
+                claim.redeemedAt() == null ? code(id, receipt) : null, claim.batchCode()));
     }
 
     private String claimAvailability(Row row, String ip, Instant now) {
@@ -184,7 +194,7 @@ public class VoucherService {
         var stores = new ArrayList<Store>();
         for (UUID id : ids) {
             var target = new StoreScope(scope.tenantId(), id);
-            cards.staff(target, actor, "wallet.cards.manage", true);
+            requireCampaignAccess(target, actor, true);
             var info = repository.store(target);
             if (!currency.equals(info.currency())) throw invalid("适用门店须使用同一币种");
             if (product != null) catalog.requireUsable(target, product, "cards");
@@ -201,7 +211,17 @@ public class VoucherService {
 
     private void manage(StoreScope scope, CurrentActor actor, boolean mutate) {
         requireAdmin(actor);
-        cards.staff(scope, actor, "wallet.cards.manage", mutate);
+        requireCampaignAccess(scope, actor, mutate);
+    }
+
+    private void requireCampaignAccess(StoreScope scope, CurrentActor actor, boolean mutate) {
+        try {
+            cards.staff(scope, actor, "wallet.cards.manage", mutate);
+        } catch (CardException e) {
+            if (!"CARD_DISABLED".equals(e.code())) throw e;
+            String name = repository.store(scope).store().name();
+            throw new CardException(e.code(), e.status(), "门店「" + name + "」未启用卡功能，请切换到该店后在「持卡与核销」顶部启用");
+        }
     }
 
     private static void requireAdmin(CurrentActor actor) {

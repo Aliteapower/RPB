@@ -69,7 +69,7 @@ watch(id, () => { result.value = undefined; qr.value = ''; sharing.value = false
 <template>
   <main class="wallet-shell voucher-public">
     <VoucherDialog v-if="message" :title="message" :tone="tone" close-label="确定" @close="message=''" />
-    <VoucherShareDialog v-else-if="sharing && result" :id="id" :name="result.face.name" @close="sharing=false" />
+    <VoucherShareDialog v-else-if="sharing && result" :id="id" :name="result.face.name" :batch-code="result.batchCode" @close="sharing=false" />
     <p v-if="busy && !result" role="status">正在加载活动…</p>
     <article v-if="result" class="wallet-card voucher-card">
       <header class="voucher-hero">
@@ -77,6 +77,7 @@ watch(id, () => { result.value = undefined; qr.value = ''; sharing.value = false
         <strong class="voucher-benefit">{{ result.face.kind === 'cash' ? voucherValue(result.face) : voucherBenefit(result.face) }}</strong>
         <p v-if="result.face.kind === 'product'" class="voucher-value">价值 {{ voucherValue(result.face) }}</p>
         <h1>{{ result.face.name }}</h1>
+        <p v-if="result.batchCode" class="voucher-value">活动批号 {{ result.batchCode }}</p>
       </header>
       <div v-if="result.status === 'open'" class="voucher-claim">
         <button class="wallet-primary" :disabled="busy" @click="load(true)">立即抢券</button>

@@ -76,6 +76,10 @@ onUnmounted(()=>{generation++;code.value='';customer.value=null;account.value=nu
    <p v-if="voucher.face.specification">{{voucher.face.specification}}</p>
   </div>
   <dl v-if="voucher.redeemedAt" class="voucher-scan-record">
+   <div v-if="voucher.issueTotal != null && voucher.redemptionNumber != null">
+    <dt>登记号</dt>
+    <dd><strong>{{voucher.batchCode + voucher.issueTotal + '.' + voucher.redemptionNumber}}</strong></dd>
+   </div>
    <div>
     <dt>批次号</dt><dd><strong>{{voucher.batchCode}}</strong>
      <span v-if="voucher.issueTotal != null && voucher.redemptionNumber != null">（本次发行共 {{voucher.issueTotal}} 张 | 第 {{voucher.redemptionNumber}} 张核销）</span>

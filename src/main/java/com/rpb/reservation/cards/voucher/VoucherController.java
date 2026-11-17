@@ -23,6 +23,13 @@ public class VoucherController {
         return vouchers.list(identity.scope(actor.tenantId(), storeId), actor);
     }
 
+    @GetMapping("/voucher-campaign-report")
+    public ReportPage report(@PathVariable UUID storeId, @RequestParam(defaultValue="") String query,
+                             @RequestParam(defaultValue="") String kind, @RequestParam(defaultValue="0") int page) {
+        var actor = identity.staff();
+        return vouchers.report(identity.scope(actor.tenantId(), storeId), actor, query, kind, page);
+    }
+
     @GetMapping("/voucher-campaigns/{id}")
     public Campaign detail(@PathVariable UUID storeId, @PathVariable UUID id) {
         var actor = identity.staff();

@@ -38,7 +38,19 @@ export interface PublicView {
   status: 'open' | 'claimed' | 'used' | 'already_claimed' | 'upcoming' | 'disabled' | 'ended' | 'sold_out'
   face: Face
   code: string | null
+  batchCode: string
 }
+export interface VoucherReportRow {
+  id: string
+  activityCode: string
+  name: string
+  kind: VoucherKind
+  total: number
+  issued: number
+  redeemed: number
+  expired: number
+}
+export interface VoucherReportPage {items: VoucherReportRow[]; hasNext: boolean}
 export interface ScanResult { status: 'redeemed' | 'used' | 'expired' | 'too_early'; face: Face; batchCode: string; redeemedAt: string | null; issueTotal: number | null; redemptionNumber: number | null }
 
 export function voucherStaff<T>(store: string, path: string, method = 'GET', body?: unknown) {

@@ -47,6 +47,37 @@ public class VoucherRepository {
             scope.tenantId().value(), scope.storeId().value());
     }
 
+    ReportPage report(StoreScope scope, String query, String kind, int page, Instant now) {
+        int size = 20;
+        var rows = jdbc.query("""
+            with campaigns as (
+                select c.id, c.tenant_id, c.activity_code, c.total, c.issued, c.redeemed, c.created_at,
+                       r.face->>'name' as name, r.face->>'kind' as kind
+                from wallet_voucher_campaigns c join wallet_voucher_revisions r
+                    on r.campaign_id=c.id and r.revision=c.revision
+                where c.tenant_id=? and c.owner_store_id=?
+                    and (position(lower(?) in lower(r.face->>'name')) > 0 or lpad(c.activity_code::text,4,'0')=?)
+                    and (?='' or r.face->>'kind'=?)
+                order by c.created_at desc, c.id desc
+                limit ? offset ?
+            )
+            select c.*, expiry.expired
+            from campaigns c
+            cross join lateral (
+                select count(*) as expired
+                from wallet_voucher_claims x join wallet_voucher_revisions r
+                    on r.campaign_id=x.campaign_id and r.revision=x.revision
+                where x.tenant_id=c.tenant_id and x.campaign_id=c.id and x.redeemed_at is null
+                    and (r.face->>'validThrough')::date < (cast(? as timestamptz) at time zone (r.face->>'timezone'))::date
+            ) expiry
+            order by c.created_at desc, c.id desc
+            """, (r,n) -> new ReportRow(r.getObject("id", UUID.class), activityCode(r), r.getString("name"),
+                r.getString("kind"), r.getInt("total"), r.getInt("issued"), r.getInt("redeemed"), r.getInt("expired")),
+            scope.tenantId().value(), scope.storeId().value(), query, query, kind, kind, size+1,
+            (long) page * size, now.atOffset(ZoneOffset.UTC));
+        return new ReportPage(List.copyOf(rows.subList(0, Math.min(rows.size(), size))), rows.size() > size);
+    }
+
     Row find(UUID id, boolean lock) {
         if (lock) jdbc.queryForList("select id from wallet_voucher_campaigns where id=? for update", UUID.class, id);
         return jdbc.query("""

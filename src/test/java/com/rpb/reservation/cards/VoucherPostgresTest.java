@@ -30,6 +30,7 @@ class VoucherPostgresTest extends CatalogPostgresTest {
         String receipt = key();
         var first = tx.execute(t -> service.claim(draft.id(), "192.0.2.14", receipt));
         assertThat(first.status()).isEqualTo("claimed");
+        assertThat(first.batchCode()).isEqualTo(draft.activityCode());
         var duplicate = tx.execute(t -> service.claim(draft.id(), "192.0.2.14", key()));
         assertThat(duplicate.status()).isEqualTo("already_claimed");
         assertThat(duplicate.code()).isNull();
@@ -40,6 +41,7 @@ class VoucherPostgresTest extends CatalogPostgresTest {
         var reopened = service.view(draft.id(), "192.0.2.14", null);
         assertThat(reopened.status()).isEqualTo("already_claimed");
         assertThat(reopened.code()).isNull();
+        assertThat(reopened.batchCode()).isEqualTo(draft.activityCode());
         assertThat(service.view(draft.id(), "192.0.2.16", null).status()).isEqualTo("open");
         assertThat(service.detail(scope, actor, draft.id()).issued()).isEqualTo(2);
         var expired = tx.execute(t -> service(NOW.plus(Duration.ofDays(1))).redeem(scope, actor, first.code()));
@@ -57,6 +59,28 @@ class VoucherPostgresTest extends CatalogPostgresTest {
     private VoucherDtos.Write cash(long value, LocalDate lastDay, Integer version) {
         return new VoucherDtos.Write("代金券", "cash", null, null, value, 3, List.of(store),
             NOW.minusSeconds(60), NOW.plusSeconds(120), DAY, lastDay, "第一条\n第二条", null, version);
+    }
+
+    @Test void voucherReportCountsUnusedExpiryByIssuedRevision() {
+        var service = service(NOW);
+        var draft = tx.execute(t -> service.save(scope, actor, null, cash(1000, DAY, null)));
+        var active = tx.execute(t -> service.state(scope, actor, draft.id(), "active", draft.version()));
+        var redeemed = tx.execute(t -> service.claim(draft.id(), "192.0.2.21", key()));
+        tx.execute(t -> service.redeem(scope, actor, redeemed.code()));
+        tx.execute(t -> service.claim(draft.id(), "192.0.2.22", key()));
+        tx.execute(t -> service.save(scope, actor, draft.id(), cash(1000, DAY.plusDays(3), active.version())));
+        tx.execute(t -> service.claim(draft.id(), "192.0.2.23", key()));
+
+        var report = service(NOW.plus(Duration.ofDays(1))).report(scope, actor, draft.activityCode(), "cash", 0);
+        assertThat(report.items()).singleElement().satisfies(row -> {
+            assertThat(row.total()).isEqualTo(3);
+            assertThat(row.issued()).isEqualTo(3);
+            assertThat(row.redeemed()).isEqualTo(1);
+            assertThat(row.expired()).isEqualTo(1);
+        });
+        assertThat(service.report(scope, actor, draft.activityCode(), "product", 0).items()).isEmpty();
+        var otherStore = new com.rpb.reservation.common.scope.StoreScope(scope.tenantId(), UUID.randomUUID());
+        assertThat(service.report(otherStore, actor, draft.activityCode(), "cash", 0).items()).isEmpty();
     }
 
     @Test void concurrentRedemptionsKeepTheirOwnOrdinalAndOriginalTotal() throws Exception {

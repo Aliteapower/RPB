@@ -97,8 +97,9 @@ function remove(item: Summary) {
         <button class="primary" :disabled="busy || !enabled || !timezone || editing !== undefined" @click="editing=null">新增抢券活动</button>
       </div>
     </header>
+    <p v-if="!enabled" class="cards-notice">请先在页面顶部<a href="#cards-feature-settings">启用卡功能</a>。跨店活动须在各适用门店分别启用。</p>
     <p v-if="error" class="cards-error" role="alert">{{ error }}</p>
-    <VoucherShareDialog v-if="sharing" :id="sharing.id" :name="sharing.name" @close="sharing=undefined" />
+    <VoucherShareDialog v-if="sharing" :id="sharing.id" :name="sharing.name" :batch-code="sharing.activityCode" @close="sharing=undefined" />
     <p v-if="busy" role="status">处理中…</p>
     <VoucherCampaignEditor v-if="editing !== undefined && timezone" :key="editing?.id ?? 'new'"
       :store="store" :stores="stores" :timezone="timezone" :campaign="editing" @saved="saved" @cancel="editing=undefined" />

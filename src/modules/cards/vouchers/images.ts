@@ -1,5 +1,23 @@
 import {voucherBenefit, voucherValue, type Face} from './api'
 
+export async function voucherShareImage(url: string, batchCode: string) {
+  const {default:QRCode} = await import('qrcode')
+  const qr = await QRCode.toCanvas(url, {width:320, margin:4})
+  const image = document.createElement('canvas')
+  image.width = qr.width
+  image.height = qr.height + 46
+  const ctx = image.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, image.width, image.height)
+  ctx.drawImage(qr, 0, 0)
+  ctx.fillStyle = '#173d58'
+  ctx.font = '600 21px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('活动批号 ' + batchCode, image.width / 2, qr.height + 13)
+  return image.toDataURL('image/png')
+}
+
 export async function cropVoucherImage(file: File) {
   const image = await createImageBitmap(file)
   try {
