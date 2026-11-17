@@ -23,7 +23,7 @@ class VoucherPostgresTest extends CatalogPostgresTest {
         return new VoucherService(new VoucherRepository(jdbc, json), access, products, Clock.fixed(now, ZoneOffset.UTC), wallet);
     }
 
-    @Test void sameIpCannotClaimAgainAndReceiptRecoversOriginalFaceAfterEditing() {
+    @Test void sharedIpAllowsDifferentPhonesAndReceiptRecoversOriginalFaceAfterEditing() {
         var service = service(NOW);
         var draft = tx.execute(t -> service.save(scope, actor, null, cash(1000, DAY, null)));
         var active = tx.execute(t -> service.state(scope, actor, draft.id(), "active", draft.version()));
@@ -31,15 +31,14 @@ class VoucherPostgresTest extends CatalogPostgresTest {
         var first = tx.execute(t -> service.claim(draft.id(), "192.0.2.14", receipt));
         assertThat(first.status()).isEqualTo("claimed");
         assertThat(first.batchCode()).isEqualTo(draft.activityCode());
-        var duplicate = tx.execute(t -> service.claim(draft.id(), "192.0.2.14", key()));
-        assertThat(duplicate.status()).isEqualTo("already_claimed");
-        assertThat(duplicate.code()).isNull();
+        var duplicate = tx.execute(t -> service.claim(draft.id(), "192.0.2.99", receipt));
+        assertThat(duplicate).isEqualTo(first);
         tx.execute(t -> service.save(scope, actor, draft.id(), cash(800, DAY, active.version())));
-        var second = tx.execute(t -> service.claim(draft.id(), "192.0.2.15", key()));
+        var second = tx.execute(t -> service.claim(draft.id(), "192.0.2.14", key()));
         assertThat(second.face().valueCents()).isEqualTo(800);
         assertThat(service.view(draft.id(), "192.0.2.14", receipt)).isEqualTo(first);
         var reopened = service.view(draft.id(), "192.0.2.14", null);
-        assertThat(reopened.status()).isEqualTo("already_claimed");
+        assertThat(reopened.status()).isEqualTo("open");
         assertThat(reopened.code()).isNull();
         assertThat(reopened.batchCode()).isEqualTo(draft.activityCode());
         assertThat(service.view(draft.id(), "192.0.2.16", null).status()).isEqualTo("open");
@@ -54,6 +53,32 @@ class VoucherPostgresTest extends CatalogPostgresTest {
         assertThatThrownBy(() -> tx.execute(t -> service.redeem(
             new com.rpb.reservation.common.scope.StoreScope(scope.tenantId(), UUID.randomUUID()), actor, first.code())))
             .hasMessageContaining("无卡业务操作权限");
+    }
+
+    @Test void samePhoneConcurrentRetriesIssueOnceAndCanJoinAnotherCampaign() throws Exception {
+        var service = service(NOW);
+        var draft = tx.execute(t -> service.save(scope, actor, null, cash(1000, DAY, null)));
+        tx.execute(t -> service.state(scope, actor, draft.id(), "active", draft.version()));
+        String receipt = key();
+        try (var threads = Executors.newVirtualThreadPerTaskExecutor()) {
+            var gate = new CountDownLatch(1);
+            var calls = new ArrayList<Future<VoucherDtos.PublicView>>();
+            for (int i = 0; i < 10; i++) {
+                String ip = "192.0.2." + (i + 1);
+                calls.add(threads.submit(() -> {
+                    gate.await();
+                    return tx.execute(t -> service.claim(draft.id(), ip, receipt));
+                }));
+            }
+            gate.countDown();
+            var first = calls.getFirst().get(20, TimeUnit.SECONDS);
+            for (var call : calls) assertThat(call.get(20, TimeUnit.SECONDS)).isEqualTo(first);
+            assertThat(service.detail(scope, actor, draft.id()).issued()).isEqualTo(1);
+            assertThat(jdbc.queryForObject("select count(*) from wallet_voucher_claims where campaign_id=?", Integer.class, draft.id())).isEqualTo(1);
+            var other = tx.execute(t -> service.save(scope, actor, null, cash(1000, DAY, null)));
+            tx.execute(t -> service.state(scope, actor, other.id(), "active", other.version()));
+            assertThat(tx.execute(t -> service.claim(other.id(), "192.0.2.1", receipt)).status()).isEqualTo("claimed");
+        }
     }
 
     private VoucherDtos.Write cash(long value, LocalDate lastDay, Integer version) {
@@ -129,7 +154,7 @@ class VoucherPostgresTest extends CatalogPostgresTest {
             var start = new CountDownLatch(1);
             var calls = new ArrayList<Future<VoucherDtos.PublicView>>();
             for (int i = 0; i < 12; i++) {
-                String ip = "192.0.2." + (i + 1);
+                String ip = "192.0.2.1";
                 calls.add(threads.submit(() -> {
                     start.await();
                     return tx.execute(t -> service.claim(campaign.id(), ip, key()));

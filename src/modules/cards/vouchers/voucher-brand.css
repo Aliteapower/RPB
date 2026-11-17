@@ -1,0 +1,7 @@
+.voucher-hero{position:relative;isolation:isolate;background:linear-gradient(120deg,#102c49,#174a64 45%,#247176 78%,#3b7588)}
+.voucher-brand-row{display:flex;align-items:center;justify-content:space-between;width:100%;gap:16px;min-width:0}
+.voucher-logo{display:block;width:64px;height:48px;object-fit:contain;border-radius:7px;background:#fff;padding:5px;box-sizing:border-box;flex-shrink:0}
+.voucher-type{padding:3px 9px;border-radius:5px;background:#ffffff24;font-size:13px;font-weight:650}
+.voucher-benefit{font-size:clamp(30px,7vw,42px);font-weight:780;line-height:1.17;font-variant-numeric:tabular-nums}
+.voucher-hero h1{margin:3px 0 0;font-size:16px;font-weight:600;line-height:1.5;color:#e3edf3}
+.voucher-value{margin:0;color:#e3edf3;font-size:14px}

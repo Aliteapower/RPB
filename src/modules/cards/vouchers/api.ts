@@ -40,6 +40,15 @@ export interface PublicView {
   code: string | null
   batchCode: string
 }
+export interface VoucherPresentation {
+  face: Face
+  batchCode: string
+  tenantName: string
+  logoUrl: string | null
+  startsAt: string
+  endsAt: string
+  contacts: {id:string; name:string; address:string|null; phone:string|null}[]
+}
 export interface VoucherReportRow {
   id: string
   activityCode: string
@@ -61,6 +70,10 @@ export function voucherPublic(id: string, receipt: string, claim = false) {
   return moduleRequest<PublicView>('/api/v1/public/voucher-campaigns/' + encodeURIComponent(id),
     claim ? '/claims' : '', claim ? 'POST' : 'GET', undefined,
     receipt ? { 'X-Voucher-Receipt': receipt } : {})
+}
+
+export function voucherPresentation(id: string) {
+  return moduleRequest<VoucherPresentation>('/api/v1/public/voucher-campaigns/'+encodeURIComponent(id),'/presentation')
 }
 
 export function voucherValue(face: Face) {

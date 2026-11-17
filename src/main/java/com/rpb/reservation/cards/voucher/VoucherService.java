@@ -104,7 +104,7 @@ public class VoucherService {
     public PublicView view(UUID id, String ip, String receipt) {
         var row = repository.find(id, false);
         var prior = restore(id, receipt);
-        return prior.orElseGet(() -> new PublicView(claimAvailability(row, ip, clock.instant()),
+        return prior.orElseGet(() -> new PublicView(availability(row, clock.instant()),
             row.campaign().face(), null, row.campaign().activityCode()));
     }
 
@@ -115,7 +115,7 @@ public class VoucherService {
         var prior = restore(id, receipt);
         if (prior.isPresent()) return prior.get();
         var now = clock.instant();
-        var status = claimAvailability(row, ip, now);
+        var status = availability(row, now);
         var face = row.campaign().face();
         var batchCode = row.campaign().activityCode();
         if (!"open".equals(status)) return new PublicView(status, face, null, batchCode);
@@ -151,14 +151,6 @@ public class VoucherService {
         return repository.receipt(id, hash("receipt:" + receipt)).map(claim ->
             new PublicView(claim.redeemedAt() == null ? "claimed" : "used", claim.face(),
                 claim.redeemedAt() == null ? code(id, receipt) : null, claim.batchCode()));
-    }
-
-    private String claimAvailability(Row row, String ip, Instant now) {
-        String status = availability(row, now);
-        if (Set.of("open","sold_out").contains(status) && repository.taken(row.campaign().id(), ip)) {
-            return "already_claimed";
-        }
-        return status;
     }
 
     private String availability(Row row, Instant now) {

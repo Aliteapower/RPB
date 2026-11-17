@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
-import {voucherPublic, voucherBenefit, voucherValue, type PublicView} from './api'
-import {downloadVoucher} from './images'
+import {voucherPublic, voucherPresentation, type PublicView, type VoucherPresentation} from './api'
+import {renderVoucherImage} from './images'
+import VoucherHero from './VoucherHero.vue'
+import VoucherStoreContacts from './VoucherStoreContacts.vue'
+import VoucherImagePreview from './VoucherImagePreview.vue'
 import QRCode from 'qrcode'
 import VoucherDialog from './VoucherDialog.vue'
 import VoucherShareDialog from './VoucherShareDialog.vue'
+import {voucherReceipt} from './receipt'
 import '../../wallet/wallet.css'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const result = ref<PublicView>()
 const qr = ref('')
+const presentation = ref<VoucherPresentation>()
+const savedImage = ref('')
+const imageBusy = ref(false)
 const busy = ref(false)
 const message = ref('')
 const tone = ref<'success' | 'notice' | 'error'>('notice')
@@ -25,16 +32,13 @@ const statusText = {
 async function load(claim = false) {
   if (claim && busy.value) return
   const campaign = id.value
-  const key = 'rpb.voucher.receipt:' + campaign
   busy.value = true
   message.value = ''
   try {
-    let receipt = localStorage.getItem(key) ?? ''
-    if (claim && !receipt) {
-      receipt = crypto.randomUUID()
-      localStorage.setItem(key, receipt)
-    }
-    const view = await voucherPublic(campaign, receipt, claim)
+    const receipt = voucherReceipt(campaign)
+    const [view, brand] = await Promise.all([voucherPublic(campaign, receipt, claim), voucherPresentation(campaign)])
+    if (id.value !== campaign) return
+    presentation.value = brand
     const image = view.code ? await QRCode.toDataURL(view.code, {width:320, margin:4, errorCorrectionLevel:'M'}) : ''
     if (id.value !== campaign) return
     result.value = view
@@ -54,31 +58,33 @@ async function load(claim = false) {
 }
 
 async function download() {
-  if (!result.value || !qr.value) return
+  if (!result.value || !qr.value || imageBusy.value) return
+  imageBusy.value = true
+  const campaign = id.value
   try {
-    await downloadVoucher(result.value.face, qr.value)
+    const image = await renderVoucherImage(result.value.face, qr.value, presentation.value)
+    if (campaign === id.value) savedImage.value = image
   } catch (e) {
-    tone.value = 'error'
-    message.value = e instanceof Error ? e.message : String(e)
+    if (campaign === id.value) {
+      tone.value = 'error'
+      message.value = e instanceof Error ? e.message : String(e)
+    }
+  } finally {
+    if (campaign === id.value) imageBusy.value = false
   }
 }
 
-watch(id, () => { result.value = undefined; qr.value = ''; sharing.value = false; void load() }, {immediate:true})
+watch(id, () => { result.value = undefined; qr.value = ''; presentation.value=undefined; savedImage.value=''; imageBusy.value=false; sharing.value = false; void load() }, {immediate:true})
 </script>
 
 <template>
   <main class="wallet-shell voucher-public">
     <VoucherDialog v-if="message" :title="message" :tone="tone" close-label="确定" @close="message=''" />
+    <VoucherImagePreview v-else-if="savedImage && result" :source="savedImage" :name="result.face.name" @close="savedImage=''" />
     <VoucherShareDialog v-else-if="sharing && result" :id="id" :name="result.face.name" :batch-code="result.batchCode" @close="sharing=false" />
     <p v-if="busy && !result" role="status">正在加载活动…</p>
     <article v-if="result" class="wallet-card voucher-card">
-      <header class="voucher-hero">
-        <span class="voucher-type">{{ result.face.kind === 'cash' ? '代金券' : '产品券' }}</span>
-        <strong class="voucher-benefit">{{ result.face.kind === 'cash' ? voucherValue(result.face) : voucherBenefit(result.face) }}</strong>
-        <p v-if="result.face.kind === 'product'" class="voucher-value">价值 {{ voucherValue(result.face) }}</p>
-        <h1>{{ result.face.name }}</h1>
-        <p v-if="result.batchCode" class="voucher-value">活动批号 {{ result.batchCode }}</p>
-      </header>
+      <VoucherHero :face="result.face" :batch-code="result.batchCode" :logo-url="presentation?.logoUrl" :tenant-name="presentation?.tenantName" />
       <div v-if="result.status === 'open'" class="voucher-claim">
         <button class="wallet-primary" :disabled="busy" @click="load(true)">立即抢券</button>
       </div>
@@ -86,7 +92,7 @@ watch(id, () => { result.value = undefined; qr.value = ''; sharing.value = false
         <h2>核销二维码</h2>
         <p>到店后出示此码</p>
         <img class="voucher-qr" :src="qr" alt="出示给门店管理员的核销二维码">
-        <button class="wallet-primary" @click="download">下载券图</button>
+        <button class="wallet-primary" :disabled="imageBusy" @click="download">{{imageBusy?'正在生成券图…':'保存券图到相册'}}</button>
       </section>
       <p v-else-if="result.status === 'used'" class="voucher-used">此券已核销</p>
       <section class="voucher-details">
@@ -96,6 +102,7 @@ watch(id, () => { result.value = undefined; qr.value = ''; sharing.value = false
           <div><dt>使用日期</dt><dd>{{ result.face.validFrom }} 至 {{ result.face.validThrough }}</dd></div>
           <div><dt>适用门店</dt><dd>{{ result.face.stores.map(s => s.name).join('、') }}</dd></div>
         </dl>
+        <VoucherStoreContacts v-if="presentation?.contacts.length" class="voucher-rules" :contacts="presentation.contacts" />
         <div v-if="result.face.rules" class="voucher-rules"><h2>活动规则</h2><p>{{ result.face.rules }}</p></div>
         <img v-if="result.face.image" class="voucher-image" :src="result.face.image" alt="活动券图">
       </section>
@@ -109,11 +116,6 @@ watch(id, () => { result.value = undefined; qr.value = ''; sharing.value = false
 <style scoped>
 .voucher-public{max-width:540px}
 .voucher-card{padding:0;overflow:hidden;overflow-wrap:anywhere}
-.voucher-hero{display:grid;justify-items:start;gap:6px;padding:24px;background:#173d58;color:#fff}
-.voucher-type{padding:3px 9px;border-radius:5px;background:#ffffff24;font-size:13px;font-weight:650}
-.voucher-benefit{font-size:clamp(30px,7vw,42px);font-weight:780;line-height:1.17;font-variant-numeric:tabular-nums}
-.voucher-hero h1{margin:3px 0 0;font-size:16px;font-weight:600;line-height:1.5;color:#e3edf3}
-.voucher-value{margin:0;color:#e3edf3;font-size:14px}
 .voucher-code,.voucher-details,.voucher-actions,.voucher-used,.voucher-claim{padding:20px 24px}
 .voucher-claim{padding-bottom:0}
 .voucher-claim button{width:100%;min-height:44px}

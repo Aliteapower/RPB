@@ -26,6 +26,18 @@ public class VoucherRepository {
     record Redemption(int issueTotal, int number) {}
     record StoreInfo(Store store, String currency, String timezone) {}
 
+    List<VoucherPresentationService.Contact> contacts(UUID tenant, Face face) {
+        if (face == null || face.stores().isEmpty()) return List.of();
+        var ids=face.stores().stream().map(Store::id).toList();
+        var sql="select id,display_name,share_address,share_contact_phone from stores where tenant_id=? and deleted_at is null and id in ("
+            + String.join(",", Collections.nCopies(ids.size(), "?")) + ") order by display_name,id";
+        var arguments=new ArrayList<Object>();
+        arguments.add(tenant);
+        arguments.addAll(ids);
+        return jdbc.query(sql,(r,n)->new VoucherPresentationService.Contact(r.getObject(1,UUID.class),
+            r.getString(2),r.getString(3),r.getString(4)),arguments.toArray());
+    }
+
     StoreInfo store(StoreScope scope) {
         return jdbc.query("""
             select id, display_name, currency, timezone from stores
@@ -134,12 +146,6 @@ public class VoucherRepository {
             join wallet_voucher_campaigns c on c.id=x.campaign_id and c.tenant_id=x.tenant_id
             join wallet_voucher_revisions r on r.campaign_id=x.campaign_id and r.revision=x.revision where x.campaign_id=? and x.receipt_hash=?
             """, this::claimed, id, hash).stream().findFirst();
-    }
-
-    boolean taken(UUID id, String ip) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("""
-            select exists(select 1 from wallet_voucher_claims where campaign_id=? and ip=cast(? as inet))
-            """, Boolean.class, id, ip));
     }
 
     void claim(Row row, String ip, String receipt, String code, Instant now) {

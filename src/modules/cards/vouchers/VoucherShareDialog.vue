@@ -12,6 +12,7 @@ const image = ref('')
 const feedback = ref('')
 const linkField = ref<HTMLInputElement>()
 const canShare = typeof navigator.share === 'function'
+const posterUrl = computed(() => new URL('/voucher-campaigns/'+encodeURIComponent(props.id)+'/poster',window.location.origin).href)
 
 onMounted(async () => {
   try {
@@ -47,7 +48,7 @@ async function copy() {
 
 async function share() {
   try {
-    await navigator.share({title:props.name, text:'活动批号 ' + props.batchCode, url:url.value})
+    await navigator.share({title:props.name, text:'幸运号 ' + props.batchCode, url:url.value})
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'AbortError')) await copy()
   }
@@ -56,10 +57,11 @@ async function share() {
 
 <template>
   <VoucherDialog title="分享抢券活动" @close="emit('close')">
-    <p class="share-campaign">{{name}} <span>活动批号 <strong>{{batchCode}}</strong></span></p>
+    <p class="share-campaign">{{name}} <span>幸运号 <strong>{{batchCode}}</strong></span></p>
     <img v-if="image" :src="image" alt="抢券活动二维码" class="share-qr">
     <label class="share-link">抢券链接 <input ref="linkField" :value="url" readonly></label>
     <div class="share-actions">
+      <a :href="posterUrl" target="_blank" rel="noopener">生成活动海报 / 打印</a>
       <button type="button" @click="copy">复制链接</button>
       <button v-if="canShare" type="button" @click="share">转发链接</button>
       <a v-if="image" :href="image" :download="'抢券活动-' + batchCode + '.png'">下载二维码</a>
