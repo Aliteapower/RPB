@@ -14,10 +14,10 @@ const current = props.campaign
 const face = current?.face
 const defaultRules = [
   '1，此券不兑现，不找零。',
-  '2，每张代金券可到店使用一次。',
+  '2，每张券可到店使用一次。',
   '3，请向店员出示核销二维码。',
   '4，不与其他活动同享。',
-  '5，活动最终解释权在规定范围内归本店所有。'
+  '5，活动最终解释权在规定范围内归本司(店)所有。'
 ].join('\n')
 const local = (time?: string) => time ? campaignLocalTime(time, props.timezone) : ''
 const form = ref({
