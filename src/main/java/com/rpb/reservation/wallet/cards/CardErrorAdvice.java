@@ -5,7 +5,7 @@ import com.rpb.reservation.wallet.domain.WalletException;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-@RestControllerAdvice(basePackages="com.rpb.reservation.wallet.cards")
+@RestControllerAdvice(basePackages={"com.rpb.reservation.wallet.cards","com.rpb.reservation.cards.voucher"})
 public class CardErrorAdvice {
  @ExceptionHandler(CardException.class)public ResponseEntity<?> card(CardException e){return reply(e.status(),e.code(),e.getMessage());}
  @ExceptionHandler(CatalogException.class)public ResponseEntity<?> catalog(CatalogException e){return reply(e.status(),e.code(),e.getMessage());}
