@@ -17,6 +17,26 @@ const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))]
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const tick=async()=>{for(let n=0;n<12;n++){await Promise.resolve();await nextTick()}}
 const home={timezone:'Asia/Singapore',storeName:'QA Store',stores:[{id:'A',name:'QA Store'}],newBusinessEnabled:true,permissions:['wine_storage.view','wine_storage.receive','wine_storage.deliver','wine_storage.rules.manage'],rules:[],categories:[],items:[],events:[],intents:[],applications:[{id:'application',customerId:'customer',status:'pending',lines:[],confirmation:null,reason:'',createdAt:'2026-10-25T10:00:00Z'}]}
+test('customer lookup keypad appends digits, clears and deletes without submitting',async()=>{
+ const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/customers?')?[]:home);await tick()
+ const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0]
+ const input=nodes(form,n=>n.tag==='input')[0]
+ const keys=nodes(form,n=>n.tag==='button'&&n.props['data-phone-key'])
+ assert.deepEqual(keys.map(n=>text(n)),['7','8','9','4','5','6','1','2','3','0','C','<'])
+ assert.equal(input.props.inputmode,'none')
+ const press=async key=>{const control=keys.find(n=>text(n)===key);assert.equal(control.props.type,'button');control.props.onClick();await tick()}
+ for(const key of ['0','9','<','2'])await press(key)
+ assert.equal(input.props.value,'02')
+ await press('C');assert.equal(input.props.value,'')
+ for(const key of '81234567')await press(key)
+ assert.equal(s.calls.filter(c=>c.url.includes('/customers?')).length,0)
+ await form.props.onSubmit({preventDefault(){}});await tick()
+ assert.equal(s.calls.find(c=>c.url.includes('/customers?')).url.endsWith('query=81234567'),true)
+ button(s.root,'输入姓名').props.onClick();await tick()
+ assert.equal(input.props.inputmode,'text')
+ assert.equal(nodes(form,n=>n.tag==='button'&&n.props['data-phone-key']).length,0)
+ s.unmount()
+})
 test('merchant customer query directly selects a unique result without a second choice',async()=>{
  const person={id:'unique-storage',displayName:'唯一存酒顾客',phone:'81234567'};const s=mount(StaffPage,false,'zh-CN',home,url=>url.includes('/customers?')?[person]:url.includes('/product-options')?{items:[],categories:[],hasMore:false}:home);await tick();const form=nodes(s.root,n=>n.tag==='form'&&String(n.props.class).includes('storage-merchant-customer-search'))[0];nodes(form,n=>n.tag==='input')[0].props.onInput({target:{value:'81234567'}});await tick();await form.props.onSubmit({preventDefault(){}});await tick();assert.match(text(s.root),/当前办理顾客/);assert.match(text(s.root),/唯一存酒顾客/);assert.ok(button(s.root,'更换顾客'));assert.ok(button(s.root,'清除顾客'));s.unmount()
 })
@@ -904,6 +924,22 @@ const receiptProduct={id:'wine',categoryId:'category',nameZh:'清香白酒',name
 const receiptHome={...home,rules:[{id:'rule',categoryId:'category',name:'不限时间规则',months:0,version:2}],categories:[{id:'category',nameZh:'酒水',nameEn:'Wine'}]}
 const emptyReceipt=()=>({id:'',customerId:'customer',status:'pending',lines:[{id:'line',productId:null,nameZh:'',nameEn:'',quantity:1,opened:false,source:'customer',photos:[],note:''}]})
 function receiptMount(locale='zh-CN',respond){return mount(ReceiveForm,false,locale,receiptHome,(url,options)=>respond?respond(url,options):url.includes('/product-options?')?{items:[receiptProduct],categories:receiptHome.categories,hasMore:false,page:0}:url.endsWith('/products/wine')?receiptProduct:options?.method==='POST'?{status:'stored'}:receiptHome,{props:{home:receiptHome,api:storageApi('A',false),application:emptyReceipt(),direct:true,disabled:false}})}
+test('receipt quantity can be typed and adjusted with minus and plus',async()=>{
+ const s=receiptMount();await tick();chooseReceiptWine(s.root);await tick()
+ const quantity=nodes(s.root,n=>n.tag==='input'&&n.props.type==='number')[0]
+ const control=label=>nodes(s.root,n=>n.tag==='button'&&n.props['aria-label']===label)[0]
+ assert.equal(control('减少瓶数').props.disabled,true)
+ await control('增加瓶数').props.onClick();await tick();assert.equal(Number(quantity.value),2)
+ await control('减少瓶数').props.onClick();await tick();assert.equal(Number(quantity.value),1)
+ updateModel(quantity,'10000');await tick();assert.equal(control('增加瓶数').props.disabled,true)
+ await control('减少瓶数').props.onClick();await tick();assert.equal(Number(quantity.value),9999)
+ const opened=nodes(s.root,n=>n.tag==='select'&&text(n).includes('已开瓶'))[0]
+ opened.options.forEach(option=>option.selected=option.props.value===true)
+ opened.listeners.change({target:opened});opened.props.onChange();await tick()
+ assert.equal(Number(quantity.value),1)
+ assert.equal(control('增加瓶数').props.disabled,true)
+ s.unmount()
+})
 function chooseReceiptWine(root){nodes(root,n=>n.tag==='button'&&text(n).includes('选择此酒品'))[0].props.onClick()}
 function setReceiptConsent(root){const consent=nodes(root,n=>n.tag==='input'&&n.props.type==='checkbox'&&n.props.required!==undefined)[0];consent.checked=true;consent.listeners.change({target:consent})}
 test('receipt search results select wine directly; clear resets identity photos quantity and consent',async()=>{
@@ -1100,7 +1136,7 @@ test('storage settings handles logout failure without a false login navigation o
 
 
 test('receipt category shortcut returns to the same draft and selects the new wine-only category',async()=>{
- const created={id:'new-category',code:'QA-WINE',nameZh:'测试新分类',nameEn:'',enabled:true,productLines:['wine_storage']}
+ const created={id:'new-category',code:'QA-WINE',nameZh:'测试新分类',nameEn:'',enabled:true,productLines:['wine_storage'],defaultUnlimitedStorage:true}
  const s=mount(ReceiveForm,false,'zh-CN',receiptHome,(url,options)=>options?.method==='POST'?created:{items:[],hasMore:false},{actor:catalogActor,props:{home:receiptHome,api:storageApi('A',false),application:emptyReceipt(),direct:true,disabled:false}})
  await tick();button(s.root,'＋ 新增酒品').props.onClick();await tick()
  const wineName=nodes(s.root,n=>n.tag==='label'&&text(n).includes('中文酒名'))[0]
@@ -1125,6 +1161,9 @@ test('receipt category shortcut returns to the same draft and selects the new wi
  assert.equal(Number(quantity.value),3)
  const category=nodes(receipt,n=>n.tag==='select'&&n.props.id?.startsWith('receipt-category-'))[0]
  assert.equal(category.value,created.id);assert.match(text(category),/测试新分类/)
+ assert.match(text(receipt),/保存期限：不限时间/)
+ setReceiptConsent(s.root);await tick()
+ assert.equal(button(s.root,'确认实物已收存').props.disabled,false)
  s.auth.user={...catalogActor,permissions:['catalog.view']};await tick()
  assert.equal(nodes(s.root,n=>n.tag==='button'&&text(n).includes('新增分类')).length,0)
  s.unmount()

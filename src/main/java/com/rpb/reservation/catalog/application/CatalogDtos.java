@@ -3,8 +3,9 @@ import java.math.BigDecimal;
 import java.util.*;
 public final class CatalogDtos {
  private CatalogDtos(){}
- public record Category(UUID id,String code,String nameZh,String nameEn,boolean enabled,int sortOrder,int version,List<String> productLines){
+ public record Category(UUID id,String code,String nameZh,String nameEn,boolean enabled,int sortOrder,int version,List<String> productLines,boolean defaultUnlimitedStorage){
   public Category(UUID id,String code,String zh,String en,boolean enabled,int sort,int version){this(id,code,zh,en,enabled,sort,version,List.of("wallet","wine_storage"));}
+  public Category(UUID id,String code,String zh,String en,boolean enabled,int sort,int version,List<String> productLines){this(id,code,zh,en,enabled,sort,version,productLines,false);}
  }
  public record CategoryWrite(String code,String nameZh,String nameEn,boolean enabled,int sortOrder,Integer expectedVersion,String idempotencyKey,List<String> productLines){
 

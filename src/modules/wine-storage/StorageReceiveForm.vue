@@ -65,7 +65,10 @@ onMounted(()=>{for(const line of lines.value){if(!line.productId)line.ruleId=rul
 const uncategorizedId=computed(()=>categories.value.find(category=>category.uncategorized)?.id)
 function ruleCategory(line:ReceiptLine){return line.categoryId||uncategorizedId.value}
 function rulesFor(line:ReceiptLine){return props.home.rules.filter(rule=>rule.categoryId===ruleCategory(line))}
-function usesDefaultRule(line:ReceiptLine){return (!line.categoryId||line.categoryId===uncategorizedId.value)&&!rulesFor(line).length}
+function usesDefaultRule(line:ReceiptLine){
+ const category=categories.value.find(c=>c.id===line.categoryId)
+ return !rulesFor(line).length&&(!line.categoryId||category?.uncategorized||category?.defaultUnlimitedStorage)
+}
 function hasWine(line:ReceiptLine){return !!(line.productId||line.nameZh.trim()||line.nameEn.trim())}
 function choose(line:ReceiptLine,product:Product){if(line.productId!==product.id)line.photos=[];selectedProducts.value=[...selectedProducts.value.filter(p=>p.id!==product.id),product];Object.assign(line,{productId:product.id,categoryId:product.categoryId,nameZh:product.nameZh,nameEn:product.nameEn,ruleId:props.home.rules.find(r=>r.categoryId===product.categoryId)?.id??''});rulesConfirmed.value=false}
 function scannedBottle(product:Product){
@@ -78,6 +81,10 @@ function patchWine(line:ReceiptLine,patch:Partial<ReceiptLine>){Object.assign(li
 watch([saving,uploading,searching,locationsLoading,wineSearching,barcodeSearching,categoryLine],()=>emit('busy-change',saving.value||uploading.value>0||searching.value||locationsLoading.value||wineSearching.value||barcodeSearching.value||!!categoryLine.value),{flush:'sync'})
 onUnmounted(()=>{generation++;locationGeneration++;emit('busy-change',false)})
 function addLine(line:ReceiptLine){const added={...line,lineId:props.direct?crypto.randomUUID():line.lineId,quantity:1,opened:props.direct?false:true,photos:[],label:''};if(props.direct)clearWine(added);lines.value.push(added)}
+function stepQuantity(line:ReceiptLine,delta:number){
+ const current=Number(line.quantity)
+ line.quantity=Math.min(line.opened?1:10000,Math.max(1,(Number.isFinite(current)?Math.trunc(current):0)+delta))
+}
 function validLine(line:ReceiptLine){return !searching.value&&!wineSearching.value&&!wineEditing.value[lineKey(line)]&&(!line.productId||available.value.some(p=>p.id===line.productId))&&(!!line.ruleId||usesDefaultRule(line))&&Number.isInteger(line.quantity)&&line.quantity>=1&&line.quantity<=(line.opened?1:10000)&&hasWine(line)}
 const chosenLines=computed(()=>lines.value.filter(hasWine))
 const remainingSteps=computed(()=>{
@@ -109,8 +116,19 @@ async function submit(){if(categoryLine.value||props.disabled||barcodeSearching.
   <p v-if="l.productId&&!searching&&!searchFailed&&!available.some(p=>p.id===l.productId)" class="storage-notice" role="status">{{t('productUnavailable')}}</p>
   <template v-if="hasWine(l)">
   <h3><span class="storage-step">2</span>{{t('storageDetailsStep')}}</h3>
-  <div class="storage-receive-grid"><label>{{t('actualQuantity')}}<small v-if="!direct">{{t('originalQuantity')}} {{application.lines.find(original=>original.id===l.lineId)?.quantity}}</small><input v-model.number="l.quantity" type="number" required min="1" :max="l.opened?1:10000"></label><label>{{t('bottleState')}}<select v-model="l.opened" @change="l.opened&&(l.quantity=1)"><option :value="false">{{t('whole')}}</option><option :value="true">{{t('opened')}}</option></select></label><label>{{t('source')}}<select v-model="l.source"><option value="store">{{t('store')}}</option><option value="customer">{{t('customer')}}</option></select></label></div>
-  <p v-if="usesDefaultRule(l)">{{t('defaultUncategorizedRule')}}</p><label v-else>{{t('rules')}}<select v-model="l.ruleId" required @change="rulesConfirmed=false"><option value="">{{t('chooseRule')}}</option><option v-for="r in rulesFor(l)" :key="r.id" :value="r.id">{{r.name}} · {{r.months===0?t('unlimited'):`${r.months} ${t('months')}`}}</option></select></label><p v-if="!usesDefaultRule(l)&&!rulesFor(l).length" class="storage-notice">{{t('missingRuleHint')}}</p>
+  <div class="storage-receive-grid">
+   <div class="storage-receipt-quantity">
+    <label :for="'receipt-quantity-'+lineKey(l)">{{t('actualQuantity')}}<small v-if="!direct">{{t('originalQuantity')}} {{application.lines.find(original=>original.id===l.lineId)?.quantity}}</small></label>
+    <div class="storage-receipt-quantity-controls">
+     <button type="button" :aria-label="t('decreaseQuantity')" :disabled="disabled||saving||l.quantity<=1" @click="stepQuantity(l,-1)">-</button>
+     <input :id="'receipt-quantity-'+lineKey(l)" v-model.number="l.quantity" type="number" inputmode="numeric" required min="1" :max="l.opened?1:10000">
+     <button type="button" :aria-label="t('increaseQuantity')" :disabled="disabled||saving||l.quantity>=(l.opened?1:10000)" @click="stepQuantity(l,1)">+</button>
+    </div>
+   </div>
+   <label>{{t('bottleState')}}<select v-model="l.opened" @change="l.opened&&(l.quantity=1)"><option :value="false">{{t('whole')}}</option><option :value="true">{{t('opened')}}</option></select></label>
+   <label>{{t('source')}}<select v-model="l.source"><option value="store">{{t('store')}}</option><option value="customer">{{t('customer')}}</option></select></label>
+  </div>
+  <p v-if="usesDefaultRule(l)">{{!l.categoryId||l.categoryId===uncategorizedId?t('defaultUncategorizedRule'):t('retention')+(locale.startsWith('en')?': ':'：')+t('unlimited')}}</p><label v-else>{{t('rules')}}<select v-model="l.ruleId" required @change="rulesConfirmed=false"><option value="">{{t('chooseRule')}}</option><option v-for="r in rulesFor(l)" :key="r.id" :value="r.id">{{r.name}} · {{r.months===0?t('unlimited'):`${r.months} ${t('months')}`}}</option></select></label><p v-if="!usesDefaultRule(l)&&!rulesFor(l).length" class="storage-notice">{{t('missingRuleHint')}}</p>
   <StoragePhotos optional v-model="l.photos" :api="api" :customer-id="application.customerId" :disabled="disabled||saving" @busy="uploading=Math.max(0,uploading+($event?1:-1))" @error="emit('error',$event)"/>
   <details class="storage-receive-extras"><summary>{{t('extraStorageDetails')}}</summary><p class="cards-muted">{{t('optionalDetailsHint')}}</p><StorageLocationSelect :model-value="l.storageLocationId" :locations="locations" :disabled="disabled||saving||locationsLoading" @update:model-value="l.storageLocationId=$event"/><button type="button" :disabled="disabled||saving||locationsLoading" @click="loadLocations">{{t('refreshLocations')}}</button><label>{{t('slotOptional')}}<input v-model="l.location" maxlength="200" :placeholder="t('slotHint')"></label><label>{{t('labelOptional')}}<input v-model="l.label" maxlength="200"></label><label>{{t('noteOptional')}}<textarea v-model="l.note" maxlength="2000"/></label></details>
   </template>
@@ -127,3 +145,11 @@ async function submit(){if(categoryLine.value||props.disabled||barcodeSearching.
 <section v-if="categoryLine&&canCreateCategory" ref="categoryPanel" class="storage-panel" tabindex="-1" :aria-label="locale.startsWith('en')?'Add category':'新增分类'">
  <CatalogCategories :base="catalogBase" :categories="[]" :default-product-lines="['wine_storage']" can-edit create-only @created="categoryCreated" @cancel="closeCategory"/>
 </section></template>
+
+<style scoped>
+.storage-receipt-quantity{min-width:0}
+.storage-receipt-quantity-controls{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:4px}
+.storage-receipt-quantity-controls button,.storage-receipt-quantity-controls input{min-width:0;min-height:44px;padding-inline:4px;text-align:center}
+.storage-receipt-quantity-controls input{width:100%;appearance:textfield;font-variant-numeric:tabular-nums}
+.storage-receipt-quantity-controls input::-webkit-inner-spin-button{appearance:none}
+</style>

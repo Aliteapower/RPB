@@ -28,10 +28,13 @@ public class CatalogRepository {
     s.tenantId().value(),UNCATEGORIZED_WINE_CODE,"未分类酒品");
   return uncategorizedWine(s).orElseThrow();
  }
- public List<Category> categories(UUID tenant){return jdbc.query("select * from catalog_categories where tenant_id=? order by sort_order,code",(r,n)->new Category(r.getObject("id",UUID.class),r.getString("code"),r.getString("name_zh"),r.getString("name_en"),r.getBoolean("enabled"),r.getInt("sort_order"),r.getInt("version"),List.of((String[])r.getArray("product_lines").getArray())),tenant);}
+ public List<Category> categories(UUID tenant){return jdbc.query("select * from catalog_categories where tenant_id=? order by sort_order,code",(r,n)->new Category(r.getObject("id",UUID.class),r.getString("code"),r.getString("name_zh"),r.getString("name_en"),r.getBoolean("enabled"),r.getInt("sort_order"),r.getInt("version"),List.of((String[])r.getArray("product_lines").getArray()),r.getBoolean("default_unlimited_storage")),tenant);}
  public UUID category(StoreScope s,CategoryWrite c){
   if(UNCATEGORIZED_WINE_CODE.equals(c.code()))throw CatalogException.invalid();
-  UUID id=UUID.randomUUID();jdbc.update("insert into catalog_categories(id,tenant_id,code,name_zh,name_en,enabled,sort_order,product_lines) values(?,?,?,?,?,?,?,?::text[])",id,s.tenantId().value(),c.code(),text(c.nameZh()),text(c.nameEn()),c.enabled(),c.sortOrder(),array(c.productLines()));return id;
+  UUID id=UUID.randomUUID();
+  boolean defaultUnlimitedStorage=c.productLines().contains("wine_storage");
+  jdbc.update("insert into catalog_categories(id,tenant_id,code,name_zh,name_en,enabled,sort_order,product_lines,default_unlimited_storage) values(?,?,?,?,?,?,?,?::text[],?)",id,s.tenantId().value(),c.code(),text(c.nameZh()),text(c.nameEn()),c.enabled(),c.sortOrder(),array(c.productLines()),defaultUnlimitedStorage);
+  return id;
  }
  public void categoryUpdate(StoreScope s,UUID id,CategoryWrite c){
   lockCategory(s,id);

@@ -17,7 +17,7 @@ import static com.rpb.reservation.winestorage.persistence.StorageRepository.at;
 @Transactional(readOnly=true)
 public class StorageApplicationService {
  private static final String UNCATEGORIZED_RULE_NAME="未分类酒品 / Uncategorized wine";
- private static final int UNCATEGORIZED_RULE_MONTHS=0;
+ private static final String DEFAULT_RULE_NAME="默认保存期限 / Default storage period";
  static boolean isLegacyUncategorizedDefault(Rule rule){
   return rule.version()==1&&rule.months()==3&&UNCATEGORIZED_RULE_NAME.equals(rule.name());
  }
@@ -122,16 +122,19 @@ public class StorageApplicationService {
     throw StorageException.conflict("保存规则已有新版本，请刷新后重新确认");
    return rule;
   }
-  if(!products.isUncategorized(s,category))throw StorageException.invalid();
+  boolean uncategorized=products.isUncategorized(s,category);
+  if(!uncategorized&&products.categories(s).stream().noneMatch(c->c.id().equals(category)&&c.enabled()&&c.defaultUnlimitedStorage()))
+   throw StorageException.invalid();
+  String defaultName=uncategorized?UNCATEGORIZED_RULE_NAME:DEFAULT_RULE_NAME;
   r.lock(s,"rule:"+category);
   var latest=r.rules(s).stream().filter(rule->rule.categoryId().equals(category)).findFirst();
-  if(latest.isPresent()&&!isLegacyUncategorizedDefault(latest.get())){
+  if(latest.isPresent()&&!(uncategorized&&isLegacyUncategorizedDefault(latest.get()))){
    var rule=latest.get();
-   if(rule.months()!=UNCATEGORIZED_RULE_MONTHS||!UNCATEGORIZED_RULE_NAME.equals(rule.name()))
+   if(rule.months()!=0||!defaultName.equals(rule.name()))
     throw StorageException.conflict("保存规则已有新版本，请刷新后重新确认");
    return rule;
   }
-  var rule=new Rule(UUID.randomUUID(),category,UNCATEGORIZED_RULE_NAME,UNCATEGORIZED_RULE_MONTHS,latest.map(previous->previous.version()+1).orElse(1));
+  var rule=new Rule(UUID.randomUUID(),category,defaultName,0,latest.map(previous->previous.version()+1).orElse(1));
   r.addRule(s,rule,actor);
   return rule;
  }

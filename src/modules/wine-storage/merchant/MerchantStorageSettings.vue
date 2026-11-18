@@ -7,7 +7,9 @@ const props=defineProps<{home:Home;api:StorageApi;disabled:boolean;canManage:boo
 const emit=defineEmits<{command:[()=>Promise<unknown>]}>(),{t}=useMerchantStorageText(),rule=ref({categoryId:'',name:'',months:3}),unlimited=ref(false)
 const validMonths=computed(()=>unlimited.value||Number.isInteger(rule.value.months)&&rule.value.months>=1&&rule.value.months<=120)
 watch(()=>rule.value.categoryId,categoryId=>{
- unlimited.value=props.home.categories.some(category=>category.id===categoryId&&category.uncategorized)
+ const category=props.home.categories.find(c=>c.id===categoryId)
+ const existing=props.home.rules.find(r=>r.categoryId===categoryId)
+ unlimited.value=!!category?.uncategorized||!!category?.defaultUnlimitedStorage&&(!existing||existing.months===0)
 })
 function save(){if(props.disabled||!props.canManage||!props.home.newBusinessEnabled||!rule.value.categoryId||!rule.value.name.trim()||!validMonths.value)return;const command={...rule.value,months:unlimited.value?0:rule.value.months};emit('command',()=>props.api.command('/rules',command))}
 </script>

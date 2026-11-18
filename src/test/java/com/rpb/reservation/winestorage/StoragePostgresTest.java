@@ -2,6 +2,7 @@ package com.rpb.reservation.winestorage;
 
 import com.rpb.reservation.catalog.CatalogPostgresTest;
 import com.rpb.reservation.catalog.application.*;
+import com.rpb.reservation.catalog.application.CatalogDtos.CategoryWrite;
 import com.rpb.reservation.catalog.application.CatalogDtos.Listing;
 import com.rpb.reservation.catalog.persistence.CatalogRepository;
 import com.rpb.reservation.common.scope.StoreScope;
@@ -254,6 +255,25 @@ class StoragePostgresTest extends CatalogPostgresTest {
 
  Registration registration(UUID photo,String key){return new Registration(customer,List.of(new ReceiptLine(null,product.id(),product.categoryId(),"","",2,false,"customer",rule.id(),List.of(photo),"代登记","A1","STAFF")),"已核对实物并向顾客说明规则",true,key);}
  StorageRegistrationService registrations(){return new StorageRegistrationService(access,r,new StorageCommands(r),app,clock);}
+ @Test void newWineCategoryDefaultsToUnlimitedUntilTheStoreSetsARule(){
+  var category=tx.execute(t->catalog.category(scope,actor,null,
+    new CategoryWrite("QA-WINE","新分类","",true,0,null,key(),List.of("wine_storage"))));
+  var line=new ReceiptLine(null,null,category.id(),"测试新分类酒","",1,false,"customer",null,List.of(),"","","");
+  var request=new Registration(customer,List.of(line),"确认实物",true,key());
+  var first=tx.execute(t->registrations().register(scope,actor,request));
+  var replay=tx.execute(t->registrations().register(scope,actor,request));
+  assertThat(replay).isEqualTo(first);
+  var noLimit=r.items(scope,customer,clock.instant()).getFirst();
+  assertThat(noLimit.expiresAt()).isNull();
+  assertThat(noLimit.snapshot().rule().months()).isZero();
+  var monthly=tx.execute(t->app.rule(scope,actor,new RuleWrite(category.id(),"按月保存",6,key())));
+  assertThatThrownBy(()->tx.execute(t->registrations().register(scope,actor,
+    new Registration(customer,List.of(line),"确认实物",true,key()))))
+    .isInstanceOfSatisfying(StorageException.class,error->assertThat(error.status()).isEqualTo(409));
+  var withRule=new ReceiptLine(null,noLimit.snapshot().productId(),category.id(),"","",1,false,"customer",monthly.id(),List.of(),"","","");
+  tx.execute(t->registrations().register(scope,actor,new Registration(customer,List.of(withRule),"确认实物",true,key())));
+  assertThat(r.items(scope,customer,clock.instant())).extracting(i->i.snapshot().rule().months()).containsExactlyInAnyOrder(0,6);
+ }
  @Test void staffCanStoreAnUncategorizedWineWithoutAnyConfiguredRule(){
   var line=new ReceiptLine(null,null,null,"QA 无分类酒品","",2,false,"customer",null,List.of(),"","","");
   var command=new Registration(customer,List.of(line),"确认实物",true,key());
