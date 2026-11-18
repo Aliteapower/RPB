@@ -19,11 +19,13 @@ function press(key:string){
 }
 
 function toggleKeypad(){
+ const input=searchInput.value
+ input?.blur()
  keypad.value=!keypad.value
- if(keypad.value){searchInput.value?.blur?.();return}
- // Keep focus within the tap so mobile browsers can open the text keyboard.
- searchInput.value?.setAttribute('inputmode','text')
- searchInput.value?.focus?.()
+ if(keypad.value||!input)return
+ // Re-enter text input during the tap, even if the phone field was already focused.
+ input.setAttribute('inputmode','text')
+ input.focus()
 }
 </script>
 <template><section class="storage-panel">

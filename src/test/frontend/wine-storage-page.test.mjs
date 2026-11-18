@@ -32,9 +32,22 @@ test('customer lookup keypad appends digits, clears and deletes without submitti
  assert.equal(s.calls.filter(c=>c.url.includes('/customers?')).length,0)
  await form.props.onSubmit({preventDefault(){}});await tick()
  assert.equal(s.calls.find(c=>c.url.includes('/customers?')).url.endsWith('query=81234567'),true)
- button(s.root,'输入姓名').props.onClick();await tick()
+ // Some touch browsers leave the phone field focused when tapping a button.
+ let focused=true
+ const nativeFocus=[]
+ input.blur=()=>{focused=false;nativeFocus.push('blur')}
+ input.setAttribute=(name,value)=>{input.props[name]=value;nativeFocus.push(name+'='+value)}
+ input.focus=()=>{if(!focused){focused=true;nativeFocus.push('focus')}}
+ button(s.root,'输入姓名').props.onClick()
+ assert.deepEqual(nativeFocus,['blur','inputmode=text','focus'])
+ await tick()
  assert.equal(input.props.inputmode,'text')
  assert.equal(nodes(form,n=>n.tag==='button'&&n.props['data-phone-key']).length,0)
+ input.props.onInput({target:{value:'陈顾客'}});await tick()
+ await form.props.onSubmit({preventDefault(){}});await tick()
+ assert.equal(new URL(s.calls.filter(c=>c.url.includes('/customers?')).at(-1).url,'http://qa').searchParams.get('query'),'陈顾客')
+ button(s.root,'数字键盘').props.onClick();await tick()
+ assert.equal(input.props.inputmode,'none')
  s.unmount()
 })
 test('merchant customer query directly selects a unique result without a second choice',async()=>{
