@@ -11,7 +11,7 @@ import {routeLocationKey,routerKey} from 'vue-router'
 let Page,Entry,Recharge,CardOperations,provideStaffWallet,useAuthSessionStore,takeScanHandoff,setScanHandoff
 const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage,sessionStorage:globalThis.sessionStorage,document:globalThis.document,Document:globalThis.Document,ShadowRoot:globalThis.ShadowRoot},mounted=new Set()
 const store='20000000-0000-0000-0000-000000000983',code=p=>p+'.'+'B'.repeat(43),permissions=['wallet.view','wallet.charge.create','wallet.collection.confirm','wallet.topup.create','wallet.cards.view','wallet.cards.redeem','wine_storage.view','wine_storage.receive','wine_storage.deliver']
-const renderer=createRenderer({createElement:tag=>({tag,tagName:tag.toUpperCase(),children:[],props:{},value:'',get options(){return this.children.filter(c=>c.tag==='option')},listeners:{},addEventListener(name,fn){this.listeners[name]=fn},removeEventListener(){},getRootNode(){return globalThis.document}}),createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>n.text=t,patchProp:(n,k,o,v)=>{n.props[k]=v;if(k==='value'){n._value=v;n.value=v}},insert:(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:n=>{const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null}})
+const renderer=createRenderer({createElement:tag=>({tag,tagName:tag.toUpperCase(),children:[],props:{},value:'',showModal(){this.open=true},get options(){return this.children.filter(c=>c.tag==='option')},listeners:{},addEventListener(name,fn){this.listeners[name]=fn},removeEventListener(){},getRootNode(){return globalThis.document}}),createText:text=>({text}),createComment:()=>({}),setText:(n,t)=>n.text=t,setElementText:(n,t)=>n.text=t,patchProp:(n,k,o,v)=>{n.props[k]=v;if(k==='value'){n._value=v;n.value=v}},insert:(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}n.parent=p;const i=a?p.children.indexOf(a):-1;if(i<0)p.children.push(n);else p.children.splice(i,0,n)},remove:n=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1)},parentNode:n=>n.parent,nextSibling:n=>{const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null}})
 const nodes=(n,p)=>[...(p(n)?[n]:[]),...(n.children||[]).flatMap(c=>nodes(c,p))],text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const tick=async()=>{for(let i=0;i<24;i++){await Promise.resolve();await nextTick()}}
 const button=(s,label)=>nodes(s.root,n=>n.tag==='button'&&text(n).trim()===label)[0]
@@ -27,13 +27,52 @@ before(async()=>{
 beforeEach(()=>{const memory=new Map();globalThis.localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};globalThis.sessionStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};globalThis.window={location:{origin:'https://booking.test'},setInterval:()=>0,clearInterval(){},addEventListener(){},removeEventListener(){}};globalThis.Document=class {};globalThis.ShadowRoot=class {};globalThis.document=Object.assign(new Document(),{activeElement:null,visibilityState:'visible',addEventListener(){},removeEventListener(){}})})
 afterEach(()=>{for(const app of mounted)app.unmount();mounted.clear();delete globalThis.staffScanTestCode})
 after(()=>{Object.assign(globalThis,original)})
-function mount(respond,perms=permissions,locale='zh-CN',component=Page,props={}){
+function mount(respond,perms=permissions,locale='zh-CN',component=Page,props={},actorType='tenant_admin'){
  const root={children:[]},calls=[],navigation=[],route=reactive({name:component===Recharge?'wallet-topup':'staff-scan',params:{storeId:store},query:{},hash:''})
  globalThis.fetch=async(url,options)=>{calls.push({url,method:options?.method??'GET',body:options?.body?JSON.parse(options.body):undefined});const data=await respond(url,options);return{ok:data?.httpStatus?false:true,status:data?.httpStatus??200,json:async()=>data}}
- const pinia=createPinia(),auth=useAuthSessionStore(pinia);auth.user={tenantId:'tenant',accountId:'cashier',roles:[],storeIds:[store],permissions:perms}
+ const pinia=createPinia(),auth=useAuthSessionStore(pinia);auth.user={tenantId:'tenant',accountId:'cashier',actorType,roles:[],storeIds:[store],permissions:perms};auth.storesLoaded=true
  let workspace;const app=renderer.createApp({setup(){if(component===Recharge)workspace=provideStaffWallet();return()=>h(component,{store,...props})}});app.use(pinia);app.use(createI18n({legacy:false,locale,messages:{}}));app.provide(routeLocationKey,route);app.provide(routerKey,{push:async target=>navigation.push(target)});app.component('RouterLink',{props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())});app.mount(root);mounted.add(app)
  return{root,calls,navigation,route,auth,get workspace(){return workspace},async scan(value){globalThis.staffScanTestCode=value;nodes(root,n=>n.props?.['data-scanner'])[0].props.onClick();await tick()},unmount(){app.unmount();mounted.delete(app)}}
 }
+const voucherCode='VC.'+'a'.repeat(64)
+const voucherResult={status:'redeemed',face:{name:'Weekend voucher',kind:'cash',currency:'SGD',valueCents:500,timezone:'Asia/Singapore'},batchCode:'1234',redeemedAt:'2026-11-17T04:00:00Z',issueTotal:20,redemptionNumber:3}
+test('voucher redemption permission opens the shared scanner and a successful scan shows its registration number',async()=>{
+ const perms=['wallet.cards.redeem']
+ const entry=mount(()=>({}),perms,'en',Entry)
+ assert.equal(nodes(entry.root,n=>n.tag==='a')[0]?.props.href,`/stores/${store}/scan`)
+ entry.unmount()
+ const s=mount(()=>voucherResult,perms,'en')
+ await s.scan(voucherCode)
+ assert.deepEqual(s.calls,[{url:`/api/v1/stores/${store}/wallet/cards/vouchers/redeem`,method:'POST',body:{code:voucherCode}}])
+ assert.match(text(s.root),/Voucher redeemed/)
+ assert.match(text(s.root),/123420\.3/)
+ assert.equal(nodes(s.root,n=>n.props?.['data-scanner']).length,0)
+ button(s,'Scan next').props.onClick();await tick()
+ assert.equal(nodes(s.root,n=>n.props?.['data-scanner']).length,1)
+})
+test('voucher scans retain the server outcome and can continue after a rejection',async()=>{
+ const responses=[
+  {...voucherResult,status:'used'},
+  {...voucherResult,status:'expired',redeemedAt:null},
+  {...voucherResult,status:'too_early',redeemedAt:null},
+  {httpStatus:403,code:'CARD_FORBIDDEN',message:'当前门店不适用'}
+ ]
+ const s=mount(()=>responses.shift())
+ for(const label of ['已使用','已过期','未到使用日期','当前门店不适用']){
+  await s.scan(voucherCode)
+  assert.match(text(s.root),new RegExp(label))
+  assert.doesNotMatch(text(s.root),/核销成功/)
+  if(label==='已使用')assert.match(text(s.root),/123420\.3/)
+  button(s,'继续扫一扫').props.onClick();await tick()
+ }
+ assert.equal(s.calls.length,4)
+})
+test('a cashier without voucher authorization cannot submit a voucher from the shared scanner',async()=>{
+ const s=mount(()=>voucherResult,permissions,'zh-CN',Page,{},'employee')
+ await s.scan(voucherCode)
+ assert.equal(s.calls.length,0)
+ assert.match(text(s.root),/无券核销权限/)
+})
 test('one merchant scanner redeems an authorised card once and shows actual quantity',async()=>{
  let resolve;const s=mount(()=>new Promise(r=>resolve=r));await tick();assert.equal(nodes(s.root,n=>n.props?.['data-scanner']==='staff').length,1)
  await s.scan(code('CA'));await s.scan(code('CA'));assert.equal(s.calls.length,1);assert.match(s.calls[0].url,/cards\/authorized-redeem$/)
